@@ -186,8 +186,8 @@ final class DownloadManager: NSObject {
         let file: URL
         weak var window: NSWindow?
         let profile: UUID
-        /// The listing it came from, when it came from AMO: the package must match the sha256 that listing publishes.
-        let slug: String?
+        /// The sha256 AMO's API publishes for the file; the bytes must match it.
+        let hash: String
     }
     private var pendingExtensionInstalls: [ObjectIdentifier: PendingExtensionInstall] = [:]
 
@@ -574,12 +574,15 @@ extension DownloadManager: WKDownloadDelegate {
         let clicked = (download.webView as? BrowserWebView)?.owner?.mainFrameWasClicked == true
         if let slug = fromAMO, clicked, chosenDestinations[identifier] == nil,
            ExtensionStore.isAddonsFile(download.originalRequest?.url),
-           DownloadPolicy.isExtensionPackage(mimeType: response.mimeType, filename: name) {
+           DownloadPolicy.isExtensionPackage(mimeType: response.mimeType, filename: name),
+           let published = await ExtensionStore.publishedAddonsFile(slug: slug),
+           // The file fetched, after redirects, must be the one the API names; anything else is a plain download.
+           ExtensionStore.isPublishedAddonsFile(response.url ?? download.originalRequest?.url, published: published.url) {
             let file = FileManager.default.temporaryDirectory
                 .appendingPathComponent("Zigzag-\(UUID().uuidString)-\(Self.safeFilename(name))")
             pendingExtensionInstalls[identifier] = PendingExtensionInstall(file: file, window: window,
                                                                           profile: item(for: download)?.profile ?? Profile.defaultID,
-                                                                          slug: slug)
+                                                                          hash: published.hash)
             items.removeAll { $0.download === download }
             changed.send(nil)
             return file
@@ -771,21 +774,15 @@ extension DownloadManager: WKDownloadDelegate {
             return
         }
         Task { @MainActor in
-            // From AMO, the package must be the file the store published: its listing names each file's sha256,
-            // and one that doesn't match is a different file, so it is not installed.
-            if let slug = pending.slug {
-                let data = try? Data(contentsOf: file)
-                let published = await Self.publishedXPIHash(slug: slug)
-                guard let data, ExtensionStore.matchesPublishedHash(data, sha256: published) else {
-                    try? FileManager.default.removeItem(at: file)
-                    Self.noticeCouldNotAdd(String(localized: "This extension’s package doesn’t match the one the Firefox Add-ons store publishes, so it wasn’t installed.",
-                                                  comment: "Shown when an .xpi downloaded from addons.mozilla.org doesn't match the sha256 the store publishes for it."), in: host)
-                    return
-                }
-            }
-            let prepared = await ExtensionStore.prepareInstallXPI(at: file)
-            // The store read the file into its own staging folder; the download copy is never kept.
+            // Read once: the bytes checked against AMO's sha256 are the bytes unpacked.
+            let data = try? Data(contentsOf: file)
             try? FileManager.default.removeItem(at: file)
+            guard let data, ExtensionStore.matchesPublishedHash(data, sha256: pending.hash) else {
+                Self.noticeCouldNotAdd(String(localized: "This extension’s package doesn’t match the one the Firefox Add-ons store publishes, so it wasn’t installed.",
+                                              comment: "Shown when an .xpi downloaded from addons.mozilla.org doesn't match the sha256 the store publishes for it."), in: host)
+                return
+            }
+            let prepared = await ExtensionStore.prepareInstallXPI(data: data)
             switch prepared {
             case .failure(let error):
                 Self.noticeCouldNotAdd(error.message, in: host)
@@ -795,20 +792,6 @@ extension DownloadManager: WKDownloadDelegate {
                 })
             }
         }
-    }
-
-    /// The sha256 AMO publishes for a listing's current file, from its API. Nil when the store can't be reached or
-    /// names no hash, and then nothing is installed: a package that can't be checked isn't taken on trust.
-    @available(macOS 15.4, *)
-    private static func publishedXPIHash(slug: String) async -> String? {
-        guard let url = URL(string: "https://addons.mozilla.org/api/v5/addons/addon/\(slug)/?lang=en-US"),
-              let answered = try? await ExtensionStore.fetch(url),
-              let data = answered.0,
-              (answered.1 as? HTTPURLResponse)?.statusCode == 200,
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let current = root["current_version"] as? [String: Any],
-              let file = current["file"] as? [String: Any] else { return nil }
-        return file["hash"] as? String
     }
 
     private static func noticeCouldNotAdd(_ message: String, in host: NSView) {

@@ -61,6 +61,44 @@ struct AddonsMozillaPageTests {
         #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: nil))
         #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: good + "00"))
     }
+
+    /// The API's current file counts only when it names an AMO file address and a hash.
+    @Test func theAPIsCurrentFileIsRead() {
+        let good = Data(#"{"current_version":{"file":{"url":"https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi","hash":"sha256:66d0e3f21ce3b32b1bc0a9399b93cb2c9aa598ef18805d92118c76f66e266c1e"}}}"#.utf8)
+        let file = ExtensionStore.publishedAddonsFile(fromAPI: good)
+        #expect(file?.url.path == "/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")
+        #expect(file?.hash.hasPrefix("sha256:") == true)
+        let elsewhere = Data(#"{"current_version":{"file":{"url":"https://example.com/firefox/downloads/file/1/x.xpi","hash":"sha256:00"}}}"#.utf8)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: elsewhere) == nil)
+        let noHash = Data(#"{"current_version":{"file":{"url":"https://addons.mozilla.org/firefox/downloads/file/1/x.xpi"}}}"#.utf8)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: noHash) == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: Data("not json".utf8)) == nil)
+    }
+
+    /// Only the exact file the API names goes to the install sheet: same AMO host and path.
+    @Test func onlyThePublishedFileIsInstalled() {
+        let published = URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!
+        let match = ExtensionStore.isPublishedAddonsFile
+        #expect(match(published, published))
+        #expect(match(URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi?src=dp-btn-primary")!, published))
+        #expect(!match(URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257480/ublock_origin-1.76.3.xpi")!, published))
+        #expect(!match(URL(string: "https://addons.cdn.mozilla.net/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!, published))
+        #expect(!match(URL(string: "http://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!, published))
+        #expect(!match(nil, published))
+    }
+
+    /// The API request never follows a redirect.
+    @Test func theAPIRequestRefusesRedirects() {
+        let response = HTTPURLResponse(url: URL(string: "https://addons.mozilla.org/api/v5/addons/addon/x/")!, statusCode: 302,
+                                       httpVersion: nil, headerFields: ["Location": "https://example.com/"])!
+        var followed: URLRequest? = URLRequest(url: URL(string: "https://example.com/")!)
+        ExtensionStore.NoRedirects().urlSession(.shared, task: URLSession.shared.dataTask(with: response.url!),
+                                                willPerformHTTPRedirection: response,
+                                                newRequest: URLRequest(url: URL(string: "https://example.com/")!)) { followed = $0 }
+        #expect(followed == nil)
+        #expect(ExtensionStore.addonsAPIURL(slug: "ublock-origin")?.host() == "addons.mozilla.org")
+        #expect(ExtensionStore.addonsAPIURL(slug: "ublock-origin")?.scheme == "https")
+    }
 }
 
 /// An XPI made byte by byte: stored entries, then the central index and its end record. Shared by every test that
@@ -207,6 +245,20 @@ struct FirefoxInstallTests {
     }
 
     // MARK: Tests
+
+    /// Bytes already checked are prepared as they are, never read again from disk.
+    @Test func checkedBytesArePreparedAsTheyAre() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let bytes = try Self.xpi(Self.manifest("bytes@example.com", "1.0"))
+        guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(data: bytes) else {
+            Issue.record("bytes didn't prepare")
+            return
+        }
+        #expect(prepared.kind == .firefox)
+        #expect(prepared.firefoxID == "bytes@example.com")
+        ExtensionStore.discard(prepared)
+    }
 
     @Test func installingAnXPIRecordsItsKindGeckoIDAndOpaqueID() async throws {
         let work = try Workspace()

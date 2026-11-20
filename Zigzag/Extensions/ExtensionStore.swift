@@ -311,6 +311,53 @@ enum ExtensionStore {
         return actual == published
     }
 
+    /// A listing's current file as AMO's API publishes it.
+    struct PublishedAddonsFile: Equatable, Sendable {
+        let url: URL
+        let hash: String
+    }
+
+    /// `current_version.file` from an AMO API answer; nil unless it names an AMO file URL and a hash.
+    nonisolated static func publishedAddonsFile(fromAPI data: Data) -> PublishedAddonsFile? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let current = root["current_version"] as? [String: Any],
+              let file = current["file"] as? [String: Any],
+              let text = file["url"] as? String, let url = URL(string: text), isAddonsFile(url),
+              let hash = file["hash"] as? String, !hash.isEmpty else { return nil }
+        return PublishedAddonsFile(url: url, hash: hash)
+    }
+
+    /// Whether a download fetched exactly the published file: same https AMO host and path.
+    nonisolated static func isPublishedAddonsFile(_ downloaded: URL?, published: URL) -> Bool {
+        guard let downloaded, isAddonsFile(downloaded), isAddonsFile(published) else { return false }
+        return downloaded.host()?.lowercased() == published.host()?.lowercased() && downloaded.path == published.path
+    }
+
+    /// AMO's API address for a listing.
+    nonisolated static func addonsAPIURL(slug: String) -> URL? {
+        URL(string: "https://addons.mozilla.org/api/v5/addons/addon/\(slug)/?lang=en-US")
+    }
+
+    /// Refuses every redirect, so an AMO API answer comes from the address asked.
+    final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
+    }
+
+    private static let addonsAPISession = URLSession(configuration: .cookieless, delegate: NoRedirects(), delegateQueue: nil)
+
+    /// The listing's current file, straight from AMO's API: no redirect, and only an https AMO answer counts.
+    @concurrent nonisolated static func publishedAddonsFile(slug: String) async -> PublishedAddonsFile? {
+        guard let url = addonsAPIURL(slug: slug),
+              let (data, response) = try? await addonsAPISession.data(from: url),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let answered = http.url, answered.scheme == "https", answered.host()?.lowercased() == "addons.mozilla.org"
+        else { return nil }
+        return publishedAddonsFile(fromAPI: data)
+    }
+
     /// WebKit keeps a service worker background's registration from one launch to the next, and on a later launch
     /// can bring it back without running its script: WebKit says the background loaded, but it never starts, and the
     /// extension's popup waits forever (1Password, from the second launch on). Chrome starts each worker afresh at
@@ -466,7 +513,14 @@ enum ExtensionStore {
     /// installing it. The kind and gecko ID come with it, for the record an install keeps.
     @available(macOS 15.4, *)
     static func prepareInstallXPI(at url: URL) async -> Result<PreparedInstall, InstallError> {
-        guard let data = try? Data(contentsOf: url), let package = try? XPIPackage(data) else { return .failure(.unpack) }
+        guard let data = try? Data(contentsOf: url) else { return .failure(.unpack) }
+        return await prepareInstallXPI(data: data)
+    }
+
+    /// The same, from bytes already read, so bytes that were checked are the bytes unpacked.
+    @available(macOS 15.4, *)
+    static func prepareInstallXPI(data: Data) async -> Result<PreparedInstall, InstallError> {
+        guard let package = try? XPIPackage(data) else { return .failure(.unpack) }
         let id = xpiID(forGeckoID: package.firefoxID, data: data)
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("\(xpiStagingPrefix)\(UUID().uuidString)")
         do {
