@@ -31,7 +31,7 @@ class CardRow: InteractiveView {
     let detail = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
 
     /// A symbol, tinted like the rest of the app's icons.
-    var symbol: String? {
+    var symbol: String? = nil {
         didSet { iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.Symbol.row) }; needsLayout = true }
     }
     /// A picture (a favicon) in place of a symbol.
@@ -263,6 +263,15 @@ final class PillButton: InteractiveView {
             invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
         }
     }
+    /// A picture beside the title, or alone: the saved toast's chevron has no title. Changing it lays the row out
+    /// again, as the title does.
+    var symbol: String? {
+        didSet {
+            iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.TypeSize.body) }
+            iconView.isHidden = symbol == nil
+            invalidateIntrinsicContentSize(); needsLayout = true; superview?.needsLayout = true
+        }
+    }
     /// A fill for `.prominent` in place of the dark one (a red for what can't be undone); nil is the primary's.
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
     /// For an action that can't be undone (Delete): `.prominent` turns red, the others take red ink.
@@ -273,6 +282,7 @@ final class PillButton: InteractiveView {
 
     init(title: String = "", symbol: String? = nil, style: Style = .plain) {
         self.style = style
+        self.symbol = symbol
         written = title
         label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 0, height: Tokens.Page.controlHeight))

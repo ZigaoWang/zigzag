@@ -278,4 +278,39 @@ enum SavePath {
     static var unsaveName: String {
         String(localized: "Unsave Page", comment: "Undo action name, shown in the Edit menu as Undo Unsave Page.")
     }
+
+    // MARK: The saved toast's chevron (#326)
+
+    /// One line of the place menu behind the saved toast's chevron: a place the page can be, and whether it is in it.
+    struct PlaceEntry: Equatable {
+        enum Kind: Equatable { case everySpace, top, folder(UUID) }
+        let kind: Kind
+        let isOn: Bool
+    }
+
+    /// Every place a saved page can be moved to, in menu order, with the one it is in ticked. A favorite lives in
+    /// every space, so the space's own places aren't ticked for it; a saved page without a folder is at the top.
+    static func placeEntries(folders: [BookmarkFolder], folderID: UUID?, inEverySpace: Bool) -> [PlaceEntry] {
+        var entries = [PlaceEntry(kind: .everySpace, isOn: inEverySpace),
+                       PlaceEntry(kind: .top, isOn: !inEverySpace && folderID == nil)]
+        entries += folders.map { PlaceEntry(kind: .folder($0.id), isOn: !inEverySpace && $0.id == folderID) }
+        return entries
+    }
+
+    /// Moves a page already saved into a folder of its space (#326), the toast's chevron: the page keeps its name,
+    /// icon and undo, and is never saved twice.
+    @discardableResult
+    static func move(_ bookmarkID: UUID, to place: Place) -> Bool {
+        guard Library.shared.bookmark(bookmarkID) != nil, Library.shared.space(place.spaceID) != nil else { return false }
+        file(bookmarkID, into: place, folder: place.folderID)
+        return true
+    }
+
+    /// The same page to the top of its space's Pinned pages, out of any folder.
+    @discardableResult
+    static func moveToTop(_ bookmarkID: UUID, in spaceID: UUID) -> Bool {
+        guard Library.shared.bookmark(bookmarkID) != nil, Library.shared.space(spaceID) != nil else { return false }
+        Library.shared.moveBookmark(bookmarkID, to: 0, in: spaceID, folder: .some(nil))
+        return true
+    }
 }

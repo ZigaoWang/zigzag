@@ -269,4 +269,36 @@ import Testing
         let unnamed = SavePath.name(ofTitle: "", url: URL(string: "https://example.com/post")!)
         #expect(unnamed == "example.com")
     }
+
+    // MARK: The saved toast's chevron
+
+    /// The menu behind the toast lists every place once, ticks the one the page is in, and ticks nothing of the
+    /// space's while the page is a favorite.
+    @Test func thePlaceMenuTicksWhereThePageIs() {
+        let folders = [BookmarkFolder(name: "Reading"), BookmarkFolder(name: "Work")]
+        let atTop = SavePath.placeEntries(folders: folders, folderID: nil, inEverySpace: false)
+        #expect(atTop == [SavePath.PlaceEntry(kind: .everySpace, isOn: false),
+                          SavePath.PlaceEntry(kind: .top, isOn: true),
+                          SavePath.PlaceEntry(kind: .folder(folders[0].id), isOn: false),
+                          SavePath.PlaceEntry(kind: .folder(folders[1].id), isOn: false)])
+        let inWork = SavePath.placeEntries(folders: folders, folderID: folders[1].id, inEverySpace: false)
+        #expect(inWork.filter(\.isOn).map(\.kind) == [.folder(folders[1].id)])
+        let everywhere = SavePath.placeEntries(folders: folders, folderID: folders[0].id, inEverySpace: true)
+        #expect(everywhere.filter(\.isOn).map(\.kind) == [.everySpace])
+    }
+
+    /// The chevron's moves change where an already saved page sits, without saving it twice: into a folder, out of
+    /// one to the top, and one record either way.
+    @Test func thePlaceMenuMovesASavedPage() throws {
+        try scratch { space, _, folder in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let saved = try #require(SavePath.save(page(), to: SavePath.quickPlace(in: space), in: manager))
+            #expect(SavePath.move(saved.id, to: SavePath.place(in: space, folder: folder.id)))
+            #expect(library.folderID(containing: saved.id) == folder.id)
+            #expect(library.bookmarks(in: space).count == 1, "moved, not saved again")
+            #expect(SavePath.moveToTop(saved.id, in: space))
+            #expect(library.folderID(containing: saved.id) == nil)
+        }
+    }
 }

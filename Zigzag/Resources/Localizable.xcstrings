@@ -21687,6 +21687,17 @@
         }
       }
     },
+    "Where It's Saved" : {
+      "comment" : "Accessibility name of the chevron on the toast that says a page is saved: opens the places it can be moved to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储位置"
+          }
+        }
+      }
+    },
     "Where ⌘T and links put a new tab in the sidebar." : {
       "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
       "localizations" : {
