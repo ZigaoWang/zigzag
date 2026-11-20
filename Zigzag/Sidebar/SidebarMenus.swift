@@ -226,7 +226,10 @@ enum SidebarMenus {
             let saveTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is pinned as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
                 : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar: pins the page into Pinned, and with ⇧ held, asks which folder.")
-            organize.append(keyed(Item(saveTitle) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }, #selector(C.toggleBookmark(_:))))
+            organize.append(keyed(Item(saveTitle) {
+                // ⇧ held asks where, as ⇧⌘D does.
+                if C.shiftHeld { controller.save(tab, request: .picker) } else { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
+            }, #selector(C.toggleBookmark(_:))))
             organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar.")) { controller.favoriteWithUndo(tab) })
         }
         if tab.bookmarkID == nil { organize += groupItems(for: tab, controller: controller) }
