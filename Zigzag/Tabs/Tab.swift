@@ -538,8 +538,9 @@ final class Tab: NSObject {
         }
         // A page's own scripts may ask Zigzag to make a loopback call, when Settings and the site's switch both say
         // yes. An extension's own page has its bridge instead, and a private window's page is refused by the handler.
+        // The script goes only into an allowed page, so every other page keeps WebKit's own networking.
         if extensionConfiguration == nil {
-            localReceivers = LocalReceiverShim.attach(to: configuration, tab: self)
+            localReceivers = LocalReceiverShim.attach(to: configuration, tab: self, origin: url.flatMap(SiteOrigin.of))
         }
         showsExtensionPage = extensionConfiguration != nil
         openedByPage = fromWebKit
@@ -2054,6 +2055,11 @@ extension Tab: WKNavigationDelegate {
         // Before the address updates, so a pinned page isn't marked as moved on.
         noteLanding(webView.url)
         if webView.url != url { followAddress(of: webView) }
+        // A page on an origin allowed here gets the loopback door as it arrives; one that isn't keeps WebKit's own.
+        if let landed = webView.url, let origin = SiteOrigin.of(landed), LocalReceiverShim.serves(origin: origin),
+           localReceivers == nil {
+            localReceivers = LocalReceiverShim.attachIfServed(to: webView, tab: self, origin: origin)
+        }
         // Answers to the last page's questions were for that page: this one asks again.
         permissionAnswers.forget()
         // A sign-in menu belongs to the page it opened on.

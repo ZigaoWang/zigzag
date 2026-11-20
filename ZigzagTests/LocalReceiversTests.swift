@@ -198,9 +198,10 @@ struct LocalReceiversTests {
         let before = SitePermissions.defaults
         SitePermissions.defaults = defaults
         let master = LocalReceivers.isEnabled
+        // The switch is put back before the store is: writing it after would land in the real defaults.
         defer {
-            SitePermissions.defaults = before
             LocalReceivers.isEnabled = master
+            SitePermissions.defaults = before
             defaults.removePersistentDomain(forName: name)
         }
         let origin = "https://creator.zerowork.io"
@@ -216,12 +217,78 @@ struct LocalReceiversTests {
         #expect(!LocalReceivers.allowsSite(origin: origin))
     }
 
+    /// A helper must not be able to move a call off this Mac with a redirect. The transport refuses to follow one,
+    /// so what comes back is the helper's 302 itself, and that is refused before its body reaches anyone.
+    @Test func aRedirectIsRefusedRatherThanFollowed() async {
+        let url = answerURL
+        let sent: @Sendable (String) -> (Data, URLResponse) = { location in
+            (Data(), HTTPURLResponse(url: url, statusCode: 302, httpVersion: nil, headerFields: ["Location": location])!)
+        }
+        await expect(.refused("the helper redirected off this Mac")) {
+            _ = try await LocalReceivers.send(LocalReceivers.Request(url: url), as: site,
+                                              transport: { _ in sent("http://192.168.1.20/steal") })
+        }
+        // One that stays on this Mac is refused too: the door answers where it is, never by following.
+        await expect(.refused("the helper redirected")) {
+            _ = try await LocalReceivers.send(LocalReceivers.Request(url: url), as: site,
+                                              transport: { _ in sent("http://localhost:9990/elsewhere") })
+        }
+    }
+
+    /// The whole door is shut while the Settings switch is off, whatever a site was allowed before.
+    @Test func theMasterSwitchShutsEverySiteDoor() {
+        let name = "LocalReceiversTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        let master = LocalReceivers.isEnabled
+        // Restore the store first, then the switch: writing through the suite after restoring it is what leaked
+        // into the real defaults before.
+        defer {
+            LocalReceivers.isEnabled = master
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let origin = "https://creator.zerowork.io"
+        SitePermissions.setLocalReceivers(true, origin: origin)
+        LocalReceivers.isEnabled = false
+        #expect(!LocalReceiverShim.serves(origin: origin))
+        LocalReceivers.isEnabled = true
+        #expect(LocalReceiverShim.serves(origin: origin))
+        #expect(!LocalReceiverShim.serves(origin: "https://elsewhere.example"))
+    }
+
+    /// A page that isn't allowed keeps WebKit's own fetch, XHR and WebSocket: its own dev server works as before.
+    @Test func aPageWithoutItsSwitchGetsTheScriptOnlyWhenAllowed() {
+        let name = "LocalReceiversTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        let master = LocalReceivers.isEnabled
+        defer {
+            LocalReceivers.isEnabled = master
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let allowed = "https://creator.zerowork.io"
+        let localhostPage = "http://localhost:3000"
+        LocalReceivers.isEnabled = true
+        SitePermissions.setLocalReceivers(true, origin: allowed)
+        #expect(LocalReceiverShim.serves(origin: allowed))
+        #expect(!LocalReceiverShim.serves(origin: localhostPage), "a local dev page keeps its own fetch and HMR socket")
+        LocalReceivers.isEnabled = false
+        #expect(!LocalReceiverShim.serves(origin: allowed))
+    }
+
     @Test func theSiteDoorIsOffUntilItIsTurnedOn() {
         let name = "LocalReceiversTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         let before = SitePermissions.defaults
         SitePermissions.defaults = defaults
+        let master = LocalReceivers.isEnabled
+        // The switch is put back before the store is: writing it after would land in the real defaults.
         defer {
+            LocalReceivers.isEnabled = master
             SitePermissions.defaults = before
             defaults.removePersistentDomain(forName: name)
         }

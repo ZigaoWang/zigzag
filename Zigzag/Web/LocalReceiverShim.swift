@@ -9,16 +9,44 @@ import WebKit
 enum LocalReceiverShim {
     static let name = "localReceivers"
 
-    /// Adds the page script and the handler that answers it. A page made by another page gets them too; an
-    /// extension's own page does not. The handler comes back so the tab can end a page's sockets when it leaves.
+    /// Whether a page at `origin` may use this door: the Settings switch and the site's own. The script goes only
+    /// into such pages, so every other page keeps WebKit's own `fetch`, `XMLHttpRequest` and `WebSocket` untouched
+    /// (a localhost dev page keeps its own `/api` and HMR socket), and nothing of this door is visible to it.
+    @MainActor
+    static func serves(origin: String) -> Bool {
+        LocalReceivers.allowsSite(origin: origin)
+    }
+
+    /// Adds the page script and the handler that answers it, for a page at `origin` the person has allowed. Every
+    /// other page keeps WebKit's own `fetch`, `XMLHttpRequest` and `WebSocket` untouched. A page made by another page
+    /// gets them too; an extension's own page does not. The handler comes back so the tab can end a page's sockets
+    /// when it leaves.
     @discardableResult
-    static func attach(to configuration: WKWebViewConfiguration, tab: Tab) -> LocalReceiverMessages? {
+    static func attach(to configuration: WKWebViewConfiguration, tab: Tab, origin: String? = nil) -> LocalReceiverMessages? {
         let controller = configuration.userContentController
+        // The script is per page, not per tab: a page that navigates to another site is decided again.
+        guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return nil }
+        guard let origin, serves(origin: origin) else { return nil }
+        let messages = LocalReceiverMessages(tab: tab)
+        controller.addScriptMessageHandler(messages, contentWorld: .page, name: name)
+        controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart,
+                                              forMainFrameOnly: true, in: .page))
+        return messages
+    }
+
+    /// Adds the script to a page that has already started, for a tab navigated onto an allowed origin. A page
+    /// created with the script already has it.
+    @discardableResult
+    static func attachIfServed(to webView: WKWebView?, tab: Tab, origin: String?) -> LocalReceiverMessages? {
+        guard let webView, let origin, serves(origin: origin) else { return nil }
+        let controller = webView.configuration.userContentController
         guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return nil }
         let messages = LocalReceiverMessages(tab: tab)
         controller.addScriptMessageHandler(messages, contentWorld: .page, name: name)
         controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart,
                                               forMainFrameOnly: true, in: .page))
+        // The page already started: the script goes in now, and stays for its next load.
+        webView.evaluateJavaScript(source, in: nil, in: .page, completionHandler: nil)
         return messages
     }
 
@@ -453,7 +481,7 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
         guard let tab, message.frameInfo.isMainFrame,
               let origin = SiteOrigin.of(message.frameInfo.securityOrigin),
               !tab.isPrivate,
-              SitePermissions.localReceivers(origin: origin) else {
+              LocalReceivers.allowsSite(origin: origin) else {
             replyHandler(["error": "denied"], nil)
             return
         }

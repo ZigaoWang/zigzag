@@ -143,6 +143,12 @@ nonisolated enum LocalReceivers {
         return answer
     }
 
+    /// The answer to one request, as the page door gives it: the same CORS checks, the same limit.
+    @MainActor
+    static func answer(for request: Request, as identity: Identity, transport: Transport? = nil) async throws -> Response {
+        try await send(request, as: identity, transport: transport)
+    }
+
     // MARK: - What a browser would ask first
 
     /// The request headers a CORS preflight does not know.
@@ -273,11 +279,23 @@ nonisolated enum LocalReceivers {
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return try await URLSession(configuration: configuration).data(for: request)
+        // Nothing is followed: a hop is another origin, and another CORS decision this door cannot make for the
+        // helper. A redirect that stays on this Mac is refused by `send` with its own words.
+        let session = URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        return try await session.data(for: request)
     }
 
-    private static func response(_ data: Data, _ raw: URLResponse, for url: URL) throws -> Response {
-        guard let http = raw as? HTTPURLResponse else { throw Failure.noAnswer }
+    /// Refuses every redirect. `URLSession` would otherwise follow one to wherever it points, LAN address and all,
+    /// and hand back that answer as if the helper had given it.
+    private final class NoRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
+    }
+
+    private static func response(_ data: Data, _ raw: URLResponse, for url: URL) throws -> Response {        guard let http = raw as? HTTPURLResponse else { throw Failure.noAnswer }
         var headers: [String: String] = [:]
         for (name, value) in http.allHeaderFields {
             headers[String(describing: name).lowercased()] = String(describing: value)
