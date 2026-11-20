@@ -615,6 +615,10 @@ final class ExtensionHost: NSObject {
             context.hasAccessToPrivateData = profile.installs.allowsPrivate(id)
             try controller.load(context)
             contexts.append(context)
+            // OldTwitter's request signing: pages made before it was installed or started again get its call too.
+            if OldTwitterSolver.isOldTwitter(id: id, manifest: ExtensionStore.manifest(for: id) ?? [:]) {
+                oldTwitterSolver.attach(toOpenPagesOf: id)
+            }
             // Installed since the profile's pages were set up: its pages are marked from their next load.
             if ExtensionStore.kind(of: id) == .firefox { addFirefoxMarker(id) }
             // Its user scripts, in every web view, from their next page.

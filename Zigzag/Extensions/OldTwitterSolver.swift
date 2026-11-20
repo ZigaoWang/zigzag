@@ -99,18 +99,50 @@ final class OldTwitterSolver: NSObject {
     private var sandboxes: [String: Sandbox] = [:]
     private var next = 0
     private var sweeper: Task<Void, Never>?
+    /// The pages' controllers that may carry the call, so one made before OldTwitter was installed or started again
+    /// gets it too, without a new window.
+    private let controllers = NSHashTable<WKUserContentController>.weakObjects()
+    /// Those that have its handler: WebKit takes a name in a world once.
+    private let handlers = NSHashTable<WKUserContentController>.weakObjects()
 
     init(host: ExtensionHost) { self.host = host }
 
     /// Puts the one call into this web view's extension world, for x.com and twitter.com.
     func attach(to configuration: WKWebViewConfiguration, extensionID: String) {
-        // A tab's setup is configured once when it is made and again with its page: only the first adds this.
-        guard !configuration.userContentController.userScripts.contains(where: { $0.source == Self.bridge }) else { return }
         self.extensionID = extensionID
+        let controller = configuration.userContentController
+        controllers.add(controller)
+        addCall(to: controller)
+    }
+
+    /// A page made before OldTwitter was installed, updated or started again gets the call as well, from its next load
+    /// and in the page it shows now. Without it the extension's script asks for a function no page has.
+    func attach(toOpenPagesOf extensionID: String) {
+        self.extensionID = extensionID
+        for controller in controllers.allObjects { addCall(to: controller) }
+        for window in WindowManager.shared.controllers where window.tabManager.profile === host.profile {
+            for tab in window.tabManager.allTabs where tab.extensionHost === host && window.holds(tab) {
+                guard let webView = tab.webView else { continue }
+                let controller = webView.configuration.userContentController
+                controllers.add(controller)
+                addCall(to: controller)
+                guard let page = webView.url?.host(), page == "x.com" || page == "twitter.com" else { continue }
+                let world = BridgeUserScripts.contentScriptWorld(extensionID)
+                webView.callAsyncJavaScript(Self.bridge, arguments: [:], in: nil, in: world) { _ in }
+            }
+        }
+    }
+
+    private func addCall(to controller: WKUserContentController) {
+        guard let extensionID else { return }
         let world = BridgeUserScripts.contentScriptWorld(extensionID)
-        configuration.userContentController.addScriptMessageHandler(self, contentWorld: world, name: Self.handlerName)
-        configuration.userContentController.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentStart,
-                                                                       forMainFrameOnly: false, in: world))
+        if !handlers.contains(controller) {
+            controller.addScriptMessageHandler(self, contentWorld: world, name: Self.handlerName)
+            handlers.add(controller)
+        }
+        guard !controller.userScripts.contains(where: { $0.source == Self.bridge }) else { return }
+        controller.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentStart,
+                                             forMainFrameOnly: false, in: world))
     }
 
     /// A fresh content world for the tab and frame this page is in, started with the codes its page worked out.
