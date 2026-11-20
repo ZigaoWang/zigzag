@@ -168,7 +168,7 @@ struct SidebarRowMenuTests {
         try inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
             #expect(titles(menu) == ["Reload Page", "Duplicate Tab", "Copy Link", "-",
-                                     "Pin Tab", "New Group with Tab", "-",
+                                     "Pin Tab", "Add to Favorites", "New Group with Tab", "-",
                                      "Open in Split View", "Move To", "-",
                                      "Rename", "Change Icon…", "-",
                                      "Close Tab", "Close Tabs Below", "Close Other Tabs"])
@@ -382,8 +382,8 @@ struct SidebarRowMenuTests {
     @Test func pickedRowsOrganizeThenClose() {
         inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.markedMenu(for: [.tab(tabs[0].id), .tab(tabs[1].id)], controller: controller)
-            // Only the tab you're on is running, so only it can be suspended; saving replaces main's Pin and Favorites items.
-            #expect(titles(menu) == ["Suspend Page", "-", "Pin 2 Tabs", "Add 2 to New Folder", "Group 2 Tabs", "Move 2 to Space", "-", "Close 2 Tabs"])
+            // Only the tab you're on is running, so only it can be suspended.
+            #expect(titles(menu) == ["Suspend Page", "-", "Pin 2 Tabs", "Add 2 to Favorites", "Add 2 to New Folder", "Group 2 Tabs", "Move 2 to Space", "-", "Close 2 Tabs"])
         }
     }
 

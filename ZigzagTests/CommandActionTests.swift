@@ -41,7 +41,7 @@ struct CommandActionTests {
         var favorite = onATab
         favorite.isFavorite = true
         #expect(!titles("save", favorite).contains("Pin Tab"))
-        #expect(!titles("every", favorite).contains("Add to Favorites"))
+        #expect(!titles("fav", favorite).contains("Add to Favorites"))
         var blank = onATab
         blank.hasPage = false
         #expect(titles("save", blank).isEmpty)

@@ -114,9 +114,10 @@ enum SidebarMenus {
                 controller.unpinMarked(pins)
             })
         }
-        // Add to Favorites is a tick on the picked pages already pinned, never a way to pin one.
-        if !isPrivate, !controller.markedSavedIDs(items).isEmpty {
-            organize.append(Item(String(localized: "Add \(items.count) to Favorites", comment: "Menu item for several picked sidebar rows")) { controller.favoriteMarked(items) })
+        if !isPrivate {
+            organize.append(Item(String(localized: "Add \(count) to Favorites", comment: "Menu item for several picked sidebar rows")) {
+                controller.favoriteMarked(items)
+            })
         }
         if !isPrivate || rows.isEmpty {
             organize += folderItems(new: String(localized: "Add \(count) to New Folder", comment: "Menu item for several picked sidebar rows"),
@@ -226,6 +227,7 @@ enum SidebarMenus {
                 : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
                 : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar: pins the page into Pinned, and with ⇧ held, asks which folder.")
             organize.append(keyed(Item(saveTitle) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }, #selector(C.toggleBookmark(_:))))
+            organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar.")) { controller.favoriteWithUndo(tab) })
         }
         if tab.bookmarkID == nil { organize += groupItems(for: tab, controller: controller) }
 
@@ -316,8 +318,8 @@ enum SidebarMenus {
                 : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
             organize.append(Item(unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
         }
-        organize.append(Item(InEverySpace.title) {
-            controller.libraryChange(SavePath.saveName) { _ = SavePath.keepInEverySpace(bookmark.id, profile: manager.profile.id) }
+        organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
+            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
             live?.isFavorite = true
         })
         // Folders of this space's pinned pages.
@@ -763,7 +765,7 @@ extension BrowserWindowController {
 
     func unpinMarked(_ pins: [UUID]) {
         var pages: [Tab] = []
-        pageChange(SavePath.unsaveName) { [tabManager] in
+        pageChange(String(localized: "Unpin Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
             pages = []
             // Each comes down to the top of the tabs, the last first, so they keep their order.
             Library.shared.together { for id in pins.reversed() { if let tab = tabManager.unbookmark(id, toIndex: 0) { pages.append(tab) } } }
@@ -774,7 +776,7 @@ extension BrowserWindowController {
     /// Several tabs pinned at once, each through `SavePath.save`, so a picked row lands where the star and ⌘D do.
     func pinMarked(_ tabs: [Tab]) {
         Tutorial.complete("pin")
-        pageChange(SavePath.saveName) { [tabManager] in
+        pageChange(String(localized: "Pin Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
             Library.shared.together {
                 for tab in tabs where tab.bookmarkID == nil {
                     guard let page = SavePath.Page(tab: tab) else { continue }
@@ -803,30 +805,19 @@ extension BrowserWindowController {
         sidebar.list.mark(pins: ids)
     }
 
-    /// Add to Favorites ticked on the picked pages already pinned, in order. They leave the list for the grid, so nothing
-    /// stays picked.
+    /// Into the favorites, in order. They leave the list for the grid, so nothing stays picked.
     func favoriteMarked(_ items: [SidebarItem]) {
-        let savedIDs = markedSavedIDs(items)
-        pageChange(SavePath.saveName) { [tabManager] in
+        pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
             Library.shared.together {
-                for id in savedIDs {
-                    Library.shared.makeFavorite(id, in: tabManager.profile.id)
-                    tabManager.bookmarkTab(for: id)?.isFavorite = true
+                for item in items {
+                    switch item {
+                    case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.favoriteTab(tab) }
+                    case .bookmark(let id):
+                        Library.shared.makeFavorite(id, in: tabManager.profile.id)
+                        tabManager.bookmarkTab(for: id)?.isFavorite = true
+                    default: break
+                    }
                 }
-            }
-        }
-    }
-
-    /// The picked rows already pinned, so Add to Favorites can tick them: never a row that isn't, since the tick
-    /// isn't a way to pin.
-    func markedSavedIDs(_ items: [SidebarItem]) -> [UUID] {
-        items.compactMap { item in
-            switch item {
-            case .bookmark(let id): return Library.shared.isFavorite(id) ? nil : id
-            case .tab(let id):
-                guard let tab = tabManager.tab(with: id), let bookmarkID = tab.bookmarkID, !tab.isFavorite else { return nil }
-                return bookmarkID
-            default: return nil
             }
         }
     }

@@ -258,8 +258,8 @@ enum CommandRanker {
             }
         }
         if c.hasPage, !c.isFavorite, c.isPinned || !c.isPrivate {
-            list.append(Action(id: "favorite", title: InEverySpace.title,
-                               keywords: ["every", "space", "favorites", "favourites", "star", "bookmark"], symbol: "star.circle"))
+            list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
+                               keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: "star"))
         }
         if c.inSplit {
             list.append(Action(id: "separate", title: String(localized: "Separate Tabs", comment: "A command in the command bar, named as in the menu bar."),

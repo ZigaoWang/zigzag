@@ -3124,7 +3124,7 @@ extension BrowserWindowController: SidebarDelegate {
             let tiles = Library.shared.favoriteTiles(in: tabManager.profile.id).count, at = slot
             switch item {
             case .tab(let id): if let tab = tabManager.tab(with: id) { favoriteWithUndo(tab, at: at) }
-            case .bookmark(let id): pageChange(SavePath.saveName) { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
+            case .bookmark(let id): pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
             default: break
             }
             slot = slot.map { $0 + Library.shared.favoriteTiles(in: tabManager.profile.id).count - tiles }

@@ -671,23 +671,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         return true
     }
 
-    /// Add to Favorites on a page already pinned (#326): it shows in every space of its profile, as a favorite.
-    /// Ticked off, the page stays saved, in this space.
     @objc func addToFavorites(_ sender: Any?) {
-        guard let tab = selectedTab, !tabManager.isPrivate, let id = tab.bookmarkID else { return }
-        if tab.isFavorite { removeFromEverySpace(sender); return }
-        libraryChange(SavePath.saveName) { _ = SavePath.keepInEverySpace(id, profile: tabManager.profile.id) }
-        tab.isFavorite = Library.shared.isFavorite(id)
-        Toast.show(String(localized: "Added to Favorites", comment: "Toast after Add to Favorites: the page now shows in every space of its profile."), symbol: "star.fill", in: self)
-    }
-
-    /// The tick taken off a favorite: the page stays saved, among this space's Pinned pages.
-    @objc func removeFromEverySpace(_ sender: Any?) {
-        guard let tab = selectedTab, !tabManager.isPrivate, let id = tab.bookmarkID, tab.isFavorite else { return }
-        let space = tabManager.currentSpaceID
-        pageChange(SavePath.saveName) { [tabManager] in _ = SavePath.keepInThisSpace(id, spaceID: space) }
-        tab.isFavorite = Library.shared.isFavorite(id)
-        Toast.show(String(localized: "Moved to Tabs", comment: "Toast after a favorite is unticked: the page stays pinned, in this space only."), symbol: "star", in: self)
+        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, tab.bookmarkID != nil || !tabManager.isPrivate else { return }
+        favoriteWithUndo(tab)
+        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "star.fill", in: self)
     }
 
     /// File › Install as App…: the site as an app of its own, with its own Dock icon (#165).
@@ -961,10 +948,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)):
-            // A saved page's tick, in every space (#326): never a destination of its own.
-            item.title = InEverySpace.title
-            item.state = tab?.isFavorite == true ? .on : .off
-            return tab?.bookmarkID != nil && tab?.url != nil && !tabManager.isPrivate
+            return tab?.url != nil && tab?.isFavorite != true && (tab?.bookmarkID != nil || !tabManager.isPrivate)
         case #selector(toggleDevelopmentSite(_:)):
             item.title = DeveloperTool.siteTitle(listed: DevelopmentSites.covers(tab?.url))
             return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)
