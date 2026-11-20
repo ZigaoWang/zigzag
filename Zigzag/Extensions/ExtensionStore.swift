@@ -1366,7 +1366,8 @@ createSolverFrame();
         Patch(file: "scripts/twchallenge.js",
               find: #"function solveChallenge\(path, method\) \{[\s\S]*?\n\}\n\nfunction recoverSolver"#,
               replace: "function solveChallenge(path, method) {\n    return window.__zigzagOldTwitterCall({ op: \"solve\", path, method });\n}\n\nfunction recoverSolver", pattern: true),
-        // The codes its page worked out go to the sandbox too; ready means it can sign requests.
+        // The codes its page worked out go to the sandbox too; ready means it can sign requests. A failed init stops
+        // signing, as in Chrome, but a timeout or a restart doesn't: the next solve starts a new sandbox over.
         Patch(file: "scripts/twchallenge.js",
               find: #"async function sendInit\(\) \{[\s\S]*?\n        \}\n        await sendInit\(\);"#,
               replace: #"""
@@ -1374,7 +1375,7 @@ async function sendInit() {
             if (generation !== solverGeneration) return;
             sentData = true;
             try {
-                await window.__zigzagOldTwitterCall({
+                let reply = await window.__zigzagOldTwitterCall({
                     op: "init",
                     data: {
                         ...initData,
@@ -1382,10 +1383,14 @@ async function sendInit() {
                         verificationCode: OLDTWITTER_CONFIG.verificationKey,
                     },
                 });
+                if (reply && reply.initError) {
+                    solverErrored = true;
+                    console.error("Error initializing solver:", reply.initError);
+                    return;
+                }
                 solverReady = true;
             } catch (e) {
-                solverErrored = true;
-                console.error("Error initializing solver:", e);
+                console.error("Solver didn't start:", e);
             }
         }
         await sendInit();

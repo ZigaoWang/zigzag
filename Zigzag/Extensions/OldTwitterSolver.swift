@@ -60,9 +60,18 @@ final class OldTwitterSolver: NSObject {
 
     struct Failure: LocalizedError {
         let message: String
-        init(_ message: String) { self.message = message }
+        /// Whether the sandbox itself said the challenge code failed, rather than a timeout or the tab moving on.
+        var initError = false
+        init(_ message: String, initError: Bool = false) {
+            self.message = message
+            self.initError = initError
+        }
         var errorDescription: String? { message }
     }
+
+    /// How long a tab's sandbox is kept after its last request. A tab left for a moment doesn't redo its init, and one
+    /// left for good doesn't hold X's vendor bundle in memory for the session.
+    static let idleLimit: TimeInterval = 600
 
     /// Whether this is OldTwitter: the store's copy by its identifier, one loaded from a folder by what its manifest says.
     static func isOldTwitter(id: String, manifest: [String: Any]) -> Bool {
@@ -312,8 +321,11 @@ final class OldTwitterSolver: NSObject {
     private func sweep() {
         let now = Date()
         for (token, sandbox) in Array(sandboxes) where sandbox.pending.isEmpty && sandbox.initTask == nil {
-            let tabGone = sandbox.webView == nil || sandbox.webView?.window == nil
-            if tabGone || now.timeIntervalSince(sandbox.lastUsed) > 120 {
+            // A tab that left its window can come back, so its sandbox waits for the idle limit like any other; only a
+            // tab that's gone, with nothing left of its web view, ends at once.
+            if sandbox.webView == nil {
+                closeToken(token, because: "The tab closed")
+            } else if now.timeIntervalSince(sandbox.lastUsed) > Self.idleLimit {
                 closeToken(token, because: "Idle")
             }
         }
@@ -328,7 +340,8 @@ final class OldTwitterSolver: NSObject {
             sandbox.ready?.resume()
             sandboxes[token]?.ready = nil
         case "initError":
-            sandbox.ready?.resume(throwing: Failure(message["error"] as? String ?? "The solver didn't start"))
+            sandbox.ready?.resume(throwing: Failure(message["error"] as? String ?? "The solver didn't start",
+                                                     initError: true))
             sandboxes[token]?.ready = nil
         case "solved":
             guard let id = (message["id"] as? NSNumber)?.intValue else { return }
@@ -375,6 +388,10 @@ extension OldTwitterSolver: WKScriptMessageHandlerWithReply {
                 do {
                     try await initialize(for: webView, key: key, frame: message.frameInfo, data: data)
                     replyHandler(nil, nil)
+                } catch let failure as Failure where failure.initError {
+                    // OldTwitter stops signing requests on this one, as Chrome does. A timeout or a restart comes back
+                    // as a plain error instead, so the next solve can try again (see the init patch).
+                    replyHandler(["initError": failure.message], nil)
                 } catch {
                     replyHandler(nil, error.localizedDescription)
                 }

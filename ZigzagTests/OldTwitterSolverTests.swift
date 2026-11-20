@@ -69,6 +69,24 @@ function recoverSolver(reason) {
         #expect(!patched.contains("contentWindow.postMessage"))
     }
 
+    /// Only the sandbox's own initError stops signing, as in Chrome. A timeout, a restart or a tab reloaded under the
+    /// sandbox comes back as a thrown error, and the next solve starts a new sandbox over.
+    @Test func aFailedInitIsNotTheSolverErroring() throws {
+        let excerpt = """
+        async function sendInit() {
+            if (generation !== solverGeneration) return;
+            solverIframe.contentWindow.postMessage({ action: "init" }, "*");
+        }
+        await sendInit();
+"""
+        let patched = try #require(apply("scripts/twchallenge.js", excerpt))
+        #expect(patched.contains(#"if (reply && reply.initError) {"#))
+        let parts = patched.components(separatedBy: "} catch (e) {")
+        #expect(parts.count == 2)
+        #expect(parts.first?.contains("solverErrored = true;") == true)
+        #expect(parts.last?.contains("solverErrored") == false)
+    }
+
     @Test func theSandboxListensForZigzagsCall() throws {
         let excerpt = """
         window.addEventListener('message', async function (event) {
