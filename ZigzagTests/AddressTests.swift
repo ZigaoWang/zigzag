@@ -243,20 +243,6 @@ struct AddressTests {
         #expect(address.visiblePinIDs == ["a", "b"])
     }
 
-    @Test func atTheLimitThePinOnATileOnlyExplains() {
-        let pin = HoverPin()
-        var clicks = 0
-        pin.onClick = { _ in clicks += 1 }
-        pin.state = .atLimit
-        #expect(!pin.isEnabled)
-        #expect(pin.toolTip == SitePanel.pinLimitTip)
-        #expect(!pin.accessibilityPerformPress())
-        pin.state = .unpinned
-        #expect(pin.isEnabled)
-        #expect(pin.accessibilityPerformPress())
-        #expect(clicks == 1)
-    }
-
     /// A pinned extension is one more of the field's buttons: Reader's and Site Controls' size, corners and press
     /// area, the same 2pt between every pair, its icon a site icon's 16pt in the middle.
     @Test func aPinnedButtonIsTheFieldsOwnButton() {
@@ -305,30 +291,20 @@ struct AddressTests {
         #expect(tile.bounds.contains(tileBadge.frame))
     }
 
-    /// The pin button on a tile: a 16pt chip inside the tile's top-right corner (top-left beside a count), a 20pt
-    /// target around it.
-    @Test func aTilesPinButtonIsEasyToHitAndInsideTheTile() {
-        let tile = NSRect(x: 100, y: 50, width: 40, height: 40)
+    /// The pin mark on a tile: inside the tile, its curve sharing a center with the tile's corner (top-left beside
+    /// an attention dot), and never a target.
+    @Test func aTilesPinMarkIsConcentricAndTakesNoClicks() {
+        let tile = NSRect(x: 100, y: 50, width: 36, height: 36)
+        let r = Tokens.Radius.tile
         for left in [false, true] {
-            let frame = SitePanel.pinFrame(on: tile, left: left)
-            #expect(frame.width >= 20 && frame.height >= 20)
-            let pin = HoverPin()
-            let chip = pin.chipFrame.offsetBy(dx: frame.minX, dy: frame.minY)
-            #expect(chip.width == Tokens.Sidebar.hoverPinChip)
-            #expect(tile.contains(chip))
-            #expect(chip.minY == tile.minY + Tokens.Sidebar.hoverPinInset)
-            #expect(left ? chip.minX == tile.minX + Tokens.Sidebar.hoverPinInset : chip.maxX == tile.maxX - Tokens.Sidebar.hoverPinInset)
+            let frame = PinMark.frame(on: tile, left: left)
+            #expect(tile.contains(frame))
+            #expect(frame.midY == tile.minY + r)
+            #expect(frame.midX == (left ? tile.minX + r : tile.maxX - r))
         }
-    }
-
-    @Test func aTilesPinIsFilledOnlyOncePinned() {
-        let pin = HoverPin()
-        #expect(pin.symbol == "pin")
-        pin.state = .pinned
-        #expect(pin.symbol == "pin.fill")
-        #expect(pin.toolTip == SitePanel.unpinTitle)
-        pin.state = .unpinned
-        #expect(pin.toolTip == SitePanel.pinTitle)
+        let mark = PinMark()
+        #expect(mark.hitTest(NSPoint(x: mark.bounds.midX, y: mark.bounds.midY)) == nil)
+        #expect(!mark.isAccessibilityElement())
     }
 
     @Test func aPopupOpeningClosesTheOtherOneInItsWindowOnly() {

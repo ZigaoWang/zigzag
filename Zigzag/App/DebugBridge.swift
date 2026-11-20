@@ -702,9 +702,8 @@ enum DebugBridge {
         // pindrag and pindump work on the address as it is, without bringing the window forward.
         if name == "pindrag" { controller.sidebar.address.debugPinDrag(arg); return }
         if name == "pindump" { controller.sidebar.address.debugDump(to: arg); return }
-        // pintoggle <extension id>: pins or unpins it, as the pin on its tile in Site Controls does.
+        // pintoggle <extension id>: pins or unpins it, as Pin to Address in its menu does.
         if name == "pintoggle" { controller.tabManager.profile.installs.togglePin(arg); return }
-        if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         if name == "pageprobe" { pageProbe(arg); return }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
@@ -2572,6 +2571,14 @@ enum DebugBridge {
             debugLog("zapstate \(SiteBoosts.site(of: tab?.webView?.url) ?? "-") picking=\(ZapPicker.current != nil) zaps=\(boost.zaps) style=\(boost.style.count)")
         case "sitecert": SitePanel.shown?.debugCertificate(Int(arg) ?? 0)
         case "sitext": SitePanel.shown?.extensionsSection?.debugCommand(arg)
+        case "sitextmenu":
+            // sitextmenu <extension id>: logs that tile's menu and the pin marks, and shows the menu at the tile for 4 s.
+            guard let section = SitePanel.shown?.extensionsSection, let button = section.debugButton(arg),
+                  let event = NSApp.currentEvent ?? NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0),
+                  let menu = button.onRightClick?(event) else { debugLog("sitextmenu \(arg): none"); break }
+            debugLog("sitextmenu \(arg) => \(menu.items.map { $0.isSeparatorItem ? "-" : $0.title }) marks=\(section.debugPinMarks)")
+            closeNextMenu(after: 4)
+            DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: button.bounds.midX, y: button.bounds.midY), in: button) }
         case "sitextcount": SitePanel.debugExtensionCount = Int(arg) ?? 0
         case "sitextforget": SiteExtensionsSection.chosenOpen = nil
         case "sitezoom": SitePanel.shown?.debugZoom(arg)

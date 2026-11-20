@@ -186,6 +186,7 @@ enum MainMenu {
                 item(DeveloperTool.console.title, #selector(C.showJavaScriptConsole(_:)), "j", [.command, .option]),
                 item(DeveloperTool.inspect.title, #selector(C.inspectElement(_:)), "c", [.command, .option]),
                 item(DeveloperTool.viewSource.title, #selector(C.viewSource(_:)), "u", [.command, .option]),
+                item(C.developerBarTitle(shown: true), #selector(C.toggleDeveloperBar(_:)), ""),
             ]),
             .separator(),
             item(String(localized: "Enter Full Screen", comment: "View menu item."), #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),

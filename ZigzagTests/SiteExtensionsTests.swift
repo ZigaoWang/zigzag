@@ -208,4 +208,89 @@ struct SiteExtensionsTests {
         #expect(A.of(offHere: true, hasAccess: true, wantsSite: true, clickAccess: false) == .offHere)
         #expect(!A.runs.isDimmed && A.blocked.isDimmed && A.runs.note == nil)
     }
+
+    // MARK: Pinning
+
+    private final class FlippedBox: NSView {
+        override var isFlipped: Bool { true }
+    }
+
+    /// A section with its pins wired as Site Controls wires them, `pinned` the extensions pinned.
+    private func wired(_ s: SiteExtensionsSection, pinned: Set<String>) {
+        s.wirePins(state: { pinned.contains($0) ? .pinned : .unpinned }, toggle: { _ in },
+                   title: { pinned.contains($0) ? SitePanel.unpinTitle : SitePanel.pinTitle })
+        s.layoutSubtreeIfNeeded()
+    }
+
+    /// Every point of a tile, its pinned corner too, is the tile's: nothing on it takes a click.
+    @Test func everyPointOfATileOpensTheExtension() throws {
+        for count in [2, 6] {
+            section(items(count), open: true) { s in
+                wired(s, pinned: ["ext1"])
+                // In a flipped view of its own at the origin, so a point in the section is one in its superview.
+                let container = FlippedBox(frame: s.frame)
+                container.addSubview(s)
+                #expect(s.debugPinMarks["ext1"] == true)
+                #expect(s.debugPinMarks["ext0"] == false)
+                for button in s.buttons {
+                    let f = button.frame
+                    for x in stride(from: f.minX + 0.5, to: f.maxX, by: 1) {
+                        for y in stride(from: f.minY + 0.5, to: f.maxY, by: 1) {
+                            let hit = s.hitTest(NSPoint(x: x, y: y))
+                            guard hit !== button, hit?.isDescendant(of: button) != true else { continue }
+                            Issue.record("\(type(of: hit)) took a click at \(x),\(y) on \(count) extensions")
+                            return
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The mark shows only on a pinned extension, comes and goes as it's pinned, and folds away with the section.
+    @Test func thePinMarkFollowsThePins() {
+        section(items(5), open: true) { s in
+            var pinned: Set<String> = []
+            s.wirePins(state: { pinned.contains($0) ? .pinned : .unpinned }, toggle: { _ in }, title: { _ in nil })
+            #expect(s.debugPinMarks.values.allSatisfy { !$0 })
+            pinned = ["ext2"]
+            s.refreshPins()
+            #expect(s.debugPinMarks.filter(\.value).map(\.key) == ["ext2"])
+            s.setOpen(false)
+            #expect(s.debugPinMarks.values.allSatisfy { !$0 })
+            s.setOpen(true)
+            #expect(s.debugPinMarks["ext2"] == true)
+        }
+    }
+
+    /// The menu's pin item says what pinning does now, and pinning reaches the address.
+    @Test func theMenuPinsAndUnpinsToTheAddress() throws {
+        let library = Library.shared
+        let info = library.addProfile(name: "Pin menu test")
+        let profile = Profiles.shared.profile(info.id)
+        let installs = profile.installs
+        let id = "pin-menu-test"
+        defer {
+            installs.unpin(id)
+            library.removeProfile(info.id)
+            library.finishedRemovingProfile(info.id)
+        }
+        var heard = 0
+        let token = profile.extensions.changed.observe { heard += 1 }
+        defer { token.cancel() }
+        let pin = BrowserWindowController.pinItem(for: id, installs: installs)
+        #expect(pin.title == SitePanel.pinTitle && pin.isEnabled)
+        let menu = NSMenu()
+        menu.addItem(pin)
+        menu.performActionForItem(at: 0)
+        #expect(installs.pins.contains(id))
+        #expect(heard == 1)
+        let unpin = BrowserWindowController.pinItem(for: id, installs: installs)
+        #expect(unpin.title == SitePanel.unpinTitle)
+        let again = NSMenu()
+        again.addItem(unpin)
+        again.performActionForItem(at: 0)
+        #expect(!installs.pins.contains(id))
+        #expect(heard == 2)
+    }
 }
