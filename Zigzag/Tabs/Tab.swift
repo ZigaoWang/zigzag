@@ -445,6 +445,11 @@ final class Tab: NSObject {
     var customIcon: String? { didSet { if oldValue != customIcon { refreshChosenIcon() } } }
     /// The chosen icon, or the site's (`SiteIcons`); nil for the favicon. Posts `.favicon` on change.
     private(set) var chosenIcon: String?
+    /// The link under the pointer in its page, as the hover script last said: where Pin Link in the page's menu
+    /// saves from (#326).
+    private(set) var hoveredLink: URL?
+    /// The text of the link the pointer is over: what Pin Link names the pinned page after.
+    private(set) var hoveredLinkTitle: String?
 
     /// A development tab (#141): Developer tools is on and the page it shows is on a site you develop
     /// (`DevelopmentSites`). The page it shows is the one last committed; before any, the address it's going to, so
@@ -2625,7 +2630,9 @@ extension Tab: WKUIDelegate {
     }
 
     /// Reported by our hover script: the link under the pointer, or nil.
-    func hoveredLinkChanged(_ url: URL?) {
+    func hoveredLinkChanged(_ url: URL?, title: String? = nil) {
+        hoveredLink = url
+        hoveredLinkTitle = url == nil ? nil : title
         host?.tab(self, hoveringLink: url)
     }
 

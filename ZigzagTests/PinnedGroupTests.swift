@@ -250,8 +250,8 @@ import Testing
         }
     }
 
-    /// ⌘D (File › Pin Group) on a tab of a group pins the group as one folder, and ⌘Z brings the group back.
-    @Test func commandDPinsTheWholeGroupAndUndoes() throws {
+    /// ⌘D (File › Save Group) on a tab of a group saves the group as one folder, and ⌘Z brings the group back.
+    @Test func commandDSavesTheWholeGroupAndUndoes() throws {
         try inWindow(["0", "1", "2"]) { controller, tabs, space in
             let manager = controller.tabManager
             let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))

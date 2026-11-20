@@ -1012,9 +1012,10 @@ enum Toast {
     /// `closes` adds a close button, for offers. `owner`: for `hide(for:in:)`. `onClose`: runs when closed by its
     /// button.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
+                     actionMenu: (() -> NSMenu?)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, onClose: (() -> Void)? = nil,
                      in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller), onClose: onClose)
+        show(text, symbol: symbol, action: action, actionMenu: actionMenu, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller), onClose: onClose)
         state(for: controller.root.overlay).owner = owner
     }
 
@@ -1074,6 +1075,7 @@ enum Toast {
 
     /// Shows a toast at the top center of `area` in any flipped view (also used by Passwords).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
+                     actionMenu: (() -> NSMenu?)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
                      onClose: (() -> Void)? = nil) {
         let state = state(for: host)
@@ -1093,8 +1095,23 @@ enum Toast {
         // Busy: an empty picture keeps the icon's place for the spinner.
         toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }
         busy ? toast.spinner.startAnimation(nil) : toast.spinner.stopAnimation(nil)
-        toast.actionButton.isHidden = action == nil
-        if let action {
+        toast.actionButton.isHidden = action == nil && actionMenu == nil
+        if let actionMenu {
+            // A saved toast says where the page went and offers the places it could go instead (#326): a lone
+            // chevron, for someone who never learnt that ⇧ asks first.
+            toast.actionButton.title = ""
+            toast.actionButton.symbol = "chevron.down"
+            toast.actionButton.setAccessibilityLabel(String(localized: "Where It's Pinned", comment: "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to."))
+            toast.actionButton.onClick = { [weak toast] _ in
+                guard let toast, let menu = actionMenu() else { return }
+                // The toast stays until a place is chosen or the menu is put away; the menu is over the page, where
+                // the toast is.
+                // Under the chevron, in the toast's own coordinates.
+                let anchor = toast.actionButton.frame
+                menu.popUp(positioning: nil, at: NSPoint(x: anchor.minX, y: (toast.isFlipped ? anchor.maxY : anchor.minY) + (toast.isFlipped ? 2 : -2)), in: toast)
+            }
+        } else if let action {
+            toast.actionButton.symbol = nil
             toast.actionButton.title = action.title
             // No click for the first half second, as on a site's permission question: a toast a page can bring up
             // ("Pop-up blocked") never catches a click meant for the page on its action.
@@ -1106,7 +1123,7 @@ enum Toast {
             }
         }
         // A toast with something to do (Undo, Pin This Page) can be put away at once, as a notification can.
-        toast.closeButton.isHidden = !(closes || action != nil)
+        toast.closeButton.isHidden = !(closes || action != nil || actionMenu != nil)
         toast.closeButton.onClick = { [weak toast] _ in
             state.hideWork?.cancel()
             toast?.dismiss()
@@ -1133,7 +1150,7 @@ enum Toast {
         @MainActor func hideWhenClear(_ toast: ToastView?) {
             // Shown again since (a repeat toast): that showing decides when it goes.
             guard let toast, toast.superview != nil, state.hideWork == nil else { return }
-            if action != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
+            if action != nil || actionMenu != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak toast] in hideWhenClear(toast) }
                 return
             }

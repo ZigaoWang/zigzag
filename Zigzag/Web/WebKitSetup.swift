@@ -254,14 +254,16 @@ enum PageScripts {
     static let linkHover = """
     (() => {
       let current = null;
-      const send = (url) => {
+      const send = (a) => {
+        const url = a ? a.href : null;
         if (url === current) return;
         current = url;
-        try { window.webkit.messageHandlers.zigzagHover.postMessage(url || ''); } catch (e) {}
+        const text = a ? ((a.getAttribute('aria-label') || a.textContent || '').trim().slice(0, 200)) : '';
+        try { window.webkit.messageHandlers.zigzagHover.postMessage(url ? { url, text } : ''); } catch (e) {}
       };
       document.addEventListener('mouseover', (e) => {
         const a = e.target && e.target.closest ? e.target.closest('a[href], area[href]') : null;
-        send(a ? a.href : null);
+        send(a);
       }, true);
       document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) send(null); }, true);
       window.addEventListener('blur', () => send(null));
@@ -288,8 +290,12 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
         guard let webView = message.webView as? BrowserWebView, let tab = webView.owner else { return }
         switch message.name {
         case "zigzagHover":
-            let text = message.body as? String ?? ""
-            tab.hoveredLinkChanged(text.isEmpty ? nil : URL(string: text))
+            if let body = message.body as? [String: Any], let url = (body["url"] as? String).flatMap(URL.init(string:)) {
+                tab.hoveredLinkChanged(url, title: body["text"] as? String)
+            } else {
+                let text = message.body as? String ?? ""
+                tab.hoveredLinkChanged(text.isEmpty ? nil : URL(string: text))
+            }
         case "zigzagLinkClick":
             guard let body = message.body as? [String: Any], let text = body["url"] as? String,
                   let url = URL(string: text) else { return }

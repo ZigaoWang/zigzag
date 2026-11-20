@@ -1290,7 +1290,9 @@ extension CommandBarController {
         case "settings": SettingsPage.open(in: controller)
         case "show-headless": Headless.showWindow()
         // The page and window commands do what the menu bar's items of the same name do.
-        case "pin", "unpin": controller.toggleBookmark(nil)
+        case "pin": if let tab = controller.tabManager.selectedTab { controller.save(tab, request: .quick) }
+        case "pin-to-folder": if let tab = controller.tabManager.selectedTab { controller.save(tab, request: .picker) }
+        case "unpin": if let tab = controller.tabManager.selectedTab { controller.toggleSavedState(of: tab) }
         case "favorite": controller.addToFavorites(nil)
         case "separate": controller.closeSplitView(nil)
         case "split":

@@ -142,6 +142,9 @@ struct SidebarRowMenuTests {
         let before = Library.shared.snapshot
         defer { Library.shared.restore(before) }
         let space = Library.shared.spaces[0].id
+        // A library this Mac already has may keep folders in its first space, which turns these menus' "Add … to New
+        // Folder" into "Add … to Folder". The snapshot puts them back afterwards.
+        for folder in Library.shared.folders(in: space) { Library.shared.removeFolder(folder.id) }
         if Library.shared.spaces.count < 2 { _ = Library.shared.addSpace(name: "Other") }
         let manager = TabManager(spaceID: space, isPrivate: isPrivate)
         defer { manager.invalidate() }
@@ -257,6 +260,9 @@ struct SidebarRowMenuTests {
         let before = Library.shared.snapshot
         defer { Library.shared.restore(before) }
         let space = Library.shared.spaces[0].id
+        // A library this Mac already has may keep folders in its first space, which turns these menus' "Add … to New
+        // Folder" into "Add … to Folder". The snapshot puts them back afterwards.
+        for folder in Library.shared.folders(in: space) { Library.shared.removeFolder(folder.id) }
         let manager = TabManager(spaceID: space)
         defer { manager.invalidate() }
         let tabs = ["A", "B"].enumerated().map { i, title in Tab(url: URL(string: "about:blank#\(i)")!, title: title, spaceID: space) }
@@ -381,7 +387,7 @@ struct SidebarRowMenuTests {
         }
     }
 
-    @Test func aPrivateWindowsTabKeepsOutOfPinsAndWindows() throws {
+    @Test func aPrivateWindowsTabKeepsOutOfSavesAndWindows() throws {
         try inWindow(["A", "B"], isPrivate: true) { controller, tabs, _ in
             let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
             #expect(!titles(menu).contains("Pin Tab") && !titles(menu).contains("Add to Favorites"))

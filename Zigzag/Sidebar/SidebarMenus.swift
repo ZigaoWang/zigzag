@@ -102,12 +102,12 @@ enum SidebarMenus {
         }
         var organize: [NSMenuItem] = []
         if !rows.isEmpty, !isPrivate {
-            organize.append(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item")
-                                 : String(localized: "Pin \(rows.count) Tabs", comment: "Menu item for several picked tabs")) {
+            organize.append(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item for one picked tab: pins the page into Pinned, at the end of it.")
+                                 : String(localized: "Pin \(rows.count) Tabs", comment: "Menu item for several picked tabs: pins them into Pinned, at the end of it.")) {
                 controller.pinMarked(rows)
             })
         }
-        // Pins are shared by every window: a private one doesn't take them away.
+        // Pinned pages are shared by every window: a private one doesn't take them away.
         if !pins.isEmpty, !isPrivate {
             organize.append(Item(pins.count == 1 ? String(localized: "Unpin Tab", comment: "Menu item")
                                  : String(localized: "Unpin \(pins.count) Tabs", comment: "Menu item for several picked pinned pages")) {
@@ -219,14 +219,17 @@ enum SidebarMenus {
         }
 
         var organize: [NSMenuItem] = []
-        // Pins and favorites are shared by every window: a private one's tabs stay out of them.
-        if !isPrivate, tab.url != nil {
-            // Half of a split pins with its other half, as a split.
+        // Save at the end of Pinned, or with ⇧ held where the picker says (#326). A whole group or a split view saves
+        // as one, so the item says which. Pinned pages are shared by every window: a private one's tabs stay out.
+        if !isPrivate, tab.bookmarkID == nil, tab.url != nil {
             let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
-            let pinTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.")
-                : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.")
-                : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar.")
-            organize.append(keyed(Item(pinTitle) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }, #selector(C.toggleBookmark(_:))))
+            let saveTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is pinned as a folder.")
+                : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
+                : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar: pins the page into Pinned, and with ⇧ held, asks which folder.")
+            organize.append(keyed(Item(saveTitle) {
+                // ⇧ held asks where, as ⇧⌘D does.
+                if C.shiftHeld { controller.save(tab, request: .picker) } else { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
+            }, #selector(C.toggleBookmark(_:))))
             organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar.")) { controller.favoriteWithUndo(tab) })
         }
         if tab.bookmarkID == nil { organize += groupItems(for: tab, controller: controller) }
@@ -287,7 +290,7 @@ enum SidebarMenus {
             context.append(Item(String(localized: "Back to Pinned Page", comment: "Item in a pinned tab's context menu in the sidebar. Goes back to the page the tab was pinned with.")) { manager.resetBookmarkTab(bookmark.id) })
             // A private window never writes where it's been into your pins.
             if !isPrivate {
-                context.append(Item(String(localized: "Set Current Page as Pinned", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off its pinned address; this makes the page it shows now the pinned one.")) {
+                context.append(Item(String(localized: "Set Current Page as Pinned", comment: "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.")) {
                     controller.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.updateBookmark(bookmark.id, url: url) }
                 })
             }
@@ -314,8 +317,8 @@ enum SidebarMenus {
         // Pins are shared by every window: a private one doesn't take them away.
         if !isPrivate {
             let unpin = Library.shared.pinnedGroup(containing: bookmark.id) != nil ? unpinGroupTitle
-                : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar.")
-                : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar.")
+                : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
+                : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
             organize.append(Item(unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
         }
         organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
@@ -773,10 +776,16 @@ extension BrowserWindowController {
         sidebar.list.mark(pages: pages)
     }
 
+    /// Several tabs pinned at once, each through `SavePath.save`, so a picked row lands where the star and ⌘D do.
     func pinMarked(_ tabs: [Tab]) {
         Tutorial.complete("pin")
         pageChange(String(localized: "Pin Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
-            Library.shared.together { for tab in tabs where tab.bookmarkID == nil { tabManager.bookmarkTab(tab, in: tab.spaceID) } }
+            Library.shared.together {
+                for tab in tabs where tab.bookmarkID == nil {
+                    guard let page = SavePath.Page(tab: tab) else { continue }
+                    _ = SavePath.save(page, to: SavePath.quickPlace(in: tab.spaceID), in: tabManager)
+                }
+            }
         }
         sidebar.list.mark(pages: tabs)
     }

@@ -146,6 +146,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
         let pill = root.topBar.pill
@@ -459,7 +460,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let landing = sidebar.list.dropTarget(at: screenPoint, allowsPinned: true)
         let space = tabManager.currentSpaceID
         if landing.section == .bookmarks {
-            pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) {
+            pageChange(SavePath.saveName) {
                 Library.shared.pinFavorite(favorite.id, in: space, at: landing.index)
                 if let folder = landing.folder { Library.shared.moveBookmark(favorite.id, to: landing.index, in: space, folder: .some(folder)) }
             }
@@ -489,7 +490,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(bookmarkID, to: landing.index, in: space, folder: .some(landing.folder)) }
             return sidebar.list.row(forBookmark: bookmarkID)
         }
-        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in
+        pageChange(SavePath.unsaveName) { [tabManager] in
             // Into this space first, so it comes down among the tabs you're looking at.
             Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space)
             tabManager.unbookmark(bookmarkID, toIndex: landing.index)
@@ -512,6 +513,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let row = dropFavorite(favorite, at: screenPoint)
         window?.makeKeyAndOrderFront(nil)
         return row
+    }
+
+    /// The star at the end of the address (#326) and the share button beside it: the star is the quick save, or with ⇧
+    /// The star: a quick pin, or with ⇧ held the place picker.
+    private func wireAddressButtons() {
+        sidebar.address.saveButton.onClick = { [weak self] _ in self?.saveFromStar() }
     }
 
     private func reloadFavorites() {
@@ -2747,7 +2754,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// Turns a bookmark back into a tab, undoably. Half of a pinned split unpins the pair.
     func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) {
-        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in tabManager.unbookmark(bookmarkID, toIndex: index) }
+        pageChange(SavePath.unsaveName) { [tabManager] in tabManager.unbookmark(bookmarkID, toIndex: index) }
     }
 
     /// A tab dropped on a pinned page: the two become one pinned split where the pinned page is, open side by side.
@@ -2945,7 +2952,7 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate else { return }
         let space = tabManager.currentSpaceID
         confirmProfileCrossing(pinned: bookmarkID, to: space) { [weak self, tabManager] in
-            self?.pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) {
+            self?.pageChange(SavePath.unsaveName) {
                 // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
                 if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
                 tabManager.unbookmark(bookmarkID, toIndex: index, under: parent, group: group)

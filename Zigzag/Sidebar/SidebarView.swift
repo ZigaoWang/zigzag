@@ -44,6 +44,28 @@ final class AddressView: InteractiveView {
     let siteControlsButton = AddressView.button("slider.horizontal.3", toolTip: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."))
     private var siteControlsBadge: BadgeView?
 
+    /// The star at the field's right end (#326): outline while the page isn't pinned, filled while it is. A click pins
+    /// it into the space you're in; ⇧-click asks where.
+    let saveButton = AddressView.button("star", toolTip: String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where."))
+    /// What the star shows: filled and accent for a page that's pinned, outline for one that isn't.
+    private(set) var isSaved = false
+    /// Whether the page can be pinned at all (a new tab has no address).
+    private(set) var canSave = false
+
+    /// The star's state for the page in the field. A page that isn't pinned, or is a private window's, keeps the star.
+    func setSaved(_ saved: Bool, canSave: Bool) {
+        guard isSaved != saved || self.canSave != canSave else { return }
+        isSaved = saved
+        self.canSave = canSave
+        saveButton.symbol = saved ? "star.fill" : "star"
+        saveButton.tint = saved ? Brand.Theme.for(saveButton).accent : Tokens.Color.icon
+        saveButton.isEnabled = canSave
+        saveButton.toolTip = saved
+            ? String(localized: "Pinned", comment: "Tooltip of the address bar's star button for a page that's pinned: it says the page is pinned.")
+            : String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where.")
+        reflow(animated: true)
+    }
+
     /// The dot on Site Controls while an extension can't work until you do something.
     func setSiteControls(needsAttention: Bool) {
         guard needsAttention != (siteControlsBadge != nil) else { return }
@@ -372,6 +394,9 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        saveButton.tint = Tokens.Color.icon
+        saveButton.isHidden = true
+        addSubview(saveButton)
         addSubview(siteControlsButton)
         _ = drop
         setAccessibilityRole(.button)
@@ -460,9 +485,12 @@ final class AddressView: InteractiveView {
         }
     }
 
+    /// The buttons always at the field's end, after the pins.
+    private var endButtons: [IconButton] { [saveButton, siteControlsButton] }
+
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + 1
+        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -519,7 +547,7 @@ final class AddressView: InteractiveView {
         let room = buttonsOnly ? bounds.width + 2 : bounds.width - x - inset - Tokens.Space.x1
         // Pins make room for the site.
         let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
-        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room, text: buttonsOnly ? nil : text)
+        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + endButtons.count, room: room, text: buttonsOnly ? nil : text)
         // The one furthest from Site Controls gives way first.
         let showing = pinEntries.suffix(fit)
         for entry in pinEntries.dropLast(fit) { takeAway(entry.button, animated: animated, removing: false) }
@@ -528,7 +556,7 @@ final class AddressView: InteractiveView {
         let pinFramesBefore = showing.map(\.button.frame)
         if showingChanged { updatePinControls(Array(showing)) }
 
-        let trailing = others + showing.map(\.button) + [siteControlsButton]
+        let trailing = others + showing.map(\.button) + endButtons
         var right = bounds.width - end
         for (index, button) in trailing.enumerated().reversed() {
             let frame = NSRect(x: right - side, y: inset, width: side, height: side)
@@ -598,7 +626,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.
@@ -1171,6 +1199,7 @@ final class SidebarView: NSView {
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: tab?.url != nil && tab?.isPrivate != true)
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.
