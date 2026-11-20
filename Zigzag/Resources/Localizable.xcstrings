@@ -2477,7 +2477,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI 应用在其中工作。Zigzag 绝不会在这里存储或填写密码，也不会用你的名片填写表单。"
+            "value" : "AI 应用在其中工作。Zigzag 绝不会在这里存储或填写密码，也不会用“我的名片”填写表单。"
           }
         }
       }
