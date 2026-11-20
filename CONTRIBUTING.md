@@ -98,7 +98,6 @@ has none; `scripts/release.sh` warns when the version it releases has no Chinese
   `test: …`, `chore: …`. Subjects are short and plain, and say what changed for the person using Zigzag. `style:`
   is for code formatting only, never for how something looks.
 - Add `(#N)` to the subject when the commit is for an issue, as in `fix: scripts check the page again once it has loaded (#26)`.
-- No trailers: no `Co-Authored-By` or other lines at the end of the message.
 - **Small commits**, one logical change each.
 - **Small, focused pull requests**: one feature or fix each, so it can be reviewed and tried in the app. A pull
   request that changes a lot at once, or moves code around while changing it, is hard to review and slow to land;
