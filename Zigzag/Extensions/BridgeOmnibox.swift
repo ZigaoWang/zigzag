@@ -23,6 +23,12 @@ nonisolated struct OmniboxKeyword: Equatable, Sendable {
         return keywords.filter { seen.insert($0.keyword.lowercased()).inserted }
     }
 
+    /// Leaves out a keyword one of Zigzag's site searches already answers to ("yt", "gh"): what you typed before
+    /// the extension came keeps meaning that site.
+    static func usable(_ keywords: [OmniboxKeyword], siteSearchKeys: Set<String>) -> [OmniboxKeyword] {
+        keywords.filter { !siteSearchKeys.contains($0.keyword.lowercased()) }
+    }
+
     /// The keyword the text is exactly, ignoring case: the bar offers Tab for it.
     static func named(_ text: String, among keywords: [OmniboxKeyword]) -> OmniboxKeyword? {
         let lower = text.lowercased()
@@ -216,12 +222,14 @@ final class BridgeOmnibox: BridgeNamespace {
 
     /// The keywords of the extensions that are on, in the order they load; in a private window, only those allowed there.
     func keywords(isPrivate: Bool) -> [OmniboxKeyword] {
-        OmniboxKeyword.unique(host.contexts.compactMap { context in
+        OmniboxKeyword.usable(OmniboxKeyword.unique(host.contexts.compactMap { context in
             guard PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData),
                   let keyword = OmniboxKeyword.keyword(in: context.webExtension.manifest) else { return nil }
             return OmniboxKeyword(extensionID: context.uniqueIdentifier, keyword: keyword, name: context.webExtension.displayName ?? keyword)
-        })
+        }), siteSearchKeys: Self.siteSearchKeys)
     }
+
+    private static let siteSearchKeys = Set(SiteSearch.all.flatMap(\.keys))
 
     func icon(for extensionID: String) -> NSImage? {
         host.context(for: extensionID)?.webExtension.icon(for: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon))

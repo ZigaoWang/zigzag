@@ -39,6 +39,14 @@ struct ExtensionOmniboxTests {
         #expect(unique == [raindrop])
     }
 
+    /// A keyword Zigzag's own site search answers to stays the site's: "yt" still means YouTube.
+    @Test func aSiteSearchKeepsItsKeyword() {
+        let youtube = OmniboxKeyword(extensionID: "cccccccccccccccccccccccccccccccc", keyword: "YT", name: "Video Helper")
+        let keys = Set(SiteSearch.all.flatMap(\.keys))
+        #expect(keys.contains("yt"))
+        #expect(OmniboxKeyword.usable([youtube, raindrop], siteSearchKeys: keys) == [raindrop])
+    }
+
     @Test func onlyTheKeywordAndASpaceEnterIt() {
         let keywords = [raindrop]
         #expect(OmniboxKeyword.entered("rd", among: keywords) == nil)
