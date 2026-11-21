@@ -171,6 +171,12 @@ final class Tab: NSObject {
     var privateStore: WKWebsiteDataStore? { didSet { if privateStore !== oldValue { refreshChosenIcon() } } }
     var isPrivate: Bool { privateStore != nil }
 
+    /// What makes a fresh start count as used (#433): a page in an everyday browser window, not a private window,
+    /// Zigzag Mini, or one of Zigzag's own pages such as Settings.
+    static func countsAsBrowsingForSession(isPrivate: Bool, isInBrowserWindow: Bool, url: URL?) -> Bool {
+        !isPrivate && isInBrowserWindow && !HistoryPage.isInternal(url)
+    }
+
     /// Moves it to another space. On another profile, its page moves with it.
     func setSpace(_ id: UUID) {
         spaceID = id
@@ -2241,6 +2247,12 @@ extension Tab: WKNavigationDelegate {
         pdfFailed = []
         checkForPDF(webView, fresh: fresh)
         hasLoadedOnce = true
+        // A page has actually loaded in an everyday browser window: on a fresh start that's browsing, and the
+        // session from before gives way (#433). A Mini, a private window or Settings isn't browsing.
+        if Self.countsAsBrowsingForSession(isPrivate: isPrivate, isInBrowserWindow: host is BrowserWindowController,
+                                            url: webView.url) {
+            WindowManager.shared.pageLoaded()
+        }
         // The page's own icon as soon as it's here, not only once it finishes (some sites never quite do).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.refreshFavicon() }
         // A new page under a tab that isn't showing: its picture is of the old one, and can't be retaken until it

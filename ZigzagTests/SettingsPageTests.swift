@@ -186,7 +186,7 @@ struct SettingsSearchTests {
     /// Find a setting knows the words people look for, and leads to the nearest row where there's no such setting.
     @Test func findsCommonWords() {
         let settings = SettingsView(pane: .general)
-        let expected = ["startup": "Ask before quitting", "launch": "Ask before quitting", "homepage": "New tabs open",
+        let expected = ["startup": "On launch", "launch": "On launch", "quit": "Ask before quitting", "homepage": "New tabs open",
                         "home page": "New tabs open", "new tab": "New tabs open", "dark mode": "Dark pages",
                         "appearance": "Dark pages", "default app": "Default browser"]
         for (words, row) in expected {

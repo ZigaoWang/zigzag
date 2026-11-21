@@ -14260,6 +14260,17 @@
         }
       }
     },
+    "On launch" : {
+      "comment" : "A setting in Settings › General: what a launch does with the last session.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动时"
+          }
+        }
+      }
+    },
     "On Specific Sites" : {
       "comment" : "Site Access choice in Settings › Extensions: the extension works only on the sites listed under it.",
       "localizations" : {
@@ -15667,6 +15678,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个人"
+          }
+        }
+      }
+    },
+    "Pick Up Where You Left Off" : {
+      "comment" : "A choice for “On launch” in Settings › General: the last session's windows come back.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接着上次继续"
+          }
+        }
+      }
+    },
+    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session." : {
+      "comment" : "Explanation under “On launch” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“历史记录 › 重新打开上次会话”里找回。"
           }
         }
       }
@@ -17132,6 +17165,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新打开已关闭的窗口"
+          }
+        }
+      }
+    },
+    "Reopen Last Session" : {
+      "comment" : "History menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新打开上次会话"
           }
         }
       }
@@ -19646,6 +19690,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从空白开始"
+          }
+        }
+      }
+    },
+    "Start Fresh" : {
+      "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全新开始"
           }
         }
       }
@@ -23423,6 +23478,17 @@
         }
       }
     },
+    "Your tabs and spaces are saved, and History › Reopen Last Session brings them back." : {
+      "comment" : "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the History menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的标签页和空间都已保存，“历史记录 › 重新打开上次会话”可以再把它们带回来。"
+          }
+        }
+      }
+    },
     "Your tabs and spaces will be right here when you open it again." : {
       "comment" : "Message of the sheet that asks before quitting; “it” is Zigzag.",
       "localizations" : {
@@ -25147,6 +25213,17 @@
         }
       }
     },
+    "quit quitting close command q ask confirm" : {
+      "comment" : "Words that find the Ask before quitting setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 关闭 命令 q 询问 确认 quit quitting close command q ask confirm"
+          }
+        }
+      }
+    },
     "see your saved passwords" : {
       "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”.",
       "localizations" : {
@@ -25293,13 +25370,13 @@
         }
       }
     },
-    "startup launch on start restore reopen session close quit" : {
-      "comment" : "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.",
+    "startup launch on start restore session reopen windows fresh blank resume" : {
+      "comment" : "Words that find the On launch setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启动 开机 打开时 恢复 重新打开 会话 关闭 退出 startup launch"
+            "value" : "启动 开机 恢复 会话 重新打开 窗口 全新 空白 继续 startup launch on start restore session reopen windows fresh blank resume"
           }
         }
       }
