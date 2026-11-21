@@ -695,9 +695,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             ?? manager.newWindow(showCommandBar: false)
     }
 
+    /// The window it came from while that's open, minimized or hidden too: its pages and private store stay with it.
+    private var openSource: BrowserWindowController? {
+        guard let source, source.window != nil, !source.windowClosed else { return nil }
+        return source
+    }
+
     /// Where this one's pages go: from a page, the window it came from while it's open; private, only a private window.
-    private var browserTarget: BrowserWindowController {
-        if let source, source.window?.isVisible == true { return source }
+    var browserTarget: BrowserWindowController {
+        if let openSource { return openSource }
         if isPrivate {
             return WindowManager.shared.controllers.last { $0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false, isPrivate: true)
         }
@@ -818,8 +824,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// The browser window that translates this page, with its toasts over this one: the window it came from, else an
     /// open one of the same privacy.
-    private var translator: BrowserWindowController? {
-        if let source, source.window?.isVisible == true { return source }
+    var translator: BrowserWindowController? {
+        if let openSource { return openSource }
         return WindowManager.shared.controllers.last { $0.tabManager.isPrivate == isPrivate }
     }
 

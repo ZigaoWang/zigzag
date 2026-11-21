@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - An older Zigzag can open spaces in the new glass colors. If you go back to an earlier version, your spaces, pinned tabs and favorites are all there, in the nearest color it has, instead of a single new space.
 - With Ask before quitting on, ⌘Q asks on a keyboard layout without Latin letters too, like Russian or Greek, where it quit at once. ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 - Never Translate This Site and Never Translate a language hold at once: a site translated earlier in the window no longer translates its next page on its own.
+- A Zigzag Mini opened from a window that's minimized or hidden still sends its page there with ⌘O, along with its new tabs and its translating, and a private one stays in that private window.
 
 ## [0.9.4] - 2026-11-21
 

@@ -305,6 +305,28 @@ struct MiniFromPageTests {
         }
     }
 
+    /// Minimized or hidden, the window it came from still takes its pages, its new tabs and its translating.
+    @Test func aHiddenSourceWindowStillTakesItsPages() async throws {
+        try await inWindow(isPrivate: true) { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            controller.window?.orderOut(nil)
+            #expect(controller.window?.isVisible == false)
+            #expect(mini.browserTarget === controller)
+            #expect(mini.translator === controller)
+            #expect(mini.browserTarget.tabManager.privateStore === mini.tab.privateStore)
+        }
+        try await inWindow { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            controller.window?.orderOut(nil)
+            #expect(mini.browserTarget === controller)
+            // Closed, it's no longer where the pages go.
+            controller.window?.close()
+            #expect(mini.translator !== controller)
+        }
+    }
+
     @Test func aTabFromOutsideGoesRightAfterItsAnchor() {
         let space = Library.shared.spaces[0].id
         let manager = TabManager(spaceID: space)

@@ -2577,7 +2577,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         WindowManager.shared.windowBecameKey(self)
     }
 
+    /// Set as the window closes, for what holds on to this controller past that (Zigzag Mini's source).
+    private(set) var windowClosed = false
+
     func windowWillClose(_ notification: Notification) {
+        windowClosed = true
         fadeTimer?.invalidate()
         numberHints?.stop()
         Autofill.shared.forget(windowOf: window)
