@@ -4,7 +4,7 @@ import WebKit
 /// The glass card that shows a tab's page when you hover it in the sidebar: the picture inset a little, its corners
 /// running with the panel's, and the title and address under it. A split is one card, as in desk view: both pages
 /// where they sit on screen, and each one's title under its own side.
-final class TabPreviewView: FloatingPanelView {
+final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
     private let picture = PagePicture()
     private let placeholder = FaviconView()
     private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
@@ -18,6 +18,37 @@ final class TabPreviewView: FloatingPanelView {
     private let imageClip = NSView()
     /// How a split's or tile group's pages share the picture; nil for one page.
     private var shape: TileShape?
+    /// The lens's caption: back, forward, the editable address, reload and Site Controls, in place of the detail line
+    /// while the card is the live page.
+    private let lensControls = NSView()
+    let lensBack = IconButton(symbol: "chevron.left", size: .compact, toolTip: String(localized: "Back", comment: "Tooltip of the lens's Back button."))
+    let lensForward = IconButton(symbol: "chevron.right", size: .compact, toolTip: String(localized: "Forward", comment: "Tooltip of the lens's Forward button."))
+    let lensAddress = NSTextField()
+    let lensReload = IconButton(symbol: "arrow.clockwise", size: .compact, toolTip: String(localized: "Reload", comment: "Tooltip of the lens's Reload button."))
+    let lensSiteControls = IconButton(symbol: "slider.horizontal.3", size: .compact, toolTip: String(localized: "Site Controls", comment: "Name of the button by the lens's address that opens the site panel."))
+    private let lensAddressBackground = ColorView(color: NSColor.labelColor.withAlphaComponent(0.07))
+    /// The live page, over the snapshot while the lens is out.
+    private let liveClip = NSView()
+    private var liveHolder: NSView?
+    private var addressBeforeEditing = ""
+
+    var onLensBack: (() -> Void)?
+    var onLensForward: (() -> Void)?
+    var onLensReload: (() -> Void)?
+    var onLensAddress: ((String) -> Void)?
+    var onLensSiteControls: ((IconButton) -> Void)?
+
+    /// While the card is the lens: the controls replace the plain detail line. Off, the browser's preview is exactly
+    /// as it was.
+    var showsLensControls = false {
+        didSet {
+            refreshCaptionVisibility()
+            needsLayout = true
+        }
+    }
+
+    /// The live page's shape, width over height, for the lens's frame.
+    private(set) var pageAspect: CGFloat = 16.0 / 10.0
     static let footerHeight = Tokens.Metric.previewCaptionHeight
     /// The caption's height in a card this wide: taller by its note while a page in it is in Developer Mode or sleeps
     /// (three lines at most, when it's half of a split).
@@ -49,7 +80,16 @@ final class TabPreviewView: FloatingPanelView {
         imageClip.layer?.addSublayer(picture.layer)
         addSubview(imageClip)
         addSubview(placeholder)
+        liveClip.wantsLayer = true
+        liveClip.layer?.masksToBounds = true
+        liveClip.layer?.cornerRadius = Tokens.Radius.panel - Self.inset
+        liveClip.layer?.cornerCurve = .continuous
+        liveClip.isHidden = true
+        addSubview(liveClip)
         [title, detail, note, title2, detail2, note2].forEach { addSubview($0) }
+        detail.identifier = NSUserInterfaceItemIdentifier("preview.detail")
+        configureLensControls()
+        addSubview(lensControls)
         for label in [note, note2] {
             label.usesSingleLineMode = false
             label.maximumNumberOfLines = 3
@@ -71,11 +111,9 @@ final class TabPreviewView: FloatingPanelView {
         title2.stringValue = partner?.displayTitle ?? ""
         detail2.stringValue = partner?.url.map(CommandRanker.displayURL) ?? ""
         title2.isHidden = partner == nil
-        detail2.isHidden = partner == nil
         note.stringValue = Self.note(for: tab)
-        note.isHidden = note.stringValue.isEmpty
         note2.stringValue = Self.note(for: partner)
-        note2.isHidden = note2.stringValue.isEmpty
+        refreshCaptionVisibility()
         placeholder.image = tab?.displayIcon ?? bookmark?.displayIcon
         setImages([tab?.snapshot] + partners.map(\.snapshot))
         needsLayout = true
@@ -96,6 +134,117 @@ final class TabPreviewView: FloatingPanelView {
         placeholder.isHidden = !empty
         Tokens.Motion.withoutAnimation { picture.layer.isHidden = empty }
         refreshColors()
+    }
+
+    /// The live page, over the snapshot while the lens is out.
+    func showLive(holder: NSView) {
+        if holder.bounds.width > 1, holder.bounds.height > 1 {
+            pageAspect = holder.bounds.width / holder.bounds.height
+        }
+        liveHolder?.removeFromSuperview()
+        liveHolder = holder
+        liveClip.addSubview(holder)
+        holder.frame = liveClip.bounds
+        holder.autoresizingMask = [.width, .height]
+        liveClip.isHidden = false
+    }
+
+    /// The page left: the snapshot is the card's picture again.
+    func endLive() {
+        liveHolder?.removeFromSuperview()
+        liveHolder = nil
+        liveClip.isHidden = true
+    }
+
+    /// The live page's address and controls, as the browser shows them.
+    func updateLens(address: String, canGoBack: Bool, canGoForward: Bool, isLoading: Bool) {
+        if lensAddress.currentEditor() == nil { lensAddress.stringValue = address }
+        addressBeforeEditing = address
+        lensBack.isEnabled = canGoBack
+        lensForward.isEnabled = canGoForward
+        lensReload.isLoading = isLoading
+    }
+
+    @objc func submitLensAddress() {
+        onLensAddress?(lensAddress.stringValue)
+        window?.makeFirstResponder(nil)
+    }
+
+    func controlTextDidBeginEditing(_ obj: Notification) {
+        addressBeforeEditing = lensAddress.stringValue
+        lensAddress.currentEditor()?.selectAll(nil)
+    }
+
+    /// Esc in the address puts the page's address back and keeps the lens; the next Esc closes it.
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        guard control === lensAddress else { return false }
+        guard commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        lensAddress.stringValue = addressBeforeEditing
+        window?.makeFirstResponder(nil)
+        return true
+    }
+
+    private func refreshCaptionVisibility() {
+        lensControls.isHidden = !showsLensControls
+        detail.isHidden = showsLensControls
+        note.isHidden = showsLensControls || note.stringValue.isEmpty
+        detail2.isHidden = showsLensControls || title2.isHidden
+        note2.isHidden = showsLensControls || note2.stringValue.isEmpty
+    }
+
+    private func configureLensControls() {
+        lensControls.identifier = NSUserInterfaceItemIdentifier("preview.lensControls")
+        lensBack.identifier = NSUserInterfaceItemIdentifier("preview.lensBack")
+        lensForward.identifier = NSUserInterfaceItemIdentifier("preview.lensForward")
+        lensReload.identifier = NSUserInterfaceItemIdentifier("preview.lensReload")
+        lensSiteControls.identifier = NSUserInterfaceItemIdentifier("preview.lensSiteControls")
+        liveClip.identifier = NSUserInterfaceItemIdentifier("preview.live")
+        lensAddress.identifier = NSUserInterfaceItemIdentifier("preview.lensAddress")
+        lensAddressBackground.layer?.cornerRadius = Tokens.Radius.field
+        lensAddressBackground.layer?.cornerCurve = .continuous
+        lensAddress.isBordered = false
+        lensAddress.drawsBackground = false
+        lensAddress.focusRingType = .none
+        lensAddress.font = .systemFont(ofSize: Tokens.Pane.addressText)
+        lensAddress.textColor = Tokens.Color.textPrimary
+        lensAddress.lineBreakMode = .byTruncatingTail
+        lensAddress.usesSingleLineMode = true
+        lensAddress.delegate = self
+        lensAddress.target = self
+        lensAddress.action = #selector(submitLensAddress)
+        [lensBack, lensForward, lensAddressBackground, lensReload, lensSiteControls].forEach(lensControls.addSubview)
+        lensAddressBackground.addSubview(lensAddress)
+        lensBack.onClick = { [weak self] _ in
+            guard self?.lensBack.isEnabled == true else { return }
+            self?.onLensBack?()
+        }
+        lensForward.onClick = { [weak self] _ in
+            guard self?.lensForward.isEnabled == true else { return }
+            self?.onLensForward?()
+        }
+        lensReload.onClick = { [weak self] _ in self?.onLensReload?() }
+        lensSiteControls.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.onLensSiteControls?(self.lensSiteControls)
+        }
+        lensControls.isHidden = true
+    }
+
+    private func layoutLensControls() {
+        let button = Tokens.Pane.button
+        let height = lensControls.bounds.height
+        let y = (height - button) / 2
+        lensBack.frame = NSRect(x: 0, y: y, width: button, height: button)
+        lensForward.frame = NSRect(x: lensBack.frame.maxX + Tokens.Space.x1, y: y, width: button, height: button)
+        lensSiteControls.frame = NSRect(x: lensControls.bounds.width - button, y: y, width: button, height: button)
+        lensReload.frame = NSRect(x: lensSiteControls.frame.minX - button - Tokens.Space.x1, y: y,
+                                  width: button, height: button)
+        let addressX = lensForward.frame.maxX + Tokens.Space.x2
+        let addressRight = lensReload.frame.minX - Tokens.Space.x2
+        let addressHeight = Tokens.Pane.addressHeight
+        lensAddressBackground.frame = NSRect(x: addressX, y: (height - addressHeight) / 2,
+                                            width: max(0, addressRight - addressX), height: addressHeight)
+        lensAddress.frame = lensAddressBackground.bounds.insetBy(dx: Tokens.Space.x2, dy: 0)
     }
 
     /// With no picture yet, a soft wash of the space under the site's icon instead of a blank white page, as the tab
@@ -121,6 +270,7 @@ final class TabPreviewView: FloatingPanelView {
         let pad = Self.inset
         let footer = footerHeight(width: bounds.width)
         imageClip.frame = NSRect(x: pad, y: pad, width: bounds.width - pad * 2, height: bounds.height - footer - pad)
+        liveClip.frame = imageClip.frame
         picture.layout(size: imageClip.bounds.size)
         Tokens.Motion.withoutAnimation { picture.layer.position = CGPoint(x: imageClip.bounds.midX, y: imageClip.bounds.midY) }
         let icon = Tokens.Space.x8
@@ -131,9 +281,18 @@ final class TabPreviewView: FloatingPanelView {
         let top = imageClip.frame.maxY + (Self.footerHeight - titleH - detailH) / 2
         // One title, or with a split, each page's under its own side; stacked pages share the row half and half.
         let firstWidth = firstCaptionWidth(bounds.width)
-        title.frame = NSRect(x: textX, y: top, width: firstWidth - textX * 2, height: titleH)
-        detail.frame = NSRect(x: textX, y: title.frame.maxY, width: firstWidth - textX * 2, height: detailH)
-        note.frame = NSRect(x: textX, y: detail.frame.maxY, width: firstWidth - textX * 2, height: noteH)
+        if showsLensControls {
+            let controlH = Tokens.Pane.button
+            let lensTop = imageClip.frame.maxY + (footer - titleH - controlH) / 2
+            title.frame = NSRect(x: textX, y: lensTop, width: bounds.width - textX * 2, height: titleH)
+            lensControls.frame = NSRect(x: textX, y: title.frame.maxY, width: bounds.width - textX * 2,
+                                        height: controlH)
+            layoutLensControls()
+        } else {
+            title.frame = NSRect(x: textX, y: top, width: firstWidth - textX * 2, height: titleH)
+            detail.frame = NSRect(x: textX, y: title.frame.maxY, width: firstWidth - textX * 2, height: detailH)
+            note.frame = NSRect(x: textX, y: detail.frame.maxY, width: firstWidth - textX * 2, height: noteH)
+        }
         let secondX = firstWidth + textX, secondWidth = max(0, bounds.width - firstWidth - textX * 2)
         title2.frame = NSRect(x: secondX, y: top, width: secondWidth, height: titleH)
         detail2.frame = NSRect(x: secondX, y: title2.frame.maxY, width: secondWidth, height: detailH)

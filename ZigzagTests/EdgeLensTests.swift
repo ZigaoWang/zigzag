@@ -95,6 +95,61 @@ struct EdgeLensTests {
         #expect(abs((frame.height - caption) - frame.width / 0.5) < 0.5)
     }
 
+    // MARK: The lens caption
+
+    @Test func theBrowsersPreviewKeepsItsCaption() {
+        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 236, height: 176))
+        card.show(tab: nil, bookmark: nil)
+        card.layoutSubtreeIfNeeded()
+        #expect(view("preview.lensControls", in: card)?.isHidden == true)
+        #expect(view("preview.detail", in: card)?.isHidden == false)
+    }
+
+    @Test func theLensCaptionReplacesTheDetailLine() {
+        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        card.show(tab: nil, bookmark: nil)
+        card.showsLensControls = true
+        card.layoutSubtreeIfNeeded()
+        #expect(view("preview.lensControls", in: card)?.isHidden == false)
+        #expect(view("preview.detail", in: card)?.isHidden == true)
+        let controls = view("preview.lensControls", in: card)
+        #expect(controls?.frame.isEmpty == false)
+        #expect((controls?.frame.maxY ?? .infinity) <= card.bounds.maxY + 0.5)
+    }
+
+    @Test func theLensCaptionShowsThePagesState() {
+        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        card.show(tab: nil, bookmark: nil)
+        card.showsLensControls = true
+        card.updateLens(address: "example.com/a", canGoBack: true, canGoForward: false, isLoading: true)
+        #expect((view("preview.lensAddress", in: card) as? NSTextField)?.stringValue == "example.com/a")
+        #expect((view("preview.lensBack", in: card) as? IconButton)?.isEnabled == true)
+        #expect((view("preview.lensForward", in: card) as? IconButton)?.isEnabled == false)
+        #expect((view("preview.lensReload", in: card) as? IconButton)?.isLoading == true)
+    }
+
+    @Test func theLensCaptionSubmitsTheTypedAddress() {
+        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        card.showsLensControls = true
+        var submitted: String?
+        card.onLensAddress = { submitted = $0 }
+        (view("preview.lensAddress", in: card) as? NSTextField)?.stringValue = "example.com/b"
+        card.submitLensAddress()
+        #expect(submitted == "example.com/b")
+    }
+
+    @Test func theLivePageBringsItsShapeAndLeavesWithTheCard() {
+        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 400))
+        card.showLive(holder: holder)
+        #expect(abs(card.pageAspect - 2) < 0.01)
+        #expect(view("preview.live", in: card)?.isHidden == false)
+        #expect(holder.superview != nil)
+        card.endLive()
+        #expect(view("preview.live", in: card)?.isHidden == true)
+        #expect(holder.superview == nil)
+    }
+
     // MARK: Place
 
     @Test func theLensSitsBesideTheSidebarOnThePagesSide() {
@@ -123,5 +178,13 @@ struct EdgeLensTests {
     private func lens(aspect: CGFloat) -> NSRect {
         EdgeLensLayout.frame(beside: sidebar, in: screen, pageAspect: aspect, caption: caption,
                              onRight: true, rowMidY: 450)
+    }
+
+    private func view(_ id: String, in root: NSView) -> NSView? {
+        if root.identifier?.rawValue == id { return root }
+        for subview in root.subviews {
+            if let found = view(id, in: subview) { return found }
+        }
+        return nil
     }
 }
