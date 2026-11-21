@@ -31,7 +31,6 @@ extension BrowserWindowController: NSMenuItemValidation {
         if commandBar.isVisible { commandBar.dismiss(); return }
         // On the desk, the card you're on.
         if desk.isVisible { desk.closeFocused(); return }
-        if dismissFloatingContent() { return }
         // Rows picked in the sidebar, with the keys still there: all of them, as one step.
         if sidebar.list.marksHaveFocus { closeMarked(sidebar.list.marked); return }
         guard let tab = selectedTab else {
@@ -428,8 +427,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
     @objc func showReaderOptions(_ sender: Any?) { toggleReaderOptions() }
-    /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
-    @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
+    @objc func translatePage(_ sender: Any?) { translatePage() }
 
     /// Floats the playing video. When WebKit can't tell which video that is, says how to do it from the page.
     @objc func togglePictureInPicture(_ sender: Any?) {
@@ -461,11 +459,9 @@ extension BrowserWindowController: NSMenuItemValidation {
     // MARK: History
 
     @objc func goBack(_ sender: Any?) {
-        if let peek = peekController, peek.isVisible { peek.goBack(); return }
         selectedTab?.goBack()
     }
     @objc func goForward(_ sender: Any?) {
-        if let peek = peekController, peek.isVisible { peek.goForward(); return }
         selectedTab?.goForward()
     }
 
@@ -931,8 +927,8 @@ extension BrowserWindowController: NSMenuItemValidation {
             // Zigzag Mini names it Open in Zigzag while it's in front; here it's itself again.
             item.title = Self.openFileTitle
             return true
-        case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
-        case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
+        case #selector(goBack(_:)): return tab?.canGoBackOrReturn ?? false
+        case #selector(goForward(_:)): return tab?.canGoForward ?? false
         case #selector(takePageScreenshot(_:)): return capture.isActive || capture.canBegin
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
@@ -1021,7 +1017,6 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil
         case #selector(translatePage(_:)):
-            let tab = peek.isVisible ? peek.tab : tab
             item.title = tab?.isTranslated == true ? String(localized: "Show Original", comment: "Menu bar item: shows the translated page as it was.")
                                                   : String(localized: "Translate Page", comment: "Menu bar item: translates the page.")
             return tab?.url != nil

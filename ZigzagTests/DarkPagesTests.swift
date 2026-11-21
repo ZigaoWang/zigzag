@@ -338,7 +338,7 @@ struct DarkPagesTests {
         withDefaults {
             DarkPages.mode = .always
             let tab = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
-            tab.isPeek = true
+            tab.isOutsideTabList = true
             let webView = tab.ensureWebView()
             defer { tab.close() }
             #expect(DarkPages.choice(for: tab.url) == nil)

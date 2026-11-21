@@ -62,12 +62,12 @@ final class PageCapture {
         return .general
     }()
 
-    /// Whether the page in front can be captured: a web page on screen, not Reader, a PDF or a peek over it.
+    /// Whether the page in front can be captured: a web page on screen, not Reader or a PDF.
     var canBegin: Bool {
         guard let controller, let tab = controller.selectedTab, PageScreenshot.canTake(tab),
               let webView = controller.selectedWebView, webView.window != nil, webView.bounds.width > 0, webView.bounds.height > 0
         else { return false }
-        return !controller.isShowingReader && !controller.peek.isVisible
+        return !controller.isShowingReader
     }
 
     /// ⇧⌘2: in, or out again.

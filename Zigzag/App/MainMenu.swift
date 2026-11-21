@@ -99,8 +99,6 @@ enum MainMenu {
 
         main.addItem(submenu("Zigzag", [
             item(String(localized: "About Zigzag", comment: "Zigzag menu item."), #selector(AppDelegate.showAbout(_:)), ""),
-            item(String(localized: "Your Zigzag Card…", comment: "Zigzag menu item: opens a card with your name and the day you started using Zigzag, to keep or share."),
-                 #selector(AppDelegate.showZigzagCard(_:)), ""),
             item(String(localized: "Check for Updates…", comment: "Zigzag menu item."), #selector(AppDelegate.checkForUpdates(_:)), ""),
             .separator(),
             item(String(localized: "Settings…", comment: "Zigzag menu item."), #selector(AppDelegate.showSettings(_:)), ","),

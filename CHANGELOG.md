@@ -5,9 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Peek is now Zigzag Mini: shift-click a link (or Open Link in Zigzag Mini) and it opens in a Mini over your window, the same as links from other apps; ⌘O moves it into a tab next to where you clicked, Esc closes it. It opens in the page's own space and profile, and from a private window it's private too, never saved to History. Open Link in Peek in a link's menu is now Open Link in Zigzag Mini, and the getting-started guide's shift-click step shows Zigzag Mini. No settings were renamed.
+- Translate Page works in Zigzag Mini, from the View menu or the page's right-click menu, with its notices over the Mini.
+
 ### Fixed
 - Scrolling is smooth on a 120 Hz display on heavy pages, like GitHub when you're signed in. Since 0.9.3 beta 4, pages were made to draw up to 120 times a second; a heavy page can't finish drawing every 8 ms, so its scroll moved at an uneven mix of 60 and 120 steps a second and stuttered, where a light page kept up. Pages now draw as WebKit and Safari have them, steady at 60 while the scroll itself still moves at the display's full rate, which measures as smooth on the same page. Settings › Developer › Feature Flags › Prefer Page Rendering Updates near 60fps, off, brings the full drawing rate back. Thanks to [FammasMaz](https://github.com/FammasMaz). ([#394](https://github.com/ZigaoWang/zigzag/issues/394))
 - The Reader button in the address bar is a plain toggle again: click it to turn Reader on, click it again to turn it off. It shows pressed while Reader is on. Reader's text and color choices moved back into the page: a small Aa button sits in the article's top-right corner, fades away as you read down and comes back when you scroll up or move the pointer near the top, and opens the choices right under it. View › Reader Text and Colors still opens them, and Esc and ⌥⌘R still turn Reader off. The Turn Off Reader row is gone. Colors are now plain round dots, like picking an accent color in System Settings, with Auto split between its light and dark paper and Space in your space's color; the chosen one has a ring in the accent color. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+- Your Zigzag Card is in About Zigzag now, instead of a menu item of its own. Under it you can pick its finish: your space's color, Holographic, Graphite or Paper, and Zigzag keeps your choice. The card is bigger, turns toward the pointer with its light following, and a click turns it over. Save as Image… makes a much sharper picture, with a soft shadow on a clear background.
 
 ## [0.9.4] - 2026-11-21
 

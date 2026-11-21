@@ -49,7 +49,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Window | 窗口 | | macOS. |
 | Private window | 无痕浏览窗口 | 隐私浏览窗口, 无痕窗口 | Safari's New Private Window is 新建无痕浏览窗口. |
 | Split View | 分屏浏览 | 分栏 | macOS calls its Split View 分屏浏览. |
-| Peek | 速览 | 预览, keep "Peek" | No Apple word; Quick Look is 快速查看, so 速览 is close without clashing. 预览 clashes with the Preview app; English would read as untranslated. |
+| Peek | 速览 | 预览, keep "Peek" | Only for the old name in release notes: Peek is now Zigzag Mini. No Apple word; Quick Look is 快速查看, so 速览 is close without clashing. 预览 clashes with the Preview app. |
 | Zigzag Mini | Zigzag Mini | 迷你窗口, 小窗口, 迷你 Arc | A name, like the app's, so it stays in Latin letters (新建 Zigzag Mini). Arc called it Little Arc. Where a plain noun reads better in a sentence, 迷你窗口. |
 | Mini player (a video that follows you) | 小播放器 | | Plain and short; not 画中画, which is macOS's Picture in Picture and a separate thing. |
 | App (a site installed as one, an app on the Mac) | App | 应用, 应用程序 | As Apple's zh-Hans writes it (App Store): 安装为 App, 打开 App. |

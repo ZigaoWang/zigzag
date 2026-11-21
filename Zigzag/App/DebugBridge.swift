@@ -401,10 +401,9 @@ enum DebugBridge {
         }
     }
 
-    /// Which page has the keyboard: the peek's, the selected tab's, or something else.
+    /// Which page has the keyboard: the selected tab's, or something else.
     static func responderName(in controller: BrowserWindowController) -> String {
         let responder = controller.window?.firstResponder
-        if let peek = controller.peek.tab?.webView, responder === peek { return "peek" }
         if let page = controller.selectedWebView, responder === page { return "tab" }
         return responder.map { String(describing: type(of: $0)) } ?? "nil"
     }
@@ -753,7 +752,7 @@ enum DebugBridge {
             return
         }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
-        // card [tilt <x> <y>|tilt off|save <path>|shot <path>|close]: Your Zigzag Card, opened behind, leaning as if
+        // card [tilt <x> <y>|tilt off|finish <name>|flip|hover <n>|save <path>|shot <path>|close]: About with Your Zigzag Card, opened behind, leaning as if
         // the pointer were there (-1 to 1 from its middle, y up), its picture saved, or its window captured by number.
         // card start <yyyy-mm-dd> <version> [exact]: the kept start, replaced, for a test copy.
         if name == "card" {
@@ -764,7 +763,7 @@ enum DebugBridge {
                 CardStart.defaults.set(f.contains("exact"), forKey: CardStart.exactKey)
                 return
             }
-            if let card = ZigzagCardWindowController.shared, !f.isEmpty { card.debug(f) } else { ZigzagCardWindowController.show() }
+            if let about = AboutWindowController.shared, !f.isEmpty { about.debugCard(f) } else { AboutWindowController.show() }
             return
         }
         // updateready <version>|off: a pretend staged update (Restart only logs); updatedismiss: the card's close
@@ -1506,8 +1505,8 @@ enum DebugBridge {
                 MenuPanel.show([.item(.init(title: "Copy Link") {}), .item(.init(title: "Share…") {}), .separator,
                                 .item(.init(title: "Close Tab") {})], from: controller.sidebar.address)
             }
-        case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
-        case "peekclose": controller.peek.close()
+        // shiftclick <url>: opens the link as a ⇧-click on the selected tab's page does, in Zigzag Mini over the window.
+        case "shiftclick": if let url = URL(string: arg) { controller.open(url, disposition: .mini, opener: controller.tabManager.selectedTab, by: .page) }
         case "switcher": controller.debugSwitcher()
         // spaceswitcher [down|up|tab|return|esc|again|back|1-9|state <path>]: opens the space switcher (or moves it on, as its
         // shortcut does), presses a key in it, or writes its rows, ">" on the choice and "*" on the space you're in.
@@ -1851,8 +1850,7 @@ enum DebugBridge {
                     for area in page.trackingAreas where inside && area.options.contains(.mouseMoved) {
                         guard let owner = area.owner as? NSObject, owner.responds(to: moved) else { continue }
                         owner.perform(moved, with: event)
-                        let name = page === controller.peek.tab?.webView ? "peek" : page === controller.selectedWebView ? "tab" : "page"
-                        heard.append(name + (PeekController.isCovered(page) ? "(ignores)" : ""))
+                        heard.append(page === controller.selectedWebView ? "tab" : "page")
                     }
                 }
                 view.subviews.forEach(walk)
@@ -2079,9 +2077,9 @@ enum DebugBridge {
             debugLog("autofillmenu => \(Autofill.shared.isShowing) \(Autofill.shared.debugRows)")
         case "autofillclick":
             // autofillclick <css selector>: a click on that element of the page, sent to the window in-process.
-            // autofillclick peek <css selector>: the same, in the page peeked at.
+            // autofillclick mini <css selector>: the same, in the last Zigzag Mini's page.
             // autofillclick right <css selector>: a right-click there, opening the page's context menu (closed after 3 s).
-            if arg.hasPrefix("peek "), let webView = controller.peek.tab?.webView { Autofill.debugClick(String(arg.dropFirst(5)), in: webView) }
+            if arg.hasPrefix("mini "), let webView = MiniWindowController.all.last?.tab.webView { Autofill.debugClick(String(arg.dropFirst(5)), in: webView) }
             else if arg.hasPrefix("right "), let webView = controller.selectedWebView { closeNextMenu(after: 3); Autofill.debugClick(String(arg.dropFirst(6)), in: webView, right: true) }
             else if let webView = controller.selectedWebView { Autofill.debugClick(arg, in: webView) }
         case "autofillpick":
@@ -2219,11 +2217,6 @@ enum DebugBridge {
                                                                 windowNumber: controller.window?.windowNumber ?? 0, context: nil,
                                                                 characters: ch, charactersIgnoringModifiers: ch, isARepeat: false, keyCode: 0) {
                 debugLog("menukey \(arg): \(NSApp.mainMenu?.performKeyEquivalent(with: event) ?? false)")
-            }
-        case "peekjs":
-            // peekjs <script>: runs in the peeked page, as js does in the tab's.
-            controller.peek.tab?.webView?.evaluateJavaScript(arg) { result, error in
-                debugLog("peekjs => \(String(describing: result).prefix(500)) \(error.map { String(describing: $0) } ?? "")")
             }
         case "textcheck":
             // textcheck [<selector>]: sends a spelling or substitution toggle to the selected page, then logs the saved
@@ -2396,7 +2389,6 @@ enum DebugBridge {
                 let t = tab.themeColor?.usingColorSpace(.sRGB)
                 debugLog("theme \(tab.displayTitle.prefix(20)): \(t.map { "h\($0.hueComponent) s\($0.saturationComponent) b\($0.brightnessComponent)" } ?? "nil") tint=\(SiteTint.color(for: tab).map { String(describing: $0) } ?? "nil")")
             }
-        case "peekexpand": controller.peek.openAsTab()
         case "linkfrom":
             // Simulates a Cmd-click on a link in the current page.
             if let tab = controller.tabManager.selectedTab, let url = URL(string: arg) { controller.tab(tab, openURL: url, disposition: .foregroundTab) }
