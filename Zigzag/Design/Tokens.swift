@@ -277,8 +277,6 @@ enum Tokens {
         static var spaceNameText: CGFloat { scaled(26) }
         static var spaceNameHeight: CGFloat { scaledEven(36) }
         /// Tracking for the space's name, in points: display type sits tighter.
-        /// The name's first letter's side bearing at that size, so its ink lands on the icon column.
-        static let spaceNameBearing: CGFloat = 1
         /// A space key in the bottom bar: a small rounded key with its number, 4pt between keys.
         static let spaceKey: CGFloat = 18
         /// Between the favorites and the list.

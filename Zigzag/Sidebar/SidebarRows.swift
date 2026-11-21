@@ -1531,8 +1531,8 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        // Large, the name stands flush with the icons' edge, the way a heading does. At 26pt the first letter's own
-        // side bearing sets its ink a point in: pulled back so the ink, not the box, meets the icons' edge.
+        // The name stands flush with the icons' edge, the way a heading does. Its first letter's own side bearing
+        // sets its ink in from the box: pulled back so the ink, not the box, meets the icons' edge, at either size.
         // Low in its slot, near the pinned tabs it names, with the room above it.
         let pad = Tokens.Space.x1
         // Large, low in its slot; at row size, centered in its row like the rows below it.
@@ -1542,7 +1542,7 @@ final class SpaceHeaderView: InteractiveView {
         let font = Self.nameFont
         let baseline = isFlipped ? y + (h + font.ascender + font.descender) / 2 : y + (h - font.ascender - font.descender) / 2
         let xMiddle = isFlipped ? baseline - font.xHeight / 2 : baseline + font.xHeight / 2
-        let bearing = Self.isLarge ? Tokens.Sidebar.spaceNameBearing : 0
+        let bearing = Self.inkBearing(of: name, font: font)
         var x = SidebarRowView.inset - Label.inset - bearing
         if icon != nil {
             // The space's icon leads the name at the name's own scale, as one mark, not a row icon beside a heading.
@@ -1574,6 +1574,12 @@ final class SpaceHeaderView: InteractiveView {
             profileTip = profileName as NSString
             addToolTip(profileLabel.frame, owner: profileTip!, userData: nil)
         }
+    }
+    /// How far in from its box the first letter's ink starts, so the name's ink, not its box, meets the icon column.
+    static func inkBearing(of text: String, font: NSFont) -> CGFloat {
+        guard let first = text.first else { return 0 }
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: String(first), attributes: [.font: font]))
+        return max(0, CTLineGetBoundsWithOptions(line, .useGlyphPathBounds).minX)
     }
     /// What the cut profile name's tooltip says; a tooltip doesn't keep its owner.
     private var profileTip: NSString?
