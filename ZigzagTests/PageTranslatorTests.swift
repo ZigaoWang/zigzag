@@ -546,4 +546,80 @@ struct PageLanguageChoiceTests {
         #expect(missing != PageTranslator.failureMessage(notDownloaded: nil))
         #expect(PageTranslator.failureMessage(notDownloaded: nil) == String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails."))
     }
+
+    // MARK: Always and Never
+
+    private func withChoices(_ body: (PageTranslator.Choices) throws -> Void) rethrows {
+        let name = "PageTranslatorTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        try body(PageTranslator.Choices(defaults: defaults))
+    }
+
+    @Test func alwaysAndNeverDecideWhatHappensOnTheirOwn() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR")
+            @MainActor func automatic(site: String = "lemonde.fr", translatedHere: Bool = false, neverHere: Set<String> = [],
+                           offers: Bool = true, offered: Bool = false) -> PageTranslator.Automatic {
+                choices.automatic(language: french, site: site, translatedHere: translatedHere, neverHere: neverHere, offers: offers, offered: offered)
+            }
+            // Nothing chosen: offered once per site, and not at all with the offer off.
+            #expect(automatic() == .offer)
+            #expect(automatic(offered: true) == .nothing)
+            #expect(automatic(offers: false) == .nothing)
+            // Always French translates on every site, by language code, even with the offer off.
+            choices.setAlways(true, "fr")
+            #expect(automatic(offers: false) == .translate)
+            #expect(automatic(site: "liberation.fr", offered: true) == .translate)
+            // Never French replaces Always French.
+            choices.setNever(true, "fr")
+            #expect(choices.alwaysLanguages.isEmpty)
+            #expect(automatic() == .nothing)
+            choices.setAlways(true, "fr")
+            #expect(choices.neverLanguages.isEmpty)
+            // Never This Site beats Always, whether kept or only for a private window.
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            #expect(automatic() == .nothing)
+            #expect(automatic(site: "liberation.fr") == .translate)
+            #expect(automatic(site: "liberation.fr", neverHere: ["liberation.fr"]) == .nothing)
+            // A site translated a moment ago keeps translating as you browse it.
+            #expect(automatic(translatedHere: true) == .translate)
+        }
+    }
+
+    @Test func aPrivateWindowKeepsNoSites() {
+        withChoices { choices in
+            #expect(!choices.setNeverSite(true, "lemonde.fr", isPrivate: true))
+            #expect(choices.neverSites.isEmpty)
+            #expect(choices.defaults.object(forKey: "TranslateNeverSites") == nil)
+            // What was chosen in a normal window still counts there.
+            #expect(choices.setNeverSite(true, "lemonde.fr", isPrivate: false))
+            #expect(!choices.setNeverSite(false, "lemonde.fr", isPrivate: true))
+            #expect(choices.neverSites == ["lemonde.fr"])
+            #expect(choices.automatic(language: Locale.Language(identifier: "fr"), site: "lemonde.fr", translatedHere: false,
+                                      offers: true, offered: false) == .nothing)
+        }
+    }
+
+    @Test func settingsListsTheChoicesAndRemovesOne() {
+        withChoices { choices in
+            let names = ["fr": "French", "de": "German", "ja": "Japanese", "es": "Spanish"]
+            choices.setAlways(true, "ja")
+            choices.setAlways(true, "fr")
+            choices.setNever(true, "es")
+            choices.setNever(true, "de")
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            let listed = choices.entries { names[$0] ?? $0 }
+            #expect(listed.always == [.always("fr"), .always("ja")])
+            #expect(listed.never == [.neverLanguage("de"), .neverLanguage("es"), .neverSite("lemonde.fr")])
+            choices.remove(.always("fr"))
+            choices.remove(.neverSite("lemonde.fr"))
+            let after = choices.entries { names[$0] ?? $0 }
+            #expect(after.always == [.always("ja")])
+            #expect(after.never == [.neverLanguage("de"), .neverLanguage("es")])
+            #expect(choices.defaults.object(forKey: "TranslateNeverSites") == nil)
+            // Kept in the existing setting, so Always choices made before this still show.
+            #expect(choices.defaults.stringArray(forKey: "TranslateAlways") == ["ja"])
+        }
+    }
 }
