@@ -547,6 +547,8 @@ final class Tab: NSObject {
         if #available(macOS 15.4, *), extensionConfiguration == nil,
            configuration.webExtensionController === profile.extensions.controller {
             profile.extensions.bridge.userScripts.attach(configuration.userContentController, isPrivate: privateStore != nil)
+            // After the private store above: a private page gets OldTwitter's challenge call only when it may run there.
+            profile.extensions.attachOldTwitterSolver(to: configuration, isPrivate: privateStore != nil)
         }
         // A page's own scripts may ask Zigzag to make a loopback call, when Settings and the site's switch both say
         // yes. An extension's own page has its bridge instead, and a private tab keeps WebKit's own networking.

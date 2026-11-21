@@ -311,13 +311,14 @@ final class ExtensionHost: NSObject {
                      injectionTime: .atDocumentStart, forMainFrameOnly: false)
     }
 
-    /// OldTwitter's challenge call, in this web view's extension world, when the extension is on.
-    func attachOldTwitterSolver(to configuration: WKWebViewConfiguration) {
+    /// OldTwitter's challenge call, in this web view's extension world, when the extension is on. A private page gets
+    /// it only when OldTwitter may run there.
+    func attachOldTwitterSolver(to configuration: WKWebViewConfiguration, isPrivate: Bool) {
         guard let id = profile.installs.installedIDs.first(where: {
                   OldTwitterSolver.isOldTwitter(id: $0, manifest: ExtensionStore.manifest(for: $0) ?? [:])
               }),
               profile.installs.state(id)?.enabled == true else { return }
-        oldTwitterSolver.attach(to: configuration, extensionID: id)
+        oldTwitterSolver.attach(to: configuration, extensionID: id, isPrivate: isPrivate)
     }
 
     /// The extension, loaded in this profile, that the page at this address is one of.
