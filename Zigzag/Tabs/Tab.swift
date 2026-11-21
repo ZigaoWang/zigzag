@@ -704,7 +704,7 @@ final class Tab: NSObject {
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
             let freed = chosen ? nil : self.memoryInUse(by: webView)
-            self.tearDown(webView)
+            self.tearDown(webView, keepingSettings: self.url.map(SettingsPage.isSettings) ?? false)
             self.freedMemory = freed
             self.sleepCause = chosen ? .chosen : reason == EnergyWatch.sleepReason ? .energy : .memory
             self.changed.send(.webView)
@@ -774,12 +774,14 @@ final class Tab: NSObject {
         }
     }
 
-    private func tearDown(_ webView: BrowserWebView) {
+    /// `keepingSettings`: the page may come back as it was (a sleep), so the Settings view stays for it: building one
+    /// again costs the whole first-open time (#357).
+    private func tearDown(_ webView: BrowserWebView, keepingSettings: Bool = false) {
         Autofill.shared.forget(webView)
         // Tabs that shared the rule keep their images.
         PageImages.set(false, in: webView)
         setPDFViewer(nil)
-        if settingsView != nil {
+        if settingsView != nil, !keepingSettings {
             settingsView = nil
             changed.send(.settings)
         }
