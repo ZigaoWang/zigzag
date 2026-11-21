@@ -402,10 +402,31 @@ struct PasswordMenuTests {
         menu.debugHover(1, true)
         #expect(menu.debugHighlight.frame == menu.debugRowFrame(1))
         #expect(menu.debugHighlight.gliding == !Tokens.Motion.reduceMotion)
-        // Off the rows, it goes back to the one the keys chose.
+        // Off the row it chose, nothing is chosen, as in MenuPanel.
         menu.debugHover(1, false)
-        #expect(menu.debugHighlight.frame == menu.debugRowFrame(0))
+        #expect(!menu.debugHighlight.shown)
         #expect(!menu.debugRowsFilled)
+        _ = window
+    }
+
+    /// With the pointer resting on a row, the arrow keys move the highlight on from it, and Return fills the row lit.
+    @Test func theKeysTakeTheHighlightFromThePointer() throws {
+        let origin = try #require(Origin(URL(string: "https://example.com")))
+        let menu = AutofillMenu(items: [.login(login("https://example.com", "sam")), .login(login("https://example.com", "alex")), .systemPasswords], origin: origin)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView?.addSubview(menu)
+        menu.frame = NSRect(x: 20, y: 20, width: 320, height: menu.contentHeight)
+        menu.layoutSubtreeIfNeeded()
+        menu.debugHover(0, true)
+        guard case .login(let first)? = menu.selected else { Issue.record("no row chosen"); return }
+        #expect(first.username == "sam")
+        menu.move(1)
+        #expect(menu.debugHighlight.frame == menu.debugRowFrame(1))
+        guard case .login(let next)? = menu.selected else { Issue.record("no row chosen"); return }
+        #expect(next.username == "alex")
+        // The pointer leaving the row it no longer lights keeps the keys' choice.
+        menu.debugHover(0, false)
+        #expect(menu.debugHighlight.frame == menu.debugRowFrame(1))
         _ = window
     }
 }

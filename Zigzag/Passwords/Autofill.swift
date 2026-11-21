@@ -219,6 +219,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         menu?.removeFromSuperview()
         let menu = AutofillMenu(items: Array(items.prefix(AutofillMenu.maxRows)), origin: origin)
         menu.onPick = { [weak self] item in self?.pick(item) }
+        menu.onHoverSelect = { [weak self, weak menu] in self?.markSelected(menu?.selected != nil) }
         let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
         menu.frame = Self.menuFrame(under: fieldInOverlay, in: overlay.bounds, height: menu.contentHeight)
         overlay.addSubview(menu)
@@ -1115,11 +1116,11 @@ final class AutofillMenu: FloatingPanelView {
             moveHighlight()
         }
     }
-    /// The row under the pointer, which the highlight shows over the one chosen with the keys.
-    private var hovered: Int? { didSet { moveHighlight() } }
     private let highlight = HighlightGlide()
     private var highlighted: Int?
     var onPick: ((Item) -> Void)?
+    /// The pointer chose a row, or left the one chosen.
+    var onHoverSelect: (() -> Void)?
 
     private let pad = Tokens.Space.x1 + 2
     private let rowHeight = Tokens.Space.x10 + Tokens.Space.x1
@@ -1141,7 +1142,9 @@ final class AutofillMenu: FloatingPanelView {
             row.onClick = { [weak self] _ in self?.onPick?(item) }
             row.hoverChanged = { [weak self, weak row] on in
                 guard let self, let row else { return }
-                if on { self.hovered = row.isEnabled ? index : nil } else if self.hovered == index { self.hovered = nil }
+                // As in MenuPanel: the pointer and the keys move one choice, which Return fills.
+                if on { self.selection = row.isEnabled ? index : -1 } else if self.selection == index { self.selection = -1 } else { return }
+                self.onHoverSelect?()
             }
             row.pressChanged = { [weak self] pressed in self?.highlight.showPressed(pressed) }
             addSubview(row)
@@ -1183,9 +1186,9 @@ final class AutofillMenu: FloatingPanelView {
     var debugRowsFilled: Bool { rows.contains { $0.layer?.backgroundColor != nil } }
     #endif
 
-    /// One highlight for the row under the pointer, or else the one the arrow keys reached, gliding between them.
+    /// One highlight on the row the pointer or the arrow keys chose last, gliding between them.
     private func moveHighlight() {
-        let next = hovered ?? (rows.indices.contains(selection) ? selection : nil)
+        let next = rows.indices.contains(selection) ? selection : nil
         guard next != highlighted else { return }
         let old = highlighted
         highlighted = next
