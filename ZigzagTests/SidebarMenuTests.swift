@@ -264,6 +264,7 @@ struct SidebarMenuTests {
             case .item(let item): titles.append(item.title); items.append(item)
             case .header(let text): titles.append("# " + text)
             case .separator: titles.append("-")
+            case .note: titles.append("note")
             }
         }
         #expect(titles == ["# Profile", "Reload Page", "-", "Delete Space", "-", "Move To", "Large Space Names", "Close Tab"])
@@ -277,6 +278,36 @@ struct SidebarMenuTests {
         items.first { $0.title == "Reload Page" }?.action()
         work.action()
         #expect(ran == ["reload", "work"])
+    }
+
+    /// A help button's lines open in the drawn menu's panel, not a system popover: wrapped to its width, read as a
+    /// popover, closed by Esc or the button again.
+    @Test func aNoteOpensInTheDrawnPanel() throws {
+        let (window, anchor) = host()
+        let text = NSAttributedString(string: String(repeating: "Matches pages on the exact hostname you enter. ", count: 4))
+        let menu = try #require(MenuPanel.show([.note(text)], from: anchor, minWidth: 300))
+        #expect(MenuPanel.current === menu)
+        #expect(menu.accessibilityRole() == .popover)
+        #expect(menu.itemTitles.isEmpty)
+        #expect(menu.frame.width >= 300)
+        // Several lines, all inside it.
+        #expect(menu.frame.height > Tokens.Page.controlHeight * 2)
+        #expect(menu.handleKey(key(53, "\u{1b}", in: window)))
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func theMatchTypeHelpTogglesItsPanel() throws {
+        let (window, anchor) = host()
+        let help = SiteRouteSheet.matchHelpButton()
+        help.frame = anchor.frame
+        anchor.superview?.addSubview(help)
+        #expect(help.accessibilityPerformPress())
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === help)
+        #expect(menu.accessibilityRole() == .popover)
+        #expect(help.accessibilityPerformPress())
+        #expect(MenuPanel.current == nil)
+        _ = window
     }
 }
 

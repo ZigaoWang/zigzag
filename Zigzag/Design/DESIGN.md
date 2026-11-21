@@ -599,7 +599,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   sidebar's empty space opens the same items, with Edit Space…, under the pointer. Keys: Up and Down,
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu
   of menu items and speaks the item the keys reach. A click outside closes it and goes no further. Panels under it
-  leave Esc and that click to it (`MenuPanel.current`). The HTML pages' `.menu` matches it.
+  leave Esc and that click to it (`MenuPanel.current`). The HTML pages' `.menu` matches it. A help button's few
+  lines (a space rule's match types) open the same way as a `.note`, read by VoiceOver as a popover; Zigzag shows
+  no system popover of its own.
 - **A row's right-click menu** (`SidebarMenus`, #327): first what only this row has (Back to Pinned Page and Set
   Current Page as Pinned while a pinned page or favorite is off its address; Separate Split View, and Remove from
   Split View for one page of three or four; Mute Tab while it plays), then the page (Reload Page, Suspend Page while a

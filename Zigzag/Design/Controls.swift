@@ -1721,6 +1721,8 @@ final class MenuPanel: FloatingPanelView {
         /// A quiet heading over the items after it ("Save Downloads To").
         case header(String)
         case separator
+        /// Words that explain, wrapped to the menu's width (a help button's few lines).
+        case note(NSAttributedString)
     }
 
     struct Item {
@@ -1781,6 +1783,9 @@ final class MenuPanel: FloatingPanelView {
 
     private let entries: [Entry]
     private var rows: [Row] = []
+    private var notes: [NSTextField] = []
+    /// The width notes wrap to, set once the menu's width is known.
+    private var noteWidth: CGFloat = 0
     private let scroll = NSScrollView()
     private let list = FlippedView()
     /// One soft gray pill that glides from row to row under the pointer, rather than each row lighting on its own.
@@ -1862,23 +1867,37 @@ final class MenuPanel: FloatingPanelView {
                 list.addSubview(Label.section(text))
             case .separator:
                 list.addSubview(ColorView(color: Tokens.Color.separator))
+            case .note(let text):
+                let note = NSTextField.dialogText("")
+                note.attributedStringValue = text
+                notes.append(note)
+                list.addSubview(note)
             }
         }
         setAccessibilityElement(true)
-        setAccessibilityRole(.menu)
+        // Only words to read: a popover, not a menu to choose from.
+        setAccessibilityRole(rows.isEmpty && !notes.isEmpty ? .popover : .menu)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private var contentHeight: CGFloat {
-        Self.pad * 2 + entries.map { entry -> CGFloat in
+        var noteIndex = 0
+        return Self.pad * 2 + entries.map { entry -> CGFloat in
             switch entry {
-            case .item: Self.rowHeight
-            case .header: Self.headerHeight
-            case .separator: Self.separatorHeight
+            case .item: return Self.rowHeight
+            case .header: return Self.headerHeight
+            case .separator: return Self.separatorHeight
+            case .note:
+                defer { noteIndex += 1 }
+                return noteHeight(notes[noteIndex])
             }
         }.reduce(0, +)
     }
+
+    private static let noteInset = Tokens.Space.x2
+
+    private func noteHeight(_ note: NSTextField) -> CGFloat { note.wrappedHeight(noteWidth) + Self.noteInset * 2 }
 
     /// The top of item `index` in the list.
     private func top(ofItem index: Int) -> CGFloat {
@@ -1891,6 +1910,7 @@ final class MenuPanel: FloatingPanelView {
                 y += Self.rowHeight
             case .header: y += Self.headerHeight
             case .separator: y += Self.separatorHeight
+            case .note: break
             }
         }
         return y
@@ -1920,6 +1940,7 @@ final class MenuPanel: FloatingPanelView {
         menu.onClose = closed
 
         let width = ceil(max(menu.fittingWidth, minWidth + Self.pad * 2))
+        menu.noteWidth = width - (Self.pad + Self.rowInset) * 2
         let a = anchor.convert(anchor.bounds, to: nil)
         let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
         let full = menu.contentHeight
@@ -2004,7 +2025,11 @@ final class MenuPanel: FloatingPanelView {
         list.frame = NSRect(x: 0, y: 0, width: width, height: contentHeight)
         var y = Self.pad, index = 0
         for view in list.subviews where view !== pill {
-            if let row = view as? Row {
+            if let note = view as? NSTextField, notes.contains(where: { $0 === note }) {
+                let h = noteHeight(note)
+                note.frame = NSRect(x: Self.pad + Self.rowInset, y: y + Self.noteInset, width: width - (Self.pad + Self.rowInset) * 2, height: h - Self.noteInset * 2)
+                y += h
+            } else if let row = view as? Row {
                 row.frame = NSRect(x: Self.pad, y: y, width: width - Self.pad * 2, height: Self.rowHeight)
                 y += Self.rowHeight
                 index += 1

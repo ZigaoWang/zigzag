@@ -78,26 +78,15 @@ enum SiteRouteSheet {
         let help = IconButton(symbol: "info.circle", size: .compact, toolTip: SiteRoutes.Match.overview)
         help.setAccessibilityLabel(String(localized: "About Match Types", comment: "Button opening space rule help."))
         help.setAccessibilityHelp(SiteRoutes.Match.overview)
-        let helpPopover = NSPopover()
-        helpPopover.behavior = .transient
         help.onClick = { [weak help] _ in
             guard let help else { return }
-            if helpPopover.isShown { helpPopover.close(); return }
-            let label = matchHelpLabel()
-            let width: CGFloat = 300
-            let padding = Tokens.Space.x4
-            let height = label.wrappedHeight(width)
-            let controller = NSViewController()
-            controller.view = NSView(frame: NSRect(x: 0, y: 0, width: width + 2 * padding, height: height + 2 * padding))
-            label.frame = controller.view.bounds.insetBy(dx: padding, dy: padding)
-            controller.view.addSubview(label)
-            helpPopover.contentViewController = controller
-            helpPopover.show(relativeTo: help.bounds, of: help, preferredEdge: .maxY)
+            if let open = MenuPanel.current, open.anchor === help { open.close(); return }
+            MenuPanel.show([.note(matchHelpText())], from: help, minWidth: 300)
         }
         return help
     }
 
-    private static func matchHelpLabel() -> NSTextField {
+    static func matchHelpText() -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.headIndent = Tokens.Space.x4
         paragraph.tabStops = [NSTextTab(textAlignment: .left, location: paragraph.headIndent)]
@@ -115,9 +104,7 @@ enum SiteRouteSheet {
             ]))
         }
         text.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: text.length))
-        let label = NSTextField.dialogText("")
-        label.attributedStringValue = text
-        return label
+        return text
     }
 }
 

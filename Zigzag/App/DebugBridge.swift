@@ -1324,6 +1324,10 @@ enum DebugBridge {
             if !controller.tab(tab, routesLink: url, arrival: newTab ? .linkNewTab : .linkClick, inBackground: f.contains("bg")) {
                 if newTab { controller.tab(tab, openURL: url, disposition: f.contains("bg") ? .backgroundTab : .foregroundTab) } else { tab.load(url, by: .page) }
             }
+        // routehelp: presses the last match-type help button in the window (Settings › Spaces, a rule's sheet).
+        case "routehelp":
+            func buttons(in view: NSView) -> [IconButton] { [view as? IconButton].compactMap { $0 } + view.subviews.flatMap(buttons) }
+            _ = controller.window?.contentView.map(buttons)?.last { $0.accessibilityLabel() == String(localized: "About Match Types", comment: "Button opening space rule help.") }?.accessibilityPerformPress()
         case "routes":
             let list = Library.shared.siteRoutes.map { "\($0.site)→\(Library.shared.space($0.spaceID)?.name ?? "?")" }
             let tabs = controller.tabManager.allTabs.map { "\(Library.shared.space($0.spaceID)?.name ?? "?"):\($0.url?.absoluteString ?? "-")" }
