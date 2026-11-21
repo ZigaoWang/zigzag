@@ -13,6 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 修复
+- OldTwitter 在 x.com 上的图标和字体能正常显示了：扩展自己的文件现在按 Zigzag 的地址读取，网站的安全策略允许这个地址，所以它的图标字体、加载图片、列表图标和标签页图标不再显示成空白方块。引用推文里的视频会就地播放，点按引用推文只会打开它自己的内容。感谢 [datarip](https://github.com/datarip)。
 - 地址栏里的阅读器按钮又变回普通开关了：点一下打开阅读器，再点一下关闭，开着时按钮是按下的样子。阅读器的文字和颜色设置回到了页面里：文章右上角有个小小的 Aa 按钮，往下读时会淡出，往上滚或把指针移到顶部附近时又会出现，点它在下面打开设置。“显示”菜单里的“阅读器文字和颜色”照样能打开，Esc 和 ⌥⌘R 照样关闭阅读器。“关闭阅读器”那一行去掉了。颜色改成了简单的圆点，跟系统设置里选强调色一样：“自动”一半浅一半深，“空间”是你空间的颜色，选中的那个外面有一圈强调色。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 
 ## [0.9.4] - 2026-11-21
@@ -34,7 +35,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 设置里说得更少：只是在重复标题的说明文字都去掉了，留下的说明都在讲后果或提醒；以前用不同说法问同一个问题的选项，现在只用一种说法。扩展的网站访问权限里，“在你点按它时”改成“点按时”。([#448](https://github.com/ZigaoWang/zigzag/issues/448))
 - 地址栏在没有东西可固定的地方不再显示星标：Zigzag 自己的页面（设置、历史记录、归档）、新标签页和无痕浏览窗口。以前它会灰着留在那里，现在旁边固定的扩展会占用它的位置。感谢 [Lakeland97](https://github.com/Lakeland97)。([#442](https://github.com/ZigaoWang/zigzag/issues/442))
 - 来自 Chrome 网上应用店或 Firefox 附加组件的主题，以及用“从文件夹安装”选的主题文件夹，不会再被安装。Zigzag 不使用浏览器主题，所以会直接说明，并提示可以改空间的颜色；以前会把主题当成扩展装上，装好后什么也不做。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
-- OldTwitter 在 x.com 上的图标和字体能正常显示了：扩展自己的文件现在按 Zigzag 的地址读取，网站的安全策略允许这个地址，所以它的图标字体、加载图片、列表图标和标签页图标不再显示成空白方块。引用推文里的视频会就地播放，点按引用推文只会打开它自己的内容。感谢 [datarip](https://github.com/datarip)。
 - 在 Chrome 网上应用店的主题页面上点提示栏的“添加”，现在只会显示一行说明 Zigzag 不使用浏览器主题，也不再出现“重试”按钮，因为重试也只会得到同样的结果。感谢 [Lakeland97](https://github.com/Lakeland97)。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
 - 在 Peek 里点了链接之后可以退回去了。Peek 打开过别的页面后，顶部会出现后退和前进按钮，⌘[、⌘] 和双指轻扫也跟在标签页里一样能用。按 Esc 还是直接关掉整个 Peek。感谢 [Lakeland97](https://github.com/Lakeland97)。([#463](https://github.com/ZigaoWang/zigzag/issues/463))
 - 翻译很长的网页不会再在 45 秒后放弃了。屏幕上看得到的部分先翻，翻好一段就换上一段，提示里会显示翻到多少了；只有连续 45 秒什么都没翻出来才会报错。感谢 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
