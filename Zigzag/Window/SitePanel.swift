@@ -925,6 +925,11 @@ final class SitePanel: FloatingPanelView {
                       developerLook: tab.developerInEffect.appearance != .followsMac).text
     }
 
+    /// What the Pure black row says under its name (#382).
+    static func pureBlackStatus(url: URL) -> String {
+        DarkPages.hasBlackSite(for: url) ? onHere : offHere
+    }
+
     /// Which rows apply to this page, as `SitePanelRows` decides from what the page is.
     private var rowContext: SitePanelRows.Context {
         var context = SitePanelRows.Context()
@@ -938,6 +943,9 @@ final class SitePanel: FloatingPanelView {
         let hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.hasPermissions = hasPermissions || context.isWeb
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
+        // Pure black for the site alone (#382): only where dark pages draw its pages, and only while the setting
+        // leaves it to sites, since with it on every site is black already.
+        context.pureBlack = DarkPages.applies(to: url) && DarkPages.wants(url) && !DarkPages.pureBlack
         context.clearsCookiesOnQuit = KeptCookies.clearsOnQuit(in: tab.profile.id)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
@@ -1025,6 +1033,16 @@ final class SitePanel: FloatingPanelView {
                 }
                 darkRow = row
                 rows.append(row)
+            case .darkBlack:
+                // Pure black for this site alone (#382), while the setting leaves it to sites: a site kept here
+                // stays black whatever the setting says.
+                let url = url
+                rows.append(.toggle(String(localized: "Pure black", comment: "Row in the site panel's This Site group, under Dark page and while Pure black backgrounds is off for every site: draws this site's darkened pages black instead of dark gray."),
+                                    on: DarkPages.black(url), status: { _ in Self.pureBlackStatus(url: url) }) { [weak self] on in
+                    guard let self else { return }
+                    DarkPages.setBlack(on, for: self.url)
+                    self.rebuildRows()
+                })
             case .keepAwake:
                 // The site's tabs never sleep in the background (TabSleep, EnergyWatch).
                 rows.append(.toggle(String(localized: "Keep tabs awake", comment: "Row in the site panel's This Site group: this site's tabs never go to sleep in the background to save memory."),
@@ -2119,7 +2137,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, localApps, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, darkBlack, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, localApps, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2134,6 +2152,8 @@ enum SitePanelRows {
         var cookieBanners = false
         /// Choices kept for a site (dark page, keeping tabs awake) are offered for it (`KeepAwake.isOffered`).
         var siteChoices = true
+        /// Pure black for the site alone is offered: dark pages draw this site's pages, and the setting is off (#382).
+        var pureBlack = false
         /// Settings › Privacy › Clear cookies when Zigzag quits is on for the profile: Keep cookies is everyday then (#383).
         var clearsCookiesOnQuit = false
         /// Full screen in the page is offered here, and the page has a video or a choice was made.
@@ -2161,6 +2181,7 @@ enum SitePanelRows {
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
         if c.siteChoices {
             rows.append(.darkPage)
+            if c.pureBlack { rows.append(.darkBlack) }
             rows.append(.keepAwake)
             if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
         }

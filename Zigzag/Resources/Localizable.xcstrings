@@ -15956,6 +15956,17 @@
         }
       }
     },
+    "Pure black" : {
+      "comment" : "Row in the site panel's This Site group, under Dark page and while Pure black backgrounds is off for every site: draws this site's darkened pages black instead of dark gray.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纯黑"
+          }
+        }
+      }
+    },
     "Pure black backgrounds" : {
       "comment" : "A setting in Settings › Appearance, under Dark pages and shown while it's on: darkened websites are black instead of dark gray.",
       "localizations" : {

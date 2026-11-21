@@ -32,6 +32,7 @@ enum DarkPages {
     private static let onKey = "DarkPagesOnSites"
     private static let offKey = "DarkPagesOffSites"
     private static let forcedKey = "DarkPagesForcedSites"
+    private static let blackSitesKey = "DarkPagesPureBlackSites"
     private static let blackKey = "DarkPagesPureBlack"
 
     static var mode: Mode {
@@ -61,6 +62,13 @@ enum DarkPages {
     static var sitesForced: Set<String> {
         get { Set(defaults.stringArray(forKey: forcedKey) ?? []) }
         set { defaults.set(Array(newValue).sorted(), forKey: forcedKey) }
+    }
+
+    /// Sites drawn black though Pure black backgrounds is off for every other site (#382). A site's place here
+    /// outlasts the setting going on and off: the switch is the way back to following it.
+    static var sitesBlack: Set<String> {
+        get { Set(defaults.stringArray(forKey: blackSitesKey) ?? []) }
+        set { defaults.set(Array(newValue).sorted(), forKey: blackSitesKey) }
     }
 
     static func site(of url: URL?) -> String? { ContentBlocker.site(of: url) }
@@ -132,6 +140,29 @@ enum DarkPages {
     /// Whether a site is darkened even when it looks dark on its own.
     static func isForced(_ url: URL?) -> Bool { siteChoice(for: url) == .force }
 
+    /// The site's own choice over the setting, #382: a site on the list is black whatever the setting says, and
+    /// every other site follows it.
+    static func black(setting: Bool, site: Bool) -> Bool { site || setting }
+
+    /// Whether a darkened page at `url` is drawn black now. A light site has no darkened page for it to change.
+    static func black(_ url: URL?) -> Bool {
+        black(setting: pureBlack, site: hasBlackSite(for: url))
+    }
+
+    /// Whether the site of `url` is on the Pure black list itself.
+    static func hasBlackSite(for url: URL?) -> Bool {
+        site(of: url).map { covers(sitesBlack, $0) } ?? false
+    }
+
+    /// Draws the site of `url` black, or back to the setting.
+    static func setBlack(_ on: Bool, for url: URL?) {
+        guard let site = site(of: url) else { return }
+        var sites = sitesBlack
+        if on { sites.insert(site) } else { sites.remove(site) }
+        sitesBlack = sites
+        refreshAll()
+    }
+
     /// Force dark for a site, or back to plain On.
     static func setForced(_ on: Bool, for url: URL?) {
         setSiteChoice(on ? .force : .on, for: url)
@@ -142,6 +173,7 @@ enum DarkPages {
         sitesOn = []
         sitesOff = []
         sitesForced = []
+        sitesBlack = []
         refreshAll()
     }
 
@@ -278,7 +310,7 @@ enum DarkPages {
     /// `standsBack`: the page's look was chosen for it (`standsBack(for:)`), so the page is told what one is told
     /// where dark pages are off.
     static func config(for store: WKWebsiteDataStore?, url: URL? = nil, standsBack: Bool = false) -> [String: Any] {
-        let black = pureBlack
+        let black = self.black(url)
         let seen = seen(for: store, url: url)
         let top = !standsBack && applies(to: url) && wants(url)
         return [
@@ -476,7 +508,7 @@ enum DarkPages {
         // A site seen dark on its own starts on its own dark; any other on the dark its white will be. A page that's
         // dark on its own shows its own dark past its edges, the one the bar above it takes (#134): WebKit's own color
         // there is the page's root's, which can be white under a dark page.
-        let ground = seen(for: store, url: url)?.color.flatMap(color(hex:)).flatMap { isDark($0) ? $0 : nil } ?? background(black: pureBlack)
+        let ground = seen(for: store, url: url)?.color.flatMap(color(hex:)).flatMap { isDark($0) ? $0 : nil } ?? background(black: black(url))
         // When dark pages aren't wanted, a site known to be dark loads on its own dark (and the bar above uses it)
         // instead of WebKit's white (#250); otherwise a dark site set to Off flashed white.
         let backdrop = wanted ? nil : loadingGround(tab?.darkPage, site: site(of: url), seen: ownLook(for: store, url: url, look: look))

@@ -1452,6 +1452,8 @@ enum DebugBridge {
         case "darksite": DarkPages.setChoice(arg == "follow" ? nil : arg == "on", for: controller.tabManager.selectedTab?.url)
         // darkforce on|off: the site panel's Force dark row for the page in front.
         case "darkforce": DarkPages.setForced(arg == "on", for: controller.tabManager.selectedTab?.url)
+        // darkblacksite on|off: the site panel's Pure black row for the page in front (#382).
+        case "darkblacksite": DarkPages.setBlack(arg == "on", for: controller.tabManager.selectedTab?.url)
         // cookiebanners reject|leave: Settings › Privacy › Cookie banners. cookiesite on|off|follow: the site panel's
         // Cookie banners row for the page in front (without its reload). cookiestate: what was found on that page, in
         // the debug log.

@@ -97,7 +97,7 @@ final class Tab: NSObject {
     /// theme color. None with no page, or under what covers it with a color of its own (a PDF, Settings).
     var pageColor: NSColor? {
         guard let webView, pdfViewer == nil, settingsView == nil else { return nil }
-        return Self.pageColor(dark: darkPage, under: webView.underPageBackgroundColor, theme: themeColor)
+        return Self.pageColor(dark: darkPage, under: webView.underPageBackgroundColor, theme: themeColor, url: webView.url)
     }
 
     /// The rule for `pageColor`. A page drawn dark, by Zigzag or on its own, is the dark the page script saw (#134): a
@@ -105,9 +105,9 @@ final class Tab: NSObject {
     /// which painted the bar white over a dark page. That holds with dark pages off too, where the page script only
     /// looks. A dark page whose script found no dark of its own to give (all of it light at the top) gives none.
     /// Darkened, it's never light: a light color then is from before Dark Reader reached it (#250). Otherwise the
-    /// background under the page, else the theme color.
-    static func pageColor(dark: DarkPages.State?, under: NSColor?, theme: NSColor?) -> NSColor? {
-        if let dark, dark.darkened, dark.color.map(DarkPages.isDark) != true { return DarkPages.background(black: DarkPages.pureBlack) }
+    /// background under the page, else the theme color. `url`: the page's, for whether its site is drawn black (#382).
+    static func pageColor(dark: DarkPages.State?, under: NSColor?, theme: NSColor?, url: URL? = nil) -> NSColor? {
+        if let dark, dark.darkened, dark.color.map(DarkPages.isDark) != true { return DarkPages.background(black: DarkPages.black(url)) }
         if let dark, let color = dark.color, dark.darkened || (dark.native && DarkPages.isDark(color)) { return color }
         return under ?? theme
     }

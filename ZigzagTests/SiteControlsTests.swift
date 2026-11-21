@@ -733,6 +733,18 @@ struct SitePanelRowsTests {
         #expect(S.none.text == nil && S.nowOn.text == "Now on")
     }
 
+    /// Pure black for the site alone (#382), right under Dark page, and only where it can change something: dark
+    /// pages draw the site, and the setting leaves it to sites.
+    @Test func pureBlackSitsUnderDarkPageWhereDarkPagesDraw() {
+        var c = Context()
+        #expect(!SitePanelRows.rows(c).contains(.darkBlack))
+        c.pureBlack = true
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .darkBlack, .keepAwake])
+        // Not in a private window, where nothing is kept for the site.
+        c.siteChoices = false
+        #expect(!SitePanelRows.rows(c).contains(.darkBlack))
+    }
+
     @Test func permissionsOnlyOnceAsked() {
         var c = Context()
         #expect(!SitePanelRows.links(c).contains(.permissions))
