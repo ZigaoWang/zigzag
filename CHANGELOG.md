@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A pinned split grows and comes apart by dragging, as a split of tabs does. Drop a tab or a pinned page on the left or right half of its row and it joins as a third or fourth page, the half it would take lit while you hold it there; at four pages the row only moves. Drag one page out by the strip above it: let go among the pinned pages and it stays pinned on its own there, let go among the tabs and it's a tab. The rest stay a pinned split, or one pinned page if only one is left. ⌘Z takes back each step.
+- More of Zigzag looks and works the same way everywhere. The command bar's chosen result has the same soft wash as Settings. A space rule's match-type help opens in Zigzag's own panel and closes with Esc or a click outside. Show All Tabs' search shows the accent ring while you type, like every search field. A search that finds nothing says so in one line, "No tabs match “x”." and the like, in the same place in Settings, Show All Tabs, the icon grid, Passwords, History and the archive. The tour, the welcome, Import, the password menu and Show All Tabs use the same buttons as the rest of the app, and the password menu's highlight glides between rows like every other menu's.
 
 ## [0.9.4] - 2026-11-21
 
