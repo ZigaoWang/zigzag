@@ -3610,7 +3610,7 @@ extension BrowserWindowController {
         // behind another app while the panel is out.
         mirror.list.onHoverTab = { [weak self] tab, rect in
             guard let self, let tab, let rect, self.edgeMini == nil, !EdgePeek.shared.isVisible else {
-                EdgePeekPreview.shared.hide()
+                EdgePeekPreview.shared.pointerLeftRow()
                 return
             }
             EdgePeekPreview.shared.hover(tab: tab, at: rect)
@@ -3755,6 +3755,11 @@ extension BrowserWindowController {
             bringForwardForEdge()
             openSpaceEditor(id)
         }
+    }
+
+    /// The lens's entry point from the preview or a row. The lens replaces the row pick's Mini in the next step.
+    func openEdgeLens(for tab: Tab) {
+        pickFromEdgeSidebar(tab)
     }
 
     /// A tab picked in the edge sidebar is borrowed into a floating Mini beside it; a favorite or a page Mini can't

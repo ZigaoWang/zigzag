@@ -12,6 +12,11 @@ struct EdgeLensTests {
 
     // MARK: One session
 
+    @Test func theEdgePreviewIsInstantWhileTheBrowsersPreviewWaits() {
+        #expect(EdgePeekPreviewPolicy.delay == 0)
+        #expect(Tokens.Motion.previewDelay > 0)
+    }
+
     @Test func theSidebarCannotHideWhileTheLensIsOpen() {
         #expect(EdgeLensPolicy.blocksSidebarHide(lensOpen: true))
         #expect(!EdgeLensPolicy.blocksSidebarHide(lensOpen: false))

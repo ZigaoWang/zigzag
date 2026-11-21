@@ -189,6 +189,12 @@ final class EdgeSidebar {
     /// The Peek keeps the panel out while its page is attached, whatever the pointer does.
     func holdForPeek(_ hold: Bool) { holdsForPeek = hold }
 
+    /// A preview or a row was clicked: the lens opens for that tab. Until the lens itself is wired, this is the same
+    /// path as picking the row.
+    func openLens(for tab: Tab) {
+        target?.openEdgeLens(for: tab)
+    }
+
     /// The panel's window, so the Peek can tell a click on the sidebar from a click outside.
     var panelWindow: NSWindow? { panel }
 
