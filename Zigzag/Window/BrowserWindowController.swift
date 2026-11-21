@@ -426,7 +426,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var lastSpaceID: UUID?
-    private var handoff: NSUserActivity?
+    private(set) var handoff: NSUserActivity?
 
     private func spaceChanged() {
         let spaces = Library.shared.spaces
@@ -643,18 +643,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// While the sidebar changes sides: the lights' room in its row follows at once, with no picture riding over.
     private var switchingSides = false
 
-    /// Handoff, as in Safari: the web page you're on, offered to your iPhone, iPad or other Mac. Never a private
-    /// window's, and never Zigzag's own pages or a local file.
-    private func updateHandoff() {
-        guard !tabManager.isPrivate, let url = tabManager.selectedTab?.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
-            handoff?.invalidate()
-            handoff = nil
-            return
-        }
-        if handoff == nil { handoff = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb) }
-        handoff?.webpageURL = url
-        handoff?.title = tabManager.selectedTab?.displayTitle
-        if window?.isKeyWindow == true { handoff?.becomeCurrent() }
+    /// Handoff, as in Safari: the key window's page, offered to your iPhone, iPad or other Mac while it stays key.
+    func updateHandoff(asKey: Bool = false) {
+        let page = (asKey || window?.isKeyWindow == true) && !NSApp.isHidden ? handoffPage : nil
+        handoff = HandoffPage.update(handoff, to: page)
+    }
+
+    /// The page Handoff offers while this window is key.
+    var handoffPage: HandoffPage? {
+        let tab = tabManager.selectedTab
+        return HandoffPage.advertised(url: tab?.url, title: tab?.title ?? "", isPrivate: tabManager.isPrivate,
+                                      errorPage: tab?.showsErrorPage ?? false)
     }
 
     /// Whether the window shows a look partway to another space, mid-swipe.
@@ -760,7 +759,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let site = isPrivate ? nil : ContentBlocker.site(of: tab?.url)
         let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all && !profile.extensions.asksForSitesOnlyOptionally(id) ? .on : .off
-        let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
+        let click = SidebarMenus.Item(String(localized: "On Click", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
         click.state = access == .click ? .on : .off
         menu.addItem(all)
         menu.addItem(click)
@@ -1652,6 +1651,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             offerWebStoreExtension()
         case .title:
             updateWindowTitle()
+            updateHandoff()
         case .webView:
             showPages()
             paintTopBar()
@@ -2408,6 +2408,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.needsLayout = true
     }
     func windowDidResignKey(_ notification: Notification) {
+        updateHandoff()
         switcher.windowResignedKey()
         spaceSwitcher.windowResignedKey()
     }
@@ -2444,7 +2445,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if let monitor = zoomEscMonitor { NSEvent.removeMonitor(monitor) }
         zoomEscMonitor = nil
         // Its page is no longer on offer to your other devices.
-        handoff?.invalidate()
+        handoff = HandoffPage.update(handoff, to: nil)
         onClose?(self)
     }
 
@@ -3564,5 +3565,33 @@ extension BrowserWindowController: CommandBarHost {
 
     func commandBarRestoreFocus() {
         if let selectedWebView { window?.makeFirstResponder(selectedWebView) }
+    }
+}
+
+/// Which page Handoff offers to your other devices, and the one activity that offers it.
+enum HandoffPage: Equatable {
+    case page(url: URL, title: String)
+
+    /// A web page another device can open: http or https, not private, not an error page, not on this Mac, no
+    /// password in its address. Zigzag Mini and web apps never offer theirs, as Safari's web apps don't.
+    static func advertised(url: URL?, title: String, isPrivate: Bool, errorPage: Bool) -> HandoffPage? {
+        guard !isPrivate, !errorPage, let url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              let host = url.host(), !host.isEmpty, !LocalReceivers.isLoopback(host: host),
+              url.user() == nil, url.password() == nil else { return nil }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return .page(url: url, title: trimmed.isEmpty ? host : trimmed)
+    }
+
+    /// The activity kept current for `page`, reusing `activity`; nil invalidates it.
+    static func update(_ activity: NSUserActivity?, to page: HandoffPage?) -> NSUserActivity? {
+        guard case let .page(url, title)? = page else {
+            activity?.invalidate()
+            return nil
+        }
+        let current = activity ?? NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
+        if current.webpageURL != url { current.webpageURL = url }
+        if current.title != title { current.title = title }
+        current.becomeCurrent()
+        return current
     }
 }

@@ -123,6 +123,8 @@ targets:
         NSHighResolutionCapable: true
         NSSupportsAutomaticTermination: false
         NSSupportsSuddenTermination: false
+        # Handoff of the page you're on, to and from your other devices.
+        NSUserActivityTypes: [NSUserActivityTypeBrowsingWeb]
         # AppleScript, Shortcuts and osascript: what they can do is in Resources/Zigzag.sdef.
         NSAppleScriptEnabled: true
         OSAScriptingDefinition: Zigzag.sdef

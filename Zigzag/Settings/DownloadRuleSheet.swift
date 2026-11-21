@@ -39,7 +39,7 @@ enum DownloadRuleSheet {
         let matchCase = Toggle(isOn: source.isCaseSensitive)
         matchCase.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
         let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
-        runsInPrivate.setAccessibilityLabel(String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
+        runsInPrivate.setAccessibilityLabel(String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
 
         // Fields per action kind.
         var actionRows: [FormSheet.Row] = []
@@ -233,20 +233,20 @@ enum DownloadRuleSheet {
         let matchRows: [FormSheet.Row] = isDestination ? [
             FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
             FormSheet.Row(label: String(localized: "File Extensions", comment: "Label of the extensions field in a per-extension destination's sheet, where the types of file are listed."), view: pattern),
-            FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
+            FormSheet.Row(label: String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
         ] : [
             FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
             FormSheet.Row(label: String(localized: "Applies to", comment: "Label of the choice of what a download rule catches, in its sheet."), view: applies),
             FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
             FormSheet.Row(label: String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet."), view: pattern),
             FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
-            FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
+            FormSheet.Row(label: String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
         ]
         // Destinations add their action; address rules list tokens unless the path is literal (Open App).
         let rows = matchRows + actionRows + (isDestination ? [
             FormSheet.Row.note(String(localized: "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins.",
                                                  comment: "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.")),
-            FormSheet.Row.note(String(localized: "Run in private windows affects Open. A file type that saves still saves there.",
+            FormSheet.Row.note(String(localized: "Allow in private windows affects only Open, not Save.",
                                       comment: "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.")),
             FormSheet.Row.note(String(localized: "Apps, scripts, installers, archives and .mobileconfig files are always saved, never opened.",
                                       comment: "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.")),
