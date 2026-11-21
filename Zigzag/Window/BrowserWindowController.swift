@@ -112,7 +112,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // So does the guide while it points at something in it.
         root.keepsRevealed = { [weak self] in
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
-                || ReaderOptions.isOpen(in: self?.window) || self?.popupHoldsSidebar == true
+                || self?.popupHoldsSidebar == true
         }
         // One floating thing at a time, the sidebar that slides out included: while the command bar is up, or a panel
         // opened from the bar above the page, the pointer at the window's edge leaves it hidden. It would slide in
@@ -154,7 +154,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
-        sidebar.address.readerOptionsButton.onClick = { [weak self] _ in self?.toggleReaderOptions() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
@@ -917,7 +916,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 guard !finished else { return }
                 switch stage {
                 case .added: finished = true; done.resume(returning: true)
-                case .failed, .cancelled: finished = true; done.resume(returning: false)
+                case .failed, .cancelled, .theme: finished = true; done.resume(returning: false)
                 case .downloading, .reviewing, .adding: break
                 }
             })
@@ -926,7 +925,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed.
     enum InstallStage {
-        case downloading, reviewing, adding, added(String), failed(String), cancelled
+        case downloading, reviewing, adding, added(String), failed(String), cancelled, theme
         var isReviewing: Bool { if case .reviewing = self { true } else { false } }
     }
 
@@ -944,6 +943,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             switch stage {
             case .downloading: Toast.show(String(localized: "Downloading extension…", comment: "Toast while an extension downloads from the Chrome Web Store."), symbol: "arrow.down.circle", duration: 3600, in: self)
             case .reviewing, .cancelled: Toast.hide(in: self)
+            case .theme: Toast.show(ExtensionStore.InstallError.theme.message, symbol: "exclamationmark.triangle", duration: 4, in: self)
             case .adding: Toast.show(String(localized: "Adding…", comment: "Toast while an extension is being added."), symbol: "arrow.down.circle", duration: 3600, in: self)
             case .added(let name): Toast.show(String(localized: "Added \(name)", comment: "Toast after an extension is added. The name is the extension's."), symbol: "checkmark.circle", duration: 2, in: self)
             case .failed(let message): Toast.show(message, symbol: "exclamationmark.triangle", duration: 4, in: self)
@@ -954,6 +954,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let result = await ExtensionStore.prepareInstall(id)
             guard let self else { return }
             switch result {
+            case .failure(.theme):
+                // A theme has nothing for Zigzag to install: the store bar says so in its line, anywhere else a toast does (#454).
+                report(.theme)
             case .failure(let error):
                 report(.failed(error.message))
             case .success(let prepared):
@@ -1703,6 +1706,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let host = TranslationHost()
         var token: SignalToken?
         var timeout: DispatchWorkItem?
+        /// When the last batch came back, or it started: the time limit counts from here.
+        var lastProgress = Date()
+        /// How much of it is done, 0 to 1.
+        var fraction: Double = 0
 
         init(tab: Tab, webView: WKWebView, name: String, site: String?, source: Locale.Language?) {
             self.tab = tab
@@ -1724,8 +1731,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var translationOffered: Set<String> = []
     /// Sites translated this session and their source language; their other pages auto-translate when in that language.
     private var translatedSites: [String: Locale.Language] = [:]
-    /// How long a translation may take before it says so instead of spinning on: Apple's translation can wait on
-    /// a prompt that never comes up, or not answer at all.
+    /// How long a translation may go without a batch coming back before it says so instead of spinning on: Apple's
+    /// translation can wait on a prompt that never comes up, or not answer at all. A long page that keeps coming
+    /// back keeps going (#465).
     private static let translationTimeout: TimeInterval = 45
 
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
@@ -1822,14 +1830,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 }
                 return
             }
-            self.startTranslating(tab, webView: webView, pieces: text.pieces, groups: groups, into: target, site: site)
+            self.startTranslating(tab, webView: webView, pieces: text.pieces, shown: Set(text.shown ?? []), groups: groups, into: target, site: site)
         }
     }
 
-    private func showTranslating(_ run: PageTranslation) {
+    private func showTranslating(_ run: PageTranslation, announces: Bool = true) {
         guard let tab = run.tab else { return }
         translationToastTab = tab
-        Toast.show(String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French."), symbol: "translate", duration: Self.translationTimeout + 5, in: self)
+        let percent = PageTranslator.percent(run.fraction)
+        let text = percent > 0
+            ? String(localized: "Translating from \(run.name)… \(percent)%", comment: "Toast while a page is translated, with how much is done. The language is its name, like French; then a percent, like 40%.")
+            : String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French.")
+        Toast.show(text, symbol: "translate", duration: Self.translationTimeout + 5, announces: announces, in: self)
     }
 
     /// Another page came into view (another tab chosen, Peek opened or put away): the toast of a translation
@@ -1844,7 +1856,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if translationToastTab == nil, let inView, let run = translations.run(for: ObjectIdentifier(inView)) { showTranslating(run) }
     }
 
-    private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], groups: [PageTranslator.Group],
+    private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], shown: Set<Int>, groups: [PageTranslator.Group],
                                   into target: Locale.Language, site: String?) {
         var names: [String] = []
         for group in groups where !names.contains(PageTranslator.name(of: group.source)) { names.append(PageTranslator.name(of: group.source)) }
@@ -1859,7 +1871,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         if translationInView(tab) { showTranslating(run) }
         watchTranslation(run, for: key)
-        run.host.translate(webView, pieces: pieces, groups: groups, into: target, progress: { _ in }, completion: { [weak self, weak run, weak tab] result in
+        run.host.translate(webView, pieces: pieces, shown: shown, groups: groups, into: target, progress: { [weak self, weak run] fraction in
+            guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
+            run.lastProgress = Date()
+            run.fraction = fraction
+            if let tab = run.tab, self.translationToastTab === tab, self.translationInView(tab) { self.showTranslating(run, announces: false) }
+        }, completion: { [weak self, weak run, weak tab] result in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             self.endTranslation(run, for: key)
             guard let tab, !tab.isClosed, tab.webView?.url == run.page else { return }
@@ -1903,10 +1920,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// No answer in time: it stops, the page goes back to how it was, and it says it couldn't. While macOS asks
     /// to download the language (its sheet on this window), it waits for you, however long that takes.
-    private func watchTranslation(_ run: PageTranslation, for key: ObjectIdentifier) {
+    private func watchTranslation(_ run: PageTranslation, for key: ObjectIdentifier, after wait: TimeInterval = translationTimeout) {
         let work = DispatchWorkItem { [weak self, weak run] in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             guard let tab = run.tab, !tab.isClosed else { self.endTranslation(run, for: key); return }
+            // A batch came back since: the limit runs from that one.
+            if let left = PageTranslator.waitLeft(lastProgress: run.lastProgress, now: Date(), limit: Self.translationTimeout) {
+                self.watchTranslation(run, for: key, after: left)
+                return
+            }
             if self.window?.attachedSheet != nil {
                 if self.translationInView(tab) { self.showTranslating(run) }
                 self.watchTranslation(run, for: key)
@@ -1918,7 +1940,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.showTranslationFailed(tab, from: run.source.map { [$0] } ?? [], into: PageTranslator.readerLanguage)
         }
         run.timeout = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.translationTimeout, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
     }
 
     /// Done, given up, or its page gone: its session stops and its toast, if showing, goes.
@@ -2029,70 +2051,64 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 return
             }
             guard self.tabManager.selectedTab === tab, self.reader == nil else { return }
-            let view = ReaderView(store: webView.configuration.websiteDataStore)
-            view.onClose = { [weak self] in self?.closeReader() }
-            // The article's links are the page's, wherever they open.
-            view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link, by: .page) }
-            view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
-            view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
-            view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
-            view.show(article, from: url, icon: tab.favicon, theme: Brand.Theme.of(self.tabManager.currentSpace))
-            self.reader = view
-            self.readerTab = tab
-            tab.readerWebView = view.webView
-            self.readerURL = url
-            let index = self.tabManager.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0
-            let card = self.root.paneCards[min(index, self.root.paneCards.count - 1)]
-            self.readerCard = card
-            card.setOverlay(view)
-            // Visible from the start (WebKit doesn't paint into a hidden view); the article is local and draws
-            // within a few frames, well inside the fade.
-            Self.readerTransition(view, entering: true)
-            self.window?.makeFirstResponder(view.webView)
-            // Opened again quickly: one listener, never two.
-            if let old = self.readerKeyMonitor { NSEvent.removeMonitor(old) }
-            self.readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                // A peek opened from the article is in front: Esc closes that first, and Reader stays. So does the
-                // command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
-                guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil, !self.peek.isVisible,
-                      !self.hasFloatingPanel, (self.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
-                self.closeReader()
-                return nil
-            }
-            self.updateReaderButton()
-            self.paintTopBar()
-            // An open Find follows the article in, and back out to the page.
-            self.findBar.pageChanged()
+            self.showReader(article, in: tab, from: url, store: webView.configuration.websiteDataStore)
         }
     }
 
-    /// Reader's text and colors, under the address's Aa. With no address on screen (the sidebar hidden, the address
-    /// not above the page), from the reading page's top-right corner instead.
+    /// Reader over `tab`'s card with `article`, once it's been read from the page.
+    func showReader(_ article: Reader.Article, in tab: Tab, from url: URL, store: WKWebsiteDataStore) {
+        let view = ReaderView(store: store)
+        view.onClose = { [weak self] in self?.closeReader() }
+        view.onOptions = { [weak self] in self?.toggleReaderOptions() }
+        // The article's links are the page's, wherever they open.
+        view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link, by: .page) }
+        view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
+        view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
+        view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
+        view.currentSpace = { [weak self] in self?.tabManager.currentSpace }
+        view.show(article, from: url, icon: tab.favicon)
+        reader = view
+        readerTab = tab
+        tab.readerWebView = view.webView
+        readerURL = url
+        let index = tabManager.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0
+        let card = root.paneCards[min(index, root.paneCards.count - 1)]
+        readerCard = card
+        card.setOverlay(view)
+        // Visible from the start (WebKit doesn't paint into a hidden view); the article is local and draws
+        // within a few frames, well inside the fade.
+        Self.readerTransition(view, entering: true)
+        window?.makeFirstResponder(view.webView)
+        // Opened again quickly: one listener, never two.
+        if let old = readerKeyMonitor { NSEvent.removeMonitor(old) }
+        readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // A peek opened from the article is in front: Esc closes that first, and Reader stays. So does the
+            // command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
+            guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil, !self.peek.isVisible,
+                  !self.hasFloatingPanel, (self.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
+            self.closeReader()
+            return nil
+        }
+        updateReaderButton()
+        paintTopBar()
+        // An open Find follows the article in, and back out to the page.
+        findBar.pageChanged()
+    }
+
+    /// The reading page shown now, if Reader is on over the page you're in.
+    var readerHere: ReaderView? { readerTab === tabManager.selectedTab ? reader : nil }
+
+    /// Reader's text and colors, under the Aa button in the reading page's top-right corner, its right edge with
+    /// the button's and always whole inside the page.
     func toggleReaderOptions() {
-        guard let reader, readerTab === tabManager.selectedTab else { return }
+        guard let reader = readerHere else { return }
         let overlay = root.overlay
-        let address = sidebar.address
-        let button = address.readerOptionsButton
-        let aboveThePage = root.barHoldsAddress
-        let docked = root.sidebarVisible && !root.isSidebarFloatingVisible
-        let onScreen = !button.isHidden && (aboveThePage || root.sidebarVisible || root.isSidebarFloatingVisible)
-        let card = readerCard ?? root.card
         if !ReaderOptions.isOpen(in: window) { closeFloatingPanels() }
-        ReaderOptions.toggle(for: reader, in: overlay, opener: onScreen ? button : nil,
-                             recedes: onScreen && docked && !aboveThePage ? [sidebar.list] : []) { [weak self, weak address, weak card] size in
-            let inset = Tokens.Metric.cardInset
-            guard let self else { return .zero }
-            if onScreen, let address, address.window != nil {
-                // As Site Controls: along the field's edge in the sidebar, under the button's end above the page.
-                let field = address.convert(address.bounds, to: overlay)
-                let b = button.convert(button.bounds, to: overlay)
-                let x = aboveThePage || self.root.sidebarOnRight ? b.maxX - size.width : field.minX
-                return NSPoint(x: SitePanelSizing.x(x, alongAddress: !aboveThePage, inset: inset, width: size.width, overlayWidth: overlay.bounds.width),
-                               y: field.maxY + Tokens.Space.x1)
-            }
-            let shown = card ?? self.root.card
-            let page = shown.convert(shown.bounds, to: overlay)
-            return NSPoint(x: max(inset, page.maxX - size.width - Tokens.Space.x3), y: page.minY + Tokens.Space.x3)
+        ReaderOptions.toggle(for: reader, in: overlay) { [weak reader, weak overlay] size in
+            guard let reader, let overlay else { return .zero }
+            let b = reader.optionsButton.convert(reader.optionsButton.bounds, to: overlay)
+            let page = reader.convert(reader.bounds, to: overlay)
+            return NSPoint(x: max(page.minX + Tokens.Space.x3, b.maxX - size.width), y: b.maxY + Tokens.Space.x1)
         }
     }
 
@@ -2338,7 +2354,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.isOnRight = onRight
         // The sidebar's own, where the docked sidebar puts it.
         root.topBar.heldSidebarButtonOrigin = held && docked
-            ? NSPoint(x: dockedMinX + sidebar.sidebarButton.frame.minX, y: Tokens.Sidebar.lightsCenter + root.sidebarTopRowDrop - SidebarView.toolbarButton / 2) : nil
+            ? NSPoint(x: dockedMinX + sidebar.sidebarButton.frame.minX, y: sidebar.trafficLightCenterY - SidebarView.toolbarButton / 2) : nil
         sidebar.sidebarButton.alphaValue = held ? 0 : 1
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),

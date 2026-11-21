@@ -507,6 +507,31 @@ enum Tokens {
         static let groupGap: CGFloat = Space.x6 + Space.x1
     }
 
+    /// Your Zigzag Card (Zigzag › Your Zigzag Card…): a bank card's proportions, in a small window of its own.
+    enum Keepsake {
+        static let size = NSSize(width: 340, height: 214)
+        static let radius: CGFloat = Radius.tile
+        /// From the card's edges to what's on it.
+        static let pad: CGFloat = Space.x6
+        static let wordmarkHeight: CGFloat = 16
+        static let nameSize: CGFloat = TypeSize.display
+        /// Room around the card in its window: at the sides, above it (under the traffic lights), and around the buttons.
+        static let margin: CGFloat = Space.x10
+        static let top: CGFloat = Space.x12
+        static let buttonGap: CGFloat = Space.x8
+        static let bottom: CGFloat = Space.x8
+        /// The most it leans toward the pointer, in degrees, and how deep the perspective is.
+        static let tilt: CGFloat = 4
+        static let perspective: CGFloat = 900
+        /// The saved picture's pixels per point.
+        static let exportScale: CGFloat = 3
+        /// Two shadows: a wide soft one it floats on, and a close one where it nearly touches.
+        static let ambientRadius: CGFloat = 22
+        static let ambientDrop: CGFloat = 12
+        static let contactRadius: CGFloat = 3
+        static let contactDrop: CGFloat = 1.5
+    }
+
     // MARK: - Type (SF Pro: six roles, one scale for the whole app)
 
     /// Every text in Zigzag is one of these. Pages, panels and the sidebar share them: the same role is the same size
@@ -608,8 +633,12 @@ enum Tokens {
 
         /// A symbol's ink, in points from the middle of its image (x right, y up).
         @MainActor private static func inkBox(_ name: String, size: CGFloat) -> CGRect {
-            inkBox(of: Self.image(name, size: size), key: "\(name) \(size)")
+            let drawn = measuredAsDrawn.contains(name)
+            return inkBox(of: Self.image(name, size: size), key: "\(name) \(size)", scale: drawn ? 2 : 4, asDrawn: drawn)
         }
+
+        /// Measured as a 2x screen draws them, not scaled up: the screen draws xmark half a point lower than its image.
+        static let measuredAsDrawn: Set<String> = ["xmark"]
 
         /// How far an image's ink sits from its middle (x right, y up), for a symbol drawn some other way (a heavier
         /// weight, a glyph of its own); `key` names it for the cache, `scale` is pixels per point.
@@ -621,17 +650,19 @@ enum Tokens {
         /// The size of an image's ink; `key` names it for the cache.
         @MainActor static func inkSize(of image: NSImage, key: String, scale: CGFloat = 4) -> CGSize { inkBox(of: image, key: key, scale: scale).size }
 
-        @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4) -> CGRect {
-            let key = scale == 4 ? key : "\(key) @\(scale)x"
+        @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4, asDrawn: Bool = false) -> CGRect {
+            let key = scale == 4 ? key : "\(key) @\(scale)x\(asDrawn ? " drawn" : "")"
             if let known = inkBoxes[key] { return known }
             let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
             var box = CGRect.zero
             if w > 0, h > 0, let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,
                                                          samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                                          colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+                // As drawn: the bitmap at the image's size in points, so the symbol snaps to pixels as on screen.
+                if asDrawn { rep.size = image.size }
                 NSGraphicsContext.saveGraphicsState()
                 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-                image.draw(in: NSRect(x: 0, y: 0, width: w, height: h))
+                image.draw(in: asDrawn ? NSRect(origin: .zero, size: image.size) : NSRect(x: 0, y: 0, width: w, height: h))
                 NSGraphicsContext.restoreGraphicsState()
                 var minX = w, maxX = -1, minY = h, maxY = -1
                 var weight = 0.0, weightedY = 0.0
@@ -1307,6 +1338,8 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.64), highDark: hex(0xFFFFFF, alpha: 0.72))
         /// Disabled quiet button text: the faintest text at full opacity, still 3:1.
         static let textDisabled = textTertiary
+        /// A round swatch's ring under the pointer: faint beside the chosen one's, with nothing moving.
+        static let swatchHoverRing = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0xFFFFFF, alpha: 0.28))
 
         static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66),
             highLight: hex(0x000000, alpha: 0.80), highDark: hex(0xFFFFFF, alpha: 0.84))
@@ -1540,6 +1573,11 @@ enum Tokens {
         static let readerChroma = 0.0035
         static let readerDarkLightness = 0.235
         static let readerDarkChroma = 0.005
+        /// Reader's Space paper: the space's own color, held out of the middle tones and as calm as a frame.
+        static let readerSpaceLightness = 0.86
+        static let readerSpaceChroma = 0.05
+        static let readerSpaceDarkLightness = 0.3
+        static let readerSpaceDarkChroma = 0.045
     }
 
     /// What sits on the frame (the sidebar's rows, its address and favorites): washes of white, so whatever the

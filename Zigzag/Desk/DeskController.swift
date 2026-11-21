@@ -284,6 +284,9 @@ final class DeskController {
     private static let actionBarHeight = Tokens.Page.controlHeight + Tokens.Space.x2 + 2
     private static let searchArea = Tokens.Space.x6 + Tokens.Space.x8 + Tokens.Space.x2
     private var frameToken: NSObjectProtocol?
+    private var boundsToken: NSObjectProtocol?
+    /// A hairline under the search band, only while cards are scrolled under it.
+    private let scrollEdge = ColorView(color: Tokens.Color.separator)
 
     /// Cards shrink with more tabs down to this, where a title still reads, and grow with fewer up to the largest.
     private let minCardWidth = Tokens.Metric.deskCardWidth
@@ -305,6 +308,12 @@ final class DeskController {
         scrollView.documentView = canvas
         scrollView.useSlimScroller()
         backdrop.addSubview(scrollView)
+        scrollEdge.isHidden = true
+        backdrop.addSubview(scrollEdge)
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        boundsToken = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scrollView.contentView, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshScrollEdge() }
+        }
         // The window resized, went full screen or the sidebar moved: the cards take the page area's new shape.
         scrollView.contentView.postsFrameChangedNotifications = true
         frameToken = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView.contentView, queue: .main) { [weak self] _ in
@@ -363,6 +372,7 @@ final class DeskController {
 
     isolated deinit {
         if let frameToken { NotificationCenter.default.removeObserver(frameToken) }
+        if let boundsToken { NotificationCenter.default.removeObserver(boundsToken) }
     }
 
     private var manager: TabManager? { controller?.tabManager }
@@ -913,6 +923,14 @@ final class DeskController {
         let x = searchIcon.frame.maxX + Tokens.Space.x2
         searchField.frame = NSRect(x: x, y: searchField.centeredY(in: h), width: width - x - Tokens.Space.x3, height: textHeight)
         scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
+        let line = Tokens.Metric.hairline
+        scrollEdge.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea - line : b.height - Self.searchArea, width: b.width, height: line)
+        scrollEdge.autoresizingMask = [.width, backdrop.isFlipped ? .maxYMargin : .minYMargin]
+        refreshScrollEdge()
+    }
+
+    private func refreshScrollEdge() {
+        scrollEdge.isHidden = scrollView.contentView.bounds.minY <= 0
     }
 
     /// The page whose card a page shows on: the first of its split or tile group among the space's tabs (a pinned

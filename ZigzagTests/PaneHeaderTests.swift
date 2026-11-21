@@ -109,6 +109,12 @@ import Testing
         }
     }
 
+    /// The screen draws xmark half a point below its image's middle: measured as drawn, the button lifts it back.
+    @Test func closeIsCenteredByItsInkAsDrawn() {
+        #expect(abs(Tokens.Symbol.inkOffset("xmark", size: Tokens.Symbol.glyph).height + 0.5) < 0.2)
+        #expect(abs(Tokens.Symbol.inkOffset("chevron.up", size: Tokens.Symbol.glyph).height) < 0.2)
+    }
+
     /// The row sits as far below the card's top as above the hairline, to the screen's pixel.
     @Test func theRowIsCenteredAboveTheHairline() {
         let header = PaneHeaderView(frame: NSRect(x: 0, y: 0, width: 700, height: PaneHeaderView.height))

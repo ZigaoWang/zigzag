@@ -286,6 +286,32 @@ enum Reader {
         static let dark = Palette(paper: 0x1E1E20, ink: 0xE6E4DF, soft: 0x9A9893, link: 0x9DBDEB,
                                   rule: "rgba(255,255,255,.12)", code: "rgba(255,255,255,.06)", select: "rgba(157,189,235,.25)", isDark: true)
 
+        /// Space's: the space's own paper (`Theme.spacePaper`), with inks of its hue solved against it: body text at
+        /// 11:1 where the paper allows and never under 7:1, links at 7:1, soft words at 4.6:1.
+        static func space(paper: NSColor, hue: Double?) -> Palette {
+            // Judged as the page draws it, in whole bytes.
+            let ground = Tokens.Color.hex(Reader.hex(paper))
+            let isDark = Brand.relativeLuminance(ground) < 0.18
+            let h = hue ?? Brand.navyHue
+            // From a starting lightness toward black (or white) until it reads.
+            func solved(_ start: Double, chroma: Double, target: Double) -> UInt32 {
+                var l = start
+                var ink = Reader.hex(SpaceColor.tone(hue: h, lightness: l, chroma: chroma))
+                while Brand.contrast(Tokens.Color.hex(ink), ground) < target, isDark ? l < 1 : l > 0 {
+                    l = isDark ? min(1, l + 0.01) : max(0, l - 0.01)
+                    ink = Reader.hex(SpaceColor.tone(hue: h, lightness: l, chroma: chroma))
+                }
+                return ink
+            }
+            let tinted = hue == nil ? 0.0 : 1.0
+            let ink = solved(isDark ? 0.93 : 0.25, chroma: 0.015 * tinted, target: 11)
+            let soft = solved(isDark ? 0.74 : 0.52, chroma: 0.025 * tinted, target: 4.6)
+            let link = solved(isDark ? 0.82 : 0.45, chroma: 0.1, target: 7)
+            func rgba(_ v: UInt32, _ alpha: Double) -> String { "rgba(\(v >> 16 & 0xFF),\(v >> 8 & 0xFF),\(v & 0xFF),\(alpha))" }
+            return Palette(paper: Reader.hex(ground), ink: ink, soft: soft, link: link, rule: rgba(ink, 0.13),
+                           code: rgba(ink, 0.06), select: rgba(link, isDark ? 0.28 : 0.2), isDark: isDark)
+        }
+
         /// The page's colors as CSS custom properties.
         var css: String {
             func hex(_ v: UInt32) -> String { String(format: "#%06X", v) }
@@ -310,6 +336,27 @@ enum Reader {
         func paper(dark isDark: Bool) -> UInt32 { isDark ? dark : light }
     }
 
+    /// Space's palettes by day and at night, from the window's space.
+    struct SpaceColors: Equatable {
+        var light = Palette.space(paper: Tokens.Color.hex(Palette.light.paper), hue: nil)
+        var dark = Palette.space(paper: Tokens.Color.hex(Palette.dark.paper), hue: nil)
+
+        static func of(_ space: SpaceInfo?) -> SpaceColors {
+            guard let space else { return SpaceColors() }
+            let paper = Brand.Theme.spacePaper(space), hue = Brand.Theme.of(space).surfaceHue
+            return SpaceColors(light: .space(paper: paper.light, hue: hue), dark: .space(paper: paper.dark, hue: hue))
+        }
+
+        func palette(dark isDark: Bool) -> Palette { isDark ? dark : light }
+
+        var css: String {
+            ":root[data-theme=\"space\"] { \(light.css) }\n@media (prefers-color-scheme: dark) { :root[data-theme=\"space\"] { \(dark.css) } }"
+        }
+    }
+
+    /// The colors that follow the space, in a style sheet of their own so they can change in place.
+    static func colorsCSS(paper: AutoPaper, space: SpaceColors) -> String { paper.css + "\n" + space.css }
+
     static func hex(_ color: NSColor) -> UInt32 {
         guard let c = color.usingColorSpace(.sRGB) else { return 0 }
         func byte(_ v: CGFloat) -> UInt32 { UInt32(max(0, min(255, (v * 255).rounded()))) }
@@ -320,9 +367,10 @@ enum Reader {
     struct Preferences: Equatable {
         enum Face: String, CaseIterable { case serif, sans }
         enum Theme: String, CaseIterable {
-            case auto, light, sepia, dark
-            /// Auto's are Light's; the page takes Dark's itself while the Mac is dark.
-            var palette: Palette { switch self { case .auto, .light: .light; case .sepia: .sepia; case .dark: .dark } }
+            case auto, light, sepia, dark, space
+            /// Auto's are Light's; the page takes Dark's itself while the Mac is dark. Space's come from the space
+            /// (`SpaceColors`).
+            var palette: Palette { switch self { case .auto, .light, .space: .light; case .sepia: .sepia; case .dark: .dark } }
         }
         /// How wide the column runs, in the text's own size, so a line holds about the same number of characters at
         /// any size: Narrow a column's 55 or so, Medium the book's 66 to 72, Wide the whole window inside its margins.
@@ -384,11 +432,43 @@ enum Reader {
         }
     }
 
+    /// Whether the page's Aa button shows: at the top, on the way back up, with the pointer near the top and while
+    /// its panel is open. Reading on down the article puts it away.
+    struct ButtonPresence: Equatable {
+        /// How far down still counts as the top, and how far a scroll runs before it counts as a direction.
+        static let top: CGFloat = 8, slack: CGFloat = 8
+        var panelOpen = false
+        var pointerNearTop = false {
+            // Brought back by the pointer, it stays until you read on.
+            didSet { if pointerNearTop { scrolledShown = true } }
+        }
+        private(set) var atTop = true
+        private var scrolledShown = true
+        private var anchor: CGFloat = 0
+
+        var isShown: Bool { panelOpen || pointerNearTop || atTop || scrolledShown }
+
+        /// The page scrolled to `y`, from its top.
+        mutating func scrolled(to y: CGFloat) {
+            atTop = y <= Self.top
+            if atTop {
+                scrolledShown = true
+                anchor = y
+            } else if y >= anchor + Self.slack {
+                scrolledShown = false
+                anchor = y
+            } else if y <= anchor - Self.slack {
+                scrolledShown = true
+                anchor = y
+            }
+        }
+    }
+
     /// The reading page: one column at the chosen measure, its words on that column's left edge, with large pictures
     /// and code free to run wider when the window has room. The header is where it's from, the title, and who wrote
     /// it and when, if the page says; then the text. `reducedMotion`: the text doesn't settle in as it opens.
     static func html(for article: Article, preferences: Preferences = .saved, icon: String? = nil, locale: Locale = .current,
-                     paper: AutoPaper = AutoPaper(), reducedMotion: Bool = false) -> String {
+                     paper: AutoPaper = AutoPaper(), space: SpaceColors = SpaceColors(), reducedMotion: Bool = false) -> String {
         let author = author(from: article.byline, site: article.site)
         let title = Self.title(article.title, siteNames: [article.site, article.siteTitle ?? ""], author: author)
         let date = publishedDate(article.published, locale: locale)
@@ -406,8 +486,8 @@ enum Reader {
         <head><meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * data:; media-src *; style-src 'unsafe-inline'; font-src *">
         <title>\(escape(title))</title>
-        <style>\(paper.css)
-        \(css)</style></head><body><main>
+        <style id="zigzag-colors">\(colorsCSS(paper: paper, space: space))</style>
+        <style>\(css)</style></head><body><main>
         <header>
         <p class="site">\(iconTag)<span>\(escape(article.site))</span></p>
         <h1 class="title">\(escape(title))</h1>
@@ -481,7 +561,7 @@ enum Reader {
     /* The header: where it's from, the title, who and when, in quiet steps of half a line. A line and a half below it, no rule. */
     header { margin: 0 0 calc(var(--line) * 1.5); }
     .site { display: flex; align-items: center; gap: 8px; margin: 0 0 calc(var(--line) * .5); font: 500 \(Int(Tokens.TypeSize.body))px/1.4 var(--sans); color: var(--soft); }
-    .site img { display: block; width: 16px; height: 16px; margin: 0; border-radius: \(Int(Tokens.Radius.small) - 1)px; flex: none; }
+    .site img { display: block; width: 16px; height: 16px; margin: 0; transform: none; border-radius: \(Int(Tokens.Radius.small) - 1)px; flex: none; }
     h1.title { margin: 0; font-size: 1.75em; line-height: 1.2; font-weight: 600; letter-spacing: -0.012em; text-wrap: balance; -webkit-hyphens: manual; hyphens: manual; }
     :root:is(:lang(zh), :lang(ja), :lang(ko)) h1.title { line-height: 1.35; letter-spacing: 0; }
     .byline { display: flex; flex-wrap: wrap; column-gap: 12px; margin: calc(var(--line) * .5) 0 0; font: \(Int(Tokens.TypeSize.body))px/1.45 var(--sans); color: var(--soft); }
@@ -578,8 +658,8 @@ enum Reader {
     }
 }
 
-/// The reading surface shown over a page card: only the article. How it reads is chosen from the address's Aa
-/// (`ReaderOptions`), as Safari's Reader keeps its choices in the toolbar.
+/// The reading surface shown over a page card: the article, and Aa in its top-right corner for how it reads
+/// (`ReaderOptions`), as Apple Books keeps its choices on the page. The address's Reader button only turns it on and off.
 final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
@@ -588,12 +668,23 @@ final class ReaderView: NSView {
     var onPeekLink: ((URL) -> Void)?
     var onBackgroundLink: ((URL) -> Void)?
     var onForegroundLink: ((URL) -> Void)?
+    /// Aa pressed: the window opens or closes the panel under it.
+    var onOptions: (() -> Void)?
     /// How it reads now, as shown.
     private(set) var preferences = Reader.Preferences.saved
     /// Auto's paper, the space's breath of color, for the panel's swatches.
     private(set) var paper = Reader.AutoPaper()
+    /// Space's palettes, from the window's space.
+    private(set) var spaceColors = Reader.SpaceColors()
+    /// The window's space now, read again whenever a space or its color changes.
+    var currentSpace: (() -> SpaceInfo?)?
+    private var themeToken: SignalToken?
     /// The page the article came from: the reading page's own address, the one load it makes by itself.
     private var articleURL: URL?
+    let optionsButton = ReaderOptionsButton()
+    private(set) var presence = Reader.ButtonPresence() { didSet { if presence != oldValue { optionsButton.setShown(presence.isShown) } } }
+    private var topArea: NSTrackingArea?
+    private static let buttonInset = Tokens.Space.x4
 
     /// `store`: the one the page it reads is in (its profile's, or its private window's).
     init(store: WKWebsiteDataStore) {
@@ -602,6 +693,14 @@ final class ReaderView: NSView {
         super.init(frame: .zero)
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
+        addSubview(optionsButton)
+        optionsButton.button.onClick = { [weak self] _ in self?.onOptions?() }
+        // The page's own scripts are off; this one, in Zigzag's world, says where it's scrolled to.
+        let scroll = ScrollMessages()
+        scroll.reader = self
+        let content = webView.configuration.userContentController
+        content.add(scroll, contentWorld: .defaultClient, name: ScrollMessages.name)
+        content.addUserScript(WKUserScript(source: ScrollMessages.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -613,7 +712,6 @@ final class ReaderView: NSView {
     func stepTextSize(_ delta: Int) -> Reader.Preferences {
         let next = preferences.stepped(delta)
         apply(next)
-        ReaderOptions.showing(next, for: self)
         return next
     }
 
@@ -623,6 +721,8 @@ final class ReaderView: NSView {
         Reader.Preferences.saved = preferences
         // The page's own scripts are off; this runs in Zigzag's world, so the change is instant.
         webView.runOwnScript(preferences.script)
+        refreshButton()
+        ReaderOptions.showing(preferences, for: self)
     }
 
     /// In the store of the page it reads, so the article's pictures are fetched as the page fetched them: one store
@@ -652,16 +752,80 @@ final class ReaderView: NSView {
     override func layout() {
         super.layout()
         webView.frame = bounds
+        let side = ReaderOptionsButton.side
+        optionsButton.frame = NSRect(x: bounds.width - side - Self.buttonInset, y: Self.buttonInset, width: side, height: side)
     }
 
-    /// `theme`: the window's space, whose breath of color Auto's paper takes.
-    func show(_ article: Reader.Article, from url: URL, icon: NSImage? = nil, theme: Brand.Theme = .navy) {
+    /// The band along the top where the pointer brings Aa back.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let topArea { removeTrackingArea(topArea) }
+        let band = NSRect(x: 0, y: 0, width: bounds.width, height: Self.buttonInset * 2 + ReaderOptionsButton.side + Tokens.Space.x4)
+        let area = NSTrackingArea(rect: band, options: [.mouseEnteredAndExited, .activeInKeyWindow], owner: self)
+        addTrackingArea(area)
+        topArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { presence.pointerNearTop = true }
+    override func mouseExited(with event: NSEvent) { presence.pointerNearTop = false }
+
+    #if DEBUG
+    func debugPointerNearTop(_ near: Bool) { presence.pointerNearTop = near }
+    #endif
+
+    /// The page scrolled: Aa goes as you read on and comes back on the way up.
+    func scrolled(to y: CGFloat) { presence.scrolled(to: y) }
+
+    /// The panel opened or closed: Aa stays while it's open.
+    func optionsShown(_ open: Bool) {
+        presence.panelOpen = open
+        optionsButton.button.isSelected = open
+    }
+
+    /// Auto's breath of color and Space's palettes come from `currentSpace`.
+    func show(_ article: Reader.Article, from url: URL, icon: NSImage? = nil) {
         articleURL = url
         webView.navigationDelegate = self
         preferences = Reader.Preferences.saved
-        paper = Reader.AutoPaper.of(theme)
+        let space = currentSpace?()
+        paper = Reader.AutoPaper.of(Brand.Theme.of(space))
+        spaceColors = Reader.SpaceColors.of(space)
+        presence = Reader.ButtonPresence()
+        optionsButton.setShown(true, animated: false)
+        refreshButton()
         webView.loadHTMLString(Reader.html(for: article, preferences: preferences, icon: Reader.iconSource(icon), paper: paper,
-                                           reducedMotion: Tokens.Motion.reduceMotion), baseURL: url)
+                                           space: spaceColors, reducedMotion: Tokens.Motion.reduceMotion), baseURL: url)
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.spaceDidChange() }
+    }
+
+    /// Another space, or a new color for this one: the page's colors change in place, and the panel's swatches.
+    private func spaceDidChange() {
+        let space = currentSpace?()
+        let paper = Reader.AutoPaper.of(Brand.Theme.of(space)), colors = Reader.SpaceColors.of(space)
+        guard paper != self.paper || colors != spaceColors else { return }
+        self.paper = paper
+        spaceColors = colors
+        refreshButton()
+        let css = Reader.colorsCSS(paper: paper, space: colors)
+        guard let data = try? JSONEncoder().encode(css), let literal = String(data: data, encoding: .utf8) else { return }
+        webView.runOwnScript("(() => { const s = document.getElementById('zigzag-colors'); if (s) s.textContent = \(literal); })(); 0")
+        ReaderOptions.colorsChanged(for: self)
+    }
+
+    /// Aa on the article's paper, in the light or dark look that paper reads in.
+    private func refreshButton() {
+        let isDark = effectiveAppearance.isDark
+        let theme = preferences.theme
+        let palette = theme == .space ? spaceColors.palette(dark: isDark) : theme.palette
+        let paper = theme == .auto ? self.paper.paper(dark: isDark) : palette.paper
+        let dark = theme == .auto ? isDark : theme == .space ? palette.isDark : theme == .dark
+        optionsButton.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        optionsButton.paper = Tokens.Color.hex(paper)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshButton()
     }
 
     override func keyDown(with event: NSEvent) {
@@ -673,11 +837,70 @@ final class ReaderView: NSView {
         // Reader closed with its panel open: the panel, and its listener for Esc and clicks, go with it.
         if window == nil { ReaderOptions.close(for: self) }
     }
+
+    /// Where the reading page is scrolled to, from a script in Zigzag's world, once a frame at most.
+    private final class ScrollMessages: NSObject, WKScriptMessageHandler {
+        static let name = "zigzagReaderScroll"
+        static let script = "(() => { let f = 0; addEventListener('scroll', () => { if (f) return; f = requestAnimationFrame(() => { f = 0;" +
+            " webkit.messageHandlers.\(name).postMessage(scrollY); }); }, { passive: true }); })();"
+        weak var reader: ReaderView?
+
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let y = message.body as? Double else { return }
+            reader?.scrolled(to: CGFloat(y))
+        }
+    }
+}
+
+/// Aa, alone in the reading page's top-right corner: a quiet icon button as the toolbar's, on the article's own
+/// paper so the text never shows through it. Put away, it takes no clicks.
+final class ReaderOptionsButton: NSView {
+    static var side: CGFloat { Tokens.Metric.iconButton }
+    let button = IconButton(symbol: "textformat.size", toolTip: String(localized: "Reader Text and Colors", comment: "View menu item: opens Reader's text size, typeface, column width and color choices."))
+    var paper: NSColor = .clear {
+        didSet {
+            button.ground = paper
+            effectiveAppearance.performAsCurrentDrawingAppearance { Tokens.Motion.withoutAnimation { layer?.backgroundColor = paper.cgColor } }
+        }
+    }
+    private(set) var isShown = true
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = button.radius
+        layer?.cornerCurve = .continuous
+        button.isOnPage = true
+        addSubview(button)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        button.frame = bounds
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { isShown ? super.hitTest(point) : nil }
+    override func isAccessibilityHidden() -> Bool { !isShown }
+
+    /// Fades in or out as a change of state; with Reduce Motion it shows and goes at once.
+    func setShown(_ shown: Bool, animated: Bool = true) {
+        guard shown != isShown || !animated else { return }
+        isShown = shown
+        let time = animated && !Tokens.Motion.reduceMotion ? Tokens.Motion.Role.state.duration() * Tokens.Motion.debugSlowdown : 0
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = time
+            ctx.timingFunction = Tokens.Motion.easeOut
+            (time > 0 ? animator() : self).alphaValue = shown ? 1 : 0
+        }
+    }
 }
 
 /// How it reads, as the site panel's rows: each choice named on the left, its control on the right. Text size
-/// steps as the page's zoom does, the face and the width slide, and the colors are round swatches. Opened from the
-/// address's Aa while Reader is on, hanging under it as Site Controls hangs from its button.
+/// steps as the page's zoom does, the face and the width slide, and the colors are a row of round dots. Hangs
+/// under the page's Aa button, as Site Controls hangs from its own.
 final class ReaderOptions: FloatingPanelView {
     private static weak var current: ReaderOptions?
     static func isOpen(in window: NSWindow?) -> Bool { current?.superview != nil && current?.window === window }
@@ -688,10 +911,15 @@ final class ReaderOptions: FloatingPanelView {
     static func showing(_ preferences: Reader.Preferences, for reader: ReaderView) {
         if let current, current.reader === reader { current.preferences = preferences }
     }
+    /// The space or its color changed while it's open: Auto's and Space's dots follow.
+    static func colorsChanged(for reader: ReaderView) {
+        guard let current, current.reader === reader else { return }
+        current.swatches.paper = reader.paper
+        current.swatches.spaceColors = reader.spaceColors
+    }
 
     private var preferences = Reader.Preferences.saved { didSet { refresh() } }
     private weak var reader: ReaderView?
-    private weak var opener: IconButton?
     /// Where it goes for its size, worked out again as the window resizes.
     private var place: ((NSSize) -> NSPoint)?
     private var monitor: Any?
@@ -705,14 +933,17 @@ final class ReaderOptions: FloatingPanelView {
     private var rows: [PanelRow] = []
 
     static let width: CGFloat = 336
-    private static let padX = Tokens.Space.x4, padY = Tokens.Space.x2
-    var panelSize: NSSize { NSSize(width: Self.width, height: Self.padY * 2 + PanelRow.height * CGFloat(rows.count)) }
+    /// The site panel's margins, counted to the words' and controls' ink.
+    private static let pad = Tokens.Space.x4
+    private var inkTop: CGFloat { rows.first?.topSlack ?? 0 }
+    private var inkBottom: CGFloat { rows.last?.bottomSlack ?? 0 }
+    var panelSize: NSSize {
+        NSSize(width: Self.width, height: ceil(Self.pad * 2 + PanelRow.height * CGFloat(rows.count) - inkTop - inkBottom))
+    }
 
-    /// Opens the panel for `reader` in `overlay`, or closes the one open. `opener`: the button it hangs from, shown
-    /// pressed while it's open; nil when there's none on screen. `recedes`: what fades back under it. `place`: its
-    /// top-left corner for its size.
-    static func toggle(for reader: ReaderView, in overlay: NSView, opener: IconButton?, recedes: [NSView] = [],
-                       place: @escaping (NSSize) -> NSPoint) {
+    /// Opens the panel for `reader` in `overlay` under its Aa button, or closes the one open. `place`: its top-left
+    /// corner for its size.
+    static func toggle(for reader: ReaderView, in overlay: NSView, place: @escaping (NSSize) -> NSPoint) {
         if let current, current.superview != nil {
             let same = current.reader === reader
             current.close()
@@ -720,22 +951,22 @@ final class ReaderOptions: FloatingPanelView {
         }
         let panel = ReaderOptions(frame: .zero)
         panel.reader = reader
-        panel.opener = opener
         panel.place = place
         panel.preferences = reader.preferences
         panel.swatches.paper = reader.paper
-        panel.recedes = recedes
+        panel.swatches.spaceColors = reader.spaceColors
         let size = panel.panelSize
         panel.frame = NSRect(origin: place(size), size: size)
         overlay.addSubview(panel)
-        if let opener, opener.window != nil {
+        let opener = reader.optionsButton
+        if opener.window != nil {
             let b = opener.convert(opener.bounds, to: overlay)
             panel.growsFrom = CGPoint(x: min(max((b.midX - panel.frame.minX) / size.width, 0), 1), y: 0)
         } else {
             panel.growsFrom = CGPoint(x: 1, y: 0)
         }
         panel.present(arrival: .pop)
-        opener?.isSelected = true
+        reader.optionsShown(true)
         current = panel
         panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { return event }
@@ -751,7 +982,7 @@ final class ReaderOptions: FloatingPanelView {
             return event
         }
         let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        let onOpener = opener.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
+        let onOpener = reader.map { $0.optionsButton.bounds.contains($0.optionsButton.convert(event.locationInWindow, from: nil)) } ?? false
         if !inside && !onOpener { close() }
         return event
     }
@@ -759,12 +990,12 @@ final class ReaderOptions: FloatingPanelView {
     func close() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        opener?.isSelected = false
+        reader?.optionsShown(false)
         if Self.current === self { Self.current = nil }
         dismiss()
     }
 
-    /// The window grew or shrank under it: back under its button, or in its corner.
+    /// The window grew or shrank under it: back under its button.
     override func resize(withOldSuperviewSize oldSize: NSSize) {
         guard let place, monitor != nil else { return }
         frame.origin = place(frame.size)
@@ -772,7 +1003,7 @@ final class ReaderOptions: FloatingPanelView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        setAccessibilityLabel(String(localized: "Text and Colors", comment: "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors."))
+        setAccessibilityLabel(String(localized: "Reader Text and Colors", comment: "View menu item: opens Reader's text size, typeface, column width and color choices."))
         let typeface = String(localized: "Typeface", comment: "VoiceOver label of the typeface choice in Reader's text and color choices.")
         let width = String(localized: "Column Width", comment: "VoiceOver label of the column width choice in Reader's text and color choices.")
         let colors = String(localized: "Colors", comment: "Row in Reader's text and color choices: the paper and ink the article is shown in.")
@@ -820,10 +1051,21 @@ final class ReaderOptions: FloatingPanelView {
     }
 
     private func layoutContent() {
+        // `pad` from the panel's edge to the first row's ink, and from the last row's ink to the bottom.
+        let top = Self.pad - inkTop
         for (i, row) in rows.enumerated() {
-            row.frame = NSRect(x: Self.padX, y: Self.padY + CGFloat(i) * PanelRow.height, width: bounds.width - Self.padX * 2, height: PanelRow.height)
+            row.frame = NSRect(x: Self.pad, y: top + CGFloat(i) * PanelRow.height, width: bounds.width - Self.pad * 2, height: PanelRow.height)
         }
     }
+
+    #if DEBUG
+    /// The open panel's color dot at `index` as if the pointer were over it; nil: none.
+    static func debugHoverSwatch(_ index: Int?) { current?.swatches.debugHover(index) }
+    /// The open panel's rows and dots, for tests.
+    static var debugCurrent: ReaderOptions? { current }
+    var debugThemes: [Reader.Preferences.Theme] { swatches.themes }
+    var debugRowCount: Int { rows.count }
+    #endif
 }
 
 /// A control at a set size, so a row can lay it out by what it asks for.
@@ -847,13 +1089,17 @@ private final class Fixed: NSView {
     }
 }
 
-/// The four colors in a row of round swatches, as the space editor's.
-private final class ReaderSwatches: NSView {
+/// The colors as a row of round dots, as macOS picks an accent color, at the space editor's swatch size.
+final class ReaderSwatches: NSView {
     var onPick: ((Reader.Preferences.Theme) -> Void)?
     var selected = Reader.Preferences.Theme.auto { didSet { for tile in tiles { tile.isSelected = tile.theme == selected } } }
     var paper = Reader.AutoPaper() { didSet { tiles.forEach { $0.paper = paper } } }
+    var spaceColors = Reader.SpaceColors() { didSet { tiles.forEach { $0.spaceColors = spaceColors } } }
+    var themes: [Reader.Preferences.Theme] { tiles.map(\.theme) }
+
+    func debugHover(_ index: Int?) { for (i, tile) in tiles.enumerated() { tile.isHovered = i == index } }
     private var tiles: [ThemeSwatch] = []
-    private static let side: CGFloat = Tokens.Metric.controlHeight, gap = Tokens.Space.x2
+    private static let side = SwatchRing.side, gap = Tokens.Space.x1
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -878,53 +1124,46 @@ private final class ReaderSwatches: NSView {
 
     override func layout() {
         super.layout()
+        // Flush with the row's end, as the other rows' controls are.
+        let x0 = bounds.width - intrinsicContentSize.width
         for (i, tile) in tiles.enumerated() {
-            tile.frame = NSRect(x: CGFloat(i) * (Self.side + Self.gap), y: (bounds.height - Self.side) / 2, width: Self.side, height: Self.side)
+            tile.frame = NSRect(x: x0 + CGFloat(i) * (Self.side + Self.gap), y: (bounds.height - Self.side) / 2, width: Self.side, height: Self.side)
         }
     }
 }
 
-/// One theme as it reads, round as the space editor's swatches: "Aa" in its own ink on its own paper, Auto half
-/// light, half dark. Chosen, it sits inside a fine ring; under the pointer it swells to meet the edge.
-private final class ThemeSwatch: InteractiveView {
+/// One color as a plain round dot of its paper, drawn as the space editor's swatches (`SwatchRing`): Auto split
+/// corner to corner between its day and night papers, Space in the space's paper as it reads now. Chosen, an accent
+/// ring with a gap; under the pointer a faint ring, nothing moving.
+final class ThemeSwatch: InteractiveView {
     let theme: Reader.Preferences.Theme
     var paper = Reader.AutoPaper() { didSet { stateDidChange(animated: false) } }
+    var spaceColors = Reader.SpaceColors() { didSet { stateDidChange(animated: false) } }
     private let ring = CALayer()
     private let fill = CALayer()
-    private let darkHalf = CALayer()
-    private let lightInk = CATextLayer()
-    private let darkInk = CATextLayer()
+    private let darkHalf = CAShapeLayer()
 
-    private static func name(_ theme: Reader.Preferences.Theme) -> String {
+    static func name(_ theme: Reader.Preferences.Theme) -> String {
         switch theme {
         case .auto: String(localized: "Auto", comment: "Color choice in Reader: follows the Mac's light or dark look.")
         case .light: String(localized: "Light", comment: "Color choice in Reader.")
         case .sepia: String(localized: "Sepia", comment: "Color choice in Reader: warm paper.")
         case .dark: String(localized: "Dark", comment: "Color choice in Reader.")
+        case .space: String(localized: "Space", comment: "Color choice in Reader: the colors of the space you're in.")
         }
     }
 
     init(theme: Reader.Preferences.Theme) {
         self.theme = theme
         super.init(frame: .zero)
-        wantsLayer = true
         layer?.addSublayer(ring)
         layer?.addSublayer(fill)
         fill.masksToBounds = true
         fill.addSublayer(darkHalf)
         darkHalf.isHidden = theme != .auto
-        for text in [lightInk, darkInk] {
-            text.font = NSFont(descriptor: Tokens.Font.small(.semibold).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.small)
-            text.fontSize = Tokens.TypeSize.small
-            text.alignmentMode = .center
-            text.contentsScale = 2
-            fill.addSublayer(text)
-        }
-        // "A" on the light half, "a" on the dark: the same word, both ways.
-        lightInk.string = theme == .auto ? "A" : "Aa"
-        darkInk.string = "a"
-        darkInk.isHidden = theme != .auto
-        toolTip = theme == .auto ? String(localized: "Auto: follows your Mac", comment: "Tooltip of the Auto color choice in Reader: light by day, dark at night, as the Mac is.") : Self.name(theme)
+        toolTip = theme == .auto ? String(localized: "Auto: follows your Mac", comment: "Tooltip of the Auto color choice in Reader: light by day, dark at night, as the Mac is.")
+            : theme == .space ? String(localized: "Space: your space’s colors", comment: "Tooltip of the Space color choice in Reader: the article takes the colors of the space you're in.")
+            : Self.name(theme)
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(Self.name(theme))
     }
@@ -943,30 +1182,28 @@ private final class ThemeSwatch: InteractiveView {
         stateDidChange(animated: false)
     }
 
+    /// The dot's paper: Auto's by day (its night half is `darkHalf`), Space's as the Mac's look has it.
+    var dotColor: UInt32 {
+        switch theme {
+        case .auto: paper.light
+        case .space: spaceColors.palette(dark: effectiveAppearance.isDark).paper
+        default: theme.palette.paper
+        }
+    }
+
     override func stateDidChange(animated: Bool) {
-        let palette = theme.palette
-        let light = theme == .auto ? paper.light : palette.paper
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                ring.frame = bounds
-                ring.cornerRadius = bounds.width / 2
-                ring.borderWidth = 2
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : .clear).cgColor
-                let inset: CGFloat = isSelected ? 3.5 : (isHovered ? 0 : 2)
-                fill.frame = bounds.insetBy(dx: inset, dy: inset)
-                fill.cornerRadius = fill.frame.width / 2
-                fill.backgroundColor = Tokens.Color.hex(light).cgColor
-                fill.borderWidth = Tokens.Metric.hairline
-                // A firmer edge than a panel's, so the light papers read on a light panel and Dark on a dark one.
-                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
-                darkHalf.backgroundColor = Tokens.Color.hex(paper.dark).cgColor
-                let w = fill.bounds.width, h = fill.bounds.height, textH = ceil(Tokens.TypeSize.small * 1.3)
-                darkHalf.frame = CGRect(x: w / 2, y: 0, width: w / 2, height: h)
-                lightInk.foregroundColor = Tokens.Color.hex(palette.ink).cgColor
-                darkInk.foregroundColor = Tokens.Color.hex(Reader.Palette.dark.ink).cgColor
-                let y = (h - textH) / 2
-                lightInk.frame = theme == .auto ? CGRect(x: 0, y: y, width: w / 2, height: textH) : CGRect(x: 0, y: y, width: w, height: textH)
-                darkInk.frame = CGRect(x: w / 2, y: y, width: w / 2, height: textH)
+                SwatchRing.draw(ring: ring, fill: fill, in: bounds, selected: isSelected, hovered: isHovered, chosen: Tokens.Color.accent)
+                fill.backgroundColor = Tokens.Color.hex(dotColor).cgColor
+                // Night's half below the diagonal from the top-right corner to the bottom-left.
+                let w = fill.bounds.width, h = fill.bounds.height
+                darkHalf.frame = fill.bounds
+                let path = CGMutablePath()
+                path.addLines(between: [CGPoint(x: w, y: 0), CGPoint(x: w, y: h), CGPoint(x: 0, y: h)])
+                path.closeSubpath()
+                darkHalf.path = path
+                darkHalf.fillColor = Tokens.Color.hex(paper.dark).cgColor
             }
         }
         setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
