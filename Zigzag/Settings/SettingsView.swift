@@ -1067,8 +1067,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
     private var sitesReset: PillButton?
     private var alwaysReset: PillButton?
+    private var neverReset: PillButton?
     private let translationGroup = FormGroup()
     private let alwaysGroup = FormGroup()
+    private let neverGroup = FormGroup()
     private let extensionsGroup = FormGroup()
     /// Extensions that come inside apps on this Mac (#194), each with Install. Looked for when the page opens.
     private let appExtensionsGroup = FormGroup()
@@ -2930,22 +2932,54 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         translationGroup.add(FormRow(title: String(localized: "Offer to translate", comment: "A setting in Settings › Translation."),
                                      detail: String(localized: "When a page is in another language, Zigzag asks once per site.", comment: "Explanation under “Offer to translate” in Settings › Translation."),
                                      control: translateOffer))
-        let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
+        neverGroup.removeAllRows()
+        let choices = PageTranslator.Choices()
+        let name = { (code: String) in PageTranslator.name(of: Locale.Language(identifier: code)) }
+        let (always, never) = choices.entries(name: name)
         // Laid out like Sites in Privacy: a heading, Reset All beside it only when there's something to reset.
-        let reset = PillButton(title: String(localized: "Reset All", comment: "Button beside Always Translate in Settings › Translation."))
-        reset.onClick = { [weak self] _ in
-            PageTranslator.alwaysLanguages = []
-            self?.reloadTranslation()
-            self?.layoutDocument()
+        func resetAll(_ entries: [PageTranslator.Choices.Entry]) -> PillButton? {
+            guard !entries.isEmpty else { return nil }
+            let reset = PillButton(title: String(localized: "Reset All", comment: "Button beside Always Translate in Settings › Translation."))
+            reset.onClick = { [weak self] _ in
+                entries.forEach(choices.remove)
+                self?.reloadTranslation()
+                self?.layoutDocument()
+            }
+            return reset
         }
-        alwaysReset = always.isEmpty ? nil : reset
-        alwaysGroup.add(always.isEmpty
-            ? FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
-                      detail: String(localized: "To always translate a language, choose it in a page’s site controls.", comment: "Under Always Translate in Settings › Translation."),
-                      control: NSView())
-            : FormRow(title: Words.list(always),
-                      detail: String(localized: "Pages in these languages are translated as soon as they open.", comment: "Under the list of languages in Settings › Translation."),
-                      control: NSView()))
+        alwaysReset = resetAll(always)
+        neverReset = resetAll(never)
+        func row(_ entry: PageTranslator.Choices.Entry) -> FormRow {
+            let title: String, icon: NSImage
+            switch entry {
+            case .always(let code), .neverLanguage(let code):
+                title = name(code)
+                icon = SettingsIcon.symbol("translate")
+            case .neverSite(let site):
+                title = site
+                icon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            }
+            let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Developer: takes the site or the page size off its list."))
+            remove.setAccessibilityLabel(String(localized: "Remove \(title)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
+            remove.onClick = { [weak self] _ in
+                choices.remove(entry)
+                self?.reloadTranslation()
+                self?.layoutDocument()
+            }
+            return FormRow(title: title, icon: icon, control: remove)
+        }
+        if always.isEmpty {
+            alwaysGroup.add(FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
+                                    detail: String(localized: "To always translate a language, choose it in a page’s site controls.", comment: "Under Always Translate in Settings › Translation."),
+                                    control: NSView()))
+        }
+        always.map(row).forEach(alwaysGroup.add)
+        if never.isEmpty {
+            neverGroup.add(FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
+                                   detail: String(localized: "Languages and sites you never translate show up here.", comment: "Under Never Translate in Settings › Translation, when there's no language or site."),
+                                   control: NSView()))
+        }
+        never.map(row).forEach(neverGroup.add)
     }
 
     // MARK: Shortcuts
@@ -3217,6 +3251,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         String(localized: "Apps on This Mac", comment: "A heading in Settings › Privacy, over the master switch that lets websites reach programs on this Mac.")
     }
     private static var alwaysTranslateHeading: String { String(localized: "Always Translate", comment: "A heading in Settings › Translation.") }
+    private static var neverTranslateHeading: String { String(localized: "Never Translate", comment: "A heading in Settings › Translation, over the languages and sites never offered or translated on their own.") }
     private static var fillingHeading: String { String(localized: "AutoFill", comment: "A heading in Settings › Passwords: when Zigzag offers to save and fill passwords and forms.") }
     /// With more than one profile, over the one row every profile shares: what it fills, named plainly, so it doesn't
     /// read as a second heading for what the one over saving and filling passwords already says.
@@ -3261,7 +3296,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.formsHeading, cardGroup)] : [])
         case .privacy: [(nil, blockingGroup), (Self.localReceiversHeading, localReceiversGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])
         case .websiteData: SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .websiteData ? websiteDataGroups : []
-        case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
+        case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup), (Self.neverTranslateHeading, neverGroup)]
         case .extensions: [(installedHeading, extensionsGroup), (Self.appExtensionsHeading, appExtensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         case .automation: [(nil, aiGroup), (Self.connectHeading, connectGroup), (Self.scriptsHeading, scriptsGroup)]
@@ -3434,6 +3469,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .translation:
             section(nil, translationGroup)
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
+            section(Self.neverTranslateHeading, neverGroup, accessory: neverReset)
         case .developer:
             section(nil, developerToolsGroup)
             // Sites rows are one line, while Page Sizes rows carry a second: lower this group so the first Remove
