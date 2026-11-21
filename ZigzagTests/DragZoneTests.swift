@@ -411,11 +411,15 @@ struct DragZoneTests {
         #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
 
         manager.select(ids[2])
+        window.layoutIfNeeded()
         let other = try #require(manager.split(for: ids[2])?.shape)
+        #expect(controller.root.tiles == other)
         controller.sidebarUndo.undo()
         // The group the drag was in goes back, though another split is showing, and the other is left alone.
         #expect(manager.split(for: ids[0])?.shape == even)
         #expect(manager.split(for: ids[2])?.shape == other)
+        // Off screen, it changes the group without drawing it over the split that is showing.
+        #expect(controller.root.tiles == other)
         // The step is still there to redo, not used up doing nothing.
         #expect(controller.sidebarUndo.canRedo)
     }
