@@ -512,35 +512,92 @@ final class WindowManager {
     }
 
     /// A fresh start passed the last session over: keep it, so Window › Reopen Last Session can bring back what it
-    /// was, however long the fresh window is used first (#433).
-    func keepSessionForReopening() {
-        guard let saved = JSONStore.load(SessionState.self, from: Paths.session), !saved.windows.isEmpty else { return }
+    /// was, however long the fresh window is used first (#433). An empty session never replaces a kept one: a fresh
+    /// start that only opened Settings or a Mini must not erase the session it passed over.
+    func keepSessionForReopening(session: URL = Paths.session, kept: URL = Paths.previousSession,
+                                 tabStates: URL = Paths.tabState, keptTabStates: URL = Paths.previousTabState) {
         // One copy per run: the session from before this launch, never this run's own saving over it.
         guard !keptPreviousSession else { return }
-        JSONStore.save(saved, to: Paths.previousSession)
+        guard let saved = JSONStore.load(SessionState.self, from: session),
+              saved.windows.contains(where: { !$0.hasNoTabs }) else { return }
+        guard JSONStore.save(saved, to: kept) else { return }
+        Self.keepTabStates(of: saved, from: tabStates, to: keptTabStates)
         keptPreviousSession = true
     }
 
     /// Whether there's a session from before a fresh start to bring back.
-    var canReopenLastSession: Bool {
-        guard let saved = JSONStore.load(SessionState.self, from: Paths.previousSession), !saved.windows.isEmpty else { return false }
+    var canReopenLastSession: Bool { hasSessionToReopen(at: Paths.previousSession) }
+
+    /// Whether the kept session at `kept` still has a window that isn't already open.
+    func hasSessionToReopen(at kept: URL) -> Bool {
+        guard let saved = JSONStore.load(SessionState.self, from: kept),
+              saved.windows.contains(where: { !$0.hasNoTabs }) else { return false }
         let open = openTabIDs
         return saved.windows.contains { window in
             !isBack(window, open: open)
         }
     }
 
-    /// Window › Reopen Last Session: the windows and tabs a fresh start passed over come back, and the fresh
-    /// session stays until the next launch writes over it.
-    func reopenLastSession() {
-        guard let saved = JSONStore.load(SessionState.self, from: Paths.previousSession), !saved.windows.isEmpty else { return }
+    /// Window › Reopen Last Session: the windows and tabs a fresh start passed over come back, with the back/forward
+    /// lists kept beside them, and the fresh session stays until the next launch writes over it.
+    func reopenLastSession(kept: URL = Paths.previousSession, keptTabStates: URL = Paths.previousTabState,
+                           tabStates: URL = Paths.tabState) {
+        guard let saved = JSONStore.load(SessionState.self, from: kept),
+              saved.windows.contains(where: { !$0.hasNoTabs }) else { return }
+        Self.restoreKeptTabStates(of: saved, from: keptTabStates, to: tabStates)
         let shares = TabStore.windowsShareTabs
         let state = shares ? saved : saved.givingWindowsTheirOwnTabs()
         let store: TabStore? = shares ? sharedStore ?? TabStore() : nil
         for windowState in state.windows { restoreWindow(windowState, store: store) }
     }
 
+    /// The back/forward lists of a session being kept: copied now, before the fresh session's saves can clean up the
+    /// old tabs' files (#433).
+    nonisolated static func keepTabStates(of saved: SessionState, from source: URL, to destination: URL) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: destination)
+        try? fm.createDirectory(at: destination, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        chmod(destination.path, 0o700)
+        for id in tabIDs(of: saved) {
+            let from = source.appendingPathComponent(id.uuidString)
+            guard fm.fileExists(atPath: from.path) else { continue }
+            let to = destination.appendingPathComponent(id.uuidString)
+            guard (try? fm.copyItem(at: from, to: to)) != nil else { continue }
+            Paths.makePrivate(to)
+        }
+    }
+
+    /// Puts a kept session's back/forward lists back where restoring reads them, so reopening brings the history
+    /// with the tabs.
+    nonisolated static func restoreKeptTabStates(of saved: SessionState, from source: URL, to destination: URL) {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: destination, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        for id in tabIDs(of: saved) {
+            let from = source.appendingPathComponent(id.uuidString)
+            guard fm.fileExists(atPath: from.path) else { continue }
+            let to = destination.appendingPathComponent(id.uuidString)
+            // A tab already open has a current list of its own: the kept older one mustn't replace it.
+            guard !fm.fileExists(atPath: to.path) else { continue }
+            guard (try? fm.copyItem(at: from, to: to)) != nil else { continue }
+            Paths.makePrivate(to)
+        }
+    }
+
+    private nonisolated static func tabIDs(of saved: SessionState) -> Set<UUID> {
+        var ids = Set<UUID>()
+        for window in saved.windows {
+            for space in window.spaces { ids.formUnion(space.tabs.map(\.id)) }
+            ids.formUnion(window.bookmarkTabs.map(\.tab.id))
+        }
+        return ids
+    }
+
     private var keptPreviousSession = false
+
+    #if DEBUG
+    /// Tests that keep more than one session in a run: the one copy per run is a launch rule (#433).
+    func forgetKeptSessionForTesting() { keptPreviousSession = false }
+    #endif
 
     /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.
     private var closedWindows: [(id: UUID, state: SessionState.WindowState, history: [UUID: Data], closedAt: Date)] = []

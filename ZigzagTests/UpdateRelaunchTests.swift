@@ -98,30 +98,125 @@ struct RelaunchIgnoresLaunchChoiceTests {
 /// once per run, from the session that launch found (#433).
 @MainActor
 struct LastSessionKeptTests {
+    private func folder() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("ZigzagLastSession-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    private func session(tabIDs: [UUID], space: UUID) -> SessionState {
+        SessionState(windows: [SessionState.WindowState(
+            frame: [], sidebarVisible: true, sidebarWidth: 240, currentSpaceID: space,
+            spaces: [SessionState.SpaceTabs(spaceID: space, tabs: tabIDs.map { id in
+                SessionState.TabState(id: id, url: URL(string: "https://kept.example/\(id)"), title: "Kept",
+                                      lastActivated: Date(), createdAt: Date())
+            }, selectedTabID: tabIDs.first)],
+            bookmarkTabs: [])])
+    }
+
     @Test func aFreshStartKeepsTheSessionItPassedOver() throws {
         let manager = WindowManager.shared
-        let saved = Paths.session, kept = Paths.previousSession
-        let oldSession = try? Data(contentsOf: saved), oldKept = try? Data(contentsOf: kept)
-        defer {
-            try? FileManager.default.removeItem(at: kept)
-            if let oldSession { try? oldSession.write(to: saved) } else { try? FileManager.default.removeItem(at: saved) }
-            if let oldKept { try? oldKept.write(to: kept) }
-        }
-        try? FileManager.default.removeItem(at: kept)
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let saved = root.appendingPathComponent("Session.json")
+        let kept = root.appendingPathComponent("SessionBeforeFreshStart.json")
+        let tabStates = root.appendingPathComponent("TabState", isDirectory: true)
+        let keptTabStates = root.appendingPathComponent("TabStateBeforeFreshStart", isDirectory: true)
+        try FileManager.default.createDirectory(at: tabStates, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: keptTabStates, withIntermediateDirectories: true)
+        manager.forgetKeptSessionForTesting()
         // Nothing saved: nothing to keep, and nothing to reopen.
-        #expect(!manager.canReopenLastSession)
+        #expect(!manager.hasSessionToReopen(at: kept))
         let space = Library.shared.spaces[0].id
-        let tab = SessionState.TabState(id: UUID(), url: URL(string: "https://kept.example"), title: "Kept",
-                                        lastActivated: Date(), createdAt: Date())
-        let state = SessionState(windows: [SessionState.WindowState(
-            frame: [], sidebarVisible: true, sidebarWidth: 240, currentSpaceID: space,
-            spaces: [SessionState.SpaceTabs(spaceID: space, tabs: [tab], selectedTabID: tab.id)],
-            bookmarkTabs: [])])
+        let state = session(tabIDs: [UUID()], space: space)
         guard JSONStore.save(state, to: saved) else { return }
-        manager.keepSessionForReopening()
+        manager.keepSessionForReopening(session: saved, kept: kept, tabStates: tabStates, keptTabStates: keptTabStates)
         // The copy is the session that was there, byte for byte.
         #expect(try Data(contentsOf: kept) == (try Data(contentsOf: saved)))
-        #expect(manager.canReopenLastSession)
+        #expect(manager.hasSessionToReopen(at: kept))
+    }
+
+    @Test func anEmptySessionNeverReplacesTheKeptOne() throws {
+        let manager = WindowManager.shared
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let saved = root.appendingPathComponent("Session.json")
+        let kept = root.appendingPathComponent("SessionBeforeFreshStart.json")
+        let tabStates = root.appendingPathComponent("TabState", isDirectory: true)
+        let keptTabStates = root.appendingPathComponent("TabStateBeforeFreshStart", isDirectory: true)
+        try FileManager.default.createDirectory(at: tabStates, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: keptTabStates, withIntermediateDirectories: true)
+        let space = Library.shared.spaces[0].id
+        let good = session(tabIDs: [UUID()], space: space)
+        let empty = session(tabIDs: [], space: space)
+        guard JSONStore.save(good, to: kept), JSONStore.save(empty, to: saved) else { return }
+        manager.forgetKeptSessionForTesting()
+        manager.keepSessionForReopening(session: saved, kept: kept, tabStates: tabStates, keptTabStates: keptTabStates)
+        #expect(try JSONStore.load(SessionState.self, from: kept)?.windows.first?.spaces.first?.tabs.count == 1)
+        #expect(manager.hasSessionToReopen(at: kept))
+    }
+
+    @Test func theKeptSessionKeepsItsBackAndForwardFiles() throws {
+        let manager = WindowManager.shared
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let saved = root.appendingPathComponent("Session.json")
+        let kept = root.appendingPathComponent("SessionBeforeFreshStart.json")
+        let tabStates = root.appendingPathComponent("TabState", isDirectory: true)
+        let keptTabStates = root.appendingPathComponent("TabStateBeforeFreshStart", isDirectory: true)
+        try FileManager.default.createDirectory(at: tabStates, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: keptTabStates, withIntermediateDirectories: true)
+        let id = UUID()
+        let history = Data([9, 8, 7])
+        try history.write(to: tabStates.appendingPathComponent(id.uuidString))
+        let state = session(tabIDs: [id], space: Library.shared.spaces[0].id)
+        guard JSONStore.save(state, to: saved) else { return }
+        manager.forgetKeptSessionForTesting()
+        manager.keepSessionForReopening(session: saved, kept: kept, tabStates: tabStates, keptTabStates: keptTabStates)
+        #expect(try Data(contentsOf: keptTabStates.appendingPathComponent(id.uuidString)) == history)
+        // The fresh session's save removes the old tab's file; reopening puts the kept one back.
+        try FileManager.default.removeItem(at: tabStates.appendingPathComponent(id.uuidString))
+        WindowManager.restoreKeptTabStates(of: state, from: keptTabStates, to: tabStates)
+        #expect(try Data(contentsOf: tabStates.appendingPathComponent(id.uuidString)) == history)
+    }
+
+    @Test func reopeningKeepsALiveTabsCurrentHistory() throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let tabStates = root.appendingPathComponent("TabState", isDirectory: true)
+        let keptTabStates = root.appendingPathComponent("TabStateBeforeFreshStart", isDirectory: true)
+        try FileManager.default.createDirectory(at: tabStates, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: keptTabStates, withIntermediateDirectories: true)
+        let id = UUID()
+        let live = Data([4, 5, 6])
+        try Data([1, 2, 3]).write(to: keptTabStates.appendingPathComponent(id.uuidString))
+        try live.write(to: tabStates.appendingPathComponent(id.uuidString))
+        let state = session(tabIDs: [id], space: Library.shared.spaces[0].id)
+        WindowManager.restoreKeptTabStates(of: state, from: keptTabStates, to: tabStates)
+        #expect(try Data(contentsOf: tabStates.appendingPathComponent(id.uuidString)) == live)
+    }
+
+    @Test func aKeptSessionWithNoTabsIsNotReopenable() throws {
+        let manager = WindowManager.shared
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let kept = root.appendingPathComponent("SessionBeforeFreshStart.json")
+        let space = Library.shared.spaces[0].id
+        guard JSONStore.save(session(tabIDs: [], space: space), to: kept) else { return }
+        #expect(!manager.hasSessionToReopen(at: kept))
+    }
+}
+
+/// What makes a fresh start count as used (#433): only a page in a browser window, never a private window, Zigzag
+/// Mini, or one of Zigzag's own pages such as Settings.
+@MainActor
+struct SessionUseTests {
+    @Test func onlyABrowserPageCountsAsBrowsing() {
+        let page = URL(string: "https://example.com/")!
+        #expect(Tab.countsAsBrowsingForSession(isPrivate: false, isInBrowserWindow: true, url: page))
+        #expect(!Tab.countsAsBrowsingForSession(isPrivate: true, isInBrowserWindow: true, url: page))
+        #expect(!Tab.countsAsBrowsingForSession(isPrivate: false, isInBrowserWindow: false, url: page))
+        #expect(!Tab.countsAsBrowsingForSession(isPrivate: false, isInBrowserWindow: true, url: URL(string: "zigzag://settings")!))
     }
 }
 

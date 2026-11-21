@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- On launch can start fresh: Pick Up Where You Left Off is the default, and Start Fresh opens one new window, keeps the previous session for Window › Reopen Last Session (with its back and forward history), and doesn’t save the new session until a page actually loads. ([#433](https://github.com/ZigaoWang/zigzag/issues/433))
 - Reader has a Space color. The article takes the colors of the space you're in, the same color as the sidebar, light or dark as the space is, with text and links kept dark (or light) enough to read easily. It changes right away when you switch spaces or change the space's color. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 
 ### Fixed
