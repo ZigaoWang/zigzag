@@ -2970,7 +2970,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         if always.isEmpty {
             alwaysGroup.add(FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
-                                    detail: String(localized: "To always translate a language, choose it in a page’s site controls.", comment: "Under Always Translate in Settings › Translation."),
+                                    detail: String(localized: "To always translate a language, choose it from the translate button in the address bar.", comment: "Under Always Translate in Settings › Translation, when there's no language. The translate button is in the address bar on pages in another language."),
                                     control: NSView()))
         }
         always.map(row).forEach(alwaysGroup.add)
