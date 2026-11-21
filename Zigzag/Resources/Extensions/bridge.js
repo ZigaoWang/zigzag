@@ -151,11 +151,12 @@
         if (!loopback) return nativeFetch(input, init);
         asBytes = true;
       }
-      // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
-      // A loopback call is the exception: it is another origin on this Mac, and the helper is a plain server with no
-      // CORS reply of its own to read, so the switch alone decides and the default credentials stand.
+      // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default,
+      // and none with omit, past CORS either way (#478). A loopback call is the exception: it is another origin on this
+      // Mac, and the helper is a plain server with no CORS reply of its own to read, so the switch alone decides and
+      // the default credentials stand.
       const credentials = option('credentials', 'same-origin');
-      if (!['http:', 'https:'].includes(url.protocol) || (!loopback && !['include', 'same-origin'].includes(credentials))
+      if (!['http:', 'https:'].includes(url.protocol) || !['include', 'same-origin', 'omit'].includes(credentials)
           || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))

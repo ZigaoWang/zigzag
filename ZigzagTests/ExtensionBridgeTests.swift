@@ -298,7 +298,7 @@ extension ExtensionBridgeTests {
             streamController.close();
             await streaming;
             const cases = [
-              [other, { credentials: 'omit' }], [other, { credentials: 'include', method: 'PROPFIND' }],
+              [other, { credentials: 'include', method: 'PROPFIND' }],
               [other, { credentials: 'include', mode: 'same-origin' }], [other, { credentials: 'include', mode: 'no-cors' }],
               [other, { credentials: 'include', integrity: 'sha256-test' }],
               [other, { credentials: 'include', redirect: 'manual' }], [other, { credentials: 'include', keepalive: true }],
@@ -716,6 +716,153 @@ extension ExtensionBridgeTests {
         #expect(try await fetched(.all) == #"200 {"signedIn":false}"#)
     }
 
+    /// Litewarden (#478): a fetch with credentials: 'omit' and its own headers, to a server that sends no CORS headers.
+    /// With host access it goes natively, without the profile's cookies, with its headers; without, it stays WebKit's,
+    /// bound by CORS.
+    @Test func omitFetchWithHostAccessGetsPastCORSWithoutCookies() async throws {
+        let server = try SessionTestServer()
+        let target = try await server.start().appendingPathComponent("headers")
+        defer { server.listener.cancel() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["<all_urls>"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("<!doctype html><title>page</title>".utf8).write(to: folder.appendingPathComponent("page.html"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        // The profile has a session cookie for the server; omit must not send it.
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/"])))
+
+        func fetched(granted: Bool, bridged: Bool) async throws -> String {
+            let controller = WKWebExtensionController(configuration: .nonPersistent())
+            let context = WKWebExtensionContext(for: ext)
+            try controller.load(context)
+            defer { try? controller.unload(context) }
+            if granted { context.setPermissionStatus(.grantedExplicitly, for: .allURLs()) }
+            let configuration = try #require(context.webViewConfiguration)
+            let door = HostAccessFetchDoor(context: context, store: store)
+            configuration.userContentController.addScriptMessageHandler(door, contentWorld: .page, name: "door")
+            let page = WKWebView(frame: .zero, configuration: configuration)
+            page.load(URLRequest(url: context.baseURL.appendingPathComponent("page.html")))
+            for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(100)) }
+            #expect(page.title == "page")
+            if bridged {
+                // The page's policy allows no eval: the bridge runs as a script of its own, as Zigzag runs it.
+                _ = try await page.callAsyncJavaScript("""
+                    const runtime = { id: 'test', getManifest: () => ({}),
+                      sendNativeMessage: (host, message) => window.webkit.messageHandlers.door.postMessage(message)
+                        .then((value) => ({ value }), (error) => ({ error: String(error && error.message || error) })) };
+                    Object.defineProperty(globalThis, 'chrome', { value: { runtime }, configurable: true, writable: true });
+                    """, in: nil, contentWorld: .page)
+                _ = try await page.callAsyncJavaScript(ExtensionBridgeScript.source, in: nil, contentWorld: .page)
+            }
+            return try await page.callAsyncJavaScript("""
+                try {
+                  const response = await fetch(target, { credentials: 'omit', cache: 'no-store',
+                    headers: { 'Bitwarden-Client-Name': 'web', 'Device-Type': '9' } });
+                  const text = (await response.text()).toLowerCase();
+                  return [response.status, response.headers.get('content-type'), text.includes('bitwarden-client-name: web'),
+                          text.includes('device-type: 9'), text.includes('origin: chrome-extension://test'), text.includes('cookie:')].join(' ');
+                } catch (error) { return error.name; }
+                """, arguments: ["target": target.absoluteString], in: nil, contentWorld: .page) as? String ?? ""
+        }
+        // The cause: WebKit's own fetch is past CORS for a simple request only, not one it asks the server about first.
+        #expect(try await fetched(granted: true, bridged: true) == "200 application/octet-stream true true true false")
+        #expect(try await fetched(granted: false, bridged: true) == "TypeError")
+        #expect(try await fetched(granted: false, bridged: false) == "TypeError")
+        // Nothing the server set came back into the profile.
+        #expect(await store.httpCookieStore.allCookies().map(\.name) == ["session"])
+    }
+
+    /// Omit goes natively with no cookie out and none kept, its headers, method and body as sent and its answer's
+    /// status, headers and body as they came; default credentials without SameSite cookies stay WebKit's.
+    @Test func omitRequestsSendTheirHeadersAndBodyWithoutCookies() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/", .init("SameSite"): "Lax"])))
+        let requests = ExtensionFetchRequests()
+        func send(_ options: [String: Any], _ path: String) async throws -> [String: Any] {
+            try #require(try await requests.withHostAccess(options, url: url.appendingPathComponent(path), extensionID: "test", store: store,
+                                                           keepsSameSiteCookies: { false }, authorize: { _ in true }) as? [String: Any])
+        }
+        func text(_ answer: [String: Any]) -> String {
+            String(decoding: Data(base64Encoded: answer["body"] as? String ?? "") ?? Data(), as: UTF8.self)
+        }
+        let headers = try await send(["credentials": "omit", "method": "GET", "cache": "no-store",
+                                      "headers": [["bitwarden-client-name", "web"], ["device-type", "9"]]], "headers")
+        #expect(headers["status"] as? Int == 200)
+        let sent = text(headers).lowercased()
+        #expect(sent.hasPrefix("get /headers "))
+        #expect(sent.contains("bitwarden-client-name: web") && sent.contains("device-type: 9"))
+        #expect(sent.contains("origin: chrome-extension://test"))
+        #expect(!sent.contains("cookie:"))
+        let answered = try #require(headers["headers"] as? [[String]])
+        #expect(answered.contains(["content-type", "application/octet-stream"]))
+        #expect(answered.contains(["cache-control", "public, max-age=3600"]))
+        #expect(!answered.contains { $0[0] == "set-cookie" })
+        for method in ["POST", "PUT", "DELETE"] {
+            let echo = try await send(["credentials": "omit", "method": method, "body": #"{"email":"a@b.c"}"#,
+                                       "headers": [["content-type", "application/json"]]], "echo")
+            #expect(text(echo) == #"{"email":"a@b.c"}"#)
+        }
+        let binary = try await send(["credentials": "omit", "method": "POST", "body": "AP8=", "encoding": "base64",
+                                     "headers": [["content-type", "application/octet-stream"]]], "echo")
+        #expect(Data(base64Encoded: binary["body"] as? String ?? "") == Data([0, 255]))
+        #expect(text(try await send(["credentials": "omit", "method": "GET"], "me")) == #"{"signedIn":false}"#)
+        // Nothing the server set came back into the profile.
+        #expect(await store.httpCookieStore.allCookies().map(\.name) == ["session"])
+        // A read too big to carry whole is WebKit's to stream, as with other credentials.
+        #expect(try await send(["credentials": "omit", "method": "GET"], "huge")["fallback"] as? Bool == true)
+        let before = server.requests.withLock { $0 }
+        #expect(try await send(["credentials": "same-origin", "method": "GET"], "me")["fallback"] as? Bool == true)
+        #expect(server.requests.withLock { $0 } == before)
+    }
+
+    /// bridge.js hands omit to Zigzag like the other credentials, with what the request carries, and reads the answer
+    /// as sent; Zigzag's fallback answer, as without host access, leaves it to WebKit.
+    @Test func omitFetchGoesToZigzag() async throws {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let page = WKWebView(frame: .zero, configuration: configuration)
+        let result = try await page.callAsyncJavaScript("""
+            const calls = [], normal = [];
+            if (!crypto.randomUUID) crypto.randomUUID = () => '00000000-0000-4000-8000-000000000000';
+            globalThis.chrome = { runtime: {
+              id: 'test', getManifest: () => ({}),
+              sendNativeMessage: async (host, message) => {
+                calls.push(message);
+                const options = message.args[0];
+                if (options.url.includes('unapproved.example')) return { value: { fallback: true } };
+                return { value: { status: 201, statusText: '', headers: [['content-type', 'application/json'], ['x-server', 'yes']],
+                                  body: btoa('{"ok":true}'), url: options.url, redirected: false } };
+              }
+            } };
+            globalThis.fetch = async (input, init) => { normal.push([input, init]); return new Response('webkit'); };
+            eval(bridge);
+            const api = 'https://vault.example/api/config';
+            const answer = await fetch(api, { credentials: 'omit', cache: 'no-store', headers: { 'Bitwarden-Client-Name': 'web', 'Device-Type': '9' } });
+            const first = calls[0] && calls[0].args[0];
+            const sentHeaders = new Map(first ? first.headers : []);
+            const native = !!first && first.credentials === 'omit' && first.cache === 'no-store' && first.method === 'GET'
+              && sentHeaders.get('bitwarden-client-name') === 'web' && sentHeaders.get('device-type') === '9';
+            const answered = answer.status === 201 && answer.headers.get('x-server') === 'yes' && (await answer.json()).ok === true;
+            await fetch(api, { credentials: 'omit', method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"a":1}' });
+            await fetch(api, { credentials: 'omit' });
+            const posted = calls.length === 3 && calls[1].args[0].body === '{"a":1}' && calls[1].args[0].method === 'POST'
+              && calls[2].args[0].credentials === 'omit' && normal.length === 0;
+            await fetch('https://unapproved.example/api', { credentials: 'omit', headers: { 'Device-Type': '9' } });
+            const declined = calls.length === 4 && normal.length === 1;
+            return { native, answered, posted, declined };
+            """, arguments: ["bridge": ExtensionBridgeScript.source], in: nil, contentWorld: .page) as? [String: Any]
+        let value = try #require(result)
+        for key in ["native", "answered", "posted", "declined"] {
+            #expect(value[key] as? Bool == true, "Failed: \(key)")
+        }
+    }
+
     @Test func siteAccessChoicesGrantWhatTheySay() throws {
         let required = try WKWebExtension.MatchPattern(string: "https://api.example/*")
         let optional: Set = [try WKWebExtension.MatchPattern(string: "*://*/*")]
@@ -989,6 +1136,31 @@ struct ExtensionNotificationKeyTests {
     @Test func whatIsntAnExtensionsIsRefused() {
         #expect(ExtensionNotificationKey("site|example.com|1") == nil)
         #expect(ExtensionNotificationKey("ext|\(rabby)") == nil)
+    }
+}
+
+/// The bridge's extensionFetch for a test extension page: host access as BridgeExtensionFetch checks it, then the
+/// same routing, with a store of the test's own.
+@MainActor
+private final class HostAccessFetchDoor: NSObject, WKScriptMessageHandlerWithReply {
+    let context: WKWebExtensionContext
+    let store: WKWebsiteDataStore
+    let requests = ExtensionFetchRequests()
+    init(context: WKWebExtensionContext, store: WKWebsiteDataStore) { self.context = context; self.store = store }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
+        guard let body = message.body as? [String: Any], let options = (body["args"] as? [Any])?.first as? [String: Any],
+              let url = (options["url"] as? String).flatMap(URL.init(string:)) else { return replyHandler(nil, "Invalid request.") }
+        guard BridgeExtensionFetch.allows(url, context: context) else { return replyHandler(["fallback": true], nil) }
+        let context = context
+        Task { @MainActor in
+            do {
+                let answer = try await requests.withHostAccess(options, url: url, extensionID: "test", store: store, keepsSameSiteCookies: { false },
+                                                               authorize: { BridgeExtensionFetch.allows($0, context: context) })
+                replyHandler(answer, nil)
+            } catch { replyHandler(nil, (error as? BridgeError)?.message ?? "\(error)") }
+        }
     }
 }
 
