@@ -2413,7 +2413,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
         // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
         let held = root.chromeBarShown && holdsToggle
-        root.topBar.showsSidebarButton = root.chromeBarShown && !docked
+        // The Whole Screen has no docked sidebar to toggle: its edge still brings it out.
+        root.topBar.showsSidebarButton = root.chromeBarShown && !docked && !root.isImmersive
         root.topBar.sidebarOnRight = onRight
         sidebar.isOnRight = onRight
         // The sidebar's own, where the docked sidebar puts it.
