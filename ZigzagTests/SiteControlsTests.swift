@@ -619,7 +619,7 @@ struct SitePanelRowsTests {
         #expect(SitePanelRows.links(Context()).isEmpty)
     }
 
-    /// The first page holds page switches only (zoom, ads, cookie banners, dark page, keep awake, full screen, translate, space); permissions, JavaScript and extensions are on the Permissions page (#311, #313).
+    /// The first page holds page switches only (zoom, ads, cookie banners, dark page, keep awake, translate, space); permissions, JavaScript and extensions are on the Permissions page (#311, #313).
     @Test func theFirstPageIsOnlyPageSwitches() {
         var c = Context()
         #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake])
@@ -628,19 +628,10 @@ struct SitePanelRowsTests {
         #expect(SitePanelRows.links(c) == [.permissions])
     }
 
-    /// The full-screen row says what it does, and under it where a video goes with the switch as it is (#385).
-    @Test func theFullScreenRowSaysWhereVideosGo() {
-        #expect(SitePanel.fullScreenTitle == String(localized: "Keep full screen in the window"))
-        #expect(SitePanel.fullScreenStatus(true) == String(localized: "Videos fill the page, not the screen"))
-        #expect(SitePanel.fullScreenStatus(false) == String(localized: "Videos fill your screen"))
-        #expect(!SitePanel.fullScreenTitle.contains("fills the page"))
-    }
-
     @Test func rowsThatApplyOnlySomewhere() {
         var c = Context()
-        c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .alwaysTranslate])
     }
 
     /// Cookie banners (#175): there once a pop-up was found or a choice kept, under Ad blocking; never in a private
@@ -664,9 +655,8 @@ struct SitePanelRowsTests {
     /// Developer Mode (#198): only in the ⋯ menu, never a row of This Site, whatever else the page has.
     @Test func developerModeIsNoRow() {
         var c = Context()
-        c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .alwaysTranslate])
     }
 
     @Test func noZoomOverReaderOrAPDF() {

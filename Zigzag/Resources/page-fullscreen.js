@@ -1,17 +1,13 @@
-// Full screen in the page (#168): with Settings › Tabs › Full screen videos fill set to The Page, or a site's own
-// choice in its controls, a page asking for full screen (a player's button, Element.requestFullscreen and its webkit
-// names, video.webkitEnterFullscreen) gets its element filling the page's own area instead of the whole screen. The
-// page is told it's in full screen as it would be (fullscreenElement, fullscreenchange), its own :fullscreen styles
-// are matched through a mark, and Esc leaves. A frame asks the page around it to fill the page with the frame, all
-// the way up. Otherwise everything is WebKit's own.
+// Full screen in the page (#168, #462): a page asking for full screen (a player's button, Element.requestFullscreen
+// and its webkit names, video.webkitEnterFullscreen) gets its element filling the page's own area. A tab on its own
+// takes the window, with the chrome out of the way; the page never takes the screen. The page is told it's in full
+// screen as it would be (fullscreenElement, fullscreenchange), its own :fullscreen styles are matched through a
+// mark, and Esc leaves. A frame asks the page around it to fill the page with the frame, all the way up.
 //
-// Per-site choices never appear here, where the page could read them: Zigzag's isolated world
-// (PageFullScreen.choiceSource) sends only page or screen. Like WebKit, it fills only on a user gesture, and frames
-// only with full screen allowed.
+// Like WebKit, it fills only on a user gesture, and frames only with full screen allowed.
 (() => {
   const KEY = Symbol.for('zigzag.fullscreen');
   if (window[KEY]) return;
-  const config = __CONFIG__;
   const MARK = 'data-zigzag-fullscreen';
   const ANCESTOR = 'data-zigzag-fullscreen-ancestor';
   const PAGE = 'data-zigzag-fullscreen-page';
@@ -21,15 +17,12 @@
   // Page globals captured before its scripts run, so redefinitions aren't called.
   const call = Function.prototype.call.bind(Function.prototype.call);
   const own = (o, n) => (o ? Object.getOwnPropertyDescriptor(o, n) : undefined);
-  const listen = EventTarget.prototype.addEventListener, send = EventTarget.prototype.dispatchEvent, NativeEvent = Event;
+
   const userActivation = own(window.Navigator && Navigator.prototype, 'userActivation');
   const activeNow = own(window.UserActivation && UserActivation.prototype, 'isActive');
   const frameAllows = own(window.HTMLIFrameElement && HTMLIFrameElement.prototype, 'allowFullscreen');
   const frameAllow = own(window.HTMLIFrameElement && HTMLIFrameElement.prototype, 'allow');
 
-  // This site's choice from Zigzag's world; the setting until then.
-  let fills = config.fill === 'page';
-  const fillsPage = () => fills;
   // A recent user gesture, which WebKit full screen requires.
   const activated = () => {
     try { return userActivation && activeNow ? !!call(activeNow.get, call(userActivation.get, navigator)) : true; } catch (e) { return false; }
@@ -59,7 +52,7 @@
       return /(^|;)\s*fullscreen(\s|;|$)/i.test(allow) && !/fullscreen\s+'none'/i.test(allow);
     } catch (e) { return false; }
   };
-  const mayFill = () => fillsPage() && enabled() && activated();
+  const mayFill = () => enabled() && activated();
   const nativeElement = () => {
     try { return (native.element ? native.element.get.call(document) : native.webkitElement && native.webkitElement.get.call(document)) || null; } catch (e) { return null; }
   };
@@ -202,7 +195,7 @@
   const later = (work) => new Promise((resolve) => setTimeout(() => { work(); resolve(); }, 0));
   const requested = function (fallback) {
     return function (...args) {
-      // Not page fill, no user gesture, or a disallowed frame: defer to WebKit.
+      // No user gesture, or a disallowed frame: defer to WebKit.
       if (!mayFill()) return fallback ? fallback.apply(this, args) : Promise.reject(new TypeError('Not supported'));
       const el = this;
       return later(() => { if (el.isConnected) enter(el, false); });
@@ -269,15 +262,11 @@
     leave();
   }, true);
 
-  // Full screen WebKit started itself (a video's own controls), while the page is to be filled: back out of it, and
-  // fill the page with the same element.
-  // Only WebKit's own events count: the ones told here are the page's to hear.
+  // Full screen WebKit started itself (a video's own controls): back out of it, and fill the page with the same
+  // element. Only WebKit's own events count: the ones told here are the page's to hear.
   let backingOut = false;
-  // Sent to the screen by Zigzag's button (`expand`): leave that full screen alone until it ends.
-  let toScreen = false;
   const tookScreen = (event) => {
-    if (toScreen) { if (event.isTrusted && !nativeElement()) toScreen = false; return; }
-    if (!event.isTrusted || backingOut || !fillsPage()) return;
+    if (!event.isTrusted || backingOut) return;
     const el = nativeElement();
     if (!el) return;
     backingOut = true;
@@ -290,7 +279,7 @@
   // A video's own full screen, apart from the page's.
   document.addEventListener('webkitbeginfullscreen', (event) => {
     const video = event.target;
-    if (!event.isTrusted || !fillsPage() || !(video instanceof HTMLVideoElement) || !native.videoExit) return;
+    if (!event.isTrusted || !(video instanceof HTMLVideoElement) || !native.videoExit) return;
     event.stopImmediatePropagation();
     try { native.videoExit.call(video); } catch (e) {}
     setTimeout(() => { if (video.isConnected) enter(video, true); }, 0);
@@ -312,29 +301,11 @@
     if (type === 'exit' && current === frame) leave({ fromChild: true });
   });
 
-  // This site's choice from Zigzag's world, now and on change.
-  const choose = (next) => {
-    fills = next;
-    if (current && !fills) leave();
-  };
-  call(listen, window, 'zigzag-fullscreen-page', () => choose(true), true);
-  call(listen, window, 'zigzag-fullscreen-screen', () => choose(false), true);
-  call(send, window, new NativeEvent('zigzag-fullscreen-ask'));
   // A page that starts is never in full screen, whatever the one before it was.
   report();
   Object.defineProperty(window, KEY, {
     value: Object.freeze({
       exit: () => { if (current) { leave(); return true; } return false; },
-      // Zigzag's button: move the page-filling element into real full screen.
-      expand: () => {
-        const el = current;
-        if (!el) return false;
-        leave();
-        toScreen = true;
-        const request = native.request || native.webkitRequest || native.webkitRequestS;
-        try { Promise.resolve(request.call(el)).catch(() => { toScreen = false; }); } catch (e) { toScreen = false; return false; }
-        return true;
-      },
       get active() { return !!current; },
     }),
     enumerable: false, configurable: false, writable: false,

@@ -1,182 +1,37 @@
 import AppKit
 import WebKit
 
-/// Where a page's full screen goes (#168): over the whole screen, as WebKit does it, or filling the page's own area
-/// in the window (its pane in a split), the window around it as it was. Settings › Tabs › Full screen videos fill
-/// decides for every site, and a site's controls for one site, so YouTube can always fill the page.
-///
-/// The page is filled by page-fullscreen.js, in the page's own world (where a player asks for full screen): it
-/// answers requestFullscreen and the webkit names for it, and a video's webkitEnterFullscreen, by fixing the element
-/// over the page's viewport, telling the page it's in full screen (fullscreenElement, fullscreenchange), matching
-/// the page's own :fullscreen rules through a mark, and leaving on Esc or exitFullscreen. A frame (an embedded
-/// player) has the page around it fill with the frame. WebKit's element full screen always opens a window of its
-/// own, with nothing public or private to keep it in the page, so a full screen WebKit starts itself (a video's own
-/// controls) is backed out of and the page filled instead.
+/// Full screen in the page (#168, #462): a page asking for full screen (a player's button, Element.requestFullscreen
+/// and its webkit names, video.webkitEnterFullscreen) gets its element filling the page's own area in the window, and
+/// a tab on its own takes the window with the chrome out of the way. The page never takes the screen. The page is told
+/// it's in full screen as it would be (fullscreenElement, fullscreenchange), its own :fullscreen styles are matched
+/// through a mark, and Esc leaves. A frame asks the page around it to fill the page with the frame, all the way up.
+/// Only a click or key of yours starts it; a frame only where it's allowed full screen.
 enum PageFullScreen {
-    enum Fill: String, CaseIterable {
-        /// The whole screen: WebKit's own full screen.
-        case screen
-        /// The page's own area in the window.
-        case page
-    }
-
-    /// Where the choices are kept; tests use their own.
-    static var defaults: UserDefaults = .standard
-    /// The setting or a site's choice changed.
-    static let changed = Signal<Void>()
-
-    private static let fillKey = "FullScreenFills"
-    private static let pageKey = "FullScreenPageSites"
-    private static let screenKey = "FullScreenScreenSites"
-
-    /// Settings › Tabs › Full screen videos fill. The whole screen until changed, as it always was.
-    static var fill: Fill {
-        get { defaults.string(forKey: fillKey).flatMap(Fill.init(rawValue:)) ?? .screen }
-        set { defaults.set(newValue.rawValue, forKey: fillKey); refreshAll() }
-    }
-
-    /// Sites (hosts without "www.") whose full screen fills the page, or the whole screen, whatever the setting.
-    /// A site covers its subdomains.
-    static var pageSites: Set<String> {
-        get { Set(defaults.stringArray(forKey: pageKey) ?? []) }
-        set { defaults.set(Array(newValue).sorted(), forKey: pageKey) }
-    }
-
-    static var screenSites: Set<String> {
-        get { Set(defaults.stringArray(forKey: screenKey) ?? []) }
-        set { defaults.set(Array(newValue).sorted(), forKey: screenKey) }
-    }
-
-    private static func covers(_ sites: Set<String>, _ site: String) -> Bool {
-        sites.contains { site == $0 || site.hasSuffix("." + $0) }
-    }
-
-    /// The site's own choice, or nil to follow the setting.
-    static func choice(for url: URL?) -> Fill? {
-        guard let site = ContentBlocker.site(of: url) else { return nil }
-        if covers(pageSites, site) { return .page }
-        if covers(screenSites, site) { return .screen }
-        return nil
-    }
-
-    /// The site's own choice first, then the setting.
-    static func fills(setting: Fill, site: Fill?) -> Fill { site ?? setting }
-
-    static func fills(for url: URL?) -> Fill { fills(setting: fill, site: choice(for: url)) }
-
-    /// Sets a site's choice, or back to following the setting (nil). A choice the same as the setting's isn't kept:
-    /// the site simply follows it. Whatever covered the site before (its parent domain's choice too) goes.
-    static func setChoice(_ choice: Fill?, for url: URL?) {
-        guard let site = ContentBlocker.site(of: url) else { return }
-        var page = pageSites.filter { !(site == $0 || site.hasSuffix("." + $0)) }
-        var screen = screenSites.filter { !(site == $0 || site.hasSuffix("." + $0)) }
-        if let choice, choice != fill {
-            if choice == .page { page.insert(site) } else { screen.insert(site) }
-        }
-        pageSites = page
-        screenSites = screen
-        refreshAll()
-    }
-
-    /// Every site's choice forgotten (Settings › Privacy › Sites › Reset All).
-    static func forgetAll() {
-        pageSites = []
-        screenSites = []
-        refreshAll()
-    }
-
-    /// Whether the site controls offer the choice: for a web page, and not in a private window, whose site would be
-    /// kept in Settings › Privacy › Sites. A private window's pages still follow the choices made elsewhere.
-    static func isOffered(for url: URL?, isPrivate: Bool) -> Bool {
-        !isPrivate && ["http", "https"].contains(url?.scheme?.lowercased() ?? "")
-    }
-
-    // MARK: Pages
-
     static let messageName = "zigzagFullScreen"
     /// The first line of the page script, to tell it from a web view's other scripts.
     static let scriptMark = "/* zigzag page full screen */\n"
 
-    /// Config for the choice script: the setting and sites with their own choice. It resolves the page's site (a
-    /// frame uses its page's), so one script serves every page.
-    static func config(fill: Fill, pageSites: Set<String>, screenSites: Set<String>) -> [String: Any] {
-        ["fill": fill.rawValue, "page": pageSites.sorted(), "screen": screenSites.sorted()]
-    }
-
-    /// The page script gets only the setting; the site list is browsing history and stays in Zigzag's world.
-    static func pageConfig(_ config: [String: Any]) -> [String: Any] {
-        ["fill": config["fill"] ?? Fill.screen.rawValue]
-    }
-
     /// Isolated from the page.
     static let world = WKContentWorld.world(name: "zigzag-fullscreen")
-
-    /// Resolves the site's choice in Zigzag's world and tells the page script only "page" or "screen", as an event:
-    /// now, on request, and when choices change.
-    static func choiceSource(config: [String: Any]) -> String {
-        scriptMark + """
-        (() => {
-          if (window.__zigzagFullScreenChoice) return;
-          let config = \(json(config));
-          const isTop = window === window.top;
-          const siteOf = (host) => (host || '').toLowerCase().replace(/^www\\./, '');
-          const topHost = () => {
-            if (isTop) return location.hostname;
-            try { const a = location.ancestorOrigins; if (a && a.length) return new URL(a[a.length - 1]).hostname; } catch (e) {}
-            try { return window.top.location.hostname; } catch (e) { return location.hostname; }
-          };
-          const covers = (list, site) => (list || []).some((s) => site === s || site.endsWith('.' + s));
-          const fills = () => {
-            const site = siteOf(topHost());
-            if (covers(config.page, site)) return true;
-            if (covers(config.screen, site)) return false;
-            return config.fill === 'page';
-          };
-          const answer = () => { try { window.dispatchEvent(new Event(fills() ? 'zigzag-fullscreen-page' : 'zigzag-fullscreen-screen')); } catch (e) {} };
-          window.addEventListener('zigzag-fullscreen-ask', answer, true);
-          window.__zigzagFullScreenChoice = { set(next) { config = next; answer(); } };
-          answer();
-        })();
-        """
-    }
-
-    static func choiceScript(config: [String: Any] = config) -> WKUserScript {
-        WKUserScript(source: choiceSource(config: config), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world)
-    }
-
-    static var config: [String: Any] { config(fill: fill, pageSites: pageSites, screenSites: screenSites) }
-
-    static func json(_ config: [String: Any]) -> String {
-        (try? JSONSerialization.data(withJSONObject: config, options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-    }
 
     private static let template: String = {
         guard let url = Bundle.main.url(forResource: "page-fullscreen", withExtension: "js") else { return "" }
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }()
 
-    /// The page script with the setting only, never the site list.
-    static func source(config: [String: Any]) -> String {
-        scriptMark + template.replacingOccurrences(of: "__CONFIG__", with: json(pageConfig(config)))
-    }
+    /// The page script.
+    static func source() -> String { scriptMark + template }
 
     /// In the page's own world, where a site's player asks for full screen, and in every frame, for embedded players.
-    static func script(config: [String: Any] = config) -> WKUserScript {
-        WKUserScript(source: source(config: config), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+    static func script() -> WKUserScript {
+        WKUserScript(source: source(), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
     }
 
     static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(scriptMark) }
 
-    /// Run in `world` by each frame's choice script on changes, and by the page to exit its full screen (Esc in
-    /// Zigzag's window).
-    static func applyCall(_ config: [String: Any]) -> String {
-        "window.__zigzagFullScreenChoice && window.__zigzagFullScreenChoice.set(\(json(config)))"
-    }
-
+    /// Run by the page to exit its full screen (Esc in Zigzag's window).
     static let exitCall = "window[Symbol.for('zigzag.fullscreen')]?.exit() ?? false"
-    static let expandCall = "window[Symbol.for('zigzag.fullscreen')]?.expand() ?? false"
-
-    private static let webViews = NSHashTable<WKWebView>.weakObjects()
 
     /// A tab's new web view: the page script, and the page telling it when it fills itself.
     static func attach(to webView: WKWebView) {
@@ -184,7 +39,6 @@ enum PageFullScreen {
         let controller = webView.configuration.userContentController
         controller.removeScriptMessageHandler(forName: messageName, contentWorld: .page)
         controller.add(Messages.shared, contentWorld: .page, name: messageName)
-        webViews.add(webView)
         watchEsc()
     }
 
@@ -214,27 +68,10 @@ enum PageFullScreen {
         return panes.first { $0.isInPageFullScreen && $0.webView != nil }
     }
 
-    /// Puts the script with the choices as they are now in place of the one there, for pages loaded from now on.
+    /// Puts the script in place, for pages loaded from now on.
     private static func install(in controller: WKUserContentController) {
         OwnScripts.remove(from: controller, where: isOurs)
-        let config = config
-        controller.addUserScript(choiceScript(config: config))
-        controller.addUserScript(script(config: config))
-    }
-
-    /// The choices changed: pages open now follow at once, pages loaded later start with them.
-    static func refreshAll() {
-        let config = config
-        var controllers = Set<ObjectIdentifier>()
-        for webView in webViews.allObjects {
-            let controller = webView.configuration.userContentController
-            if controllers.insert(ObjectIdentifier(controller)).inserted { install(in: controller) }
-            // Each frame's script is told directly; choices never pass between frames.
-            for frame in [nil] + PageFrames.shared.frames(in: webView) {
-                webView.runOwnScript(applyCall(config), in: frame, world: world)
-            }
-        }
-        changed.send()
+        controller.addUserScript(script())
     }
 
     /// Esc in Zigzag's window, while a page there fills itself: it leaves.
@@ -242,14 +79,6 @@ enum PageFullScreen {
         guard tab.isInPageFullScreen, let webView = tab.webView else { return }
         webView.runOwnScript(exitCall, world: .page)
         tab.isInPageFullScreen = false
-    }
-
-    /// The expand button over a page-filled element (#257) sends it to real full screen. WebKit only allows full
-    /// screen from a click or key and treats an app script as one, so the press counts as yours.
-    static func expand(_ tab: Tab) {
-        guard tab.isInPageFullScreen, let webView = tab.webView else { return }
-        tab.isInPageFullScreen = false
-        webView.evaluateJavaScript(expandCall, in: nil, in: .page) { _ in }
     }
 
     private final class Messages: NSObject, WKScriptMessageHandler {
