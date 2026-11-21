@@ -20,6 +20,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - What's New shows a fine line above its buttons while there are more notes below, and under its title once you've scrolled, instead of the notes being cut off there. ([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 - The close button in the find bar, and every other ✕ button, sits level with the buttons beside it instead of half a point low. ([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 - While an update downloads, its card in the sidebar keeps the same margin on the right as on the left. ([#458](https://github.com/ZigaoWang/zigzag/issues/458))
+- The yes-or-no steps in the welcome window sit in the middle of the window, with no large empty gap above the buttons at the bottom. ([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 
 ## [0.9.4] - 2026-11-21
 
