@@ -18,7 +18,9 @@ enum EdgePeekFocusPolicy {
 
 /// Whether a page can go back where it came from: never into a closed tab, and not at all when it had no home.
 enum EdgePeekRestorePolicy {
-    static func canRestore(isClosed: Bool, hasOrigin: Bool) -> Bool { !isClosed && hasOrigin }
+    static func canRestore(isClosed: Bool, hasOrigin: Bool, reason: EdgeLensReason = .escape) -> Bool {
+        !isClosed && hasOrigin && reason != .selection
+    }
 }
 
 /// What the lens does when the browser's context changes under it: a space switch ends it, and a page opened from
@@ -28,6 +30,11 @@ enum EdgePeekRouting {
 
     static func closesOnSpaceChange(peekVisible: Bool) -> Bool { peekVisible }
     static func newPage(peekVisible: Bool) -> NewPage { peekVisible ? .peek : .browser }
+    /// A page opened from the lens replaces it; selecting any other tab is leaving the lens.
+    static func selectionKeepsLens(lensTab: Tab?, selected: Tab?) -> Bool {
+        guard let lensTab, let selected, selected !== lensTab else { return false }
+        return selected.opener === lensTab
+    }
 }
 
 /// The edge lens (#365): the sidebar's preview, opened. The tab's own page fills the preview card beside the sidebar,
@@ -71,13 +78,26 @@ final class EdgePeek {
     // MARK: Opening
 
     /// The preview or a row was clicked: the lens opens from the preview's frame, or closes first if it is already
-    /// out. One action never opens a second lens.
-    func show(tab: Tab, from controller: BrowserWindowController) {
+    /// out. One action never opens a second lens. A page opened from the lens replaces its page instead.
+    func show(tab: Tab, from controller: BrowserWindowController, replacing: Bool = false) {
         if isVisible {
-            dismiss(self.tab === tab ? .sameTab : .sidebarClick)
+            switch EdgeLensPolicy.openAction(isVisible: true, replacing: replacing) {
+            case .replace:
+                swap(to: tab, from: controller)
+            case .close:
+                dismiss(self.tab === tab ? .sameTab : .sidebarClick)
+            case .open:
+                break
+            }
             return
         }
         guard !isCollapsing else { return }
+        // The lens and the sidebar are one session: a lens with no panel would float over another app with nothing
+        // to put its page back into.
+        guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else {
+            EdgePeekPreview.shared.hide()
+            return
+        }
         EdgePeekPreview.shared.hide()
         makePanel()
         guard let panel, let card, let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else { return }
@@ -133,6 +153,33 @@ final class EdgePeek {
             MainActor.assumeIsolated { self?.managerChanged(change) }
         }
         installLensObservers(for: controller)
+        refreshLens()
+    }
+
+    /// A page opened from the lens takes the card over: the old page goes back to its tab, and the new page's holder
+    /// moves into the same card. The panel, its frame and the sidebar stay.
+    private func swap(to tab: Tab, from controller: BrowserWindowController) {
+        guard controller === self.controller, tab !== self.tab, !tab.isClosed, tab.url != nil else { return }
+        _ = tab.ensureWebView()
+        guard let holder = tab.pageHolder, let card, let panel else { return }
+        card.endLive()
+        if let old = self.tab, let oldHolder = old.pageHolder, let origin {
+            oldHolder.removeFromSuperview()
+            oldHolder.frame = originFrame
+            origin.addSubview(oldHolder)
+            origin.needsLayout = true
+        }
+        origin = holder.superview
+        originFrame = holder.frame
+        holder.removeFromSuperview()
+        self.tab = tab
+        card.showsLensControls = true
+        card.show(tab: tab, bookmark: nil)
+        card.showLive(holder: holder)
+        card.layoutSubtreeIfNeeded()
+        controller.setEdgePeek(tab.id)
+        token = tab.changed.observe { [weak self] _ in self?.refreshLens() }
+        if let webView = tab.webView { panel.makeFirstResponder(webView) }
         refreshLens()
     }
 
@@ -247,7 +294,8 @@ final class EdgePeek {
         controller?.setEdgePeek(nil)
         if let tab, let holder = tab.pageHolder {
             holder.removeFromSuperview()
-            if EdgePeekRestorePolicy.canRestore(isClosed: tab.isClosed, hasOrigin: origin != nil), let origin {
+            if EdgePeekRestorePolicy.canRestore(isClosed: tab.isClosed, hasOrigin: origin != nil, reason: reason),
+               let origin {
                 holder.frame = originFrame
                 origin.addSubview(holder)
                 origin.needsLayout = true
@@ -265,7 +313,7 @@ final class EdgePeek {
         panel?.makeFirstResponder(nil)
         panel?.ignoresMouseEvents = true
         guard let panel else {
-            finishCollapse(hideSidebar: hideSidebar)
+            finishCollapse(hideSidebar: hideSidebar, reason: reason)
             return
         }
         let source = EdgePeekPreview.shared.currentFrame ?? sourceFrame ?? panel.frame
@@ -279,14 +327,14 @@ final class EdgePeek {
         let deadline = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.isCollapsing else { return }
-                self.finishCollapse(hideSidebar: hideSidebar)
+                self.finishCollapse(hideSidebar: hideSidebar, reason: reason)
             }
         }
         collapseDeadline = deadline
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05, execute: deadline)
     }
 
-    private func finishCollapse(hideSidebar: Bool) {
+    private func finishCollapse(hideSidebar: Bool, reason: EdgeLensReason) {
         collapseDeadline?.cancel()
         collapseDeadline = nil
         isCollapsing = false
@@ -297,7 +345,8 @@ final class EdgePeek {
         panel?.ignoresMouseEvents = false
         if hideSidebar {
             EdgeSidebar.shared.hide(animated: true)
-        } else {
+        } else if EdgeLensPolicy.keepsKey(after: reason), !EdgeSidebar.shared.isCommandBarOpen {
+            // A lens action leaves the keyboard in the sidebar. A context change leaves it where the user put it.
             EdgeSidebar.shared.makeKey()
         }
     }
@@ -352,9 +401,9 @@ final class EdgePeek {
             MainActor.assumeIsolated {
                 guard let self, self.isVisible, !self.isCollapsing, MenuPanel.current == nil else { return }
                 let point = NSEvent.mouseLocation
-                guard self.panel?.frame.contains(point) != true else { return }
-                let overSidebar = EdgeSidebar.shared.panelWindow?.frame.contains(point) == true
-                self.dismiss(overSidebar ? .sidebarClick : .outsideClick)
+                guard self.panel?.frame.contains(point) != true,
+                      EdgeSidebar.shared.panelWindow?.frame.contains(point) != true else { return }
+                self.dismiss(.outsideClick)
             }
         }
         outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
@@ -365,7 +414,11 @@ final class EdgePeek {
             }
             if event.window === self.panel { return event }
             if event.window === EdgeSidebar.shared.panelWindow {
-                self.dismiss(.sidebarClick)
+                // A row, New Tab or blank click is a sidebar action; the sidebar's own controls (back, reload, the
+                // address) act on the lens and leave it open.
+                if EdgeSidebar.shared.clickClosesLens(at: event.locationInWindow) {
+                    self.dismiss(.sidebarClick)
+                }
                 return event
             }
             if event.window === self.controller?.window {
@@ -431,10 +484,16 @@ final class EdgePeek {
         case .structure:
             if tab?.isClosed == true { dismiss(.sameTab) }
         case .selection:
-            // The browser moved to another page under the lens: the page has no card of its own to go back to, and
-            // restoring it would paint it over the page now in that card.
-            if tab?.isClosed == true || (tab != nil && controller?.tabManager.selectedTab !== tab) {
-                dismiss(.sameTab)
+            if tab?.isClosed == true {
+                dismiss(.selection)
+                return
+            }
+            if let tab, let selected = controller?.tabManager.selectedTab, selected !== tab {
+                // A page opened from the lens is a replacement, not a selection away from it: the show that follows
+                // swaps the page in. Anything else is leaving the lens, and the page must not be put back over the
+                // card that now owns its place.
+                if EdgePeekRouting.selectionKeepsLens(lensTab: tab, selected: selected) { return }
+                dismiss(.selection)
             }
         case .content:
             break

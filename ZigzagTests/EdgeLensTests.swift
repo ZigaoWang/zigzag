@@ -53,6 +53,27 @@ struct EdgeLensTests {
         }
     }
 
+    @Test func aPageOpenedFromTheLensReplacesItsPage() {
+        #expect(EdgeLensPolicy.openAction(isVisible: false, replacing: false) == .open)
+        #expect(EdgeLensPolicy.openAction(isVisible: true, replacing: true) == .replace)
+        #expect(EdgeLensPolicy.openAction(isVisible: true, replacing: false) == .close)
+    }
+
+    @Test func theSidebarKeepsTheKeyboardOnlyAfterALensAction() {
+        for reason in [EdgeLensReason.sameTab, .sidebarClick, .escape] {
+            #expect(EdgeLensPolicy.keepsKey(after: reason))
+        }
+        for reason in [EdgeLensReason.outsideClick, .altTab, .spaceChange, .browserFront, .windowClose, .featureOff,
+                       .selection] {
+            #expect(!EdgeLensPolicy.keepsKey(after: reason))
+        }
+    }
+
+    @Test func aSelectionChangeDoesNotPutThePageBack() {
+        #expect(EdgePeekRestorePolicy.canRestore(isClosed: false, hasOrigin: true, reason: .escape))
+        #expect(!EdgePeekRestorePolicy.canRestore(isClosed: false, hasOrigin: true, reason: .selection))
+    }
+
     // MARK: Size
 
     @Test func theLensIsSixtyPercentOfTheScreen() {
@@ -60,8 +81,9 @@ struct EdgeLensTests {
     }
 
     @Test func theLensIsAtLeast480Wide() {
-        let frame = EdgeLensLayout.frame(beside: NSRect(x: 320, y: 16, width: 264, height: 568),
-                                         in: NSRect(x: 0, y: 0, width: 600, height: 600),
+        // A screen with room for the minimum beside the sidebar, or the gap wins instead (see the narrow-screen test).
+        let frame = EdgeLensLayout.frame(beside: NSRect(x: 520, y: 16, width: 264, height: 568),
+                                         in: NSRect(x: 0, y: 0, width: 800, height: 600),
                                          pageAspect: 1.6, caption: caption, onRight: true, rowMidY: 300)
         #expect(abs(frame.width - 480) < 0.5)
     }
@@ -81,6 +103,23 @@ struct EdgeLensTests {
         #expect(frame.width <= visible.width)
         #expect(frame.minX >= visible.minX)
         #expect(frame.maxX <= visible.maxX)
+    }
+
+    @Test func theLensKeepsItsGapFromTheSidebarOnANarrowScreen() {
+        let visible = NSRect(x: 0, y: 0, width: 760, height: 700)
+        let leftSide = NSRect(x: 16, y: 16, width: 264, height: 668)
+        let left = EdgeLensLayout.frame(beside: leftSide, in: visible, pageAspect: 1.6, caption: caption,
+                                        onRight: false, rowMidY: 350)
+        #expect(left.minX >= leftSide.maxX + Tokens.Space.x2 - 0.5)
+        #expect(left.maxX <= visible.maxX + 0.5)
+        #expect(!left.intersects(leftSide))
+
+        let rightSide = NSRect(x: 480, y: 16, width: 264, height: 668)
+        let right = EdgeLensLayout.frame(beside: rightSide, in: visible, pageAspect: 1.6, caption: caption,
+                                         onRight: true, rowMidY: 350)
+        #expect(right.maxX <= rightSide.minX - Tokens.Space.x2 + 0.5)
+        #expect(right.minX >= visible.minX - 0.5)
+        #expect(!right.intersects(rightSide))
     }
 
     @Test func thePageKeepsItsAspectUnderTheCaption() {
@@ -148,6 +187,18 @@ struct EdgeLensTests {
         card.endLive()
         #expect(view("preview.live", in: card)?.isHidden == true)
         #expect(holder.superview == nil)
+    }
+
+    @Test func aRestoredPageIsNotTakenFromItsCardAgain() {
+        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 338))
+        let origin = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 338))
+        card.showLive(holder: holder)
+        // The close puts the page back in its tab before the card stops being live.
+        holder.removeFromSuperview()
+        origin.addSubview(holder)
+        card.endLive()
+        #expect(holder.superview === origin)
     }
 
     // MARK: Place

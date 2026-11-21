@@ -2576,8 +2576,8 @@ extension BrowserWindowController: TabHost {
         let flags = action.modifierFlags
         let background = flags.contains(.command) && !flags.contains(.shift)
         let newTab = tabManager.newTab(url: nil, select: !background, configuration: configuration, opener: tab, site: action.request.url)
-        if EdgePeekRouting.newPage(peekVisible: EdgePeek.shared.isVisible) == .peek {
-            EdgePeek.shared.show(tab: newTab, from: self)
+        if EdgePeekRouting.newPage(peekVisible: EdgePeek.shared.isVisible) == .peek, !background {
+            EdgePeek.shared.show(tab: newTab, from: self, replacing: true)
         }
         return newTab.ensureWebView()
     }
@@ -3563,7 +3563,7 @@ extension BrowserWindowController: CommandBarHost {
         guard edgeCommandBarInPlace else { return }
         if EdgePeekRouting.newPage(peekVisible: EdgePeek.shared.isVisible) == .peek,
            let tab = tabManager.selectedTab {
-            EdgePeek.shared.show(tab: tab, from: self)
+            EdgePeek.shared.show(tab: tab, from: self, replacing: true)
         } else {
             bringForwardForEdge()
         }
@@ -3760,7 +3760,7 @@ extension BrowserWindowController {
         }
     }
 
-    /// The lens's entry point from the preview or a row. The lens replaces the row pick's Mini in the next step.
+    /// The lens's entry point from the preview or a row.
     func openEdgeLens(for tab: Tab) {
         pickFromEdgeSidebar(tab)
     }

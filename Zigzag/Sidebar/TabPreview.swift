@@ -144,7 +144,8 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
         if holder.bounds.width > 1, holder.bounds.height > 1 {
             pageAspect = holder.bounds.width / holder.bounds.height
         }
-        liveHolder?.removeFromSuperview()
+        // Only a page still in the clip belongs to it. A page already put back in its tab is not taken again.
+        if liveHolder?.superview === liveClip { liveHolder?.removeFromSuperview() }
         liveHolder = holder
         liveClip.addSubview(holder)
         holder.frame = liveClip.bounds
@@ -157,9 +158,10 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
-    /// The page left: the snapshot is the card's picture again.
+    /// The page left: the snapshot is the card's picture again. A page the close already put back in its tab stays
+    /// there; only a page still in the live clip is taken out.
     func endLive() {
-        liveHolder?.removeFromSuperview()
+        if liveHolder?.superview === liveClip { liveHolder?.removeFromSuperview() }
         liveHolder = nil
         liveClip.isHidden = true
     }

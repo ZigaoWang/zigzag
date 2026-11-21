@@ -42,6 +42,9 @@ final class EdgePeekPreview {
     /// The card's frame wherever it last was: the lens grows from it, even when the preview is already gone.
     var currentFrame: NSRect? { panel?.frame }
 
+    /// Whether the card is out and clickable. The sidebar stays out while it is: the preview is the closed lens.
+    var isVisible: Bool { panel?.isVisible == true }
+
     /// The pointer is on a row: at once, or following it row to row.
     func hover(tab: Tab, at row: NSRect) {
         guard EdgePeekPreviewPolicy.shouldShow(hovered: true, peekVisible: EdgePeek.shared.isVisible) else {
@@ -68,7 +71,7 @@ final class EdgePeekPreview {
         scheduleHide(after: EdgePeekPreviewPolicy.pointerGrace)
     }
 
-    /// The pointer left, a row was picked, the card was clicked, or the popout came out: the preview goes.
+    /// The pointer left, a row was picked, the card was clicked, or the sidebar went: the preview goes.
     func hide() {
         pending?.cancel()
         pending = nil

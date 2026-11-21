@@ -34,4 +34,14 @@ struct EdgePeekTests {
         #expect(EdgePeekRouting.newPage(peekVisible: true) == .peek)
         #expect(EdgePeekRouting.newPage(peekVisible: false) == .browser)
     }
+
+    @Test func aPageOpenedFromTheLensIsAReplacementNotASelectionChange() {
+        let space = UUID()
+        let lens = Tab(url: URL(string: "https://example.com")!, title: "Lens", spaceID: space)
+        let opened = Tab(url: URL(string: "https://example.com/next")!, title: "Next", spaceID: space)
+        opened.opener = lens
+        #expect(EdgePeekRouting.selectionKeepsLens(lensTab: lens, selected: opened))
+        #expect(!EdgePeekRouting.selectionKeepsLens(lensTab: lens, selected: lens))
+        #expect(!EdgePeekRouting.selectionKeepsLens(lensTab: lens, selected: nil))
+    }
 }
