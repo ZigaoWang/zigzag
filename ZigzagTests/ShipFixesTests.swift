@@ -1388,4 +1388,23 @@ struct ZigzagCardTests {
             }
         }
     }
+
+    @Test func theChosenFinishHasTheAccentRingAsReadersColorsDo() throws {
+        let swatches = CardFinishSwatches(selected: .graphite, palette: CardPalette(hue: Brand.navyHue, hue2: nil))
+        swatches.frame = NSRect(origin: .zero, size: swatches.fittingSize)
+        swatches.layoutSubtreeIfNeeded()
+        let tiles = swatches.subviews
+        #expect(tiles.count == CardFinish.allCases.count)
+        for (tile, finish) in zip(tiles, CardFinish.allCases) {
+            tile.layout()
+            let ring = try #require(tile.layer?.sublayers?.first)
+            var accent: CGColor?
+            tile.effectiveAppearance.performAsCurrentDrawingAppearance { accent = Tokens.Color.accent.cgColor }
+            if finish == .graphite {
+                #expect(ring.borderColor == accent)
+            } else {
+                #expect(ring.borderColor != accent)
+            }
+        }
+    }
 }
