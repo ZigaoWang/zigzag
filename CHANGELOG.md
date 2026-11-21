@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - ⇧⌘C copies the page's link on every site, as in Arc. On a file page on GitHub, which uses the same keys to copy the file's raw text, it copied the file instead.
 - With Ask before quitting on, choosing Quit Zigzag in the menu quits right away, as in Chrome: only ⌘Q asks. Quitting while files download still asks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
+- Zigzag's own pages, like Settings, History and the archive, can't be dragged into Pinned, onto a pinned folder or page, or into Favorites, as ⌘D and the star already refused them. The tab stays where it was. Pin Tab and Add to Favorites aren't offered for them in the tab's menu or the command bar either. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#472](https://github.com/ZigaoWang/zigzag/issues/472))
 
 ## [0.9.4] - 2026-11-21
 
