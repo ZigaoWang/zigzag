@@ -227,8 +227,10 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     static var autoFillDetection: NSObject? {
         let shared = NSSelectorFromString("sharedInstance"), create = NSSelectorFromString("_createTargetDetectionControllerIfNecessary")
         guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
-              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.responds(to: create),
-              let ivar = class_getInstanceVariable(type, "_targetDetectionController") else { return nil }
+              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.isKind(of: type), controller.responds(to: create),
+              let ivar = class_getInstanceVariable(type, "_targetDetectionController"),
+              // Read only while it holds an object, as it does on the macOS versions this was written for.
+              ivar_getTypeEncoding(ivar).map({ String(cString: $0).hasPrefix("@") }) == true else { return nil }
         controller.perform(create)
         return object_getIvar(controller, ivar) as? NSObject
     }
