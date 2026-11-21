@@ -28,6 +28,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A toast with an icon, like the zoom level's, keeps as much room after its words as before its icon, instead of 3 points more on the right.
 - Reader on a local file names it in its header and in Read the original at the end, instead of leaving them blank.
 - In the welcome window's yes-or-no steps, the answer you didn't pick keeps its outline. It lost it as soon as the button was drawn again, so Show Ads and Not Now read as plain text beside the picked answer.
+- The welcome window's Skip sits on the same line as the progress dots, instead of 3 points below them.
 
 ## [0.9.3] - 2026-11-18
 

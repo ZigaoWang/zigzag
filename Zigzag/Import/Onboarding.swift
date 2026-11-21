@@ -321,7 +321,9 @@ private final class StepPage: NSView {
             dot.alphaValue = i == index ? 1 : i < index ? 0.55 : 0.28
             dx += w + 6
         }
-        skip.frame = NSRect(x: bounds.width - 28 - skip.fittingWidth, y: 12, width: skip.fittingWidth, height: Tokens.Space.x8)
+        // Skip's text on the dots' center line.
+        let skipY = dotY + Tokens.Welcome.dot / 2 - Tokens.Space.x8 / 2
+        skip.frame = NSRect(x: bounds.width - 28 - skip.fittingWidth, y: skipY, width: skip.fittingWidth, height: Tokens.Space.x8)
         let th = ceil(title.sizeThatFits(NSSize(width: width, height: 200)).height)
         let bh0 = ceil(body.sizeThatFits(NSSize(width: width - 80, height: 200)).height)
         let footY = bounds.height - 40 - Tokens.Space.x10
