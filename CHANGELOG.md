@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - ⇧⌘C copies the page's link on every site, as in Arc. On a file page on GitHub, which uses the same keys to copy the file's raw text, it copied the file instead.
+- With Ask before quitting on, choosing Quit Zigzag in the menu quits right away, as in Chrome: only ⌘Q asks. Quitting while files download still asks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 
 ## [0.9.4] - 2026-11-21
 
