@@ -96,7 +96,8 @@ final class PaneDrag {
         }
         if over !== list { list?.externalHover(at: nil) }
         list = over
-        over?.externalHover(at: screenPoint)
+        // A pinned page can land among the pinned pages too, as its row can.
+        over?.externalHover(at: screenPoint, allowsPinned: tab.bookmarkID != nil)
         controller.root.splitDropHint.follow(window.convertPoint(fromScreen: screenPoint))
         controller.root.splitDropHint.show(move: move)
         // A tick as it comes onto another place it would take.
@@ -117,7 +118,7 @@ final class PaneDrag {
             controller.rearrangeWithUndo(tab, kind)
         case .list:
             guard let (owner, list) = SidebarListView.list(at: screenPoint) else { return }
-            controller.movePaneToList(tab, of: owner, at: list.dropIndex(at: screenPoint))
+            controller.movePaneToList(tab, of: owner, at: list.dropTarget(at: screenPoint, allowsPinned: tab.bookmarkID != nil))
         case .outside:
             if option, controller.canOpenInMini(tab) { controller.openInMini(tab, at: screenPoint) } else { controller.movePaneToNewWindow(tab, at: screenPoint) }
         }
@@ -157,10 +158,12 @@ extension BrowserWindowController {
         }
     }
 
-    /// Whether a pane can leave its group for a place in `owner`'s tab list: an ordinary tab, into this window's list
-    /// or another's, as a tab moves between windows (#167), never between a private window and another.
+    /// Whether a pane can leave its group for a place in `owner`'s sidebar list: an ordinary tab, into this window's
+    /// list or another's, as a tab moves between windows (#167), never between a private window and another; a
+    /// pinned page, into this window's list, its tabs or its pinned pages, as its row can.
     func canMovePane(_ tab: Tab, toListOf owner: BrowserWindowController) -> Bool {
-        guard tab.bookmarkID == nil, tabManager.split(for: tab) != nil else { return false }
+        guard tabManager.split(for: tab) != nil else { return false }
+        if tab.bookmarkID != nil { return owner === self && !tabManager.isPrivate && !tab.isFavorite }
         return owner === self || (!tabManager.isPrivate && !owner.tabManager.isPrivate)
     }
 

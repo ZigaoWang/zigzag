@@ -2077,15 +2077,27 @@ final class TabManager {
         let pair = splits[index]
         // A pinned group's pages keep their places: the rest stays open, each on its own, as a pinned split's other
         // half does.
-        guard pair.isGroup, tab.bookmarkID == nil, let rest = pair.removing(tab.id) else {
+        guard pair.isGroup, tab.bookmarkID == nil else {
             unsplit(tab, notify: notify)
             return pair.ids.first { $0 != tab.id }.flatMap { self.tab(with: $0) }
         }
-        splits[index] = rest
+        let taker = closeUp(index, without: tab)
         if notify {
             structureChanged()
             selectionChanged()
         }
+        return taker
+    }
+
+    /// Split `index` without `tab`, the rest closed up around its place (a split of two ends); the page that grew
+    /// over its room is returned.
+    private func closeUp(_ index: Int, without tab: Tab) -> Tab? {
+        let pair = splits[index]
+        guard let rest = pair.removing(tab.id) else {
+            splits.remove(at: index)
+            return pair.ids.first { $0 != tab.id }.flatMap { self.tab(with: $0) }
+        }
+        splits[index] = rest
         // The page that grew over its room: the one whose place now covers part of where it was.
         let gone = pair.shape.regions[pair.ids.firstIndex(of: tab.id) ?? 0].cells
         let shape = rest.shape
@@ -2093,18 +2105,21 @@ final class TabManager {
         return self.tab(with: rest.ids[taker])
     }
 
-    /// One pinned page out of its pinned group of three or four, as `leaveGroup` takes a tab out of a group of tabs:
-    /// it stays pinned on its own, and the rest stay one pinned group, closed up around its place, on screen too.
-    func leavePinnedGroup(_ bookmarkID: UUID) {
-        guard let pinned = Library.shared.pinnedSplit(containing: bookmarkID), pinned.isGroup else { return }
+    /// One pinned page out of its pinned split, as `leaveGroup` takes a tab out of a group of tabs: it stays pinned on
+    /// its own, and the rest stay one pinned split, closed up around its place, on screen too; of two, the other is a
+    /// pinned page on its own. The page that grew over its room on screen is returned.
+    @discardableResult
+    func leavePinnedGroup(_ bookmarkID: UUID) -> Tab? {
+        guard Library.shared.pinnedSplit(containing: bookmarkID) != nil else { return nil }
         // On screen first, so the group there still matches its pinned one once the library changes.
-        if let tab = bookmarkTabs[bookmarkID], let index = splits.firstIndex(where: { $0.contains(tab.id) }),
-           let rest = splits[index].removing(tab.id) {
-            splits[index] = rest
+        var taker: Tab?
+        if let tab = bookmarkTabs[bookmarkID], let index = splits.firstIndex(where: { $0.contains(tab.id) }) {
+            taker = closeUp(index, without: tab)
         }
         Library.shared.removeFromPinnedSplit(bookmarkID)
         structureChanged()
         selectionChanged()
+        return taker
     }
 
     /// Two to four tabs of one space side by side as a tile group laid out as `shape`, ending any splits they were in

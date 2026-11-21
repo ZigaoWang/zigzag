@@ -140,8 +140,14 @@ extension BrowserWindowController {
     /// A pane dragged by its strip onto a sidebar's tab list: it leaves its group, which closes up, and is a tab of
     /// its own there, as a tab dragged into the list lands. Another window's list: it leaves the group here and moves
     /// to that window as a tab moved there does (#167), whose ⌘Z sends it back; ⌘Z here then puts it back in the group.
-    func movePaneToList(_ tab: Tab, of target: BrowserWindowController, at index: Int) {
-        guard tab.bookmarkID == nil, tabManager.split(for: tab) != nil else { return }
+    /// A pinned page leaves its pinned split and lands as its own row would: pinned there, or a tab among the tabs.
+    func movePaneToList(_ tab: Tab, of target: BrowserWindowController, at place: (section: SidebarListView.Section, index: Int, folder: UUID?)) {
+        guard canMovePane(tab, toListOf: target) else { return }
+        if let id = tab.bookmarkID {
+            movePinnedPaneToList(id, at: place)
+            return
+        }
+        let index = place.index
         guard target !== self else {
             let space = tabManager.currentSpaceID
             pageChange(Self.moveTabName) { [tabManager] in
@@ -159,6 +165,25 @@ extension BrowserWindowController {
             guard let self, let target else { return }
             self.leaveGroupWithUndo(tab)
             self.move([tab], to: target, at: index)
+        }
+    }
+
+    /// A pinned pane out of its pinned split, the rest closing up as Remove from Split View leaves them, then onto the
+    /// list as its row dropped there: moved among the pinned pages, or unpinned into the tabs. One step to undo.
+    private func movePinnedPaneToList(_ id: UUID, at place: (section: SidebarListView.Section, index: Int, folder: UUID?)) {
+        let space = tabManager.currentSpaceID
+        pageChange(Self.moveTabName) { [weak self] in
+            guard let self else { return }
+            // The list counted this page where it sat in its split; once out, the place after it is one less.
+            let was = Library.shared.bookmarks(in: space).firstIndex { $0.id == id }
+            if let rest = tabManager.leavePinnedGroup(id) { tabManager.select(rest) }
+            switch place.section {
+            case .bookmarks:
+                let index = was.map { place.index > $0 ? place.index - 1 : place.index } ?? place.index
+                listMoveBookmark(id, to: index, in: space, folder: place.folder)
+            case .tabs:
+                listUnbookmark(id, to: place.index)
+            }
         }
     }
 

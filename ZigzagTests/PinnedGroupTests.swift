@@ -638,7 +638,7 @@ import Testing
         }
     }
 
-    // MARK: Growing by drag
+    // MARK: Growing and pulling apart by drag
 
     /// A tab dropped on a pinned split's row joins it as a third or fourth page, where the same drop on a split of
     /// tabs puts it, every line where it was; one ⌘Z takes it back out, a tab again.
@@ -727,6 +727,57 @@ import Testing
             #expect(inTabs == inPinned)
             #expect(inTabs == (count < 4 ? 1 : nil))
             #expect(manager.joining(.tab(extra.id), onto: .pinned(mark), onRight: false) == nil ? count == 4 : count < 4)
+        }
+    }
+
+    /// One page dragged by its strip out of a pinned split of three: into Pinned it stays pinned on its own where it
+    /// was let go, into the tabs it's a tab; the other two stay a pinned split, on screen too. ⌘Z puts it back.
+    @Test(arguments: [true, false]) func aPagePulledOutOfAPinnedSplitOfThree(intoPinned: Bool) throws {
+        let section: SidebarListView.Section = intoPinned ? .bookmarks : .tabs
+        try inWindow(["0", "1", "2", "x"]) { controller, all, space in
+            let manager = controller.tabManager
+            let tabs = Array(all.prefix(3))
+            manager.makeGroup(tabs, shape: Self.shapes[2])
+            manager.bookmarkTab(tabs[0], in: space)
+            manager.bookmarkTab(all[3], in: space, keepingGroup: false)
+            let marks = tabs.compactMap(\.bookmarkID), x = try #require(all[3].bookmarkID)
+            manager.select(tabs[1])
+            #expect(controller.canMovePane(tabs[1], toListOf: controller))
+            // Let go after the pinned page that follows the split, counted as the list counts it, or first among the tabs.
+            controller.movePaneToList(tabs[1], of: controller, at: (section, section == .bookmarks ? 4 : 0, nil))
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == [marks[0], marks[2]])
+            #expect(manager.split(for: tabs[0])?.ids == [tabs[0].id, tabs[2].id])
+            #expect(manager.split(for: tabs[1]) == nil)
+            if section == .bookmarks {
+                #expect(Library.shared.pinnedSplit(containing: marks[1]) == nil)
+                #expect(Library.shared.bookmarks(in: space).map(\.id) == [marks[0], marks[2], x, marks[1]])
+                #expect(tabs[1].bookmarkID == marks[1])
+            } else {
+                #expect(Library.shared.bookmark(marks[1]) == nil)
+                #expect(tabs[1].bookmarkID == nil)
+                #expect(manager.tabs(in: space).first === tabs[1])
+            }
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == marks + [x])
+            #expect(manager.split(for: tabs[0])?.ids == tabs.map(\.id))
+        }
+    }
+
+    /// Out of a pinned split of two, the page left is a pinned page on its own, as Separate Split View leaves it.
+    @Test func aPagePulledOutOfAPinnedSplitOfTwo() throws {
+        try inWindow(["0", "1"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.makeGroup(tabs, shape: Self.shapes[0])
+            manager.bookmarkTab(tabs[0], in: space)
+            let marks = tabs.compactMap(\.bookmarkID)
+            controller.movePaneToList(tabs[0], of: controller, at: (.tabs, 0, nil))
+            #expect(Library.shared.pinnedSplit(containing: marks[1]) == nil)
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == [marks[1]])
+            #expect(manager.split(for: tabs[1]) == nil)
+            #expect(tabs[0].bookmarkID == nil)
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.pinnedSplit(containing: marks[1])?.ids == marks)
         }
     }
 }
