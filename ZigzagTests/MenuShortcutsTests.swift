@@ -81,6 +81,15 @@ import Testing
         #expect(!AppDelegate.isQuitKey(nil))
     }
 
+    @Test func onlyTheQuitKeyAsksButDownloadsAlwaysDo() {
+        // The menu and the Dock quit at once; the key asks while the setting is on.
+        #expect(AppDelegate.asks(fromKey: true, setting: true, downloading: 0))
+        #expect(!AppDelegate.asks(fromKey: false, setting: true, downloading: 0))
+        #expect(!AppDelegate.asks(fromKey: true, setting: false, downloading: 0))
+        #expect(AppDelegate.asks(fromKey: false, setting: false, downloading: 2))
+        #expect(AppDelegate.asks(fromKey: false, setting: true, downloading: 1))
+    }
+
     @Test func commandTOpensTheNewTabBarAndAgainClosesIt() async throws {
         #expect(keys(#selector(BrowserWindowController.newTab(_:))) == ["⌘t"])
         try await inWindow([nil]) { controller, _ in

@@ -232,14 +232,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var quitConfirmed = false
 
     /// Asks before quitting, in the window, like Zigzag's other confirmations. Never when the Mac is logging out,
-    /// restarting or shutting down, when an update restarts Zigzag, or for Quit Zigzag chosen in the menu. ⌘Q again, or Return, quits.
+    /// restarting or shutting down, when an update restarts Zigzag, or for Quit chosen in the menu or the Dock: only
+    /// the Quit key asks. ⌘Q again, or Return, quits.
     static var asksBeforeQuitting: Bool {
         get { UserDefaults.standard.object(forKey: "AskBeforeQuitting") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "AskBeforeQuitting") }
     }
 
-    /// Set while Quit Zigzag chosen in the menu quits: choosing it is the confirmation, as in Chrome (#441).
-    private static var quittingFromMenu = false
+    /// Set while the Quit key quits: choosing Quit anywhere else is the confirmation, as in Chrome (#441).
+    private static var quittingFromKey = false
+
+    /// Whether the setting asks for this quit: only for the Quit key, or always while files download.
+    static func asks(fromKey: Bool, setting: Bool, downloading: Int) -> Bool {
+        (setting && fromKey) || downloading > 0
+    }
 
     /// Whether the event is the ⌘Q key, the one quit the setting asks about.
     static func isQuitKey(_ event: NSEvent?) -> Bool {
@@ -249,8 +255,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func quitFromMenu(_ sender: Any?) {
-        Self.quittingFromMenu = !Self.isQuitKey(NSApp.currentEvent)
-        defer { Self.quittingFromMenu = false }
+        Self.quittingFromKey = Self.isQuitKey(NSApp.currentEvent)
+        defer { Self.quittingFromKey = false }
         NSApp.terminate(sender)
     }
 
@@ -264,7 +270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .terminateLater
         }
         // Asked already, or not asking: downloads are the one thing worth asking about anyway.
-        guard !Self.quitConfirmed, (Self.asksBeforeQuitting && !Self.quittingFromMenu) || downloading > 0 else { return quitNow() }
+        guard !Self.quitConfirmed, Self.asks(fromKey: Self.quittingFromKey, setting: Self.asksBeforeQuitting, downloading: downloading) else { return quitNow() }
         // Logging out, restarting or shutting down: the system's own reason is on the quit event.
         if let event = NSAppleEventManager.shared().currentAppleEvent,
            event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil { return quitNow() }
