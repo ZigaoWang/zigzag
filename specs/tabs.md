@@ -50,6 +50,10 @@
 - Click a sleeping tab → it loads again where it was.
   Test: UnloadedTabTests.aSleepingTabClickedLoadsAgainWhereItWas
 
+## Handoff
+- The key window's tab on an http or https page → offered to your other devices; never a private window, Zigzag's own pages, a file, an error page or this Mac's own address.
+  Test: HandoffTests.onlyAWebPageAnotherDeviceCanOpenIsOffered
+
 ## Sound
 - A tab playing sound or muted → a speaker after its title; clicking it mutes or unmutes that page.
   Test: RowSpeakerTests.theSpeakerMutesAndUnmutesItsPage
