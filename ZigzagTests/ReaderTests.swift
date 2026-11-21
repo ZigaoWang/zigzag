@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import WebKit
@@ -240,6 +241,100 @@ struct ReaderTests {
         #expect(first.webView.configuration.websiteDataStore === one)
         #expect(second.webView.configuration.websiteDataStore === other)
         #expect(first.webView.configuration.defaultWebpagePreferences.allowsContentJavaScript == false)
+    }
+
+    /// Aa shows at the top, goes as you read on, and comes back on the way up, with the pointer near the top, and
+    /// for as long as its panel is open.
+    @Test func theAaButtonGoesAsYouReadOn() {
+        var p = Reader.ButtonPresence()
+        #expect(p.isShown)
+        p.scrolled(to: 4)
+        #expect(p.isShown)
+        p.scrolled(to: 300)
+        #expect(!p.isShown)
+        // A small wobble back doesn't count as heading up.
+        p.scrolled(to: 296)
+        #expect(!p.isShown)
+        p.scrolled(to: 280)
+        #expect(p.isShown)
+        p.scrolled(to: 600)
+        #expect(!p.isShown)
+        p.pointerNearTop = true
+        #expect(p.isShown)
+        // Brought back by the pointer, it stays until you read on.
+        p.pointerNearTop = false
+        #expect(p.isShown)
+        p.scrolled(to: 700)
+        #expect(!p.isShown)
+        p.panelOpen = true
+        p.scrolled(to: 900)
+        #expect(p.isShown)
+        p.panelOpen = false
+        #expect(!p.isShown)
+        p.scrolled(to: 0)
+        #expect(p.isShown && p.atTop)
+    }
+
+    /// Aa sits in the reading page's top-right corner as a toolbar-sized button, and takes no clicks while put away.
+    @Test func theAaButtonIsInThePagesCorner() {
+        let view = ReaderView(store: .nonPersistent())
+        view.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        view.layoutSubtreeIfNeeded()
+        let button = view.optionsButton
+        #expect(button.superview === view)
+        #expect(button.frame.size == NSSize(width: Tokens.Metric.iconButton, height: Tokens.Metric.iconButton))
+        #expect(button.frame.minY == Tokens.Space.x4)
+        #expect(view.bounds.maxX - button.frame.maxX == Tokens.Space.x4)
+        #expect(button.button.symbol == "textformat.size")
+        #expect(button.hitTest(NSPoint(x: button.frame.midX, y: button.frame.midY)) != nil)
+        button.setShown(false, animated: false)
+        #expect(button.alphaValue == 0)
+        #expect(button.hitTest(NSPoint(x: button.frame.midX, y: button.frame.midY)) == nil)
+    }
+
+    /// The colors are five plain dots, each named, in the space editor's swatch size.
+    @Test func theColorsKeepAllFiveThemes() {
+        let row = ReaderSwatches()
+        #expect(row.themes == Reader.Preferences.Theme.allCases)
+        #expect(row.themes == [.auto, .light, .sepia, .dark, .space])
+        #expect(row.intrinsicContentSize.height == SwatchRing.side)
+        let names = Reader.Preferences.Theme.allCases.map { ThemeSwatch(theme: $0).accessibilityLabel() }
+        #expect(names == ["Auto", "Light", "Sepia", "Dark", "Space"])
+        #expect(ThemeSwatch(theme: .light).toolTip == "Light")
+    }
+}
+
+/// The address's Reader button turns Reader on and off; Aa in the page opens how it reads.
+@MainActor
+struct ReaderToggleTests {
+    @Test func aSecondClickTurnsReaderOff() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let url = try #require(URL(string: "https://example.com/story"))
+        let tab = Tab(url: url, title: "Story", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let article = Reader.Article(title: "T", byline: "", site: "S", content: "<p>x</p>", length: 1, lang: "en")
+        controller.showReader(article, in: tab, from: url, store: .nonPersistent())
+        let button = controller.sidebar.address.readerButton
+        #expect(controller.isReaderOnHere)
+        #expect(button.isSelected)
+        let reader = try #require(controller.readerHere)
+        reader.optionsButton.button.onClick?(NSEvent())
+        #expect(ReaderOptions.isOpen(in: controller.window))
+        #expect(reader.optionsButton.button.isSelected && reader.presence.panelOpen)
+        #expect(ReaderOptions.debugCurrent?.debugRowCount == 4)
+        #expect(ReaderOptions.debugCurrent?.debugThemes == Reader.Preferences.Theme.allCases)
+        // A second click on the address's button: Reader goes, its panel with it, never the panel alone.
+        button.onClick?(NSEvent())
+        #expect(!controller.isReaderOnHere)
+        #expect(!ReaderOptions.isOpen(in: controller.window))
+        #expect(!button.isSelected)
     }
 }
 

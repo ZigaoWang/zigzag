@@ -753,6 +753,20 @@ enum DebugBridge {
             return
         }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
+        // card [tilt <x> <y>|tilt off|save <path>|shot <path>|close]: Your Zigzag Card, opened behind, leaning as if
+        // the pointer were there (-1 to 1 from its middle, y up), its picture saved, or its window captured by number.
+        // card start <yyyy-mm-dd> <version> [exact]: the kept start, replaced, for a test copy.
+        if name == "card" {
+            let f = arg.split(separator: " ").map(String.init)
+            if f.first == "start", f.count >= 3, let date = ISO8601DateFormatter().date(from: f[1] + "T12:00:00Z") {
+                CardStart.defaults.set(date, forKey: CardStart.dateKey)
+                CardStart.defaults.set(f[2], forKey: CardStart.versionKey)
+                CardStart.defaults.set(f.contains("exact"), forKey: CardStart.exactKey)
+                return
+            }
+            if let card = ZigzagCardWindowController.shared, !f.isEmpty { card.debug(f) } else { ZigzagCardWindowController.show() }
+            return
+        }
         // updateready <version>|off: a pretend staged update (Restart only logs); updatedismiss: the card's close
         // button; updatestate <path>: menu title and staged update (JSON).
         if name == "updateready" { Updater.shared.debugStage(arg == "off" || arg.isEmpty ? nil : arg); return }
@@ -2808,8 +2822,12 @@ enum DebugBridge {
             Task { @MainActor in await DebugBridge.extensionTest(f[0], page: page, in: controller) }
         case "ua": controller.selectedWebView?.customUserAgent = arg.isEmpty ? nil : arg; controller.selectedWebView?.reload()
         case "readerstyle": controller.toggleReaderOptions()
-        // readerbutton: the address's Reader button, as a click. readerswatchhover <n|off>: a color swatch under the pointer.
-        case "readerbutton": controller.pressReaderButton()
+        // readerbutton: the address's Reader button, as a click. readeraa: the page's Aa button, as a click.
+        // readerswatchhover <n|off>: a color dot under the pointer.
+        case "readerbutton": controller.sidebar.address.readerButton.onClick?(NSEvent())
+        case "readeraa": controller.readerHere?.optionsButton.button.onClick?(NSEvent())
+        // readerpointer <on|off>: the pointer in the reading page's top band, or out of it.
+        case "readerpointer": controller.readerHere?.debugPointerNearTop(arg == "on")
         case "readerswatchhover": ReaderOptions.debugHoverSwatch(Int(arg))
         case "readerprefs":
             // readerprefs <auto|light|sepia|dark> <serif|sans> <narrow|medium|wide> [size]: Reader's choices, applied to the open article.

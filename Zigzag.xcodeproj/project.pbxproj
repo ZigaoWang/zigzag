@@ -269,6 +269,7 @@
 		793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */; };
 		79B109D184AEBA99124E805F /* ExtensionSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */; };
 		7A6644E5F8E6F88E4D4B80E1 /* AboutWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E9A925D7802ECE0037DA97 /* AboutWindow.swift */; };
+		C4A7D1E20F3B4C5D6E7F8A90 /* ZigzagCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A7D1E20F3B4C5D6E7F8A91 /* ZigzagCard.swift */; };
 		7AB39474A82DB35790BF5AE1 /* PhoneLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A4EB98BE921B92AA85CBF4 /* PhoneLink.swift */; };
 		7C136AE63DBC68A78BFA1EB9 /* SiteRouteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75BA5C343852E0E29D797FC /* SiteRouteSheet.swift */; };
 		7C2FE38D621DB85C0E007C50 /* CleanLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC2746C9940BC684BB9A616 /* CleanLinkTests.swift */; };
@@ -933,6 +934,7 @@
 		88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageDialogSheet.swift; sourceTree = "<group>"; };
 		88D86346DE78193D507DCECC /* TabStateCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStateCacheTests.swift; sourceTree = "<group>"; };
 		88E9A925D7802ECE0037DA97 /* AboutWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindow.swift; sourceTree = "<group>"; };
+		C4A7D1E20F3B4C5D6E7F8A91 /* ZigzagCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagCard.swift; sourceTree = "<group>"; };
 		88F9F8B1C1119171EFC0072B /* DebugBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBridge.swift; sourceTree = "<group>"; };
 		89A07EB62BF2057B04CDC41A /* autoconsent.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = autoconsent.info.json; sourceTree = "<group>"; };
 		8A7E9A550FE7FAD6F8CA7697 /* HistoryLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLookup.swift; sourceTree = "<group>"; };
@@ -1734,6 +1736,7 @@
 				07632F352E115A10525D3A97 /* UpdateReady.swift */,
 				795D70D21D90CC7FB8A2295D /* UpdateRelaunch.swift */,
 				88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */,
+				C4A7D1E20F3B4C5D6E7F8A91 /* ZigzagCard.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -2346,6 +2349,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A6644E5F8E6F88E4D4B80E1 /* AboutWindow.swift in Sources */,
+				C4A7D1E20F3B4C5D6E7F8A90 /* ZigzagCard.swift in Sources */,
 				B0B613E852FA44892B755F04 /* AcknowledgementsWindow.swift in Sources */,
 				548A302B2614C99406A1F549 /* AdFilters.swift in Sources */,
 				21251A414831FB29A32D3804 /* AddressDrop.swift in Sources */,
@@ -2999,7 +3003,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 134;
+				CURRENT_PROJECT_VERSION = 135;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -3118,7 +3122,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 134;
+				CURRENT_PROJECT_VERSION = 135;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 432GL3WKY2;

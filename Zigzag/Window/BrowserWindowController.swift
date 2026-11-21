@@ -112,7 +112,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // So does the guide while it points at something in it.
         root.keepsRevealed = { [weak self] in
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
-                || ReaderOptions.isOpen(in: self?.window) || self?.popupHoldsSidebar == true
+                || self?.popupHoldsSidebar == true
         }
         // One floating thing at a time, the sidebar that slides out included: while the command bar is up, or a panel
         // opened from the bar above the page, the pointer at the window's edge leaves it hidden. It would slide in
@@ -153,7 +153,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
             return nil
         }
-        sidebar.address.readerButton.onClick = { [weak self] _ in self?.pressReaderButton() }
+        sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
@@ -2051,76 +2051,64 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 return
             }
             guard self.tabManager.selectedTab === tab, self.reader == nil else { return }
-            let view = ReaderView(store: webView.configuration.websiteDataStore)
-            view.onClose = { [weak self] in self?.closeReader() }
-            // The article's links are the page's, wherever they open.
-            view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link, by: .page) }
-            view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
-            view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
-            view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
-            view.currentSpace = { [weak self] in self?.tabManager.currentSpace }
-            view.show(article, from: url, icon: tab.favicon)
-            self.reader = view
-            self.readerTab = tab
-            tab.readerWebView = view.webView
-            self.readerURL = url
-            let index = self.tabManager.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0
-            let card = self.root.paneCards[min(index, self.root.paneCards.count - 1)]
-            self.readerCard = card
-            card.setOverlay(view)
-            // Visible from the start (WebKit doesn't paint into a hidden view); the article is local and draws
-            // within a few frames, well inside the fade.
-            Self.readerTransition(view, entering: true)
-            self.window?.makeFirstResponder(view.webView)
-            // Opened again quickly: one listener, never two.
-            if let old = self.readerKeyMonitor { NSEvent.removeMonitor(old) }
-            self.readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                // A peek opened from the article is in front: Esc closes that first, and Reader stays. So does the
-                // command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
-                guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil, !self.peek.isVisible,
-                      !self.hasFloatingPanel, (self.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
-                self.closeReader()
-                return nil
-            }
-            self.updateReaderButton()
-            self.paintTopBar()
-            // An open Find follows the article in, and back out to the page.
-            self.findBar.pageChanged()
+            self.showReader(article, in: tab, from: url, store: webView.configuration.websiteDataStore)
         }
     }
 
-    /// The address's Reader button: off, it turns Reader on; on, it opens Reader's options, where it turns off.
-    func pressReaderButton() {
-        if isReaderOnHere { toggleReaderOptions() } else { toggleReader() }
+    /// Reader over `tab`'s card with `article`, once it's been read from the page.
+    func showReader(_ article: Reader.Article, in tab: Tab, from url: URL, store: WKWebsiteDataStore) {
+        let view = ReaderView(store: store)
+        view.onClose = { [weak self] in self?.closeReader() }
+        view.onOptions = { [weak self] in self?.toggleReaderOptions() }
+        // The article's links are the page's, wherever they open.
+        view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link, by: .page) }
+        view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
+        view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
+        view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
+        view.currentSpace = { [weak self] in self?.tabManager.currentSpace }
+        view.show(article, from: url, icon: tab.favicon)
+        reader = view
+        readerTab = tab
+        tab.readerWebView = view.webView
+        readerURL = url
+        let index = tabManager.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0
+        let card = root.paneCards[min(index, root.paneCards.count - 1)]
+        readerCard = card
+        card.setOverlay(view)
+        // Visible from the start (WebKit doesn't paint into a hidden view); the article is local and draws
+        // within a few frames, well inside the fade.
+        Self.readerTransition(view, entering: true)
+        window?.makeFirstResponder(view.webView)
+        // Opened again quickly: one listener, never two.
+        if let old = readerKeyMonitor { NSEvent.removeMonitor(old) }
+        readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // A peek opened from the article is in front: Esc closes that first, and Reader stays. So does the
+            // command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
+            guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil, !self.peek.isVisible,
+                  !self.hasFloatingPanel, (self.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
+            self.closeReader()
+            return nil
+        }
+        updateReaderButton()
+        paintTopBar()
+        // An open Find follows the article in, and back out to the page.
+        findBar.pageChanged()
     }
 
-    /// Reader's text and colors, under the address's Reader button. With no address on screen (the sidebar hidden,
-    /// the address not above the page), from the reading page's top-right corner instead.
+    /// The reading page shown now, if Reader is on over the page you're in.
+    var readerHere: ReaderView? { readerTab === tabManager.selectedTab ? reader : nil }
+
+    /// Reader's text and colors, under the Aa button in the reading page's top-right corner, its right edge with
+    /// the button's and always whole inside the page.
     func toggleReaderOptions() {
-        guard let reader, readerTab === tabManager.selectedTab else { return }
+        guard let reader = readerHere else { return }
         let overlay = root.overlay
-        let address = sidebar.address
-        let button = address.readerButton
-        let aboveThePage = root.barHoldsAddress
-        let docked = root.sidebarVisible && !root.isSidebarFloatingVisible
-        let onScreen = !button.isHidden && (aboveThePage || root.sidebarVisible || root.isSidebarFloatingVisible)
-        let card = readerCard ?? root.card
         if !ReaderOptions.isOpen(in: window) { closeFloatingPanels() }
-        ReaderOptions.toggle(for: reader, in: overlay, opener: onScreen ? button : nil,
-                             recedes: onScreen && docked && !aboveThePage ? [sidebar.list] : []) { [weak self, weak address, weak card] size in
-            let inset = Tokens.Metric.cardInset
-            guard let self else { return .zero }
-            if onScreen, let address, address.window != nil {
-                // As Site Controls: along the field's edge in the sidebar, under the button's end above the page.
-                let field = address.convert(address.bounds, to: overlay)
-                let b = button.convert(button.bounds, to: overlay)
-                let x = aboveThePage || self.root.sidebarOnRight ? b.maxX - size.width : field.minX
-                return NSPoint(x: SitePanelSizing.x(x, alongAddress: !aboveThePage, inset: inset, width: size.width, overlayWidth: overlay.bounds.width),
-                               y: field.maxY + Tokens.Space.x1)
-            }
-            let shown = card ?? self.root.card
-            let page = shown.convert(shown.bounds, to: overlay)
-            return NSPoint(x: max(inset, page.maxX - size.width - Tokens.Space.x3), y: page.minY + Tokens.Space.x3)
+        ReaderOptions.toggle(for: reader, in: overlay) { [weak reader, weak overlay] size in
+            guard let reader, let overlay else { return .zero }
+            let b = reader.optionsButton.convert(reader.optionsButton.bounds, to: overlay)
+            let page = reader.convert(reader.bounds, to: overlay)
+            return NSPoint(x: max(page.minX + Tokens.Space.x3, b.maxX - size.width), y: b.maxY + Tokens.Space.x1)
         }
     }
 

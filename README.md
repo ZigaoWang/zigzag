@@ -160,7 +160,8 @@ Translation runs on your Mac, with Apple's on-device Translation. Fraudulent web
 the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
 Help › Report a Problem writes a report you can read first, and nothing is sent unless you send it.
 The Mac's Passwords list keeps a small log of its steps in `~/Library/Logs/Zigzag/passwords.log`, never a login or
-a site, and it stays on your Mac.
+a site, and it stays on your Mac. Your Zigzag Card is made on your Mac from your account's name and the day Zigzag
+first ran, and its picture holds only what the card shows.
 
 ## Install
 
