@@ -100,6 +100,14 @@ import Testing
         header.isOnCard = false
         #expect(header.appearance == nil)
     }
+
+    /// Reload's ring would sit low centered by its box, as its arrowhead stands above it: it goes up by its ink's weight.
+    @Test func reloadIsCenteredByItsInksWeight() {
+        for size in [Tokens.Pane.glyph, Tokens.Sidebar.glyph] {
+            #expect(Tokens.Symbol.inkOffset("arrow.clockwise", size: size).height < -0.3)
+            #expect(abs(Tokens.Symbol.inkOffset("chevron.left", size: size).height) < 0.2)
+        }
+    }
 }
 
 /// The page area's ground, which moves the window wherever nothing on it takes the press.
