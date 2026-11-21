@@ -2189,6 +2189,9 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        // A link preview from the page that's going has nothing left to describe, and a hover from it during the
+        // load must not bring the preview back.
+        hoveredLinkChanged(nil)
         isLeavingPage = true
         // The page is going: a socket it opened to this Mac goes with it.
         localReceivers?.closeAllSockets()
@@ -2602,6 +2605,9 @@ extension Tab: WKUIDelegate {
 
     /// Reported by our hover script: the link under the pointer, or nil.
     func hoveredLinkChanged(_ url: URL?, title: String? = nil) {
+        // The page is going: a hover from it is for a page that won't be here, and must not bring the preview back
+        // after the click cleared it.
+        guard !isLeavingPage else { return }
         hoveredLink = url
         hoveredLinkTitle = url == nil ? nil : title
         host?.tab(self, hoveringLink: url)

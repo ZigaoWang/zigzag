@@ -613,6 +613,43 @@ struct BookmarkFolderTests {
         #expect(LinkStatusController.describe(try #require(URL(string: "mailto:a@example.com"))) == "Email a@example.com")
     }
 
+    /// The pill follows the pointer: it shows a link only while the pointer is on one, and a press, a move off the
+    /// link, or a scroll clears it (#449).
+    @Test func theHoverScriptOnlyShowsALinkUnderThePointer() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript("""
+        var posted = [];
+        var listeners = {};
+        function listen(name, fn) { listeners[name] = fn; }
+        var window = {
+          webkit: { messageHandlers: { zigzagHover: { postMessage: function (m) { posted.push(m); } } } },
+          addEventListener: listen
+        };
+        var document = { addEventListener: listen };
+        var link = { href: 'https://example.com/a', getAttribute: function () { return null; }, textContent: 'A', closest: function () { return this; } };
+        var plain = { closest: function () { return null; } };
+        """)
+        context.evaluateScript(PageScripts.linkHover)
+        #expect(context.exception == nil)
+        let result = context.evaluateScript("""
+        listeners['mouseover']({ target: link });
+        var shows = posted.length === 1 && posted[0].url === 'https://example.com/a';
+        listeners['mousedown']({});
+        var press = posted[posted.length - 1] === '';
+        listeners['mouseover']({ target: link });
+        listeners['mousemove']({ target: plain });
+        var move = posted[posted.length - 1] === '';
+        listeners['mouseover']({ target: link });
+        listeners['mouseout']({ relatedTarget: plain });
+        var out = posted[posted.length - 1] === '';
+        listeners['mouseover']({ target: link });
+        listeners['scroll']({});
+        var scrolled = posted[posted.length - 1] === '';
+        shows && press && move && out && scrolled;
+        """)
+        #expect(result?.toBool() == true)
+    }
+
     @Test func aCutOffSecureConnectionIsNotCalledAnImpostor() throws {
         let url = try #require(URL(string: "https://example.com/"))
         let cutOff = ErrorPage.describe(NSError(domain: NSURLErrorDomain, code: NSURLErrorSecureConnectionFailed), url: url)
