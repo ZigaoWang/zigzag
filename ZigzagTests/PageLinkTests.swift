@@ -35,7 +35,7 @@ struct PageLinkTests {
         #expect(activation([]) == .page)
         #expect(activation(.command) == .newTab(inFront: false))
         #expect(activation([.command, .shift]) == .newTab(inFront: true))
-        #expect(activation(.shift) == .peek)
+        #expect(activation(.shift) == .mini)
         #expect(activation(.option) == .download)
         // ⌘ is read before ⌥: ⌥⌘ opens a tab, as in Chrome.
         #expect(activation([.command, .option]) == .newTab(inFront: false))
@@ -49,7 +49,7 @@ struct PageLinkTests {
         #expect(activation(.option, mainFrame: false) == .page)
         #expect(activation([], mainFrame: false) == .page)
         #expect(activation(.command, type: .other, mainFrame: false) == .page)
-        #expect(activation([], type: .other, mainFrame: false, followed: .peek) == .page)
+        #expect(activation([], type: .other, mainFrame: false, followed: .mini) == .page)
         // A frame's link opens a tab on ⌘ or a middle click, as on the page.
         #expect(activation(.command, mainFrame: false) == .newTab(inFront: false))
         #expect(activation([.command, .shift], mainFrame: false) == .newTab(inFront: true))
@@ -59,7 +59,7 @@ struct PageLinkTests {
         #expect(activation(.control) == .page)
         // A page's own navigation is the click's only when it follows that very click: ⇧ peeks, ⌥ downloads, and a
         // plain navigation of the page's own stays the page's.
-        #expect(activation([], type: .other, followed: .peek) == .peek)
+        #expect(activation([], type: .other, followed: .mini) == .mini)
         #expect(activation([], type: .other, followed: .download) == .download)
         #expect(activation([], type: .other, followed: .page) == .page)
         // The guard every page gets takes ⌘ from the page, and reports ⇧ and ⌥ so the navigation after them is known.
@@ -72,25 +72,25 @@ struct PageLinkTests {
     /// A ⇧-click on a link the page then sends this tab to is a peek, taken once: the same link, within the window.
     @Test func aShiftClickThePageFollowsIsAPeekOnce() {
         let tab = Tab(url: URL(string: "https://example.com/")!, spaceID: UUID())
-        tab.modifiedClickFollowed(URL(string: "https://example.com/watch?v=1")!, peek: true, download: false)
-        #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == .peek)
+        tab.modifiedClickFollowed(URL(string: "https://example.com/watch?v=1")!, mini: true, download: false)
+        #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == .mini)
         // Taken once: a second navigation to the same link is the page's own.
         #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == nil)
         // Another link is another navigation.
-        tab.modifiedClickFollowed(URL(string: "https://example.com/watch?v=1")!, peek: true, download: false)
+        tab.modifiedClickFollowed(URL(string: "https://example.com/watch?v=1")!, mini: true, download: false)
         #expect(tab.followedActivation(for: URL(string: "https://example.com/other")!) == nil)
         // ⌥ is the download.
-        tab.modifiedClickFollowed(URL(string: "https://example.com/file.zip")!, peek: false, download: true)
+        tab.modifiedClickFollowed(URL(string: "https://example.com/file.zip")!, mini: false, download: true)
         #expect(tab.followedActivation(for: URL(string: "https://example.com/file.zip")!) == .download)
         // Nothing for a click that carried neither.
-        tab.modifiedClickFollowed(URL(string: "https://example.com/plain")!, peek: false, download: false)
+        tab.modifiedClickFollowed(URL(string: "https://example.com/plain")!, mini: false, download: false)
         #expect(tab.followedActivation(for: URL(string: "https://example.com/plain")!) == nil)
     }
 
     /// The mark goes when the moment passes: a page navigation a while after a ⇧-click is the page's own, not a peek.
     @Test func aClickMarkGoesOnceTheMomentHasPassed() {
         let tab = Tab(url: URL(string: "https://example.com/")!, spaceID: UUID())
-        tab.followedClick = (URL(string: "https://example.com/watch?v=1")!, .peek, Date().addingTimeInterval(-Tab.followedClickWindow - 1))
+        tab.followedClick = (URL(string: "https://example.com/watch?v=1")!, .mini, Date().addingTimeInterval(-Tab.followedClickWindow - 1))
         #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == nil)
     }
 

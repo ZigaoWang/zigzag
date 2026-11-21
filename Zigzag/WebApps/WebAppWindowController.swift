@@ -363,7 +363,7 @@ extension WebAppWindowController: TabHost {
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         switch disposition {
         // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
-        case .currentTab, .peek:
+        case .currentTab, .mini:
             tab.load(url, by: sender)
         case .newWindow, .privateWindow:
             WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: sender)

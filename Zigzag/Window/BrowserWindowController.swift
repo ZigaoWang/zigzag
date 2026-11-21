@@ -2090,7 +2090,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         view.onOptions = { [weak self] in self?.toggleReaderOptions() }
         // The article's links are the page's, wherever they open.
         view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link, by: .page) }
-        view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
+        view.onPeekLink = { [weak self] link in self?.open(link, disposition: .mini, opener: tab, by: .page) }
         view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
         view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
         view.currentSpace = { [weak self] in self?.tabManager.currentSpace }
@@ -2511,7 +2511,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens a URL as requested, switching to an existing tab if the page is open. `sender`: who gave the address; a
     /// page's link (⌘-click, Reader) is `.page`. `httpFallback`: `url` is https for a scheme-less address, retried over
-    /// http if unreachable (`CommandRanker.Destination`); Peek and new windows don't fall back.
+    /// http if unreachable (`CommandRanker.Destination`); Zigzag Mini and new windows don't fall back.
     func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true, by sender: Tab.LoadSender = .zigzag,
               httpFallback: Bool = false) {
         // A page that comes to the front, say a link from Mail, isn't left under the command bar the empty window opened with.
@@ -2534,8 +2534,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let tab = tabManager.newTab(url: url, select: false, opener: opener, by: sender, httpFallback: httpFallback)
             // Background link with the sidebar hidden: show a note. Not for tabs Zigzag opened itself (guide, restore).
             if sender == .page { newTabNote.show(tab) }
-        case .peek:
-            showPeek(url: url, configuration: nil, by: sender)
+        case .mini:
+            openInMini(url, configuration: nil, opener: opener ?? tabManager.selectedTab, by: sender)
         case .newWindow:
             // A private window's links stay private.
             WindowManager.shared.newWindow(url: url, isPrivate: tabManager.isPrivate)
@@ -2544,10 +2544,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// A link in Zigzag Mini over this window (⇧-click, Open Link in Zigzag Mini), in its page's profile and privacy.
     @discardableResult
-    func showPeek(url: URL?, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
+    func openInMini(_ url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
         commandBar.dismiss(restoringFocus: false)
-        return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab, by: sender)
+        return MiniWindowController.open(fromPage: url, configuration: configuration, opener: opener, in: self, by: sender).tab.webView
     }
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
@@ -2612,9 +2613,7 @@ extension BrowserWindowController: TabHost {
     var hostWindow: NSWindow? { window }
 
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
-        // Inside peek, another peek just navigates the card.
         // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
-        if tab.isPeek, disposition == .peek { tab.load(url, by: sender); return }
         // A result opened from a search page keeps the search one Back away.
         if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
            let history = tab.interactionStateForSaving {
@@ -2654,7 +2653,7 @@ extension BrowserWindowController: TabHost {
             }
         }
         if let pending = BrowserWebView.takePendingDisposition(for: tab.webView) {
-            if pending == .peek { return showPeek(url: nil, configuration: configuration) }
+            if pending == .mini { return openInMini(nil, configuration: configuration, opener: tab, by: .page) }
             // A new window gets its own fresh page, not one tied to this tab (and a private one never shares anything).
             // From a private window, it is private too. Only a link to the web: an app's asks from the page here.
             if pending == .newWindow || pending == .privateWindow, let url = action.request.url {

@@ -1506,7 +1506,8 @@ enum DebugBridge {
                 MenuPanel.show([.item(.init(title: "Copy Link") {}), .item(.init(title: "Share…") {}), .separator,
                                 .item(.init(title: "Close Tab") {})], from: controller.sidebar.address)
             }
-        case "peek": if let url = URL(string: arg) { controller.open(url, disposition: .peek) }
+        // shiftclick <url>: opens the link as a ⇧-click on the selected tab's page does, in Zigzag Mini over the window.
+        case "shiftclick", "peek": if let url = URL(string: arg) { controller.open(url, disposition: .mini, opener: controller.tabManager.selectedTab, by: .page) }
         case "peekclose": controller.peek.close()
         case "switcher": controller.debugSwitcher()
         // spaceswitcher [down|up|tab|return|esc|again|back|1-9|state <path>]: opens the space switcher (or moves it on, as its

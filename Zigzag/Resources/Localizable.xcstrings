@@ -12,6 +12,17 @@
         }
       }
     },
+    "Open Link in Zigzag Mini" : {
+      "comment" : "Item in a page's right-click menu: opens the link in Zigzag Mini, the small window for one page, over this one (Arc called it Little Arc).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag Mini 中打开链接"
+          }
+        }
+      }
+    },
     "Since %@" : {
       "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
       "localizations" : {
@@ -14566,17 +14577,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在新窗口中打开链接"
-          }
-        }
-      }
-    },
-    "Open Link in Peek" : {
-      "comment" : "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在速览中打开链接"
           }
         }
       }

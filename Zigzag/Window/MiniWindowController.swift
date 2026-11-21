@@ -1077,7 +1077,7 @@ extension MiniWindowController: TabHost {
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
         switch disposition {
-        case .currentTab, .peek:
+        case .currentTab, .mini:
             tab.load(url, by: sender)
         case .newWindow, .privateWindow:
             WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: isPrivate || disposition == .privateWindow, by: sender)
@@ -1090,6 +1090,11 @@ extension MiniWindowController: TabHost {
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
         let pending = BrowserWebView.takePendingDisposition(for: tab.webView)
+        // Open Link in Zigzag Mini, in Zigzag Mini: the link opens right here, as a ⇧-click on it does.
+        if pending == .mini, let url = action.request.url {
+            tab.load(url, by: .page)
+            return nil
+        }
         if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
             if Tab.route(forPageLink: url, from: tab.url) == .load {
                 WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: isPrivate || pending == .privateWindow, by: .page)

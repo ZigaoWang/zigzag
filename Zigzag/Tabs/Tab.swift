@@ -31,7 +31,8 @@ enum OpenDisposition {
     case currentTab
     case foregroundTab
     case backgroundTab
-    case peek
+    /// Zigzag Mini over the window (⇧-click, Open Link in Zigzag Mini).
+    case mini
     case newWindow
     case privateWindow
 }
@@ -1826,7 +1827,7 @@ extension Tab: WKNavigationDelegate {
             let activation = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: isMainFrame,
                                                  modifiers: flags, buttonNumber: navigationAction.buttonNumber,
                                                  followed: followed)
-            // Site routes (#286) apply to clicks and new-tab links; not peek (⇧), download (⌥) or page-initiated.
+            // Site routes (#286) apply to clicks and new-tab links; not Zigzag Mini (⇧), download (⌥) or page-initiated.
             let opensTab = activation.isNewTab
             if followed == nil, userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
                host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
@@ -1836,8 +1837,8 @@ extension Tab: WKNavigationDelegate {
             case .newTab(let inFront):
                 host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
-            case .peek:
-                host?.tab(self, openURL: url, disposition: .peek)
+            case .mini:
+                host?.tab(self, openURL: url, disposition: .mini)
                 return (.cancel, preferences)
             case .download:
                 return (.download, preferences)
@@ -1879,10 +1880,10 @@ extension Tab: WKNavigationDelegate {
         return (.allow, preferences)
     }
 
-    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Peek, ⌥ download, else the
+    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Zigzag Mini, ⌥ download, else the
     /// page. `followed` is a ⇧ or ⌥ click the page kept and then navigated to itself.
     enum LinkActivation: Equatable {
-        case page, peek, download
+        case page, mini, download
         case newTab(inFront: Bool)
 
         var isNewTab: Bool { if case .newTab = self { true } else { false } }
@@ -1898,7 +1899,7 @@ extension Tab: WKNavigationDelegate {
         if type == .linkActivated {
             // ⌘ wins over ⌥, as in Chrome.
             if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }
-            if modifiers.contains(.shift) { return .peek }
+            if modifiers.contains(.shift) { return .mini }
             if modifiers.contains(.option) { return .download }
             return .page
         }
@@ -1909,8 +1910,8 @@ extension Tab: WKNavigationDelegate {
     static let followedClickWindow: TimeInterval = 2
 
     /// From the page script: a ⇧ or ⌥ click landed on `url` and the page kept it.
-    func modifiedClickFollowed(_ url: URL, peek: Bool, download: Bool) {
-        let activation: LinkActivation = peek ? .peek : download ? .download : .page
+    func modifiedClickFollowed(_ url: URL, mini: Bool, download: Bool) {
+        let activation: LinkActivation = mini ? .mini : download ? .download : .page
         followedClick = activation == .page ? nil : (url, activation, Date())
     }
 

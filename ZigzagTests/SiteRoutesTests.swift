@@ -313,7 +313,6 @@ struct SiteRoutesTests {
     @Test func miniPeekAndAppsKeepTheirPages() {
         #expect(target("https://youtube.com/", .linkClick, place: .mini) == nil)
         #expect(target("https://youtube.com/", .typed, place: .mini) == nil)
-        #expect(target("https://youtube.com/", .linkClick, place: .peek) == nil)
         #expect(target("https://youtube.com/", .linkClick, place: .webApp) == nil)
         // Open in Zigzag from Mini is routed.
         #expect(target("https://youtube.com/", .fromMini, place: .mini) == media)
