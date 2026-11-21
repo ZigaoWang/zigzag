@@ -320,6 +320,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         renamingPage = renamingPart == 0 ? tab : pages.indices.contains(renamingPart) ? pages[renamingPart] : nil
         let field = PlainTextField(font: label.font ?? Tokens.Font.body(), placeholder: String(localized: "Name", comment: "Placeholder of the field that renames a tab, in its sidebar row."))
         field.stringValue = label.stringValue
+        // The row's ink, so the name doesn't change color as you edit it.
+        field.textColor = Brand.Theme.for(self).rowInk
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
         label.isHidden = true
@@ -977,7 +979,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func layoutRenameField() {
         guard let field = renameField else { return }
         let height = ceil(field.intrinsicContentSize.height)
-        let y = (bounds.height - height) / 2
+        // On the title's line, so the name doesn't move as editing starts.
+        let y = title.frame.midY - height / 2
         guard isSplit else {
             let x = title.frame.minX
             field.frame = NSRect(x: x, y: y, width: max(0, bounds.width - x - Self.inset), height: height)
@@ -1354,6 +1357,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         setAccessibilityLabel(tabGroup ? String(localized: "\(name), group, \(count) tabs", comment: "Accessibility label of a group of tabs in the sidebar: its name, then how many tabs it holds.")
                               : String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
         setAccessibilityValue(open ? 1 : 0)
+        title.textColor = Brand.Theme.for(self).rowInk
         needsLayout = true
     }
 
@@ -1389,12 +1393,15 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
         if let field = renameField {
             let height = ceil(field.intrinsicContentSize.height)
-            field.frame = NSRect(x: title.frame.minX, y: (bounds.height - height) / 2, width: max(0, bounds.width - title.frame.minX - Self.inset), height: height)
+            // On the title's line, so the name doesn't move as editing starts.
+            field.frame = NSRect(x: title.frame.minX, y: title.frame.midY - height / 2, width: max(0, bounds.width - title.frame.minX - Self.inset), height: height)
         }
     }
 
     override func stateDidChange(animated: Bool) {
         super.stateDidChange(animated: animated)
+        // The space's ink, as the pinned pages under it.
+        title.textColor = Brand.Theme.for(self).rowInk
         if isDropTarget {
             // The one drop target look, as on the favorites and a split's half.
             setLifted(false)
@@ -1412,6 +1419,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: isTabGroup ? String(localized: "Group name", comment: "Placeholder of the field that renames a group of tabs, in its sidebar row.")
                                    : String(localized: "Folder name", comment: "Placeholder of the field that renames a folder, in its sidebar row."))
         field.stringValue = title.stringValue
+        // The title's own ink, so the name doesn't change color as you edit it.
+        field.textColor = title.textColor
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
         title.isHidden = true
@@ -1522,8 +1531,8 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        // Large, the name stands flush with the icons' edge, the way a heading does. At 26pt the first letter's own
-        // side bearing sets its ink a point in: pulled back so the ink, not the box, meets the icons' edge.
+        // The name stands flush with the icons' edge, the way a heading does. Its first letter's own side bearing
+        // sets its ink in from the box: pulled back so the ink, not the box, meets the icons' edge, at either size.
         // Low in its slot, near the pinned tabs it names, with the room above it.
         let pad = Tokens.Space.x1
         // Large, low in its slot; at row size, centered in its row like the rows below it.
@@ -1533,7 +1542,7 @@ final class SpaceHeaderView: InteractiveView {
         let font = Self.nameFont
         let baseline = isFlipped ? y + (h + font.ascender + font.descender) / 2 : y + (h - font.ascender - font.descender) / 2
         let xMiddle = isFlipped ? baseline - font.xHeight / 2 : baseline + font.xHeight / 2
-        let bearing = Self.isLarge ? Tokens.Sidebar.spaceNameBearing : 0
+        let bearing = Self.inkBearing(of: name, font: font)
         var x = SidebarRowView.inset - Label.inset - bearing
         if icon != nil {
             // The space's icon leads the name at the name's own scale, as one mark, not a row icon beside a heading.
@@ -1565,6 +1574,12 @@ final class SpaceHeaderView: InteractiveView {
             profileTip = profileName as NSString
             addToolTip(profileLabel.frame, owner: profileTip!, userData: nil)
         }
+    }
+    /// How far in from its box the first letter's ink starts, so the name's ink, not its box, meets the icon column.
+    static func inkBearing(of text: String, font: NSFont) -> CGFloat {
+        guard let first = text.first else { return 0 }
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: String(first), attributes: [.font: font]))
+        return max(0, CTLineGetBoundsWithOptions(line, .useGlyphPathBounds).minX)
     }
     /// What the cut profile name's tooltip says; a tooltip doesn't keep its owner.
     private var profileTip: NSString?
@@ -1674,7 +1689,9 @@ final class SeparatorRowView: NSView {
         // Center the caps on `mid`, Clear's capsule center.
         let capsY = mid - h / 2 - Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarLabel(), lineHeight: h)
         let scale = window?.backingScaleFactor ?? 2
-        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
+        // Its ink, not its box, on the icon column, as the space's name is.
+        let bearing = SpaceHeaderView.inkBearing(of: label.stringValue, font: label.font ?? Tokens.Font.sidebarLabel())
+        label.frame = NSRect(x: SidebarRowView.inset - Label.inset - bearing, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
         let cw = clearButton.fittingWidth, ch: CGFloat = 20
         clearButton.frame = NSRect(x: bounds.width - cw, y: floor(mid - ch / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()

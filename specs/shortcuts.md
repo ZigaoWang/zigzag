@@ -21,6 +21,8 @@
   Test: NumberHintsTests.numbersGoToTheirPlaceAndNineToTheLast
 - ⌃1–⌃9 → that space; ⌃9 is the ninth, and a number with no space does nothing.
   Test: NumberHintsTests.spaceNumbersGoToTheirOwnSpaceAndNinthIsTheNinth
+- Hold ⌘ or ⌃ a moment → the numbers show; pressing their own number keys keeps them up while the key is held, and any other key, a click or letting go hides them.
+  Test: NumberHintsTests.theNumbersOwnKeysKeepThemShown
 - ⌘Y → History, and ⌘, → Settings, each opens as a tab in the front window.
   No test yet.
 

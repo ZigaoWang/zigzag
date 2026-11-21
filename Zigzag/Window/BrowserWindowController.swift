@@ -1991,7 +1991,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
             view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
             view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
-            view.show(article, from: url, icon: tab.favicon)
+            view.show(article, from: url, icon: tab.favicon, theme: Brand.Theme.of(self.tabManager.currentSpace))
             self.reader = view
             self.readerTab = tab
             tab.readerWebView = view.webView
@@ -2041,13 +2041,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         findBar.pageChanged()
     }
 
-    /// Reader stands in for the page in place, so it only crossfades, quickly both ways: nothing rises or zooms.
-    /// Moving or transforming a view that hosts web content stops WebKit drawing into it, and so does a fully
-    /// transparent start (hence 0.01).
+    /// Reader stands in for the page in place: its paper fades in over `enter` while the text settles up inside it
+    /// (the page's own CSS), and fades out over `exit`; with Reduce Motion a crossfade. The view itself never moves
+    /// or scales, which stops WebKit drawing into it, nor starts fully transparent (hence 0.01).
     private static func readerTransition(_ view: NSView, entering: Bool, completion: (@MainActor () -> Void)? = nil) {
         if entering { view.alphaValue = 0.01 }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown
+            ctx.duration = Tokens.Motion.Role.present.duration(entering: entering) * Tokens.Motion.debugSlowdown
             ctx.timingFunction = Tokens.Motion.easeOut
             view.animator().alphaValue = entering ? 1 : 0.01
         }, completionHandler: Tokens.Motion.completion(completion))

@@ -2762,6 +2762,16 @@ enum DebugBridge {
         case "readerstyle":
             func find(_ v: NSView) -> ReaderControls? { (v as? ReaderControls) ?? v.subviews.lazy.compactMap(find).first }
             if let content = controller.window?.contentView { find(content)?.toggleOptions() }
+        case "readerprefs":
+            // readerprefs <auto|light|sepia|dark> <serif|sans> <narrow|medium|wide> [size]: Reader's choices, applied to the open article.
+            let f = arg.split(separator: " ").map(String.init)
+            func find(_ v: NSView) -> ReaderView? { (v as? ReaderView) ?? v.subviews.lazy.compactMap(find).first }
+            guard f.count >= 3, let content = controller.window?.contentView, let reader = find(content) else { break }
+            reader.debugSet(Reader.Preferences(size: f.count > 3 ? Int(f[3]) ?? 20 : 20, face: .init(rawValue: f[1]) ?? .serif,
+                                               theme: .init(rawValue: f[0]) ?? .auto, width: .init(rawValue: f[2]) ?? .medium))
+        case "readerjs":
+            // readerjs <script>: runs in the open article, in Zigzag's own script world.
+            controller.debugReaderWebView?.runOwnScript(arg)
         case "hidetoasts": Toast.hide(in: controller)
         // showtoast <text>: a plain toast for six seconds.
         case "showtoast": Toast.show(arg, symbol: "checkmark", duration: 6, in: controller)
@@ -2779,6 +2789,18 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // viewtree <path>: every view in the window with its frame in window points (top left), for measuring.
+        case "viewtree":
+            guard let content = controller.window?.contentView else { break }
+            var out = ""
+            func walk(_ v: NSView, _ depth: Int) {
+                let r = v.convert(v.bounds, to: nil)
+                let text = (v as? NSTextField)?.stringValue.prefix(40) ?? ""
+                out += String(repeating: " ", count: depth) + "\(type(of: v)) x=\(r.minX) y=\(content.bounds.height - r.maxY) w=\(r.width) h=\(r.height)\(v.isHidden ? " hidden" : "") \(text)\n"
+                if !v.isHidden { v.subviews.forEach { walk($0, depth + 1) } }
+            }
+            walk(content, 0)
+            try? out.write(toFile: arg, atomically: true, encoding: .utf8)
         // quitfromloop: quits from the run loop, as ⌘Q does, not from inside a main-queue block: what quitting waits
         // for (downloads pausing, cookies clearing) comes back on the main queue.
         case "quitfromloop": NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)

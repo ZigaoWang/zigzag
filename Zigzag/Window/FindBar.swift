@@ -906,7 +906,10 @@ final class ToastView: FloatingPanelView {
 
     /// The right end: padding, or the action and the close button, the last one inset as evenly as it sits.
     private var trailingWidth: CGFloat {
-        guard !actionButton.isHidden || !closeButton.isHidden else { return Tokens.Space.x4 }
+        // With an icon, the words end as far from the edge as the symbol's ink starts.
+        guard !actionButton.isHidden || !closeButton.isHidden else {
+            return icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + (Tokens.Metric.favicon - Tokens.Symbol.row) / 2
+        }
         var width = actionButton.isHidden ? 0 : Tokens.Space.x3 + actionButton.fittingWidth
         if !closeButton.isHidden { width += (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1) + closeButton.frame.width }
         return width + (Self.height - (closeButton.isHidden ? Tokens.Metric.toastButtonHeight : closeButton.frame.height)) / 2
@@ -1025,8 +1028,10 @@ enum Toast {
         // Under the bar of an AI app using the page, if there is one.
         var page = controller.root.cardFrame
         let reserved = AgentControl.shared.reservedHeight(in: controller)
-        page.origin.y += reserved
-        page.size.height -= reserved
+        // Under a split's pane strips, clear of their buttons, as the find bar is.
+        let strip = controller.root.card.showsHeader && !controller.root.card.liftsHeader ? PaneHeaderView.height : 0
+        page.origin.y += reserved + strip
+        page.size.height -= reserved + strip
         // Below any page question or top update note, never over them.
         return PageQuestions.area(page, below: PageQuestions.occupied(in: controller.root.overlay))
     }

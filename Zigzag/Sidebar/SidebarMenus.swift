@@ -28,7 +28,8 @@ enum SidebarMenus {
         static let moveTo = "arrow.right.square", newWindow = "macwindow.badge.plus", mini = "macwindow"
         static let outOfFolder = "arrow.turn.up.left", removeFromFolder = "folder.badge.minus", openAll = "plus.rectangle.on.rectangle"
         static let back = "arrow.uturn.backward", setCurrent = "checkmark.circle", separate = "rectangle.portrait.and.arrow.right"
-        static let changeIcon = "face.smiling", folder = "folder", showTab = "arrow.forward.square"
+        // The outline face: macOS draws face.smiling filled in dark mode.
+        static let changeIcon = "face.dashed", folder = "folder", showTab = "arrow.forward.square"
         static let close = "xmark", closeSplit = "xmark.rectangle", closeBelow = "arrow.down.to.line", closeOthers = "xmark.circle"
         static let remove = "trash"
     }
