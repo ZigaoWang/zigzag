@@ -235,6 +235,14 @@ struct PasswordMenuTests {
         #expect(!menu.isOnScreen)
     }
 
+    /// The chosen row wears a menu's highlight, as `MenuPanel` items do, not the row hover.
+    @Test func theChosenRowIsTheMenuHighlight() throws {
+        let row = AutofillRow(item: .generate, origin: try #require(Origin(URL(string: "https://example.com"))))
+        #expect(row.fill == nil)
+        row.isSelected = true
+        #expect(row.fill == Tokens.Color.highlight)
+    }
+
     // MARK: Filling
 
     private func fill(_ webView: WKWebView, focusing id: String) async throws -> [String: Any]? {

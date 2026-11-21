@@ -1156,7 +1156,7 @@ final class AutofillMenu: FloatingPanelView {
     }
 }
 
-private final class AutofillRow: InteractiveView {
+final class AutofillRow: InteractiveView {
     let item: AutofillMenu.Item
     private let icon = NSImageView()
     private let name: Label
@@ -1239,7 +1239,9 @@ private final class AutofillRow: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
+
+    /// A menu's highlight, as `MenuPanel` draws its items.
+    var fill: NSColor? { isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.highlight : nil }
 }
