@@ -97,15 +97,14 @@ enum PageTranslator {
             }
         }
 
-        /// What happens on its own when a page in `language` opens on `site`. A site translated this session keeps
-        /// translating; Never beats Always; otherwise the offer, once per site.
+        /// What happens on its own when a page in `language` opens on `site`. Never beats everything, in every window;
+        /// a site translated this session keeps translating; then Always; otherwise the offer, once per site.
         func automatic(language: Locale.Language, site: String, translatedHere: Bool, neverHere: Set<String> = [],
                        offers: Bool, offered: Bool) -> Automatic {
-            if translatedHere { return .translate }
             if neverSites.contains(site) || neverHere.contains(site) { return .nothing }
             let code = PageTranslator.code(of: language)
             if neverLanguages.contains(code) { return .nothing }
-            if alwaysLanguages.contains(code) { return .translate }
+            if translatedHere || alwaysLanguages.contains(code) { return .translate }
             return offers && !offered ? .offer : .nothing
         }
     }

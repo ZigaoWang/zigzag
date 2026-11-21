@@ -582,8 +582,9 @@ struct PageLanguageChoiceTests {
             #expect(automatic() == .nothing)
             #expect(automatic(site: "liberation.fr") == .translate)
             #expect(automatic(site: "liberation.fr", neverHere: ["liberation.fr"]) == .nothing)
-            // A site translated a moment ago keeps translating as you browse it.
-            #expect(automatic(translatedHere: true) == .translate)
+            // A site translated a moment ago keeps translating as you browse it, unless it's a Never site.
+            #expect(automatic(site: "liberation.fr", translatedHere: true, offers: false) == .translate)
+            #expect(automatic(translatedHere: true) == .nothing)
         }
     }
 
@@ -611,6 +612,22 @@ struct PageLanguageChoiceTests {
             #expect(automatic("liberation.fr", afterLanguage) == .nothing)
             #expect(choices.automatic(language: german, site: "spiegel.de", translatedHere: afterLanguage["spiegel.de"] != nil,
                                       offers: true, offered: true) == .translate)
+        }
+    }
+
+    /// A Never chosen in one window, or in Settings, holds in a window that still counts the site as translated.
+    @Test func aNeverChoiceBeatsASiteTranslatedInAnotherWindow() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR")
+            @MainActor func automatic(_ site: String = "lemonde.fr") -> PageTranslator.Automatic {
+                choices.automatic(language: french, site: site, translatedHere: true, offers: true, offered: true)
+            }
+            #expect(automatic() == .translate)
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            #expect(automatic() == .nothing)
+            #expect(automatic("liberation.fr") == .translate)
+            choices.setNever(true, "fr")
+            #expect(automatic("liberation.fr") == .nothing)
         }
     }
 
