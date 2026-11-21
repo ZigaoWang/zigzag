@@ -1025,8 +1025,10 @@ enum Toast {
         // Under the bar of an AI app using the page, if there is one.
         var page = controller.root.cardFrame
         let reserved = AgentControl.shared.reservedHeight(in: controller)
-        page.origin.y += reserved
-        page.size.height -= reserved
+        // Under a split's pane strips, clear of their buttons, as the find bar is.
+        let strip = controller.root.card.showsHeader && !controller.root.card.liftsHeader ? PaneHeaderView.height : 0
+        page.origin.y += reserved + strip
+        page.size.height -= reserved + strip
         // Below any page question or top update note, never over them.
         return PageQuestions.area(page, below: PageQuestions.occupied(in: controller.root.overlay))
     }
