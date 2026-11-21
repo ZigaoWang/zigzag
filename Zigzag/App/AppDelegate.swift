@@ -184,6 +184,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PictureInPicture.floatPanels()
     }
     func applicationDidResignActive(_ notification: Notification) { MiniLinkWake.appDidResign() }
+    // A hidden Zigzag offers no page to your other devices.
+    func applicationDidHide(_ notification: Notification) { WindowManager.shared.controllers.forEach { $0.updateHandoff() } }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Only a Zigzag Mini up counts as no window: the Dock icon brings the browser back.
@@ -359,12 +361,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return menu
     }
 
-    /// A page handed off from your iPhone or another Mac opens here, like a link from any app.
+    func application(_ application: NSApplication, willContinueUserActivityWithType userActivityType: String) -> Bool {
+        userActivityType == NSUserActivityTypeBrowsingWeb
+    }
+
+    /// A page handed off from your iPhone or another Mac opens in a tab here, routed like a link from any app.
+    /// macOS hands a browsing activity from another device only to the default browser.
     func application(_ application: NSApplication, continue userActivity: NSUserActivity,
                      restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
         guard userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL,
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return false }
-        open(url)
+        guard launched else { pendingURLs.append(url); return true }
+        WindowManager.shared.openHandedOff(url)
+        NSApp.activate()
         return true
     }
 

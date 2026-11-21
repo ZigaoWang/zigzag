@@ -182,8 +182,16 @@ final class PaneHeaderView: NSView {
         let loading = tab?.isLoading ?? false
         reload.symbol = loading ? "xmark" : "arrow.clockwise"
         reload.toolTip = loading ? String(localized: "Stop", comment: "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.") : String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page.")
-        address.text = tab?.url.map(CommandRanker.displayURL) ?? ""
+        address.text = tab?.url.map(Self.addressText) ?? ""
+        address.notSecure = tab?.isNotSecure ?? false
         needsLayout = true
+    }
+
+    /// A web page's address; a file or Zigzag page by its sidebar name, never a cut "file:".
+    static func addressText(_ url: URL) -> String {
+        let name = AddressView.name(of: url)
+        guard let host = url.host(), !url.isFileURL, name == AddressView.site(host, port: url.port, scheme: url.scheme) else { return name }
+        return CommandRanker.displayURL(url)
     }
 
     /// What the strip shows at a width, most first: its buttons give way one step at a time so the address keeps
@@ -275,7 +283,9 @@ final class PaneHeaderView: NSView {
         // they keep the card's radius in from its edges, so the first and last clear its rounded corners and sit as far
         // in from one edge as from the other: every pane's strip in a window alike.
         let edge = overCard ? Tokens.Radius.card : 0
-        let y = isInBar ? round((bounds.height - b) / 2) : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
+        // Rounded to pixels, not down, so the row is as far from the top as from the hairline.
+        let scale = window?.backingScaleFactor ?? 2
+        let y = isInBar ? round((bounds.height - b) / 2) : round((bounds.height - Tokens.Metric.hairline - b) / 2 * scale) / scale
         let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth,
                            splitButtons: arrangesSplit, resetLayout: resetsLayout)
         currentFit = fit

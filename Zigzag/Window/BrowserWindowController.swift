@@ -54,6 +54,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// With the sidebar hidden, notes a link opened in a background tab (#272).
     lazy var newTabNote = NewTabNote(controller: self)
     lazy var peek = PeekController(controller: self)
+    /// Capture (⇧⌘2): the mode over the page and the card it leaves.
+    lazy var capture = PageCapture(controller: self)
     /// A playing video you've left, in a small card over the page.
     lazy var miniPlayer = MiniPlayer(controller: self)
     var peekController: PeekController? { peek }
@@ -79,6 +81,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.commandBar.reposition()
             self.findBar.reposition()
             self.peek.reposition()
+            self.capture.reposition()
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
             NoticeCard.reposition(in: self)
@@ -105,13 +108,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // So does the guide while it points at something in it.
         root.keepsRevealed = { [weak self] in
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
-                || self?.popupHoldsSidebar == true
+                || ReaderOptions.isOpen(in: self?.window) || self?.popupHoldsSidebar == true
         }
         // One floating thing at a time, the sidebar that slides out included: while the command bar is up, or a panel
         // opened from the bar above the page, the pointer at the window's edge leaves it hidden. It would slide in
         // under them, and under a panel it would then be held there.
         root.blocksEdgeReveal = { [weak self] in
             self?.commandBar.isVisible == true || SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window)
+                || ReaderOptions.isOpen(in: self?.window)
         }
         // A click beside a zoomed pane puts it back, as one beside Peek puts it away.
         root.zoomScrim.onClick = { [weak self] in self?.unzoomPane() }
@@ -146,6 +150,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        sidebar.address.readerOptionsButton.onClick = { [weak self] _ in self?.toggleReaderOptions() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
@@ -393,7 +398,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var lastSpaceID: UUID?
-    private var handoff: NSUserActivity?
+    private(set) var handoff: NSUserActivity?
 
     private func spaceChanged() {
         let spaces = Library.shared.spaces
@@ -616,18 +621,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// While the sidebar changes sides: the lights' room in its row follows at once, with no picture riding over.
     private var switchingSides = false
 
-    /// Handoff, as in Safari: the web page you're on, offered to your iPhone, iPad or other Mac. Never a private
-    /// window's, and never Zigzag's own pages or a local file.
-    private func updateHandoff() {
-        guard !tabManager.isPrivate, let url = tabManager.selectedTab?.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
-            handoff?.invalidate()
-            handoff = nil
-            return
-        }
-        if handoff == nil { handoff = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb) }
-        handoff?.webpageURL = url
-        handoff?.title = tabManager.selectedTab?.displayTitle
-        if window?.isKeyWindow == true { handoff?.becomeCurrent() }
+    /// Handoff, as in Safari: the key window's page, offered to your iPhone, iPad or other Mac while it stays key.
+    func updateHandoff(asKey: Bool = false) {
+        let page = (asKey || window?.isKeyWindow == true) && !NSApp.isHidden ? handoffPage : nil
+        handoff = HandoffPage.update(handoff, to: page)
+    }
+
+    /// The page Handoff offers while this window is key.
+    var handoffPage: HandoffPage? {
+        let tab = tabManager.selectedTab
+        return HandoffPage.advertised(url: tab?.url, title: tab?.title ?? "", isPrivate: tabManager.isPrivate,
+                                      errorPage: tab?.showsErrorPage ?? false)
     }
 
     /// Whether the window shows a look partway to another space, mid-swipe.
@@ -676,6 +680,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if tab !== shownTab {
             // A peek is a look from the page you were on: going to another tab or space puts it away.
             peek.close()
+            // So is Capture.
+            capture.cancel()
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && (tab.map { tabManager.partners(of: $0) } ?? []).contains { $0 === readerTab }
             if !readerStillShown { closeReader() }
@@ -1457,20 +1463,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func nowPlayingMenu(for tab: Tab) -> NSMenu? {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.")) { [weak self] in
+        typealias S = SidebarMenus.Symbol
+        menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound."), symbol: S.showTab) { [weak self] in
             self?.tabManager.select(tab)
         })
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item(isPausedForNowPlaying(tab) ? String(localized: "Play", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
-                                       : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) { [weak self] in
+                                       : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."),
+                                       symbol: isPausedForNowPlaying(tab) ? S.play : S.pause) { [weak self] in
             self?.toggleNowPlaying(tab)
         })
         menu.addItem(SidebarMenus.Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
-                                       : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) {
+                                       : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."),
+                                       symbol: tab.isMuted ? S.unmute : S.mute) {
             tab.setMuted(!tab.isMuted)
         })
         menu.addItem(.separator())
-        menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing.")) { [weak self] in
+        menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing."), symbol: S.close) { [weak self] in
+
             self?.hideNowPlaying(tab)
         })
         return menu
@@ -1621,6 +1631,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             offerWebStoreExtension()
         case .title:
             updateWindowTitle()
+            updateHandoff()
         case .webView:
             showPages()
             paintTopBar()
@@ -1901,6 +1912,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The pane the reading page covers: in a split, the one its tab is in.
     private weak var readerCard: PageCardView?
     var isReaderOpen: Bool { readerCard != nil }
+    /// Reader is on over the page you're in.
+    var isReaderOnHere: Bool { reader != nil && readerTab === tabManager.selectedTab }
     private var readerURL: URL?
     private var readerKeyMonitor: Any?
 
@@ -1991,7 +2004,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
             view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
             view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
-            view.show(article, from: url, icon: tab.favicon)
+            view.show(article, from: url, icon: tab.favicon, theme: Brand.Theme.of(self.tabManager.currentSpace))
             self.reader = view
             self.readerTab = tab
             tab.readerWebView = view.webView
@@ -2021,8 +2034,39 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Reader's text and colors, under the address's Aa. With no address on screen (the sidebar hidden, the address
+    /// not above the page), from the reading page's top-right corner instead.
+    func toggleReaderOptions() {
+        guard let reader, readerTab === tabManager.selectedTab else { return }
+        let overlay = root.overlay
+        let address = sidebar.address
+        let button = address.readerOptionsButton
+        let aboveThePage = root.barHoldsAddress
+        let docked = root.sidebarVisible && !root.isSidebarFloatingVisible
+        let onScreen = !button.isHidden && (aboveThePage || root.sidebarVisible || root.isSidebarFloatingVisible)
+        let card = readerCard ?? root.card
+        if !ReaderOptions.isOpen(in: window) { closeFloatingPanels() }
+        ReaderOptions.toggle(for: reader, in: overlay, opener: onScreen ? button : nil,
+                             recedes: onScreen && docked && !aboveThePage ? [sidebar.list] : []) { [weak self, weak address, weak card] size in
+            let inset = Tokens.Metric.cardInset
+            guard let self else { return .zero }
+            if onScreen, let address, address.window != nil {
+                // As Site Controls: along the field's edge in the sidebar, under the button's end above the page.
+                let field = address.convert(address.bounds, to: overlay)
+                let b = button.convert(button.bounds, to: overlay)
+                let x = aboveThePage || self.root.sidebarOnRight ? b.maxX - size.width : field.minX
+                return NSPoint(x: SitePanelSizing.x(x, alongAddress: !aboveThePage, inset: inset, width: size.width, overlayWidth: overlay.bounds.width),
+                               y: field.maxY + Tokens.Space.x1)
+            }
+            let shown = card ?? self.root.card
+            let page = shown.convert(shown.bounds, to: overlay)
+            return NSPoint(x: max(inset, page.maxX - size.width - Tokens.Space.x3), y: page.minY + Tokens.Space.x3)
+        }
+    }
+
     private func closeReader() {
         guard let view = reader else { return }
+        ReaderOptions.close(for: view)
         reader = nil
         readerTab?.readerWebView = nil
         readerTab = nil
@@ -2041,13 +2085,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         findBar.pageChanged()
     }
 
-    /// Reader stands in for the page in place, so it only crossfades, quickly both ways: nothing rises or zooms.
-    /// Moving or transforming a view that hosts web content stops WebKit drawing into it, and so does a fully
-    /// transparent start (hence 0.01).
+    /// Reader stands in for the page in place: its paper fades in over `enter` while the text settles up inside it
+    /// (the page's own CSS), and fades out over `exit`; with Reduce Motion a crossfade. The view itself never moves
+    /// or scales, which stops WebKit drawing into it, nor starts fully transparent (hence 0.01).
     private static func readerTransition(_ view: NSView, entering: Bool, completion: (@MainActor () -> Void)? = nil) {
         if entering { view.alphaValue = 0.01 }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown
+            ctx.duration = Tokens.Motion.Role.present.duration(entering: entering) * Tokens.Motion.debugSlowdown
             ctx.timingFunction = Tokens.Motion.easeOut
             view.animator().alphaValue = entering ? 1 : 0.01
         }, completionHandler: Tokens.Motion.completion(completion))
@@ -2344,6 +2388,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.needsLayout = true
     }
     func windowDidResignKey(_ notification: Notification) {
+        updateHandoff()
         switcher.windowResignedKey()
         spaceSwitcher.windowResignedKey()
     }
@@ -2362,6 +2407,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
         peek.close()
+        capture.cancel()
+        capture.dismissPreview()
         // The mini player floats in a panel of its own: it goes with the window too.
         miniPlayer.windowClosing()
         // So is a folder's icon picker, and the event monitor it holds.
@@ -2378,7 +2425,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if let monitor = zoomEscMonitor { NSEvent.removeMonitor(monitor) }
         zoomEscMonitor = nil
         // Its page is no longer on offer to your other devices.
-        handoff?.invalidate()
+        handoff = HandoffPage.update(handoff, to: nil)
         onClose?(self)
     }
 
@@ -2603,7 +2650,8 @@ extension BrowserWindowController: TabHost {
     /// One floating thing at a time: the command bar, site panel, downloads and space editor each close the
     /// others when they open, and previews and the link bubble stay away while any of them is up.
     var hasFloatingPanel: Bool {
-        switcher.isActive || commandBar.isVisible || SitePanel.isOpen(in: window) || DownloadsPanel.isOpen(in: window) || SpaceEditorPanel.current != nil || desk.isVisible || iconPicker != nil
+        switcher.isActive || commandBar.isVisible || SitePanel.isOpen(in: window) || DownloadsPanel.isOpen(in: window) || ReaderOptions.isOpen(in: window)
+            || SpaceEditorPanel.current != nil || desk.isVisible || iconPicker != nil
     }
 
     /// A folder's icon picker, when it's open in this window.
@@ -2615,6 +2663,7 @@ extension BrowserWindowController: TabHost {
         if commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
         SitePanel.closeCurrent()
         DownloadsPanel.closeCurrent()
+        ReaderOptions.closeCurrent()
         SpaceEditorPanel.current?.close()
         iconPicker?.close()
         previews.hide()
@@ -3395,7 +3444,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listMenu(for item: SidebarItem) -> NSMenu? {
         switch item {
-        case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID)
+        case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID, anchor: sidebar.list.headerView)
         case .tab(let id): return tabManager.tab(with: id).map { SidebarMenus.tabMenu(for: $0, controller: self) }
         case .bookmark(let id): return Library.shared.bookmark(id).map { SidebarMenus.bookmarkMenu(for: $0, controller: self) }
         case .folder(let id): return Library.shared.folder(id).map { SidebarMenus.folderMenu(for: $0, controller: self) }
@@ -3411,8 +3460,11 @@ extension BrowserWindowController: SidebarDelegate {
     /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
     func sidebarDoubleClickedBlank() { if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) } }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
-    func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
-        let menu = SidebarMenus.spaceMenu(for: id, controller: self)
+    /// A space dot's menu: Edit Space… opens at the dot.
+    func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }
+
+    private func sidebarSpaceMenu(for id: UUID, anchor: NSView?) -> NSMenu? {
+        let menu = SidebarMenus.spaceMenu(for: id, controller: self, anchor: anchor)
         return menu.items.isEmpty ? nil : menu
     }
 }
@@ -3480,6 +3532,7 @@ extension BrowserWindowController: CommandBarHost {
         if desk.isVisible { desk.hide(openingTab: nil) }
         SitePanel.closeCurrent()
         DownloadsPanel.closeCurrent()
+        ReaderOptions.closeCurrent()
         SpaceEditorPanel.current?.close()
         // Over a peek, Esc and ⌘L would go to the peek's page or the tab behind it: put the peek away first.
         peek.close()
@@ -3492,5 +3545,33 @@ extension BrowserWindowController: CommandBarHost {
 
     func commandBarRestoreFocus() {
         if let selectedWebView { window?.makeFirstResponder(selectedWebView) }
+    }
+}
+
+/// Which page Handoff offers to your other devices, and the one activity that offers it.
+enum HandoffPage: Equatable {
+    case page(url: URL, title: String)
+
+    /// A web page another device can open: http or https, not private, not an error page, not on this Mac, no
+    /// password in its address. Zigzag Mini and web apps never offer theirs, as Safari's web apps don't.
+    static func advertised(url: URL?, title: String, isPrivate: Bool, errorPage: Bool) -> HandoffPage? {
+        guard !isPrivate, !errorPage, let url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              let host = url.host(), !host.isEmpty, !LocalReceivers.isLoopback(host: host),
+              url.user() == nil, url.password() == nil else { return nil }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return .page(url: url, title: trimmed.isEmpty ? host : trimmed)
+    }
+
+    /// The activity kept current for `page`, reusing `activity`; nil invalidates it.
+    static func update(_ activity: NSUserActivity?, to page: HandoffPage?) -> NSUserActivity? {
+        guard case let .page(url, title)? = page else {
+            activity?.invalidate()
+            return nil
+        }
+        let current = activity ?? NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
+        if current.webpageURL != url { current.webpageURL = url }
+        if current.title != title { current.title = title }
+        current.becomeCurrent()
+        return current
     }
 }

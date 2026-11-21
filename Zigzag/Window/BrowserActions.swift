@@ -128,9 +128,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
+    /// File › Capture… (⇧⌘2): Capture's mode over the page, or out of it again.
     @objc func takePageScreenshot(_ sender: Any?) {
-        guard let tab = selectedTab else { return }
-        PageScreenshot.take(tab, in: self)
+        capture.toggle()
     }
 
     @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
@@ -429,6 +429,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
+    @objc func showReaderOptions(_ sender: Any?) { toggleReaderOptions() }
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
     @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
 
@@ -715,7 +716,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Favorites are shared by every window: a private one adds none, pinned or not.
         guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate else { return }
         favoriteWithUndo(tab)
-        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "star.fill", in: self)
+        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "heart.fill", in: self)
     }
 
     /// File › Install as App…: the site as an app of its own, with its own Dock icon (#165).
@@ -894,7 +895,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
         Tutorial.complete("space")
-        renameSpace(nil)
+        // At the button or menu row it came from; from the menu bar or command bar, beside the space's name.
+        openSpaceEditor(tabManager.currentSpaceID, anchor: sender as? NSView)
         if let madeProfile { SpaceEditorPanel.current?.follow(madeProfile: madeProfile) }
         // Esc while naming it: never mind. Back where you were, without the space, and the guide still asks for one.
         SpaceEditorPanel.current?.onCancel = { [weak self] in
@@ -933,7 +935,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
         case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
-        case #selector(takePageScreenshot(_:)): return PageScreenshot.canTake(tab)
+        case #selector(takePageScreenshot(_:)): return capture.isActive || capture.canBegin
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
              #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(showJavaScriptConsole(_:)), #selector(inspectElement(_:)),
@@ -1016,6 +1018,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(collapseAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: true)
         case #selector(expandAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: false)
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
+        case #selector(showReaderOptions(_:)): return isReaderOnHere
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil

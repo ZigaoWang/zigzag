@@ -21,6 +21,8 @@
   Test: NumberHintsTests.numbersGoToTheirPlaceAndNineToTheLast
 - ⌃1–⌃9 → that space; ⌃9 is the ninth, and a number with no space does nothing.
   Test: NumberHintsTests.spaceNumbersGoToTheirOwnSpaceAndNinthIsTheNinth
+- Hold ⌘ or ⌃ a moment → the numbers show; pressing their own number keys keeps them up while the key is held, and any other key, a click or letting go hides them.
+  Test: NumberHintsTests.theNumbersOwnKeysKeepThemShown
 - ⌘Y → History, and ⌘, → Settings, each opens as a tab in the front window.
   No test yet.
 
@@ -51,6 +53,14 @@
   No test yet.
 - ⌥⌘I (or F12) → Web Inspector opens, or closes if open.
   Test: DeveloperToolsTests.developerMenuHasChromesKeys
+- ⇧⌘2 → Capture dims the page; ⇧⌘2 again or Esc leaves it, and so does going to another tab.
+  Test: MenuShortcutsTests.shiftCommandTwoOpensCaptureAndEscLeaves
+- In Capture, a drag → an area kept inside the page, moved and resized by its grips, turning over past an edge.
+  Test: PageCaptureGeometryTests.gripsResizeAndTurnOver
+- In Capture's Element mode, a click → the element whole: as shown, scrolled into view and back, or drawn in one piece when it's taller than the window.
+  Test: PageCaptureGeometryTests.anElementIsTakenWholeEvenOffScreen
+- Capture… in the command bar → offered on a page that can be captured, found by "capture" or "screenshot".
+  Test: CommandActionTests.captureIsOfferedWhereThePageCanBeTaken
 
 ## Custom shortcuts
 - Give an item keys in Settings › Shortcuts that another item had → yours win, and the other item has no shortcut.
