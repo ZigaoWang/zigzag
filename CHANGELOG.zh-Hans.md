@@ -12,6 +12,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 修复
+- 在 Chrome 网上应用店的主题页面上点提示栏的“添加”，现在只会显示一行说明 Zigzag 不使用浏览器主题，也不再出现“重试”按钮，因为重试也只会得到同样的结果。感谢 [Lakeland97](https://github.com/Lakeland97)。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
+
 ## [0.9.4] - 2026-11-21
 
 阅读器重新设计，更像 Zigzag 自己的一部分；像 Arc 一样截图，可以截一块区域、一个元素或整个页面；支持接力到 iPhone、iPad 和其他 Mac；⌘Z 可以撤销分屏调整；侧边栏宽度每个窗口都记得；缩放可以按住连续调，也能直接输入；设置里的文字更简洁。

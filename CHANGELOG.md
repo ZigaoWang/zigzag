@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Add on the bar over a Chrome Web Store theme ends with one line saying Zigzag doesn't use browser themes, and the bar no longer offers Try Again, which could only fail the same way. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#454](https://github.com/ZigaoWang/zigzag/issues/454))
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, and a calmer Settings.
