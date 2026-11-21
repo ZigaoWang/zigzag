@@ -12,6 +12,17 @@
         }
       }
     },
+    "Since %@" : {
+      "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自 %@ 起"
+          }
+        }
+      }
+    },
     "Where ⌘T and links put a new tab in the sidebar." : {
       "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
       "localizations" : {
@@ -25969,61 +25980,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Zigzag 卡片"
-          }
-        }
-      }
-    },
-    "Using Zigzag since %@" : {
-      "comment" : "On Your Zigzag Card: the day Zigzag was first used on this Mac.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 起使用 Zigzag"
-          }
-        }
-      }
-    },
-    "Started on %@" : {
-      "comment" : "On Your Zigzag Card: the version of Zigzag first used on this Mac.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最初的版本：%@"
-          }
-        }
-      }
-    },
-    "Started on %@ or earlier" : {
-      "comment" : "On Your Zigzag Card: the earliest version Zigzag has on record for this Mac, when it was in use before it kept the first one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最初的版本：%@ 或更早"
-          }
-        }
-      }
-    },
-    "Joined in the beta" : {
-      "comment" : "On Your Zigzag Card: Zigzag was first used here before version 1.0.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beta 版时加入"
-          }
-        }
-      }
-    },
-    "Day %lld" : {
-      "comment" : "On Your Zigzag Card: how many days since Zigzag was first used here, counting the first as 1.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 天"
           }
         }
       }

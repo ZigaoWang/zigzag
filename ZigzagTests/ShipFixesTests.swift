@@ -1277,8 +1277,6 @@ struct ZigzagCardTests {
         #expect(!CardStart.isBeta("2.1.0"))
         #expect(!CardStart.isBeta(""))
         let face = CardFace(name: "", start: now, version: "1.0.0", isExact: true, day: 1)
-        #expect(face.betaLine == nil)
-        #expect(CardFace(name: "", start: now, version: "0.9.4", isExact: true, day: 1).betaLine != nil)
     }
 
     @Test func versionsCompareAsReleasesDo() {

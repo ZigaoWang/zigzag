@@ -123,25 +123,11 @@ struct CardFace: Equatable {
         formatter.dateStyle = .long
         formatter.timeStyle = .none
         let date = formatter.string(from: start)
-        return String(localized: "Using Zigzag since \(date)", comment: "On Your Zigzag Card: the day Zigzag was first used on this Mac.")
+        return String(localized: "Since \(date)", comment: "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac.")
     }
-
-    var versionLine: String {
-        let shown = VersionName.display(version)
-        return isExact
-            ? String(localized: "Started on \(shown)", comment: "On Your Zigzag Card: the version of Zigzag first used on this Mac.")
-            : String(localized: "Started on \(shown) or earlier",
-                     comment: "On Your Zigzag Card: the earliest version Zigzag has on record for this Mac, when it was in use before it kept the first one.")
-    }
-
-    var betaLine: String? {
-        CardStart.isBeta(version) ? String(localized: "Joined in the beta", comment: "On Your Zigzag Card: Zigzag was first used here before version 1.0.") : nil
-    }
-
-    var dayLine: String { String(localized: "Day \(day)", comment: "On Your Zigzag Card: how many days since Zigzag was first used here, counting the first as 1.") }
 
     /// Everything on it, for VoiceOver.
-    var spoken: String { ([name] + [sinceLine, versionLine, betaLine, dayLine].compactMap { $0 }).filter { !$0.isEmpty }.joined(separator: "\n") }
+    var spoken: String { [name, sinceLine].filter { !$0.isEmpty }.joined(separator: "\n") }
 }
 
 /// The card's colors, from the space in front: its hue, and a second one when the space has a gradient. White, gray
@@ -243,24 +229,12 @@ enum CardArt {
             context.fillPath()
         }
 
-        // Top right, level with the wordmark: the version it started on, the beta under it.
         let small = Tokens.Font.detail()
         let step = lineHeight(small)
-        let first = mark.maxY
-        let markEnd = mark.maxX + Tokens.Space.x4
-        for (i, line) in [face.versionLine, face.betaLine].compactMap({ $0 }).enumerated() {
-            draw(text(line, font: small, color: quiet, alignment: .right), baseline: first + CGFloat(i) * step, font: small,
-                 x: markEnd, width: rect.maxX - pad - markEnd)
-        }
 
-        // At the foot: the name over the day it began, and the day count at the end of that line.
+        // At the foot: the name over the day it began.
         let lower = rect.maxY - pad
-        let figures = Tokens.Font.figures(Tokens.TypeSize.label)
-        let dayWidth = ceil(text(face.dayLine, font: figures, color: quiet).size().width)
-        draw(text(face.dayLine, font: figures, color: quiet, alignment: .right), baseline: lower, font: figures,
-             x: rect.maxX - pad - dayWidth, width: dayWidth)
-        let textWidth = rect.width - pad * 2 - dayWidth - Tokens.Space.x4
-        draw(text(face.sinceLine, font: small, color: quiet), baseline: lower, font: small, x: rect.minX + pad, width: textWidth)
+        draw(text(face.sinceLine, font: small, color: quiet), baseline: lower, font: small, x: rect.minX + pad, width: rect.width - pad * 2)
         if !face.name.isEmpty {
             let font = Tokens.Font.voice(Tokens.Keepsake.nameSize)
             let paragraph = NSMutableParagraphStyle()
