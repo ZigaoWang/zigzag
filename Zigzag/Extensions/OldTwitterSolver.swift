@@ -50,6 +50,8 @@ final class OldTwitterSolver: NSObject {
       // on the quote's text opens it as the link did.
       const unlinkQuote = (element) => {
         if (!element || element.tagName !== "A" || !element.classList || !element.classList.contains("tweet-body-quote")) return;
+        // A ⌘, ⌃ or middle press puts the address back for the browser to follow.
+        if (element.hasAttribute("data-zigzag-modified")) return;
         const href = element.getAttribute("href");
         if (!href) return;
         element.setAttribute("data-zigzag-href", href);
@@ -71,11 +73,20 @@ final class OldTwitterSolver: NSObject {
           video.preload = "metadata";
           if (!video.currentTime) video.currentTime = 0.1;
         } catch (e) {}
-        // An invisible layer over the picture, so a click there plays or pauses it. The video's own controls at
-        // the top and in the bar stay outside it. No button of Zigzag's is drawn: WebKit's own shows.
+        // An invisible layer over the picture, so a click there plays or pauses it. It takes the video's own box,
+        // never the strip around it, and the video's controls at the top and in the bar stay outside it. No button of
+        // Zigzag's is drawn: WebKit's own shows.
         const layer = document.createElement("div");
         layer.setAttribute("data-zigzag-play", "");
-        layer.style.cssText = "position:absolute;left:0;right:0;top:22%;bottom:18%;z-index:3;background:transparent;cursor:pointer;";
+        layer.style.cssText = "position:absolute;z-index:3;background:transparent;cursor:pointer;";
+        const place = () => {
+          const box = video.getBoundingClientRect(), holderBox = holder.getBoundingClientRect();
+          if (!box.width || !box.height) return;
+          layer.style.left = (box.left - holderBox.left) + "px";
+          layer.style.top = (box.top - holderBox.top + box.height * 0.28) + "px";
+          layer.style.width = box.width + "px";
+          layer.style.height = (box.height * 0.5) + "px";
+        };
         layer.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -83,6 +94,10 @@ final class OldTwitterSolver: NSObject {
           else video.pause();
         });
         holder.appendChild(layer);
+        place();
+        new ResizeObserver(place).observe(holder);
+        new ResizeObserver(place).observe(video);
+        addEventListener("resize", place);
       };
       const fix = (element) => {
         if (!element || element.nodeType !== 1) return;
@@ -109,13 +124,17 @@ final class OldTwitterSolver: NSObject {
         const target = event.target instanceof Element ? event.target : null;
         if (!target) return;
         if (target.closest("[data-zigzag-play]")) return;
-        // The video's own controls, at the top and in the bar, keep their clicks.
+        // A click on the video is the video's own controls'.
         if (target.closest("video")) return;
+        const quote = target.closest("a.tweet-body-quote");
+        // ⌘ takes the quoted tweet itself, in a new tab: the click reaches the link, and the extension's own
+        // handlers let a modified click through.
+        if (quote && (event.metaKey || quote.hasAttribute("data-zigzag-modified"))) return;
         // A link in the quoted text (a URL, a mention, the quoted account) is its own.
         if (target.closest("a[href]")) return;
         // A quoted tweet opens in the extension's own modal, which is its own handler's doing. Without the href,
         // nothing follows it in a tab.
-        if (target.closest("a.tweet-body-quote")) event.preventDefault();
+        if (quote) event.preventDefault();
       }, true);
       // The address is put back for the right-click menu alone, so Open in New Tab still has a link, and taken off
       // again on the next left press, so a click on the quote or its video never follows it.
@@ -125,21 +144,14 @@ final class OldTwitterSolver: NSObject {
         if (!quote) return;
         const href = quote.getAttribute("data-zigzag-href");
         if (!href) return;
-        if (event.button === 2) quote.setAttribute("href", href);
-        else if (event.button === 0) quote.removeAttribute("href");
-      }, true);
-      // OldTwitter starts a quoted video again at the sound level the page loaded with, not the one you set with the
-      // controls. The level you set is kept here and put back as it plays, whatever made the video anew.
-      let chosenVolume = null;
-      document.addEventListener("volumechange", (event) => {
-        const video = event.target;
-        if (event.isTrusted && video && video.tagName === "VIDEO" && !video.muted) chosenVolume = video.volume;
-      }, true);
-      document.addEventListener("play", (event) => {
-        const video = event.target;
-        if (chosenVolume !== null && video && video.tagName === "VIDEO" && Math.abs(video.volume - chosenVolume) > 0.01) {
-          video.volume = chosenVolume;
+        // The page's own world has already put it back for a ⌘, ⌃ or middle press, and marked it.
+        if (quote.hasAttribute("data-zigzag-modified")) {
+          quote.setAttribute("href", href);
+          return;
         }
+        const newTab = event.button === 1 || (event.button === 0 && event.metaKey);
+        if (event.button === 2 || newTab) quote.setAttribute("href", href);
+        else if (event.button === 0) quote.removeAttribute("href");
       }, true);
       new MutationObserver((mutations) => {
         for (const mutation of mutations) {
@@ -150,6 +162,45 @@ final class OldTwitterSolver: NSObject {
       }).observe(document.documentElement || document, {
         childList: true, subtree: true, attributes: true, attributeFilter: ["src", "href", "srcset", "poster", "style", "data"], characterData: true,
       });
+    })();
+    """
+
+    /// One level for every video on x.com, in the page's own world: the timeline and the floating modal are the
+    /// same post, and WebKit starts a video that plays late muted. The last level set on a video that was not muted
+    /// becomes the page's, and a video that starts gets it, unmuted.
+    /// The page's own world sees the keys held on a click; the extension's own world does not always. A ⌘ or middle
+    /// press puts the quoted tweet's link back and marks it, so every handler can tell that click is the browser's.
+    static let modified = """
+    (() => {
+      if (window.__zigzagOldTwitterModified) return;
+      window.__zigzagOldTwitterModified = true;
+      document.addEventListener("mousedown", (event) => {
+        if (!event.isTrusted || !(event.metaKey || event.button === 1)) return;
+        const quote = event.target.closest && event.target.closest("a.tweet-body-quote");
+        const href = quote && quote.getAttribute("data-zigzag-href");
+        if (!href) return;
+        quote.setAttribute("href", href);
+        quote.setAttribute("data-zigzag-modified", "");
+        setTimeout(() => {
+          quote.removeAttribute("data-zigzag-modified");
+          quote.removeAttribute("href");
+        }, 2000);
+      }, true);
+      // ⌘ on a tweet's own body is that tweet's link: it opens in a new tab, not in the extension's viewer.
+      document.addEventListener("click", (event) => {
+        if (!event.isTrusted || !event.metaKey) return;
+        const target = event.target;
+        if (!target.closest) return;
+        if (target.closest("a[href], button, video, [data-zigzag-play], .tweet-button")) return;
+        const tweet = target.closest(".tweet");
+        if (!tweet || target.closest("a.tweet-body-quote")) return;
+        const link = tweet.querySelector(".tweet-time");
+        const href = link && link.getAttribute("href");
+        if (!href) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.open(href, "_blank", "noopener");
+      }, true);
     })();
     """
 
@@ -227,6 +278,7 @@ final class OldTwitterSolver: NSObject {
                 guard let page = webView.url?.host(), page == "x.com" || page == "twitter.com" else { continue }
                 let world = BridgeUserScripts.contentScriptWorld(extensionID)
                 webView.callAsyncJavaScript(Self.bridge, arguments: [:], in: nil, in: world) { _ in }
+                webView.callAsyncJavaScript(Self.modified, arguments: [:], in: nil, in: .page) { _ in }
             }
         }
     }
@@ -241,6 +293,10 @@ final class OldTwitterSolver: NSObject {
         guard !controller.userScripts.contains(where: { $0.source == Self.bridge }) else { return }
         controller.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentStart,
                                              forMainFrameOnly: false, in: world))
+        if !controller.userScripts.contains(where: { $0.source == Self.modified }) {
+            controller.addUserScript(WKUserScript(source: Self.modified, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: false, in: .page))
+        }
     }
 
     /// A fresh content world for the tab and frame this page is in, started with the codes its page worked out.
