@@ -21,6 +21,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 开着“退出前询问”时，在没有拉丁字母的键盘布局（比如俄语或希腊语）下按 ⌘Q 也会询问了，以前会直接退出。([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 - “永不翻译此网站”和“永不翻译某种语言”会立刻生效：之前在这个窗口里翻译过的网站，下一个页面不会再自动翻译。
 - 从已最小化或隐藏的窗口打开的 Zigzag Mini，按 ⌘O 仍然会把页面放回那个窗口，新标签页和翻译也一样；无痕的 Mini 会留在它的无痕窗口里。
+- 有网站访问权限的扩展，带着自己的请求头、不带 Cookie 去访问这个网站时能连上了，比如 Litewarden 这类连自建 Vaultwarden 的密码管理器。这种请求现在由 Zigzag 替它发出，不带你的 Cookie；以前服务器不返回 CORS 头就会失败。感谢 [Kronight](https://github.com/Kronight)。([#478](https://github.com/ZigaoWang/zigzag/issues/478))
 
 ## [0.9.4] - 2026-11-21
 

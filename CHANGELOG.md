@@ -14,6 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With Ask before quitting on, ⌘Q asks on a keyboard layout without Latin letters too, like Russian or Greek, where it quit at once. ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 - Never Translate This Site and Never Translate a language hold at once: a site translated earlier in the window no longer translates its next page on its own.
 - A Zigzag Mini opened from a window that's minimized or hidden still sends its page there with ⌘O, along with its new tabs and its translating, and a private one stays in that private window.
+- An extension with access to a site reaches it when it sends its own headers without cookies, as password managers for a self-hosted server like Litewarden do with Vaultwarden. Zigzag sends such a request for it, without your cookies, where it used to fail because the server sent no CORS headers. Thanks to [Kronight](https://github.com/Kronight). ([#478](https://github.com/ZigaoWang/zigzag/issues/478))
 
 ## [0.9.4] - 2026-11-21
 
