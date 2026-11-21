@@ -2331,6 +2331,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Not in full screen: the lights live in the title bar that comes down with the menu bar there, so a picture of
         // them on the sliding sidebar would only flash and vanish.
         let fullScreen = window.styleMask.contains(.fullScreen)
+        // The page is under the lights only in full screen with neither the bar nor the sidebar there; then they
+        // get a backing so they don't float over it (#462). The bar or sidebar is their backing otherwise.
+        let backing = Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.showsTopBar,
+                                                    sidebarVisible: docked, sidebarFloating: floating)
+        if (fullScreenBar != nil) != backing, !window.fullScreenPhase.isMoving { showFullScreenBar(backing) }
         // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
         // Beside a sidebar on the right, the bar holding the address keeps them there always: the window's top left.
         // Without it they're in the sidebar's top row on either side, the page running up to the top as on the left
@@ -2338,7 +2343,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let onRight = root.sidebarOnRight
         let barKeepsLights = onRight && root.barHoldsAddress
         let inBar = root.showsTopBar && (barKeepsLights || (!docked && !floating))
-        let room = barKeepsLights ? 0 : window.trafficLightsWidth
+        let room = Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
         // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
         // nothing in the row moves while it's on screen; until then their picture rides in it.
         if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
@@ -2385,6 +2390,36 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidResize(_ notification: Notification) { layoutTrafficLights(); onStateChange?() }
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
+
+    /// The bar behind the traffic lights when the page is under them in full screen (#462). AppKit's title bar is
+    /// transparent, so without it the lights float over the page. Uses the title bar material, as Safari's toolbar.
+    private var fullScreenBar: NSVisualEffectView?
+
+    private func showFullScreenBar(_ on: Bool) {
+        fullScreenBar?.removeFromSuperview()
+        fullScreenBar = nil
+        guard on, let titlebar = browserWindow.standardWindowButton(.closeButton)?.superview else { return }
+        let bar = NSVisualEffectView(frame: titlebar.bounds)
+        bar.material = .titlebar
+        bar.blendingMode = .behindWindow
+        bar.state = .followsWindowActiveState
+        bar.autoresizingMask = [.width, .height]
+        titlebar.addSubview(bar, positioned: .below, relativeTo: nil)
+        fullScreenBar = bar
+    }
+
+    /// Whether the lights need a backing of their own: in full screen, when the page is under them because neither
+    /// the bar nor the sidebar is. With either there, they sit on Zigzag's own chrome (#462).
+    nonisolated static func needsTrafficLightBacking(fullScreen: Bool, barShown: Bool, sidebarVisible: Bool,
+                                                     sidebarFloating: Bool) -> Bool {
+        fullScreen && !barShown && !sidebarVisible && !sidebarFloating
+    }
+
+    /// The room the lights take in the sidebar's top row. In full screen they are in the title bar, not the sidebar,
+    /// so the sidebar keeps none for them (#462).
+    nonisolated static func trafficLightRoom(fullScreen: Bool, barKeepsLights: Bool, width: CGFloat) -> CGFloat {
+        fullScreen || barKeepsLights ? 0 : width
+    }
 
     /// The window's place before it went full screen: what's saved, so leaving full screen after a relaunch gives
     /// back the window you had, not one the size of the screen.
