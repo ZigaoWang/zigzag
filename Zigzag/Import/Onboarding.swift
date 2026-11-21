@@ -346,7 +346,8 @@ private final class StepPage: NSView {
         content.frame = NSRect(x: Self.cardPad, y: Self.cardPad, width: inner, height: ch - Self.cardPad * 2)
         let nw = max(next.fittingWidth + 24, 150)
         next.frame = NSRect(x: x + width - nw, y: fy, width: nw, height: h)
-        back.frame = NSRect(x: x - Tokens.Space.x2, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
+        // Back's text starts on the card's edge.
+        back.frame = NSRect(x: x - back.textInset, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
     }
 }
 
