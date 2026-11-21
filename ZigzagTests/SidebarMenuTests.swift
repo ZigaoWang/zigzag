@@ -82,6 +82,20 @@ struct SidebarMenuTests {
         #expect(abs(frame.maxY - point.y) < 0.5)
     }
 
+    /// Short of room below, the menu slides up only as far as it must, as macOS's does, never flipped whole above.
+    @Test func rightClickNearTheBottomSlidesUpJustEnough() throws {
+        let (window, anchor) = host()
+        let area = try #require(window.contentView).bounds
+        let point = NSPoint(x: 120, y: area.minY + 40)
+        let menu = try #require(MenuPanel.show(entries { _ in }, from: anchor, placement: .at(point)))
+        defer { menu.close(animated: false) }
+        let frame = menu.convert(menu.bounds, to: nil)
+        // Its bottom rests on the window's margin, so its top is no higher than it needs to be.
+        #expect(frame.minY >= area.minY)
+        #expect(frame.minY - area.minY <= 12)
+        #expect(frame.maxY > point.y)
+    }
+
     @Test func aShortcutWidensTheMenuToFitIt() throws {
         let (_, anchor) = host()
         let plain = try #require(MenuPanel.show([.item(MenuPanel.Item(title: "New Tab") {})], from: anchor))

@@ -1950,10 +1950,11 @@ final class MenuPanel: FloatingPanelView {
                 maxY = area.maxY
             }
         case .at(let point):
-            // Under the pointer, as a right-click's menu opens; above it where there's no room below.
+            // Under the pointer, as a right-click's menu opens. Short of room below, it slides up only as far as it
+            // must, as macOS's does, so its first items stay by the pointer (never flipped whole above it).
             x = point.x
-            maxY = fits(point.y) ? point.y : fits(point.y + height) ? point.y + height : area.maxY
-            growsY = maxY == point.y ? 0 : 1
+            maxY = min(max(point.y, area.minY + height), area.maxY)
+            growsY = min(max((maxY - point.y) / max(height, 1), 0), 1)
         }
         x = min(max(x, area.minX), max(area.minX, area.maxX - width))
         let rect = NSRect(x: x, y: maxY - height, width: width, height: height)
