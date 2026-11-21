@@ -12,6 +12,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 修复
+- 在 Peek 里点了链接之后可以退回去了。Peek 打开过别的页面后，顶部会出现后退和前进按钮，⌘[、⌘] 和双指轻扫也跟在标签页里一样能用。按 Esc 还是直接关掉整个 Peek。感谢 [Lakeland97](https://github.com/Lakeland97)。([#463](https://github.com/ZigaoWang/zigzag/issues/463))
+
 ## [0.9.4] - 2026-11-21
 
 阅读器重新设计，更像 Zigzag 自己的一部分；像 Arc 一样截图，可以截一块区域、一个元素或整个页面；支持接力到 iPhone、iPad 和其他 Mac；⌘Z 可以撤销分屏调整；侧边栏宽度每个窗口都记得；缩放可以按住连续调，也能直接输入；设置里的文字更简洁。

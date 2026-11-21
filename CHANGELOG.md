@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A link followed inside Peek can be walked back. Once the Peek has gone to another page, back and forward buttons show in its top strip, and ⌘[ and ⌘] or a two-finger swipe work there as in a tab. Esc still closes the whole Peek. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#463](https://github.com/ZigaoWang/zigzag/issues/463))
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, and a calmer Settings.
