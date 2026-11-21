@@ -2762,6 +2762,16 @@ enum DebugBridge {
         case "readerstyle":
             func find(_ v: NSView) -> ReaderControls? { (v as? ReaderControls) ?? v.subviews.lazy.compactMap(find).first }
             if let content = controller.window?.contentView { find(content)?.toggleOptions() }
+        case "readerprefs":
+            // readerprefs <auto|light|sepia|dark> <serif|sans> <narrow|medium|wide> [size]: Reader's choices, applied to the open article.
+            let f = arg.split(separator: " ").map(String.init)
+            func find(_ v: NSView) -> ReaderView? { (v as? ReaderView) ?? v.subviews.lazy.compactMap(find).first }
+            guard f.count >= 3, let content = controller.window?.contentView, let reader = find(content) else { break }
+            reader.debugSet(Reader.Preferences(size: f.count > 3 ? Int(f[3]) ?? 20 : 20, face: .init(rawValue: f[1]) ?? .serif,
+                                               theme: .init(rawValue: f[0]) ?? .auto, width: .init(rawValue: f[2]) ?? .medium))
+        case "readerjs":
+            // readerjs <script>: runs in the open article, in Zigzag's own script world.
+            controller.debugReaderWebView?.runOwnScript(arg)
         case "hidetoasts": Toast.hide(in: controller)
         // showtoast <text>: a plain toast for six seconds.
         case "showtoast": Toast.show(arg, symbol: "checkmark", duration: 6, in: controller)
