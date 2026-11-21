@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A right-click menu near the bottom of the window slides up only as far as it needs to, as macOS's menus do, instead of opening wholly above the pointer. Its first items stay right by the pointer, so Separate Split View or Reload Page is a short move away wherever you click.
+- Choose Image… and Use Site Icon under the icon grid line up with the search field above them, and the grid's panel keeps the same margin below them as at its sides. Their hover fill reached out toward the panel's edge and nearly touched its bottom corners.
 
 ## [0.9.3] - 2026-11-18
 
