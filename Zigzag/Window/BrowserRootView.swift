@@ -1858,6 +1858,7 @@ final class BrowserRootView: SpaceFrameView {
         switch step {
         case "begin": resizeHandle.onBegin?()
         case "end": resizeHandle.onEnd?(false)
+        case "reset": resizeHandle.onDoubleClick?()
         default: if let x = Double(step) { resizeHandle.onDrag?(CGFloat(x), false) }
         }
     }
