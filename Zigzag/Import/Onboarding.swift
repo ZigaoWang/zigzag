@@ -454,13 +454,12 @@ private enum Onboard {
     static func mark(chosen: PrimaryButton, other: PrimaryButton) {
         // The answer you're on is plainly picked: solid, in the ribbon's pale with deep ink. The other is just its
         // outline, so there's no doubt which Continue goes with.
+        chosen.customEdge = nil
         chosen.customFill = Brand.ribbon
         chosen.customInk = Brand.navy
-        chosen.layer?.borderWidth = 0
+        other.customEdge = Brand.ribbon.withAlphaComponent(0.45)
         other.customFill = .clear
         other.customInk = Brand.ribbon.withAlphaComponent(0.85)
-        other.layer?.borderWidth = 1
-        other.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.45).cgColor
     }
 
     /// A question's answers, side by side in the middle, the same width.
