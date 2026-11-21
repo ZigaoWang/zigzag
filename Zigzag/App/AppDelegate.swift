@@ -461,7 +461,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
-    @objc func showZigzagCard(_ sender: Any?) { ZigzagCardWindowController.show() }
 
     /// Settings opens as a tab in the front window, as History does.
     @objc func showSettings(_ sender: Any?) { frontBrowserWindow().map { SettingsPage.open(in: $0) } }

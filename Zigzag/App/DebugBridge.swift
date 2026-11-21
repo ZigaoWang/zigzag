@@ -753,7 +753,7 @@ enum DebugBridge {
             return
         }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
-        // card [tilt <x> <y>|tilt off|save <path>|shot <path>|close]: Your Zigzag Card, opened behind, leaning as if
+        // card [tilt <x> <y>|tilt off|finish <name>|flip|hover <n>|save <path>|shot <path>|close]: About with Your Zigzag Card, opened behind, leaning as if
         // the pointer were there (-1 to 1 from its middle, y up), its picture saved, or its window captured by number.
         // card start <yyyy-mm-dd> <version> [exact]: the kept start, replaced, for a test copy.
         if name == "card" {
@@ -764,7 +764,7 @@ enum DebugBridge {
                 CardStart.defaults.set(f.contains("exact"), forKey: CardStart.exactKey)
                 return
             }
-            if let card = ZigzagCardWindowController.shared, !f.isEmpty { card.debug(f) } else { ZigzagCardWindowController.show() }
+            if let about = AboutWindowController.shared, !f.isEmpty { about.debugCard(f) } else { AboutWindowController.show() }
             return
         }
         // updateready <version>|off: a pretend staged update (Restart only logs); updatedismiss: the card's close

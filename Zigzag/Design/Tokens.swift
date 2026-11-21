@@ -484,8 +484,6 @@ enum Tokens {
     enum Welcome {
         /// The wordmark on the hello screen.
         static let wordmarkHeight: CGFloat = 72
-        /// The wordmark heading a window of the app's own (About, Import).
-        static let smallWordmarkHeight: CGFloat = 22
         /// The glass card a step's choice sits on.
         static let cardWidth: CGFloat = 560
         /// A step's big title, in display weight: the one place type is this large.
@@ -494,9 +492,6 @@ enum Tokens {
         static let countSize: CGFloat = 60
         /// A brand moment's card (onboarding's import card).
         static let cardRadius: CGFloat = 22
-        /// The About window: its width and height, the app icon and the wordmark under it.
-        static let aboutSize = NSSize(width: 320, height: 476)
-        static let aboutIcon: CGFloat = 96
         /// About › Acknowledgments: wide enough for a license's lines as written.
         static let acknowledgementsSize = NSSize(width: 640, height: 600)
         /// The progress dots.
@@ -507,29 +502,43 @@ enum Tokens {
         static let groupGap: CGFloat = Space.x6 + Space.x1
     }
 
-    /// Your Zigzag Card (Zigzag › Your Zigzag Card…): a bank card's proportions, in a small window of its own.
+    /// Your Zigzag Card, the hero of About Zigzag: a bank card's proportions.
     enum Keepsake {
-        static let size = NSSize(width: 340, height: 214)
-        static let radius: CGFloat = Radius.tile
+        static let size = NSSize(width: 420, height: 264)
+        /// A bank card's corner for its width.
+        static let radius: CGFloat = 16
         /// From the card's edges to what's on it.
-        static let pad: CGFloat = Space.x6
-        static let wordmarkHeight: CGFloat = 16
-        static let nameSize: CGFloat = TypeSize.display
-        /// Room around the card in its window: at the sides, above it (under the traffic lights), and around the buttons.
-        static let margin: CGFloat = Space.x10
-        static let top: CGFloat = Space.x12
-        static let buttonGap: CGFloat = Space.x8
-        static let bottom: CGFloat = Space.x8
-        /// The most it leans toward the pointer, in degrees, and how deep the perspective is.
-        static let tilt: CGFloat = 4
-        static let perspective: CGFloat = 900
-        /// The saved picture's pixels per point.
-        static let exportScale: CGFloat = 3
+        static let pad: CGFloat = Space.x6 + Space.x1
+        static let wordmarkHeight: CGFloat = 18
+        /// The wordmark alone in the middle of the back.
+        static let backWordmarkHeight: CGFloat = 30
+        static let nameSize: CGFloat = 26
+        /// The ribbon Zs pressed into the surface: their height, the grid they sit on, and how deep they're pressed.
+        static let motifHeight: CGFloat = 9
+        static let motifStep = NSSize(width: 40, height: 32)
+        static let motifDepth: CGFloat = 0.6
+        /// How deep the wordmark is stamped.
+        static let stampDepth: CGFloat = 0.35
+        /// The most it turns toward the pointer, in degrees, and how far the eye is from it.
+        static let tilt: CGFloat = 8
+        static let perspective: CGFloat = 1100
+        /// Turning after the pointer, slow enough to feel its weight; settling back on a soft spring; turning over.
+        static let follow: TimeInterval = Material.follow * 0.5
+        static let settle: TimeInterval = Material.follow
+        static let settleBounce: CGFloat = 0.12
+        static let turn: TimeInterval = Motion.large * 2
+        /// The saved picture's pixels per point, and the clear room around the card for its shadow, in points.
+        static let exportScale: CGFloat = 8
+        static let exportMargin: CGFloat = Space.x10
         /// Two shadows: a wide soft one it floats on, and a close one where it nearly touches.
-        static let ambientRadius: CGFloat = 22
-        static let ambientDrop: CGFloat = 12
+        static let ambientRadius: CGFloat = 24
+        static let ambientDrop: CGFloat = 14
         static let contactRadius: CGFloat = 3
         static let contactDrop: CGFloat = 1.5
+        /// Room around it in About: at the sides, above it (under the traffic lights), and under it.
+        static let margin: CGFloat = Space.x10
+        static let top: CGFloat = Space.x12
+        static let gap: CGFloat = Space.x6
     }
 
     // MARK: - Type (SF Pro: six roles, one scale for the whole app)

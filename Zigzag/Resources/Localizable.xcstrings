@@ -10922,7 +10922,7 @@
       }
     },
     "Graphite" : {
-      "comment" : "Name of a curated space color, in the space editor.",
+      "comment" : "Name of a curated space color, in the space editor.\nFinish of Your Zigzag Card in About: dark brushed metal.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15369,7 +15369,7 @@
       }
     },
     "Paper" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
+      "comment" : "Tooltip and accessibility label of a preset look in the space editor.\nFinish of Your Zigzag Card in About: warm linen paper.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18650,7 +18650,7 @@
       }
     },
     "Share…" : {
-      "comment" : "Button under Your Zigzag Card: opens the Mac's share menu with its picture.\nFile menu item.",
+      "comment" : "Button in About Zigzag, under Your Zigzag Card: opens the Mac's share menu with its picture.\nFile menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19519,7 +19519,7 @@
       }
     },
     "Space" : {
-      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.\nFinish of Your Zigzag Card in About: the colors of the space you're in.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -25940,19 +25940,8 @@
         }
       }
     },
-    "Your Zigzag Card…" : {
-      "comment" : "Zigzag menu item: opens a card with your name and the day you started using Zigzag, to keep or share.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的 Zigzag 卡片…"
-          }
-        }
-      }
-    },
     "Your Zigzag Card" : {
-      "comment" : "Title of the window with Your Zigzag Card, and its name for VoiceOver.",
+      "comment" : "VoiceOver name of Your Zigzag Card in About Zigzag.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -25963,7 +25952,7 @@
       }
     },
     "Save as Image…" : {
-      "comment" : "Button under Your Zigzag Card: saves it as a PNG picture, asking where.",
+      "comment" : "Button in About Zigzag, under Your Zigzag Card: saves it as a PNG picture, asking where.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -25980,6 +25969,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 卡片"
+          }
+        }
+      }
+    },
+    "Holographic" : {
+      "comment" : "Finish of Your Zigzag Card in About: iridescent foil.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "镭射"
+          }
+        }
+      }
+    },
+    "Finish" : {
+      "comment" : "VoiceOver name of the row of finishes under Your Zigzag Card in About Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卡面"
           }
         }
       }
