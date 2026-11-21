@@ -218,6 +218,9 @@ enum CommandRanker {
         var isPrivate = false
         /// The page you're on has an address (a blank new tab doesn't).
         var hasPage = false
+        /// The page can go into Pinned, or the favorites; Zigzag's own views can't (#472).
+        var canPin = true
+        var canFavorite = true
         var isPinned = false
         /// Pin and unpin act on the whole group (#209).
         var isGroup = false
@@ -251,7 +254,7 @@ enum CommandRanker {
                 list.append(Action(id: "unpin", title: c.isGroup ? String(localized: "Unpin Group", comment: "A command in the command bar, named as in the menu bar: takes the pinned group out of Pinned.")
                                    : String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar: takes a pinned page out of Pinned."),
                                    keywords: ["save", "unsave", "unpin", "pin", "tab", "group", "remove"], symbol: "star.slash"))
-            } else {
+            } else if c.canPin {
                 list.append(Action(id: "pin", title: c.isGroup ? String(localized: "Pin Group", comment: "A command in the command bar, named as in the menu bar: pins the group of tabs as one folder.")
                                    : String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar: pins the page into Pinned."),
                                    keywords: ["save", "pin", "tab", "group", "keep", "bookmark"], symbol: "star"))
@@ -259,7 +262,7 @@ enum CommandRanker {
                                    keywords: ["save", "folder", "pin", "tab", "file"], symbol: "folder.badge.plus"))
             }
         }
-        if c.hasPage, !c.isFavorite, !c.isPrivate {
+        if c.hasPage, c.canFavorite, !c.isFavorite, !c.isPrivate {
             list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
                                keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: SidebarMenus.Symbol.favorite))
         }
@@ -370,6 +373,8 @@ enum CommandRanker {
         let tabs = manager.currentTabs
         guard let tab = manager.selectedTab else { return c }
         c.hasPage = tab.url != nil
+        c.canPin = manager.canPin(tab)
+        c.canFavorite = manager.canPin(tab, keepingGroup: false)
         c.canCapture = WindowManager.shared.controllers.first { $0.tabManager === manager }?.capture.canBegin ?? false
         c.developerTools = DeveloperTool.allCases.filter { $0.isOffered(for: tab, isPrivate: manager.isPrivate, inSplit: manager.split(for: tab) != nil) }
         c.isDevelopmentSite = DevelopmentSites.covers(tab.url)

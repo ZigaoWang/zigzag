@@ -232,10 +232,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var quitConfirmed = false
 
     /// Asks before quitting, in the window, like Zigzag's other confirmations. Never when the Mac is logging out,
-    /// restarting or shutting down, or when an update restarts Zigzag. ⌘Q again, or Return, quits.
+    /// restarting or shutting down, when an update restarts Zigzag, or for Quit Zigzag chosen in the menu. ⌘Q again, or Return, quits.
     static var asksBeforeQuitting: Bool {
         get { UserDefaults.standard.object(forKey: "AskBeforeQuitting") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "AskBeforeQuitting") }
+    }
+
+    /// Set while Quit Zigzag chosen in the menu quits: choosing it is the confirmation, as in Chrome (#441).
+    private static var quittingFromMenu = false
+
+    /// Whether the event is the ⌘Q key, the one quit the setting asks about.
+    static func isQuitKey(_ event: NSEvent?) -> Bool {
+        guard let event, event.type == .keyDown else { return false }
+        return event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
+            && event.charactersIgnoringModifiers?.lowercased() == "q"
+    }
+
+    @objc func quitFromMenu(_ sender: Any?) {
+        Self.quittingFromMenu = !Self.isQuitKey(NSApp.currentEvent)
+        defer { Self.quittingFromMenu = false }
+        NSApp.terminate(sender)
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -248,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .terminateLater
         }
         // Asked already, or not asking: downloads are the one thing worth asking about anyway.
-        guard !Self.quitConfirmed, Self.asksBeforeQuitting || downloading > 0 else { return quitNow() }
+        guard !Self.quitConfirmed, (Self.asksBeforeQuitting && !Self.quittingFromMenu) || downloading > 0 else { return quitNow() }
         // Logging out, restarting or shutting down: the system's own reason is on the quit event.
         if let event = NSAppleEventManager.shared().currentAppleEvent,
            event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil { return quitNow() }

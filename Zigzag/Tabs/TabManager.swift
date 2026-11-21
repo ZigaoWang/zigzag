@@ -1199,6 +1199,17 @@ final class TabManager {
         return !members.isEmpty && members.allSatisfy { $0.url != nil }
     }
 
+    /// Whether pinning this tab pins only pages that can be pinned (#472): its own, and the group's or split's pages
+    /// that would be pinned with it. Zigzag's own views never go into Pinned or the favorites.
+    func canPin(_ tab: Tab, keepingGroup: Bool = true) -> Bool {
+        guard tab.bookmarkID == nil else { return true }
+        let pinnable: (Tab) -> Bool = { $0.url.map(SavePath.Page.isPinnable) ?? false }
+        guard pinnable(tab) else { return false }
+        if keepingGroup, pinsGroup(tab), let groupID = tab.groupID { return tabs(inGroup: groupID).allSatisfy(pinnable) }
+        let partners = split(for: tab)?.ids.compactMap { self.tab(with: $0) } ?? []
+        return partners.filter { $0.bookmarkID == nil && $0.url != nil }.allSatisfy(pinnable)
+    }
+
     /// Pins a whole tab group (#325) as one folder at a place among the pinned pages; nil if it can't be pinned whole.
     @discardableResult
     func pinGroup(_ id: UUID, at index: Int? = nil, in spaceID: UUID? = nil) -> BookmarkFolder? {

@@ -18,6 +18,8 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 在 x.com 的 OldTwitter 里，引用帖子中的视频，点它的控制按钮会播放或暂停视频，不会再打开那条引用。感谢 [datarip](https://github.com/datarip)。
 - ⇧⌘C 在所有网站上都会复制网页链接，和 Arc 一样。以前在 GitHub 的文件页面上，因为 GitHub 也用这组快捷键复制文件原文，按下去复制的是文件内容。
+- 开着“退出前询问”时，从菜单里选“退出 Zigzag”会直接退出，和 Chrome 一样：只有按 ⌘Q 才会询问。还有文件在下载时退出仍然会询问。感谢 [Lakeland97](https://github.com/Lakeland97)。([#441](https://github.com/ZigaoWang/zigzag/issues/441))
+- Zigzag 自己的页面，比如设置、历史记录和归档，不能再拖进“已固定”、拖到固定的文件夹或网页上，或者拖进收藏，和 ⌘D、星标一样。标签页会留在原处。标签页的菜单和命令栏里也不再为它们提供“固定标签页”和“添加到收藏”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#472](https://github.com/ZigaoWang/zigzag/issues/472))
 
 ## [0.9.4] - 2026-11-21
 

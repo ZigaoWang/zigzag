@@ -708,7 +708,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func addToFavorites(_ sender: Any?) {
         // Favorites are shared by every window: a private one adds none, pinned or not.
-        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate else { return }
+        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate, tabManager.canPin(tab, keepingGroup: false) else { return }
         favoriteWithUndo(tab)
         Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "heart.fill", in: self)
     }
@@ -985,7 +985,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)):
-            return tab?.url != nil && tab?.isFavorite != true && !tabManager.isPrivate
+            return tab?.url != nil && tab.map { tabManager.canPin($0, keepingGroup: false) } == true && tab?.isFavorite != true && !tabManager.isPrivate
         case #selector(toggleDevelopmentSite(_:)):
             item.title = DeveloperTool.siteTitle(listed: DevelopmentSites.covers(tab?.url))
             return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)

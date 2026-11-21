@@ -222,11 +222,13 @@ extension BrowserWindowController {
 
     /// A tab (and a split's other half) into the favorites at a tile's place (nil: the end).
     func favoriteWithUndo(_ tab: Tab, at index: Int? = nil) {
+        guard tabManager.canPin(tab, keepingGroup: false) else { return }
         pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteTab(tab, at: index) }
     }
 
     /// A tab or pinned page dropped on a favorite's middle: the two become one favorite, side by side.
     func joinFavoriteWithUndo(_ tab: Tab, onto favoriteID: UUID, onRight: Bool) {
+        guard tabManager.canPin(tab, keepingGroup: false) else { return }
         pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.joinFavorite(tab, onto: favoriteID, onRight: onRight) }
     }
 

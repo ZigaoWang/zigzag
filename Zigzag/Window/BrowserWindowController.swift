@@ -2942,6 +2942,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// Bookmarks a tab, undoably. A grouped tab pins its group unless `keepingGroup` is false.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID, keepingGroup: Bool = true) {
+        guard tabManager.canPin(tab, keepingGroup: keepingGroup) else { return }
         Tutorial.complete("pin")
         let name = keepingGroup && tabManager.pinsGroup(tab) ? Self.pinGroupUndoName : String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")
         pageChange(name) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: keepingGroup) }
@@ -2952,7 +2953,7 @@ extension BrowserWindowController: SidebarDelegate {
     /// A tab group's row dropped among the pinned pages (#325): the whole group pins there as one folder, undoably.
     /// `folder`: the folder the gap is in, if any.
     func listPinGroup(_ id: UUID, at index: Int, in spaceID: UUID, folder parent: UUID?) {
-        guard !tabManager.isPrivate else { return }
+        guard !tabManager.isPrivate, let first = tabManager.tabs(inGroup: id).first, tabManager.canPin(first) else { return }
         let tabs = tabManager.tabs(inGroup: id)
         confirmProfileCrossing(tabs.flatMap(tabManager.panes(of:)), to: spaceID) { [weak self] in
             guard let self else { return }
@@ -2971,7 +2972,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// A tab dropped on a pinned page: the two become one pinned split where the pinned page is, open side by side.
     func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool) {
-        guard !tabManager.isPrivate else { return }
+        guard !tabManager.isPrivate, tabManager.canPin(tab, keepingGroup: false) else { return }
         pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.pinSplit(tab, with: bookmarkID, tabOnRight: tabOnRight) }
     }
 
