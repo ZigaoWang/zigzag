@@ -33,6 +33,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - In the welcome window's Pin the sites you use, each site's icon and name sit in the middle of its tile, so a picked tile's tint has even room above and below them. They sat 4 points from its top and 11 from its bottom.
 - In the welcome window's import step, a browser's hover fill is rounded on every row, as the list's box is, and Stay signed in to your sites has the same corners. Only the first row's top was rounded, by the box clipping it, and every other fill had square corners against the lines between rows.
 - In the column of Settings, the Translation symbol is drawn at the size of the others. It was half as wide again as the rest, 23 points against about 16.
+- In the Import window, a browser whose count runs to two lines, like Chrome with its extensions, gets a row tall enough for them. The second line ran out of its row, onto the edge of the chosen row's tint.
 
 ## [0.9.3] - 2026-11-18
 
