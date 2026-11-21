@@ -420,4 +420,66 @@ struct DragZoneTests {
         defer { third.window?.close() }
         #expect(third.root.sidebarWidth == Tokens.Metric.sidebarWidth)
     }
+
+    /// ⌘Z puts a group's lines back after a change, and redo moves them forward again (#435).
+    @Test func undoPutsTheTileLinesBack() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let ids = (0..<2).map { _ in Tab(url: nil, title: "Page", spaceID: space) }
+        manager.adopt(ids, in: space)
+        manager.makeSplit(ids[0], with: ids[1], vertical: true)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(ids[0])
+        let window = try #require(controller.window)
+        window.layoutIfNeeded()
+        let even = try #require(manager.split(for: ids[0])?.shape)
+        #expect(even.isStacked)
+        var lower = even
+        lower.moveRowLine(in: 0, to: 0.6, length: 600, minimum: 100)
+        controller.applyTileShape(lower, undoTo: manager.split(for: ids[0])?.shape)
+        #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
+        controller.sidebarUndo.undo()
+        #expect(manager.split(for: ids[0])?.shape.rowShares == [0.5, 0.5])
+        controller.sidebarUndo.redo()
+        #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
+    }
+
+    /// ⌘Z for one group's lines leaves another group alone, even where both are two pages (#435).
+    @Test func undoFindsAnotherGroupsLinesWhereverItIs() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let ids = (0..<4).map { _ in Tab(url: nil, title: "Page", spaceID: space) }
+        manager.adopt(ids, in: space)
+        manager.makeSplit(ids[0], with: ids[1], vertical: true)
+        manager.makeSplit(ids[2], with: ids[3], vertical: true)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(ids[0])
+        let window = try #require(controller.window)
+        window.layoutIfNeeded()
+        let even = try #require(manager.split(for: ids[0])?.shape)
+        var lower = even
+        lower.moveRowLine(in: 0, to: 0.6, length: 600, minimum: 100)
+        controller.applyTileShape(lower, undoTo: manager.split(for: ids[0])?.shape)
+        #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
+
+        manager.select(ids[2])
+        window.layoutIfNeeded()
+        let other = try #require(manager.split(for: ids[2])?.shape)
+        #expect(controller.root.tiles == other)
+        controller.sidebarUndo.undo()
+        // The group the drag was in goes back, though another split is showing, and the other is left alone.
+        #expect(manager.split(for: ids[0])?.shape == even)
+        #expect(manager.split(for: ids[2])?.shape == other)
+        // Off screen, it changes the group without drawing it over the split that is showing.
+        #expect(controller.root.tiles == other)
+        // The step is still there to redo, not used up doing nothing.
+        #expect(controller.sidebarUndo.canRedo)
+    }
+
 }
