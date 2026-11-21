@@ -1622,7 +1622,9 @@ private final class PickTile: InteractiveView {
             detail.frame = NSRect(x: x, y: name.frame.maxY + 1, width: bounds.width - x - 12, height: detail.lineHeight)
         } else {
             let s: CGFloat = 40
-            icon.frame = NSRect(x: (bounds.width - s) / 2, y: bounds.height / 2 - s + 4, width: s, height: s)
+            // The icon and name centered as one block, so a picked tile's wash has even room above and below.
+            let top = round((bounds.height - s - 8 - name.lineHeight) / 2)
+            icon.frame = NSRect(x: (bounds.width - s) / 2, y: top, width: s, height: s)
             // Picked: a small check on the icon's bottom-right corner, like a selected photo.
             check.frame = NSRect(x: icon.frame.maxX - 13, y: icon.frame.maxY - 13, width: 18, height: 18)
             name.frame = NSRect(x: 4, y: icon.frame.maxY + 8, width: bounds.width - 8, height: name.lineHeight)

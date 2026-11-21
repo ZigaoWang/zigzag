@@ -30,6 +30,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - In the welcome window's yes-or-no steps, the answer you didn't pick keeps its outline. It lost it as soon as the button was drawn again, so Show Ads and Not Now read as plain text beside the picked answer.
 - The welcome window's Skip sits on the same line as the progress dots, instead of 3 points below them.
 - The welcome window's Back starts on the card's left edge, as Continue ends on its right one, instead of 3 points in.
+- In the welcome window's Pin the sites you use, each site's icon and name sit in the middle of its tile, so a picked tile's tint has even room above and below them. They sat 4 points from its top and 11 from its bottom.
 
 ## [0.9.3] - 2026-11-18
 
