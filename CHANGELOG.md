@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Icons in buttons sit on the screen's pixels where their ink is centered, instead of snapping to the nearest whole point, so some no longer sit half a point off.
 - In a split view, the reload button on each page's strip lines up with back and forward instead of sitting a little low.
 - A split view page's strip keeps as much room above its buttons and address as below them, instead of sitting half a point high.
+- A split view page on plain http shows the not-secure mark in its strip's address, as the sidebar's address does.
 
 ## [0.9.3] - 2026-11-18
 

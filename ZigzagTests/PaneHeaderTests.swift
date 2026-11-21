@@ -118,6 +118,14 @@ import Testing
         #expect(abs(above - below) <= 0.5)
         #expect(header.back.frame.midY == header.reload.frame.midY)
     }
+
+    /// Like the sidebar's address, the strip's marks a page that isn't secure.
+    @Test func anHttpPageIsMarkedNotSecure() {
+        let tab = Tab(url: URL(string: "http://example.com")!, spaceID: UUID())
+        let header = PaneHeaderView()
+        header.show(tab)
+        #expect(header.address.notSecure)
+    }
 }
 
 /// The page area's ground, which moves the window wherever nothing on it takes the press.

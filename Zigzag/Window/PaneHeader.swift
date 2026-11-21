@@ -183,6 +183,7 @@ final class PaneHeaderView: NSView {
         reload.symbol = loading ? "xmark" : "arrow.clockwise"
         reload.toolTip = loading ? String(localized: "Stop", comment: "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.") : String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page.")
         address.text = tab?.url.map(CommandRanker.displayURL) ?? ""
+        address.notSecure = tab?.isNotSecure ?? false
         needsLayout = true
     }
 
