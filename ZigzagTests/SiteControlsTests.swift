@@ -488,6 +488,19 @@ struct ZoomStepperTests {
         #expect(stepper.zoom == 1)
     }
 
+    /// The typing tip belongs to the caller, and the parts are a line apart: the sidebar size's tooltip isn't about
+    /// typing a zoom (#395).
+    @Test func theTypingTipIsTheCallersAndItsPartsAreLinesApart() {
+        let stepper = ZoomStepper()
+        stepper.resetTip = "Actual Size"
+        stepper.typingTip = "⇧-click to type a zoom"
+        #expect(stepper.debugPercentToolTip == "Actual Size\n⇧-click to type a zoom")
+        stepper.typingTip = nil
+        #expect(stepper.debugPercentToolTip == "Actual Size")
+        stepper.typingTip = "⇧-click to type a size"
+        #expect(stepper.debugPercentToolTip == "Actual Size\n⇧-click to type a size")
+    }
+
     /// The stepper takes the steps of what it sets (#361): the sidebar size's 5% steps from 75% to 150%, its
     /// percentage back to 100%, and the room its widest step needs.
     @Test func takesTheStepsOfWhatItSets() {

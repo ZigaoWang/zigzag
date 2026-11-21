@@ -1950,8 +1950,9 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
     var lessTip = String(localized: "Zoom Out", comment: "Tooltip of the − button on the Zoom row of the site panel.") { didSet { refresh() } }
     var moreTip = String(localized: "Zoom In", comment: "Tooltip of the + button on the Zoom row of the site panel.") { didSet { refresh() } }
     var resetTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.") { didSet { refresh() } }
-    /// After the reset tip: how to type a zoom instead of stepping to it (#395).
-    var typingTip = String(localized: "⇧-click to type a zoom", comment: "After Actual Size in the percentage's tooltip on the Zoom row: Shift-clicking it lets you type a zoom.") { didSet { refresh() } }
+    /// After the reset tip: how to type a zoom instead of stepping to it (#395). Nil where typing says nothing
+    /// useful, as on the Sidebar size row.
+    var typingTip: String? = String(localized: "⇧-click to type a zoom", comment: "After Actual Size in the percentage's tooltip on the Zoom row: Shift-clicking it lets you type a zoom.") { didSet { refresh() } }
     /// The percentage's VoiceOver name, a format with the value in it: "Zoom %@, Actual Size" for a page.
     var percentName = String(localized: "Zoom %@, Actual Size", comment: "VoiceOver name of the percentage on the Zoom row of the site panel: the zoom now, then what pressing it does.") {
         didSet { refresh() }
@@ -2027,6 +2028,8 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
         typedField.stringValue = text
         endTyping(commit: true)
     }
+
+    var debugPercentToolTip: String? { percent.toolTip }
     #endif
 
     private func go(_ direction: Int) {
@@ -2055,14 +2058,21 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
 
     private func startRepeating(_ direction: Int) {
         stopHoldingTimer()
+        // The pause is over: the next step comes at once, then every gap. Waiting a gap here made the first repeat
+        // arrive at 0.52s instead of 0.4s.
+        guard stepWhileHolding(direction) else { return }
         holdTimer = Timer.scheduledTimer(withTimeInterval: Self.holdGap, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                guard ZoomLevels.canStep(self.zoom, by: direction, in: self.steps) else { self.stopHolding(); return }
-                self.go(direction)
-            }
+            MainActor.assumeIsolated { _ = self?.stepWhileHolding(direction) }
         }
         RunLoop.main.add(holdTimer!, forMode: .common)
+    }
+
+    /// One step of a hold, or the end of it at the stepper's end.
+    @discardableResult
+    private func stepWhileHolding(_ direction: Int) -> Bool {
+        guard ZoomLevels.canStep(zoom, by: direction, in: steps) else { stopHolding(); return false }
+        go(direction)
+        return true
     }
 
     private func stopHoldingTimer() {
@@ -2082,8 +2092,16 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
         stopHolding()
         typedField.stringValue = ZoomLevels.percent(zoom)
         typedField.frame = percent.frame
+        // A field, not a bolder percentage: the panel's faint fill and hairline edge, in the button's place.
+        typedField.wantsLayer = true
+        typedField.layer?.cornerRadius = Tokens.Radius.control
+        typedField.layer?.cornerCurve = .continuous
+        typedField.layer?.backgroundColor = Tokens.Color.chromeFill.cgColor
+        typedField.layer?.borderWidth = Tokens.Metric.hairline
+        typedField.layer?.borderColor = Tokens.Color.chromeEdge.cgColor
         typedField.isHidden = false
         percent.isHidden = true
+        watchClicksOutside()
         window?.makeFirstResponder(typedField)
         typedField.currentEditor()?.selectAll(nil)
     }
@@ -2095,12 +2113,41 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
         let typed = ZoomLevels.typed(typedField.stringValue)
         typedField.isHidden = true
         percent.isHidden = false
+        stopWatchingClicksOutside()
         if commit, let typed, let first = steps.first, let last = steps.last {
             // Any level between the stepper's ends, not just a preset; ⌘+ and − go on from it.
             set(min(max(typed, first), last))
         }
-        if let editor, window?.firstResponder === editor { window?.makeFirstResponder(nil) }
+        // The field editor can stay first responder after Return even once the field is hidden, and then typing
+        // goes into nothing. Let it go only if it, or its editor, still holds the focus.
+        if let window {
+            let responder = window.firstResponder
+            if responder === typedField || responder === editor || window.fieldEditor(false, for: typedField) === responder {
+                window.makeFirstResponder(nil)
+            }
+        }
     }
+
+    private var outsideClick: Any?
+
+    /// A click anywhere but the field finishes it, as leaving a field does; the click itself still goes where it
+    /// was aimed.
+    private func watchClicksOutside() {
+        stopWatchingClicksOutside()
+        outsideClick = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+            guard let self, !self.typedField.isHidden else { return event }
+            let point = self.typedField.convert(event.locationInWindow, from: nil)
+            if !self.typedField.bounds.contains(point) { self.endTyping(commit: true) }
+            return event
+        }
+    }
+
+    private func stopWatchingClicksOutside() {
+        if let outsideClick { NSEvent.removeMonitor(outsideClick) }
+        outsideClick = nil
+    }
+
+    isolated deinit { stopWatchingClicksOutside() }
 
     func controlTextDidEndEditing(_ obj: Notification) { endTyping(commit: true) }
 
@@ -2120,7 +2167,7 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
     private func refresh() {
         minus.toolTip = lessTip
         plus.toolTip = moreTip
-        percent.toolTip = resetTip + " · " + typingTip
+        percent.toolTip = [resetTip, typingTip].compactMap { $0 }.joined(separator: "\n")
         percent.title = ZoomLevels.percent(zoom)
         percent.setAccessibilityLabel(String(format: percentName, ZoomLevels.percent(zoom)))
         minus.isEnabled = ZoomLevels.canStep(zoom, by: -1, in: steps)
