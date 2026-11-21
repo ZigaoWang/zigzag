@@ -628,6 +628,11 @@ final class IconButton: InteractiveView {
 
     override var intrinsicContentSize: NSSize { frame.size }
 
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        needsLayout = true
+    }
+
     override func layout() {
         super.layout()
         if image != nil {
@@ -636,7 +641,11 @@ final class IconButton: InteractiveView {
         } else if glyph == nil {
             // The symbol's ink, not its image, in the middle.
             let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
-            imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
+            // The image at its own size on the screen's pixels: centered by the image view, it snaps to whole points.
+            let size = imageView.image?.size ?? bounds.size
+            let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+            let x = bounds.midX - size.width / 2 - ink.width, y = bounds.midY - size.height / 2 + (isFlipped ? ink.height : -ink.height)
+            imageView.frame = NSRect(x: round(x * scale) / scale, y: round(y * scale) / scale, width: size.width, height: size.height)
         } else {
             // The glyph's own ink goes in the middle (a play triangle leans right in its image).
             let ink = glyphInk
