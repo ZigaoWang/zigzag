@@ -62,8 +62,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool
     /// A tab dropped on another tab's middle: the two open side by side.
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
-    /// A tab dropped on a split's row joins it as a third or fourth page (`TabManager.joining`).
-    func listJoinSplit(_ tab: Tab, onto other: Tab, onRight: Bool)
+    /// A tab or pinned page dropped on a split's row joins it as a third or fourth page (`TabManager.joining`).
+    func listJoinSplit(_ page: TabManager.RowPage, onto target: TabManager.RowPage, onRight: Bool)
     /// ⇧-clicked a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160).
     func listZoomPane(_ tab: Tab)
     /// A tab dropped on a pinned page's middle: a pinned split.
@@ -2007,12 +2007,29 @@ final class SidebarListView: NSView {
         }
     }
 
+    /// The row as a page a split's row can take, or be: a tab's or a pinned page's.
+    private static func rowPage(_ item: SidebarItem) -> TabManager.RowPage? {
+        switch item {
+        case .tab(let id): .tab(id)
+        case .bookmark(let id): .pinned(id)
+        default: nil
+        }
+    }
+
+    /// Whether the row shows a split, of tabs or of pinned pages: a drop on it joins that split, never makes one.
+    private func isSplitRow(_ item: SidebarItem) -> Bool {
+        switch item {
+        case .tab(let id): manager?.tab(with: id).flatMap { manager?.split(for: $0) } != nil
+        case .bookmark(let id): Library.shared.pinnedSplit(containing: id) != nil
+        default: false
+        }
+    }
+
     private func canSplit(_ carried: SidebarItem, onto target: SidebarItem) -> Bool {
         guard carried != target, let a = splitSide(of: carried), let b = splitSide(of: target) else { return false }
-        // Tab onto a split's row: joins it, up to four pages.
-        if case .tab(let c) = carried, case .tab(let t) = target, let manager, let tab = manager.tab(with: c), let onto = manager.tab(with: t),
-           manager.split(for: onto) != nil {
-            return manager.joining(tab, onto: onto, onRight: true) != nil || manager.joining(tab, onto: onto, onRight: false) != nil
+        // Onto a split's row, a tab's or a pinned one's: joins it, up to four pages.
+        if isSplitRow(target), let manager, let page = Self.rowPage(carried), let onto = Self.rowPage(target) {
+            return manager.joining(page, onto: onto, onRight: true) != nil || manager.joining(page, onto: onto, onRight: false) != nil
         }
         // Pinned pages are shared by every window, so a private one makes no pinned splits and takes none apart.
         if manager?.isPrivate == true {
@@ -2117,6 +2134,22 @@ final class SidebarListView: NSView {
         }
         placeLine()
     }
+
+    #if DEBUG
+    /// The offer a drag shows with `carried` resting on `target`'s middle, without a pointer: the carried row faint
+    /// and the half it would take lit, if `canSplit` allows it; nil puts it all away. Returns whether it's offered.
+    @discardableResult
+    func debugOfferSplit(_ carried: SidebarItem?, onto target: SidebarItem?, onRight: Bool) -> Bool {
+        for view in rows.values { view.alphaValue = 1 }
+        guard let carried, let target, canSplit(carried, onto: target) else { showSplitTarget(nil); return false }
+        rows[carried]?.alphaValue = CarriedCopy.faint
+        switch target {
+        case .tab(let id), .bookmark(let id): showSplitTarget(SplitDrop(id: id, onRight: onRight))
+        default: return false
+        }
+        return true
+    }
+    #endif
 
     private weak var externalTarget: SidebarListView?
     private var edgeDirection: Int?
@@ -2351,10 +2384,15 @@ final class SidebarListView: NSView {
         // row it was dropped on, so it shows once: on a pinned page, a pinned split; on a tab, a split among tabs.
         if let split = drag.splitTarget {
             let ontoTab = manager.tab(with: split.id)
+            // Onto a split's row: it joins that split, among tabs or among the pinned pages.
+            let onto: SidebarItem = ontoTab == nil ? .bookmark(split.id) : .tab(split.id)
+            if isSplitRow(onto), let page = Self.rowPage(drag.item), let target = Self.rowPage(onto) {
+                delegate?.listJoinSplit(page, onto: target, onRight: split.onRight)
+                if let tab { return landingView(for: tab) }
+                return rows[onto]
+            }
             if let tab {
-                if let ontoTab, manager.split(for: ontoTab) != nil {
-                    delegate?.listJoinSplit(tab, onto: ontoTab, onRight: split.onRight)
-                } else if let ontoTab { delegate?.listSplit(ontoTab, with: tab, otherOnRight: split.onRight) } else { delegate?.listPinSplit(tab, onto: split.id, tabOnRight: split.onRight) }
+                if let ontoTab { delegate?.listSplit(ontoTab, with: tab, otherOnRight: split.onRight) } else { delegate?.listPinSplit(tab, onto: split.id, tabOnRight: split.onRight) }
                 return landingView(for: tab)
             }
             if case .bookmark(let id) = drag.item, let ontoTab {

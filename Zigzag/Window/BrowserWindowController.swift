@@ -3484,10 +3484,10 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
-    func listJoinSplit(_ tab: Tab, onto other: Tab, onRight: Bool) {
-        guard let kind = tabManager.joining(tab, onto: other, onRight: onRight) else { return }
+    func listJoinSplit(_ page: TabManager.RowPage, onto target: TabManager.RowPage, onRight: Bool) {
+        guard let kind = tabManager.joining(page, onto: target, onRight: onRight) else { return }
         pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in
-            tabManager.tile(tab, beside: other, kind)
+            tabManager.join(page, onto: target, kind)
         }
     }
     func listZoomPane(_ tab: Tab) { toggleZoom(tab) }

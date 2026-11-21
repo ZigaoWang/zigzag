@@ -1566,6 +1566,22 @@ final class Library {
         commit()
     }
 
+    /// A page into the pinned split `targetID` is in, where `drop` puts it (`SplitPair.adding`), after the split's
+    /// pages and in its folder: a new page, or one pinned on its own in that space.
+    func joinPinnedSplit(_ page: Bookmark, onto targetID: UUID, _ drop: TileDrop.Kind) {
+        guard let s = spaces.firstIndex(where: { $0.pinnedSplits?.contains { $0.contains(targetID) } == true }),
+              let i = spaces[s].pinnedSplits?.firstIndex(where: { $0.contains(targetID) }),
+              let grown = spaces[s].pinnedSplits?[i].layout.adding(page.id, drop) else { return }
+        spaces[s].bookmarks.removeAll { $0.id == page.id }
+        for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == page.id } }
+        let after = spaces[s].bookmarks.lastIndex { grown.contains($0.id) }.map { $0 + 1 } ?? spaces[s].bookmarks.count
+        spaces[s].bookmarks.insert(page, at: after)
+        if let f = spaces[s].folders?.firstIndex(where: { $0.bookmarkIDs.contains(targetID) }) { spaces[s].folders?[f].bookmarkIDs.append(page.id) }
+        spaces[s].pinnedSplits?[i] = PinnedSplit(layout: grown)
+        tidyFolders(s)
+        commit()
+    }
+
     /// One page out of its pinned or favorite group of three or four: it stays where it's kept, on its own after the
     /// group, and the rest close up around its place as a group of tabs does; out of a split of two, the split ends.
     func removeFromPinnedSplit(_ id: UUID) {

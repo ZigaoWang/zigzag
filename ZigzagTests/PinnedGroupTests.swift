@@ -637,6 +637,98 @@ import Testing
             #expect(shape(pinRow) == inTabs)
         }
     }
+
+    // MARK: Growing by drag
+
+    /// A tab dropped on a pinned split's row joins it as a third or fourth page, where the same drop on a split of
+    /// tabs puts it, every line where it was; one ⌘Z takes it back out, a tab again.
+    @Test(arguments: [2, 3]) func aDropGrowsAPinnedSplitAsATabSplit(count: Int) throws {
+        try inWindow((0...count).map(String.init)) { controller, all, space in
+            let manager = controller.tabManager
+            let tabs = Array(all.prefix(count)), extra = all[count]
+            let shape = Self.shapes[count == 2 ? 0 : 2]
+            manager.makeGroup(tabs, shape: shape)
+            let kind = try #require(manager.joining(extra, onto: tabs[0], onRight: true))
+            let asTabs = try #require(manager.split(for: tabs[0])?.adding(extra.id, kind))
+            manager.bookmarkTab(tabs[0], in: space)
+            let marks = tabs.compactMap(\.bookmarkID)
+            let before = try #require(Library.shared.pinnedSplit(containing: marks[0]))
+            #expect(manager.joining(.tab(extra.id), onto: .pinned(marks[0]), onRight: true) == kind)
+            let undo = controller.sidebarUndo
+            undo.groupsByEvent = false
+            undo.beginUndoGrouping()
+            controller.listJoinSplit(.tab(extra.id), onto: .pinned(marks[0]), onRight: true)
+            undo.endUndoGrouping()
+            let mark = try #require(extra.bookmarkID)
+            let grown = try #require(Library.shared.pinnedSplit(containing: marks[0]))
+            // In the order the pages read in their new places, as the tabs' would be.
+            let markOf = Dictionary(uniqueKeysWithValues: zip(all.map(\.id), marks + [mark]))
+            #expect(grown.ids == asTabs.ids.compactMap { markOf[$0] })
+            #expect(grown.shape == asTabs.shape)
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == grown.ids)
+            #expect(manager.split(for: tabs[0])?.ids == asTabs.ids)
+            #expect(manager.split(for: tabs[0])?.shape == asTabs.shape)
+            #expect(!manager.tabs(in: space).contains { $0 === extra })
+            undo.undo()
+            #expect(Library.shared.pinnedSplit(containing: marks[0]) == before)
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.shape == before.shape)
+            #expect(Library.shared.bookmark(mark) == nil)
+            #expect(manager.tabs(in: space).contains { $0.id == extra.id })
+            #expect(manager.split(for: tabs[0])?.ids == tabs.map(\.id))
+        }
+    }
+
+    /// A pinned page on its own dropped on a pinned split of three is its fourth page, after the others, undoably.
+    @Test func aPinnedPageJoinsAPinnedSplitOfThree() throws {
+        try inWindow(["0", "1", "2", "x"]) { controller, all, space in
+            let manager = controller.tabManager
+            let tabs = Array(all.prefix(3))
+            manager.makeGroup(tabs, shape: Self.shapes[2])
+            manager.bookmarkTab(tabs[0], in: space)
+            manager.bookmarkTab(all[3], in: space, keepingGroup: false)
+            let marks = tabs.compactMap(\.bookmarkID), x = try #require(all[3].bookmarkID)
+            Library.shared.moveBookmark(x, to: 0, in: space)
+            let kind = try #require(manager.joining(.pinned(x), onto: .pinned(marks[0]), onRight: false))
+            let expected = try #require(Library.shared.pinnedSplit(containing: marks[0])?.layout.adding(x, kind))
+            controller.listJoinSplit(.pinned(x), onto: .pinned(marks[0]), onRight: false)
+            let grown = try #require(Library.shared.pinnedSplit(containing: x))
+            #expect(grown.ids == expected.ids && Set(grown.ids) == Set(marks + [x]))
+            #expect(grown.shape == expected.shape && grown.shape.regions.count == 4)
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == grown.ids)
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == [x] + marks)
+        }
+    }
+
+    /// The tab list and the pinned pages offer the same drop on a split's row: the half under the pointer lit on a
+    /// split of two or three, nothing at four, where the row only moves.
+    @Test(arguments: [2, 3, 4]) func bothSectionsOfferTheSameDrop(count: Int) throws {
+        try inWindow((0...count).map(String.init)) { controller, all, space in
+            let manager = controller.tabManager
+            let list = controller.sidebar.list
+            let tabs = Array(all.prefix(count)), extra = all[count]
+            manager.makeGroup(tabs, shape: Self.shapes[count == 2 ? 0 : count == 3 ? 2 : 4])
+            let carried = SidebarItem.tab(extra.id)
+            func offer(onto target: SidebarItem, row: () -> NSView?) throws -> Int? {
+                list.reload(animated: false)
+                list.layoutSubtreeIfNeeded()
+                let offered = list.debugOfferSplit(carried, onto: target, onRight: true)
+                let side = try #require(row() as? TabRowView).splitDropSide
+                #expect(offered == (side != nil))
+                list.debugOfferSplit(nil, onto: nil, onRight: false)
+                return side
+            }
+            let inTabs = try offer(onto: .tab(tabs[0].id)) { list.row(for: tabs[0]) }
+            #expect(manager.joining(extra, onto: tabs[0], onRight: false) == nil ? count == 4 : count < 4)
+            manager.bookmarkTab(tabs[0], in: space)
+            let mark = try #require(tabs[0].bookmarkID)
+            let inPinned = try offer(onto: .bookmark(mark)) { list.row(forBookmark: mark) }
+            #expect(inTabs == inPinned)
+            #expect(inTabs == (count < 4 ? 1 : nil))
+            #expect(manager.joining(.tab(extra.id), onto: .pinned(mark), onRight: false) == nil ? count == 4 : count < 4)
+        }
+    }
 }
 
 /// How a favorite group's tile shows its pages (#203): a small icon for each, placed as the pages share the window, and

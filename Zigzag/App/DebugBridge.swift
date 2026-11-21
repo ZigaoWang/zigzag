@@ -1400,6 +1400,27 @@ enum DebugBridge {
             debugPaneDrag?.moved(to: point)
             debugPaneDragPoint = point
             debugLog("panedrag \(arg) => \(String(describing: debugPaneDrag?.target)) at \(point)")
+        case "rowdrop", "rowjoin":
+            // rowdrop <carried>|<target>|<left|right>: the row titled <carried> resting on the middle of <target>'s row
+            // (a tab's or a pinned page's), the offer it shows; rowdrop alone puts it away. rowjoin: that drop, undoably.
+            let f = arg.components(separatedBy: "|")
+            func item(_ title: String) -> SidebarItem? {
+                if let tab = controller.tabManager.currentTabs.first(where: { $0.displayTitle.contains(title) }) { return .tab(tab.id) }
+                return Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).first { $0.title.contains(title) }.map { .bookmark(SidebarListView.rowID($0.id)) }
+            }
+            let carried = f.count == 3 ? item(f[0]) : nil, target = f.count == 3 ? item(f[1]) : nil
+            if name == "rowjoin" {
+                if case .tab(let id)? = carried, let tab = controller.tabManager.tab(with: id), case .tab(let t)? = target, let other = controller.tabManager.tab(with: t), controller.tabManager.split(for: other) != nil {
+                    controller.listJoinSplit(.tab(tab.id), onto: .tab(other.id), onRight: f[2] == "right")
+                } else if let carried, case .bookmark(let t)? = target {
+                    let page: TabManager.RowPage? = switch carried { case .tab(let id): .tab(id); case .bookmark(let id): .pinned(id); default: nil }
+                    if let page { controller.listJoinSplit(page, onto: .pinned(t), onRight: f[2] == "right") }
+                }
+                controller.sidebar.list.debugOfferSplit(nil, onto: nil, onRight: false)
+                debugLog("rowjoin \(arg) done")
+            } else {
+                debugLog("rowdrop \(arg) offered=\(controller.sidebar.list.debugOfferSplit(carried, onto: target, onRight: f.count == 3 && f[2] == "right"))")
+            }
         case "rowhover":
             // rowhover <n>: the row of the tab at this place in the list as if the pointer were over it; off: none.
             let tabs = controller.tabManager.currentTabs
