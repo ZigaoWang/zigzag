@@ -16,7 +16,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 阅读器多了“空间”颜色：文章用你所在空间的颜色，和边栏同一个颜色，空间是浅色就浅、深色就深，文字和链接的对比度保证读起来轻松。切换空间或改空间颜色时会马上跟着变。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 
 ### 修复
-- 全屏时，关闭、最小化和全屏按钮跟着菜单栏一起出现，下面有工具栏或边栏时不再有自己的灰色条，只有网页在下面时才有背景。([#469](https://github.com/ZigaoWang/zigzag/issues/469))
+- 全屏时，关闭、最小化和全屏按钮跟着菜单栏一起出现，下面有工具栏或边栏时不再有自己的灰色条，只有网页在下面时才有背景。感谢 [Lakeland97](https://github.com/Lakeland97)。([#469](https://github.com/ZigaoWang/zigzag/issues/469))
 - 在 Chrome 网上应用店的主题页面上点提示栏的“添加”，现在只会显示一行说明 Zigzag 不使用浏览器主题，也不再出现“重试”按钮，因为重试也只会得到同样的结果。感谢 [Lakeland97](https://github.com/Lakeland97)。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
 - 在 Peek 里点了链接之后可以退回去了。Peek 打开过别的页面后，顶部会出现后退和前进按钮，⌘[、⌘] 和双指轻扫也跟在标签页里一样能用。按 Esc 还是直接关掉整个 Peek。感谢 [Lakeland97](https://github.com/Lakeland97)。([#463](https://github.com/ZigaoWang/zigzag/issues/463))
 - 翻译很长的网页不会再在 45 秒后放弃了。屏幕上看得到的部分先翻，翻好一段就换上一段，提示里会显示翻到多少了；只有连续 45 秒什么都没翻出来才会报错。感谢 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
