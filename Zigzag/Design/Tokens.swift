@@ -1522,6 +1522,11 @@ enum Tokens {
         static let washChroma = 0.016
         static let washDarkLightness = 0.235
         static let washDarkChroma = 0.016
+        /// Reader's Auto paper: a breath of the space, lighter than a panel by day, so long text keeps its contrast.
+        static let readerLightness = 0.985
+        static let readerChroma = 0.008
+        static let readerDarkLightness = 0.235
+        static let readerDarkChroma = 0.012
     }
 
     /// What sits on the frame (the sidebar's rows, its address and favorites): washes of white, so whatever the
