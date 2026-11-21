@@ -14,6 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - In a split view, the reload button on each page's strip lines up with back and forward instead of sitting a little low.
 - A split view page's strip keeps as much room above its buttons and address as below them, instead of sitting half a point high.
 - A split view page on plain http shows the not-secure mark in its strip's address, as the sidebar's address does.
+- A local file open in a split view shows its name in its strip's address instead of "file:", and History and Settings show their names too.
 
 ## [0.9.3] - 2026-11-18
 

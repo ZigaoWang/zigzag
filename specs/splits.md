@@ -63,6 +63,8 @@
   Test: PaneMoveTests.aPaneZoomsAndGoesBack
 - An http page in a pane → its strip's address shows the not-secure mark, as the sidebar's does.
   Test: PaneHeaderTests.anHttpPageIsMarkedNotSecure
+- A file or a Zigzag page (History, Settings) in a pane → its strip's address shows its name, never a cut "file:".
+  Test: PaneHeaderTests.aFileShowsItsNameAndAWebPageItsAddress
 
 ## Closing and suspending one page
 - Close one page of a split of two (⌘W, or × on its strip or row part) → the one left takes the split row's place as a plain tab.

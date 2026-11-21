@@ -126,6 +126,14 @@ import Testing
         header.show(tab)
         #expect(header.address.notSecure)
     }
+
+    /// A page with no site shows by its name, never a cut "file:"; a web page shows its address.
+    @Test func aFileShowsItsNameAndAWebPageItsAddress() {
+        #expect(PaneHeaderView.addressText(URL(fileURLWithPath: "/tmp/Notes.html")) == "Notes.html")
+        #expect(PaneHeaderView.addressText(URL(string: "https://www.example.com/a/b")!) == "example.com/a/b")
+        #expect(PaneHeaderView.addressText(URL(string: "http://127.0.0.1:8765/Alpha.html")!) == "127.0.0.1:8765/Alpha.html")
+        #expect(PaneHeaderView.addressText(HistoryPage.url) == "History")
+    }
 }
 
 /// The page area's ground, which moves the window wherever nothing on it takes the press.

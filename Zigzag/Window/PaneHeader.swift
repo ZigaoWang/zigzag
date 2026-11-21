@@ -182,9 +182,16 @@ final class PaneHeaderView: NSView {
         let loading = tab?.isLoading ?? false
         reload.symbol = loading ? "xmark" : "arrow.clockwise"
         reload.toolTip = loading ? String(localized: "Stop", comment: "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.") : String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page.")
-        address.text = tab?.url.map(CommandRanker.displayURL) ?? ""
+        address.text = tab?.url.map(Self.addressText) ?? ""
         address.notSecure = tab?.isNotSecure ?? false
         needsLayout = true
+    }
+
+    /// A web page's address; a file or Zigzag page by its sidebar name, never a cut "file:".
+    static func addressText(_ url: URL) -> String {
+        let name = AddressView.name(of: url)
+        guard let host = url.host(), !url.isFileURL, name == AddressView.site(host, port: url.port, scheme: url.scheme) else { return name }
+        return CommandRanker.displayURL(url)
     }
 
     /// What the strip shows at a width, most first: its buttons give way one step at a time so the address keeps
