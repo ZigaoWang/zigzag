@@ -3653,6 +3653,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let content = FormRow(title: rule.name.isEmpty ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.") : rule.name,
                                   detail: rule.summarySentence, control: controls)
             content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            content.revealsOnHover(remove)
             let row = DraggableRow(content)
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
@@ -3789,6 +3790,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let content = FormRow(title: types.isEmpty ? String(localized: "Untitled File Type", comment: "A per-extension destination with no extensions yet.") : types,
                                   detail: rule.destinationSentence, control: controls)
             content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            content.revealsOnHover(remove)
             downloadTypesGroup.add(content)
         }
     }
