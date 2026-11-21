@@ -184,9 +184,6 @@ final class OldTwitterSolver: NSObject {
     })();
     """
 
-    /// One level for every video on x.com, in the page's own world: the timeline and the floating modal are the
-    /// same post, and WebKit starts a video that plays late muted. The last level set on a video that was not muted
-    /// becomes the page's, and a video that starts gets it, unmuted.
     /// The page's own world sees the keys held on a click; the extension's own world does not always. A ⌘ or middle
     /// press puts the quoted tweet's link back and marks it, so every handler can tell that click is the browser's.
     static let modified = """
