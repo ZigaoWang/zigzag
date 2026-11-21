@@ -259,7 +259,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let wanted = combo.flags.intersection([.command, .option, .control, .shift])
         // An uppercase key equivalent carries ⇧ by itself.
         let flags = combo.key.lowercased() != combo.key ? wanted.union(.shift) : wanted
-        return pressed.key == combo.key.lowercased() && pressed.flags == flags
+        guard pressed.flags == flags else { return false }
+        if pressed.key == combo.key.lowercased() { return true }
+        // A layout without Latin letters (Russian, Greek, Hebrew) types its own letter there, and the menu still takes
+        // the key where the letter sits on a US keyboard: so does this.
+        guard !pressed.key.unicodeScalars.allSatisfy(\.isASCII), let code = ansiKeyCode(combo.key) else { return false }
+        return event.keyCode == code
+    }
+
+    /// Where a letter or digit sits on a US keyboard (the kVK_ANSI_ codes).
+    static func ansiKeyCode(_ key: String) -> UInt16? {
+        let codes: [Character: UInt16] = [
+            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
+            "e": 14, "r": 15, "y": 16, "t": 17, "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "9": 25, "7": 26,
+            "8": 28, "0": 29, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46,
+        ]
+        guard key.count == 1, let char = key.lowercased().first else { return nil }
+        return codes[char]
     }
 
     @objc func quitFromMenu(_ sender: Any?) {

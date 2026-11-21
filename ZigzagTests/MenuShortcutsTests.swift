@@ -108,6 +108,25 @@ import Testing
         #expect(Shortcuts.renamed([:]).isEmpty)
     }
 
+    /// On a Russian layout ⌘Q types ⌘Й; it's still the Quit key, where Q sits, as the menu takes it.
+    @Test func theQuitKeyOnALayoutWithoutLatinLetters() {
+        func key(_ characters: String, _ flags: NSEvent.ModifierFlags, code: UInt16) -> NSEvent? {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                             characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
+        }
+        let quit = Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags.command.rawValue)
+        #expect(AppDelegate.isQuitKey(key("й", .command, code: 12), combo: quit))
+        #expect(!AppDelegate.isQuitKey(key("ц", .command, code: 13), combo: quit))
+        #expect(!AppDelegate.isQuitKey(key("й", [.command, .option], code: 12), combo: quit))
+        // A custom shortcut goes by its own key's place.
+        let custom = Shortcuts.Combo(key: "x", modifiers: NSEvent.ModifierFlags([.command, .option]).rawValue)
+        #expect(AppDelegate.isQuitKey(key("ч", [.command, .option], code: 7), combo: custom))
+        #expect(!AppDelegate.isQuitKey(key("й", .command, code: 12), combo: custom))
+        // A Latin layout with Q elsewhere (AZERTY's A key) goes by the letter, as the menu does.
+        #expect(!AppDelegate.isQuitKey(key("a", .command, code: 12), combo: quit))
+        #expect(AppDelegate.isQuitKey(key("q", .command, code: 0), combo: quit))
+    }
+
     @Test func onlyTheQuitKeyAsksButDownloadsAlwaysDo() {
         // The menu and the Dock quit at once; the key asks while the setting is on.
         #expect(AppDelegate.asks(fromKey: true, setting: true, downloading: 0))
