@@ -148,11 +148,15 @@ function recoverSolver(reason) {
           removeAttribute(name) { delete __quoteAttributes[name]; },
           closest(selector) { return this; },
         };
-        var __videoAttributes = {};
+        var __videoAttributes = {}, __holderAttributes = {}, __holderListeners = {};
         var __holder = {
           style: {},
           getBoundingClientRect: () => ({ left: 0, top: 0, width: 320, height: 180 }),
           appendChild: () => { __layers++; },
+          getAttribute(name) { return __holderAttributes[name] || null; },
+          setAttribute(name, value) { __holderAttributes[name] = value; },
+          hasAttribute(name) { return __holderAttributes[name] !== undefined; },
+          addEventListener(name, run) { (__holderListeners[name] || (__holderListeners[name] = [])).push(run); },
         };
         var __video = {
           nodeType: 1,
@@ -165,7 +169,7 @@ function recoverSolver(reason) {
           setAttribute(name, value) { __videoAttributes[name] = value; },
           hasAttribute(name) { return __videoAttributes[name] !== undefined; },
           removeAttribute(name) { delete __videoAttributes[name]; },
-          closest(selector) { return selector === "a.tweet-body-quote" ? __quote : null; },
+          closest(selector) { return selector === "a.tweet-body-quote" ? __quote : selector === "video" ? this : null; },
           getBoundingClientRect: () => ({ left: 0, top: 0, width: 320, height: 180 }),
         };
         var __root = {
@@ -212,12 +216,61 @@ function recoverSolver(reason) {
         #expect(context.evaluateScript("__mutationObservers")?.toInt32() == 1)
         #expect(context.evaluateScript("__resizeObservers")?.toInt32() == 2)
         #expect(context.evaluateScript("__layers")?.toInt32() == 1)
+        #expect(context.evaluateScript("__holderListeners.click.length")?.toInt32() == 1)
         // Even without the window's flag, the mark on the video keeps its one layer.
         context.evaluateScript("delete window.__zigzagOldTwitterBridge")
         context.evaluateScript(OldTwitterSolver.bridge)
         #expect(context.evaluateScript("__layers")?.toInt32() == 1)
         #expect(context.evaluateScript("__resizeObservers")?.toInt32() == 2)
+        #expect(context.evaluateScript("__holderListeners.click.length")?.toInt32() == 1)
         #expect(context.evaluateScript("__video.hasAttribute('data-zigzag-play-video')")?.toBool() == true)
+    }
+
+    /// A plain click on a quoted video belongs to the video's own controls. It stops at the video's holder, before
+    /// the quote's own click handler, so the quote does not open. A modified click is the browser's and passes.
+    @Test func aClickOnAQuotedVideoStopsAtItsHolder() throws {
+        let context = bridgePage()
+        context.evaluateScript(OldTwitterSolver.bridge)
+        #expect(context.evaluateScript("__holder.hasAttribute('data-zigzag-quote-click')")?.toBool() == true)
+        #expect(context.evaluateScript("__holderListeners.click.length")?.toInt32() == 1)
+
+        context.evaluateScript("""
+        var __plain = { target: __video, metaKey: false, ctrlKey: false, prevented: false, stopped: false,
+          preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
+        __holderListeners.click[0](__plain);
+        """)
+        #expect(context.evaluateScript("__plain.prevented")?.toBool() == true)
+        #expect(context.evaluateScript("__plain.stopped")?.toBool() == true)
+
+        context.evaluateScript("""
+        var __modified = { target: __video, metaKey: true, ctrlKey: false, prevented: false, stopped: false,
+          preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
+        __holderListeners.click[0](__modified);
+        """)
+        #expect(context.evaluateScript("__modified.prevented")?.toBool() == false)
+        #expect(context.evaluateScript("__modified.stopped")?.toBool() == false)
+    }
+
+    /// The native controls stop the click before it leaves them, so the document's capture listener is the one
+    /// that keeps a plain click on a quoted video from following the quote's link. A modified click is the browser's.
+    @Test func aClickOnAQuotedVideoStopsTheQuotesLink() throws {
+        let context = bridgePage()
+        context.evaluateScript(OldTwitterSolver.bridge)
+        context.evaluateScript("""
+        var __click = __document.find((pair) => pair[0] === 'click')[1];
+        var __videoTarget = new Element();
+        __videoTarget.closest = (selector) => selector === "video" ? __video : selector === "a.tweet-body-quote" ? __quote : null;
+        var __plain = { target: __videoTarget, metaKey: false, ctrlKey: false, prevented: false,
+          preventDefault() { this.prevented = true; } };
+        __click(__plain);
+        """)
+        #expect(context.evaluateScript("__plain.prevented")?.toBool() == true)
+        context.evaluateScript("""
+        var __modified = { target: __videoTarget, metaKey: true, ctrlKey: false, prevented: false,
+          preventDefault() { this.prevented = true; } };
+        __click(__modified);
+        """)
+        #expect(context.evaluateScript("__modified.prevented")?.toBool() == false)
     }
 
     /// The ⌘-click script is in every site's page world, but it listens only on x.com and twitter.com, and once.

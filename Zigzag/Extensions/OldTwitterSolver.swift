@@ -99,6 +99,19 @@ final class OldTwitterSolver: NSObject {
           else video.pause();
         });
         holder.appendChild(layer);
+        // A click on the video belongs to WebKit's controls. The quote's own handler sits on the link around the
+        // video and takes the same click as a request for the quote, which opens it. The controls have already had
+        // the click when it reaches their holder, so it stops there. A ⌘ or ⌃ press is the browser's.
+        if (!holder.hasAttribute("data-zigzag-quote-click")) {
+          holder.setAttribute("data-zigzag-quote-click", "");
+          holder.addEventListener("click", (event) => {
+            if (event.metaKey || event.ctrlKey) return;
+            const target = event.target;
+            if (!target || !target.closest || !target.closest("video")) return;
+            event.preventDefault();
+            event.stopPropagation();
+          }, false);
+        }
         place();
         new ResizeObserver(place).observe(holder);
         new ResizeObserver(place).observe(video);
@@ -129,9 +142,14 @@ final class OldTwitterSolver: NSObject {
         const target = event.target instanceof Element ? event.target : null;
         if (!target) return;
         if (target.closest("[data-zigzag-play]")) return;
-        // A click on the video is the video's own controls'.
-        if (target.closest("video")) return;
         const quote = target.closest("a.tweet-body-quote");
+        // A click on the video is the video's own controls'. The controls stop the click before it leaves them,
+        // so the quote's own handler never sees it, but the link under the video still would. The default is
+        // stopped here, before the controls, and a ⌘ or ⌃ press is left to the browser.
+        if (target.closest("video")) {
+          if (quote && !event.metaKey && !event.ctrlKey) event.preventDefault();
+          return;
+        }
         // ⌘ takes the quoted tweet itself, in a new tab: the click reaches the link, and the extension's own
         // handlers let a modified click through.
         if (quote && (event.metaKey || quote.hasAttribute("data-zigzag-modified"))) return;
