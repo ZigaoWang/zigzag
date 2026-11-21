@@ -413,6 +413,8 @@ enum Reader {
             --sans: system-ui, -apple-system, "Helvetica Neue", sans-serif;
             --mono: ui-monospace, "SF Mono", Menlo, monospace;
             --face: var(--serif); --leading: 1.6;
+            /* One line of the text: every space between blocks is a share of it. */
+            --line: calc(var(--leading) * 1rem);
             font-size: var(--size, 20px);
             /* The page's margins: Zigzag's page gutter in a small window, generous in a big one. */
             --gutter: clamp(\(Int(Tokens.Page.gutter))px, 6vw, 112px);
@@ -446,40 +448,42 @@ enum Reader {
     :root[data-motion="reduce"] main { animation: none; }
     @media (prefers-reduced-motion: reduce) { main { animation: none; } }
 
-    /* The header: where it's from, the title, who and when. Space below it, no rule. */
-    header { margin: 0 0 2.2em; }
-    .site { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font: 500 \(Int(Tokens.TypeSize.row))px/1.4 var(--sans); color: var(--soft); }
-    .site img { display: block; width: 16px; height: 16px; margin: 0; border-radius: 3px; flex: none; }
-    h1.title { margin: 0; font-size: 2.1em; line-height: 1.12; font-weight: 700; letter-spacing: -0.016em; text-wrap: balance; -webkit-hyphens: manual; hyphens: manual; }
-    :root:is(:lang(zh), :lang(ja), :lang(ko)) h1.title { line-height: 1.3; letter-spacing: 0; }
-    .byline { display: flex; flex-wrap: wrap; column-gap: 14px; margin: 14px 0 0; font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); }
-    .byline .author { color: var(--ink); font-weight: 500; }
+    /* The header: where it's from, the title, who and when, in quiet steps of half a line. A line and a half below it, no rule. */
+    header { margin: 0 0 calc(var(--line) * 1.5); }
+    .site { display: flex; align-items: center; gap: 8px; margin: 0 0 calc(var(--line) * .5); font: 500 \(Int(Tokens.TypeSize.body))px/1.4 var(--sans); color: var(--soft); }
+    .site img { display: block; width: 16px; height: 16px; margin: 0; border-radius: \(Int(Tokens.Radius.small) - 1)px; flex: none; }
+    h1.title { margin: 0; font-size: 1.75em; line-height: 1.2; font-weight: 600; letter-spacing: -0.012em; text-wrap: balance; -webkit-hyphens: manual; hyphens: manual; }
+    :root:is(:lang(zh), :lang(ja), :lang(ko)) h1.title { line-height: 1.35; letter-spacing: 0; }
+    .byline { display: flex; flex-wrap: wrap; column-gap: 12px; margin: calc(var(--line) * .5) 0 0; font: \(Int(Tokens.TypeSize.body))px/1.45 var(--sans); color: var(--soft); }
+    .byline .author { font-weight: 500; }
 
-    /* The text's rhythm: a line of space between paragraphs, headings closer to what follows than to what came before. */
+    /* The text's rhythm, in shares of a line: three quarters between paragraphs, a line around pictures, quotes and
+       code, a line and a half over a heading and half a line under it, so it sits with what it heads. */
     article > :first-child { margin-top: 0; }
-    p, ul, ol, dl, blockquote, pre, table, figure, details { margin: 0 0 1em; }
+    p, ul, ol, dl, details { margin: 0 0 calc(var(--line) * .75); }
     p { text-wrap: pretty; }
-    h2, h3, h4, h5, h6 { margin: 1.8em 0 .5em; line-height: 1.25; font-weight: 700; letter-spacing: -0.008em; text-wrap: balance;
+    h2, h3, h4, h5, h6 { margin: calc(var(--line) * 1.5) 0 calc(var(--line) * .5); line-height: 1.3; font-weight: 600; letter-spacing: -0.006em; text-wrap: balance;
                          -webkit-hyphens: manual; hyphens: manual; }
-    h2 { font-size: 1.4em; } h3 { font-size: 1.15em; } h4, h5, h6 { font-size: 1em; }
-    :is(h2, h3, h4) + :is(h3, h4, h5) { margin-top: .9em; }
-    article h1 { font-size: 1.4em; margin: 1.8em 0 .5em; line-height: 1.25; }
+    h2 { font-size: 1.3em; } h3 { font-size: 1.1em; } h4, h5, h6 { font-size: 1em; }
+    :is(h2, h3, h4) + :is(h3, h4, h5) { margin-top: calc(var(--line) * .75); }
+    article h1 { font-size: 1.3em; margin: calc(var(--line) * 1.5) 0 calc(var(--line) * .5); line-height: 1.3; font-weight: 600; }
 
-    /* Links read as part of the sentence: the text's own color, a quiet underline, the link color when pointed at. */
-    a { color: inherit; text-decoration: underline 1px; text-underline-offset: .2em;
-        text-decoration-color: color-mix(in srgb, currentColor 24%, transparent); }
+    /* Links read as part of the sentence: the text's own color over a thin underline in the link color, all link color
+       when pointed at. */
+    a { color: inherit; text-decoration: underline 1px; text-underline-offset: .22em;
+        text-decoration-color: color-mix(in srgb, var(--link) 50%, transparent); }
     a:hover { color: var(--link); text-decoration-color: currentColor; }
     :is(h1, h2, h3, h4, h5, h6) a, figure a { text-decoration: none; }
 
     /* Pictures at their own size, never bigger, centered on the column; a large one runs past the text into the
        margins as far as the window allows. A caption small and quiet under each, on the text's edge. */
     img, video, picture, svg, canvas { max-width: 100%; height: auto; }
-    img, video { display: block; max-width: calc(100% + 2 * var(--bleed)); margin: 1.6em 0 1.6em 50%; transform: translateX(-50%); border-radius: 4px; }
+    img, video { display: block; max-width: calc(100% + 2 * var(--bleed)); margin: var(--line) 0 var(--line) 50%; transform: translateX(-50%); border-radius: \(Int(Tokens.Radius.thumbnail))px; }
     img.inline { display: inline; max-width: 100%; margin: 0; transform: none; vertical-align: middle; border-radius: 0; }
-    figure { margin: 1.8em calc(-1 * var(--bleed)); }
+    figure { margin: var(--line) calc(-1 * var(--bleed)); }
     figure :is(img, video) { max-width: 100%; margin: 0 auto; transform: none; }
     figure > a, picture { display: block; }
-    figcaption { max-width: 40rem; margin: .6em 0 0; padding: 0 var(--bleed); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); text-wrap: pretty; -webkit-hyphens: manual; hyphens: manual; }
+    figcaption { max-width: 40rem; margin: calc(var(--line) * .375) 0 0; padding: 0 var(--bleed); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); text-wrap: pretty; -webkit-hyphens: manual; hyphens: manual; }
     /* Inside a list, a quote or a table, pictures and code keep to their box. */
     :is(li, blockquote, td, th, dd) :is(img, video) { max-width: 100%; margin-left: 0; transform: none; }
     :is(li, blockquote, td, th, dd) figure { margin-inline: 0; }
@@ -490,33 +494,33 @@ enum Reader {
     :is(ul, ol):has(> li img) { list-style: none; padding: 0; }
     li:has(> img, > figure, > a > img) { margin: 0; }
 
-    blockquote { margin: 1.4em 0; padding: 0 0 0 1.1em; border-left: 2px solid var(--rule); color: var(--soft); }
+    blockquote { margin: var(--line) 0; padding: 0 0 0 1.1em; border-left: 2px solid var(--rule); color: var(--soft); }
     blockquote > :last-child { margin-bottom: 0; }
 
-    code, kbd, samp, pre { font-family: var(--mono); font-size: .84em; -webkit-hyphens: none; hyphens: none; }
-    code, kbd { padding: .1em .32em; border-radius: 4px; background: var(--code); }
+    code, kbd, samp, pre { font-family: var(--mono); font-size: .82em; -webkit-hyphens: none; hyphens: none; }
+    code, kbd { padding: .08em .3em; border-radius: \(Int(Tokens.Radius.small))px; background: var(--code); }
     /* Code's box hangs into the margins when there's room, its first column on the text's edge, so long lines get
        more room before they scroll. */
-    pre { margin-inline: calc(-1 * var(--code-bleed)); padding: 14px 16px 14px max(16px, var(--code-bleed)); border-radius: 8px;
+    pre { margin: var(--line) calc(-1 * var(--code-bleed)); padding: 14px 16px 14px max(16px, var(--code-bleed)); border-radius: \(Int(Tokens.Radius.field))px;
           background: var(--code); line-height: 1.55; overflow-x: auto; white-space: pre; tab-size: 4; }
     :is(li, blockquote, td, th, dd) pre { margin-inline: 0; padding-left: 16px; }
     pre code { padding: 0; background: none; font-size: inherit; }
 
-    table { display: block; width: max-content; max-width: calc(100% + var(--bleed)); overflow-x: auto; margin: 1.6em 0; border-collapse: collapse;
+    table { display: block; width: max-content; max-width: calc(100% + var(--bleed)); overflow-x: auto; margin: var(--line) 0; border-collapse: collapse;
             font: 15px/1.5 var(--sans); }
     th, td { padding: 7px 16px 7px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
     th { font-weight: 600; }
     caption { caption-side: bottom; margin-top: .6em; text-align: left; font-size: 14px; color: var(--soft); }
 
     ul, ol { padding-left: 1.4em; }
-    li { margin: .3em 0; } li > :is(p, ul, ol) { margin: .3em 0; }
+    li { margin: calc(var(--line) * .25) 0; } li > :is(p, ul, ol) { margin: calc(var(--line) * .25) 0; }
     li::marker { color: var(--soft); }
-    dt { font-weight: 600; } dd { margin: 0 0 .6em 1.4em; }
-    hr { height: 1px; margin: 2em 0; border: 0; background: var(--rule); }
+    dt { font-weight: 600; } dd { margin: 0 0 calc(var(--line) * .5) 1.4em; }
+    hr { height: 1px; margin: calc(var(--line) * 1.5) 0; border: 0; background: var(--rule); }
     sup, sub { line-height: 0; font-size: .7em; }
     abbr[title] { text-decoration: none; }
 
-    .end { margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--rule); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); }
+    .end { margin-top: calc(var(--line) * 2); padding-top: calc(var(--line) * .75); border-top: 1px solid var(--rule); font: \(Int(Tokens.TypeSize.body))px/1.45 var(--sans); color: var(--soft); }
     .end a { color: inherit; }
 
     /* Leftovers from the page that don't belong in reading. */

@@ -117,6 +117,14 @@ struct ReaderTests {
         #expect(!Reader.html(for: article, preferences: Reader.Preferences()).contains("data-motion=\"reduce\" style="))
     }
 
+    /// The title is a calm semibold, smaller than before, and the page's spaces are shares of one line.
+    @Test func headerAndRhythmFollowOneLine() {
+        #expect(Reader.css.contains("--line: calc(var(--leading) * 1rem)"))
+        #expect(Reader.css.contains("h1.title { margin: 0; font-size: 1.75em; line-height: 1.2; font-weight: 600;"))
+        #expect(Reader.css.contains("header { margin: 0 0 calc(var(--line) * 1.5); }"))
+        #expect(Reader.css.contains("border-radius: \(Int(Tokens.Radius.thumbnail))px"))
+    }
+
     /// The reading page is in the store of the page it reads, never one every reading page shares: the article's
     /// pictures would carry a site's cookies from one profile to another, and out of a private window.
     @Test func aReadingPageIsInItsPagesStore() {
