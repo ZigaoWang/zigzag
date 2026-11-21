@@ -715,7 +715,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Favorites are shared by every window: a private one adds none, pinned or not.
         guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate else { return }
         favoriteWithUndo(tab)
-        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "star.fill", in: self)
+        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "heart.fill", in: self)
     }
 
     /// File › Install as App…: the site as an app of its own, with its own Dock icon (#165).
@@ -894,7 +894,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
         Tutorial.complete("space")
-        renameSpace(nil)
+        // At the button or menu row it came from; from the menu bar or command bar, beside the space's name.
+        openSpaceEditor(tabManager.currentSpaceID, anchor: sender as? NSView)
         if let madeProfile { SpaceEditorPanel.current?.follow(madeProfile: madeProfile) }
         // Esc while naming it: never mind. Back where you were, without the space, and the guide still asks for one.
         SpaceEditorPanel.current?.onCancel = { [weak self] in

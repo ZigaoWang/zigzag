@@ -1098,6 +1098,7 @@ final class BridgeExtensionFetch: BridgeNamespace {
         // or not, rather than their text form.
         let body: Data?
         if let text = options["body"] as? String {
+            guard ExtensionFetchRequests.base64Size(text) <= LocalReceivers.responseLimit else { throw BridgeError("That request is too large.") }
             guard let decoded = Data(base64Encoded: text) else { throw BridgeError("That request's body is not readable.") }
             body = decoded
         } else {
@@ -1193,8 +1194,8 @@ final class ExtensionFetchRequests {
             // Over plain HTTP that session knows nothing of the sites WebKit keeps on HTTPS (HSTS) and would send
             // their cookies in the clear, so outside this Mac those stay with WebKit's own fetch.
             if url.scheme == "http", !Self.isLoopback(url) { return ["fallback": true] }
-            if (Self.body(options)?.count ?? 0) > Self.responseLimit { return ["fallback": true] }
-            let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
+            if Self.bodySize(options) > Self.responseLimit { return ["fallback": true] }
+            let request = try Self.writeRequest(options, body: Self.body(options), url: url, extensionID: extensionID)
             return try await send(request, key: key, store: store, authorize: authorize)
         }
         if openPages < Self.pageLimit {
@@ -1238,14 +1239,15 @@ final class ExtensionFetchRequests {
         if let when = cancelled.removeValue(forKey: key), when.timeIntervalSinceNow > -40 { throw BridgeError("Extension request cancelled.") }
         guard pages[key] == nil, writes[key] == nil else { throw BridgeError("Extension request is already running.") }
         let method = (options["method"] as? String ?? "GET").uppercased()
-        let body = Self.body(options)
+        let fits = Self.bodySize(options) <= Self.responseLimit
+        let body = fits ? Self.body(options) : nil
         let headers = options["headers"] as? [[String]] ?? []
         let streams = headers.contains { $0.count == 2 && $0[0].lowercased() == "accept" && $0[1].lowercased().contains("event-stream") }
         guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method),
-              url.scheme == "https" || Self.isLoopback(url), !streams, (body?.count ?? 0) <= Self.responseLimit,
+              url.scheme == "https" || Self.isLoopback(url), !streams, fits,
               options["body"] == nil || options["body"] is NSNull || body != nil, body == nil || !["GET", "HEAD"].contains(method)
         else { return ["fallback": true] }
-        let request = try Self.writeRequest(options, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        let request = try Self.writeRequest(options, body: body, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
         return try await send(request, key: key, store: store, followsOtherOrigins: true, authorize: authorize)
     }
 
@@ -1286,11 +1288,24 @@ final class ExtensionFetchRequests {
         return options["encoding"] as? String == "base64" ? Data(base64Encoded: text) : Data(text.utf8)
     }
 
-    /// What a write sends, read from the extension's message here so the rest can leave the main thread.
-    private static func writeRequest(_ options: [String: Any], url: URL, extensionID: String,
+    /// A body's size in bytes as bridge.js sent it, read from its length without decoding base64.
+    nonisolated static func bodySize(_ options: [String: Any]) -> Int {
+        guard let text = options["body"] as? String else { return 0 }
+        return options["encoding"] as? String == "base64" ? base64Size(text) : text.utf8.count
+    }
+
+    /// The bytes a base64 text decodes to, padding left out.
+    nonisolated static func base64Size(_ text: String) -> Int {
+        let utf8 = text.utf8
+        let padding = utf8.reversed().prefix(2).prefix { $0 == UInt8(ascii: "=") }.count
+        return max(0, utf8.count / 4 * 3 - padding)
+    }
+
+    /// What a write sends, read from the extension's message here so the rest can leave the main thread. `body` is
+    /// `body(options)`, decoded once by the caller.
+    private static func writeRequest(_ options: [String: Any], body: Data?, url: URL, extensionID: String,
                                      methods: Set<String> = ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"]) throws -> ExtensionWrite.Request {
         let method = (options["method"] as? String ?? "POST").uppercased()
-        let body = Self.body(options)
         guard methods.contains(method), options["body"] == nil || options["body"] is NSNull || body != nil else {
             throw BridgeError("Unsupported extension request.")
         }

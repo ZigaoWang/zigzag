@@ -358,8 +358,8 @@ final class PeekController {
     /// Promotes the peeked page to a real tab, without reloading it.
     func openAsTab() {
         guard isVisible, let controller, let tab else { return }
-        // Extensions saw it last, after the window's tabs.
-        let place = controller.tabManager.navigableTabs.count
+        // Extensions saw it last, after the window's tabs in every space.
+        let place = controller.tabManager.tabsForExtensions.count
         isVisible = false
         token = nil
         self.tab = nil

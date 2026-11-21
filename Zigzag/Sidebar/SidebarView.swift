@@ -680,6 +680,7 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button))
+        drawsMenu = true
         // Pressed as the toolbar's buttons are: around its middle, so the icon never moves off its line.
         pressScales = true
         layer?.cornerRadius = Tokens.Radius.control
