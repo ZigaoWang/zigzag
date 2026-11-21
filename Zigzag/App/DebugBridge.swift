@@ -738,6 +738,20 @@ enum DebugBridge {
         if name == "pintoggle" { controller.tabManager.profile.installs.togglePin(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         if name == "pageprobe" { pageProbe(arg); return }
+        // handoff <path> [askey]: the page Handoff would offer and the activity offering it (JSON); askey offers it as
+        // if the window were key, without bringing it forward.
+        if name == "handoff" {
+            let f = arg.split(separator: " ").map(String.init)
+            guard let path = f.first else { return }
+            if f.dropFirst().first == "askey" { controller.updateHandoff(asKey: true) }
+            var state: [String: Any] = ["key": controller.window?.isKeyWindow == true, "private": controller.tabManager.isPrivate]
+            if case let .page(url, title)? = controller.handoffPage { state["page"] = ["url": url.absoluteString, "title": title] }
+            if let activity = controller.handoff {
+                state["activity"] = ["type": activity.activityType, "url": activity.webpageURL?.absoluteString ?? "", "title": activity.title ?? ""]
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: path)) }
+            return
+        }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
         // updateready <version>|off: a pretend staged update (Restart only logs); updatedismiss: the card's close
         // button; updatestate <path>: menu title and staged update (JSON).
