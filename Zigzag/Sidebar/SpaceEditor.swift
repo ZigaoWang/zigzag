@@ -539,9 +539,9 @@ final class LookSwatch: InteractiveView {
                 ring.frame = bounds
                 ring.cornerRadius = bounds.width / 2
                 ring.borderWidth = 2
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : .clear).cgColor
-                // Chosen, the swatch sits inside a fine ring; under the pointer it swells to meet the edge.
-                let inset: CGFloat = isSelected ? 3.5 : (isHovered ? 0 : 2)
+                // Chosen, the swatch sits inside a fine ring; under the pointer a faint ring shows and nothing moves.
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : isHovered ? Tokens.Color.swatchHoverRing : .clear).cgColor
+                let inset: CGFloat = isSelected ? 3.5 : 2
                 fill.frame = bounds.insetBy(dx: inset, dy: inset)
                 fill.cornerRadius = fill.frame.width / 2
                 checker.frame = fill.frame
@@ -988,8 +988,8 @@ final class ColorChip: InteractiveView {
                 ring.frame = bounds
                 ring.cornerRadius = bounds.width / 2
                 ring.borderWidth = 2
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : .clear).cgColor
-                let inset: CGFloat = isSelected ? 4 : (isHovered ? 0.5 : 1.5)
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : isHovered ? Tokens.Color.swatchHoverRing : .clear).cgColor
+                let inset: CGFloat = isSelected ? 4 : 1.5
                 fill.frame = bounds.insetBy(dx: inset, dy: inset)
                 fill.cornerRadius = fill.frame.width / 2
                 fill.backgroundColor = color.cgColor
@@ -1104,8 +1104,8 @@ final class BackgroundSwatch: InteractiveView {
     override func stateDidChange(animated: Bool) {
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                let inset: CGFloat = isHovered ? 0 : 2
-                let circle = bounds.insetBy(dx: inset, dy: inset)
+                // The slot stays its size under the pointer; its outline and glyph darken.
+                let circle = bounds.insetBy(dx: 2, dy: 2)
                 outline.frame = bounds
                 outline.path = CGPath(ellipseIn: circle.insetBy(dx: 0.6, dy: 0.6), transform: nil)
                 outline.strokeColor = (isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary).cgColor

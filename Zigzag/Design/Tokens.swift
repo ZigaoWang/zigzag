@@ -1307,6 +1307,8 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.64), highDark: hex(0xFFFFFF, alpha: 0.72))
         /// Disabled quiet button text: the faintest text at full opacity, still 3:1.
         static let textDisabled = textTertiary
+        /// A round swatch's ring under the pointer: faint beside the chosen one's, with nothing moving.
+        static let swatchHoverRing = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0xFFFFFF, alpha: 0.28))
 
         static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66),
             highLight: hex(0x000000, alpha: 0.80), highDark: hex(0xFFFFFF, alpha: 0.84))
@@ -1540,6 +1542,11 @@ enum Tokens {
         static let readerChroma = 0.0035
         static let readerDarkLightness = 0.235
         static let readerDarkChroma = 0.005
+        /// Reader's Space paper: the space's own color, held out of the middle tones and as calm as a frame.
+        static let readerSpaceLightness = 0.86
+        static let readerSpaceChroma = 0.05
+        static let readerSpaceDarkLightness = 0.3
+        static let readerSpaceDarkChroma = 0.045
     }
 
     /// What sits on the frame (the sidebar's rows, its address and favorites): washes of white, so whatever the

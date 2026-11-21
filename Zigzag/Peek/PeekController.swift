@@ -1,9 +1,12 @@
 import AppKit
 import WebKit
 
-/// The peek's top strip, on the panel's glass: the site, then "Open as Tab" and close. As slim as a split view pane's
+/// The peek's top strip, on the panel's glass: back and forward once the peek has history, the site, then "Open as
+/// Tab" and close. As slim as a split view pane's
 /// strip (`Tokens.Pane`), so the page gets the room.
 final class PeekHeaderView: NSView {
+    let back = PeekHeaderView.button("chevron.left", toolTip: Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(BrowserWindowController.goBack(_:))))
+    let forward = PeekHeaderView.button("chevron.right", toolTip: Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(BrowserWindowController.goForward(_:))))
     let icon = FaviconView()
     let host = Label("", font: .systemFont(ofSize: Tokens.Pane.addressText), color: Tokens.Color.textPrimary)
     let expandButton = PeekHeaderView.button("arrow.up.left.and.arrow.down.right", toolTip: String(localized: "Open Peek as Tab", comment: "Tooltip of the button in Peek's top strip that keeps the page as a tab."))
@@ -15,7 +18,10 @@ final class PeekHeaderView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [icon, host, expandButton, closeButton].forEach { addSubview($0) }
+        [back, forward, icon, host, expandButton, closeButton].forEach { addSubview($0) }
+        back.setAccessibilityLabel(String(localized: "Back", comment: "Tooltip of the sidebar's back button."))
+        forward.setAccessibilityLabel(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."))
+        showHistory(back: false, forward: false)
         // Out of the strip, "Close" alone doesn't say what closes.
         expandButton.setAccessibilityLabel(String(localized: "Open Peek as Tab", comment: "Tooltip of the button in Peek's top strip that keeps the page as a tab."))
         closeButton.setAccessibilityLabel(String(localized: "Close Peek", comment: "Tooltip of the close button in Peek's top strip."))
@@ -28,13 +34,27 @@ final class PeekHeaderView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// Whether back and forward show: only once there's a page to go back or forward to (#463).
+    var showsHistory: Bool { !back.isHidden }
+
+    /// Back and forward appear together once either has somewhere to go, each enabled by its own.
+    func showHistory(back canGoBack: Bool, forward canGoForward: Bool) {
+        let shows = canGoBack || canGoForward
+        back.isEnabled = canGoBack
+        forward.isEnabled = canGoForward
+        guard shows == back.isHidden else { return }
+        back.isHidden = !shows
+        forward.isHidden = !shows
+        needsLayout = true
+    }
+
     /// The color under the strip: the peeked page's (nil: the panel's own surface). Its icons and text turn light or
     /// dark, whichever reads more clearly on it, as a split view pane's strip does (`PaneHeaderView.ground`).
     var ground: NSColor? {
         didSet {
             guard ground != oldValue else { return }
             appearance = PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
-            [expandButton, closeButton].forEach { $0.isOnPage = ground != nil; $0.ground = ground }
+            [back, forward, expandButton, closeButton].forEach { $0.isOnPage = ground != nil; $0.ground = ground }
         }
     }
 
@@ -46,9 +66,13 @@ final class PeekHeaderView: NSView {
         let edge = (bounds.height - b) / 2
         closeButton.frame = NSRect(x: bounds.width - edge - b, y: edge, width: b, height: b)
         expandButton.frame = NSRect(x: closeButton.frame.minX - b, y: edge, width: b, height: b)
-        [expandButton, closeButton].forEach { $0.radius = max(Tokens.Radius.control, Tokens.Radius.large - edge) }
+        [back, forward, expandButton, closeButton].forEach { $0.radius = max(Tokens.Radius.control, Tokens.Radius.large - edge) }
+        // Back and forward take the leading corner, as the pane strip's do; the favicon follows them.
+        back.frame = NSRect(x: edge, y: edge, width: b, height: b)
+        forward.frame = NSRect(x: back.frame.maxX, y: edge, width: b, height: b)
         let iconSize = Tokens.Pane.favicon
-        icon.frame = NSRect(x: edge + (b - iconSize) / 2, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
+        let iconSlot = showsHistory ? forward.frame.maxX + Tokens.Space.x1 : edge
+        icon.frame = NSRect(x: iconSlot + (b - iconSize) / 2, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
         let x = icon.frame.maxX + Tokens.Space.x2 - Label.inset
         let h = host.lineHeight
         host.frame = NSRect(x: x, y: (bounds.height - h) / 2, width: max(0, expandButton.frame.minX - x - Tokens.Space.x2), height: h)
@@ -65,6 +89,8 @@ final class PeekController {
     /// The peek's window, for pointing at it (the Getting started guide).
     var panelView: NSView { panel }
     private let header = PeekHeaderView()
+    /// The strip, for tests.
+    var headerView: PeekHeaderView { header }
     private let content = NSView()
     private(set) var tab: Tab?
     /// The tab the Peek opened over, for extensions: active again when the Peek goes, unless you've moved on.
@@ -106,6 +132,8 @@ final class PeekController {
         scrim.onClick = { [weak self] in self?.close() }
         header.closeButton.onClick = { [weak self] _ in self?.close() }
         header.expandButton.onClick = { [weak self] _ in self?.openAsTab() }
+        header.back.onClick = { [weak self] _ in self?.goBack() }
+        header.forward.onClick = { [weak self] _ in self?.goForward() }
         // A mouse plugged in or out, or Show scroll bars changed, switches the Mac between the two styles.
         scrollerStyleObserver = NotificationCenter.default.addObserver(forName: NSScroller.preferredScrollerStyleDidChangeNotification,
                                                                        object: nil, queue: .main) { [weak self] _ in
@@ -262,7 +290,7 @@ final class PeekController {
 
     private func tabChanged(_ change: Tab.Change) {
         switch change {
-        case .url, .favicon, .title, .loading: refreshHeader()
+        case .url, .favicon, .title, .loading, .navigation: refreshHeader()
         default: break
         }
         switch change {
@@ -294,6 +322,7 @@ final class PeekController {
         header.host.lineBreakMode = AddressView.lineBreak(forName: header.host.stringValue)
         header.icon.image = tab.favicon
         header.icon.isLoading = tab.isLoading
+        header.showHistory(back: tab.canGoBack, forward: tab.canGoForward)
     }
 
     /// The panel and its strip in the page's own color, as a split view pane's card and strip are (and a zoomed
