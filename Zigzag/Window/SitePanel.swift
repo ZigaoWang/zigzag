@@ -915,9 +915,9 @@ final class SitePanel: FloatingPanelView {
         let allowed = SiteJavaScript.allows(url, in: tab)
         if SiteJavaScript.isOwn(url, in: tab) {
             if !allowed { return String(localized: "Off here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site's own choice turns its scripts off.") }
-            return SiteJavaScript.isAllowed ? nil : String(localized: "On here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site runs its scripts, though Settings › Privacy › JavaScript is Not Allowed.")
+            return SiteJavaScript.isAllowed ? nil : String(localized: "On here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site runs its scripts, though Settings › Privacy › JavaScript is set to Block.")
         }
-        return allowed ? nil : String(localized: "Every site", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.")
+        return allowed ? nil : String(localized: "Every site", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Block: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.")
     }
 
     static func darkStatus(tab: Tab, url: URL) -> String? {
@@ -1131,7 +1131,7 @@ final class SitePanel: FloatingPanelView {
             }
             permissionRows.append(row)
         }
-        // JavaScript isn't a WebKit permission but belongs here: Allowed or Not Allowed, overriding Settings › Privacy
+        // JavaScript isn't a WebKit permission but belongs here: Allow or Block, overriding Settings › Privacy
         // › JavaScript. Applies at load, so choosing reloads; private windows keep it per tab.
         if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             let tab = tab, url = url

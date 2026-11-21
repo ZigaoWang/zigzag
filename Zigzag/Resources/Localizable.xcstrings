@@ -1,6 +1,61 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
+      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
+          }
+        }
+      }
+    },
+    "Where ⌘T and links put a new tab in the sidebar." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘T 和链接打开的新标签页在边栏中的位置。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes at the top." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在顶部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes at the bottom." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在底部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes next to the current tab." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在当前标签页旁边。"
+          }
+        }
+      }
+    },
     "#%lld on GitHub" : {
       "comment" : "Tooltip of an issue number at the end of a point in What’s New, like “#32 on GitHub”.",
       "localizations" : {
@@ -1251,13 +1306,13 @@
         }
       }
     },
-    "Floats over other apps and desktops when you switch away, and back in its page when you return." : {
+    "The video floats over other apps and desktops, and goes back in its page when you return." : {
       "comment" : "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "切换离开时，视频浮在其他 App 和桌面之上；再切回来时，回到页面里。"
+            "value" : "视频会在其他 App 和桌面上方浮动，回到 Zigzag 时再回到页面里。"
           }
         }
       }
@@ -1284,19 +1339,19 @@
         }
       }
     },
-    "Its right-click menu can turn this off too." : {
+    "The mini player’s right-click menu can turn this off too." : {
       "comment" : "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Its right-click menu can turn this off too."
+            "value" : "The mini player’s right-click menu can turn this off too."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它的右键菜单也能关掉。"
+            "value" : "也可以在小播放器的右键菜单里关闭。"
           }
         }
       }

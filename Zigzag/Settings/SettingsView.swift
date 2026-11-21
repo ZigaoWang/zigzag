@@ -1124,6 +1124,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return row
     }()
     private let newTabPlace = DropdownButton()
+    private var newTabRow: FormRow?
     private let controlTabOrder = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
@@ -1387,7 +1388,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                               control: quitToggle)
         // There's no startup setting: your tabs always come back. Quitting is the nearest, and where people look.
-        quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.")
+        quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Startup and launch find this row, the nearest to a startup setting. Not shown.")
         generalGroup.add(quitRow)
         reloadWebApps()
         webAppsToken = WebAppStore.shared.changed.observe { [weak self] in
@@ -1519,6 +1520,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     control: borderlessToggle))
         addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
         let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
+                                 detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
                                  control: addressAboveToggle)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
@@ -1637,14 +1639,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             return DropdownButton.Option(title: title)
         }
-        newTabPlace.onSelect = { index in
+        newTabPlace.onSelect = { [weak self] index in
             TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index]
+            self?.refreshNewTabPlace()
         }
         let newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
                                 control: newTabPlace)
+        self.newTabRow = newTabRow
         // There's no homepage: a new tab opens the address bar. This is the setting nearest to one.
         newTabRow.keywords = String(localized: "new tab homepage home page start page position order same site domain group organize", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
         tabsGroup.add(newTabRow)
+        refreshNewTabPlace()
         controlTabOrder.options = TabSwitcher.Order.allCases.map { order in
             let title = switch order {
             case .recent: String(localized: "Recent Tabs", comment: "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab shows the tabs you used last, most recent first.")
@@ -1685,13 +1690,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(energyRow)
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         let videoRow = FormRow(title: String(localized: "Show a mini player when you switch tabs", comment: "A setting in Settings › Tabs."),
-                               detail: String(localized: "Its right-click menu can turn this off too.", comment: "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs."),
+                               detail: String(localized: "The mini player’s right-click menu can turn this off too.", comment: "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs."),
                                control: pipToggle)
         videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Show a mini player setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(videoRow)
         leavePipToggle.onChange = { on in AutoPictureInPicture.isOn = on }
         let leaveRow = FormRow(title: String(localized: "Show a mini player when you leave Zigzag", comment: "A setting in Settings › Tabs, below “Show a mini player when you switch tabs”: a playing video moves into Zigzag's small player, over other apps, when you switch to another app or desktop."),
-                               detail: String(localized: "Floats over other apps and desktops when you switch away, and back in its page when you return.", comment: "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs."),
+                               detail: String(localized: "The video floats over other apps and desktops, and goes back in its page when you return.", comment: "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs."),
                                control: leavePipToggle)
         leaveRow.keywords = String(localized: "mini player picture in picture pip floating video other app desktop space leave switch away background automatic", comment: "Words that find the Show a mini player when you leave Zigzag setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(leaveRow)
@@ -3870,6 +3875,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     /// Pure black backgrounds shows only while dark pages are on.
+    /// The New tabs open row says where a page goes when its site has no tabs open yet, for the choice that needs
+    /// telling: Next to Tabs from the Same Site has nowhere to go, and follows the fallback below it.
+    private func refreshNewTabPlace() {
+        guard let newTabRow else { return }
+        guard TabManager.newTabPlace == .sameSite else {
+            newTabRow.detailText = String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs.")
+            return
+        }
+        newTabRow.detailText = switch TabManager.otherNewTabPlace {
+        case .top: String(localized: "A page from a site with no tabs open goes at the top.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
+        case .bottom: String(localized: "A page from a site with no tabs open goes at the bottom.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
+        case .next, .sameSite: String(localized: "A page from a site with no tabs open goes next to the current tab.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
+        }
+    }
+
     private func refreshPureBlack() {
         let shown = DarkPages.mode != .off
         guard pureBlackRow.isAvailable != shown else { return }
