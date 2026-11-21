@@ -60,6 +60,39 @@ enum DebugBridge {
     /// [noend], miniborderless on|off. Without a mini window, miniask and minianswer use the front browser window.
     /// pageprobe <path> [mark]: each tab's page state as JSON; `mark` tags live pages so a later probe shows which
     /// reloaded.
+    /// capture [area|element|full|visible] (Capture begun in that mode, or switched to it), capture toggle (⇧⌘2),
+    /// capture cancel, capture drag x y w h (an area drawn, in the page's points), capture hover x y (the pointer
+    /// there), capture go (Return), capture key <char> (a key while capturing), capture state <path> (JSON),
+    /// capture card copy|save|share|close (the card after it).
+    private static func runCapture(_ arg: String, in controller: BrowserWindowController) {
+        let f = arg.split(separator: " ").map(String.init)
+        let capture = controller.capture
+        let modes: [String: PageCapture.Mode] = ["area": .area, "element": .element, "full": .fullPage, "visible": .visible]
+        let numbers = f.dropFirst().compactMap { Double($0) }.map { CGFloat($0) }
+        switch f.first ?? "" {
+        case "toggle": capture.toggle()
+        case "cancel": capture.cancel()
+        case "drag": if numbers.count == 4 { capture.debugDrag(NSRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])) }
+        case "hover": if numbers.count == 2 { capture.debugHover(NSPoint(x: numbers[0], y: numbers[1])) }
+        case "go": capture.confirm()
+        case "key":
+            guard f.count == 2, let window = controller.window else { break }
+            let codes: [String: UInt16] = ["esc": 53, "return": 36, "left": 123, "right": 124, "down": 125, "up": 126]
+            let chars = codes[f[1]] == nil ? f[1] : ""
+            if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                                            context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: codes[f[1]] ?? 0) {
+                _ = capture.handle(event)
+            }
+        case "state":
+            guard f.count == 2, let data = try? JSONSerialization.data(withJSONObject: capture.debugState, options: [.prettyPrinted, .sortedKeys]) else { break }
+            try? data.write(to: URL(fileURLWithPath: f[1]))
+        case "card": if f.count == 2 { capture.debugPreview?.debugPress(f[1]) }
+        case let name:
+            let mode = modes[name]
+            if capture.isActive, let mode { capture.choose(mode) } else { capture.begin(mode) }
+        }
+    }
+
     private static func pageProbe(_ arg: String) {
         let f = arg.split(separator: " ").map(String.init)
         guard let path = f.first else { return }
@@ -1277,6 +1310,7 @@ enum DebugBridge {
         case "deskkey": controller.desk.debugKey(arg)
         case "private": WindowManager.shared.newWindow(url: URL(string: arg), showCommandBar: false, isPrivate: true)
         case "pageshot": if let webView = controller.selectedWebView { PageScreenshot.debugCapture(webView, to: URL(fileURLWithPath: arg)) }
+        case "capture": runCapture(arg, in: controller)
         case "reader": controller.toggleReader()
         case "translate": controller.translatePage()
         case "split":
