@@ -320,6 +320,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         renamingPage = renamingPart == 0 ? tab : pages.indices.contains(renamingPart) ? pages[renamingPart] : nil
         let field = PlainTextField(font: label.font ?? Tokens.Font.body(), placeholder: String(localized: "Name", comment: "Placeholder of the field that renames a tab, in its sidebar row."))
         field.stringValue = label.stringValue
+        // The row's ink, so the name doesn't change color as you edit it.
+        field.textColor = Brand.Theme.for(self).rowInk
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
         label.isHidden = true
@@ -1415,6 +1417,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: isTabGroup ? String(localized: "Group name", comment: "Placeholder of the field that renames a group of tabs, in its sidebar row.")
                                    : String(localized: "Folder name", comment: "Placeholder of the field that renames a folder, in its sidebar row."))
         field.stringValue = title.stringValue
+        // The title's own ink, so the name doesn't change color as you edit it.
+        field.textColor = title.textColor
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
         title.isHidden = true
