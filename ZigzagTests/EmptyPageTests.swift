@@ -52,6 +52,25 @@ struct EmptyPageTests {
         }
     }
 
+    @Test func aGlassSpaceTintsItsPageMoreLightly() {
+        for color in SpaceColor.palette {
+            let glass = SpaceInfo(name: "G", color: color, defaultColor: color).withDefaultColors(color)
+            let ground = EmptyPage.ground(for: glass, isPrivate: false), wash = Brand.Theme.of(glass).wash
+            let day = resolved(ground, Self.light), dayWash = resolved(wash, Self.light)
+            #expect(day.saturationComponent <= dayWash.saturationComponent, "\(color)")
+            #expect(luminance(day) >= luminance(dayWash) && luminance(day) < 0.999, "\(color)")
+            let night = resolved(ground, Self.dark), nightWash = resolved(wash, Self.dark)
+            // At night a light tint of its hue, deep and well under the sidebar's own color.
+            #expect(night.brightnessComponent < 0.25 && night.saturationComponent > nightWash.saturationComponent, "\(color)")
+            #expect(night.saturationComponent < resolved(glass.background, Self.dark).saturationComponent, "\(color)")
+        }
+        // Spaces from before keep the wash.
+        for color in SpaceColor.legacy {
+            let space = SpaceInfo(name: "S", color: color)
+            #expect(resolved(EmptyPage.ground(for: space, isPrivate: false), Self.light) == resolved(Brand.Theme.of(space).wash, Self.light))
+        }
+    }
+
     @Test func neutralSpacesAndPrivateWindowsKeepThePlainCard() {
         #expect(EmptyPage.ground(for: SpaceInfo(name: "W", color: .snow, tint: 0), isPrivate: false) == Tokens.Color.cardBackground)
         #expect(EmptyPage.ground(for: SpaceInfo(name: "G", color: .graphite, tint: 0), isPrivate: false) == Tokens.Color.cardBackground)
