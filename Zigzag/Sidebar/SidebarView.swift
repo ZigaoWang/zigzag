@@ -60,6 +60,8 @@ final class AddressView: InteractiveView {
         saveButton.symbol = saved ? "star.fill" : "star"
         saveButton.tint = saved ? Brand.Theme.for(saveButton).accent : Tokens.Color.icon
         saveButton.isEnabled = canSave
+        // Nothing to pin, nothing to offer: the star goes rather than sitting greyed out (#442).
+        saveButton.isHidden = !canSave
         saveButton.toolTip = saved
             ? String(localized: "Pinned", comment: "Tooltip of the address bar's star button for a page that's pinned: it says the page is pinned.")
             : String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where.")
@@ -486,7 +488,7 @@ final class AddressView: InteractiveView {
     }
 
     /// The buttons always at the field's end, after the pins.
-    private var endButtons: [IconButton] { [saveButton, siteControlsButton] }
+    private var endButtons: [IconButton] { [saveButton, siteControlsButton].filter { !$0.isHidden } }
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
