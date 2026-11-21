@@ -369,7 +369,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebarUndo.setActionName(String(localized: "Resize Tiles", comment: "Undo action name, shown in the Edit menu as Undo Resize Tiles."))
     }
 
-
     static func defaultFrame() -> NSRect {
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let size = NSSize(width: min(Tokens.Metric.windowDefaultSize.width, screen.width - Tokens.Space.x16),
