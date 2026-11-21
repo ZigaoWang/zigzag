@@ -26,6 +26,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 在“显示所有标签页”里，卡片滚到搜索框下面时会出现一条细线，不会再像被硬切掉一样。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 - “新功能”里，下面还有内容时按钮上方会出现一条细线，往下滚后标题下面也会有，说明文字不会再被硬切掉。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 - 查找栏的关闭按钮和其他所有 ✕ 按钮现在跟旁边的按钮对齐了，不会再低半个点。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
+- 下载更新时，边栏里那张卡片左右两边的边距现在一样了。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 
 ## [0.9.4] - 2026-11-21
 
