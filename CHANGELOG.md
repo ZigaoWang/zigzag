@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- The tab you're on keeps its own soft shadow after it moves between Pinned and Tabs, for example when you pin it with the star. The shadow it lifts with while it glides stayed behind, larger and darker, and could sit apart from the row, below it.
 - Both knobs of a gradient on the space editor's color wheel drag again. With two pale colors close together near the middle, a press on the second knob took hold of the first one instead; now the knob nearer the pointer is the one that moves.
 - Clicking the Custom swatch in the space editor always shows the color wheel and Shade. Clicked while they were already out, it folded them away, and with Effects open below there was no sign of how to bring them back.
 - The space editor opens next to what you opened it from. Edit Space… in the menu of the space's name at the top of the sidebar opened it down by the space icons at the bottom; it now opens beside the name. From a space icon or the + it rises from the bottom as before, and from the menu bar or the command bar it opens beside the space's name. However tall it gets, with the color wheel and Effects open, it stays inside the window, and the wheel gets a little smaller in a short window.
