@@ -421,8 +421,8 @@ final class IconPickerPanel: FloatingPanelView {
     var preferredWidth: CGFloat { IconGrid.width + pad * 2 }
 
     /// Pages get Choose Image… and, with an icon set, Use Site Icon (#303); folders get neither.
-    private let chooseImage: TextButton?
-    private let useSite = TextButton(title: SidebarMenus.useSiteIconTitle)
+    private let chooseImage: PillButton?
+    private let useSite = PillButton(title: SidebarMenus.useSiteIconTitle, style: .quiet)
     /// Footer row: a gap under the search field, then the buttons, then the panel's own margin below them.
     private var footHeight: CGFloat { chooseImage == nil ? 0 : Tokens.Space.x2 + Tokens.Space.x7Height }
     var preferredHeight: CGFloat { IconGrid.height + pad * 2 + footHeight }
@@ -431,7 +431,7 @@ final class IconPickerPanel: FloatingPanelView {
     init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?,
          onChooseImage: (() -> Void)? = nil, onPick: @escaping (String?) -> Void) {
         grid = IconGrid(noneSymbol: noneSymbol, noneImage: noneImage, noneToolTip: noneToolTip, selected: selected)
-        chooseImage = onChooseImage.map { _ in TextButton(title: SidebarMenus.chooseImageTitle) }
+        chooseImage = onChooseImage.map { _ in PillButton(title: SidebarMenus.chooseImageTitle, style: .quiet) }
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         grid.onPick = { [weak self] icon in
