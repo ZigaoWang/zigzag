@@ -176,9 +176,16 @@ final class SafePDF {
     nonisolated static func pageText(from remote: RemotePageText, pageSize: CGSize? = nil) -> PageText {
         let boxes: [CGRect] = remote.boxes.withUnsafeBytes { raw in
             let values = raw.bindMemory(to: Float32.self)
-            return stride(from: 0, to: values.count - 3, by: 4).map {
-                CGRect(x: CGFloat(values[$0]), y: CGFloat(values[$0 + 1]), width: CGFloat(values[$0 + 2]), height: CGFloat(values[$0 + 3]))
+            var rects: [CGRect] = []
+            rects.reserveCapacity(values.count / 4)
+            var i = 0
+            while i + 3 < values.count {
+                let rect = CGRect(x: CGFloat(values[i]), y: CGFloat(values[i + 1]),
+                                  width: CGFloat(values[i + 2]), height: CGFloat(values[i + 3]))
+                rects.append(rect)
+                i += 4
             }
+            return rects
         }
         let page = pageSize.map { CGRect(origin: .zero, size: $0) }
         let links = remote.links.compactMap { link -> Link? in
