@@ -211,7 +211,8 @@ One look for each state, everywhere:
   on a panel a clear neutral fill, `selectedFill`, with a 1px `selectedEdge` and `setLifted(true)`'s shadow-sm
   (`applyRowStyle`). In a list of places
   (Settings' sections) and for a keyboard-chosen result: the accent at `Color.selectionAlpha`.
-- Keyboard highlight in a floating list: `Color.highlight`.
+- Keyboard highlight in a floating list: `Color.highlight`, one pill gliding between rows (the menus, the password
+  menu).
 - Focus: never the system's blue. A field shows the accent at `focusAlpha` (60%), 1.5pt, while typing. A drawn
   control reached with Tab (Full Keyboard Access) shows a ring in the accent at 60%, `Metric.focusRing` (2pt) wide,
   `Metric.focusGap` (2pt) outside it, following its shape. Only the keyboard brings it; a click never does.

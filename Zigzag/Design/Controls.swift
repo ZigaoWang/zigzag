@@ -1703,6 +1703,49 @@ final class DropdownButton: InteractiveView {
     }
 }
 
+/// A floating list's one highlight (`Color.highlight`, `Radius.row`): it glides from row to row under the pointer
+/// rather than each row lighting on its own. From the keyboard, arriving from nothing or with Reduce Motion it's
+/// simply there; leaving every row, it fades. Put it behind the rows.
+final class HighlightGlide: ColorView {
+    init() {
+        super.init(color: Tokens.Color.highlight)
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        alphaValue = 0
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    /// Moves to `target`, or fades for nil. `wasShown`: it was on a row before this change.
+    func move(to target: NSRect?, wasShown: Bool) {
+        guard let target else {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Tokens.Motion.quick
+                context.timingFunction = Tokens.Motion.easeOut
+                animator().alphaValue = 0
+            }
+            return
+        }
+        if !wasShown || alphaValue == 0 || Tokens.Motion.isFromKey || Tokens.Motion.reduceMotion {
+            layer?.removeAllAnimations()
+            Tokens.Motion.withoutAnimation { frame = target }
+            alphaValue = 1
+        } else {
+            alphaValue = 1
+            Tokens.Motion.glide(self, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
+        }
+    }
+
+    /// Keeps it on its row through a relayout, without a glide.
+    func follow(_ target: NSRect) { Tokens.Motion.withoutAnimation { frame = target } }
+
+    /// Pressed, it darkens a step.
+    func showPressed(_ pressed: Bool) { color = pressed ? Tokens.Color.pressedFill : Tokens.Color.highlight }
+}
+
 /// What an AppKit menu item carries, as its represented object, for its row in a drawn menu: its symbol, and
 /// whether it's destructive.
 protocol MenuItemStyle: AnyObject {
@@ -1792,7 +1835,7 @@ final class MenuPanel: FloatingPanelView {
     private let scroll = NSScrollView()
     private let list = FlippedView()
     /// One soft gray pill that glides from row to row under the pointer, rather than each row lighting on its own.
-    private let pill = ColorView(color: Tokens.Color.highlight)
+    private let pill = HighlightGlide()
     private var highlighted: Int? {
         didSet {
             rows.enumerated().forEach { $0.element.isHighlighted = $0.offset == highlighted }
@@ -1840,10 +1883,6 @@ final class MenuPanel: FloatingPanelView {
         scroll.useSlimScroller()
         scroll.documentView = list
         addSubview(scroll)
-        pill.wantsLayer = true
-        pill.layer?.cornerRadius = Tokens.Radius.row
-        pill.layer?.cornerCurve = .continuous
-        pill.alphaValue = 0
         list.addSubview(pill)
         let hasImages = entries.contains { if case .item(let item) = $0 { return item.image != nil || item.symbol != nil }; return false }
         for entry in entries {
@@ -2046,33 +2085,18 @@ final class MenuPanel: FloatingPanelView {
                 y += Self.separatorHeight
             }
         }
-        if let highlighted, rows.indices.contains(highlighted) { Tokens.Motion.withoutAnimation { pill.frame = rows[highlighted].frame } }
+        if let highlighted, rows.indices.contains(highlighted) { pill.follow(rows[highlighted].frame) }
     }
 
     /// The highlight glides from where it was to the row now under the pointer. From the keyboard, or arriving from
     /// nothing, it's simply there; leaving every row, it fades.
     private func movePill(from old: Int?) {
-        guard let highlighted, rows.indices.contains(highlighted) else {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = Tokens.Motion.quick
-                context.timingFunction = Tokens.Motion.easeOut
-                pill.animator().alphaValue = 0
-            }
-            return
-        }
-        let target = rows[highlighted].frame
-        if old == nil || pill.alphaValue == 0 || Tokens.Motion.isFromKey || Tokens.Motion.reduceMotion {
-            pill.layer?.removeAllAnimations()
-            Tokens.Motion.withoutAnimation { pill.frame = target }
-            pill.alphaValue = 1
-        } else {
-            pill.alphaValue = 1
-            Tokens.Motion.glide(pill, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
-        }
+        let target = highlighted.flatMap { rows.indices.contains($0) ? rows[$0].frame : nil }
+        pill.move(to: target, wasShown: old != nil)
     }
 
     /// Pressed, the highlight darkens a step.
-    fileprivate func showPressed(_ pressed: Bool) { pill.color = pressed ? Tokens.Color.pressedFill : Tokens.Color.highlight }
+    fileprivate func showPressed(_ pressed: Bool) { pill.showPressed(pressed) }
 
     // MARK: Closing
 

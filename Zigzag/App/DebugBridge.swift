@@ -2114,6 +2114,8 @@ enum DebugBridge {
             }
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }
+        // autofillpreview [n]: the password menu with made-up logins over the page; with n, its highlight moves n rows.
+        case "autofillpreview": Autofill.shared.debugPreview(in: controller.root.overlay, move: Int(arg) ?? 0)
         case "autofillmenu":
             debugLog("autofillmenu => \(Autofill.shared.isShowing) \(Autofill.shared.debugRows)")
         case "autofillclick":

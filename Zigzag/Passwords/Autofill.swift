@@ -268,6 +268,21 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         show([item], under: NSRect(x: 40, y: 120, width: 320, height: 32), in: webView, frame: frame, origin: origin)
     }
 
+    /// For the debug bridge: the menu with two made-up logins (never saved) in `overlay`, to look at; `move` steps its
+    /// highlight as the arrow keys do.
+    func debugPreview(in overlay: NSView, move: Int) {
+        if let menu, move != 0 { menu.move(move); return }
+        menu?.removeFromSuperview()
+        guard let origin = Origin(URL(string: "https://example.com")) else { return }
+        let logins = ["sam@example.com", "alex@example.com"].map {
+            Credential(id: UUID(), origin: origin, username: $0, title: "", notes: "", otpAuth: "", created: Date(), modified: Date(), lastUsed: nil)
+        }
+        let menu = AutofillMenu(items: logins.map { .login($0) } + [.systemPasswords], origin: origin)
+        menu.frame = NSRect(x: 40, y: 120, width: 320, height: menu.contentHeight)
+        overlay.addSubview(menu)
+        self.menu = menu
+    }
+
     /// The menu's rows, for the debug log.
     var debugRows: [String] { menu?.debugRows ?? [] }
 
@@ -1094,7 +1109,16 @@ final class AutofillMenu: FloatingPanelView {
     private let footer = TextButton(title: String(localized: "Passwords", comment: "Link at the bottom of the menu that fills a password into a page: opens the Passwords window."), font: Tokens.Font.small(.medium))
     private let footerLine = ColorView(color: Tokens.Color.separator)
     private let hasFooter: Bool
-    private var selection = -1 { didSet { rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection } } }
+    private var selection = -1 {
+        didSet {
+            rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection }
+            moveHighlight()
+        }
+    }
+    /// The row under the pointer, which the highlight shows over the one chosen with the keys.
+    private var hovered: Int? { didSet { moveHighlight() } }
+    private let highlight = HighlightGlide()
+    private var highlighted: Int?
     var onPick: ((Item) -> Void)?
 
     private let pad = Tokens.Space.x1 + 2
@@ -1111,9 +1135,15 @@ final class AutofillMenu: FloatingPanelView {
             }
         }
         radius = Tokens.Radius.panel
-        rows = items.map { item in
+        addSubview(highlight)
+        rows = items.enumerated().map { index, item in
             let row = AutofillRow(item: item, origin: origin)
             row.onClick = { [weak self] _ in self?.onPick?(item) }
+            row.hoverChanged = { [weak self, weak row] on in
+                guard let self, let row else { return }
+                if on { self.hovered = row.isEnabled ? index : nil } else if self.hovered == index { self.hovered = nil }
+            }
+            row.pressChanged = { [weak self] pressed in self?.highlight.showPressed(pressed) }
             addSubview(row)
             return row
         }
@@ -1143,12 +1173,30 @@ final class AutofillMenu: FloatingPanelView {
     #if DEBUG
     var debugRows: [String] { rows.map(\.debugName) }
     func debugRowFrame(_ index: Int) -> NSRect? { rows.indices.contains(index) ? rows[index].frame : nil }
+    /// The pointer over row `index`, or off it.
+    func debugHover(_ index: Int, _ on: Bool) { if rows.indices.contains(index) { rows[index].isHovered = on } }
+    /// The one highlight: where it is, and whether it's showing.
+    var debugHighlight: (frame: NSRect, shown: Bool, gliding: Bool) {
+        (highlight.frame, highlighted != nil, highlight.layer?.animation(forKey: "glide") != nil)
+    }
+    /// Whether any row paints a fill of its own.
+    var debugRowsFilled: Bool { rows.contains { $0.layer?.backgroundColor != nil } }
     #endif
+
+    /// One highlight for the row under the pointer, or else the one the arrow keys reached, gliding between them.
+    private func moveHighlight() {
+        let next = hovered ?? (rows.indices.contains(selection) ? selection : nil)
+        guard next != highlighted else { return }
+        let old = highlighted
+        highlighted = next
+        highlight.move(to: next.map { rows[$0].frame }, wasShown: old != nil)
+    }
 
     private func layoutRows() {
         for (index, row) in rows.enumerated() {
             row.frame = NSRect(x: pad, y: pad + CGFloat(index) * rowHeight, width: bounds.width - pad * 2, height: rowHeight)
         }
+        if let highlighted, rows.indices.contains(highlighted) { highlight.follow(rows[highlighted].frame) }
         guard hasFooter else { return }
         let y = pad + CGFloat(rows.count) * rowHeight + pad / 2
         footerLine.frame = NSRect(x: pad + Tokens.Space.x2, y: y, width: bounds.width - (pad + Tokens.Space.x2) * 2, height: Tokens.Metric.hairline)
@@ -1238,10 +1286,6 @@ final class AutofillRow: InteractiveView {
         detail.frame = NSRect(x: x, y: name.frame.maxY, width: bounds.width - x - Tokens.Space.x2, height: detail.lineHeight)
     }
 
-    override func stateDidChange(animated: Bool) {
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-    }
-
-    /// A menu's highlight, as `MenuPanel` draws its items.
-    var fill: NSColor? { isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.highlight : nil }
+    // The menu's one gliding highlight shows hover, the keys' choice and the press; the row draws none of its own.
+    override func stateDidChange(animated: Bool) {}
 }

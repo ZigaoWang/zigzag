@@ -235,14 +235,6 @@ struct PasswordMenuTests {
         #expect(!menu.isOnScreen)
     }
 
-    /// The chosen row wears a menu's highlight, as `MenuPanel` items do, not the row hover.
-    @Test func theChosenRowIsTheMenuHighlight() throws {
-        let row = AutofillRow(item: .generate, origin: try #require(Origin(URL(string: "https://example.com"))))
-        #expect(row.fill == nil)
-        row.isSelected = true
-        #expect(row.fill == Tokens.Color.highlight)
-    }
-
     // MARK: Filling
 
     private func fill(_ webView: WKWebView, focusing id: String) async throws -> [String: Any]? {
@@ -392,5 +384,28 @@ struct PasswordMenuTests {
         menu.onPick = { _ in picked = true }
         #expect(menu.subviews.compactMap { $0 as? InteractiveView }.allSatisfy { !$0.isEnabled })
         #expect(!picked)
+    }
+
+    /// One highlight glides between rows, as in every drawn menu: the arrow keys put it on a row, the pointer takes it
+    /// to another, and no row lights on its own.
+    @Test func oneHighlightGlidesBetweenRows() throws {
+        let origin = try #require(Origin(URL(string: "https://example.com")))
+        let menu = AutofillMenu(items: [.login(login("https://example.com", "sam")), .login(login("https://example.com", "alex")), .systemPasswords], origin: origin)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView?.addSubview(menu)
+        menu.frame = NSRect(x: 20, y: 20, width: 320, height: menu.contentHeight)
+        menu.layoutSubtreeIfNeeded()
+        #expect(!menu.debugHighlight.shown)
+        menu.move(1)
+        #expect(menu.debugHighlight.shown)
+        #expect(menu.debugHighlight.frame == menu.debugRowFrame(0))
+        menu.debugHover(1, true)
+        #expect(menu.debugHighlight.frame == menu.debugRowFrame(1))
+        #expect(menu.debugHighlight.gliding == !Tokens.Motion.reduceMotion)
+        // Off the rows, it goes back to the one the keys chose.
+        menu.debugHover(1, false)
+        #expect(menu.debugHighlight.frame == menu.debugRowFrame(0))
+        #expect(!menu.debugRowsFilled)
+        _ = window
     }
 }
