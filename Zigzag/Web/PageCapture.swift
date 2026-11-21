@@ -253,9 +253,17 @@ final class PageCapture {
             return true
         default: break
         }
-        let typed = event.charactersIgnoringModifiers?.lowercased() ?? ""
-        if let mode = Mode.allCases.first(where: { $0.key == typed }) { choose(mode); return true }
+        if let mode = Self.mode(typed: event.charactersIgnoringModifiers ?? "", keyCode: event.keyCode) { choose(mode); return true }
         return false
+    }
+
+    /// The mode a letter picks. A layout without Latin letters goes by where the letter sits on a US keyboard, as the
+    /// Quit key does (#441); AZERTY and Dvorak go by the letter typed.
+    static func mode(typed: String, keyCode: UInt16) -> Mode? {
+        let typed = typed.lowercased()
+        if let mode = Mode.allCases.first(where: { $0.key == typed }) { return mode }
+        guard !typed.isEmpty, !typed.unicodeScalars.allSatisfy(\.isASCII) else { return nil }
+        return Mode.allCases.first { AppDelegate.ansiKeyCode($0.key) == keyCode }
     }
 
     // MARK: Pointing at elements

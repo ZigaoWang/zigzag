@@ -177,4 +177,17 @@ struct PageCaptureGeometryTests {
         #expect(controller.capture.handle(try key("\u{1b}", code: 53)))
         #expect(!controller.capture.isActive)
     }
+
+    /// Russian types "ф" on the A key and "у" on E: the key picks the mode. AZERTY's A key types "q", which picks none.
+    @Test func modeKeysWorkOnLayoutsWithoutLatinLetters() {
+        #expect(PageCapture.mode(typed: "ф", keyCode: 0) == .area)
+        #expect(PageCapture.mode(typed: "у", keyCode: 14) == .element)
+        #expect(PageCapture.mode(typed: "а", keyCode: 3) == .fullPage)
+        #expect(PageCapture.mode(typed: "м", keyCode: 9) == .visible)
+        #expect(PageCapture.mode(typed: "ы", keyCode: 1) == nil)
+        #expect(PageCapture.mode(typed: "A", keyCode: 0) == .area)
+        #expect(PageCapture.mode(typed: "q", keyCode: 0) == nil)
+        #expect(PageCapture.mode(typed: "a", keyCode: 12) == .area)
+        #expect(PageCapture.mode(typed: "", keyCode: 0) == nil)
+    }
 }
