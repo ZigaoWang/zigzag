@@ -51,6 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !Self.isHostingTests {
             // A new version backs up the data the last one left, and a restore asked for before restarting puts
             // a backup back, both before anything reads it.
+            // The day Zigzag was first used here, kept once, while the last run's version is still on record.
+            CardStart.settle()
             // A new version owes its notes: noted before the backup records this version as the one that ran.
             WhatsNew.noteLaunch()
             let info = Bundle.main.infoDictionary
@@ -489,6 +491,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
+    @objc func showZigzagCard(_ sender: Any?) { ZigzagCardWindowController.show() }
 
     /// Settings opens as a tab in the front window, as History does.
     @objc func showSettings(_ sender: Any?) { frontBrowserWindow().map { SettingsPage.open(in: $0) } }

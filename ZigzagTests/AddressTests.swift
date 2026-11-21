@@ -296,7 +296,7 @@ struct AddressTests {
         #expect(a.imageSide == 16 && b.imageSide == Tokens.Sidebar.addressIcon)
     }
 
-    /// Reader is one button: it stays put when Reader turns on, and says what a click does in each state.
+    /// Reader's button is a toggle: it stays put when Reader turns on, shows pressed, and says what a click does.
     @Test func readersOneButtonSaysWhatAClickDoes() {
         let address = AddressView(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Sidebar.addressHeight))
         address.setReader(available: true, active: false)
@@ -308,8 +308,8 @@ struct AddressTests {
         #expect(address.readerButton.frame.minX == readerX)
         #expect(address.buttonsWidth == width)
         #expect(address.readerButton.isSelected)
-        #expect(address.readerButton.toolTip == "Reader Options")
-        #expect(address.readerButton.accessibilityLabel() == "Reader Options")
+        #expect(address.readerButton.toolTip?.hasPrefix("Hide Reader") == true)
+        #expect(address.readerButton.accessibilityLabel() == "Hide Reader")
         #expect(!address.subviews.contains { ($0 as? IconButton)?.symbol == "textformat.size" })
         address.setReader(available: true, active: false)
         #expect(!address.readerButton.isSelected)
