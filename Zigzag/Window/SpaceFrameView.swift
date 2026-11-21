@@ -25,10 +25,9 @@ class SpaceFrameView: ColorView {
         }
         let (color, end, clear) = Self.frameColors(of: space, isPrivate: isPrivate)
         // See-through: the frosted desktop shows through, and the space's color washes over it, thinner the more shows.
-        // Only clear glass needs a see-through window, which macOS shows at 80 Hz on a 120 Hz display (#394).
-        let seeThroughWindow = clear && space.usesClearGlass
-        window?.isOpaque = !seeThroughWindow
-        window?.backgroundColor = seeThroughWindow ? .clear : .windowBackgroundColor
+        // The window stays opaque: macOS shows a see-through one at 80 Hz on a 120 Hz display (#394).
+        window?.isOpaque = true
+        window?.backgroundColor = .windowBackgroundColor
         setGlass(clear, clear: space.usesClearGlass, tint: space.frameColor)
         // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
         // sits under it and would be hidden); a single color washes as a gradient of itself.
@@ -72,8 +71,8 @@ class SpaceFrameView: ColorView {
 
     /// Frosted glass behind the frame, for spaces that want the desktop to show through: blurred, so what's behind
     /// reads as soft shapes and never as text under the sidebar's own. The sidebar's material, the clearest there is.
-    private lazy var glassView: NSVisualEffectView = {
-        let glass = NSVisualEffectView()
+    private lazy var glassView: WindowFrosting = {
+        let glass = WindowFrosting()
         glass.blendingMode = .behindWindow
         glass.material = .sidebar
         // Live while the window is in front; a still frosting behind other apps' windows, as macOS's own sidebars.
@@ -87,43 +86,19 @@ class SpaceFrameView: ColorView {
 
     /// The frosting always covers all of what's behind: anything thinner lets it through sharp, and its text then
     /// reads under the sidebar's own. See-through spaces thin their color over the blur instead.
-    /// `clear`: Liquid Glass, really transparent and still blurred, tinted with `tint` (it draws over the frame's own
-    /// wash, so the color goes in the glass). Before macOS 26 the frosted glass stands in.
+    /// `clear`: clear glass, lightly blurred and tinted with `tint`. It is the frosting with its milk taken out, not
+    /// Liquid Glass: that needs a see-through window, which macOS shows at 80 Hz on a 120 Hz display (#394).
+    /// Before macOS 26 the frosted glass stands in.
     func setGlass(_ on: Bool, clear: Bool = false, tint: NSColor? = nil) {
         glassWanted = on
         let liquid = clear && SpaceInfo.hasClearGlass
         windowGlass = on ? WindowGlass(isClear: liquid, tint: liquid ? tint : nil) : nil
         defer { refreshGlassOcclusion() }
-        if #available(macOS 26.0, *), clear {
-            glassView.isHidden = true
-            let glass = clearGlass as? NSGlassEffectView ?? {
-                let made = NSGlassEffectView()
-                // Regular, not the clear style: still plainly see-through, but blurred enough that what's behind reads
-                // as color and shape, never as text under the sidebar's own.
-                made.style = .regular
-                made.cornerRadius = 0
-                made.wantsLayer = true
-                made.layer?.zPosition = -3
-                addSubview(made, positioned: .below, relativeTo: nil)
-                clearGlass = made
-                return made
-            }()
-            glass.isHidden = !on
-            glass.tintColor = tint
-            if on { glass.frame = glassFrame }
-            // The glass draws over the frame's own grain, so it carries its own, kept in step by `setGrain`.
-            if glass.contentView == nil {
-                let content = NSView()
-                content.wantsLayer = true
-                content.layer?.addSublayer(glassGrain)
-                glass.contentView = content
-            }
-            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
-            return
-        }
-        clearGlass?.isHidden = true
         glassView.isHidden = !on
         glassView.material = .sidebar
+        glassView.clearTint = liquid ? tint : nil
+        // Clear glass stays live, as Liquid Glass did; the frosting rests to a still one behind other apps' windows.
+        glassView.state = liquid ? .active : .followsWindowActiveState
         if on { glassView.frame = glassFrame }
     }
 
@@ -133,7 +108,6 @@ class SpaceFrameView: ColorView {
     /// Where the glass needs to be: only what you can see through. The whole frame, unless something opaque covers
     /// part of it for good.
     var glassFrame: NSRect { bounds }
-    private var glassGrainBounds: NSRect { NSRect(origin: .zero, size: glassFrame.size) }
 
     /// Nothing to see through right now, so the glass rests.
     var glassIsCovered: Bool { false }
@@ -141,10 +115,6 @@ class SpaceFrameView: ColorView {
     /// Puts the glass where it needs to be now (after what covers it changes).
     func refreshGlassFrame() {
         if !glassView.isHidden { glassView.frame = glassFrame }
-        if let clearGlass, !clearGlass.isHidden {
-            clearGlass.frame = glassFrame
-            Tokens.Motion.withoutAnimation { glassGrain.frame = glassGrainBounds }
-        }
     }
 
     /// Whether the space wants glass; `refreshGlassOcclusion` keeps it off while the window can't be seen.
@@ -173,28 +143,16 @@ class SpaceFrameView: ColorView {
     func refreshGlassOcclusion() {
         let visible = window?.occlusionState.contains(.visible) ?? true
         let on = glassWanted && visible && !glassIsCovered
-        if let clearGlass, !clearGlass.isHidden || on { clearGlass.alphaValue = on ? 1 : 0 }
         glassView.alphaValue = on ? 1 : 0
     }
 
     #if DEBUG
     var debugGlass: [String: Any] {
         ["opaque": window?.isOpaque ?? false, "wanted": glassWanted, "frosted": !glassView.isHidden, "frostedAlpha": glassView.alphaValue,
-         "clear": clearGlass.map { !$0.isHidden } ?? false, "clearAlpha": clearGlass?.alphaValue ?? -1,
-         "clearFrame": NSStringFromRect(clearGlass?.frame ?? .zero), "occlusionVisible": window?.occlusionState.contains(.visible) ?? false,
+         "clear": glassView.clearTint != nil, "occlusionVisible": window?.occlusionState.contains(.visible) ?? false,
          "background": window?.backgroundColor.description ?? ""]
     }
     #endif
-
-    /// The clear glass, once a clear space has asked for it.
-    private var clearGlass: NSView?
-    /// Grain inside the clear glass, matching the frame's.
-    private lazy var glassGrain: CALayer = {
-        let grain = CALayer()
-        grain.backgroundColor = MaterialImages.grain.cgColor
-        grain.opacity = 0
-        return grain
-    }()
 
     // MARK: Gradient and grain
 
@@ -257,13 +215,12 @@ class SpaceFrameView: ColorView {
     /// 0 is smooth; 1 is as much as reads as texture without becoming noise.
     func setGrain(_ amount: Double, animated: Bool) {
         let target = Float(min(max(amount, 0), 1) * 0.18)
-        guard grainLayer.opacity != target || glassGrain.opacity != target else { return }
+        guard grainLayer.opacity != target else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
         CATransaction.setAnimationDuration(Tokens.Motion.large)
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         grainLayer.opacity = target
-        glassGrain.opacity = target
         CATransaction.commit()
     }
 
@@ -279,4 +236,73 @@ class SpaceFrameView: ColorView {
 struct WindowGlass: Equatable {
     var isClear: Bool
     var tint: NSColor?
+}
+
+/// The window's frosting, which can also be clear glass: the same behind-window blur, which the window server draws
+/// at the display's full rate in an opaque window, with most of its milk taken out, a lighter blur, and the space's
+/// color laid into it as Liquid Glass lays its tint. Where the material's layers aren't the ones expected, it stays
+/// the frosting.
+final class WindowFrosting: NSVisualEffectView {
+    /// The color clear glass takes on; nil for the frosting.
+    var clearTint: NSColor? { didSet { if clearTint != oldValue { tune() } } }
+
+    /// How much of the material's milk clear glass keeps, how far it blurs, and how much of the tint's hue it takes:
+    /// matched to Liquid Glass over light and dark desktops.
+    static let clearMilk: Float = 0.6
+    static let clearBlur = 6.0
+    static let clearHue: Float = 0.6
+
+    private let hueLayer: CALayer = {
+        let layer = CALayer()
+        layer.compositingFilter = "colorBlendMode"
+        layer.isHidden = true
+        return layer
+    }()
+    private var frostedBlur: [ObjectIdentifier: Any] = [:]
+
+    override func updateLayer() { super.updateLayer(); tune() }
+    override func layout() { super.layout(); tune() }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); tune() }
+
+    /// AppKit rebuilds the material's layers when the appearance, state or material changes, so this runs after.
+    private func tune() {
+        guard let root = layer else { return }
+        let clear = clearTint != nil
+        var material: [CALayer] = []
+        var pending = (root.sublayers ?? []).filter { $0 !== hueLayer }
+        while let next = pending.popLast() {
+            material.append(next)
+            pending += next.sublayers ?? []
+        }
+        Tokens.Motion.withoutAnimation {
+            for layer in material {
+                switch layer.name {
+                case "fill": layer.opacity = clear ? Self.clearMilk : 1
+                case "tone": layer.opacity = clear ? 0 : 1
+                case "Backdrop": blur(layer, clear: clear)
+                default: break
+                }
+            }
+            if hueLayer.superlayer !== root { root.addSublayer(hueLayer) }
+            hueLayer.zPosition = 1
+            hueLayer.frame = root.bounds
+            hueLayer.isHidden = !clear
+            hueLayer.opacity = Self.clearHue
+            if let clearTint {
+                effectiveAppearance.performAsCurrentDrawingAppearance { hueLayer.backgroundColor = clearTint.withAlphaComponent(1).cgColor }
+            }
+        }
+    }
+
+    /// The backdrop's blur, lighter for clear glass, back to the material's own for the frosting.
+    private func blur(_ backdrop: CALayer, clear: Bool) {
+        guard let filters = backdrop.filters as? [NSObject] else { return }
+        for filter in filters {
+            guard let name = filter.value(forKey: "name") as? String, name.hasPrefix("gaussianBlur") else { continue }
+            let id = ObjectIdentifier(backdrop)
+            if frostedBlur[id] == nil { frostedBlur[id] = filter.value(forKey: "inputRadius") }
+            guard let radius = clear ? Self.clearBlur : frostedBlur[id] else { continue }
+            backdrop.setValue(radius, forKeyPath: "filters.\(name).inputRadius")
+        }
+    }
 }

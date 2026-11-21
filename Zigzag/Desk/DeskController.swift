@@ -74,8 +74,8 @@ final class DeskHeaderView: InteractiveView {
 /// space with the space's color washed over it, or the color solid, with its gradient and grain. So the desk reads as
 /// the sidebar opened up to fill the window, not a different surface laid over it.
 final class DeskFrameView: NSView {
-    private let glass: NSVisualEffectView = {
-        let glass = NSVisualEffectView()
+    private let glass: WindowFrosting = {
+        let glass = WindowFrosting()
         glass.blendingMode = .behindWindow
         glass.material = .sidebar
         glass.state = .followsWindowActiveState
@@ -85,8 +85,6 @@ final class DeskFrameView: NSView {
     private let grain = CALayer()
     /// Holds the wash and grain in a view of its own, so AppKit keeps them above the glass.
     private let paint = NSView()
-    /// Liquid Glass for a clear space, once one asks for it.
-    private var clearGlass: NSView?
     /// Last paint, repainted on appearance change.
     private var painted: (space: SpaceInfo, isPrivate: Bool)?
     /// Called after an appearance change repaint.
@@ -133,33 +131,10 @@ final class DeskFrameView: NSView {
         let end = isPrivate ? nil : reduced ? space.background2 : space.frameColor2
         glass.isHidden = !clear
         glass.frame = bounds
-        // Clear glass, as the window has it: Liquid Glass tinted with the space's color, the grain inside it.
-        let liquid = clear && space.usesClearGlass
-        if #available(macOS 26.0, *), liquid {
-            glass.isHidden = true
-            let view = clearGlass as? NSGlassEffectView ?? {
-                let made = NSGlassEffectView()
-                made.style = .regular
-                made.cornerRadius = 0
-                made.autoresizingMask = [.width, .height]
-                let content = NSView()
-                content.wantsLayer = true
-                made.contentView = content
-                addSubview(made, positioned: .above, relativeTo: glass)
-                clearGlass = made
-                return made
-            }()
-            view.isHidden = false
-            view.frame = bounds
-            view.tintColor = color
-            if grain.superlayer !== view.contentView?.layer { view.contentView?.layer?.addSublayer(grain) }
-            // The color is in the glass; no wash on top of it.
-            Tokens.Motion.withoutAnimation { wash.opacity = 0 }
-        } else {
-            clearGlass?.isHidden = true
-            Tokens.Motion.withoutAnimation { wash.opacity = 1 }
-            if grain.superlayer !== paint.layer { paint.layer?.addSublayer(grain) }
-        }
+        // Clear glass, as the window has it: the frosting cleared and tinted with the space's color.
+        let liquid = clear && space.usesClearGlass && SpaceInfo.hasClearGlass
+        glass.clearTint = liquid ? color : nil
+        glass.state = liquid ? .active : .followsWindowActiveState
         paint.frame = bounds
         Tokens.Motion.withoutAnimation { wash.frame = bounds; grain.frame = bounds }
         let r = space.gradientAngle * .pi / 180

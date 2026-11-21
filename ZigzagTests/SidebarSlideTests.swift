@@ -90,22 +90,44 @@ struct SidebarSlideTests {
         #expect(!SidebarContainer.usesLiquidGlass(isGlass: false, windowGlass: clear, hasClearGlass: true))
     }
 
-    @Test func onlyClearGlassMakesTheWindowSeeThrough() {
+    @Test func theWindowStaysOpaqueOnEveryGlass() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
         let frame = SpaceFrameView()
         window.contentView = frame
         var space = SpaceInfo(name: "See-through", color: .sky)
         space.translucency = 0.6
-        let showsDesktop = SpaceFrameView.frameColors(of: space, isPrivate: false).clear
-        space.clearGlass = false
-        frame.paint(space, isPrivate: false, animated: false)
-        #expect(window.isOpaque)
-        space.clearGlass = nil
-        frame.paint(space, isPrivate: false, animated: false)
-        #expect(window.isOpaque == !(showsDesktop && space.usesClearGlass))
+        for glass in [false, nil] as [Bool?] {
+            space.clearGlass = glass
+            frame.paint(space, isPrivate: false, animated: false)
+            #expect(window.isOpaque)
+            // No Liquid Glass anywhere in the frame: it caps the window at 80 Hz on a 120 Hz display (#394).
+            #expect(!Self.subviews(of: frame).contains { String(describing: type(of: $0)).contains("GlassEffect") })
+        }
         space.translucency = nil
         frame.paint(space, isPrivate: false, animated: false)
         #expect(window.isOpaque)
+    }
+
+    @Test func clearGlassClearsTheFrostingAndGivesItBack() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        let frosting = WindowFrosting(frame: window.contentLayoutRect)
+        frosting.blendingMode = .behindWindow
+        frosting.material = .sidebar
+        frosting.state = .active
+        window.contentView = frosting
+        frosting.layoutSubtreeIfNeeded()
+        func fill() -> Float? { Self.layers(of: frosting.layer).first { $0.name == "fill" }?.opacity }
+        let frosted = fill()
+        frosting.clearTint = .systemTeal
+        if frosted != nil { #expect(fill() == WindowFrosting.clearMilk) }
+        frosting.clearTint = nil
+        #expect(fill() == frosted)
+    }
+
+    private static func subviews(of view: NSView) -> [NSView] { view.subviews + view.subviews.flatMap(subviews(of:)) }
+    private static func layers(of layer: CALayer?) -> [CALayer] {
+        guard let layer else { return [] }
+        return [layer] + (layer.sublayers ?? []).flatMap(layers(of:))
     }
 
     @Test func theEditorSaysWhenClearShowsAsFrosted() {
