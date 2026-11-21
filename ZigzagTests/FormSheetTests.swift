@@ -92,6 +92,23 @@ struct FormSheetTests {
         #expect(confirm.isEnabled)
         #expect(confirm.toolTip == nil)
     }
+
+    /// A field on the window's frame takes the sidebar address's fill, and the accent ring while typing, as every field.
+    @Test func aFieldOnTheFrameKeepsTheSharedRing() throws {
+        let field = FilledField.search("Search tabs")
+        field.isOnFrame = true
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 200), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView?.addSubview(field)
+        field.frame = NSRect(x: 20, y: 20, width: 300, height: Tokens.Metric.controlHeight)
+        let fill = try #require(field.layer?.backgroundColor)
+        field.effectiveAppearance.performAsCurrentDrawingAppearance {
+            #expect(fill == Tokens.Chrome.field.cgColor)
+        }
+        #expect((field.layer?.borderColor?.alpha ?? 0) == 0)
+        #expect(window.makeFirstResponder(field.field))
+        #expect((field.layer?.borderColor?.alpha ?? 0) > 0)
+        #expect(field.layer?.borderWidth == 1.5)
+    }
 }
 
 extension NSView {

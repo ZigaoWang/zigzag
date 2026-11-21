@@ -654,7 +654,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   4pt while held; the track's color fades over the same time. Reduce Motion: the knob jumps, the color fades.
 - **Field** (`FilledField`): soft fill, accent ring while typing; `.isPill` for a field on its own in a panel;
   `.isOutlined` for the page look, white with a hairline and a faint shadow like the buttons beside it, which a
-  page's header gives its search; `FilledField.search` with the magnifying glass.
+  page's header gives its search; `FilledField.search` with the magnifying glass; `.isOnFrame` for one on the
+  window's colored frame, in the sidebar address's `Chrome.field` (Show All Tabs' search).
 
 ## Materials
 

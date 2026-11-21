@@ -1223,9 +1223,12 @@ final class FilledField: NSView {
     /// Invalid content: the border turns the warning color, so a blocked form shows which field holds it up.
     var isInvalid = false { didSet { guard isInvalid != oldValue else { return }; updateColors() } }
 
+    /// On the window's colored frame rather than a panel: the sidebar address's soft fill (`Chrome.field`).
+    var isOnFrame = false { didSet { updateColors() } }
+
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = (isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
+            layer?.backgroundColor = (isOnFrame ? Tokens.Chrome.field : isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
             let ring = (tint ?? Brand.Theme.for(self).accent).withAlphaComponent(Tokens.Color.focusAlpha)
             layer?.borderColor = (isInvalid ? Tokens.Color.destructive
                                              : isEditing ? ring : isOutlined ? Tokens.Color.controlEdge : .clear).cgColor

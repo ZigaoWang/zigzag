@@ -274,9 +274,8 @@ final class DeskController {
     /// Counts opens and closes, so one that's been taken over doesn't finish what the next one started.
     private var transition = 0
     /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
-    private let searchBox = ColorView()
-    private let searchIcon = NSImageView()
-    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
+    private let searchBox = FilledField.search(String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
+    private var searchField: NSTextField { searchBox.field }
     private let searchDelegate = DeskSearchDelegate()
     private let noMatches = Label(String(localized: "No tabs match", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search."), font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
@@ -331,16 +330,9 @@ final class DeskController {
         closeButton.onClick = { [weak self] _ in self?.closeSelected() }
         doneButton.onClick = { [weak self] _ in self?.hide(openingTab: nil) }
 
-        searchBox.wantsLayer = true
-        searchBox.layer?.cornerRadius = Self.searchHeight / 2
-        searchBox.layer?.cornerCurve = .continuous
-        searchIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.Symbol.inline)
-        searchIcon.imageScaling = .scaleNone
-        searchIcon.contentTintColor = Tokens.Color.textTertiary
         // The sidebar's soft field on the frame, like the address: the desk's search sits on the space's color.
-        searchBox.layer?.borderWidth = 0
-        searchBox.addSubview(searchIcon)
-        searchBox.addSubview(searchField)
+        searchBox.isPill = true
+        searchBox.isOnFrame = true
         backdrop.addSubview(searchBox)
         noMatches.isHidden = true
         canvas.addSubview(noMatches)
@@ -914,12 +906,6 @@ final class DeskController {
         let top = backdrop.isFlipped ? Tokens.Space.x6 : b.height - Tokens.Space.x6 - h
         searchBox.frame = NSRect(x: round((b.width - width) / 2), y: top, width: width, height: h)
         searchBox.autoresizingMask = [.minXMargin, .maxXMargin, backdrop.isFlipped ? .maxYMargin : .minYMargin]
-        searchBox.color = Tokens.Chrome.field
-        let icon = Tokens.Symbol.inline
-        searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
-        let textHeight = ceil(searchField.intrinsicContentSize.height)
-        let x = searchIcon.frame.maxX + Tokens.Space.x2
-        searchField.frame = NSRect(x: x, y: searchField.centeredY(in: h), width: width - x - Tokens.Space.x3, height: textHeight)
         scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
         let line = Tokens.Metric.hairline
         scrollEdge.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea - line : b.height - Self.searchArea, width: b.width, height: line)
