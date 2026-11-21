@@ -2808,6 +2808,9 @@ enum DebugBridge {
             Task { @MainActor in await DebugBridge.extensionTest(f[0], page: page, in: controller) }
         case "ua": controller.selectedWebView?.customUserAgent = arg.isEmpty ? nil : arg; controller.selectedWebView?.reload()
         case "readerstyle": controller.toggleReaderOptions()
+        // readerbutton: the address's Reader button, as a click. readerswatchhover <n|off>: a color swatch under the pointer.
+        case "readerbutton": controller.pressReaderButton()
+        case "readerswatchhover": ReaderOptions.debugHoverSwatch(Int(arg))
         case "readerprefs":
             // readerprefs <auto|light|sepia|dark> <serif|sans> <narrow|medium|wide> [size]: Reader's choices, applied to the open article.
             let f = arg.split(separator: " ").map(String.init)

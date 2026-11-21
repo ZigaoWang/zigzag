@@ -197,6 +197,36 @@ enum Brand {
                     SpaceColor.tone(hue: h, lightness: Tokens.Frame.readerDarkLightness, chroma: Tokens.Frame.readerDarkChroma))
         }
 
+        /// Reader's Space paper, day and night: the sidebar's own color (its first, solid), kept light or deep enough
+        /// for text at 7:1 and no louder than a curated frame. White, grays and black stay as they are.
+        static func spacePaper(_ space: SpaceInfo) -> (light: NSColor, dark: NSColor) {
+            func resolved(_ name: NSAppearance.Name) -> NSColor {
+                var color = space.background
+                NSAppearance(named: name)?.performAsCurrentDrawingAppearance { color = space.background.usingColorSpace(.sRGB) ?? color }
+                return calmPaper(color)
+            }
+            return (resolved(.aqua), resolved(.darkAqua))
+        }
+
+        /// A color moved out of the middle tones (OKLCH lightness at least 0.86, or at most 0.3) and its chroma capped,
+        /// so both a dark and a light ink can read on it.
+        static func calmPaper(_ color: NSColor) -> NSColor {
+            guard let c = color.usingColorSpace(.sRGB) else { return color }
+            let lab = OKLab.lab(r: OKLab.decode(c.redComponent), g: OKLab.decode(c.greenComponent), b: OKLab.decode(c.blueComponent))
+            let light = lab.l >= 0.55
+            let l = light ? max(lab.l, Tokens.Frame.readerSpaceLightness) : min(lab.l, Tokens.Frame.readerSpaceDarkLightness)
+            let chroma = (lab.a * lab.a + lab.b * lab.b).squareRoot()
+            let most = light ? Tokens.Frame.readerSpaceChroma : Tokens.Frame.readerSpaceDarkChroma
+            var k = chroma > most ? most / chroma : 1
+            var rgb = OKLab.rgb(l: l, a: lab.a * k, b: lab.b * k)
+            while !OKLab.inGamut(rgb), k > 0.01 {
+                k *= 0.94
+                rgb = OKLab.rgb(l: l, a: lab.a * k, b: lab.b * k)
+            }
+            let e = rgb.map { OKLab.encode(min(max($0, 0), 1)) }
+            return NSColor(srgbRed: e[0], green: e[1], blue: e[2], alpha: 1)
+        }
+
         /// A page's quiet column or header (Settings, History, Passwords): a light tint of the space, between the
         /// frame and the white page.
         var wash: NSColor {

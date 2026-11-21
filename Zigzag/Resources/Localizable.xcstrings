@@ -11133,7 +11133,7 @@
       }
     },
     "Hide Reader" : {
-      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.\nTooltip of the address bar's Reader button while Reader is on.",
+      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16487,6 +16487,17 @@
         }
       }
     },
+    "Reader Options" : {
+      "comment" : "Tooltip and VoiceOver name of the address bar's Reader button while Reader is on, and VoiceOver name of the panel it opens: text size, typeface, column width, colors and Turn Off Reader.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读器选项"
+          }
+        }
+      }
+    },
     "Reader Text and Colors" : {
       "comment" : "View menu item: opens Reader's text size, typeface, column width and color choices.",
       "localizations" : {
@@ -19508,7 +19519,7 @@
       }
     },
     "Space" : {
-      "comment" : "VoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19536,6 +19547,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空间 %lld"
+          }
+        }
+      }
+    },
+    "Space: your space’s colors" : {
+      "comment" : "Tooltip of the Space color choice in Reader: the article takes the colors of the space you're in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间：你所在空间的颜色"
           }
         }
       }
@@ -20120,17 +20142,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字大小"
-          }
-        }
-      }
-    },
-    "Text and Colors" : {
-      "comment" : "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文字和颜色"
           }
         }
       }
@@ -21710,6 +21721,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 %@ 上关闭"
+          }
+        }
+      }
+    },
+    "Turn Off Reader" : {
+      "comment" : "Action at the bottom of Reader's text and color choices: closes Reader and shows the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭阅读器"
           }
         }
       }

@@ -117,6 +117,90 @@ struct ReaderTests {
         #expect(!Reader.html(for: article, preferences: Reader.Preferences()).contains("data-motion=\"reduce\" style="))
     }
 
+    /// Space's paper is the space's own color, and its inks read on it: body text and links at 7:1 or more, soft words
+    /// at 4.5:1, in every curated color, custom hues at every strength, every shade from white to black and see-through.
+    @Test func spaceColorsReadInEverySpace() {
+        var spaces = SpaceColor.allCases.map { SpaceInfo(name: $0.name, color: $0) }
+        for step in 0..<24 {
+            for intensity in [0.0, 0.4, 1.0] {
+                var custom = SpaceInfo(name: "hue", color: .sky)
+                custom.hue = Double(step) / 24
+                custom.intensity = intensity
+                spaces.append(custom)
+            }
+            for depth in stride(from: 0.0, through: 1.0, by: 0.1) {
+                for tint in [0.0, 0.5, 1.0] {
+                    var painted = SpaceInfo(name: "paint", color: .sky)
+                    painted.hue = Double(step) / 24
+                    painted.brightness = depth
+                    painted.tint = tint
+                    spaces.append(painted)
+                }
+            }
+        }
+        var glass = SpaceInfo(name: "glass", color: .rose)
+        glass.translucency = 0.8
+        spaces.append(glass)
+        var worst = (ink: 99.0, link: 99.0, soft: 99.0)
+        for space in spaces {
+            let colors = Reader.SpaceColors.of(space)
+            for palette in [colors.light, colors.dark] {
+                let paper = Tokens.Color.hex(palette.paper)
+                worst.ink = min(worst.ink, Brand.contrast(Tokens.Color.hex(palette.ink), paper))
+                worst.link = min(worst.link, Brand.contrast(Tokens.Color.hex(palette.link), paper))
+                worst.soft = min(worst.soft, Brand.contrast(Tokens.Color.hex(palette.soft), paper))
+                #expect(palette.isDark == (Brand.relativeLuminance(paper) < 0.18))
+            }
+        }
+        #expect(worst.ink >= 7)
+        #expect(worst.link >= 7)
+        #expect(worst.soft >= 4.5)
+        // White stays white, black stays black, and a curated color is the sidebar's own.
+        #expect(Reader.SpaceColors.of(SpaceInfo(name: "w", color: .snow)).light.paper == 0xFFFFFF)
+        #expect(Reader.SpaceColors.of(SpaceInfo(name: "b", color: .ink)).dark.paper == 0x000000)
+        let sage = SpaceInfo(name: "s", color: .sage)
+        var frame = sage.background
+        NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance { frame = sage.background.usingColorSpace(.sRGB) ?? frame }
+        #expect(Reader.SpaceColors.of(sage).light.paper == Reader.hex(frame))
+        #expect(Reader.SpaceColors.of(sage).light.paper != Reader.SpaceColors.of(SpaceInfo(name: "r", color: .rose)).light.paper)
+    }
+
+    /// Space is a theme of its own, saved by name: an older Zigzag that doesn't know it reads Auto.
+    @Test func spaceIsSavedAndReachesThePage() throws {
+        let defaults = try #require(UserDefaults(suiteName: "ReaderTests-\(UUID().uuidString)"))
+        Reader.Preferences(theme: .space).save(to: defaults)
+        #expect(defaults.string(forKey: "ReaderTheme") == "space")
+        #expect(Reader.Preferences.load(from: defaults).theme == .space)
+        defaults.set("someday", forKey: "ReaderTheme")
+        #expect(Reader.Preferences.load(from: defaults).theme == .auto)
+        #expect(Reader.Preferences(theme: .space).script.contains("dataset.theme='space'"))
+        let colors = Reader.SpaceColors.of(SpaceInfo(name: "s", color: .lavender))
+        let article = Reader.Article(title: "T", byline: "", site: "S", content: "<p>x</p>", length: 1, lang: "en")
+        let page = Reader.html(for: article, preferences: Reader.Preferences(theme: .space), space: colors)
+        #expect(page.contains("data-theme=\"space\""))
+        #expect(page.contains("<style id=\"zigzag-colors\">"))
+        #expect(page.contains(":root[data-theme=\"space\"] { \(colors.light.css) }"))
+        #expect(page.contains("@media (prefers-color-scheme: dark) { :root[data-theme=\"space\"] { \(colors.dark.css) } }"))
+        // Print stays black on white whatever the theme.
+        #expect(Reader.css.contains(":root, :root[data-theme] { \(Reader.Palette.light.css) --ink: #000;"))
+    }
+
+    /// The site's icon sits on the text's left edge: the pictures' centering doesn't move it.
+    @Test func headerIconSitsOnTheTextsEdge() async throws {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        let article = Reader.Article(title: "A title", byline: "", site: "example.com", content: "<p>Body text.</p>", length: 10, lang: "en")
+        let dot = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="
+        webView.loadHTMLString(Reader.html(for: article, preferences: Reader.Preferences(), icon: dot, reducedMotion: true), baseURL: nil)
+        while webView.isLoading { try await Task.sleep(for: .milliseconds(20)) }
+        let script = "const r = s => document.querySelector(s).getBoundingClientRect();" +
+            "return [r('.site img').left, r('.site span').left, r('h1.title').left, r('article p').left];"
+        let edges = try await webView.callAsyncJavaScript(script, arguments: [:], contentWorld: .defaultClient) as? [Double] ?? []
+        try #require(edges.count == 4)
+        #expect(edges[0] == edges[2])
+        #expect(edges[0] == edges[3])
+        #expect(edges[1] == edges[0] + 16 + 8)
+    }
+
     /// The article's own "By …" line goes when the header already names that author; the text itself never does.
     @Test func aBylineTheHeaderShowsIsntRepeated() async throws {
         let webView = WKWebView()

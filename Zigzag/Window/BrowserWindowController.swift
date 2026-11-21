@@ -153,8 +153,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
             return nil
         }
-        sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
-        sidebar.address.readerOptionsButton.onClick = { [weak self] _ in self?.toggleReaderOptions() }
+        sidebar.address.readerButton.onClick = { [weak self] _ in self?.pressReaderButton() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
@@ -2059,7 +2058,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
             view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
             view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
-            view.show(article, from: url, icon: tab.favicon, theme: Brand.Theme.of(self.tabManager.currentSpace))
+            view.currentSpace = { [weak self] in self?.tabManager.currentSpace }
+            view.show(article, from: url, icon: tab.favicon)
             self.reader = view
             self.readerTab = tab
             tab.readerWebView = view.webView
@@ -2089,13 +2089,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Reader's text and colors, under the address's Aa. With no address on screen (the sidebar hidden, the address
-    /// not above the page), from the reading page's top-right corner instead.
+    /// The address's Reader button: off, it turns Reader on; on, it opens Reader's options, where it turns off.
+    func pressReaderButton() {
+        if isReaderOnHere { toggleReaderOptions() } else { toggleReader() }
+    }
+
+    /// Reader's text and colors, under the address's Reader button. With no address on screen (the sidebar hidden,
+    /// the address not above the page), from the reading page's top-right corner instead.
     func toggleReaderOptions() {
         guard let reader, readerTab === tabManager.selectedTab else { return }
         let overlay = root.overlay
         let address = sidebar.address
-        let button = address.readerOptionsButton
+        let button = address.readerButton
         let aboveThePage = root.barHoldsAddress
         let docked = root.sidebarVisible && !root.isSidebarFloatingVisible
         let onScreen = !button.isHidden && (aboveThePage || root.sidebarVisible || root.isSidebarFloatingVisible)

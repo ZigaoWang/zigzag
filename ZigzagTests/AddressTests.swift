@@ -296,18 +296,23 @@ struct AddressTests {
         #expect(a.imageSide == 16 && b.imageSide == Tokens.Sidebar.addressIcon)
     }
 
-    /// Reader's Aa shows only while Reader is on, just before Reader's own button, which stays where it was.
-    @Test func readersTextAndColorsShowWhileReaderIsOn() {
+    /// Reader is one button: it stays put when Reader turns on, and says what a click does in each state.
+    @Test func readersOneButtonSaysWhatAClickDoes() {
         let address = AddressView(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Sidebar.addressHeight))
         address.setReader(available: true, active: false)
         let readerX = address.readerButton.frame.minX
-        #expect(address.readerOptionsButton.isHidden)
+        let width = address.buttonsWidth
+        #expect(address.readerButton.toolTip?.hasPrefix("Show Reader") == true)
+        #expect(address.readerButton.accessibilityLabel() == "Show Reader")
         address.setReader(available: true, active: true)
-        #expect(!address.readerOptionsButton.isHidden)
         #expect(address.readerButton.frame.minX == readerX)
-        #expect(address.readerButton.frame.minX - address.readerOptionsButton.frame.maxX == 2)
+        #expect(address.buttonsWidth == width)
+        #expect(address.readerButton.isSelected)
+        #expect(address.readerButton.toolTip == "Reader Options")
+        #expect(address.readerButton.accessibilityLabel() == "Reader Options")
+        #expect(!address.subviews.contains { ($0 as? IconButton)?.symbol == "textformat.size" })
         address.setReader(available: true, active: false)
-        #expect(address.readerOptionsButton.isHidden)
+        #expect(!address.readerButton.isSelected)
     }
 
     /// The count is a 12pt pill in the button's bottom-right corner, never past the button's edges, however long.
