@@ -129,8 +129,11 @@ class InteractiveView: NSView {
             guard oldValue != isPressed else { return }
             stateDidChange(animated: false)
             if pressScales { showPress(isPressed) } else if pressSinks { showSink(isPressed) }
+            pressChanged?(isPressed)
         }
     }
+    /// A press staying down or lifting, for a control that repeats while held.
+    var pressChanged: ((Bool) -> Void)?
     /// Buttons and rows give under the finger: `Tokens.Motion.pressScale` while held, easing back on release.
     var pressScales = false
     /// Things that read as objects sink a point instead and settle back with weight (`showSink`).

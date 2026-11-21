@@ -25519,6 +25519,17 @@
         }
       }
     },
+    "⇧-click to type a zoom" : {
+      "comment" : "After Actual Size in the percentage's tooltip on the Zoom row: Shift-clicking it lets you type a zoom.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 ⇧ 点按可输入缩放比例"
+          }
+        }
+      }
+    },
     "⌃Tab switches to" : {
       "comment" : "A setting in Settings › Tabs: what Control-Tab does. ⌃ is the Control key. Followed by Recent Tabs or Next Tab in the Sidebar.",
       "localizations" : {

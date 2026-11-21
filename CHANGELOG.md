@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Zoom keeps going while you hold − or + in Site Controls, and ⇧-clicking the percentage lets you type one, like 130%, instead of stepping to it. A plain click still goes back to Actual Size. ([#395](https://github.com/ZigaoWang/zigzag/issues/395))
+
 ### Fixed
 - Change Icon's face in the sidebar's menus and Site Controls stays an outline in dark mode, like the icons beside it. macOS draws that face filled in dark mode, so it stood out as a solid gray disc.
 - A right-click menu near the bottom of the window slides up only as far as it needs to, as macOS's menus do, instead of opening wholly above the pointer. Its first items stay right by the pointer, so Separate Split View or Reload Page is a short move away wherever you click.

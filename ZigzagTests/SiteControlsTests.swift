@@ -455,6 +455,25 @@ struct ZoomStepperTests {
         #expect(ZoomLevels.percent(1.25) == "125%")
     }
 
+    /// A percentage typed in is the zoom itself, not snapped to a preset; the stepper's own ends bound it (#395).
+    @Test func aTypedPercentageIsTheZoomItself() {
+        #expect(ZoomLevels.typed("130%") == 1.3)
+        #expect(ZoomLevels.typed(" 80 % ") == 0.8)
+        #expect(ZoomLevels.typed("abc") == nil)
+        #expect(ZoomLevels.typed("0") == nil)
+        let stepper = ZoomStepper()
+        var changes: [CGFloat] = []
+        stepper.onChange = { changes.append($0) }
+        stepper.debugType("130%")
+        #expect(stepper.zoom == 1.3)
+        stepper.debugType("1000")
+        #expect(stepper.zoom == 3)
+        stepper.debugType("10")
+        #expect(stepper.zoom == 0.5)
+        stepper.debugType("130%")
+        #expect(changes == [1.3, 3, 0.5, 1.3])
+    }
+
     @Test func percentageResetsTo100() {
         let stepper = ZoomStepper()
         var changes: [CGFloat] = []
