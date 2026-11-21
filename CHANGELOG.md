@@ -5,11 +5,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- ⇧⌘C copies the page's link on every site, as in Arc. On a file page on GitHub, which uses the same keys to copy the file's raw text, it copied the file instead.
-
 ### New
 - Translating works as in Chrome and Safari. The offer on a page in another language has a … menu with Always Translate (the language), Never Translate (the language) and Never Translate This Site. On a page in another language, a translate button in the address bar opens the same choices, with Translate or Show Original; it stays pressed while the page is translated. Settings › Translation lists the languages you always or never translate and the sites you never translate, each with Remove. A private window never saves a site to the list: Never Translate This Site there lasts until the window closes.
+
+### Fixed
+- ⇧⌘C copies the page's link on every site, as in Arc. On a file page on GitHub, which uses the same keys to copy the file's raw text, it copied the file instead.
 
 ## [0.9.4] - 2026-11-21
 
