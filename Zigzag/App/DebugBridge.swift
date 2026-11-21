@@ -634,6 +634,11 @@ enum DebugBridge {
         }
     }
     private static var menuToClose: NSObjectProtocol?
+
+    /// A sidebar menu as a right-click at `point` in `view` shows it.
+    private static func showDrawn(_ menu: NSMenu, from view: NSView, at point: NSPoint) {
+        MenuPanel.show(MenuPanel.entries(from: menu), from: view, placement: .at(view.convert(point, to: nil)))
+    }
     private static var trackedMenu: NSMenu?
 
     private static func runKeepOnTop(_ name: String, _ arg: String) {
@@ -932,7 +937,10 @@ enum DebugBridge {
             let hit = view.map { "\(type(of: $0))" } ?? ""
             var answered = "", items: [String] = []
             while let v = view {
-                if let menu = v.menu(for: event) { answered = "\(type(of: v))"; items = menu.items.map { $0.isSeparatorItem ? "-" : $0.title }; break }
+                // Sidebar rows draw their menu from `onRightClick` and give AppKit none.
+                if let menu = ((v as? InteractiveView)?.drawsMenu == true ? (v as? InteractiveView)?.onRightClick?(event) : v.menu(for: event)) {
+                    answered = "\(type(of: v))"; items = menu.items.map { $0.isSeparatorItem ? "-" : $0.title }; break
+                }
                 // The sidebar draws its own menu for its empty space (`showBlankMenu`).
                 if v === controller.sidebar {
                     answered = "SidebarView"
@@ -1928,7 +1936,7 @@ enum DebugBridge {
             debugLog("rowmenu \(arg) => \(menu.map(titles) ?? [])")
             if let menu, let anchor {
                 closeNextMenu(after: 4)
-                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: anchor.bounds.midY), in: anchor) }
+                DispatchQueue.main.async { showDrawn(menu, from: anchor, at: NSPoint(x: 60, y: anchor.bounds.midY)) }
             }
         case "foldermenu":
             // foldermenu <folder>[>item]: that item of the folder's menu, as choosing it does; no item, the menu at its
@@ -1941,7 +1949,7 @@ enum DebugBridge {
                 if case let index = menu.indexOfItem(withTitle: path[1]), index >= 0 { menu.performActionForItem(at: index) }
             } else if let row = controller.sidebar.list.row(forFolder: folder.id) {
                 closeNextMenu(after: 4)
-                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: row.bounds.midY), in: row) }
+                DispatchQueue.main.async { showDrawn(menu, from: row, at: NSPoint(x: 60, y: row.bounds.midY)) }
             }
         case "spacemenu":
             // spacemenu [item]: that item of the right-click menu above the pinned tabs, as choosing it does; no item,
@@ -1953,9 +1961,29 @@ enum DebugBridge {
                 if case let index = menu.indexOfItem(withTitle: arg), index >= 0 { menu.performActionForItem(at: index) }
             } else {
                 closeNextMenu(after: 4)
-                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 40, y: header.bounds.midY), in: header) }
+                DispatchQueue.main.async { showDrawn(menu, from: header, at: NSPoint(x: 40, y: header.bounds.midY)) }
+            }
+        case "dotmenu":
+            // dotmenu <space name>: the right-click menu of that space's icon at the bottom of the sidebar, drawn; it
+            // closes by itself after 4 s.
+            guard let space = Library.shared.spaces.first(where: { $0.name == arg }), let dot = controller.sidebar.dot(for: space.id),
+                  let menu = controller.sidebarSpaceMenu(for: space.id) else { break }
+            closeNextMenu(after: 4)
+            DispatchQueue.main.async { showDrawn(menu, from: dot, at: NSPoint(x: dot.bounds.midX, y: dot.bounds.midY)) }
+        case "drawnkey":
+            // drawnkey up|down|left|right|return|esc: that key in the open drawn menu, as typed.
+            let codes: [String: UInt16] = ["up": 126, "down": 125, "left": 123, "right": 124, "return": 36, "esc": 53]
+            if let code = codes[arg] { MenuPanel.current?.debugKey(code) }
+        case "drawnopen":
+            // drawnopen <title>: opens that item's submenu in the open drawn menu, as hovering it does.
+            MenuPanel.current?.debugOpenSubmenu(arg)
+        case "drawnmenu":
+            // drawnmenu <path>: the open drawn menu's titles, and its open submenus', as JSON.
+            if let menu = MenuPanel.current, let data = try? JSONSerialization.data(withJSONObject: menu.debugState) {
+                try? data.write(to: URL(fileURLWithPath: arg))
             }
         case "folderstate":
+
             debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
         case "scrolllist":

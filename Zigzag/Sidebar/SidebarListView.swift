@@ -946,7 +946,9 @@ final class SidebarListView: NSView {
                 folding.autoenablesItems = false
                 if !folding.items.isEmpty { folding.insertItem(.separator(), at: 0) }
                 folding.insertItem(SidebarMenus.Item(header.isCollapsed ? String(localized: "Show Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: unfolds them.")
-                                                                          : String(localized: "Hide Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: folds them away.")) { [weak self] in
+                                                                          : String(localized: "Hide Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: folds them away."),
+                                                   symbol: header.isCollapsed ? SidebarMenus.Symbol.showPins : SidebarMenus.Symbol.hidePins) { [weak self] in
+
                     self?.toggleCollapsed()
                 }, at: 0)
                 return folding

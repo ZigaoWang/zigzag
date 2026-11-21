@@ -1450,20 +1450,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func nowPlayingMenu(for tab: Tab) -> NSMenu? {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.")) { [weak self] in
+        typealias S = SidebarMenus.Symbol
+        menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound."), symbol: S.showTab) { [weak self] in
             self?.tabManager.select(tab)
         })
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item(isPausedForNowPlaying(tab) ? String(localized: "Play", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
-                                       : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) { [weak self] in
+                                       : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."),
+                                       symbol: isPausedForNowPlaying(tab) ? S.play : S.pause) { [weak self] in
             self?.toggleNowPlaying(tab)
         })
         menu.addItem(SidebarMenus.Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
-                                       : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) {
+                                       : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."),
+                                       symbol: tab.isMuted ? S.unmute : S.mute) {
             tab.setMuted(!tab.isMuted)
         })
         menu.addItem(.separator())
-        menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing.")) { [weak self] in
+        menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing."), symbol: S.close) { [weak self] in
+
             self?.hideNowPlaying(tab)
         })
         return menu

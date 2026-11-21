@@ -21,6 +21,7 @@ class SidebarRowView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        drawsMenu = true
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         title.font = Tokens.Font.sidebarRow()
@@ -1499,7 +1500,9 @@ final class SpaceHeaderView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        drawsMenu = true
         chevron.imageScaling = .scaleNone
+
         chevron.contentTintColor = Tokens.Color.textTertiary
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.imageAlignment = .alignCenter
