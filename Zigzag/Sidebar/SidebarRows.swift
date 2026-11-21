@@ -1689,7 +1689,9 @@ final class SeparatorRowView: NSView {
         // Center the caps on `mid`, Clear's capsule center.
         let capsY = mid - h / 2 - Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarLabel(), lineHeight: h)
         let scale = window?.backingScaleFactor ?? 2
-        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
+        // Its ink, not its box, on the icon column, as the space's name is.
+        let bearing = SpaceHeaderView.inkBearing(of: label.stringValue, font: label.font ?? Tokens.Font.sidebarLabel())
+        label.frame = NSRect(x: SidebarRowView.inset - Label.inset - bearing, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
         let cw = clearButton.fittingWidth, ch: CGFloat = 20
         clearButton.frame = NSRect(x: bounds.width - cw, y: floor(mid - ch / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()
