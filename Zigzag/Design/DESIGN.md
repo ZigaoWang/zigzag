@@ -494,6 +494,17 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   or one of its web apps). Back in front of that tab, it goes back in its page; back on another tab or window, it
   plays on until you go to its tab. Picture in Picture or full screen you started, a mini player already showing, a
   video the page won't let float (`disablePictureInPicture`), and Zigzag Mini's page are left alone.
+- **Capture** (`PageCapture`, `CapturePreview`, #457): ⇧⌘2, Site Controls or the command bar dims the page (or its
+  pane) in `Color.captureScrim`, fading in and out like a sheet's scrim, its corners the page card's. Area: a drag
+  draws the clear part with a hairline in `captureEdge`, round grips on its corners and sides (`captureHandle`), the
+  Mac's crosshair, resize and hand pointers, and its size in tabular figures on a small capsule under it. Element: the
+  part under the pointer is clear with the drop target's edge (1.5pt accent, `Radius.small`), gliding between parts in
+  `highlightGlide`. The toolbar is a capsule floating panel near the page's foot, `captureToolbarHeight`: Area and
+  Element (the chosen one the soft card), a hairline, Full Page and Visible, Capture (the one prominent pill, once an
+  area is drawn) and ×, names dropped for icons alone in a narrow pane; keys in the tooltips (A, E, F, V, Return,
+  Esc). After it, the card in the page's bottom right, `capturePreviewWidth`, growing out of that corner: the picture
+  (a tall one from its top) to drag out, then Copied, Save and Share as Site Controls' captioned tiles. It goes after
+  six seconds unless the pointer is on it, or at a click elsewhere or Esc.
 - **Full screen in the page** (`PageFullScreen`, #168): with Settings › Tabs › Full screen videos fill set to The Page,
   or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)
   fills the page card, or its pane in a split, in black, the window's chrome as it was. No bar, no note: the player's
