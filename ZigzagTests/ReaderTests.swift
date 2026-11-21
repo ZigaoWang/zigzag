@@ -65,7 +65,7 @@ struct ReaderTests {
 
     @Test func choicesReachThePageAsVariables() {
         let preferences = Reader.Preferences(size: 22, face: .sans, theme: .dark, width: .narrow)
-        #expect(preferences.rootStyle == "--size: 22px; --measure: 29em")
+        #expect(preferences.rootStyle == "--size: 22px; --measure: 28rem")
         #expect(preferences.script.contains("dataset.theme='dark'"))
         #expect(preferences.script.contains("dataset.face='sans'"))
         #expect(Reader.Palette.dark.css.contains("--paper: #1E1E20;"))
@@ -81,7 +81,40 @@ struct ReaderTests {
         #expect(page.contains("default-src 'none'"))
         #expect(page.contains("<h1 class=\"title\">A title</h1>"))
         #expect(page.contains("<span class=\"author\">Ada</span><time>March 3, 2024</time>"))
-        #expect(page.contains("style=\"--size: 20px; --measure: 34em\""))
+        #expect(page.contains("style=\"--size: 20px; --measure: 34rem\""))
+    }
+
+    /// Wide has no cap of its own: the column is the window inside its margins.
+    @Test func wideFillsTheWindow() {
+        #expect(Reader.Preferences.Width.wide.measure == "100vw")
+        #expect(Reader.css.contains("main { max-width: var(--measure, 34rem)"))
+        #expect(Reader.css.contains("padding: 80px var(--gutter) 120px"))
+        // Changing a choice keeps the space's paper and the line you were on.
+        let script = Reader.Preferences(width: .wide).script
+        #expect(script.contains("setProperty('--measure','100vw')"))
+        #expect(!script.contains("setAttribute('style'"))
+        #expect(script.contains("scrollBy"))
+    }
+
+    /// Auto's paper is a breath of the space's color, and the inks keep their contrast on it in every hue.
+    @Test func autoPaperTakesTheSpacesColorAndKeepsContrast() throws {
+        #expect(Reader.AutoPaper.of(.navy) == Reader.AutoPaper())
+        for step in 0..<20 {
+            var theme = Brand.Theme(hue: Double(step) / 20)
+            theme.surfaceHue = Double(step) / 20
+            let paper = Reader.AutoPaper.of(theme)
+            #expect(paper != Reader.AutoPaper())
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.light.ink), Tokens.Color.hex(paper.light)) >= 12)
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.light.soft), Tokens.Color.hex(paper.light)) >= 4.5)
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.dark.ink), Tokens.Color.hex(paper.dark)) >= 10)
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.dark.soft), Tokens.Color.hex(paper.dark)) >= 4.5)
+        }
+        let article = Reader.Article(title: "T", byline: "", site: "S", content: "<p>x</p>", length: 1, lang: "en")
+        let tinted = Reader.AutoPaper(light: 0xF8F9FC, dark: 0x1D2026)
+        let page = Reader.html(for: article, preferences: Reader.Preferences(), paper: tinted, reducedMotion: true)
+        #expect(page.contains("--tint: #F8F9FC; --tint-dark: #1D2026;"))
+        #expect(page.contains("data-motion=\"reduce\" style="))
+        #expect(!Reader.html(for: article, preferences: Reader.Preferences()).contains("data-motion=\"reduce\" style="))
     }
 
     /// The reading page is in the store of the page it reads, never one every reading page shares: the article's

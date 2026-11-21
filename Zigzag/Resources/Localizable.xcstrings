@@ -6667,6 +6667,17 @@
         }
       }
     },
+    "Colors" : {
+      "comment" : "Row in Reader's text and color choices: the paper and ink the article is shown in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颜色"
+          }
+        }
+      }
+    },
     "Column Width" : {
       "comment" : "VoiceOver label of the column width choice in Reader's text and color choices.",
       "localizations" : {
@@ -19813,6 +19824,17 @@
         }
       }
     },
+    "Text %@, Actual Size" : {
+      "comment" : "VoiceOver name of the percentage on Reader's Text Size row: the size now, then what pressing it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字 %@，实际大小"
+          }
+        }
+      }
+    },
     "Text %lld%%" : {
       "comment" : "Toast when Reader's text size changes, like Text 120%.",
       "localizations" : {
@@ -19831,6 +19853,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文本替换"
+          }
+        }
+      }
+    },
+    "Text Size" : {
+      "comment" : "Row in Reader's text and color choices: the − 100% + stepper.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字大小"
           }
         }
       }
