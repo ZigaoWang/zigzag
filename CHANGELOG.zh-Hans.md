@@ -12,7 +12,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-## [0.9.3] - 2026-11-18
+## [0.9.3] - 2026-11-21
 
 来自其他 App 的链接会在 Zigzag Mini 中打开；网站可以有自己的图标；空间编辑器更清爽；更新卡片会显示进度；每个网站的设置都能单独修改；已固定的文件夹可以全部在标签页中打开；清除 Cookie 时可以保留你选的网站；同一网站的不同路径可以归到不同空间；可以手动让页面休眠；可以在设置里检查扩展更新；你允许的扩展可以在无痕窗口里运行；支持 Firefox 扩展；扩展可以用地址栏关键词；分屏的页面大小可以自由调整；可以在地址栏直接固定页面；侧边栏的右键菜单都换成了 Zigzag 自己的菜单；另外修复了分屏浏览、像 Chrome 一样关闭和重新打开标签页、120 Hz 下的滚动、“密码”列表、切换标签页的快捷键、扩展的网站访问权限、全屏、通行密钥、Proton Pass、Passbolt、YouTube 上 ⌘ 点击、固定分组、GitHub 上的查找等问题。
 
@@ -66,7 +66,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
 - 鼠标侧键的后退和前进在 Zigzag Mini 和已安装的网页 App 里也能用了，不再只在浏览器窗口里有效。感谢 [Tuszy42](https://github.com/Tuszy42)。([#345](https://github.com/ZigaoWang/zigzag/issues/345))
 - 密码管理器扩展的通行密钥在网页打开期间会一直有效。以前 WebKit 可能丢掉网页的通行密钥对象，再换一个没有扩展挂钩的新对象，登录就交给了浏览器，而不是 Bitwarden 这类扩展。Zigzag 现在也会给 Strongbox 让路，和 1Password、Bitwarden 一样。感谢 [bkonia](https://github.com/bkonia)。([#344](https://github.com/ZigaoWang/zigzag/issues/344))
-- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
 - 在空间之间轻扫时，窗口颜色会跟着手指从一个空间的颜色渐变到下一个，取消轻扫时会变回原来的颜色。以前要等手指松开，颜色才会变。
 - 登录页面在用户名栏提供通行密钥后（例如 GitHub），通行密钥仍然可以正常使用。以前重新载入这样的页面，或者再次请求通行密钥时，请求可能被拒绝，之后所有网站的通行密钥都会直接失败，没有任何提示，直到重新启动 Mac。如果你的通行密钥现在已经失效，更新后请重新启动一次 Mac。感谢 [vandenbulckjean](https://github.com/vandenbulckjean)。([#348](https://github.com/ZigaoWang/zigzag/issues/348))
 - 在扩展弹窗里改的设置不会再自己变回去了。Strongbox 的“填充”开关每次点完显示的都是点之前的状态，重新打开又反过来，因为 WebKit 有时会在扩展上一次保存还没完成时就先读了存储。现在每个扩展的保存和读取都按它调用的顺序完成，和 Chrome 一样。感谢 [bkonia](https://github.com/bkonia)。([#350](https://github.com/ZigaoWang/zigzag/issues/350))
