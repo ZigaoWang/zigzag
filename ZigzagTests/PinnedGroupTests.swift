@@ -518,6 +518,38 @@ import Testing
         #expect(splits.count == 1 && splits[0].ids == [marks[2].id, marks[0].id] && splits[0].ratio == 0.6)
         #expect(bookmarks.map(\.id) == [marks[1].id, marks[2].id, marks[0].id])
     }
+
+    /// The tab list and the pinned pages draw a split's row with the same view, laid out the same: its parts,
+    /// hairlines and × in the same places.
+    @Test(arguments: [2, 3, 4]) func bothSectionsDrawTheSameRow(count: Int) throws {
+        try inWindow((0..<count).map(String.init)) { controller, tabs, space in
+            let manager = controller.tabManager
+            let list = controller.sidebar.list
+            manager.makeGroup(tabs, shape: Self.shapes[count == 2 ? 0 : count == 3 ? 2 : 4])
+            manager.select(tabs[0])
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let tabRow = try #require(list.row(for: tabs[0]) as? TabRowView)
+            let hairline = Tokens.Metric.hairline
+            func shape(_ row: TabRowView) -> [NSRect] {
+                row.isHovered = true
+                row.layoutSubtreeIfNeeded()
+                var parts: [NSRect] = []
+                for view in row.subviews where !view.isHidden && (view is FaviconView || view.frame.width == hairline) { parts.append(view.frame) }
+                return [row.bounds, row.closeButton.frame] + parts.sorted { ($0.minX, $0.width) < ($1.minX, $1.width) }
+            }
+            let inTabs = shape(tabRow)
+            #expect(tabRow.parts.count == count - 1)
+            manager.bookmarkTab(tabs[0], in: space)
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let mark = try #require(tabs[0].bookmarkID)
+            let pinRow = try #require(list.row(forBookmark: mark) as? TabRowView)
+            #expect(type(of: pinRow) == type(of: tabRow))
+            #expect(pinRow.parts.count == count - 1)
+            #expect(shape(pinRow) == inTabs)
+        }
+    }
 }
 
 /// How a favorite group's tile shows its pages (#203): a small icon for each, placed as the pages share the window, and

@@ -23,8 +23,7 @@ import Testing
     private func row(_ tab: Tab, partners: [Tab]) -> TabRowView {
         let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
         row.configure(tab: tab)
-        row.configure(partners: partners)
-        row.closesPart = true
+        row.configure(parts: partners.map { TabRowView.Part(page: $0) })
         return row
     }
 
@@ -60,41 +59,42 @@ import Testing
         }
     }
 
-    /// The row's × is on the part pointed at, else on the page you're in.
-    @Test func theRowsCloseButtonClosesOnePart() throws {
-        try inWindow(["A", "B"]) { controller, tabs in
-            let left = tabs[0], right = tabs[1]
-            let row = row(left, partners: [right])
-            row.isSelected = true
-            row.focusedHalf = 1
-            #expect(row.closingPage === right)
-            row.focusedHalf = 0
-            #expect(row.closingPage === left)
-            // Not a split row's per-part ×: the row's own tab.
-            row.closesPart = false
-            #expect(row.closingPage === left)
+    /// The × of a split's row sits where a single tab's does, at the row's end, and says it closes the split.
+    @Test func theCloseButtonSitsWhereASingleTabsDoes() throws {
+        try inWindow(["A", "B", "C"]) { controller, tabs in
+            let single = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
+            single.configure(tab: tabs[2])
+            single.isSelected = true
+            single.layoutSubtreeIfNeeded()
+            for focused in [0, 1] {
+                let row = row(tabs[0], partners: [tabs[1]])
+                row.isSelected = true
+                row.focusedHalf = focused
+                row.layoutSubtreeIfNeeded()
+                #expect(!row.closeButton.isHidden)
+                #expect(row.closeButton.frame == single.closeButton.frame)
+                #expect(row.closeButton.toolTip == "Close Split View")
+            }
+            let row = row(tabs[0], partners: [tabs[1]])
+            row.layoutSubtreeIfNeeded()
+            #expect(row.closeButton.isHidden)
             _ = controller
         }
     }
 
-    /// The × sits inside the part it closes, named for that page, and only on the row you're in or point at.
-    @Test func theCloseButtonSitsInItsPart() throws {
-        try inWindow(["A", "B"]) { controller, tabs in
-            let row = row(tabs[0], partners: [tabs[1]])
-            row.isSelected = true
-            row.focusedHalf = 1
-            row.layoutSubtreeIfNeeded()
-            #expect(!row.closeButton.isHidden)
-            #expect(row.closeButton.frame.minX > row.bounds.midX && row.closeButton.frame.maxX < row.bounds.maxX)
-            #expect(row.closeButton.toolTip == "Close B")
-            row.focusedHalf = 0
-            row.layoutSubtreeIfNeeded()
-            #expect(row.closeButton.frame.maxX < row.bounds.midX)
-            #expect(row.closeButton.toolTip == "Close A")
-            row.isSelected = false
-            row.layoutSubtreeIfNeeded()
-            #expect(row.closeButton.isHidden)
-            _ = controller
+    /// The row's × closes every page of the split, and one ⌘Z brings them back side by side.
+    @Test func theRowsCloseButtonClosesTheSplit() throws {
+        try inWindow(["A", "B", "C"]) { controller, tabs in
+            let manager = controller.tabManager
+            manager.makeSplit(tabs[0], with: tabs[1])
+            controller.sidebar.list.reload(animated: false)
+            controller.sidebar.list.layoutSubtreeIfNeeded()
+            let row = try #require(controller.sidebar.list.row(for: tabs[0]) as? TabRowView)
+            row.onClose?()
+            #expect(manager.currentTabs.map(\.displayTitle) == ["C"])
+            controller.sidebarUndo.undo()
+            #expect(manager.currentTabs.map(\.displayTitle) == ["A", "B", "C"])
+            #expect(manager.currentTabs.first { $0.displayTitle == "A" }.flatMap(manager.split(for:))?.count == 2)
         }
     }
 

@@ -1015,12 +1015,7 @@ final class SidebarListView: NSView {
                 guard let self, let row, let tab = row.tab else { return }
                 // ⇧-click a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160).
                 // Anywhere else ⇧ picks rows, as always.
-                let point = row.convert(event.locationInWindow, from: nil)
-                if event.modifierFlags.intersection([.shift, .command, .option, .control]) == .shift, row.pages.count > 1,
-                   let selected = self.manager?.selectedTab, row.pages.contains(where: { $0 === selected }), let page = row.page(at: point) {
-                    self.delegate?.listZoomPane(page)
-                    return
-                }
+                if self.zoomsPart(of: row, with: event) { return }
                 if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
                 self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
@@ -1029,13 +1024,14 @@ final class SidebarListView: NSView {
             // In a row of several pages, the part double-clicked is the page renamed.
             row.onDoubleClick = { [weak row] in row?.beginRename(at: Self.pointer(in: row)) }
             row.onRename = { [weak row] name in (row?.renamingPage ?? row?.tab)?.customTitle = name.isEmpty ? nil : name }
-            // A split row's × closes the page of the part it's on; the other stays open (#404).
+            // The × closes the row: a split's or group's every page, as a single tab's one. A middle-click closes the
+            // part's page alone (#404).
             row.onClose = { [weak self, weak row] in
-                guard let page = row?.closingPage else { return }
-                self?.delegate?.listClose(page)
+                guard let row, let tab = row.tab else { return }
+                if row.pages.count > 1 { self?.delegate?.listClose(row.pages) } else { self?.delegate?.listClose(tab) }
             }
             row.onMiddleClick = { [weak self, weak row] in
-                guard let row, let page = Self.pointer(in: row).flatMap(row.page(at:)) ?? row.tab else { return }
+                guard let row, let page = Self.pointer(in: row).flatMap(row.partPage(at:)) ?? row.tab else { return }
                 self?.delegate?.listClose(page)
             }
             row.onToggleNested = { [weak self, weak row] in
@@ -1073,6 +1069,7 @@ final class SidebarListView: NSView {
             }
             row.onClick = { [weak self, weak row] event in
                 guard let self, let row else { return }
+                if self.zoomsPart(of: row, with: event) { return }
                 if self.mark(item, with: event) { return }
                 // A pinned split's or group's row: each part opens its own page, and all open side by side.
                 var opening = id
@@ -1096,14 +1093,16 @@ final class SidebarListView: NSView {
                     self.delegate?.listClose(tab)
                 }
             }
-            // Away from its page, the button says "Back to Pinned Page", and does that; a middle-click still unloads.
-            // Beside a tab, the × on the tab's part closes only that tab (#404).
-            row.onClose = { [weak self, weak row] in
+            // Away from its page, the button says "Back to Pinned Page", and does that. Otherwise the × unloads the row,
+            // and a middle-click the part's page alone, as on a tab's row.
+            row.onClose = { [weak self] in
                 if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
-                if let row, row.closesPart, let page = row.closingPage { self?.delegate?.listClose(page) } else { unload() }
+                unload()
             }
             row.onMiddleClick = { [weak self, weak row] in
-                if let row, row.closesPart, let page = Self.pointer(in: row).flatMap(row.page(at:)) { self?.delegate?.listClose(page) } else { unload() }
+                guard let row else { return }
+                guard row.isSplit else { unload(); return }
+                if let page = Self.pointer(in: row).flatMap(row.partPage(at:)) { self?.delegate?.listClose(page) }
             }
             row.onRightClick = { [weak self, weak row] event in self?.menu(for: item, row: row, event: event) }
             row.onDragStart = { [weak self, weak row] event in
@@ -1148,14 +1147,8 @@ final class SidebarListView: NSView {
             row.configure(tab: tab)
             // Both halves of a split show as open, and every page of a tile group.
             let partners = manager.partners(of: tab)
-            let partner = partners.first
-            row.configure(partners: partners)
-            row.partnerLeads = partners.count == 1 && manager.split(for: tab)?.left == partner?.id
-            row.isSelected = tab === selected || partners.contains { $0 === selected }
-            row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
-            row.closesPart = !partners.isEmpty
-            // The pane zoomed over the rest: its part of the row is lit (#160).
-            row.zoomedPart = zoomedTabID.flatMap { zoomed in row.pages.firstIndex { $0.id == zoomed } }
+            configureGroup(row, own: tab, parts: partners.map { TabRowView.Part(page: $0) },
+                           partnerLeads: partners.count == 1 && manager.split(for: tab)?.left == partners.first?.id, selected: selected)
             // A split's age for Clear is its newest page's.
             row.freshness = SiteTint.freshness(lastActivated: ([tab] + partners).map(\.lastActivated).max() ?? tab.lastActivated)
             row.isMarked = marked.contains(item)
@@ -1188,30 +1181,40 @@ final class SidebarListView: NSView {
             // A pinned split or group shows all its pages, open or not, the way a split among tabs does.
             let riders = Library.shared.pinnedSplit(containing: id).flatMap { $0.left == id ? $0.riders.compactMap(Library.shared.bookmark) : nil } ?? []
             for mark in riders where mark.displayIcon == nil { FaviconStore.shared.prefetch(for: mark.url) }
-            let pinned = riders.first
-            let partner = pinned.flatMap { manager.bookmarkTab(for: $0.id) }
-            if let pinned {
-                row.configure(pinnedPartner: pinned.title, icon: pinned.displayIcon, unloaded: partner == nil)
-            } else {
-                row.configure(pinnedPartner: nil, icon: nil, unloaded: false)
-            }
-            row.configure(pinnedExtras: riders.dropFirst().map { ($0.title, $0.displayIcon, manager.bookmarkTab(for: $0.id)) })
-            let extraPages = row.extraPages
             // Split beside a tab, it carries that tab too: the page shows once, in its own place.
-            let beside = pinned == nil ? tab.flatMap(manager.partner(of:)) : nil
-            row.configure(partner: partner ?? beside)
-            row.partnerLeads = beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id
+            let beside = riders.isEmpty ? tab.flatMap(manager.partner(of:)) : nil
+            let parts = riders.map { TabRowView.Part(page: manager.bookmarkTab(for: $0.id), name: $0.title, icon: $0.displayIcon) }
+                + [beside].compactMap { $0.map { TabRowView.Part(page: $0) } }
+            configureGroup(row, own: tab, parts: parts,
+                           partnerLeads: beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id, selected: selected)
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
-            let other = partner ?? beside
-            let parts: [Tab?] = [tab, other] + extraPages
-            let focused = selected.flatMap { selected in parts.firstIndex { $0 != nil && $0 === selected } }
-            row.isSelected = focused != nil
-            row.focusedHalf = focused ?? 0
-            row.closesPart = beside != nil && !away
             row.isMarked = marked.contains(item)
         default:
             break
         }
+    }
+
+    /// What a split's or tile group's row shows besides its own page, the same in the tab list and among the pinned
+    /// pages: its other parts, which one leads, which is lit as the page you're in, and the one zoomed over the rest.
+    private func configureGroup(_ row: TabRowView, own: Tab?, parts: [TabRowView.Part], partnerLeads: Bool, selected: Tab?) {
+        row.configure(parts: parts)
+        row.partnerLeads = partnerLeads
+        let pages = [own] + parts.map(\.page)
+        let focused = selected.flatMap { selected in pages.firstIndex { $0 != nil && $0 === selected } }
+        row.isSelected = focused != nil
+        row.focusedHalf = focused ?? 0
+        // The pane zoomed over the rest: its part of the row is lit (#160).
+        row.zoomedPart = zoomedTabID.flatMap { zoomed in pages.firstIndex { $0?.id == zoomed } }
+    }
+
+    /// ⇧-click a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160). Anywhere
+    /// else ⇧ picks rows, as always.
+    private func zoomsPart(of row: TabRowView, with event: NSEvent) -> Bool {
+        guard event.modifierFlags.intersection([.shift, .command, .option, .control]) == .shift, row.pages.count > 1,
+              let selected = manager?.selectedTab, row.pages.contains(where: { $0 === selected }),
+              let page = row.partPage(at: row.convert(event.locationInWindow, from: nil)) else { return false }
+        delegate?.listZoomPane(page)
+        return true
     }
 
     // MARK: Picking several

@@ -51,7 +51,7 @@ struct TabMuteTests {
     private func row(_ tab: Tab, partner: Tab? = nil) -> TabRowView {
         let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
         row.configure(tab: tab)
-        row.configure(partner: partner)
+        row.configure(parts: [partner].compactMap { $0.map { TabRowView.Part(page: $0) } })
         row.layoutSubtreeIfNeeded()
         return row
     }

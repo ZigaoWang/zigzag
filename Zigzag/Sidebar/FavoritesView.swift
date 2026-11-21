@@ -312,7 +312,7 @@ final class FavoritesView: NSView {
     private func drag(_ tile: FavoriteTile, favorite: Bookmark, event: NSEvent) {
         guard let window, let from = tiles.firstIndex(where: { $0 === tile }) else { return }
         let start = window.convertPoint(toScreen: event.locationInWindow)
-        let row = CarriedRow(favorite, icon: tile.iconImage, partners: tile.partners, partnerIcons: tile.partnerIconImages)
+        let row = TabRowView.carried(favorite, icon: tile.iconImage, partners: tile.partners, partnerIcons: tile.partnerIconImages)
         let rowSize = NSSize(width: bounds.width, height: Tokens.Sidebar.rowHeight)
         // As a row it's held just past its icon, as if it had been picked up there.
         let rowGrab = NSPoint(x: Tokens.Sidebar.rowInset + Tokens.Sidebar.favicon + Tokens.Space.x1, y: rowSize.height / 2)
@@ -829,35 +829,17 @@ final class FavoriteTile: InteractiveView {
     private static var iconSide: CGFloat { Tokens.Sidebar.favoriteIcon }
 }
 
-/// The row a carried favorite turns into over the tab list: its page, or a split's or tile group's pages side by side
-/// with a hairline between each, as the row will look there.
-final class CarriedRow: NSView {
-    private let parts: [SidebarRowView]
-    private let dividers: [ColorView]
-
-    init(_ favorite: Bookmark, icon: NSImage?, partners: [Bookmark], partnerIcons: [NSImage?]) {
-        parts = ([favorite] + partners).map { _ in SidebarRowView() }
-        dividers = partners.map { _ in ColorView(color: Tokens.Color.separator) }
-        super.init(frame: .zero)
-        let icons = [icon] + partnerIcons
-        for (i, (part, page)) in zip(parts, [favorite] + partners).enumerated() {
-            // Three or four parts are too narrow for names: their icons alone, as the row shows them.
-            part.title.stringValue = parts.count > 2 ? "" : page.title
-            part.icon.image = icons.indices.contains(i) ? icons[i] : nil
-            addSubview(part)
-        }
-        dividers.forEach(addSubview)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func layout() {
-        super.layout()
-        let width = bounds.width / CGFloat(parts.count)
-        for (i, part) in parts.enumerated() {
-            let x = floor(width * CGFloat(i))
-            part.frame = NSRect(x: x, y: 0, width: floor(width * CGFloat(i + 1)) - x, height: bounds.height)
-            if i > 0 { dividers[i - 1].frame = NSRect(x: x, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4) }
-        }
+/// The row a carried favorite turns into over the tab list: the same row a tab or pinned page has there, a split's or
+/// tile group's pages in its parts.
+extension TabRowView {
+    static func carried(_ favorite: Bookmark, icon: NSImage?, partners: [Bookmark], partnerIcons: [NSImage?]) -> TabRowView {
+        let row = TabRowView()
+        row.bookmarkIcon = icon
+        row.fixedTitle = favorite.title
+        row.configure(tab: nil)
+        row.configure(parts: partners.enumerated().map { i, page in
+            Part(page: nil, name: page.title, icon: partnerIcons.indices.contains(i) ? partnerIcons[i] : nil)
+        })
+        return row
     }
 }
