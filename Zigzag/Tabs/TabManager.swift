@@ -654,7 +654,7 @@ final class TabManager {
         let panes = other.panes(of: tab)
         let together = pair != nil && panes.count == pair?.count && panes.allSatisfy { $0.bookmarkID == nil }
         let pages = together ? panes : [tab]
-        let places = pages.map { page in other.navigableTabs.firstIndex { $0 === page } ?? 0 }
+        let places = pages.map { page in other.tabsForExtensions.firstIndex { $0 === page } ?? 0 }
         pages.forEach { other.release($0, toWindow: true) }
         // Each in at the same place, last first, so they keep their order.
         for page in pages.reversed() { insert(page, at: index) }

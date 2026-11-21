@@ -54,6 +54,21 @@ import Testing
         }
     }
 
+    /// A moved tab's old place is counted as tabs.query lists the window: every space's tabs, this space's first.
+    @Test func aMovedTabsPlaceCountsEverySpace() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let work = Library.shared.addSpace(name: "Moved tab place").id
+        windows { a, b in
+            a.newTab(url: nil, spaceID: space, select: false)
+            a.newTab(url: nil, spaceID: space, select: false)
+            let away = a.newTab(url: nil, spaceID: work, select: false)
+            let listed = a.tabsForExtensions.firstIndex { $0 === away }
+            #expect(listed == 2)
+            #expect(b.take(away, from: a, at: 0).map(\.from) == [listed])
+        }
+    }
+
     @Test func movingBackPutsItWhereItWas() {
         windows { a, b in
             let tabs = (0..<3).map { _ in a.newTab(url: nil, spaceID: space, select: false) }
