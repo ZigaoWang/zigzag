@@ -10,7 +10,7 @@ struct SpaceDefaultColorsTests {
         var spaces: [SpaceInfo] = []
         for i in 0..<count {
             let pick = SpaceColor.next(unused: spaces.map(\.color))
-            spaces.append(SpaceInfo(name: "Space \(i + 1)", color: pick, defaultColor: pick))
+            spaces.append(SpaceInfo(name: "Space \(i + 1)", color: pick, defaultColor: pick).withDefaultColors(pick))
         }
         return spaces
     }
@@ -18,7 +18,7 @@ struct SpaceDefaultColorsTests {
     @Test func defaultIsTheColorTheSpaceWasMadeWith() {
         let spaces = made(9)
         #expect(Library.defaultColors(of: spaces) == spaces.map(\.color))
-        #expect(Array(spaces.prefix(3).map(\.color)) == [.sky, .sage, .sand])
+        #expect(Array(spaces.prefix(3).map(\.color)) == [.lagoon, .sunset, .forest])
     }
 
     @Test func useDefaultColorsPutsBackANewSpacesLook() {
@@ -79,24 +79,24 @@ struct SpaceDefaultColorsTests {
         // White sets the space's color to graphite; the color it was made with is still the one that comes back.
         var spaces = made(3)
         let original = spaces[1]
-        SpaceLook.presets[0].apply(to: &spaces[1])
+        SpaceLook.white.apply(to: &spaces[1])
         #expect(spaces[1].color == .graphite)
         let color = Library.defaultColors(of: spaces)[1]
-        #expect(color == .sage)
+        #expect(color == .sunset)
         #expect(spaces[1].withDefaultColors(color) == original)
     }
 
     @Test func spacesFromBeforeItWasKept() {
         // Not kept: the color it still has, or once White took it, the one a space in its place would get.
         var old = [SpaceInfo(name: "A", color: .sky), SpaceInfo(name: "B", color: .sage), SpaceInfo(name: "C", color: .sand)]
-        SpaceLook.presets[1].apply(to: &old[1])
+        SpaceLook.black.apply(to: &old[1])
         old[2].hue = 0.3
         #expect(Library.defaultColors(of: old) == [.sky, .sage, .sand])
     }
 
     @Test func keptOnceAndStable() {
         var old = [SpaceInfo(name: "A", color: .sky), SpaceInfo(name: "B", color: .sage), SpaceInfo(name: "C", color: .sand)]
-        SpaceLook.presets[0].apply(to: &old[1])
+        SpaceLook.white.apply(to: &old[1])
         let kept = Library.keepingDefaultColors(old)
         #expect(kept.map(\.defaultColor) == [.sky, .sage, .sand])
         // Moved first, it keeps the one it was given, not the first space's.
@@ -130,6 +130,131 @@ struct SpaceDefaultColorsTests {
         let mine = SpaceLookEditor(space: chosen, defaultColor: .sky, dark: true)
         mine.follow(dark: false)
         #expect(abs(mine.shownDepth - 0.8) < 0.001)
+    }
+}
+
+/// The palette new spaces and the editor's presets take, and the older colors existing spaces keep.
+@MainActor
+struct SpacePaletteTests {
+    private func resolved(_ color: NSColor, dark: Bool) -> NSColor {
+        var out = color
+        NSAppearance(named: dark ? .darkAqua : .aqua)!.performAsCurrentDrawingAppearance { out = color.usingColorSpace(.sRGB) ?? color }
+        return out
+    }
+
+    /// `top` laid over an opaque `ground`.
+    private func laid(_ top: NSColor, over ground: NSColor) -> NSColor {
+        let a = top.alphaComponent
+        return NSColor(srgbRed: top.redComponent * a + ground.redComponent * (1 - a), green: top.greenComponent * a + ground.greenComponent * (1 - a),
+                       blue: top.blueComponent * a + ground.blueComponent * (1 - a), alpha: 1)
+    }
+
+    /// What the glass shows under the color, blurred, over a light desktop and over a dark, busy one.
+    private func glassGrounds(dark: Bool) -> [NSColor] {
+        (dark ? [0.09, 0.5] : [0.96, 0.3]).map { NSColor(srgbRed: $0, green: $0, blue: $0, alpha: 1) }
+    }
+
+    @Test func aFreshSpaceIsLagoonGlass() {
+        let first = SpaceColor.newSpaceOrder[0]
+        #expect(first == .lagoon)
+        let space = SpaceInfo(name: "Personal", color: first, defaultColor: first).withDefaultColors(first)
+        #expect(space.isSeeThrough && space.clearGlass == nil)
+        #expect(abs(space.seeThrough - Tokens.Frame.paletteSeeThrough) < 0.001)
+        // It follows the Mac: light by day, deep at night, teal running into blue.
+        #expect(space.brightness == nil && space.readableAppearance == nil && space.appearance == nil)
+        #expect(space.hue == 0.5 && space.hue2 == 0.6)
+        let day = resolved(space.background, dark: false), night = resolved(space.background, dark: true)
+        #expect(Brand.relativeLuminance(day) > 0.6 && Brand.relativeLuminance(night) < 0.06)
+        #expect(day.saturationComponent > 0.08)
+        #expect(space.hasDefaultColors(first))
+        #expect(SpaceLook.curated(first).matches(space))
+        // The Lagoon in the row is the deep one, a choice of its own.
+        #expect(!SpaceLook.presets.contains { $0.matches(space) })
+        #expect(first.look!.space.readableAppearance == "dark")
+    }
+
+    @Test func existingSpacesKeepTheirColors() throws {
+        // A space saved before the palette reads back exactly as it was: the same color, solid.
+        let json = #"{"id":"\#(UUID().uuidString)","name":"A","color":"sky","bookmarks":[]}"#
+        let old = try JSONDecoder().decode(SpaceInfo.self, from: Data(json.utf8)).upgraded
+        let kept = Library.keepingDefaultColors([old])[0]
+        #expect(kept.color == .sky && kept.defaultColor == .sky && !kept.isSeeThrough && kept.brightness == nil)
+        for dark in [false, true] {
+            let tone = dark ? SpaceColor.tone(hue: 0.585, lightness: Tokens.Frame.darkLightness, chroma: Tokens.Frame.darkChroma * 0.78)
+                : SpaceColor.tone(hue: 0.585, lightness: Tokens.Frame.lightness, chroma: Tokens.Frame.chroma * 0.78)
+            #expect(resolved(kept.background, dark: dark) == resolved(tone, dark: false))
+        }
+        // Use Default Colors on an older color stays one solid color following the Mac.
+        let back = SpaceInfo(name: "B", color: .sage).withDefaultColors(.sage)
+        #expect(!back.isSeeThrough && back.brightness == nil && back.hue == nil)
+        for color in SpaceColor.legacyAll { #expect(color.look == nil) }
+        // Older spaces whose color is gone still get back what they were made with then.
+        var spaces = [SpaceInfo(name: "A", color: .sky), SpaceInfo(name: "B", color: .sage)]
+        SpaceLook.black.apply(to: &spaces[1])
+        #expect(Library.defaultColors(of: spaces) == [.sky, .sage])
+    }
+
+    @Test func profilesKeepTheOlderColors() {
+        #expect(ProfileDirectory.ownColor(for: .sage, used: []) == .sage)
+        #expect(SpaceColor.legacy.contains(ProfileDirectory.ownColor(for: .lagoon, used: [])))
+        #expect(SpaceColor.legacyNext(unused: []) == .sky)
+    }
+
+    @Test func thePaletteIsDistinctGlass() {
+        let looks = SpaceColor.palette.compactMap(\.look)
+        #expect(looks.count == 14)
+        #expect(looks.allSatisfy { $0.seeThrough > 0 })
+        // Deep ones and light ones, and a few two-hue gradients, never across the whole wheel.
+        let spaces = looks.map(\.space)
+        #expect(spaces.filter { $0.readableAppearance == "dark" }.count >= 5)
+        #expect(spaces.filter { $0.readableAppearance == "light" }.count >= 3)
+        let gradients = looks.filter { $0.hue2 != nil }
+        #expect((3...4).contains(gradients.count))
+        for look in gradients {
+            let d = abs(look.hue - look.hue2!)
+            #expect(min(d, 1 - d) < 0.25, "\(look.name)")
+        }
+        func lab(_ c: NSColor) -> (l: Double, a: Double, b: Double) {
+            OKLab.lab(r: OKLab.decode(c.redComponent), g: OKLab.decode(c.greenComponent), b: OKLab.decode(c.blueComponent))
+        }
+        for (a, b) in zip(spaces, spaces.dropFirst()) {
+            // Both ends, so a gradient that starts at a neighbor's color still tells apart by where it goes.
+            var distance = 0.0
+            for (x, y) in [(a.background, b.background), (a.background2 ?? a.background, b.background2 ?? b.background)] {
+                let p = lab(resolved(x, dark: false)), q = lab(resolved(y, dark: false))
+                distance += ((p.l - q.l) * (p.l - q.l) + (p.a - q.a) * (p.a - q.a) + (p.b - q.b) * (p.b - q.b)).squareRoot()
+            }
+            #expect(distance > 0.03, "\(a.name) and \(b.name): \(distance)")
+        }
+    }
+
+    /// Primary text at 4.5:1 or more on every preset, in the mode its window takes, and on what new spaces get in both
+    /// modes: on the solid color, on the glass over a light and a dark desktop, and on the selected tab's card.
+    @Test func everyPresetKeepsTextReadable() {
+        let looks = SpaceLook.presets.map { ($0, $0.space.readableAppearance == "dark") }
+            + SpaceColor.palette.compactMap(\.defaultLook).flatMap { [($0, false), ($0, true)] }
+        for (look, dark) in looks {
+            let space = look.space
+            let text = resolved(Brand.Theme.of(space).rowInk, dark: dark)
+            var grounds = [resolved(space.background, dark: dark)] + (space.background2.map { [resolved($0, dark: dark)] } ?? [])
+            if look.seeThrough > 0 {
+                // Solid with Reduce Transparency: the space's own ink on its own color.
+                var opaque = space
+                opaque.translucency = nil
+                let ink = resolved(Brand.Theme.of(opaque).rowInk, dark: dark)
+                for ground in grounds { #expect(Brand.contrast(laid(ink, over: ground), ground) >= 4.5, "\(look.name) solid \(dark)") }
+                grounds = [space.frameColor, space.frameColor2].compactMap { $0 }.flatMap { tint in
+                    glassGrounds(dark: dark).map { laid(resolved(tint, dark: dark), over: $0) }
+                }
+            }
+            let card = resolved(Tokens.Chrome.card, dark: dark)
+            for ground in grounds {
+                let ratio = Brand.contrast(laid(text, over: ground), ground)
+                #expect(ratio >= 4.5, "\(look.name) \(dark ? "dark" : "light"): \(String(format: "%.2f", ratio)):1")
+                let tab = laid(card, over: ground)
+                #expect(Brand.contrast(laid(text, over: tab), tab) >= 4.5, "\(look.name) tab \(dark)")
+            }
+        }
     }
 }
 

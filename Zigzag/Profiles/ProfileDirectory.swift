@@ -128,7 +128,9 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
 
     /// The space's color if a profile can have it and none does, else the next unused one.
     @MainActor static func ownColor(for spaceColor: SpaceColor, used: [SpaceColor]) -> SpaceColor {
-        spaceColor.isNeutral || used.contains(spaceColor) ? SpaceColor.next(unused: used) : spaceColor
+        // Profiles keep the older colors: a palette color takes the nearest of them.
+        let color = spaceColor.isNeutral ? spaceColor : spaceColor.nearestLegacy
+        return color.isNeutral || used.contains(color) ? SpaceColor.legacyNext(unused: used) : color
     }
 
     /// `name`, or with a number after it when a profile is already called that, so two profiles never read alike.

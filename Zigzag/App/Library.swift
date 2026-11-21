@@ -388,7 +388,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     }
 
     /// The space with the colors a new one gets: `color` alone, light by day and dark at night with the Mac, with no
-    /// gradient, see-through or grain. Its name, icon, pages and the rest stay.
+    /// gradient, see-through or grain; a palette color, its look. Its name, icon, pages and the rest stay.
     func withDefaultColors(_ color: SpaceColor) -> SpaceInfo {
         var space = self
         space.color = color
@@ -406,6 +406,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         space.clearGlass = nil
         space.grain = nil
         space.appearance = nil
+        // The palette's colors come on clear glass, following the Mac; the older ones are one solid color.
+        color.defaultLook?.apply(to: &space)
         return space.upgraded
     }
 
@@ -644,7 +646,8 @@ final class Library {
             if stored.siteRoutes == nil { saveNow() }
         } else {
             wasRead = false
-            spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: .sky, defaultColor: .sky)]
+            let first = SpaceColor.newSpaceOrder[0]
+            spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: first, defaultColor: first).withDefaultColors(first)]
             searchEngine = .google
             importedFromArc = false
             saveNow()
@@ -700,7 +703,7 @@ final class Library {
     func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID, ownProfile: Bool = false) -> SpaceInfo {
         let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
         var space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
-                              color: pick)
+                              color: pick).withDefaultColors(pick)
         space.defaultColor = pick
         spaces.append(space)
         directory.place(newSpace: space, on: profile, ownProfile: ownProfile, usedColors: profiles.map { self.color(of: $0) })
@@ -745,7 +748,8 @@ final class Library {
         var made: [SpaceColor] = []
         for space in spaces {
             if let kept = space.defaultColor { made.append(kept) }
-            else if space.color == .graphite, space.brightness != nil { made.append(SpaceColor.next(unused: made)) }
+            // Spaces not kept were made before the new palette, so they got the colors of then.
+            else if space.color == .graphite, space.brightness != nil { made.append(SpaceColor.legacyNext(unused: made)) }
             else { made.append(space.color) }
         }
         return made

@@ -23,6 +23,72 @@
         }
       }
     },
+    "Citrus" : {
+      "comment" : "Name of a curated space color, in the space editor. Lime running into tangerine.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "柑橘"
+          }
+        }
+      }
+    },
+    "Dune" : {
+      "comment" : "Name of a curated space color, in the space editor. A soft sandy gold.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沙丘"
+          }
+        }
+      }
+    },
+    "Dusk" : {
+      "comment" : "Name of a curated space color, in the space editor. Deep indigo running into deep rose.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暮色"
+          }
+        }
+      }
+    },
+    "Forest" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep forest green.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "森林"
+          }
+        }
+      }
+    },
+    "Fuchsia" : {
+      "comment" : "Name of a curated space color, in the space editor. A hot magenta.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "品红"
+          }
+        }
+      }
+    },
+    "Lagoon" : {
+      "comment" : "Name of a curated space color, in the space editor. Deep teal running into deep blue.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "泻湖"
+          }
+        }
+      }
+    },
     "Languages and sites you never translate show up here." : {
       "comment" : "Under Never Translate in Settings › Translation, when there's no language or site.",
       "localizations" : {
@@ -30,6 +96,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "永不翻译的语言和网站会显示在这里。"
+          }
+        }
+      }
+    },
+    "Lilac" : {
+      "comment" : "Name of a curated space color, in the space editor. A soft lilac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "丁香紫"
+          }
+        }
+      }
+    },
+    "Merlot" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep red wine.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "梅洛"
+          }
+        }
+      }
+    },
+    "Midnight" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep midnight indigo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "午夜"
           }
         }
       }
@@ -89,6 +188,28 @@
         }
       }
     },
+    "Petrol" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep inky teal.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "石油蓝"
+          }
+        }
+      }
+    },
+    "Seafoam" : {
+      "comment" : "Name of a curated space color, in the space editor. A soft mint green.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海沫"
+          }
+        }
+      }
+    },
     "Since %@" : {
       "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
       "localizations" : {
@@ -96,6 +217,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自 %@ 起"
+          }
+        }
+      }
+    },
+    "Sunset" : {
+      "comment" : "Name of a curated space color, in the space editor. Coral running into violet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日落"
           }
         }
       }
@@ -129,6 +261,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "翻译设置…"
+          }
+        }
+      }
+    },
+    "Volt" : {
+      "comment" : "Name of a curated space color, in the space editor. An electric lime green.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电光绿"
+          }
+        }
+      }
+    },
+    "Watermelon" : {
+      "comment" : "Name of a curated space color, in the space editor. A bright pinkish red.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西瓜红"
           }
         }
       }
@@ -9888,17 +10042,6 @@
         }
       }
     },
-    "Espresso" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "浓缩咖啡"
-          }
-        }
-      }
-    },
     "Every download is saved to the folder above, whatever kind of file it is." : {
       "comment" : "Under “No file types yet” in Settings › Downloads.",
       "localizations" : {
@@ -15435,7 +15578,7 @@
       }
     },
     "Paper" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor.\nFinish of Your Zigzag Card in About: warm linen paper.",
+      "comment" : "Finish of Your Zigzag Card in About: warm linen paper.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19387,23 +19530,12 @@
       }
     },
     "Sky" : {
-      "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale blue.",
+      "comment" : "Name of a curated space color, in the space editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "天蓝"
-          }
-        }
-      }
-    },
-    "Slate" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "石板灰"
           }
         }
       }

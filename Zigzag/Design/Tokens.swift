@@ -1559,6 +1559,23 @@ enum Tokens {
         static let chroma = 0.045
         static let darkLightness = 0.27
         static let darkChroma = 0.04
+        /// The space editor's palette: a touch richer than the colors before it, by day and at night.
+        static let paletteLightness = 0.915
+        static let paletteChroma = 0.078
+        static let paletteDarkLightness = 0.27
+        static let paletteDarkChroma = 0.05
+        /// How see-through the palette's looks are, on clear glass: as clear as keeps text at 4.5:1 over a desktop
+        /// that works against it. Vivid ones are lighter, so a little less.
+        static let paletteSeeThrough = 0.45
+        static let vividSeeThrough = 0.4
+        /// How strong a new space's palette color is while it follows the Mac (`SpaceColor.background(hue:intensity:)`).
+        static let followingIntensity = 0.8
+        static let softFollowingIntensity = 0.5
+        /// A blank page in a palette space on glass: fainter than `wash`, near white by day and near the page's dark at night.
+        static let glassPageLightness = 0.982
+        static let glassPageChroma = 0.012
+        static let glassPageDarkLightness = 0.228
+        static let glassPageDarkChroma = 0.018
         /// A floating panel: near white with a breath of the space by day, a deep gray of it at night.
         static let panelLightness = 0.975
         static let panelChroma = 0.02

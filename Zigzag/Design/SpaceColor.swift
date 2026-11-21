@@ -4,12 +4,56 @@ import AppKit
 /// Light values are pale enough for dark text, dark values deep enough for light text.
 enum SpaceColor: String, Codable, CaseIterable {
     case snow, graphite, ink, sky, sage, sand, rose, lavender, mint, peach
+    case lagoon, sunset, dusk, citrus, midnight, petrol, forest, merlot, watermelon, fuchsia, volt, lilac, seafoam, dune
 
-    /// The color a new space or profile gets: the first with a hue that none has yet, else, once all are taken,
-    /// the next of `fallback` in turn.
-    static func next(unused used: [SpaceColor], fallback: [SpaceColor] = allCases) -> SpaceColor {
+    /// The space editor's glass (`look`): gradients, then deep and moody, vivid, and soft.
+    static let palette: [SpaceColor] = [.lagoon, .sunset, .dusk, .citrus, .midnight, .petrol, .forest, .merlot, .watermelon, .fuchsia, .volt, .lilac, .seafoam, .dune]
+    /// The order new spaces take them in: lagoon first, then each far from the one before.
+    static let newSpaceOrder: [SpaceColor] = [.lagoon, .sunset, .forest, .fuchsia, .citrus, .midnight, .watermelon, .dusk, .seafoam, .merlot, .volt, .lilac, .petrol, .dune]
+    /// The colors given out before the palette, in their order. Profiles and Arc imports still use them.
+    static let legacy: [SpaceColor] = [.sky, .sage, .sand, .rose, .lavender, .mint, .peach]
+    static let legacyAll: [SpaceColor] = [.snow, .graphite, .ink] + legacy
+
+    /// The color a new space gets: the first of `order` that none has yet, else, once all are taken, the next of
+    /// `fallback` in turn.
+    static func next(unused used: [SpaceColor], from order: [SpaceColor] = newSpaceOrder, fallback: [SpaceColor]? = nil) -> SpaceColor {
         let taken = Set(used)
-        return allCases.first { !$0.isNeutral && !taken.contains($0) } ?? fallback[used.count % fallback.count]
+        let fallback = fallback ?? order
+        return order.first { !taken.contains($0) } ?? fallback[used.count % fallback.count]
+    }
+
+    /// As colors were given out before the new palette: for profiles, and for working out what older spaces were made with.
+    static func legacyNext(unused used: [SpaceColor], fallback: [SpaceColor] = legacyAll) -> SpaceColor {
+        next(unused: used, from: legacy, fallback: fallback)
+    }
+
+    /// The color from before nearest this one around the wheel.
+    var nearestLegacy: SpaceColor {
+        guard !isNeutral, !Self.legacy.contains(self) else { return self }
+        func distance(_ other: SpaceColor) -> Double { let d = abs(other.hue - hue); return min(d, 1 - d) }
+        return Self.legacy.min { distance($0) < distance($1) } ?? .sky
+    }
+
+    /// The palette's looks on clear glass: hue and depth (0 light, 1 deep), and a second hue for a gradient. Deep ones
+    /// keep the window dark and the rest light, day and night; nil for the colors from before.
+    var paletteLook: (hue: Double, depth: Double, tint: Double, hue2: Double?, depth2: Double, seeThrough: Double)? {
+        switch self {
+        case .lagoon: (0.5, 0.91, 1, 0.6, 0.93, Tokens.Frame.paletteSeeThrough)
+        case .sunset: (0.015, 0.36, 1, 0.8, 0.4, Tokens.Frame.vividSeeThrough)
+        case .dusk: (0.72, 0.91, 1, 0.95, 0.91, Tokens.Frame.paletteSeeThrough)
+        case .citrus: (0.22, 0.36, 1, 0.075, 0.36, Tokens.Frame.vividSeeThrough)
+        case .midnight: (0.7, 0.92, 1, nil, 0.92, Tokens.Frame.paletteSeeThrough)
+        case .petrol: (0.48, 0.92, 1, nil, 0.92, Tokens.Frame.paletteSeeThrough)
+        case .forest: (0.38, 0.91, 1, nil, 0.91, Tokens.Frame.paletteSeeThrough)
+        case .merlot: (0.94, 0.91, 1, nil, 0.91, Tokens.Frame.paletteSeeThrough)
+        case .watermelon: (0.97, 0.38, 1, nil, 0.38, Tokens.Frame.vividSeeThrough)
+        case .fuchsia: (0.87, 0.4, 1, nil, 0.4, Tokens.Frame.vividSeeThrough)
+        case .volt: (0.22, 0.4, 1, nil, 0.4, Tokens.Frame.vividSeeThrough)
+        case .lilac: (0.76, 0.12, 0.8, nil, 0.12, Tokens.Frame.paletteSeeThrough)
+        case .seafoam: (0.45, 0.12, 0.8, nil, 0.12, Tokens.Frame.paletteSeeThrough)
+        case .dune: (0.12, 0.16, 0.9, nil, 0.16, Tokens.Frame.paletteSeeThrough)
+        default: nil
+        }
     }
 
     /// Without a hue: pure white, gray and black. A gradient or a hue doesn't apply to them.
@@ -33,6 +77,20 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .lavender: String(localized: "Lavender", comment: "Name of a curated space color, in the space editor.")
         case .mint: String(localized: "Mint", comment: "Name of a curated space color, in the space editor.")
         case .peach: String(localized: "Peach", comment: "Name of a curated space color, in the space editor.")
+        case .lagoon: String(localized: "Lagoon", comment: "Name of a curated space color, in the space editor. Deep teal running into deep blue.")
+        case .sunset: String(localized: "Sunset", comment: "Name of a curated space color, in the space editor. Coral running into violet.")
+        case .dusk: String(localized: "Dusk", comment: "Name of a curated space color, in the space editor. Deep indigo running into deep rose.")
+        case .citrus: String(localized: "Citrus", comment: "Name of a curated space color, in the space editor. Lime running into tangerine.")
+        case .midnight: String(localized: "Midnight", comment: "Name of a curated space color, in the space editor. A deep midnight indigo.")
+        case .petrol: String(localized: "Petrol", comment: "Name of a curated space color, in the space editor. A deep inky teal.")
+        case .forest: String(localized: "Forest", comment: "Name of a curated space color, in the space editor. A deep forest green.")
+        case .merlot: String(localized: "Merlot", comment: "Name of a curated space color, in the space editor. A deep red wine.")
+        case .watermelon: String(localized: "Watermelon", comment: "Name of a curated space color, in the space editor. A bright pinkish red.")
+        case .fuchsia: String(localized: "Fuchsia", comment: "Name of a curated space color, in the space editor. A hot magenta.")
+        case .volt: String(localized: "Volt", comment: "Name of a curated space color, in the space editor. An electric lime green.")
+        case .lilac: String(localized: "Lilac", comment: "Name of a curated space color, in the space editor. A soft lilac.")
+        case .seafoam: String(localized: "Seafoam", comment: "Name of a curated space color, in the space editor. A soft mint green.")
+        case .dune: String(localized: "Dune", comment: "Name of a curated space color, in the space editor. A soft sandy gold.")
         }
     }
 
@@ -48,6 +106,20 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .lavender: 0.765
         case .mint: 0.46
         case .peach: 0.055
+        case .lagoon: 0.5
+        case .sunset: 0.015
+        case .dusk: 0.72
+        case .citrus: 0.22
+        case .midnight: 0.7
+        case .petrol: 0.48
+        case .forest: 0.38
+        case .merlot: 0.94
+        case .watermelon: 0.97
+        case .fuchsia: 0.87
+        case .volt: 0.22
+        case .lilac: 0.76
+        case .seafoam: 0.45
+        case .dune: 0.12
         }
     }
 
@@ -60,6 +132,11 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .snow: return Tokens.Color.hex(0xFFFFFF)
         case .graphite: return Tokens.Color.dynamic(light: Tokens.Color.hex(0xE4E4E2), dark: Tokens.Color.hex(0x1F1F21))
         case .ink: return Tokens.Color.hex(0x000000)
+        case _ where Self.palette.contains(self):
+            // Only shown for a space given the color without its look: soft by day and deep at night.
+            let h = wheelHue ?? 0.6
+            return Tokens.Color.dynamic(light: Self.tone(hue: h, lightness: Tokens.Frame.paletteLightness, chroma: Tokens.Frame.paletteChroma),
+                                        dark: Self.tone(hue: h, lightness: Tokens.Frame.paletteDarkLightness, chroma: Tokens.Frame.paletteDarkChroma))
         default:
             let h = wheelHue ?? 0.6
             // Blue reads louder than the others at the same chroma on a screen: sky is a step dustier.
@@ -67,6 +144,11 @@ enum SpaceColor: String, Codable, CaseIterable {
             return Tokens.Color.dynamic(light: Self.tone(hue: h, lightness: Tokens.Frame.lightness, chroma: Tokens.Frame.chroma * k),
                                         dark: Self.tone(hue: h, lightness: Tokens.Frame.darkLightness, chroma: Tokens.Frame.darkChroma * k))
         }
+    }
+
+    /// A palette color's dot: its own color at the look's depth, a step lighter.
+    private var paletteSwatch: NSColor? {
+        paletteLook.map { SpaceColor.paint(hue: $0.hue, depth: 0.35 + 0.45 * $0.depth, tint: $0.tint) }
     }
 
     /// A wheel hue at an OKLCH lightness and chroma, eased off where a screen can't show that much color.
@@ -180,6 +262,8 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .snow: return Tokens.Color.dynamic(light: Tokens.Color.hex(0xFFFFFF), dark: Tokens.Color.hex(0xF2F2F7))
         case .graphite: return Tokens.Color.dynamic(light: Tokens.Color.hex(0x8E8E93), dark: Tokens.Color.hex(0x98989D))
         case .ink: return Tokens.Color.dynamic(light: Tokens.Color.hex(0x1C1C1E), dark: Tokens.Color.hex(0x000000))
+        case _ where Self.palette.contains(self):
+            return paletteSwatch ?? .gray
         default:
             let h = wheelHue ?? 0.6
             return Tokens.Color.dynamic(light: Self.tone(hue: h, lightness: 0.7, chroma: 0.105),

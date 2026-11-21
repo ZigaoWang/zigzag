@@ -11,14 +11,14 @@ extension Library {
     /// A profile's color: the one chosen for it, else the one its place in the list gives it.
     func color(of profile: ProfileInfo) -> SpaceColor {
         if let color = profile.color { return color }
-        let colors = SpaceColor.allCases.filter { !$0.isNeutral }
+        let colors = SpaceColor.legacy
         return colors[(profiles.firstIndex { $0.id == profile.id } ?? 0) % colors.count]
     }
 }
 
 /// The curated colors as a row of dots, one chosen: a profile's color in its form.
 final class ColorDots: NSView {
-    static let colors = SpaceColor.allCases.filter { !$0.isNeutral }
+    static let colors = SpaceColor.legacy
     /// As big as the space editor's swatches, which these are.
     static let side: CGFloat = 24
     private let dots: [LookSwatch]
@@ -147,7 +147,7 @@ enum ProfileSheets {
     static func new(in host: NSView, done: ((ProfileInfo) -> Void)? = nil) -> FormSheet {
         let library = Library.shared
         let name = FilledField(placeholder: String(localized: "Name this profile", comment: "Placeholder of the name field in the sheet that makes or edits a profile."))
-        let dots = ColorDots(selected: SpaceColor.next(unused: library.profiles.map { library.color(of: $0) }, fallback: ColorDots.colors))
+        let dots = ColorDots(selected: SpaceColor.legacyNext(unused: library.profiles.map { library.color(of: $0) }, fallback: ColorDots.colors))
         let seeds = library.profiles
         let start = DropdownButton()
         start.options = [DropdownButton.Option(title: String(localized: "Start Empty", comment: "Choice in the sheet that makes a profile: it starts with no extensions."), image: nil)]

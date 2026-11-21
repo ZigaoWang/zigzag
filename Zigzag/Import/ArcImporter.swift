@@ -156,7 +156,7 @@ enum ArcImporter {
                 targets[folder] = here.id
             } else if create {
                 let library = Library.shared
-                targets[folder] = library.addProfile(name: name, color: SpaceColor.next(unused: library.profiles.map { library.color(of: $0) })).id
+                targets[folder] = library.addProfile(name: name, color: SpaceColor.legacyNext(unused: library.profiles.map { library.color(of: $0) })).id
             }
         }
         return targets
@@ -629,7 +629,7 @@ enum ArcImporter {
         let color = NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
         if color.saturationComponent < 0.15 { return .graphite }
         let hue = color.hueComponent
-        let candidates = SpaceColor.allCases.filter { !$0.isNeutral }
+        let candidates = SpaceColor.legacy
         return candidates.min { a, b in
             hueDistance(hue, (a.swatch.usingColorSpace(.sRGB)?.hueComponent ?? 0)) < hueDistance(hue, (b.swatch.usingColorSpace(.sRGB)?.hueComponent ?? 0))
         } ?? .sky
