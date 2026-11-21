@@ -23,6 +23,7 @@ final class NowPlayingView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        drawsMenu = true
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         // Long titles fade at the end, like tab rows.

@@ -451,6 +451,17 @@ struct ImportLayoutTests {
         #expect(none.contains { $0 is ImportEmptyState })
         #expect(!none.contains { $0 is ChoicePill })
     }
+
+    /// Onboarding's unpicked answer keeps its outline through hover and press, which redraw the button's look.
+    @Test func outlinedButtonKeepsItsEdge() {
+        let button = PrimaryButton(title: "Show Ads")
+        button.customFill = .clear
+        button.customEdge = .white
+        button.stateDidChange(animated: false)
+        #expect(button.layer?.borderWidth == 1)
+        button.customEdge = nil
+        #expect(button.layer?.borderWidth == 0)
+    }
 }
 
 /// The table of browsers Zigzag reads: each one once, and passwords only where the Keychain item is known (#41).

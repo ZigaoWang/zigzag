@@ -278,7 +278,16 @@ extension ExtensionBridgeTests {
               && !!boundary && formText.includes('--' + boundary) && formText.includes('name="data[gpg_auth][keyid]"')
               && sentBuffer.encoding === 'base64' && sentBuffer.body === btoa(String.fromCharCode(255, 0))
               && sentBlob.encoding === 'base64' && sentBlob.body === btoa('x') && calls[6].args[0].encoding === undefined;
+            // Over the 32 MB limit, a body goes to WebKit without being read or encoded; at it, to the bridge.
+            const limit = 32 << 20, bigForm = new FormData();
+            bigForm.append('file', new Blob([new Uint8Array(limit + 1)]));
+            const over = [new Uint8Array(limit + 1), new Blob([new Uint8Array(limit + 1)]), bigForm, 'x'.repeat(limit + 1)];
+            for (const body of over) await fetch(other, { ...json, body });
+            const overSkippedBridge = calls.length === 13 && normal.length === over.length;
+            await fetch(other, { ...json, body: new Uint8Array(limit) });
+            const capped = overSkippedBridge && calls.length === 14 && calls[13].args[0].body.length === Math.ceil(limit / 3) * 4;
             calls.length = 10;
+            normal.length = 0;
             const request = new Request(other, json);
             const fallback = await fetch(request);
             const untouched = !request.bodyUsed && normal[0][0] === request;
@@ -318,13 +327,13 @@ extension ExtensionBridgeTests {
             ongoingController.abort();
             try { await ongoing; } catch (error) { aborted = aborted && error.name === 'AbortError'; }
             const cancelForwarded = calls.at(-1).fn === 'cancel' && calls.at(-1).args[0] === calls.at(-2).args[0].requestID;
-            return { binary, cloneOK, shared, defaults, binaryBodies, untouched, streamUntouched, fallback: await fallback.text(),
+            return { binary, cloneOK, shared, defaults, binaryBodies, capped, untouched, streamUntouched, fallback: await fallback.text(),
                      unsupportedSkippedBridge, declinedOnce, noRetry, aborted, preAbortedSkippedBridge, cancelForwarded };
             """, arguments: ["bridge": ExtensionBridgeScript.source, "extensionID": extensionID], in: nil, contentWorld: .page) as? [String: Any]
         let value = try #require(result)
         #expect(value["binary"] as? String == "0,255,128,65")
         #expect(value["fallback"] as? String == "original")
-        for key in ["cloneOK", "shared", "defaults", "binaryBodies", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
+        for key in ["cloneOK", "shared", "defaults", "binaryBodies", "capped", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
             #expect(value[key] as? Bool == true, "Failed fetch behavior: \(key)")
         }
     }
@@ -373,6 +382,26 @@ extension ExtensionBridgeTests {
         #expect(ExtensionFetchRequests.body(["body": "plain", "encoding": "base64"]) == nil)
         #expect(ExtensionFetchRequests.body(["body": "plain"]) == Data("plain".utf8))
         #expect(ExtensionFetchRequests.body(["body": "AP8=", "encoding": "base64"]) == Data([0, 255]))
+    }
+
+    /// A body over the limit falls back to WebKit, its size read from the base64 length rather than by decoding it.
+    @Test func oversizedBodiesFallBackBeforeDecoding() async throws {
+        for count in 0...5 {
+            #expect(ExtensionFetchRequests.base64Size(Data(repeating: 7, count: count).base64EncodedString()) == count)
+        }
+        let limit = ExtensionFetchRequests.responseLimit
+        #expect(ExtensionFetchRequests.bodySize(["body": Data(count: limit).base64EncodedString(), "encoding": "base64"]) == limit)
+        #expect(ExtensionFetchRequests.bodySize(["body": "hello 世界"]) == 12)
+        let over = Data(count: limit + 1).base64EncodedString()
+        let options: [String: Any] = ["method": "POST", "body": over, "encoding": "base64"]
+        let url = try #require(URL(string: "https://example.invalid/upload"))
+        let written = try await ExtensionFetchRequests().response(options, url: url, extensionID: "test", store: .nonPersistent()) as? [String: Any]
+        #expect(written?["fallback"] as? Bool == true)
+        let direct = try await ExtensionFetchRequests().direct(options, url: url, extensionID: "test", store: .nonPersistent(),
+                                                               authorize: { _ in true }) as? [String: Any]
+        #expect(direct?["fallback"] as? Bool == true)
+        let local = try #require(URL(string: "http://127.0.0.1:1/upload"))
+        #expect(throws: BridgeError.self) { try BridgeExtensionFetch.localReceiverRequest(["method": "POST", "body": over], url: local) }
     }
 
     @Test func logoutPreservesExtensionOriginAndDeletesOnlyItsProfilesCookie() async throws {

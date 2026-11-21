@@ -280,9 +280,16 @@ final class PeekController {
         }
     }
 
+    /// The strip's name for a page: its host, or with none (a local file) its sidebar name, never an empty strip.
+    static func stripName(for url: URL?, title: String) -> String {
+        let host = url.map(HistoryStore.normalizedHost) ?? ""
+        let name = host.isEmpty ? AddressView.name(of: url) : host
+        return name.isEmpty ? title : name
+    }
+
     private func refreshHeader() {
         guard let tab else { return }
-        header.host.stringValue = tab.url.map(HistoryStore.normalizedHost) ?? tab.displayTitle
+        header.host.stringValue = Self.stripName(for: tab.url, title: tab.displayTitle)
         // Cut from the start, so the domain that says whose site it is stays whole (#189).
         header.host.lineBreakMode = AddressView.lineBreak(forName: header.host.stringValue)
         header.icon.image = tab.favicon
@@ -358,8 +365,8 @@ final class PeekController {
     /// Promotes the peeked page to a real tab, without reloading it.
     func openAsTab() {
         guard isVisible, let controller, let tab else { return }
-        // Extensions saw it last, after the window's tabs.
-        let place = controller.tabManager.navigableTabs.count
+        // Extensions saw it last, after the window's tabs in every space.
+        let place = controller.tabManager.tabsForExtensions.count
         isVisible = false
         token = nil
         self.tab = nil

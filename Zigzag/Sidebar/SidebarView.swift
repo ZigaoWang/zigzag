@@ -427,7 +427,7 @@ final class AddressView: InteractiveView {
 
     /// The site's name as the address shows it: without "www.", with a port that isn't the usual one, so
     /// "accounts.google.com:81" never reads as Google's own.
-    private static func site(_ host: String, port: Int?, scheme: String?) -> String {
+    static func site(_ host: String, port: Int?, scheme: String?) -> String {
         let name = host.withoutWWW
         let usual = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
         guard let port, port != usual else { return name }
@@ -680,6 +680,7 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button))
+        drawsMenu = true
         // Pressed as the toolbar's buttons are: around its middle, so the icon never moves off its line.
         pressScales = true
         layer?.cornerRadius = Tokens.Radius.control
