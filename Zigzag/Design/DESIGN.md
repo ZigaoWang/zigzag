@@ -45,10 +45,19 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 The soul of the window. A space's color fills the sidebar and the frame around the page completely, by day and at
 night (`SpaceColor`, `Tokens.Frame`).
 
-- **Curated colors**: white, sky, lavender, rose, peach, sand, sage, mint and graphite. The hues sit at one OKLCH
-  lightness (0.915) and one gentle chroma (0.045) by day, and at a deep, quiet tint (0.27, 0.04) at night, so any two
-  look right side by side and each is colored enough to tell at a glance. A curated space follows the Mac between
-  its two shades. A new space takes the next curated color no other space has.
+- **Palette** (`SpaceColor.palette`, `SpaceColor.look`): fourteen looks on clear glass, each a mood rather than a hue
+  step, each a hue at a depth like a custom color, so the window's mode follows the depth day and night. Gradients,
+  two hues top to bottom and never across the wheel: Lagoon (teal to blue), Sunset (coral to violet), Dusk (indigo to
+  rose), Citrus (lime to tangerine). Deep and moody, with a dark window and light text: Midnight, Petrol, Forest,
+  Merlot. Bright: Watermelon, Fuchsia, Volt. Soft: Lilac, Seafoam, Dune. Only Lagoon and Midnight lean blue. Deep and
+  soft looks are see-through to 0.45 and bright ones to 0.4 (`paletteSeeThrough`, `vividSeeThrough`), as clear as
+  keeps text at 4.5:1 over a desktop that works against it. A new space takes the next of `SpaceColor.newSpaceOrder`
+  no other space has, Lagoon first, in its following version (`SpaceColor.defaultLook`): the same hues and glass, light
+  by day and deep at night with the Mac, so a fresh window on a light Mac is light. Use Default Colors gives that back;
+  the presets in the row keep their own depth, a choice made on purpose.
+- **Older colors**: white, sky, lavender, rose, peach, sand, sage, mint and graphite, at 0.915 and 0.045 by day and
+  0.27 and 0.04 at night, solid. Spaces that have them keep them exactly, Use Default Colors included, and profiles
+  still take their colors from these.
 - **Custom**: any hue and depth from the wheel, mixed in OKLCH (`SpaceColor.paint`); a deep one turns the window dark.
 - **Effects**, all optional: a second color for a gradient and its direction, see-through (the frosted desktop under
   a thinner coat of the color), and grain.
@@ -551,7 +560,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
 - **A space with no page open** (`EmptyPage`): the page card stays, in the space's wash (`Theme.wash`, the sidebar's
   color a few steps lighter by day, deep and calm at night), with the wordmark engraved in its middle. White, grays,
-  black and private windows keep the plain card. A picture chosen in the space's editor (Background) fills the card
+  black and private windows keep the plain card. A palette look on glass takes a fainter tint (`Frame.glassPage…`), so the
+  window reads as one piece of glass. A picture chosen in the space's editor (Background) fills the card
   instead, aspect fill and centered, read only while the page is empty; on it the wordmark is laid on in white with
   one soft shadow (`Color.markOnPicture`), since an engraving can't read over every picture.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
@@ -563,13 +573,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Panel radius, a crisp hairline edge, one soft small shadow, 12pt padding, `CardRow`-style rows inset 4pt. It grows
   out of what opened it. Command bar, space editor, icon picker, site panel, find, downloads, previews, and the
   Control-Tab switcher, which centers on the page beside the sidebar.
-- **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of swatches: Default (the
-  colors it was made with), six presets in light and deep pairs, Background (the empty page's picture, a dashed slot
+- **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then two rows of nine swatches: Default (the
+  colors it was made with), the palette's fourteen, solid White, Background (the empty page's picture, a dashed slot
   until there is one, then its thumbnail with a × on hover) and Custom, ringed when the colors are none of the
   others, which unfolds the wheel and Shade. Under the pointer a swatch shows a faint ring (`Color.swatchHoverRing`)
   and keeps its size, as Reader's do. Under them Effects, folded under a disclosure (`DisclosureRow`): a
   second color and its direction, See-through, Glass (Clear or Frosted, for a see-through space), Grain. While
-  Clear shows as frosted on battery or in Low Power Mode, a line in the explanation style under Glass says so. Effects opens by itself when the space uses any of them. Last,
+  Clear shows as frosted on battery or in Low Power Mode, a line in the explanation style under Glass says so. Effects opens by itself when the space uses any of them, a palette look's own glass and gradient aside. A glass look's swatch is a piece of it: its color over a faint checkerboard, lit along the top. Last,
   under a hairline, Profile: a dropdown of the profiles, with New Profile at its end (a profile of the space's own,
   named after it and following its name while you type it, in one step with no sheet); its tooltip says spaces on
   the same profile share sign-ins, history and extensions. The

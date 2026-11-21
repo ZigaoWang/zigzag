@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Translating works as in Chrome and Safari. The offer on a page in another language has a … menu with Always Translate (the language), Never Translate (the language) and Never Translate This Site. On a page in another language, a translate button in the address bar opens the same choices, with Translate or Show Original; it stays pressed while the page is translated. Settings › Translation lists the languages you always or never translate and the sites you never translate, each with Remove. A private window never saves a site to the list: Never Translate This Site there lasts until the window closes.
+- New spaces start in Lagoon, teal running into blue on clear glass with the desktop showing through, airy on a light Mac and deep on a dark one, and the space editor has fourteen glass looks with moods of their own: gradients Lagoon, Sunset, Dusk and Citrus; deep Midnight, Petrol, Forest and Merlot; bright Watermelon, Fuchsia and Volt; and soft Lilac, Seafoam and Dune, beside solid white. Deep ones keep the window dark with light text. Your spaces keep the colors they have now.
 
 ### Fixed
 - In OldTwitter on x.com, the controls of a video inside a quoted post play and pause the video instead of opening the quote. Thanks to [datarip](https://github.com/datarip).
