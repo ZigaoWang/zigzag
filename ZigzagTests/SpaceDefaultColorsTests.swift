@@ -226,4 +226,15 @@ struct ColorWheelDragTests {
         #expect(abs(wheel.spots[1].hue - 0.3) < 0.01)
         #expect(abs((editor.look.hue ?? 0) - 0.9) < 0.001)
     }
+
+    /// Clicking Custom again keeps the wheel out.
+    @Test func customAlwaysShowsTheWheel() {
+        let editor = SpaceLookEditor(space: SpaceInfo(name: "School", color: .sky), defaultColor: .sky, dark: false)
+        let folded = editor.preferredHeight
+        editor.showCustom()
+        let shown = editor.preferredHeight
+        editor.showCustom()
+        #expect(shown > folded)
+        #expect(editor.preferredHeight == shown)
+    }
 }

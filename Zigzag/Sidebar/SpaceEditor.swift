@@ -1232,7 +1232,7 @@ final class SpaceLookEditor: NSView {
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
     /// The picture the space's empty page shows; the panel picks and removes it.
     let backgroundSwatch = BackgroundSwatch()
-    /// Ringed when the colors match no other swatch; click toggles the wheel and Shade.
+    /// Ringed when the colors match no other swatch; click shows the wheel and Shade.
     private let customSwatch = LookSwatch(look: nil, name: String(localized: "Custom", comment: "Tooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own."))
     private var showsCustom = false
     /// In the row's order, for the arrow keys.
@@ -1334,7 +1334,7 @@ final class SpaceLookEditor: NSView {
             }
         }
         defaultSwatch.onClick = { [weak self] _ in self?.useDefaultColors() }
-        customSwatch.onClick = { [weak self] _ in self?.toggleCustom() }
+        customSwatch.onClick = { [weak self] _ in self?.showCustom() }
         effects.onClick = { [weak self] _ in
             guard let self else { return }
             self.showsEffects.toggle()
@@ -1531,6 +1531,12 @@ final class SpaceLookEditor: NSView {
         shadeSlider.colors = stride(from: 0.0, through: 1, by: 0.2).map { SpaceColor.paint(hue: spot.hue, depth: $0, tint: spot.amount) }
         clearSlider.value = space.seeThrough
         clearSlider.colors = colors
+    /// The Custom swatch: always shows the wheel and Shade, never folds them.
+    func showCustom() {
+        guard !showsCustom else { return }
+        toggleCustom()
+    }
+
         // What you chose, even while battery saving shows frosted for now.
         glassSwitch.selectedIndex = space.clearGlass != false ? 0 : 1
         grainSlider.value = space.grain ?? 0
