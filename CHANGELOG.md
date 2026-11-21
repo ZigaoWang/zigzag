@@ -16,6 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - To help fix the Mac's Passwords list on macOS 26, Zigzag keeps a small log of its steps on your Mac, never your logins, in ~/Library/Logs/Zigzag/passwords.log. Help › Report a Problem includes it. ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - A swipe back or forward no longer fills its arrow partway and then empties it when your fingers stop. The arrow now fills only once you've swiped far enough, and with your fingers resting it stays exactly as it is. A quick flick let go while your fingers are still moving still goes back or forward. Thanks to [frarees](https://github.com/frarees). ([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - Reader is one button in the address bar. With Reader off it turns Reader on; with Reader on it opens Reader's options (text size, typeface, column width, colors), which now end with Turn Off Reader. The separate Aa button is gone. Esc and ⌥⌘R still turn Reader off, and View › Reader Text and Colors still opens the options. The site's icon at the top of an article now lines up with the text, and the color swatches in Reader and the space editor no longer grow under the pointer; a faint ring shows instead. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+- In Show All Tabs, a fine line shows under the search field while cards are scrolled under it, instead of the cards being cut off there. ([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 
 ## [0.9.4] - 2026-11-21
 
