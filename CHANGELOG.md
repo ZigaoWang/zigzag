@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Translate Page works in Zigzag Mini, from the View menu or the page's right-click menu, with its notices over the Mini.
 
 ### Fixed
+- Zigzag no longer quits when you click without dragging while capturing an area.
 - The Reader button in the address bar is a plain toggle again: click it to turn Reader on, click it again to turn it off. It shows pressed while Reader is on. Reader's text and color choices moved back into the page: a small Aa button sits in the article's top-right corner, fades away as you read down and comes back when you scroll up or move the pointer near the top, and opens the choices right under it. View › Reader Text and Colors still opens them, and Esc and ⌥⌘R still turn Reader off. The Turn Off Reader row is gone. Colors are now plain round dots, like picking an accent color in System Settings, with Auto split between its light and dark paper and Space in your space's color; the chosen one has a ring in the accent color. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 - Your Zigzag Card is in About Zigzag now, instead of a menu item of its own. Under it you can pick its finish: your space's color, Holographic, Graphite or Paper, and Zigzag keeps your choice. The card is bigger, turns toward the pointer with its light following, and a click turns it over. Save as Image… makes a much sharper picture, with a soft shadow on a clear background.
 
