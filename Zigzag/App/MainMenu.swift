@@ -143,7 +143,7 @@ enum MainMenu {
             item(String(localized: "Share…", comment: "File menu item."), #selector(C.sharePage(_:)), ""),
             item(String(localized: "Save Page As…", comment: "File menu item."), #selector(C.savePageAs(_:)), "s"),
             item(String(localized: "Export as PDF…", comment: "File menu item."), #selector(C.exportAsPDF(_:)), ""),
-            item(String(localized: "Take Screenshot of Whole Page", comment: "File menu item."), #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
+            item(String(localized: "Capture…", comment: "File menu item, with ⇧⌘2: a mode over the page to take a picture of an area, an element, the whole page or what's on screen."), #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
             item(String(localized: "Print…", comment: "File menu item."), #selector(C.printPage(_:)), "p"),
         ]))
 

@@ -415,14 +415,14 @@ final class SitePanel: FloatingPanelView {
             if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.pageHost?.copyPageURL(nil) }
             self.close()
         }))
-        if controller != nil, PageScreenshot.canTake(tab), !readerOn {
+        if let controller, controller.capture.canBegin, !readerOn {
             specs.append(("camera.viewfinder",
                           String(localized: "Capture", comment: "Action in the site panel, under its icon: takes a screenshot of the whole page."),
-                          String(localized: "Take Screenshot of Whole Page", comment: "Tooltip of the Capture action in the site panel."),
+                          String(localized: "Capture an Area, an Element or the Whole Page (⇧⌘2)", comment: "Tooltip of the Capture action in the site panel."),
                           false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
-                PageScreenshot.take(self.tab, in: controller)
+                controller.capture.begin()
             }))
         }
         // Always here, as in the menu, for when the offer went by or never came: a page that's already in your

@@ -54,6 +54,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// With the sidebar hidden, notes a link opened in a background tab (#272).
     lazy var newTabNote = NewTabNote(controller: self)
     lazy var peek = PeekController(controller: self)
+    /// Capture (⇧⌘2): the mode over the page and the card it leaves.
+    lazy var capture = PageCapture(controller: self)
     /// A playing video you've left, in a small card over the page.
     lazy var miniPlayer = MiniPlayer(controller: self)
     var peekController: PeekController? { peek }
@@ -79,6 +81,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.commandBar.reposition()
             self.findBar.reposition()
             self.peek.reposition()
+            self.capture.reposition()
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
             NoticeCard.reposition(in: self)
@@ -670,6 +673,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if tab !== shownTab {
             // A peek is a look from the page you were on: going to another tab or space puts it away.
             peek.close()
+            // So is Capture.
+            capture.cancel()
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && (tab.map { tabManager.partners(of: $0) } ?? []).contains { $0 === readerTab }
             if !readerStillShown { closeReader() }
@@ -2358,6 +2363,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
         peek.close()
+        capture.cancel()
+        capture.dismissPreview()
         // The mini player floats in a panel of its own: it goes with the window too.
         miniPlayer.windowClosing()
         // So is a folder's icon picker, and the event monitor it holds.

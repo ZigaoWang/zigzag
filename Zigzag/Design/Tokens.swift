@@ -159,6 +159,15 @@ enum Tokens {
         static let peekHeaderHeight: CGFloat = Pane.height
         /// Peek's rim around its page, at the sides and below: enough to hold the page, not a frame around it.
         static let peekInset: CGFloat = 2
+        /// Capture's toolbar (⇧⌘2): a capsule of control-height buttons, `Space.x1 + 2` in from its edge.
+        static let captureToolbarHeight: CGFloat = controlHeight + (Space.x1 + 2) * 2
+        /// The round grips on a captured area's corners and sides.
+        static let captureHandle: CGFloat = Space.x2 + 1
+        /// A drag shorter than this either way is a click, not an area.
+        static let captureMinSide: CGFloat = Space.x2
+        /// The card that shows a capture, and the tallest its picture gets.
+        static let capturePreviewWidth: CGFloat = 240
+        static let capturePreviewMaxImage: CGFloat = 160
     }
 
     // MARK: - Pages
@@ -1429,6 +1438,10 @@ enum Tokens {
         static let textSelectionAlpha: CGFloat = 0.26
         /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.
         static let peekScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
+        /// Capture's dim over the page around what's picked: firm enough that the clear part reads at once.
+        static let captureScrim = dynamic(light: hex(0x000000, alpha: 0.3), dark: hex(0x000000, alpha: 0.5))
+        /// The edge of a picked area: a light line that reads on the dim and on the page it frames.
+        static let captureEdge = hex(0xFFFFFF, alpha: 0.9)
         /// A keycap's fill and edge (`KeyCap`): a touch of the field fill with a hairline, like a key seen from above.
         static let keyCapFill = dynamic(light: hex(0x000000, alpha: 0.04), dark: hex(0xFFFFFF, alpha: 0.07),
             highLight: hex(0x000000, alpha: 0.07), highDark: hex(0xFFFFFF, alpha: 0.11))

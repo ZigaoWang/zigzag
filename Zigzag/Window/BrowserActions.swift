@@ -128,9 +128,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
+    /// File › Capture… (⇧⌘2): Capture's mode over the page, or out of it again.
     @objc func takePageScreenshot(_ sender: Any?) {
-        guard let tab = selectedTab else { return }
-        PageScreenshot.take(tab, in: self)
+        capture.toggle()
     }
 
     @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
@@ -934,7 +934,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
         case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
-        case #selector(takePageScreenshot(_:)): return PageScreenshot.canTake(tab)
+        case #selector(takePageScreenshot(_:)): return capture.isActive || capture.canBegin
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
              #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(showJavaScriptConsole(_:)), #selector(inspectElement(_:)),
