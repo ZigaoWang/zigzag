@@ -12,6 +12,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The traffic lights and the buttons beside them sit midway between the top of the window and the address field, with as much room above them as below, instead of lower down.
 - To help fix the Mac's Passwords list on macOS 26, Zigzag keeps a small log of its steps on your Mac, never your logins, in ~/Library/Logs/Zigzag/passwords.log. Help › Report a Problem includes it. ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - A swipe back or forward no longer fills its arrow partway and then empties it when your fingers stop. The arrow now fills only once you've swiped far enough, and with your fingers resting it stays exactly as it is. A quick flick let go while your fingers are still moving still goes back or forward. Thanks to [frarees](https://github.com/frarees). ([#377](https://github.com/ZigaoWang/zigzag/issues/377))
+- Reader is one button in the address bar. With Reader off it turns Reader on; with Reader on it opens Reader's options (text size, typeface, column width, colors), which now end with Turn Off Reader. The separate Aa button is gone. Esc and ⌥⌘R still turn Reader off, and View › Reader Text and Colors still opens the options. The site's icon at the top of an article now lines up with the text, and the color swatches in Reader and the space editor no longer grow under the pointer; a faint ring shows instead. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+
+### New
+- Reader has a Space color. The article takes the colors of the space you're in, the same color as the sidebar, light or dark as the space is, with text and links kept dark (or light) enough to read easily. It changes right away when you switch spaces or change the space's color. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 
 ## [0.9.4] - 2026-11-21
 
