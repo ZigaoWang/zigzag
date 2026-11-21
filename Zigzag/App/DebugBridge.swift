@@ -1340,6 +1340,14 @@ enum DebugBridge {
         case "capture": runCapture(arg, in: controller)
         case "reader": controller.toggleReader()
         case "translate": controller.translatePage()
+        // translatemenu: the address bar's translate button, as a click. translateoptions: the offer's … button.
+        // translatestub: the page marked translated, without Apple's translation.
+        case "translatemenu": controller.showTranslateMenu()
+        case "translateoptions":
+            let toast = controller.root.overlay.subviews.compactMap { $0 as? ToastView }.last
+            toast?.optionsButton.onClick?(NSEvent())
+        case "translatestub": controller.debugMarkTranslated()
+        case "translatesettings": SettingsPage.open(.translation, in: controller)
         case "split":
             // Splits the shown tab with the one at this sidebar position.
             let list = controller.tabManager.navigableTabs

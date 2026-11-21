@@ -149,6 +149,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        sidebar.address.translateButton.onClick = { [weak self] _ in self?.showTranslateMenu() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
@@ -744,6 +745,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         updateNowPlaying()
         offerWebStoreExtension()
         updateReaderButton()
+        updateTranslateButton()
         findBar.pageChanged()
     }
 
@@ -1672,6 +1674,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .reader:
             updateReaderButton()
         case .language:
+            updateTranslateButton()
             offerTranslation()
         case .themeColor, .darkPage:
             paintTopBar()
@@ -1724,6 +1727,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var translationOffered: Set<String> = []
     /// Sites translated this session and their source language; their other pages auto-translate when in that language.
     private var translatedSites: [String: Locale.Language] = [:]
+    /// Never Translate This Site chosen in a private window: kept only while the window is open.
+    private var neverTranslatedHere: Set<String> = []
     /// How long a translation may go without a batch coming back before it says so instead of spinning on: Apple's
     /// translation can wait on a prompt that never comes up, or not answer at all. A long page that keeps coming
     /// back keeps going (#465).
@@ -1770,26 +1775,98 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard let tab = tabManager.selectedTab, let language = tab.foreignLanguage, !tab.isTranslated,
               PageTranslator.readsLanguage(of: tab.url, errorPage: tab.showsErrorPage),
               let site = ContentBlocker.site(of: tab.url) else { return }
-        // Languages you always translate, and sites you translated a moment ago, translate on their own.
-        if translatedSites[site] != nil || PageTranslator.translatesAlways(language) { translatePage(asked: false); return }
-        guard PageTranslator.offers, !translationOffered.contains(site) else { return }
-        translationOffered.insert(site)
-        showTranslationOffer(tab, language: language)
+        switch PageTranslator.Choices().automatic(language: language, site: site, translatedHere: translatedSites[site] != nil,
+                                                  neverHere: neverTranslatedHere, offers: PageTranslator.offers,
+                                                  offered: translationOffered.contains(site)) {
+        case .translate: translatePage(asked: false)
+        case .offer:
+            translationOffered.insert(site)
+            showTranslationOffer(tab, language: language)
+        case .nothing: break
+        }
     }
 
     private func showTranslationOffer(_ tab: Tab, language: Locale.Language) {
+        let text = String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French.")
+        let translate = (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
+            if let tab { self?.translatePage(tab: tab) }
+        })
+        let options = { [weak self, weak tab] () -> [MenuPanel.Entry] in
+            guard let self, let tab else { return [] }
+            return self.translateChoices(tab, language: language)
+        }
         if let mini = translationMini(tab) {
-            Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
-                       action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
-                           if let tab { self?.translatePage(tab: tab) }
-                       }), duration: 6, closes: true, over: mini.overlay, area: mini.overlay.bounds)
+            Toast.show(text, symbol: "translate", action: translate, options: options, duration: 6, closes: true, over: mini.overlay, area: mini.overlay.bounds)
             return
         }
         translationOfferPage = tab.url
-        Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
-                   action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
-                       if let tab { self?.translatePage(tab: tab) }
-                   }), duration: 6, closes: true, owner: tab, in: self)
+        Toast.show(text, symbol: "translate", action: translate, options: options, duration: 6, closes: true, owner: tab, in: self)
+    }
+
+    /// The address bar's translate button: on pages in another language, and pressed while translated.
+    private func updateTranslateButton() {
+        guard let tab = tabManager.selectedTab else { sidebar.address.setTranslation(available: false, translated: false); return }
+        let foreign = tab.foreignLanguage != nil && PageTranslator.readsLanguage(of: tab.url, errorPage: tab.showsErrorPage)
+        sidebar.address.setTranslation(available: foreign, translated: tab.isTranslated)
+    }
+
+    /// The translate button's menu: Translate or Show Original, then the Always and Never choices.
+    func showTranslateMenu() {
+        guard let tab = tabManager.selectedTab else { return }
+        let language = tab.foreignLanguage ?? ContentBlocker.site(of: tab.url).flatMap { translatedSites[$0] }
+        var entries: [MenuPanel.Entry] = [.item(MenuPanel.Item(title: PageTranslator.menuTitle(translated: tab.isTranslated)) { [weak self, weak tab] in
+            if let tab { self?.translatePage(tab: tab) }
+        })]
+        let choices = translateChoices(tab, language: language)
+        if !choices.isEmpty { entries += [.separator] + choices }
+        MenuPanel.show(entries, from: sidebar.address.translateButton, placement: .below)
+    }
+
+    /// Always Translate and Never Translate for the page's language and site, and the way to Settings.
+    private func translateChoices(_ tab: Tab, language: Locale.Language?) -> [MenuPanel.Entry] {
+        let choices = PageTranslator.Choices()
+        var entries: [MenuPanel.Entry] = []
+        if let language {
+            let code = PageTranslator.code(of: language), name = PageTranslator.name(of: language)
+            let always = choices.alwaysLanguages.contains(code), never = choices.neverLanguages.contains(code)
+            entries.append(.item(MenuPanel.Item(title: String(localized: "Always Translate \(name)", comment: "Item in the translate menu: pages in this language are translated as they open. The name is a language's, like French."),
+                                                isChecked: always) { [weak self, weak tab] in
+                choices.setAlways(!always, code)
+                guard !always, let self, let tab, !tab.isTranslated else { return }
+                self.translatePage(tab: tab)
+            }))
+            entries.append(.item(MenuPanel.Item(title: String(localized: "Never Translate \(name)", comment: "Item in the translate menu: pages in this language are never offered or translated on their own. The name is a language's, like French."),
+                                                isChecked: never) { [weak self, weak tab] in
+                choices.setNever(!never, code)
+                if !never, let self, let tab { self.stopOffering(tab) }
+            }))
+        }
+        if let site = ContentBlocker.site(of: tab.url) {
+            let never = choices.neverSites.contains(site) || neverTranslatedHere.contains(site)
+            entries.append(.item(MenuPanel.Item(title: String(localized: "Never Translate This Site", comment: "Item in the translate menu: pages on this site are never offered or translated on their own."),
+                                                isChecked: never) { [weak self, weak tab] in
+                guard let self else { return }
+                if never {
+                    choices.setNeverSite(false, site, isPrivate: false)
+                    self.neverTranslatedHere.remove(site)
+                    return
+                }
+                if !choices.setNeverSite(true, site, isPrivate: self.tabManager.isPrivate) { self.neverTranslatedHere.insert(site) }
+                if let tab { self.stopOffering(tab) }
+            }))
+        }
+        entries += [.separator, .item(MenuPanel.Item(title: String(localized: "Translation Settings…", comment: "Item in the translate menu: opens Settings › Translation.")) { [weak self] in
+            if let self { SettingsPage.open(.translation, in: self) }
+        })]
+        return entries
+    }
+
+    /// After a Never choice: the offer goes, and a translated page shows its original.
+    private func stopOffering(_ tab: Tab) {
+        if tab.isTranslated { translatePage(tab: tab); return }
+        if translationInView(tab) {
+            if let mini = translationMini(tab) { Toast.hide(over: mini.overlay) } else { Toast.hide(for: tab, in: self) }
+        }
     }
 
     /// Translates the current tab or `chosen` (sidebar tab menu, page menu, Zigzag Mini), or reverts it. Tabs translate
@@ -1809,6 +1886,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             PageTranslator.restore(in: webView)
             tab.isTranslated = false
             if let site { translatedSites[site] = nil }
+            updateTranslateButton()
             if translationInView(tab) { hideTranslationToast(tab) }
             return
         }
@@ -1904,6 +1982,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             case .success:
                 tab.isTranslated = true
                 if let site = run.site, let source = run.source { self.translatedSites[site] = source }
+                self.updateTranslateButton()
                 guard inView else { return }
                 self.translationToast(tab, String(localized: "Translated from \(run.name)", comment: "Toast after a page is translated. The language is its name, like French."), symbol: "translate",
                                       action: (title: String(localized: "Show Original", comment: "Button in the toast after a page is translated: shows it untranslated again."), run: { [weak self, weak tab] in
@@ -1974,6 +2053,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             Toast.hide(in: self)
         }
     }
+
+    #if DEBUG
+    /// Marks the page translated without Apple's translation, for screenshots.
+    func debugMarkTranslated() {
+        guard let tab = tabManager.selectedTab else { return }
+        tab.isTranslated = true
+        if let site = ContentBlocker.site(of: tab.url), let language = tab.foreignLanguage { translatedSites[site] = language }
+        updateTranslateButton()
+    }
+    #endif
 
     // MARK: Reader
 

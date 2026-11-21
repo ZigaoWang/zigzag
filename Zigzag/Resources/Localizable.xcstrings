@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Always Translate %@" : {
+      "comment" : "Item in the translate menu: pages in this language are translated as they open. The name is a language's, like French.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总是翻译%@"
+          }
+        }
+      }
+    },
     "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
       "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
       "localizations" : {
@@ -8,6 +19,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
+          }
+        }
+      }
+    },
+    "Languages and sites you never translate show up here." : {
+      "comment" : "Under Never Translate in Settings › Translation, when there's no language or site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译的语言和网站会显示在这里。"
+          }
+        }
+      }
+    },
+    "Never Translate" : {
+      "comment" : "A heading in Settings › Translation, over the languages and sites never offered or translated on their own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译"
+          }
+        }
+      }
+    },
+    "Never Translate %@" : {
+      "comment" : "Item in the translate menu: pages in this language are never offered or translated on their own. The name is a language's, like French.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译%@"
+          }
+        }
+      }
+    },
+    "Never Translate This Site" : {
+      "comment" : "Item in the translate menu: pages on this site are never offered or translated on their own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译此网站"
           }
         }
       }
@@ -52,6 +107,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这就是 Zigzag Mini"
+          }
+        }
+      }
+    },
+    "Translated" : {
+      "comment" : "Tooltip of the address bar's translate button on a translated page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已翻译"
+          }
+        }
+      }
+    },
+    "Translation Settings…" : {
+      "comment" : "Item in the translate menu: opens Settings › Translation.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译设置…"
           }
         }
       }
@@ -15287,17 +15364,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "页面和目录"
-          }
-        }
-      }
-    },
-    "Pages in these languages are translated as soon as they open." : {
-      "comment" : "Under the list of languages in Settings › Translation.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些语言的页面一打开就会被翻译。"
           }
         }
       }

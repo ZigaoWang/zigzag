@@ -30,6 +30,16 @@ final class AddressView: InteractiveView {
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
     /// Shown on articles: turns Reader on and off.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
+    /// Shown on pages in another language, pressed while translated: opens the translate menu.
+    let translateButton = AddressView.button("translate", toolTip: String(localized: "Translate", comment: "Action in the site panel: translates the page."))
+
+    func setTranslation(available: Bool, translated: Bool) {
+        wantsTranslate = available || translated
+        translateButton.isSelected = translated
+        translateButton.toolTip = translated ? String(localized: "Translated", comment: "Tooltip of the address bar's translate button on a translated page.")
+            : String(localized: "Translate", comment: "Action in the site panel: translates the page.")
+        reflow(animated: true)
+    }
 
     func setCapture(camera: Bool, microphone: Bool) {
         wantsCapture = camera || microphone
@@ -403,6 +413,8 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        translateButton.isHidden = true
+        addSubview(translateButton)
         saveButton.tint = Tokens.Color.icon
         saveButton.isHidden = true
         addSubview(saveButton)
@@ -513,7 +525,7 @@ final class AddressView: InteractiveView {
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
+        let count = (wantsTranslate ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -541,6 +553,7 @@ final class AddressView: InteractiveView {
     }
 
     private var wantsReader = false
+    private var wantsTranslate = false
     private var wantsCapture = false
     /// The buttons drawn in the field, those leaving aside.
     private var drawn = Set<ObjectIdentifier>()
@@ -563,7 +576,7 @@ final class AddressView: InteractiveView {
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
         var others: [IconButton] = []
-        for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
+        for (button, wanted) in [(translateButton, wantsTranslate), (readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         // Without the site, buttons get the whole width, including a gap after the last.
@@ -649,7 +662,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [translateButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.
