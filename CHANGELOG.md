@@ -14,7 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A theme from the Chrome Web Store or Firefox Add-ons, or a theme folder picked with Install from Folder, isn't installed. Zigzag doesn't use browser themes, so it says that and points to a space's colors, where it used to add the theme as an extension that did nothing. ([#454](https://github.com/ZigaoWang/zigzag/issues/454))
 
 ### Fixed
-- The sidebar's edge can be dragged while it's out over the page, as it can while it takes room in the window, and the width it leaves is the width every new window and every launch starts with; double-clicking the edge puts the usual width back. ([#431](https://github.com/ZigaoWang/zigzag/issues/431))
+- The sidebar's edge can be dragged while it's out over the page, as it can while it takes room in the window, and the width it leaves is the width every new window starts with, after a restart too; double-clicking the edge puts the usual width back. ([#431](https://github.com/ZigaoWang/zigzag/issues/431))
 
 ## [0.9.3] - 2026-11-21
 
