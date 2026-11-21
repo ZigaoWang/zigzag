@@ -511,7 +511,7 @@ final class WindowManager {
         return !controllers.isEmpty
     }
 
-    /// A fresh start passed the last session over: keep it, so Window › Reopen Last Session can bring back what it
+    /// A fresh start passed the last session over: keep it, so History › Reopen Last Session can bring back what it
     /// was, however long the fresh window is used first (#433). An empty session never replaces a kept one: a fresh
     /// start that only opened Settings or a Mini must not erase the session it passed over.
     func keepSessionForReopening(session: URL = Paths.session, kept: URL = Paths.previousSession,
@@ -538,7 +538,7 @@ final class WindowManager {
         }
     }
 
-    /// Window › Reopen Last Session: the windows and tabs a fresh start passed over come back, with the back/forward
+    /// History › Reopen Last Session: the windows and tabs a fresh start passed over come back, with the back/forward
     /// lists kept beside them, and the fresh session stays until the next launch writes over it.
     func reopenLastSession(kept: URL = Paths.previousSession, keptTabStates: URL = Paths.previousTabState,
                            tabStates: URL = Paths.tabState) {

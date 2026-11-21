@@ -220,6 +220,8 @@ enum MainMenu {
             item(String(localized: "Show Archive", comment: "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs."), #selector(AppDelegate.showArchive(_:)), ""),
             item(String(localized: "Reopen Closed Tab", comment: "History menu item."), #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
             item(String(localized: "Reopen Closed Window", comment: "History menu item."), #selector(AppDelegate.reopenClosedWindow(_:)), ""),
+            // What a fresh start passed over at launch (#433), as in Safari.
+            item(String(localized: "Reopen Last Session", comment: "History menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh."), #selector(AppDelegate.reopenLastSession(_:)), ""),
             // Recently closed tabs and windows, and pages by day (#271).
             HistoryMenu.makeRecentlyClosedItem(),
             .separator(),
@@ -231,9 +233,6 @@ enum MainMenu {
         main.addItem(history)
 
         let window = submenu(String(localized: "Window", comment: "A menu in the menu bar."), [
-            // What a fresh start passed over at launch (#433): the session from before comes back.
-            item(String(localized: "Reopen Last Session", comment: "Window menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh."), #selector(AppDelegate.reopenLastSession(_:)), ""),
-            .separator(),
             item(String(localized: "Minimize", comment: "Window menu item."), #selector(NSWindow.performMiniaturize(_:)), "m"),
             item(String(localized: "Zoom", comment: "Window menu item."), #selector(NSWindow.performZoom(_:)), ""),
             // No key: ⌥⌘T is Translate Page, and there's no common one for this.

@@ -15715,13 +15715,13 @@
         }
       }
     },
-    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for Window › Reopen Last Session." : {
+    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session." : {
       "comment" : "Explanation under “On launch” in Settings › General.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“窗口 › 重新打开上次会话”里找回。"
+            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“历史记录 › 重新打开上次会话”里找回。"
           }
         }
       }
@@ -17192,7 +17192,7 @@
       }
     },
     "Reopen Last Session" : {
-      "comment" : "Window menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh.",
+      "comment" : "History menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19717,7 +19717,7 @@
       }
     },
     "Start Fresh" : {
-      "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for Window › Reopen Last Session.",
+      "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -23511,13 +23511,13 @@
         }
       }
     },
-    "Your tabs and spaces are saved, and Window › Reopen Last Session brings them back." : {
-      "comment" : "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the Window menu.",
+    "Your tabs and spaces are saved, and History › Reopen Last Session brings them back." : {
+      "comment" : "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the History menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的标签页和空间都已保存，“窗口 › 重新打开上次会话”可以再把它们带回来。"
+            "value" : "你的标签页和空间都已保存，“历史记录 › 重新打开上次会话”可以再把它们带回来。"
           }
         }
       }

@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// What a launch does with the last session: pick it up, or start with one fresh window, the saved session left for
-/// Window › Reopen Last Session (#433). Reopening is the default, so nothing changes for anyone who never opens Settings.
+/// History › Reopen Last Session (#433). Reopening is the default, so nothing changes for anyone who never opens Settings.
 enum LaunchChoice: String, CaseIterable, Sendable {
     case resume, fresh
 
@@ -166,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
                                        miniOnly: miniOnly, webAppOnly: webAppOnly)
         WindowManager.shared.sessionWaiting = plan.sessionWaiting
-        // Settings › General › On launch: a fresh start keeps the saved session for Window › Reopen Last Session
+        // Settings › General › On launch: a fresh start keeps the saved session for History › Reopen Last Session
         // instead of bringing it back, and doesn't write over it until the new window is used (#433). An update's
         // relaunch is never a fresh start: it puts exactly what was open back.
         let resumes = UpdateRelaunch.resumes(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
@@ -269,8 +269,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let fresh = LaunchChoice.choice == .fresh
         let keepsTabs = String(localized: "Your tabs and spaces will be right here when you open it again.",
                                comment: "Message of the sheet that asks before quitting; “it” is Zigzag.")
-        let freshTabs = String(localized: "Your tabs and spaces are saved, and Window › Reopen Last Session brings them back.",
-                               comment: "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the Window menu.")
+        let freshTabs = String(localized: "Your tabs and spaces are saved, and History › Reopen Last Session brings them back.",
+                               comment: "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the History menu.")
         let message = downloading == 0
             ? (fresh ? freshTabs : keepsTabs)
             : String(localized: "\(downloading) downloads are still in progress. They pause, and you can resume them from Downloads when you open Zigzag again.",
@@ -458,7 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
     @objc func openDocument(_ sender: Any?) { frontBrowserWindow()?.openDocument(sender) }
     @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
-    /// Window › Reopen Last Session: the session a fresh start passed over (#433).
+    /// History › Reopen Last Session: the session a fresh start passed over (#433).
     @objc func reopenLastSession(_ sender: Any?) { WindowManager.shared.reopenLastSession() }
     /// The latest closed tab or window, as in Chrome; with no window open, that's usually the window.
     @objc func reopenClosedTab(_ sender: Any?) {
