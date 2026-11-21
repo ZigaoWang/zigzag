@@ -88,6 +88,8 @@ enum Reader {
                 const block = img.closest('p, li, td, th, dd');
                 if (block && !img.closest('figure') && block.textContent.trim().length > 0) img.classList.add('inline');
               });
+              // The header names the author; the article's own "By …" line would say it twice.
+              (\(Reader.repeatedBylineScript))(body, article.byline || '', siteName());
               // A wiki's date is when the page was started, not when what you read was written.
               const time = wiki ? null : document.querySelector('article time[datetime], main time[datetime], header time[datetime]');
               const published = wiki ? '' : article.publishedTime || meta('article:published_time') || (time ? time.getAttribute('datetime') : '') || '';
@@ -104,6 +106,34 @@ enum Reader {
         """
         return [WKUserScript(source: readability + "\n" + readerable + "\n" + check, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient)]
     }()
+
+    /// Takes out the article's opening line when it only names the author the header shows: "By Ada Palmer" under a
+    /// header that says Ada Palmer. Compared without case, "By" or extra spaces, and only among the first few blocks,
+    /// never inside a paragraph, so the text itself is left alone.
+    static let repeatedBylineScript = #"""
+    (root, byline, site) => {
+      const norm = s => (s || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase()
+        .replace(/^(?:(?:written|posted|words|story)\s+)?by\s+|^作者\s*[:：]?\s*/, '')
+        .replace(/^[\s|\-–—·•,:：/]+|[\s|\-–—·•,:：/]+$/g, '');
+      const name = norm(byline);
+      if (name.length < 2 || name.length > 60 || /contributors|http|@/.test(name) || name === norm(site)) return;
+      let blocks = 0;
+      const visit = parent => {
+        for (const el of [...parent.children]) {
+          const text = norm(el.textContent);
+          if (!text) { if (el.matches('img, picture, figure, video, svg')) blocks++; continue; }
+          if (text === name) { el.remove(); return true; }
+          if (el.matches('p, h1, h2, h3, h4, h5, h6, li, ul, ol, dl, blockquote, pre, table, figure')) {
+            if (++blocks >= 3) return true;
+            continue;
+          }
+          if (visit(el)) return true;
+        }
+        return false;
+      };
+      visit(root);
+    }
+    """#
 
     private static func resource(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
