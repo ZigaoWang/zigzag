@@ -421,11 +421,9 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// again (#316).
     @objc func resetTileLayout(_ sender: Any?) {
         guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, shape.isParted else { return }
+        let before = shape
         shape.evenOut()
-        tabManager.setTileShape(shape, for: tab)
-        root.setTiles(shape, animated: true)
-        root.paneCards.forEach { $0.header.resetsLayout = false }
-        onStateChange?()
+        applyTileShape(shape, undoTo: before)
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
@@ -1063,6 +1061,17 @@ enum ZoomLevels {
 
     /// A zoom as people read it: "125%".
     static func percent(_ zoom: CGFloat) -> String { "\(Int((zoom * 100).rounded()))%" }
+
+    /// A typed zoom as a value: "130%", "130" or " 130 % ". Nil when it isn't a number above zero; the caller
+    /// keeps it within its own levels.
+    static func typed(_ text: String) -> CGFloat? {
+        let plain = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "%", with: "")
+            .replacingOccurrences(of: "％", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        guard let percent = Double(plain), percent.isFinite, percent > 0 else { return nil }
+        return CGFloat(percent / 100)
+    }
 
     /// Zoom for sites without their own: Settings › Appearance › Page zoom (100% by default). Actual Size resets to it,
     /// as in Chrome and Safari.

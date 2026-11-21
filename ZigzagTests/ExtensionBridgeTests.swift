@@ -1174,7 +1174,7 @@ private final class SiteAccessTestTab: NSObject, WKWebExtensionTab {
 }
 
 /// Content scripts follow site access as it changes, the extension starting again when it has less, as ExtensionHost
-/// does: When You Click It runs them only once clicked, while the tab stays on that site; On Specific Sites only
+/// does: On Click runs them only once clicked, while the tab stays on that site; On Specific Sites only
 /// there; On All Sites everywhere.
 @MainActor
 struct SiteAccessContentScriptTests {
@@ -1295,7 +1295,7 @@ struct SiteAccessContentScriptTests {
         #expect(try await ran(off))
     }
 
-    /// Under When You Click It, an extension that never asked for activeTab is given only a site it asked for.
+    /// Under On Click, an extension that never asked for activeTab is given only a site it asked for.
     @Test func aClickGivesOnlyASiteItAskedFor() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

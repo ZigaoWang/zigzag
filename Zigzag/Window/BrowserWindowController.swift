@@ -62,7 +62,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The page in this window's Peek, while it's up.
     var peekedTab: Tab? { peek.tab }
 
-    init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth) {
+    init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat? = nil) {
         self.tabManager = tabManager
         root = BrowserRootView(sidebar: sidebar)
         let rect = frame ?? BrowserWindowController.defaultFrame()
@@ -73,8 +73,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
-        // A width saved before the toolbar's buttons grew can be narrower than they now need.
-        root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
+        // view keeps the width dragged out last time, which every window shares (#431).
+        if let sidebarWidth {
+            // A window restored from a session keeps its own; the shared width is written only by a drag (#431).
+            root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        }
         root.onLayoutChange = { [weak self] in
             guard let self else { return }
             self.layoutTrafficLights()
@@ -124,8 +128,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // The reset button shows while a grid's line is parted, and goes when it's one line again.
             self.root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
             guard final else { return }
-            self.tabManager.setTileShape(shape, for: tab)
-            self.onStateChange?()
+            // A whole drag is one change: the group's lines when it began are what ⌘Z puts back (#435).
+            self.applyTileShape(shape, undoTo: self.tabManager.split(for: tab)?.shape)
         }
 
         sidebar.delegate = self
@@ -358,6 +362,34 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435).
+    func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?) {
+        guard let tab = tabManager.selectedTab, let group = tabManager.split(for: tab) else { return }
+        applyTileShape(shape, undoTo: inverse, in: group.ids)
+    }
+
+    /// As above, for the group of `ids`: a group's pages, not just where its lines were, so ⌘Z after selecting another
+    /// split leaves that one alone (#435).
+    private func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?, in ids: [UUID]) {
+        // The group the drag was in, wherever it is: another split can be showing when ⌘Z runs, and the step must
+        // still put its lines back rather than be used up doing nothing (#435).
+        guard let group = tabManager.splits.first(where: { $0.ids == ids }) else { return }
+        guard group.shape.regions == shape.regions, group.shape != shape else { return }
+        guard let page = group.ids.compactMap({ tabManager.tab(with: $0) }).first else { return }
+        tabManager.setTileShape(shape, for: page)
+        // Only the group on screen is drawn; the other split is left as it is.
+        if let shown = tabManager.selectedTab, tabManager.split(for: shown)?.ids == ids {
+            root.setTiles(shape, animated: true)
+            root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
+        }
+        onStateChange?()
+        guard let inverse else { return }
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            controller.applyTileShape(inverse, undoTo: shape, in: ids)
+        }
+        sidebarUndo.setActionName(String(localized: "Resize Tiles", comment: "Undo action name, shown in the Edit menu as Undo Resize Tiles."))
+    }
+
     static func defaultFrame() -> NSRect {
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let size = NSSize(width: min(Tokens.Metric.windowDefaultSize.width, screen.width - Tokens.Space.x16),
@@ -589,9 +621,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if window?.isVisible == true { closeFloatingPanels() }
         sidebar.holdsAddress = !above
         if above {
-            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
+            sidebar.address.starInPill = true
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
             let tab = tabManager.selectedTab
             root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+            root.topBar.showPin(sidebar.address.canSave)
+        } else {
+            root.topBar.pin = nil
+            sidebar.address.starInPill = false
         }
         root.barHoldsAddress = above
         showTopBar()
@@ -696,6 +734,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+        root.topBar.showPin(sidebar.address.canSave)
         paintTopBar()
         // A collapsed pinned section and a folded tab group (#209) show the current tab, so they update with the
         // selection.
@@ -731,7 +770,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let site = isPrivate ? nil : ContentBlocker.site(of: tab?.url)
         let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all && !profile.extensions.asksForSitesOnlyOptionally(id) ? .on : .off
-        let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
+        let click = SidebarMenus.Item(String(localized: "On Click", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
         click.state = access == .click ? .on : .off
         menu.addItem(all)
         menu.addItem(click)
@@ -1621,6 +1660,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             sidebar.update(tab: tab)
             root.topBar.showPage(url: tab.url, notSecure: tab.isNotSecure)
+            root.topBar.showPin(sidebar.address.canSave)
             paintTopBar()
             updateWindowTitle()
             offerWebStoreExtension()

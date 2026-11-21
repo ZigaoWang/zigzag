@@ -499,8 +499,21 @@ final class AddressView: InteractiveView {
         }
     }
 
+    /// Whether the star is in the top bar's pill instead, with the address above the page (#437).
+    var starInPill = false {
+        didSet {
+            guard starInPill != oldValue else { return }
+            // However the pill left the star, the field draws it from scratch when it comes back, by its own rule (#443).
+            drawn.remove(ObjectIdentifier(saveButton))
+            if starInPill { saveButton.removeFromSuperview() } else { saveButton.isHidden = !canSave; addSubview(saveButton) }
+            reflow(animated: true)
+        }
+    }
+
     /// The buttons always at the field's end, after the pins.
-    private var endButtons: [IconButton] { [saveButton, siteControlsButton].filter { !$0.isHidden } }
+    private var endButtons: [IconButton] {
+        (starInPill ? [siteControlsButton] : [saveButton, siteControlsButton]).filter { !$0.isHidden }
+    }
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
