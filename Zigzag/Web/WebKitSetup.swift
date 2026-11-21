@@ -266,7 +266,23 @@ enum PageScripts {
         const a = e.target && e.target.closest ? e.target.closest('a[href], area[href]') : null;
         send(a);
       }, true);
-      document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) send(null); }, true);
+      // The pointer is the only thing that decides: every move shows the link under it, or nothing. A move that
+      // lands anywhere but a link clears the preview, so it can't stay over a page that isn't a link.
+      document.addEventListener('mousemove', (e) => {
+        const a = e.target && e.target.closest ? e.target.closest('a[href], area[href]') : null;
+        send(a);
+      }, true);
+      document.addEventListener('mouseout', (e) => {
+        const to = e.relatedTarget;
+        const a = to && to.closest ? to.closest('a[href], area[href]') : null;
+        if (!a) send(null);
+      }, true);
+      // A click can start a navigation before the page reports a mouseout, and moving away during the load then
+      // leaves the pill showing the old address. Hide it as soon as the button goes down, and on the click itself.
+      document.addEventListener('mousedown', () => send(null), true);
+      document.addEventListener('click', () => send(null), true);
+      // The page can move under a still pointer, taking the link away without a mouse event.
+      window.addEventListener('scroll', () => send(null), true);
       window.addEventListener('blur', () => send(null));
       window.addEventListener('pagehide', () => send(null));
     })();

@@ -65,7 +65,7 @@ struct ReaderTests {
 
     @Test func choicesReachThePageAsVariables() {
         let preferences = Reader.Preferences(size: 22, face: .sans, theme: .dark, width: .narrow)
-        #expect(preferences.rootStyle == "--size: 22px; --measure: 29em")
+        #expect(preferences.rootStyle == "--size: 22px; --measure: 28rem")
         #expect(preferences.script.contains("dataset.theme='dark'"))
         #expect(preferences.script.contains("dataset.face='sans'"))
         #expect(Reader.Palette.dark.css.contains("--paper: #1E1E20;"))
@@ -81,7 +81,71 @@ struct ReaderTests {
         #expect(page.contains("default-src 'none'"))
         #expect(page.contains("<h1 class=\"title\">A title</h1>"))
         #expect(page.contains("<span class=\"author\">Ada</span><time>March 3, 2024</time>"))
-        #expect(page.contains("style=\"--size: 20px; --measure: 34em\""))
+        #expect(page.contains("style=\"--size: 20px; --measure: 34rem\""))
+    }
+
+    /// Wide has no cap of its own: the column is the window inside its margins.
+    @Test func wideFillsTheWindow() {
+        #expect(Reader.Preferences.Width.wide.measure == "100vw")
+        #expect(Reader.css.contains("main { max-width: var(--measure, 34rem)"))
+        #expect(Reader.css.contains("padding: 80px var(--gutter) 120px"))
+        // Changing a choice keeps the space's paper and the line you were on.
+        let script = Reader.Preferences(width: .wide).script
+        #expect(script.contains("setProperty('--measure','100vw')"))
+        #expect(!script.contains("setAttribute('style'"))
+        #expect(script.contains("scrollBy"))
+    }
+
+    /// Auto's paper is a breath of the space's color, and the inks keep their contrast on it in every hue.
+    @Test func autoPaperTakesTheSpacesColorAndKeepsContrast() throws {
+        #expect(Reader.AutoPaper.of(.navy) == Reader.AutoPaper())
+        for step in 0..<20 {
+            var theme = Brand.Theme(hue: Double(step) / 20)
+            theme.surfaceHue = Double(step) / 20
+            let paper = Reader.AutoPaper.of(theme)
+            #expect(paper != Reader.AutoPaper())
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.light.ink), Tokens.Color.hex(paper.light)) >= 12)
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.light.soft), Tokens.Color.hex(paper.light)) >= 4.5)
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.dark.ink), Tokens.Color.hex(paper.dark)) >= 10)
+            #expect(Brand.contrast(Tokens.Color.hex(Reader.Palette.dark.soft), Tokens.Color.hex(paper.dark)) >= 4.5)
+        }
+        let article = Reader.Article(title: "T", byline: "", site: "S", content: "<p>x</p>", length: 1, lang: "en")
+        let tinted = Reader.AutoPaper(light: 0xF8F9FC, dark: 0x1D2026)
+        let page = Reader.html(for: article, preferences: Reader.Preferences(), paper: tinted, reducedMotion: true)
+        #expect(page.contains("--tint: #F8F9FC; --tint-dark: #1D2026;"))
+        #expect(page.contains("data-motion=\"reduce\" style="))
+        #expect(!Reader.html(for: article, preferences: Reader.Preferences()).contains("data-motion=\"reduce\" style="))
+    }
+
+    /// The article's own "By …" line goes when the header already names that author; the text itself never does.
+    @Test func aBylineTheHeaderShowsIsntRepeated() async throws {
+        let webView = WKWebView()
+        webView.loadHTMLString("<!doctype html><title></title>", baseURL: nil)
+        while webView.isLoading { try await Task.sleep(for: .milliseconds(20)) }
+        func strip(_ html: String, byline: String, site: String = "Field Notes") async throws -> String {
+            let script = "const d = document.createElement('div'); d.innerHTML = html; (\(Reader.repeatedBylineScript))(d, byline, site); return d.innerHTML;"
+            return try await webView.callAsyncJavaScript(script, arguments: ["html": html, "byline": byline, "site": site], contentWorld: .page) as? String ?? ""
+        }
+        #expect(try await strip("<div><p class=\"byline\">By Ada Palmer</p><p>Text.</p></div>", byline: "Ada Palmer") == "<div><p>Text.</p></div>")
+        #expect(try await strip("<div><p>BY  <a href=\"#\">ada   palmer</a></p><p>Text.</p></div>", byline: "By Ada Palmer") == "<div><p>Text.</p></div>")
+        #expect(try await strip("<p>作者：张三</p><p>正文。</p>", byline: "张三") == "<p>正文。</p>")
+        // Words about the author, or the name inside a sentence, are the text.
+        let sentence = "<p>Ada Palmer wrote this.</p><p>Read <a href=\"#\">Ada Palmer</a> here.</p>"
+        #expect(try await strip(sentence, byline: "Ada Palmer") == sentence)
+        // Past the article's opening, a line with the name alone is the text too (a signature).
+        let late = "<p>One.</p><p>Two.</p><p>Three.</p><p>Ada Palmer</p>"
+        #expect(try await strip(late, byline: "Ada Palmer") == late)
+        // A credit the header doesn't show (the site's own name) stays.
+        #expect(try await strip("<p>By Field Notes</p><p>Text.</p>", byline: "Field Notes") == "<p>By Field Notes</p><p>Text.</p>")
+        #expect(try await strip("<p>By Ada Palmer</p>", byline: "") == "<p>By Ada Palmer</p>")
+    }
+
+    /// The title is a calm semibold, smaller than before, and the page's spaces are shares of one line.
+    @Test func headerAndRhythmFollowOneLine() {
+        #expect(Reader.css.contains("--line: calc(var(--leading) * 1rem)"))
+        #expect(Reader.css.contains("h1.title { margin: 0; font-size: 1.75em; line-height: 1.2; font-weight: 600;"))
+        #expect(Reader.css.contains("header { margin: 0 0 calc(var(--line) * 1.5); }"))
+        #expect(Reader.css.contains("border-radius: \(Int(Tokens.Radius.thumbnail))px"))
     }
 
     /// The reading page is in the store of the page it reads, never one every reading page shares: the article's

@@ -94,6 +94,15 @@ struct CommandActionTests {
         #expect(titles("reopen", c) == ["Reopen Closed Tab"])
     }
 
+    /// Capture… (⇧⌘2) is offered on a page it can take, by its name and by "screenshot" (#457).
+    @Test func captureIsOfferedWhereThePageCanBeTaken() {
+        var c = onATab
+        #expect(!titles("capture", c).contains("Capture…"))
+        c.canCapture = true
+        #expect(titles("capture", c).contains("Capture…"))
+        #expect(titles("screenshot", c).contains("Capture…"))
+    }
+
     @Test func aFirstLetterNeverRunsOne() {
         // "s" then Return searches for s, it doesn't save; the app's own commands still match as before.
         #expect(!titles("s", onATab).contains("Pin Tab"))

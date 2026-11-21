@@ -84,6 +84,23 @@
         }
       }
     },
+    "%@ %@ at %@.png" : {
+      "comment" : "A captured picture's file name: the page's title, the day (2026-11-21) and the time (14.03.22).",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ at %3$@.png"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ %3$@.png"
+          }
+        }
+      }
+    },
     "%@ %lld-bit" : {
       "comment" : "A certificate's public key on the certificate page of the site panel: its type, then its size in bits, like “RSA 2048-bit”.",
       "localizations" : {
@@ -2319,6 +2336,17 @@
         }
       }
     },
+    "A browser theme. Zigzag doesn’t use them." : {
+      "comment" : "One line beside a name, in place of installing it, when it's a browser theme rather than an extension.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是浏览器主题，Zigzag 不使用主题。"
+          }
+        }
+      }
+    },
     "A content blocker doesn’t let this page load. If you trust the site, allow it in the blocker, then try again." : {
       "comment" : "Message on the page Zigzag shows when a content blocker kept a page from loading.",
       "localizations" : {
@@ -3719,6 +3747,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开“设置 › 标签页 › 归档闲置的标签页”后，归档的标签页会出现在这里。"
+          }
+        }
+      }
+    },
+    "Area" : {
+      "comment" : "Capture's toolbar: drag over the page to pick an area.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "区域"
           }
         }
       }
@@ -5302,6 +5341,17 @@
         }
       }
     },
+    "Cancel (Esc)" : {
+      "comment" : "Tooltip of the close button in Capture's toolbar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消（Esc）"
+          }
+        }
+      }
+    },
     "Canceled" : {
       "comment" : "Under a download's name in the downloads panel: the download was stopped.",
       "localizations" : {
@@ -5430,6 +5480,83 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "截图"
+          }
+        }
+      }
+    },
+    "Capture (Return)" : {
+      "comment" : "Tooltip of the Capture button in Capture's toolbar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图（Return）"
+          }
+        }
+      }
+    },
+    "Capture What’s on Screen (V)" : {
+      "comment" : "Tooltip of Visible in Capture's toolbar; V is its key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取屏幕上可见的内容（V）"
+          }
+        }
+      }
+    },
+    "Capture an Area, an Element or the Whole Page (⇧⌘2)" : {
+      "comment" : "Tooltip of the Capture action in the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取区域、元素或整个页面（⇧⌘2）"
+          }
+        }
+      }
+    },
+    "Capture the Whole Page (F)" : {
+      "comment" : "Tooltip of Full Page in Capture's toolbar; F is its key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取整个页面（F）"
+          }
+        }
+      }
+    },
+    "Capture: drag over the page to pick an area, or press E to pick an element" : {
+      "comment" : "VoiceOver announcement when Capture mode starts (⇧⌘2). E is the key for Element.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图：在页面上拖移来选取区域，或按 E 选取元素"
+          }
+        }
+      }
+    },
+    "Captured picture" : {
+      "comment" : "VoiceOver name of a capture's picture on the card after Capture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取的图片"
+          }
+        }
+      }
+    },
+    "Capture…" : {
+      "comment" : "File menu item, with ⇧⌘2: a mode over the page to take a picture of an area, an element, the whole page or what's on screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图…"
           }
         }
       }
@@ -6243,6 +6370,17 @@
         }
       }
     },
+    "Click a Part of the Page (E)" : {
+      "comment" : "Tooltip of Element in Capture's toolbar; E is its key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按页面上的一部分（E）"
+          }
+        }
+      }
+    },
     "Click a shortcut to change or remove it. To find one, type its name or keys in Find a setting." : {
       "comment" : "Hint at the top of Settings › Shortcuts. “Find a setting” is the search field's placeholder.",
       "localizations" : {
@@ -6741,6 +6879,17 @@
         }
       }
     },
+    "Colors" : {
+      "comment" : "Row in Reader's text and color choices: the paper and ink the article is shown in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颜色"
+          }
+        }
+      }
+    },
     "Column Width" : {
       "comment" : "VoiceOver label of the column width choice in Reader's text and color choices.",
       "localizations" : {
@@ -6952,6 +7101,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已拷贝"
+          }
+        }
+      }
+    },
+    "Copied to the Clipboard" : {
+      "comment" : "Tooltip of Copied under a capture's picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝到剪贴板"
           }
         }
       }
@@ -9282,6 +9442,17 @@
         }
       }
     },
+    "Drag to Pick an Area (A)" : {
+      "comment" : "Tooltip of Area in Capture's toolbar; A is its key.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖移来选取区域（A）"
+          }
+        }
+      }
+    },
     "Drag “%@” onto the page" : {
       "comment" : "The split view step's title in the getting-started guide, a card in the window, naming the tab to drag. The name is a page's title.",
       "localizations" : {
@@ -9465,6 +9636,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "效果"
+          }
+        }
+      }
+    },
+    "Element" : {
+      "comment" : "Capture's toolbar: point at a part of the page (an element) and click to take it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元素"
           }
         }
       }
@@ -10476,6 +10658,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "磨砂"
+          }
+        }
+      }
+    },
+    "Full Page" : {
+      "comment" : "Capture's toolbar: takes the whole page, top to bottom.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整个页面"
           }
         }
       }
@@ -14111,6 +14304,17 @@
         }
       }
     },
+    "Only what’s on screen: this page scrolls inside itself" : {
+      "comment" : "On the card after Capture's Full Page, when only the visible part could be taken.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只截到了屏幕上的部分：这个页面是在内部滚动的"
+          }
+        }
+      }
+    },
     "Only when you ask" : {
       "comment" : "Under Always translate <language> in the site panel's This Site group, while it's off: pages are translated only when asked.",
       "localizations" : {
@@ -16283,6 +16487,17 @@
         }
       }
     },
+    "Reader Text and Colors" : {
+      "comment" : "View menu item: opens Reader's text size, typeface, column width and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读器文字和颜色"
+          }
+        }
+      }
+    },
     "Reading List" : {
       "comment" : "Folder that pages from another browser's reading list are imported into.",
       "localizations" : {
@@ -17559,6 +17774,17 @@
         }
       }
     },
+    "Save to the Download Folder" : {
+      "comment" : "Tooltip of Save under a capture's picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储到下载文件夹"
+          }
+        }
+      }
+    },
     "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins." : {
       "comment" : "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.",
       "localizations" : {
@@ -17671,6 +17897,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已存储到你的钥匙串，用于 %@"
+          }
+        }
+      }
+    },
+    "Save…" : {
+      "comment" : "Under a capture's picture: saves it, asking where.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储…"
           }
         }
       }
@@ -19832,6 +20069,17 @@
         }
       }
     },
+    "Text %@, Actual Size" : {
+      "comment" : "VoiceOver name of the percentage on Reader's Text Size row: the size now, then what pressing it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字 %@，实际大小"
+          }
+        }
+      }
+    },
     "Text %lld%%" : {
       "comment" : "Toast when Reader's text size changes, like Text 120%.",
       "localizations" : {
@@ -19854,8 +20102,19 @@
         }
       }
     },
+    "Text Size" : {
+      "comment" : "Row in Reader's text and color choices: the − 100% + stepper.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字大小"
+          }
+        }
+      }
+    },
     "Text and Colors" : {
-      "comment" : "Tooltip of the button in Reader's bar that shows its text and color choices.",
+      "comment" : "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20747,6 +21006,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此文件不在这里"
+          }
+        }
+      }
+    },
+    "This is a browser theme, and Zigzag doesn’t use browser themes. To change how Zigzag looks, choose Edit Space… on a space and pick its colors." : {
+      "comment" : "Shown instead of installing a theme from the Chrome Web Store or Firefox Add-ons. Edit Space… is the item in a space's right-click menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是一个浏览器主题，Zigzag 不使用浏览器主题。想改变 Zigzag 的外观，可以在空间上选择“编辑空间…”，然后挑选它的颜色。"
           }
         }
       }
@@ -22498,6 +22768,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示网页源代码"
+          }
+        }
+      }
+    },
+    "Visible" : {
+      "comment" : "Capture's toolbar: takes what's on screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可见区域"
           }
         }
       }
@@ -25270,6 +25551,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一个 JSON 数组。令牌会自动填入。"
+          }
+        }
+      }
+    },
+    "Drag into Another App" : {
+      "comment" : "Tooltip of a capture's picture on the card after Capture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖到其他 App"
           }
         }
       }

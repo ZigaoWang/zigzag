@@ -128,9 +128,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
+    /// File › Capture… (⇧⌘2): Capture's mode over the page, or out of it again.
     @objc func takePageScreenshot(_ sender: Any?) {
-        guard let tab = selectedTab else { return }
-        PageScreenshot.take(tab, in: self)
+        capture.toggle()
     }
 
     @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
@@ -429,6 +429,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
+    @objc func showReaderOptions(_ sender: Any?) { toggleReaderOptions() }
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
     @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
 
@@ -934,7 +935,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
         case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
-        case #selector(takePageScreenshot(_:)): return PageScreenshot.canTake(tab)
+        case #selector(takePageScreenshot(_:)): return capture.isActive || capture.canBegin
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
              #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(showJavaScriptConsole(_:)), #selector(inspectElement(_:)),
@@ -1017,6 +1018,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(collapseAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: true)
         case #selector(expandAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: false)
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
+        case #selector(showReaderOptions(_:)): return isReaderOnHere
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil

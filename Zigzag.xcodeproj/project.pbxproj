@@ -479,6 +479,8 @@
 		D3A86D92C8E9D6BBEC5DAF34 /* DeveloperBarTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F1832E89D6F479620EBD61E /* DeveloperBarTools.swift */; };
 		D4333F0C5C4389BE81F84324 /* CRXPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD01A7A43B5EDAF47909918 /* CRXPackage.swift */; };
 		D4E392F2E4665F1392953B9D /* PageScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */; };
+		A1C4E7F20B3D5968C7E1F024 /* PageCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D5F8031C4E6A79D8F20135 /* PageCapture.swift */; };
+		C3E6091D2D5F7B8AE9031246 /* CapturePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F71A2E3E608C9BFA142357 /* CapturePreview.swift */; };
 		D6D76DD61EB6256891FC1DF8 /* hsts_preload.txt in Resources */ = {isa = PBXBuildFile; fileRef = 716A069979B5264F4ECB33CA /* hsts_preload.txt */; };
 		D7DA27736AE177FF489E42C3 /* ChromeProfilesImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6C77CFE33BFCD7CC963266 /* ChromeProfilesImportTests.swift */; };
 		D883218F4625AC9A509AACD4 /* PageSizeReadout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64B70249EDBB278A5BC1055E /* PageSizeReadout.swift */; };
@@ -668,6 +670,8 @@
 		0C054793F49E04AC36C79015 /* CertificateDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateDetails.swift; sourceTree = "<group>"; };
 		0C4237F81EED9D709728975F /* SiteDataBench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteDataBench.swift; sourceTree = "<group>"; };
 		0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageScreenshot.swift; sourceTree = "<group>"; };
+		B2D5F8031C4E6A79D8F20135 /* PageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCapture.swift; sourceTree = "<group>"; };
+		D4F71A2E3E608C9BFA142357 /* CapturePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePreview.swift; sourceTree = "<group>"; };
 		0C67092285DC153FB7BBDFCE /* Materials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Materials.swift; sourceTree = "<group>"; };
 		0C6B64529E363AA584C30979 /* PasswordHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealth.swift; sourceTree = "<group>"; };
 		0D77B180834B8F01E59D50DF /* BridgeBookmarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeBookmarks.swift; sourceTree = "<group>"; };
@@ -1597,6 +1601,8 @@
 				2FC330CEE0425B72CE83C21D /* PageHolder.swift */,
 				6EDE9D07101FEC2F5F8AE029 /* PagePrinting.swift */,
 				0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */,
+				B2D5F8031C4E6A79D8F20135 /* PageCapture.swift */,
+				D4F71A2E3E608C9BFA142357 /* CapturePreview.swift */,
 				0939AA1C492888F73AB9B214 /* PageTextChecking.swift */,
 				8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */,
 				E6B84DBDA9267299D5DB571D /* PageVideos.swift */,
@@ -2511,6 +2517,8 @@
 				DFFC3E144CD875DBCDE8D91C /* PageImageIcon.swift in Sources */,
 				0BB1AA17ED8F39E5DAA90885 /* PagePrinting.swift in Sources */,
 				D4E392F2E4665F1392953B9D /* PageScreenshot.swift in Sources */,
+				A1C4E7F20B3D5968C7E1F024 /* PageCapture.swift in Sources */,
+				C3E6091D2D5F7B8AE9031246 /* CapturePreview.swift in Sources */,
 				A601B78AFE9B349C0C46968E /* PageShots.swift in Sources */,
 				5DB3D4718EDE79B0ABB22788 /* PageSizeHandle.swift in Sources */,
 				D883218F4625AC9A509AACD4 /* PageSizeReadout.swift in Sources */,
@@ -2991,7 +2999,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 131;
+				CURRENT_PROJECT_VERSION = 133;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -3110,7 +3118,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 131;
+				CURRENT_PROJECT_VERSION = 133;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 432GL3WKY2;

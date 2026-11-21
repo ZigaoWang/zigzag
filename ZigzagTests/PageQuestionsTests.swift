@@ -63,4 +63,16 @@ struct PageQuestionsTests {
         // "Password saved" outlasts the prompt sliding away.
         #expect(Toast.confirmationDuration >= 2.5)
     }
+
+    /// A toast's words end as far from its edge as its symbol's ink starts.
+    @Test func aToastWithAnIconIsInsetEvenly() {
+        let toast = ToastView(frame: .zero)
+        toast.label.stringValue = "110%"
+        toast.icon.image = Tokens.Symbol.image("plus.magnifyingglass", size: Tokens.Symbol.row)
+        let symbolInk = Tokens.Space.x3 + (Tokens.Metric.favicon - Tokens.Symbol.row) / 2
+        let trailing = toast.fittingWidth - toast.label.inkWidth - (Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2)
+        #expect(trailing == symbolInk)
+        toast.icon.image = nil
+        #expect(toast.fittingWidth - toast.label.inkWidth == Tokens.Space.x4 * 2)
+    }
 }
