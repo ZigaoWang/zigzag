@@ -372,6 +372,8 @@ final class WindowManager {
     func saveNow(synchronously: Bool = false) {
         saveDebouncer.cancel()
         guard !controllers.isEmpty, !sessionWaiting else { return }
+        // Started fresh and nothing done yet: the session from before is still the one to bring back.
+        if startingFresh, !sessionWasUsed { return }
         // Private windows are never written down.
         let saved = controllers.filter { !$0.tabManager.isPrivate }
         guard !saved.isEmpty else { return }
@@ -469,6 +471,18 @@ final class WindowManager {
     /// Zigzag opened for a link going to Zigzag Mini, as Arc's Little Arc does: the browser windows weren't brought back.
     /// Whatever asks for a browser window next brings them back first.
     var sessionWaiting = false
+
+    /// Launched with Settings › General › On launch set to start fresh: until the new window is used, saving would put
+    /// one blank page in place of the session that's still there to reopen (#433).
+    var startingFresh = false
+
+    /// Whether the fresh window has been used: it went somewhere, got a second tab, or a window joined it.
+    var sessionWasUsed: Bool {
+        let saved = controllers.filter { !$0.tabManager.isPrivate }
+        guard saved.count == 1, let only = saved.first else { return saved.count > 1 }
+        let tabs = only.tabManager.allTabs
+        return tabs.count > 1 || tabs.contains { $0.url != nil }
+    }
 
     /// Brings back every window and tab from the last run, crash or not. Returns false if there was nothing.
     @discardableResult

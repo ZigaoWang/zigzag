@@ -149,7 +149,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
                                        miniOnly: miniOnly, webAppOnly: webAppOnly)
         WindowManager.shared.sessionWaiting = plan.sessionWaiting
-        let restored = plan.restoresSession ? WindowManager.shared.restoreSession() : false
+        // Settings › General › On launch: a fresh start keeps the saved session for Window › Reopen Last Window
+        // instead of bringing it back, and doesn't write over it until the new window is used (#433).
+        let resumes = plan.restoresSession && LaunchChoice.choice == .resume
+        WindowManager.shared.startingFresh = plan.restoresSession && !resumes
+        let restored = resumes ? WindowManager.shared.restoreSession() : false
         if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()

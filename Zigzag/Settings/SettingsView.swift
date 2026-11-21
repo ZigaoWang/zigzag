@@ -1134,6 +1134,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let miniToggle = Toggle()
     private let energyToggle = Toggle()
     private let languagePicker = DropdownButton()
+    private let launchChoice = DropdownButton()
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
@@ -1338,6 +1339,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: defaultControl)
         defaultRow.keywords = String(localized: "default app links open launch", comment: "Words that find the Default browser setting with Find a setting in Settings. Not shown.")
         generalGroup.add(defaultRow)
+        launchChoice.options = LaunchChoice.allCases.map { choice in
+            switch choice {
+            case .resume: DropdownButton.Option(title: String(localized: "Pick Up Where You Left Off", comment: "A choice for “On launch” in Settings › General: the last session's windows come back."))
+            case .fresh: DropdownButton.Option(title: String(localized: "Start Fresh", comment: "A choice for “On launch” in Settings › General: one new window, the last session left for Window › Reopen Last Window."))
+            }
+        }
+        launchChoice.selectedIndex = LaunchChoice.allCases.firstIndex(of: LaunchChoice.choice) ?? 0
+        launchChoice.onSelect = { index in LaunchChoice.choice = LaunchChoice.allCases[index] }
+        let launchRow = FormRow(title: String(localized: "On launch", comment: "A setting in Settings › General: what a launch does with the last session."),
+                                detail: String(localized: "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for Window › Reopen Last Window.", comment: "Explanation under “On launch” in Settings › General."),
+                                control: launchChoice)
+        launchRow.keywords = String(localized: "startup restore session reopen windows fresh blank resume", comment: "Words that find the On launch setting with Find a setting in Settings. Not shown.")
+        generalGroup.add(launchRow)
         // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
         if Self.hasLanguages {
             // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
