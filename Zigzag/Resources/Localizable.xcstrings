@@ -2185,6 +2185,17 @@
         }
       }
     },
+    "A browser theme. Zigzag doesn’t use them." : {
+      "comment" : "One line beside a name, in place of installing it, when it's a browser theme rather than an extension.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是浏览器主题，Zigzag 不使用主题。"
+          }
+        }
+      }
+    },
     "A content blocker doesn’t let this page load. If you trust the site, allow it in the blocker, then try again." : {
       "comment" : "Message on the page Zigzag shows when a content blocker kept a page from loading.",
       "localizations" : {
@@ -20998,6 +21009,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此文件不在这里"
+          }
+        }
+      }
+    },
+    "This is a browser theme, and Zigzag doesn’t use browser themes. To change how Zigzag looks, choose Edit Space… on a space and pick its colors." : {
+      "comment" : "Shown instead of installing a theme from the Chrome Web Store or Firefox Add-ons. Edit Space… is the item in a space's right-click menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是一个浏览器主题，Zigzag 不使用浏览器主题。想改变 Zigzag 的外观，可以在空间上选择“编辑空间…”，然后挑选它的颜色。"
           }
         }
       }
