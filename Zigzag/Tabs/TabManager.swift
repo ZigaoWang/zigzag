@@ -1120,6 +1120,17 @@ final class TabManager {
         // Pinned pages stop being a pinned split (separated, one made a favorite, undo, another window): the split on
         // screen ends with it.
         let splitCount = splits.count
+        // A page that left its pinned split in another window: the rest close up around its place, as they did there.
+        for index in splits.indices.reversed() where splits[index].isGroup {
+            let pages = splits[index].ids.compactMap { tab(with: $0) }
+            let marks = pages.compactMap(\.bookmarkID)
+            guard marks.count == pages.count, marks.count == splits[index].count, !groupFits(pages) else { continue }
+            guard let kept = marks.lazy.compactMap({ Library.shared.pinnedSplit(containing: $0) })
+                .first(where: { Set($0.ids).isStrictSubset(of: marks) }) else { continue }
+            for (page, mark) in zip(pages, marks) where !kept.contains(mark) && splits.indices.contains(index) && splits[index].contains(page.id) {
+                _ = closeUp(index, without: page)
+            }
+        }
         // A tile group of more is ordinary tabs of one space or one pinned group's pages, or it ends too.
         splits.removeAll { pair in
             guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return false }

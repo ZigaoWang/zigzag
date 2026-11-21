@@ -573,6 +573,29 @@ import Testing
         }
     }
 
+    /// One page out of a pinned split of three or four in one window: another window showing it keeps the rest side by
+    /// side, the page on its own, as the first window does.
+    @Test(arguments: [2, 4]) func onePageLeavesAPinnedSplitShownInAnotherWindow(index: Int) throws {
+        let shape = Self.shapes[index]
+        try withTabs(shape.regions.indices.map(String.init)) { manager, tabs, space in
+            manager.makeGroup(tabs, shape: shape)
+            manager.bookmarkTab(tabs[0], in: space)
+            let marks = tabs.compactMap(\.bookmarkID)
+            let other = TabManager(spaceID: space)
+            defer { other.invalidate() }
+            other.openBookmark(try #require(Library.shared.bookmark(marks[0])))
+            let pages = marks.compactMap(other.bookmarkTab(for:))
+            #expect(other.split(for: pages[0])?.count == marks.count)
+            manager.leavePinnedGroup(marks[1])
+            let here = try #require(manager.split(for: tabs[0]))
+            let there = try #require(other.split(for: pages[0]))
+            #expect(there.ids.compactMap { other.tab(with: $0)?.bookmarkID } == here.ids.compactMap { manager.tab(with: $0)?.bookmarkID })
+            #expect(Set(there.ids) == Set(pages.map(\.id)).subtracting([pages[1].id]))
+            #expect(there.shape == here.shape)
+            #expect(other.split(for: pages[1]) == nil)
+        }
+    }
+
     /// Closing one page of a pinned split unloads that page and keeps the pin whole, for four pages as for two.
     @Test(arguments: [2, 4]) func closingOnePinnedPageKeepsThePin(count: Int) throws {
         try inWindow((0..<count).map(String.init)) { controller, tabs, space in
