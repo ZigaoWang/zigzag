@@ -16,10 +16,22 @@ enum EdgePeekFocusPolicy {
     }
 }
 
-/// Whether a page can go back where it came from: never into a closed tab, and not at all when it had no home.
+/// Whether a page can go back where it came from: never into a closed tab, and not at all when it had no home. A
+/// selection change puts it back only where its card still shows it; elsewhere the card now owns the place and the
+/// page must not be painted over it.
 enum EdgePeekRestorePolicy {
-    static func canRestore(isClosed: Bool, hasOrigin: Bool, reason: EdgeLensReason = .escape) -> Bool {
-        !isClosed && hasOrigin && reason != .selection
+    static func canRestore(isClosed: Bool, hasOrigin: Bool, reason: EdgeLensReason = .escape,
+                           cardStillShowsPage: Bool = false) -> Bool {
+        guard !isClosed, hasOrigin else { return false }
+        return reason != .selection || cardStillShowsPage
+    }
+}
+
+/// Whether the lens can move to another page: not to the page it is on, and not to a closed tab. A page WebKit opened
+/// for the lens has its configuration before its address, so a missing URL never keeps it out.
+enum EdgePeekSwap {
+    static func canTake(_ tab: Tab, from current: Tab?, isClosed: Bool) -> Bool {
+        !isClosed && tab !== current
     }
 }
 
@@ -125,8 +137,7 @@ final class EdgePeek {
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         sourceFrame = EdgePeekPreview.shared.currentFrame
             ?? controller.edgeSidebarForDisplay().sidebar.list.lastPickedRowFrame
-        let frame = EdgeLensLayout.frame(beside: sidebarFrame, in: visible, pageAspect: card.pageAspect,
-                                         caption: card.lensCaptionHeight,
+        let frame = EdgeLensLayout.frame(beside: sidebarFrame, in: visible,
                                          onRight: EdgeSidebar.shared.panelOnRight,
                                          rowMidY: sourceFrame?.midY ?? sidebarFrame.midY)
         panel.setFrame(sourceFrame ?? frame, display: false)
@@ -156,14 +167,16 @@ final class EdgePeek {
         refreshLens()
     }
 
-    /// A page opened from the lens takes the card over: the old page goes back to its tab, and the new page's holder
-    /// moves into the same card. The panel, its frame and the sidebar stay.
+    /// A page opened from the lens takes the card over: the new page's holder moves into the same card. The page it
+    /// leaves goes back to its card only if that card still shows it; a page the browser has already replaced (a link
+    /// opened from the lens) is not painted back over the new one. The panel, its frame and the sidebar stay.
     private func swap(to tab: Tab, from controller: BrowserWindowController) {
-        guard controller === self.controller, tab !== self.tab, !tab.isClosed, tab.url != nil else { return }
+        guard controller === self.controller, EdgePeekSwap.canTake(tab, from: self.tab, isClosed: tab.isClosed) else { return }
         _ = tab.ensureWebView()
         guard let holder = tab.pageHolder, let card, let panel else { return }
         card.endLive()
-        if let old = self.tab, let oldHolder = old.pageHolder, let origin {
+        if let old = self.tab, let oldHolder = old.pageHolder, let origin,
+           old.webView != nil, controller.root.card.webView === old.webView {
             oldHolder.removeFromSuperview()
             oldHolder.frame = originFrame
             origin.addSubview(oldHolder)
@@ -223,6 +236,7 @@ final class EdgePeek {
         }
         card.onLensAddress = { [weak self] text in self?.navigate(to: text) }
         card.onLensSiteControls = { [weak self] button in self?.showSiteControls(from: button) }
+        card.onLensClose = { [weak self] in self?.dismiss(.escape) }
     }
 
     private func refreshLens() {
@@ -294,7 +308,11 @@ final class EdgePeek {
         controller?.setEdgePeek(nil)
         if let tab, let holder = tab.pageHolder {
             holder.removeFromSuperview()
-            if EdgePeekRestorePolicy.canRestore(isClosed: tab.isClosed, hasOrigin: origin != nil, reason: reason),
+            // A selection change puts the page back only if its card still shows it (the split's other pane); a page
+            // the card has replaced stays out, so it never paints over the page that owns the place now.
+            let cardStillShowsPage = controller?.root.card.webView === tab.webView
+            if EdgePeekRestorePolicy.canRestore(isClosed: tab.isClosed, hasOrigin: origin != nil, reason: reason,
+                                                cardStillShowsPage: cardStillShowsPage),
                let origin {
                 holder.frame = originFrame
                 origin.addSubview(holder)
@@ -488,11 +506,23 @@ final class EdgePeek {
                 dismiss(.selection)
                 return
             }
-            if let tab, let selected = controller?.tabManager.selectedTab, selected !== tab {
+            if let lensTab = tab, let selected = controller?.tabManager.selectedTab, selected !== lensTab {
                 // A page opened from the lens is a replacement, not a selection away from it: the show that follows
                 // swaps the page in. Anything else is leaving the lens, and the page must not be put back over the
                 // card that now owns its place.
-                if EdgePeekRouting.selectionKeepsLens(lensTab: tab, selected: selected) { return }
+                if EdgePeekRouting.selectionKeepsLens(lensTab: lensTab, selected: selected) {
+                    // The replacement is shown right after this notification. If it never comes (Switch to Tab, an
+                    // extension selecting a child tab), the lens has no page there: close it on the next turn, so the
+                    // swap has its moment first.
+                    DispatchQueue.main.async { [weak self] in
+                        MainActor.assumeIsolated {
+                            guard let self, self.isVisible, !self.isCollapsing, self.tab === lensTab,
+                                  self.controller?.tabManager.selectedTab === selected else { return }
+                            self.dismiss(.selection)
+                        }
+                    }
+                    return
+                }
                 dismiss(.selection)
             }
         case .content:

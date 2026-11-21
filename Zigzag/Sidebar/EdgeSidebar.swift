@@ -529,6 +529,16 @@ final class EdgeSidebar {
 final class EdgeSidebarPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// ⌘T in either panel — the sidebar's or the lens's — opens the panel's own command bar, as a new tab there.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        if mods == .command, event.charactersIgnoringModifiers?.lowercased() == "t" {
+            EdgeSidebar.shared.newTabInPlace()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 }
 
 /// The panel's content: the floating sidebar card, set off the screen's edge as it is from a window's, and flush at
@@ -573,15 +583,6 @@ final class EdgeSidebarHost: NSView {
         let point = convert(event.locationInWindow, from: nil)
         if container?.frame.contains(point) != true { EdgeSidebar.shared.hide(); return }
         super.mouseDown(with: event)
-    }
-
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
-        if mods == .command, event.charactersIgnoringModifiers?.lowercased() == "t" {
-            EdgeSidebar.shared.newTabInPlace()
-            return true
-        }
-        return super.performKeyEquivalent(with: event)
     }
 }
 

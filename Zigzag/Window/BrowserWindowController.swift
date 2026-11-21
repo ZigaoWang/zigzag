@@ -30,6 +30,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var edgeSiteHost: EdgeSitePanelHost?
     /// The command bar is open over the screen in the edge panel, not in this window.
     private(set) var edgeCommandBarInPlace = false
+    /// The panel's command bar is opening what was chosen: the tab it makes or selects opens in the lens.
+    private var edgeBarChoosing = false
     let root: BrowserRootView
 
     /// The window's sidebar and, once the hot edge has made it, the mirror it shows: one change reaches both. The
@@ -394,6 +396,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .selection:
             if tabManager.selectedTab != nil { commandBar.pageArrived() }
             showSelectedTab()
+            // A tab chosen in the panel's command bar opens in the lens, over the panel; the window stays behind.
+            if edgeBarChoosing, let tab = tabManager.selectedTab {
+                edgeBarChoosing = false
+                EdgePeek.shared.show(tab: tab, from: self, replacing: true)
+            }
             // An AI app's bar goes with the tab it's using.
             AgentControl.shared.refresh(self)
             // "Translating…" belongs to its tab: it goes on there quietly, and shows again when you're back.
@@ -3558,20 +3565,16 @@ extension BrowserWindowController: CommandBarHost {
         else { window?.makeFirstResponder(field) }
     }
 
-    /// A result chosen in the panel is the moment the browser comes forward on it.
+    /// A result chosen in the panel: the tab it makes or selects opens in the lens, over the panel, not behind it.
     func commandBarChoseResult() {
         guard edgeCommandBarInPlace else { return }
-        if EdgePeekRouting.newPage(peekVisible: EdgePeek.shared.isVisible) == .peek,
-           let tab = tabManager.selectedTab {
-            EdgePeek.shared.show(tab: tab, from: self, replacing: true)
-        } else {
-            bringForwardForEdge()
-        }
+        edgeBarChoosing = true
     }
 
     func commandBarDidHide() {
         guard edgeCommandBarInPlace else { return }
         edgeCommandBarInPlace = false
+        edgeBarChoosing = false
         EdgeSidebar.shared.commandBarDidHide()
     }
 }
@@ -3766,11 +3769,19 @@ extension BrowserWindowController {
     }
 
     /// A tab picked in the edge sidebar opens the lens beside it; a favorite or a page the lens can't take brings the
-    /// window forward on it. The lens is one action: a click while it is open closes it and opens nothing else.
+    /// window forward on it. A click while the lens is open: the same row closes it, another row brings that page into
+    /// it rather than closing the lens and opening nothing.
     private func pickFromEdgeSidebar(_ tab: Tab) {
-        if EdgePeek.shared.isVisible {
-            EdgePeek.shared.dismiss(EdgePeek.shared.tab === tab ? .sameTab : .sidebarClick)
+        switch EdgeLensPolicy.pickAction(isVisible: EdgePeek.shared.isVisible,
+                                         sameTab: EdgePeek.shared.tab === tab) {
+        case .close:
+            EdgePeek.shared.dismiss(.sameTab)
             return
+        case .replace:
+            EdgePeek.shared.show(tab: tab, from: self, replacing: true)
+            return
+        case .open:
+            break
         }
         // Any page can be borrowed, pinned or private or Zigzag's own, as the person asked. One that has no web view
         // yet (a just-opened tab, a picked pinned page never looked at) is made here first, beside the panel.
