@@ -24,8 +24,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SidebarView()
     /// The live second sidebar the hot screen edge shows (#363), made the first time it comes out.
     private(set) var edgeSidebar: SidebarView?
-    /// The floating Mini the edge sidebar borrowed a tab into, if one is out.
-    private var edgeMini: MiniWindowController?
+    /// The floating sidebar container the edge panel shows, if it has been made.
     private var edgeContainer: SidebarContainer?
     /// The panel's Site Controls host, kept for as long as its panel is open.
     private var edgeSiteHost: EdgeSitePanelHost?
@@ -3613,7 +3612,7 @@ extension BrowserWindowController {
         // Hovering a row shows its still page beside it, in the panel's own window: the browser window's overlay is
         // behind another app while the panel is out.
         mirror.list.onHoverTab = { [weak self] tab, rect in
-            guard let self, let tab, let rect, self.edgeMini == nil, !EdgePeek.shared.isVisible else {
+            guard let self, let tab, let rect, !EdgePeek.shared.isVisible else {
                 EdgePeekPreview.shared.pointerLeftRow()
                 return
             }
@@ -3783,8 +3782,8 @@ extension BrowserWindowController {
         EdgePeek.shared.show(tab: tab, from: self)
     }
 
-    /// The page the edge panel is showing: the popout's, or the one the panel's rows are on.
-    var edgePanelTab: Tab? { edgeMini?.tab ?? EdgePeek.shared.tab ?? tabManager.selectedTab }
+    /// The page the edge panel is showing: the lens's, or the one the panel's rows are on.
+    var edgePanelTab: Tab? { EdgePeek.shared.tab ?? tabManager.selectedTab }
 
     /// A pinned page picked in the edge panel: its live tab, opened in the popout like a tab row.
     private func openBookmarkFromEdgeSidebar(_ bookmark: Bookmark) {
@@ -3809,15 +3808,9 @@ extension BrowserWindowController {
         SitePanel.toggle(in: host, from: button)
     }
 
-    /// The panel went away: the popout and its site panel go with it, whichever of them was out.
+    /// The panel went away: the lens and its site panel go with it, whichever of them was out.
     func edgePopoutDidDismiss() {
         if SitePanel.isOpen(in: EdgeSidebar.shared.panelWindow) { SitePanel.closeCurrent() }
-        if let mini = edgeMini {
-            edgeMini = nil
-            mini.closeBorrowed()
-            setEdgePeek(nil)
-            EdgeSidebar.shared.holdForPeek(false)
-        }
         if EdgePeek.shared.isVisible { EdgePeek.shared.dismiss(.windowClose) }
     }
 

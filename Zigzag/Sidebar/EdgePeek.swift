@@ -30,25 +30,6 @@ enum EdgePeekRouting {
     static func newPage(peekVisible: Bool) -> NewPage { peekVisible ? .peek : .browser }
 }
 
-enum EdgePeekLayout {
-    /// The page area beside the sidebar, inside the screen's own margins.
-    static func pageFrame(beside sidebar: NSRect, in screen: NSRect, onRight: Bool) -> NSRect {
-        let margin = Tokens.Space.x2
-        let bottom = screen.minY + margin
-        let height = max(0, screen.height - margin * 2)
-        if onRight {
-            let x = screen.minX + margin
-            return NSRect(x: x, y: bottom, width: max(0, sidebar.minX - margin - x), height: height)
-        }
-        let x = sidebar.maxX + margin
-        return NSRect(x: x, y: bottom, width: max(0, screen.maxX - margin - x), height: height)
-    }
-
-    static func expandedFrame(in screen: NSRect, onRight: Bool) -> NSRect {
-        screen.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
-    }
-}
-
 /// The edge lens (#365): the sidebar's preview, opened. The tab's own page fills the preview card beside the sidebar,
 /// its caption carries the page's controls, and the sidebar and the lens live and close as one session.
 ///
