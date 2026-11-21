@@ -98,6 +98,16 @@ import Testing
         #expect(!AppDelegate.isQuitKey(key("q", .command), combo: .none))
     }
 
+    /// A Quit shortcut changed or taken away before Quit had an action of its own stays as you set it.
+    @Test func aQuitShortcutSetBeforeKeepsAfterTheRename() {
+        let option = Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags([.command, .option]).rawValue)
+        #expect(Shortcuts.renamed(["terminate:#0": option]) == ["quitFromMenu:#0": option])
+        #expect(Shortcuts.renamed(["terminate:#0": .none, "newTab:#0": option]) == ["quitFromMenu:#0": .none, "newTab:#0": option])
+        // One already saved under the new id is the newer choice.
+        #expect(Shortcuts.renamed(["terminate:#0": option, "quitFromMenu:#0": .none]) == ["quitFromMenu:#0": .none])
+        #expect(Shortcuts.renamed([:]).isEmpty)
+    }
+
     @Test func onlyTheQuitKeyAsksButDownloadsAlwaysDo() {
         // The menu and the Dock quit at once; the key asks while the setting is on.
         #expect(AppDelegate.asks(fromKey: true, setting: true, downloading: 0))
