@@ -450,8 +450,8 @@ private enum Onboard {
     }
 
     /// The second answer to a question: an outline on the blue.
-    static func outline(_ title: String) -> PrimaryButton {
-        let button = PrimaryButton(title: title)
+    static func outline(_ title: String) -> PillButton {
+        let button = PillButton(title: title, style: .prominent)
         button.customFill = Brand.ribbon.withAlphaComponent(0.12)
         button.customInk = Brand.ribbon
         return button
@@ -460,7 +460,7 @@ private enum Onboard {
     static let answerHeight: CGFloat = 44
 
     /// The picked answer is outlined and lit; the other stays quiet. Neither looks like Continue, which is solid.
-    static func mark(chosen: PrimaryButton, other: PrimaryButton) {
+    static func mark(chosen: PillButton, other: PillButton) {
         // The answer you're on is plainly picked: solid, in the ribbon's pale with deep ink. The other is just its
         // outline, so there's no doubt which Continue goes with.
         chosen.customEdge = nil
@@ -482,31 +482,27 @@ private enum Onboard {
     }
 
     /// Back and Skip, quiet on the blue.
-    static func quietLight(_ title: String) -> TextButton {
-        let button = TextButton(title: title, font: Tokens.Font.body(.medium))
-        button.textColor = Brand.ribbon.withAlphaComponent(0.75)
+    static func quietLight(_ title: String) -> PillButton {
+        let button = PillButton(title: title, style: .quiet)
+        button.customInk = Brand.ribbon.withAlphaComponent(0.75)
         return button
     }
 
     /// The main action on a step: the brand's blue.
-    static func primary(_ title: String) -> PrimaryButton {
-        let button = PrimaryButton(title: title)
-        button.fixedTheme = Brand.Theme.brand
-        return button
+    static func primary(_ title: String) -> PillButton {
+        PillButton(title: title, style: .prominent)
     }
 
     /// The welcome's one button: light on the blue.
-    static func light(_ title: String) -> PrimaryButton {
-        let button = PrimaryButton(title: title)
+    static func light(_ title: String) -> PillButton {
+        let button = PillButton(title: title, style: .prominent)
         button.customFill = Brand.ribbon
         button.customInk = Brand.navy
         return button
     }
 
-    static func quiet(_ title: String) -> TextButton {
-        let button = TextButton(title: title, font: Tokens.Font.body(.medium))
-        button.textColor = Tokens.Color.textSecondary
-        return button
+    static func quiet(_ title: String) -> PillButton {
+        PillButton(title: title, style: .quiet)
     }
 }
 

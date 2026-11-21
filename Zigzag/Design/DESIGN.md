@@ -634,8 +634,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   one entry off a list at once (a site, a language, a remembered answer, a shortcut's keys).
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.
 - **Pill button** (`PillButton`): capsule, `.plain` on `fieldFill`, `.quiet` fill on hover only, `.prominent` in
-  the accent, one per surface; `isDestructive` for what can't be undone. `PrimaryButton` and `TextButton` remain
-  in Settings and a few panels until rebuilt.
+  the accent, one per surface; `isDestructive` for what can't be undone. The welcome and Import use it too, in the
+  brand's colors (`customFill`, `customInk`, `customEdge`) where they sit on its blue. `TextButton` remains only in
+  the icon grid until rebuilt.
 - **Dialog** (`Tokens.Dialog`): `DialogHeader` (a picture, the question in the heading's weight, a quiet line under
   it), the explaining text, then `DialogButtons` (the answers at the trailing end, the main one last and filled; a
   quiet choice alone at the leading end). Confirmations, page dialogs, extension and save-password prompts use it.
@@ -646,12 +647,12 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - **Buttons** (`ButtonLook`, `applyButtonLook`), capsules `Metric.controlHeight` (28) tall, `Font.control()`:
   - Secondary (`PillButton` `.plain`, `TextButton.form`): `controlFill` (white; a lighter step of the surface in
     dark mode), a hairline `controlEdge` and a faint `controlShadow` (1.5pt, 0.5 down). A symbol may lead the title.
-  - Primary (`PillButton` `.prominent`, `PrimaryButton`): the one thing to do on a surface, a pill filled with the
+  - Primary (`PillButton` `.prominent`): the one thing to do on a surface, a pill filled with the
     space's accent (`Brand.Theme.accent`) and its `onAccent` text, a step lighter under the pointer and deeper
     pressed, as a switch that's on; red only for what can't be undone. `Color.primaryFill` (dark, light at night) is
     left only for the plain `ButtonLook.primary` with no tint.
   - Quiet (`.quiet`): no fill until the pointer is over it.
-  `PrimaryButton` and `TextButton` draw the same looks for the forms that still use them; new code uses `PillButton`.
+  `TextButton` draws the same looks where it's still used; new code uses `PillButton`.
 - **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
   around it) and a small round 14pt knob. Off, a porcelain knob on the left of a neutral track; on, the knob slides
   right, turns white, and the track fills with the space's accent (`Switch.knobOn`, `edgeOn`), a step deeper under

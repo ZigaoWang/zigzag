@@ -978,68 +978,6 @@ extension NSScrollView {
     }
 }
 
-/// The primary action on a screen: the dark filled pill (`ButtonLook.primary`), one per screen. Kept for the forms
-/// that still build on it; new code uses `PillButton(style: .prominent)`, which looks the same.
-final class PrimaryButton: InteractiveView {
-    private let label: Label
-    /// Kept for callers from when the primary took its window's accent; the primary is dark whatever the theme.
-    var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
-    /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
-    var isDestructive = false { didSet { stateDidChange(animated: false) } }
-    /// Set both to draw the button in other colors, like a light button on the brand's blue.
-    var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
-    var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
-    /// A hairline in this color around it, kept through hover and press.
-    var customEdge: NSColor? { didSet { stateDidChange(animated: false) } }
-    /// Moves the title off center, to leave room for something beside it (a keycap).
-    var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
-
-    init(title: String) {
-        written = title
-        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.onPrimary)
-        super.init(frame: .zero)
-        pressScales = true
-        layer?.cornerCurve = .continuous
-        addSubview(label)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(title)
-        stateDidChange(animated: false)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private var written = ""
-    var title: String {
-        get { written }
-        set { written = newValue; label.stringValue = newValue; setAccessibilityLabel(newValue); needsLayout = true }
-    }
-
-    var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x8 }
-
-    override var intrinsicContentSize: NSSize { NSSize(width: ceil(max(fittingWidth, 72)), height: Tokens.Page.controlHeight) }
-
-    override func layout() {
-        super.layout()
-        layer?.cornerRadius = bounds.height / 2
-        let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x4 + labelOffset, y: label.centeredY(in: bounds.height), width: bounds.width - Tokens.Space.x8, height: h)
-        label.alignment = .center
-    }
-
-    override func stateDidChange(animated: Bool) {
-        // The space's own accent unless told otherwise, as `PillButton(.prominent)`.
-        let theme = Brand.Theme.for(self)
-        let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
-        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : customFill.map(Brand.ink(on:)) ?? theme.onAccent))
-        if let customEdge {
-            Tokens.Motion.withoutAnimation {
-                layer?.borderWidth = 1
-                layer?.borderColor = cgColor(customEdge)
-            }
-        }
-    }
-}
-
 /// A text button: quiet text that fills under the pointer ("Clear", "Skip"), or with `form` the secondary look
 /// (`ButtonLook.secondary`). Kept for the forms that still build on it; new code uses `PillButton`.
 final class TextButton: InteractiveView {

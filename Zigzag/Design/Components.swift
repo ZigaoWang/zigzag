@@ -196,7 +196,7 @@ extension NSView {
 
 // MARK: - Button looks
 
-/// The looks a button takes, the same everywhere (`PillButton`, `PrimaryButton`, `TextButton.form`, `DropdownButton`):
+/// The looks a button takes, the same everywhere (`PillButton`, `TextButton.form`, `DropdownButton`):
 /// - `.secondary`: white with a hairline edge and a faint shadow (a lighter step of the surface in dark mode);
 /// - `.primary`: the one thing to do on a surface, a dark filled pill (light in dark mode), whatever the space;
 /// - `.quiet`: no fill until the pointer is over it.
@@ -286,9 +286,12 @@ final class PillButton: InteractiveView {
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
     /// For an action that can't be undone (Delete): `.prominent` turns red, the others take red ink.
     var isDestructive = false { didSet { stateDidChange(animated: false) } }
-    /// Set both to draw the button in other colors: a light pill on the brand's blue frame (the welcome).
+    /// Set both to draw the button in other colors: a light pill on the brand's blue frame (the welcome). `customInk`
+    /// alone colors a `.quiet` button's words (Back on the welcome's blue).
     var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
     var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
+    /// A hairline in this color around it, kept through hover and press (the welcome's unpicked answer).
+    var customEdge: NSColor? { didSet { stateDidChange(animated: false) } }
 
     init(title: String = "", symbol: String? = nil, style: Style = .plain) {
         self.style = style
@@ -326,6 +329,14 @@ final class PillButton: InteractiveView {
 
     /// Room on each side of the title: a touch more for the outlined and filled looks, which read as objects.
     private var sidePad: CGFloat { style == .quiet ? Tokens.Space.x3 : Tokens.Space.x4 - 2 }
+
+    /// From the edge to the title at fitting width, so a quiet button's words can line up with text above it.
+    var textInset: CGFloat { sidePad }
+
+    #if DEBUG
+    /// The color its words are drawn in now.
+    var debugInk: NSColor? { label.textColor }
+    #endif
 
     var fittingWidth: CGFloat {
         guard hasTitle else { return Tokens.Page.controlHeight }
@@ -366,6 +377,13 @@ final class PillButton: InteractiveView {
         }
         let tinted = style == .prominent || customFill != nil
         label.textColor = isDestructive && !tinted && isEnabled ? Tokens.Color.destructive : ink
+        if !tinted, let customInk { label.textColor = isEnabled ? customInk : TextButton.disabledInk(customInk) }
+        if let customEdge {
+            Tokens.Motion.withoutAnimation {
+                layer?.borderWidth = 1
+                layer?.borderColor = cgColor(customEdge)
+            }
+        }
         iconView.contentTintColor = tinted ? ink : !isEnabled && style == .quiet ? Tokens.Color.textDisabled
             : isHovered || isSelected || style == .plain ? Tokens.Color.textPrimary : Tokens.Color.icon
     }
