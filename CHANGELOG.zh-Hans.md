@@ -12,6 +12,16 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 修复
+- 在 Peek 里点了链接之后可以退回去了。Peek 打开过别的页面后，顶部会出现后退和前进按钮，⌘[、⌘] 和双指轻扫也跟在标签页里一样能用。按 Esc 还是直接关掉整个 Peek。感谢 [Lakeland97](https://github.com/Lakeland97)。([#463](https://github.com/ZigaoWang/zigzag/issues/463))
+- 翻译很长的网页不会再在 45 秒后放弃了。屏幕上看得到的部分先翻，翻好一段就换上一段，提示里会显示翻到多少了；只有连续 45 秒什么都没翻出来才会报错。感谢 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
+- 红黄绿按钮和旁边的按钮现在正好在窗口顶部和地址栏中间，上下留白一样，不再偏下。
+- 为了修好 macOS 26 上 Mac 的密码列表，Zigzag 会在你的 Mac 上记一份很小的步骤日志，绝不记你的登录信息，放在 ~/Library/Logs/Zigzag/passwords.log。“帮助 › 报告问题”会附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+
+## [0.9.4] - 2026-11-21
+
+阅读器重新设计，更像 Zigzag 自己的一部分；像 Arc 一样截图，可以截一块区域、一个元素或整个页面；支持接力到 iPhone、iPad 和其他 Mac；⌘Z 可以撤销分屏调整；侧边栏宽度每个窗口都记得；缩放可以按住连续调，也能直接输入；设置里的文字更简洁。
+
 ### 新功能
 - 在“网站设置”的缩放一行里按住 − 或 + 不放，缩放会继续变化；按住 ⇧ 点按百分比可以直接输入，比如 130%，不用一档一档点过去。直接点按仍然是回到实际大小。([#395](https://github.com/ZigaoWang/zigzag/issues/395))
 - 阅读器现在跟 Zigzag 其他地方一个样子了。“宽”会铺满整个窗口（留着页边距），不再卡在一栏窄窄的宽度；“中”还是书本的行长，“窄”稍微再窄一点。窗口够宽时，大图和代码块会伸到页边距里，图片改成居中，不再贴着文字左边。标题没那么粗了，正文开头不再重复一遍作者，段落间距也统一了。开着阅读器时，Aa 放在地址栏里阅读器按钮旁边（也可以用“显示”菜单里的“阅读器文字和颜色”），不再浮在文章上面；点开是 Zigzag 自己的面板，每项都有名字：“文字大小”和网页缩放一样用 − 100% + 调，点百分比恢复；还有“字体”“栏宽”，“颜色”换成了圆形色块。“自动”只带一丝空间的颜色，文字对比度不变。改设置时正在读的那一行会留在原地；打开阅读器时文字会轻轻浮上来，开了“减弱动态效果”就只淡入。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
@@ -22,10 +32,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 侧边栏滑出到页面之上时，也可以拖动它的边缘调整宽度，和在窗口里占位置时一样；拖出来的宽度会成为之后每个新窗口的宽度，重启后也一样；连按两下边缘会恢复原来的宽度。([#431](https://github.com/ZigaoWang/zigzag/issues/431))
 
 ### 修复
-- 在 Peek 里点了链接之后可以退回去了。Peek 打开过别的页面后，顶部会出现后退和前进按钮，⌘[、⌘] 和双指轻扫也跟在标签页里一样能用。按 Esc 还是直接关掉整个 Peek。感谢 [Lakeland97](https://github.com/Lakeland97)。([#463](https://github.com/ZigaoWang/zigzag/issues/463))
-- 翻译很长的网页不会再在 45 秒后放弃了。屏幕上看得到的部分先翻，翻好一段就换上一段，提示里会显示翻到多少了；只有连续 45 秒什么都没翻出来才会报错。感谢 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
-- 红黄绿按钮和旁边的按钮现在正好在窗口顶部和地址栏中间，上下留白一样，不再偏下。
-- 为了修好 macOS 26 上 Mac 的密码列表，Zigzag 会在你的 Mac 上记一份很小的步骤日志，绝不记你的登录信息，放在 ~/Library/Logs/Zigzag/passwords.log。“帮助 › 报告问题”会附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 设置里说得更少：只是在重复标题的说明文字都去掉了，留下的说明都在讲后果或提醒；以前用不同说法问同一个问题的选项，现在只用一种说法。扩展的网站访问权限里，“在你点按它时”改成“点按时”。([#448](https://github.com/ZigaoWang/zigzag/issues/448))
 - 地址栏在没有东西可固定的地方不再显示星标：Zigzag 自己的页面（设置、历史记录、归档）、新标签页和无痕浏览窗口。以前它会灰着留在那里，现在旁边固定的扩展会占用它的位置。感谢 [Lakeland97](https://github.com/Lakeland97)。([#442](https://github.com/ZigaoWang/zigzag/issues/442))
 - 来自 Chrome 网上应用店或 Firefox 附加组件的主题，以及用“从文件夹安装”选的主题文件夹，不会再被安装。Zigzag 不使用浏览器主题，所以会直接说明，并提示可以改空间的颜色；以前会把主题当成扩展装上，装好后什么也不做。([#454](https://github.com/ZigaoWang/zigzag/issues/454))

@@ -5,6 +5,16 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A link followed inside Peek can be walked back. Once the Peek has gone to another page, back and forward buttons show in its top strip, and ⌘[ and ⌘] or a two-finger swipe work there as in a tab. Esc still closes the whole Peek. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#463](https://github.com/ZigaoWang/zigzag/issues/463))
+- Translating a long page no longer gives up after 45 seconds. The text on screen is translated first and each part appears as soon as it's ready, the toast shows how far along it is, and it only stops with an error when nothing has come back for 45 seconds. Thanks to [orisred](https://github.com/orisred). ([#465](https://github.com/ZigaoWang/zigzag/issues/465))
+- The traffic lights and the buttons beside them sit midway between the top of the window and the address field, with as much room above them as below, instead of lower down.
+- To help fix the Mac's Passwords list on macOS 26, Zigzag keeps a small log of its steps on your Mac, never your logins, in ~/Library/Logs/Zigzag/passwords.log. Help › Report a Problem includes it. ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+
+## [0.9.4] - 2026-11-21
+
+Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, and a calmer Settings.
+
 ### New
 - Zoom keeps going while you hold − or + in Site Controls, and ⇧-clicking the percentage lets you type one, like 130%, instead of stepping to it. A plain click still goes back to Actual Size. ([#395](https://github.com/ZigaoWang/zigzag/issues/395))
 - Reader looks and works like the rest of Zigzag. Wide now fills the window inside its margins instead of stopping at a narrow column, Medium stays a book's line length, and Narrow is a little narrower. Large pictures and code blocks run past the text into the margins when the window has room, and pictures are centered rather than on the text's left edge. The title is lighter, the author is no longer repeated at the top of the text, and the spacing follows one steady rhythm. While Reader is on, Aa sits in the address bar beside the Reader button (or in View › Reader Text and Colors) instead of floating over the article, and opens Zigzag's own panel, with each choice named: Text Size steps as page zoom does (− 100% +, the percentage puts it back), Typeface, Column Width, and Colors as round swatches. Auto takes the barest hint of the space's color, the text as dark (or light) as before. Changing a choice keeps the line you were reading in place, and the text settles in as Reader opens, a plain fade with Reduce Motion. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
@@ -15,10 +25,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The sidebar's edge can be dragged while it's out over the page, as it can while it takes room in the window, and the width it leaves is the width every new window starts with, after a restart too; double-clicking the edge puts the usual width back. ([#431](https://github.com/ZigaoWang/zigzag/issues/431))
 
 ### Fixed
-- A link followed inside Peek can be walked back. Once the Peek has gone to another page, back and forward buttons show in its top strip, and ⌘[ and ⌘] or a two-finger swipe work there as in a tab. Esc still closes the whole Peek. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#463](https://github.com/ZigaoWang/zigzag/issues/463))
-- Translating a long page no longer gives up after 45 seconds. The text on screen is translated first and each part appears as soon as it's ready, the toast shows how far along it is, and it only stops with an error when nothing has come back for 45 seconds. Thanks to [orisred](https://github.com/orisred). ([#465](https://github.com/ZigaoWang/zigzag/issues/465))
-- The traffic lights and the buttons beside them sit midway between the top of the window and the address field, with as much room above them as below, instead of lower down.
-- To help fix the Mac's Passwords list on macOS 26, Zigzag keeps a small log of its steps on your Mac, never your logins, in ~/Library/Logs/Zigzag/passwords.log. Help › Report a Problem includes it. ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - Settings says less: lines under a label that only repeated it are gone, the lines that stay carry a consequence or a warning, and choices that asked the same question in different words now use one. Extension Site Access says On Click. ([#448](https://github.com/ZigaoWang/zigzag/issues/448))
 - The address field no longer shows the star where there is nothing to pin: on Zigzag's own pages (Settings, History, the archive), a new tab and private windows. It used to sit there dimmed, and the pins beside it now take its place. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#442](https://github.com/ZigaoWang/zigzag/issues/442))
 - A theme from the Chrome Web Store or Firefox Add-ons, or a theme folder picked with Install from Folder, isn't installed. Zigzag doesn't use browser themes, so it says that and points to a space's colors, where it used to add the theme as an extension that did nothing. ([#454](https://github.com/ZigaoWang/zigzag/issues/454))
