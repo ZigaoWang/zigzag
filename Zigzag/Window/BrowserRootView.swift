@@ -597,7 +597,20 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     var sidebarVisible = true
-    var sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth
+    /// The sidebar's width, kept across windows and launches: dragging its edge sets it, double-clicking that edge
+    /// puts it back to the default (#431).
+    var sidebarWidth: CGFloat = BrowserRootView.storedSidebarWidth { didSet { saveSidebarWidth() } }
+
+    static let sidebarWidthKey = "SidebarWidth"
+
+    private static var storedSidebarWidth: CGFloat {
+        let stored = UserDefaults.standard.double(forKey: sidebarWidthKey)
+        return stored > 0 ? min(max(CGFloat(stored), Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth) : Tokens.Metric.sidebarWidth
+    }
+
+    private func saveSidebarWidth() {
+        UserDefaults.standard.set(Double(sidebarWidth), forKey: Self.sidebarWidthKey)
+    }
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?
     /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation) and its curve, so what rides
@@ -686,6 +699,15 @@ final class BrowserRootView: SpaceFrameView {
             // Dragged well past its narrowest, it closes, as a Mac sidebar does; dragged back out in the same drag, it
             // opens again. Closed this way it keeps the width it had, for when it opens next.
             let closesAt = Tokens.Metric.sidebarMinWidth / 2
+            // Out over the page, the edge sets the width and nothing else: it stays out until the pointer leaves.
+            if self.sidebarRevealed, !self.sidebarVisible {
+                let width = Tokens.Space.snap(min(max(x, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
+                guard width != self.sidebarWidth else { return }
+                self.sidebarWidth = width
+                self.needsLayout = true
+                self.layoutSubtreeIfNeeded()
+                return
+            }
             if self.sidebarVisible, x < closesAt {
                 self.sidebarWidth = self.widthBeforeDrag
                 self.setSidebarVisible(false, animated: true)
@@ -706,7 +728,16 @@ final class BrowserRootView: SpaceFrameView {
         resizeHandle.onEnd = { [weak self] _ in
             guard let self else { return }
             self.isDraggingSidebarEdge = false
+            self.saveSidebarWidth()
             self.needsLayout = true
+            self.onSidebarWidthChange?(self.sidebarWidth)
+        }
+        // Double-clicking the edge puts the sidebar back to its usual width.
+        resizeHandle.onDoubleClick = { [weak self] in
+            guard let self else { return }
+            self.sidebarWidth = Tokens.Metric.sidebarWidth
+            self.needsLayout = true
+            self.layoutSubtreeIfNeeded()
             self.onSidebarWidthChange?(self.sidebarWidth)
         }
         // Links and files dropped on the page area open as tabs too: an empty window, or with the sidebar hidden.
@@ -1242,6 +1273,15 @@ final class BrowserRootView: SpaceFrameView {
 
     /// The band along the sidebar's edge that takes a drag, full height: well into the sidebar's empty strip beside its
     /// rows, a little into the page, and less on the right, where the page's scroll bar is (#362).
+    /// The band over the popout's inner edge: the same reach either side of the card's edge, the card being inset in
+    /// the window rather than flush.
+    static func revealedResizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
+        let card = sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: onRight)
+        let width = Tokens.Metric.resizeHandleWidth
+        let edge = onRight ? card.maxX : card.minX
+        return NSRect(x: edge - width / 2, y: card.minY, width: width, height: card.height)
+    }
+
     static func resizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
         let inside = Tokens.Metric.sidebarDragReach, out = resizeHandlePageReach(onRight: onRight)
         return mirrored(NSRect(x: bounds.minX + sidebarWidth - inside, y: bounds.minY, width: inside + out, height: bounds.height), in: bounds, if: onRight)

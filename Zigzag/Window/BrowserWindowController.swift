@@ -60,7 +60,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The page in this window's Peek, while it's up.
     var peekedTab: Tab? { peek.tab }
 
-    init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth) {
+    init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat? = nil) {
         self.tabManager = tabManager
         root = BrowserRootView(sidebar: sidebar)
         let rect = frame ?? BrowserWindowController.defaultFrame()
@@ -71,8 +71,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
-        // A width saved before the toolbar's buttons grew can be narrower than they now need.
-        root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
+        // view keeps the width dragged out last time, which every window shares (#431).
+        if let sidebarWidth {
+            root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        }
         root.onLayoutChange = { [weak self] in
             guard let self else { return }
             self.layoutTrafficLights()

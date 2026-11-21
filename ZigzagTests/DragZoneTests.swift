@@ -362,4 +362,45 @@ struct DragZoneTests {
         #expect(!(hit(-Tokens.Metric.sidebarDragReach - 4) is ResizeHandle))
         #expect(!(hit(Tokens.Metric.dragReach + 4) is ResizeHandle))
     }
+
+    /// The popout sidebar's edge takes the pointer, the width it leaves behind is kept for the next window, and a
+    /// double-click puts the usual width back (#431).
+    @Test func thePopoutSidebarEdgeSetsAWidthEveryWindowKeeps() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer {
+            manager.invalidate()
+            Library.shared.restore(before)
+            UserDefaults.standard.removeObject(forKey: BrowserRootView.sidebarWidthKey)
+        }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        root.sidebarWidth = Tokens.Metric.sidebarWidth
+        root.sidebarVisible = false
+        root.reveal(true)
+        window.layoutIfNeeded()
+        let card = BrowserRootView.sidebarFrame(in: root.bounds, width: root.sidebarWidth, visible: false,
+                                               revealed: true, onRight: root.sidebarOnRight)
+        let handle = try #require(root.subviews.compactMap { $0 as? ResizeHandle }.first { !$0.isHidden })
+        #expect(abs(handle.frame.midX - (root.sidebarOnRight ? card.maxX : card.minX)) <= 1)
+        // Dragged wider, it keeps the width past this window.
+        handle.onBegin?()
+        let to = root.convert(NSPoint(x: root.sidebarWidth + 40, y: 300), to: nil)
+        handle.onDrag?(to, false)
+        handle.onEnd?(false)
+        #expect(root.sidebarWidth > Tokens.Metric.sidebarWidth)
+        let kept = root.sidebarWidth
+        let second = BrowserWindowController(tabManager: TabManager(spaceID: space), frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { second.window?.close() }
+        #expect(second.root.sidebarWidth == kept)
+        // Double-clicking the edge puts the usual width back.
+        handle.onDoubleClick?()
+        #expect(root.sidebarWidth == Tokens.Metric.sidebarWidth)
+    }
 }
