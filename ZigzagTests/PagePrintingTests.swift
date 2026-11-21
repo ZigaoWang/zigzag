@@ -155,7 +155,7 @@ struct PageCaptureGeometryTests {
     }
 
     /// ⇧⌘2 then ⌘T: the bar takes the typing, so Capture ends; a key Capture has no use for goes on (#457).
-    @Test func theCommandBarEndsCaptureAndOtherKeysGoOn() throws {
+    @Test func theCommandBarEndsCaptureAndCaptureKeepsItsKeys() throws {
         let space = Library.shared.spaces[0].id
         let manager = TabManager(spaceID: space)
         defer { manager.invalidate() }
@@ -167,8 +167,8 @@ struct PageCaptureGeometryTests {
         controller.window?.layoutIfNeeded()
         controller.capture.begin()
         #expect(controller.capture.isActive)
-        #expect(!controller.capture.handle(try key("x", code: 7)))
-        #expect(!controller.capture.handle(try key("1", code: 18)))
+        #expect(controller.capture.handle(try key("x", code: 7)))
+        #expect(controller.capture.handle(try key("1", code: 18)))
         #expect(!controller.capture.handle(try key("f", code: 3, flags: .command)))
         #expect(controller.capture.isActive)
         controller.commandBarWillShow()

@@ -231,8 +231,8 @@ final class PageCapture {
         monitors = [keys, clicks].compactMap { $0 }
     }
 
-    /// Esc leaves, Return takes, A, E, F and V pick the mode, the arrows nudge the area (⇧ by 10). True for a key it
-    /// used; any other key goes on, ⌘ keys to the menus as ever.
+    /// Esc leaves, Return takes, A, E, F and V pick the mode, the arrows nudge the area (⇧ by 10). Other keys stay out
+    /// of the page while capturing; ⌘ keys go to the menus as ever.
     func handle(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
         if flags.contains(.command) || flags.contains(.control) { return false }
@@ -254,7 +254,7 @@ final class PageCapture {
         default: break
         }
         if let mode = Self.mode(typed: event.charactersIgnoringModifiers ?? "", keyCode: event.keyCode) { choose(mode); return true }
-        return false
+        return true
     }
 
     /// The mode a letter picks. A layout without Latin letters goes by where the letter sits on a US keyboard, as the
