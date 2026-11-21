@@ -84,4 +84,13 @@ struct HandoffTests {
         #expect(renamed === first && first.title == "Two, loaded")
         #expect(HandoffPage.update(first, to: nil) == nil)
     }
+
+    /// Handed off while Zigzag was still launching: a tab, as when it's running, even with Zigzag Mini taking links.
+    @Test func aPageHandedOffAtLaunchNeverOpensInMini() throws {
+        let handedOff = try #require(URL(string: "https://example.com/handed"))
+        let link = try #require(URL(string: "https://example.com/link"))
+        #expect(!AppDelegate.pendingOpensInMini(handedOff, handedOff: [handedOff], opensInMini: { _ in true }))
+        #expect(AppDelegate.pendingOpensInMini(link, handedOff: [handedOff], opensInMini: { _ in true }))
+        #expect(!AppDelegate.pendingOpensInMini(link, handedOff: [], opensInMini: { _ in false }))
+    }
 }

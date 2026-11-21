@@ -20,6 +20,8 @@ enum LaunchChoice: String, CaseIterable, Sendable {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
+    /// Which of `pendingURLs` were handed off from another device: those open in a tab, never Zigzag Mini (#456).
+    private var pendingHandoffs: Set<URL> = []
     /// Sites installed as apps asked for before launch finished (one opened with Zigzag not running).
     private var pendingWebApps: [URL] = []
     private var launched = false
@@ -159,7 +161,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Onboarding not finished: it comes first, instead of the window that was waiting behind it. Opened for links that
         // all go to Zigzag Mini, only Zigzag Mini comes up, as Little Arc does; the windows come back when you ask.
-        let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(WindowManager.shared.opensInMini)
+        let handoffs = pendingHandoffs
+        let goesToMini = { (url: URL) in Self.pendingOpensInMini(url, handedOff: handoffs, opensInMini: WindowManager.shared.opensInMini) }
+        let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(goesToMini)
         // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
         // wait until you ask for them.
         let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
@@ -181,11 +185,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launched = true
         if !pendingURLs.isEmpty {
             // A link for Zigzag Mini opens just that, as it would with Zigzag already running.
-            if !restored, !WindowManager.shared.opensInMini(pendingURLs[0]) {
+            if !restored, !goesToMini(pendingURLs[0]) {
                 WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false)
             }
-            pendingURLs.forEach { WindowManager.shared.openExternal($0) }
+            pendingURLs.forEach { handoffs.contains($0) ? WindowManager.shared.openHandedOff($0) : WindowManager.shared.openExternal($0) }
             pendingURLs = []
+            pendingHandoffs = []
         } else if !restored, !plan.sessionWaiting {
             WindowManager.shared.newWindow()
         }
@@ -417,6 +422,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
+    /// Whether a link waiting for launch goes to Zigzag Mini: as the setting says, but never a handed-off page (#456).
+    static func pendingOpensInMini(_ url: URL, handedOff: Set<URL>, opensInMini: (URL) -> Bool) -> Bool {
+        !handedOff.contains(url) && opensInMini(url)
+    }
+
     private func open(_ url: URL) {
         guard launched else { pendingURLs.append(url); return }
         // Zigzag Mini comes forward on its own, as Little Arc does: activating the whole app would bring every browser
@@ -446,7 +456,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                      restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
         guard userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL,
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return false }
-        guard launched else { pendingURLs.append(url); return true }
+        guard launched else {
+            pendingURLs.append(url)
+            pendingHandoffs.insert(url)
+            return true
+        }
         WindowManager.shared.openHandedOff(url)
         NSApp.activate()
         return true
