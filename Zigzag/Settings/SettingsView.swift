@@ -2895,7 +2895,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 browser.installExtension(id, into: profile, also: { [weak self] stage in
                     switch stage {
                     case .added: if ICloudPasswords.isOn(in: profile) { ICloudPasswords.use(in: profile) }
-                    case .failed, .cancelled: break
+                    case .failed, .cancelled, .theme: break
                     case .downloading, .reviewing, .adding: return
                     }
                     self?.reloadPasswords()

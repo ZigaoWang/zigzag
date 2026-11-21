@@ -878,7 +878,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 guard !finished else { return }
                 switch stage {
                 case .added: finished = true; done.resume(returning: true)
-                case .failed, .cancelled: finished = true; done.resume(returning: false)
+                case .failed, .cancelled, .theme: finished = true; done.resume(returning: false)
                 case .downloading, .reviewing, .adding: break
                 }
             })
@@ -887,7 +887,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed.
     enum InstallStage {
-        case downloading, reviewing, adding, added(String), failed(String), cancelled
+        case downloading, reviewing, adding, added(String), failed(String), cancelled, theme
         var isReviewing: Bool { if case .reviewing = self { true } else { false } }
     }
 
@@ -904,7 +904,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             switch stage {
             case .downloading: Toast.show(String(localized: "Downloading extension…", comment: "Toast while an extension downloads from the Chrome Web Store."), symbol: "arrow.down.circle", duration: 3600, in: self)
-            case .reviewing, .cancelled: Toast.hide(in: self)
+            case .reviewing, .cancelled, .theme: Toast.hide(in: self)
             case .adding: Toast.show(String(localized: "Adding…", comment: "Toast while an extension is being added."), symbol: "arrow.down.circle", duration: 3600, in: self)
             case .added(let name): Toast.show(String(localized: "Added \(name)", comment: "Toast after an extension is added. The name is the extension's."), symbol: "checkmark.circle", duration: 2, in: self)
             case .failed(let message): Toast.show(message, symbol: "exclamationmark.triangle", duration: 4, in: self)
@@ -915,6 +915,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let result = await ExtensionStore.prepareInstall(id)
             guard let self else { return }
             switch result {
+            case .failure(.theme):
+                // The store's own page and the bar say it: a theme has nothing for Zigzag to install (#454).
+                report(.theme)
             case .failure(let error):
                 report(.failed(error.message))
             case .success(let prepared):
