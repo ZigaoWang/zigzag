@@ -634,6 +634,11 @@ enum DebugBridge {
         }
     }
     private static var menuToClose: NSObjectProtocol?
+
+    /// A sidebar menu as a right-click at `point` in `view` shows it.
+    private static func showDrawn(_ menu: NSMenu, from view: NSView, at point: NSPoint) {
+        MenuPanel.show(MenuPanel.entries(from: menu), from: view, placement: .at(view.convert(point, to: nil)))
+    }
     private static var trackedMenu: NSMenu?
 
     private static func runKeepOnTop(_ name: String, _ arg: String) {
@@ -932,7 +937,10 @@ enum DebugBridge {
             let hit = view.map { "\(type(of: $0))" } ?? ""
             var answered = "", items: [String] = []
             while let v = view {
-                if let menu = v.menu(for: event) { answered = "\(type(of: v))"; items = menu.items.map { $0.isSeparatorItem ? "-" : $0.title }; break }
+                // Sidebar rows draw their menu from `onRightClick` and give AppKit none.
+                if let menu = ((v as? InteractiveView)?.drawsMenu == true ? (v as? InteractiveView)?.onRightClick?(event) : v.menu(for: event)) {
+                    answered = "\(type(of: v))"; items = menu.items.map { $0.isSeparatorItem ? "-" : $0.title }; break
+                }
                 // The sidebar draws its own menu for its empty space (`showBlankMenu`).
                 if v === controller.sidebar {
                     answered = "SidebarView"
@@ -979,6 +987,43 @@ enum DebugBridge {
             if arg.isEmpty { SpaceEditorPanel.current?.debugRemoveBackground() } else { SpaceEditorPanel.current?.debugSetBackground(URL(fileURLWithPath: arg)) }
         // editorcustom: toggles the Custom swatch's wheel and Shade.
         case "editorcustom": SpaceEditorPanel.current?.debugToggleCustom()
+        // editorcustomclick: a click on the Custom swatch.
+        case "editorcustomclick": SpaceEditorPanel.current?.debugClickCustom()
+        // editoreffects, editorsecond: Effects opened or folded, a second color added or removed.
+        case "editoreffects": SpaceEditorPanel.current?.debugToggleEffects()
+        case "editorsecond": SpaceEditorPanel.current?.debugToggleSecondColor()
+        // editordrag <knob> <hue> <amount>: that wheel knob pressed and dragged to the spot (0...1 each).
+        case "editordrag":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 3 { SpaceEditorPanel.current?.debugDrag(Int(n[0]), to: ColorWheel.Spot(hue: n[1], amount: n[2])) }
+        // editorprobe: the panel's place and what a press on each knob lands on, logged.
+        case "editorprobe": debugLog("editorprobe \(SpaceEditorPanel.current?.debugProbe() ?? "closed")")
+        // editfrom header|dot|dotclick|blank|plus|menubar: opens the editor the way that place does.
+        case "editfrom":
+            let id = controller.tabManager.currentSpaceID
+            let edit = String(localized: "Edit Space…", comment: "Item in a space's context menu.")
+            func perform(_ menu: NSMenu?, _ title: String) {
+                if let menu, case let index = menu.indexOfItem(withTitle: title), index >= 0 { menu.performActionForItem(at: index) }
+            }
+            switch arg {
+            case "header": perform(controller.listMenu(for: .header), edit)
+            case "dot": perform(controller.sidebarSpaceMenu(for: id), edit)
+            case "dotclick": controller.sidebar.onEditSpace?(id)
+            case "blank", "plus":
+                let entries = arg == "blank" ? SidebarMenus.blankPanel(controller: controller) : SidebarMenus.addPanel(controller: controller)
+                let title = arg == "blank" ? edit : String(localized: "New Space", comment: "Item in the menu of the sidebar's + and its empty space: adds a space and opens it to be named.")
+                for case .item(let item) in entries where item.title == title { item.action() }
+            case "menubar":
+                func find(_ menu: NSMenu) -> NSMenuItem? {
+                    for item in menu.items {
+                        if let sub = item.submenu, let found = find(sub) { return found }
+                        if item.title == edit { return item }
+                    }
+                    return nil
+                }
+                if let item = NSApp.mainMenu.flatMap(find), let action = item.action, let window = controller.window { _ = (window.firstResponder ?? window).tryToPerform(action, with: item) }
+            default: break
+            }
         case "tourskip": Tutorial.skip()
         case "tourend": Tutorial.isHidden = true; controller.root.overlay.subviews.compactMap { $0 as? GuidedTour }.forEach { $0.removeFromSuperview() }
         case "fullscreen": controller.window?.toggleFullScreen(nil)
@@ -1891,7 +1936,7 @@ enum DebugBridge {
             debugLog("rowmenu \(arg) => \(menu.map(titles) ?? [])")
             if let menu, let anchor {
                 closeNextMenu(after: 4)
-                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: anchor.bounds.midY), in: anchor) }
+                DispatchQueue.main.async { showDrawn(menu, from: anchor, at: NSPoint(x: 60, y: anchor.bounds.midY)) }
             }
         case "foldermenu":
             // foldermenu <folder>[>item]: that item of the folder's menu, as choosing it does; no item, the menu at its
@@ -1904,7 +1949,7 @@ enum DebugBridge {
                 if case let index = menu.indexOfItem(withTitle: path[1]), index >= 0 { menu.performActionForItem(at: index) }
             } else if let row = controller.sidebar.list.row(forFolder: folder.id) {
                 closeNextMenu(after: 4)
-                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: row.bounds.midY), in: row) }
+                DispatchQueue.main.async { showDrawn(menu, from: row, at: NSPoint(x: 60, y: row.bounds.midY)) }
             }
         case "spacemenu":
             // spacemenu [item]: that item of the right-click menu above the pinned tabs, as choosing it does; no item,
@@ -1916,9 +1961,29 @@ enum DebugBridge {
                 if case let index = menu.indexOfItem(withTitle: arg), index >= 0 { menu.performActionForItem(at: index) }
             } else {
                 closeNextMenu(after: 4)
-                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 40, y: header.bounds.midY), in: header) }
+                DispatchQueue.main.async { showDrawn(menu, from: header, at: NSPoint(x: 40, y: header.bounds.midY)) }
+            }
+        case "dotmenu":
+            // dotmenu <space name>: the right-click menu of that space's icon at the bottom of the sidebar, drawn; it
+            // closes by itself after 4 s.
+            guard let space = Library.shared.spaces.first(where: { $0.name == arg }), let dot = controller.sidebar.dot(for: space.id),
+                  let menu = controller.sidebarSpaceMenu(for: space.id) else { break }
+            closeNextMenu(after: 4)
+            DispatchQueue.main.async { showDrawn(menu, from: dot, at: NSPoint(x: dot.bounds.midX, y: dot.bounds.midY)) }
+        case "drawnkey":
+            // drawnkey up|down|left|right|return|esc: that key in the open drawn menu, as typed.
+            let codes: [String: UInt16] = ["up": 126, "down": 125, "left": 123, "right": 124, "return": 36, "esc": 53]
+            if let code = codes[arg] { MenuPanel.current?.debugKey(code) }
+        case "drawnopen":
+            // drawnopen <title>: opens that item's submenu in the open drawn menu, as hovering it does.
+            MenuPanel.current?.debugOpenSubmenu(arg)
+        case "drawnmenu":
+            // drawnmenu <path>: the open drawn menu's titles, and its open submenus', as JSON.
+            if let menu = MenuPanel.current, let data = try? JSONSerialization.data(withJSONObject: menu.debugState) {
+                try? data.write(to: URL(fileURLWithPath: arg))
             }
         case "folderstate":
+
             debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
         case "scrolllist":
@@ -2714,6 +2779,18 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // viewtree <path>: every view in the window with its frame in window points (top left), for measuring.
+        case "viewtree":
+            guard let content = controller.window?.contentView else { break }
+            var out = ""
+            func walk(_ v: NSView, _ depth: Int) {
+                let r = v.convert(v.bounds, to: nil)
+                let text = (v as? NSTextField)?.stringValue.prefix(40) ?? ""
+                out += String(repeating: " ", count: depth) + "\(type(of: v)) x=\(r.minX) y=\(content.bounds.height - r.maxY) w=\(r.width) h=\(r.height)\(v.isHidden ? " hidden" : "") \(text)\n"
+                if !v.isHidden { v.subviews.forEach { walk($0, depth + 1) } }
+            }
+            walk(content, 0)
+            try? out.write(toFile: arg, atomically: true, encoding: .utf8)
         // quitfromloop: quits from the run loop, as ⌘Q does, not from inside a main-queue block: what quitting waits
         // for (downloads pausing, cookies clearing) comes back on the main queue.
         case "quitfromloop": NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)

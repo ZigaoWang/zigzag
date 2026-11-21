@@ -722,6 +722,23 @@ final class SidebarListView: NSView {
         view.wantsLayer = true
         addSubview(view)
         let layer = view.layer
+        // The row's own shadow (the card of the tab you're on) is lent to the lift and given back after it.
+        let own = layer.map { ($0.shadowColor, $0.shadowRadius, $0.shadowOffset, $0.shadowPath) }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak view] in
+            MainActor.assumeIsolated {
+                guard let view, let layer = view.layer, layer.animation(forKey: "lift") == nil else { return }
+                if let own {
+                    layer.shadowColor = own.0
+                    layer.shadowRadius = own.1
+                    layer.shadowOffset = own.2
+                    layer.shadowPath = own.3
+                }
+                // A row draws its card from its state, which may have changed while it moved.
+                (view as? InteractiveView)?.stateDidChange(animated: false)
+                view.refreshCardShadowPath()
+            }
+        }
         layer?.shadowColor = NSColor.black.cgColor
         layer?.shadowRadius = Tokens.Shadow.carryRadius
         // Its shape given up front, so the shadow costs nothing to draw while it moves.
@@ -733,6 +750,7 @@ final class SidebarListView: NSView {
         lift.keyTimes = [0, 0.25, 0.7, 1]
         lift.duration = Tokens.Motion.standard
         layer?.add(lift, forKey: "lift")
+        CATransaction.commit()
         Tokens.Motion.glide(view, to: frame, duration: Tokens.Motion.standard, timing: Tokens.Motion.drawer)
     }
 
@@ -928,7 +946,9 @@ final class SidebarListView: NSView {
                 folding.autoenablesItems = false
                 if !folding.items.isEmpty { folding.insertItem(.separator(), at: 0) }
                 folding.insertItem(SidebarMenus.Item(header.isCollapsed ? String(localized: "Show Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: unfolds them.")
-                                                                          : String(localized: "Hide Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: folds them away.")) { [weak self] in
+                                                                          : String(localized: "Hide Pinned Tabs", comment: "Item in the context menu of the space's name above its pinned tabs: folds them away."),
+                                                   symbol: header.isCollapsed ? SidebarMenus.Symbol.showPins : SidebarMenus.Symbol.hidePins) { [weak self] in
+
                     self?.toggleCollapsed()
                 }, at: 0)
                 return folding

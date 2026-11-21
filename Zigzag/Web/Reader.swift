@@ -70,7 +70,9 @@ enum Reader {
                 const host = location.hostname.replace(/^(www|m)\\./, '');
                 if (/(^|\\.)wikipedia\\.org$/.test(host)) return 'Wikipedia';
                 const own = (meta('og:site_name') || '').trim();
-                return own && own.length <= 28 && !/\\b(inc|llc|ltd|foundation|corporation)\\b/i.test(own) ? own : host;
+                // A local file has no host: its name, as the address shows it.
+                const name = host || decodeURIComponent(location.pathname.split('/').pop() || '');
+                return own && own.length <= 28 && !/\\b(inc|llc|ltd|foundation|corporation)\\b/i.test(own) ? own : name;
               };
               const meta = n => (document.querySelector(`meta[property="${n}"], meta[name="${n}"]`) || {}).content || '';
               const article = new Readability(copy).parse();

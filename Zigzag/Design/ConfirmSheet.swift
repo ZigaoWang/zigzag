@@ -227,7 +227,7 @@ final class ConfirmSheet: NSView {
 
     private func height(for width: CGFloat) -> CGFloat {
         let pad = Tokens.Dialog.padding, inner = width - pad * 2
-        return pad + header.height(for: inner) + Tokens.Space.x2 + body.wrappedHeight(inner) + Tokens.Dialog.gap + Tokens.Space.x1
+        return pad + header.height(for: inner) + Tokens.Space.x2 + body.wrappedHeight(inner + Label.inset * 2) + Tokens.Dialog.gap + Tokens.Space.x1
             + DialogButtons.height + pad
     }
 
@@ -241,7 +241,8 @@ final class ConfirmSheet: NSView {
         let pad = Tokens.Dialog.padding
         let inner = panel.bounds.width - pad * 2
         header.frame = NSRect(x: pad, y: pad, width: inner, height: header.height(for: inner))
-        body.frame = NSRect(x: pad, y: header.frame.maxY + Tokens.Space.x2, width: inner, height: body.wrappedHeight(inner))
+        // Set out by the label inset, so its first letter lines up with the title's.
+        body.frame = NSRect(x: pad - Label.inset, y: header.frame.maxY + Tokens.Space.x2, width: inner + Label.inset * 2, height: body.wrappedHeight(inner + Label.inset * 2))
         buttons.frame = NSRect(x: pad, y: panel.bounds.height - pad - DialogButtons.height, width: inner, height: DialogButtons.height)
     }
 }

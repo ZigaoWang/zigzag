@@ -150,7 +150,7 @@ class ListItem: InteractiveView {
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         // Monochrome outline symbols in a favicon's slot, as the sidebar's rows have them.
-        icon.image = Tokens.Symbol.image(symbol, size: Tokens.Symbol.row)
+        icon.image = Tokens.Symbol.image(symbol, size: Self.symbolSize(symbol))
         icon.imageScaling = .scaleNone
         count.alignment = .right
         count.isHidden = true
@@ -160,6 +160,14 @@ class ListItem: InteractiveView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// The widest a symbol's ink may run; a wider one (translate) is drawn smaller to match the others.
+    private static let widestInk: CGFloat = 20
+
+    private static func symbolSize(_ symbol: String) -> CGFloat {
+        let width = Tokens.Symbol.inkSize(symbol, size: Tokens.Symbol.row).width
+        return width > widestInk ? floor(Tokens.Symbol.row * widestInk / width) : Tokens.Symbol.row
+    }
 
     override func layout() {
         super.layout()

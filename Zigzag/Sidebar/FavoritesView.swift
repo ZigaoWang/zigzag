@@ -521,6 +521,7 @@ final class FavoriteTile: InteractiveView {
         self.bookmark = bookmark
         self.partners = partners
         super.init(frame: .zero)
+        drawsMenu = true
         layer?.cornerRadius = Tokens.Sidebar.favoriteRadius
         layer?.cornerCurve = .continuous
         addSubview(icon)

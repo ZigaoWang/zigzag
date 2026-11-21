@@ -423,8 +423,8 @@ final class IconPickerPanel: FloatingPanelView {
     /// Pages get Choose Image… and, with an icon set, Use Site Icon (#303); folders get neither.
     private let chooseImage: TextButton?
     private let useSite = TextButton(title: SidebarMenus.useSiteIconTitle)
-    /// Footer row height: a quiet button with equal padding on all sides.
-    private var footHeight: CGFloat { chooseImage == nil ? 0 : Tokens.Space.x1 * 2 + Tokens.Space.x7Height - pad }
+    /// Footer row: a gap under the search field, then the buttons, then the panel's own margin below them.
+    private var footHeight: CGFloat { chooseImage == nil ? 0 : Tokens.Space.x2 + Tokens.Space.x7Height }
     var preferredHeight: CGFloat { IconGrid.height + pad * 2 + footHeight }
 
     /// `onChooseImage`: a page's picker, which also accepts image files and can revert to the site icon.
@@ -452,12 +452,12 @@ final class IconPickerPanel: FloatingPanelView {
     private func layoutParts() {
         grid.frame = NSRect(x: pad, y: pad, width: IconGrid.width, height: IconGrid.height)
         guard let chooseImage else { return }
-        // Text aligns with the grid; buttons extend past it by their padding.
-        let y = pad + IconGrid.height + Tokens.Space.x1, h = Tokens.Space.x7Height
+        // The buttons' hover fill keeps to the grid's edges, as the search field does, never out toward the panel's.
+        let y = pad + IconGrid.height + Tokens.Space.x2, h = Tokens.Space.x7Height
         let chooseWidth = min(ceil(chooseImage.fittingWidth), IconGrid.width / 2)
-        chooseImage.frame = NSRect(x: pad - chooseImage.textInset, y: y, width: chooseWidth, height: h)
+        chooseImage.frame = NSRect(x: pad, y: y, width: chooseWidth, height: h)
         let siteWidth = min(ceil(useSite.fittingWidth), IconGrid.width / 2)
-        useSite.frame = NSRect(x: pad + IconGrid.width - siteWidth + useSite.textInset, y: y, width: siteWidth, height: h)
+        useSite.frame = NSRect(x: pad + IconGrid.width - siteWidth, y: y, width: siteWidth, height: h)
     }
 
     required init?(coder: NSCoder) { fatalError() }

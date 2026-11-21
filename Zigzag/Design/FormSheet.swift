@@ -306,7 +306,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     private func height(for width: CGFloat) -> CGFloat {
         let pad = Tokens.Dialog.padding, inner = width - pad * 2
         var height = pad + header.height(for: inner)
-        if let body { height += Tokens.Space.x2 + body.wrappedHeight(inner) }
+        if let body { height += Tokens.Space.x2 + body.wrappedHeight(inner + Label.inset * 2) }
         height += Tokens.Dialog.gap
         height += rowsHeight(width: inner)
         return height + Tokens.Dialog.gap + DialogButtons.height + pad
@@ -325,7 +325,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         header.frame = NSRect(x: pad, y: pad, width: inner, height: header.height(for: inner))
         var y = header.frame.maxY
         if let body {
-            body.frame = NSRect(x: pad, y: y + Tokens.Space.x2, width: inner, height: body.wrappedHeight(inner))
+            // Set out by the label inset, so its first letter lines up with the title's.
+            body.frame = NSRect(x: pad - Label.inset, y: y + Tokens.Space.x2, width: inner + Label.inset * 2, height: body.wrappedHeight(inner + Label.inset * 2))
             y = body.frame.maxY
         }
         y += Tokens.Dialog.gap
