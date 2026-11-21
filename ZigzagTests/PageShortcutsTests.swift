@@ -62,6 +62,11 @@ import WebKit
         #expect(BrowserWindow.browserKeeps(key(String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]), in: menu))
     }
 
+    /// ⌘Q quits from a page that takes every ⌘ key, as it did before Quit had an action of its own.
+    @Test func theQuitKeyStaysTheBrowsers() {
+        #expect(BrowserWindow.browserKeeps(key("q"), in: MainMenu.build()))
+    }
+
     @Test func everythingElseIsThePagesFirst() {
         let menu = menu()
         // A Zigzag item a page may also use (⌘S saves in an editor, ⌘[ indents in Docs), and keys no item has.

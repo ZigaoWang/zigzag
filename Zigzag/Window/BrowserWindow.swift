@@ -118,7 +118,7 @@ final class BrowserWindow: NSWindow {
     /// quitting and hiding, the sidebar and the tab overview, and Zigzag's own windows. Everything else a page may use
     /// for its document first, as in Safari and Chrome.
     static let browserActions: Set<String> = [
-        "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:",
+        "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:", "quitFromMenu:",
         "newTab:", "newWindow:", "newPrivateWindow:", "openLocation:", "closeTab:", "closeOtherTabs:", "performClose:",
         "reopenClosedTab:", "selectNextTab:", "selectPreviousTab:", "selectTabByNumber:",
         "nextSpace:", "previousSpace:", "selectSpaceByNumber:", "showSpaceSwitcher:", "newSpace:", "reloadPage:", "reloadPageFromOrigin:", "stopLoading:",
