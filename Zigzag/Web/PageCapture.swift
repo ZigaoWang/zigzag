@@ -45,10 +45,10 @@ final class PageCapture {
 
     init(controller: BrowserWindowController) { self.controller = controller }
 
-    /// Area or Element, whichever you used last; Area to begin with.
+    /// Area or Element, whichever you used last; Element to begin with, as in Arc, where a drag still draws an area.
     static var lastMode: Mode {
-        get { UserDefaults.standard.string(forKey: "CaptureMode") == Mode.element.rawValue ? .element : .area }
-        set { UserDefaults.standard.set(newValue == .element ? newValue.rawValue : nil, forKey: "CaptureMode") }
+        get { UserDefaults.standard.string(forKey: "CaptureMode") == Mode.area.rawValue ? .area : .element }
+        set { UserDefaults.standard.set(newValue == .area ? newValue.rawValue : nil, forKey: "CaptureMode") }
     }
 
     /// Where pictures are copied. Test copies and unit tests use one of their own, never your clipboard.
