@@ -906,7 +906,10 @@ final class ToastView: FloatingPanelView {
 
     /// The right end: padding, or the action and the close button, the last one inset as evenly as it sits.
     private var trailingWidth: CGFloat {
-        guard !actionButton.isHidden || !closeButton.isHidden else { return Tokens.Space.x4 }
+        // With an icon, the words end as far from the edge as the symbol's ink starts.
+        guard !actionButton.isHidden || !closeButton.isHidden else {
+            return icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + (Tokens.Metric.favicon - Tokens.Symbol.row) / 2
+        }
         var width = actionButton.isHidden ? 0 : Tokens.Space.x3 + actionButton.fittingWidth
         if !closeButton.isHidden { width += (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1) + closeButton.frame.width }
         return width + (Self.height - (closeButton.isHidden ? Tokens.Metric.toastButtonHeight : closeButton.frame.height)) / 2

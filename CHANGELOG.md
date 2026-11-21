@@ -25,6 +25,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Peek names a local file by its name in its strip, as the sidebar does, instead of showing nothing beside the icon.
 - A confirmation's message lines up with its title instead of starting 2 points further in, in sheets and forms alike.
 - What's New lines up the app icon's edge with the headings and points under it, instead of sitting 5 points in.
+- A toast with an icon, like the zoom level's, keeps as much room after its words as before its icon, instead of 3 points more on the right.
 
 ## [0.9.3] - 2026-11-18
 
