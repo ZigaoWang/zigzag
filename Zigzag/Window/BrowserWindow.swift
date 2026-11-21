@@ -124,6 +124,8 @@ final class BrowserWindow: NSWindow {
         "nextSpace:", "previousSpace:", "selectSpaceByNumber:", "showSpaceSwitcher:", "newSpace:", "reloadPage:", "reloadPageFromOrigin:", "stopLoading:",
         "performMiniaturize:", "toggleFullScreen:", "toggleBrowserSidebar:", "toggleDeskView:", "showWebInspector:",
         "showDownloads:", "showHistory:", "hideWebApp:", "quitWebApp:",
+        // ⇧⌘C copies the page's link, as in Arc, even where the page has its own (GitHub copies a file's raw text).
+        "copyPageURL:", "copyPageURLAsMarkdown:",
     ]
 
     /// Whether the menu item these keys belong to is one the browser keeps (`browserActions`). Keys no item has are

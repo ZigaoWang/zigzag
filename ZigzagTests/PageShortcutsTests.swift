@@ -75,7 +75,7 @@ import WebKit
     @Test func zigzagsRealMenuKeepsTabsAndWindows() {
         // The shipped list names actions that exist on the browser window's controller.
         for name in ["newTab:", "closeTab:", "openLocation:", "reloadPage:", "selectTabByNumber:", "reopenClosedTab:",
-                     "nextSpace:", "previousSpace:"] {
+                     "nextSpace:", "previousSpace:", "copyPageURL:", "copyPageURLAsMarkdown:"] {
             #expect(BrowserWindow.browserActions.contains(name))
         }
         // Each one is an action something in Zigzag has.
