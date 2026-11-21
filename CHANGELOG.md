@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- Zigzag › Your Zigzag Card… shows a card with your name, the day you started using Zigzag and the version you started on, in your space's color. Save it as an image or share it. It's made on your Mac and nothing is sent anywhere.
 - Reader has a Space color. The article takes the colors of the space you're in, the same color as the sidebar, light or dark as the space is, with text and links kept dark (or light) enough to read easily. It changes right away when you switch spaces or change the space's color. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 
 ### Fixed
