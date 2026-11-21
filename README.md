@@ -76,6 +76,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Web apps** | Install as App makes a site an app of its own, in your Applications folder, the Dock and ⌘Tab, with a toolbar in the site's color. |
 | **Peek** | Shift-click a link to read it over the page you're on. |
 | **Mini player** | Leave a tab while its video plays and the video follows you in a small player. Resize it from any edge and put it anywhere, even outside the window over other apps. Turn it off from its menu if you'd rather not have it. Switch to another app and the video floats over it in Picture in Picture. |
+| **Streaming** | Netflix, Apple TV+, Disney+ and other protected video play as in Safari, through WebKit's FairPlay Streaming. |
 | **Now Playing** | Every tab playing sound in the background gets a card at the foot of the sidebar, up to three, to pause or mute it. |
 | **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
 | **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Point at it to see which it would close. A split view stays or goes whole. Undo brings them back. |
