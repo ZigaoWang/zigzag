@@ -704,7 +704,9 @@ final class BrowserRootView: SpaceFrameView {
             let closesAt = Tokens.Metric.sidebarMinWidth / 2
             // Out over the page, the edge sets the width and nothing else: it stays out until the pointer leaves.
             if self.sidebarRevealed, !self.sidebarVisible {
-                let width = Tokens.Space.snap(min(max(x, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
+                // The card floats a frame's inset in from the window edge, so the width is the pointer's reach less it.
+                let reach = x - Tokens.Metric.cardInset
+                let width = Tokens.Space.snap(min(max(reach, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
                 guard width != self.sidebarWidth else { return }
                 self.sidebarWidth = width
                 self.needsLayout = true
@@ -1277,18 +1279,18 @@ final class BrowserRootView: SpaceFrameView {
 
     /// The band along the sidebar's edge that takes a drag, full height: well into the sidebar's empty strip beside its
     /// rows, a little into the page, and less on the right, where the page's scroll bar is (#362).
-    /// The band over the popout's inner edge: the same reach either side of the card's edge, the card being inset in
-    /// the window rather than flush.
-    static func revealedResizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
-        let card = sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: onRight)
-        let width = Tokens.Metric.resizeHandleWidth
-        let edge = onRight ? card.maxX : card.minX
-        return NSRect(x: edge - width / 2, y: card.minY, width: width, height: card.height)
-    }
-
     static func resizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
         let inside = Tokens.Metric.sidebarDragReach, out = resizeHandlePageReach(onRight: onRight)
         return mirrored(NSRect(x: bounds.minX + sidebarWidth - inside, y: bounds.minY, width: inside + out, height: bounds.height), in: bounds, if: onRight)
+    }
+
+    /// The band over the popout's inner edge: the same reach either side of the card's edge, the card being inset in
+    /// the window rather than flush. The page faces the card's inner side, `maxX` on the left and `minX` on the right.
+    static func revealedResizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
+        let card = sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: onRight)
+        let width = Tokens.Metric.resizeHandleWidth
+        let edge = onRight ? card.minX : card.maxX
+        return NSRect(x: edge - width / 2, y: card.minY, width: width, height: card.height)
     }
 
     static func resizeHandlePageReach(onRight: Bool) -> CGFloat { onRight ? Tokens.Metric.dragReach / 2 : Tokens.Metric.dragReach }
@@ -1766,6 +1768,8 @@ final class BrowserRootView: SpaceFrameView {
         revealMeter.begin(show ? "out" : "in", in: self)
         #endif
         sidebarRevealed = show
+        // The handle's place follows the card, and only layout moves it; the test was laying out by hand and hiding this.
+        needsLayout = true
         let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
         // Out, it slides all the way before the pointer can send it back: one slide, never cut short and begun again.
         let slide = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown : curve.duration

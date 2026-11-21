@@ -242,7 +242,7 @@ final class WindowManager {
             frame = (fullScreen ? key.windowedFrame : window.frame)?.offsetBy(dx: Tokens.Space.x6, dy: -Tokens.Space.x6)
         }
         let controller = makeController(manager: manager, frame: frame, sidebarVisible: keyController?.root.sidebarVisible ?? true,
-                                        sidebarWidth: keyController?.root.sidebarWidth ?? Tokens.Metric.sidebarWidth)
+                                        sidebarWidth: keyController?.root.sidebarWidth)
         let firstLaunch = url == nil && !isPrivate && Self.needsOnboarding
         if firstLaunch {
             // First launch is its own moment: the welcome window, then the browser.
@@ -270,7 +270,7 @@ final class WindowManager {
         return controller
     }
 
-    private func makeController(manager: TabManager, frame: NSRect?, sidebarVisible: Bool, sidebarWidth: CGFloat) -> BrowserWindowController {
+    private func makeController(manager: TabManager, frame: NSRect?, sidebarVisible: Bool, sidebarWidth: CGFloat?) -> BrowserWindowController {
         let controller = BrowserWindowController(tabManager: manager, frame: frame, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth)
         controller.onClose = { [weak self] closed in self?.windowClosed(closed) }
         controller.onStateChange = { [weak self] in self?.scheduleSave() }

@@ -388,17 +388,26 @@ struct DragZoneTests {
         let root = controller.root
         root.sidebarWidth = Tokens.Metric.sidebarWidth
         root.sidebarVisible = false
+        window.layoutIfNeeded()
+        root.needsLayout = false
         root.reveal(true)
+        // A real reveal lays out by itself: the handle leaves the shown sidebar's spot without the test doing it.
+        #expect(root.needsLayout)
         window.layoutIfNeeded()
         let card = BrowserRootView.sidebarFrame(in: root.bounds, width: root.sidebarWidth, visible: false,
                                                revealed: true, onRight: root.sidebarOnRight)
         #expect(!root.resizeHandle.isHidden)
-        #expect(abs(root.resizeHandle.frame.midX - (root.sidebarOnRight ? card.maxX : card.minX)) <= 1)
+        #expect(abs(root.resizeHandle.frame.midX - (root.sidebarOnRight ? card.minX : card.maxX)) <= 1)
         // Dragged wider, it keeps the width past this window.
         root.debugEdgeDrag("begin")
         let to = root.convert(NSPoint(x: root.sidebarWidth + 40, y: 300), to: nil).x
         root.debugEdgeDrag("\(to)")
         root.debugEdgeDrag("end")
+        // The card floats a frame's inset in from the window, so the pointer's reach is that much wider than the card.
+        let reach = BrowserRootView.reach(of: to, in: root.bounds, onRight: root.sidebarOnRight)
+        let expected = Tokens.Space.snap(min(max(reach - Tokens.Metric.cardInset,
+                                                 Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
+        #expect(root.sidebarWidth == expected)
         #expect(root.sidebarWidth > Tokens.Metric.sidebarWidth)
         let kept = root.sidebarWidth
         let second = BrowserWindowController(tabManager: TabManager(spaceID: space), frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
