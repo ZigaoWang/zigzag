@@ -2,12 +2,12 @@ import AppKit
 import WebKit
 
 /// Where a page's full screen goes (#168, #462): Settings › Tabs › Full screen videos fill decides for every site,
-/// and a site's controls for one site. The Page fills the page's own area in the window, with the chrome around it;
-/// The Whole Screen puts the browser into its own full-screen space, with the page filling it. Either way the page
-/// itself is filled by page-fullscreen.js, in the page's own world: it answers requestFullscreen and the webkit names
-/// for it, and a video's webkitEnterFullscreen, by fixing the element over the page's viewport, telling the page it's
-/// in full screen, matching its :fullscreen rules through a mark, and leaving on Esc or exitFullscreen. A frame has
-/// the page around it fill with the frame. The page never gets a full-screen window of its own.
+/// and a site's controls for one site. The Page fills the page's own area in the window, with the chrome around it,
+/// through page-fullscreen.js in the page's own world: it answers requestFullscreen and the webkit names for it, and
+/// a video's webkitEnterFullscreen, by fixing the element over the page's viewport, telling the page it's in full
+/// screen, matching its :fullscreen rules through a mark, and leaving on Esc or exitFullscreen. A frame has the page
+/// around it fill with the frame. The Whole Screen is WebKit's own native element full screen, as in Safari and
+/// Chrome: the script steps aside and leaves the whole request to WebKit, which owns that full-screen window.
 enum PageFullScreen {
     enum Fill: String, CaseIterable {
         /// The whole screen: the browser's own full-screen space.
@@ -92,6 +92,8 @@ enum PageFullScreen {
     static let messageName = "zigzagFullScreen"
     /// The first line of the page script, to tell it from a web view's other scripts.
     static let scriptMark = "/* zigzag page full screen */\n"
+    /// Where the script reads the fill it follows. Set for each page as it starts, and kept current while it's open.
+    private static let fillName = "zigzag.fullscreen.fill"
 
     /// Isolated from the page.
     static let world = WKContentWorld.world(name: "zigzag-fullscreen")
@@ -101,12 +103,14 @@ enum PageFullScreen {
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }()
 
-    /// The page script.
-    static func source() -> String { scriptMark + template }
+    /// The page script, with the fill its page starts with.
+    static func source(fill: Fill = .screen) -> String {
+        scriptMark + "window[Symbol.for('\(fillName)')] = '\(fill.rawValue)';\n" + template
+    }
 
     /// In the page's own world, where a site's player asks for full screen, and in every frame, for embedded players.
-    static func script() -> WKUserScript {
-        WKUserScript(source: source(), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+    static func script(fill: Fill = .screen) -> WKUserScript {
+        WKUserScript(source: source(fill: fill), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
     }
 
     static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(scriptMark) }
@@ -115,12 +119,43 @@ enum PageFullScreen {
     static let exitCall = "window[Symbol.for('zigzag.fullscreen')]?.exit() ?? false"
 
     /// A tab's new web view: the page script, and the page telling it when it fills itself.
-    static func attach(to webView: WKWebView) {
-        install(in: webView.configuration.userContentController)
+    static func attach(to webView: WKWebView, fill: Fill = .screen) {
         let controller = webView.configuration.userContentController
+        install(in: controller, fill: fill)
         controller.removeScriptMessageHandler(forName: messageName, contentWorld: .page)
         controller.add(Messages.shared, contentWorld: .page, name: messageName)
+        views.add(webView)
+        if changedToken == nil { changedToken = changed.observe { _ in refreshAll() } }
         watchEsc()
+    }
+
+    /// The web views whose pages follow the choice, so a change to it reaches them while their pages are open.
+    private static let views = NSHashTable<WKWebView>.weakObjects()
+    private static var changedToken: SignalToken?
+
+    /// A page has committed: its script follows the choice for the address it landed on, not the one before it.
+    static func pageCommitted(_ webView: WKWebView) { refresh(webView) }
+
+    /// Gives a loaded page's script its choice now: the next document the web view loads starts with it too.
+    static func setFill(_ fill: Fill, in webView: WKWebView) {
+        install(in: webView.configuration.userContentController, fill: fill)
+        webView.runOwnScript(fillCall(fill), world: .page)
+    }
+
+    /// Tells a page's script which way its full screen goes now.
+    static func fillCall(_ fill: Fill) -> String {
+        "window[Symbol.for('zigzag.fullscreen')]?.fill('\(fill.rawValue)'); 0"
+    }
+
+    private static func refresh(_ webView: WKWebView) {
+        let fill = fills(for: webView.url)
+        install(in: webView.configuration.userContentController, fill: fill)
+        guard webView.url != nil else { return }
+        webView.runOwnScript(fillCall(fill), world: .page)
+    }
+
+    private static func refreshAll() {
+        for webView in views.allObjects { refresh(webView) }
     }
 
     private static var escMonitor: Any?
@@ -150,9 +185,9 @@ enum PageFullScreen {
     }
 
     /// Puts the script in place, for pages loaded from now on.
-    private static func install(in controller: WKUserContentController) {
+    private static func install(in controller: WKUserContentController, fill: Fill) {
         OwnScripts.remove(from: controller, where: isOurs)
-        controller.addUserScript(script())
+        controller.addUserScript(script(fill: fill))
     }
 
     /// Esc in Zigzag's window, while a page there fills itself: it leaves.

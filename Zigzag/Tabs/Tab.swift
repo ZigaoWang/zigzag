@@ -615,7 +615,7 @@ final class Tab: NSObject {
         if let pageHolder { pageHolder.hold(webView) } else { pageHolder = PageHolder(holding: webView) }
         observe(webView)
         DarkPages.attach(to: webView)
-        PageFullScreen.attach(to: webView)
+        PageFullScreen.attach(to: webView, fill: PageFullScreen.fills(for: url))
         PageImages.join(webView)
         // A page opened by another inherits its Disable Images (`shareImagesChoice`).
         if fromWebKit, !developer.imagesOff,
@@ -2239,6 +2239,8 @@ extension Tab: WKNavigationDelegate {
         // Before the address updates, so a pinned page isn't marked as moved on.
         noteLanding(webView.url)
         if webView.url != url { followAddress(of: webView) }
+        // The page that landed follows this address's full screen choice, whatever the one before it did (#462).
+        PageFullScreen.pageCommitted(webView)
         // The page that landed is the page the door is for: it stays for an allowed origin, and a page that went
         // somewhere else has it taken out, so the dev page it became keeps its own fetch, XHR and HMR socket.
         if let landed = webView.url {

@@ -2307,21 +2307,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Full screen in the page (#462)
 
-    /// A page's full screen fills its pane in a split, or follows the setting on its own: The Page fills the window
-    /// with the chrome around it; The Whole Screen takes the browser into its own space. The space is the browser's,
-    /// the same as Enter Full Screen; the page does not get a separate one.
+    /// A page's own full screen. The Page fills the page's area through its script, and the window leaves it be.
+    /// The Whole Screen never comes here: WebKit runs that full screen itself, so the window keeps no state for it.
     func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {
-        guard tab === tabManager.selectedTab else { return }
-        if on {
-            guard tabManager.split(for: tab) == nil, PageFullScreen.fills(for: tab.url) == .screen else { return }
-            beginWholeScreen(tab)
-        } else if tab === pageFullScreenTab {
-            endWholeScreen()
-        }
+        guard !on, tab === pageFullScreenTab else { return }
+        endWholeScreen()
     }
 
-    /// The page has the window: a windowed browser enters its full-screen space for the duration. The chrome gets
-    /// out of the way and comes back from the top. A browser already in a space stays in it.
+    /// The expand button takes a page-filled page to The Whole Screen: a windowed browser enters its full-screen
+    /// space for the duration. The chrome gets out of the way and comes back from the top. A browser already in a
+    /// space stays in it.
     private func beginWholeScreen(_ tab: Tab) {
         guard pageFullScreenTab == nil else { return }
         pageFullScreenTab = tab
@@ -2372,7 +2367,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func restoreAddressAfterImmersive() { placeAddress() }
 
     /// Whether the address belongs in the bar above the page: when Settings › Appearance says so, and always while
-    /// a page has The Whole Screen (#462).
+    /// the expand button holds The Whole Screen (#462).
     nonisolated static func addressBelongsInBar(abovePage: Bool, wholeScreen: Bool) -> Bool {
         abovePage || wholeScreen
     }
@@ -2383,17 +2378,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         !selectedIsFull || (inSplit && !expandedZoom)
     }
 
-    /// Whether the page's expand button shows: a windowed page can be promoted, and so can a page in a split, which
-    /// fills its pane. A page already in The Whole Screen has nothing to promote.
+    /// Whether the page's expand button shows: only a page filled by its script has somewhere to go from here. A page
+    /// in The Whole Screen is WebKit's native full screen, and a page already expanded has nothing to promote.
     func tabShowsFullScreenExpand(_ tab: Tab) -> Bool {
         guard tab === tabManager.selectedTab, pageFullScreenTab !== tab else { return false }
-        return tabManager.split(for: tab) != nil || PageFullScreen.fills(for: tab.url) == .page
+        return PageFullScreen.fills(for: tab.url) == .page
     }
 
-    /// The expand button over a page-filled video: take it to The Whole Screen, a pane in a split filling the space
-    /// first, as a tile expands over the others.
+    /// The expand button over a page-filled page: take it to The Whole Screen, a pane in a split filling the space
+    /// first, as a tile expands over the others. The page script keeps The Page's fill; the browser's space is the
+    /// expand action's own, not a page's request (which WebKit answers itself for The Whole Screen).
     func tabDidAskToExpandFullScreen(_ tab: Tab) {
-        guard tab === tabManager.selectedTab, pageFullScreenTab !== tab else { return }
+        guard tab === tabManager.selectedTab, pageFullScreenTab !== tab,
+              PageFullScreen.fills(for: tab.url) == .page else { return }
         if let pair = tabManager.split(for: tab), paneZoom.tabID != tab.id {
             paneZoom.toggle(tab.id, in: pair.ids, places: pair.shape.regions)
             pageFullScreenExpandedZoom = true
@@ -2403,7 +2400,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The split ended (or began), or the tab changed: a page that was in The Whole Screen and is no longer alone
-    /// leaves the space; a page that is alone and follows The Whole Screen takes it.
+    /// leaves the space. A page whose fill is The Whole Screen is never in this state: WebKit owns that full screen.
     private func updatePageFullScreenForLayout() {
         guard let tab = tabManager.selectedTab else { return }
         if let full = pageFullScreenTab,
@@ -2412,8 +2409,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             PageFullScreen.exit(full)
             endWholeScreen()
         }
-        guard tab.isInPageFullScreen, pageFullScreenTab == nil, tabManager.split(for: tab) == nil else { return }
-        if PageFullScreen.fills(for: tab.url) == .screen { beginWholeScreen(tab) }
     }
 
     // MARK: Traffic lights

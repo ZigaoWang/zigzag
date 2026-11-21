@@ -88,16 +88,85 @@ struct PageFullScreenTests {
 
     // MARK: The script
 
-    /// The page script is ours, in every frame, before the page runs.
+    /// The page script is ours, in every frame, before the page runs, with the fill it is given.
     @Test func theScriptIsOurs() {
-        let source = PageFullScreen.source()
+        let source = PageFullScreen.source(fill: .page)
         #expect(source.hasPrefix(PageFullScreen.scriptMark))
         #expect(source.contains("requestFullscreen"))
-        let script = PageFullScreen.script()
+        #expect(source.contains("'page'"))
+        #expect(PageFullScreen.source(fill: .screen).contains("'screen'"))
+        let script = PageFullScreen.script(fill: .page)
         #expect(PageFullScreen.isOurs(script))
         #expect(!script.isForMainFrameOnly)
         #expect(script.injectionTime == .atDocumentStart)
         #expect(!PageFullScreen.isOurs(WKUserScript(source: "1", injectionTime: .atDocumentStart, forMainFrameOnly: true)))
+    }
+
+    /// WebKit's own requestFullscreen, captured by the page script before the page runs: a test can see whether a
+    /// request was left to WebKit or filled by the script.
+    private static let nativeProbe = """
+    window.__nativeFullScreenRequests = 0;
+    Element.prototype.requestFullscreen = function () {
+      window.__nativeFullScreenRequests++;
+      return Promise.reject(new Error('WebKit\\'s own full screen'));
+    };
+    window.__probeRequest = Element.prototype.requestFullscreen;
+    """
+
+    /// The Whole Screen is WebKit's own, as in Safari and Chrome: the script installs nothing over the Fullscreen
+    /// API, and a request goes to WebKit with the page left exactly as it was (#464).
+    @Test func theWholeScreenLeavesFullScreenToWebKit() async throws {
+        let webView = await load(Self.page, fill: .screen, probe: Self.nativeProbe)
+        let result = try await page("""
+        const native = Element.prototype.requestFullscreen;
+        try { await document.getElementById('player').requestFullscreen(); } catch (e) {}
+        return [window.__nativeFullScreenRequests, native === window.__probeRequest,
+                document.getElementById('player').hasAttribute('data-zigzag-fullscreen'),
+                document.fullscreenElement, document.webkitFullscreenElement]
+        """, in: webView) as? [Any]
+        let values = try #require(result)
+        #expect(values[0] as? Int == 1)
+        #expect(values[1] as? Bool == true)
+        #expect(values[2] as? Bool == false)
+        #expect(values[3] is NSNull)
+        #expect(values[4] is NSNull)
+    }
+
+    /// The Page is still the page script's: its request is filled by the script, and WebKit never sees it (#464).
+    @Test func thePageStillUsesTheFillScript() async throws {
+        let webView = await load(Self.page, fill: .page, probe: Self.nativeProbe)
+        let result = try await page("""
+        const native = Element.prototype.requestFullscreen;
+        await document.getElementById('player').requestFullscreen();
+        return [window.__nativeFullScreenRequests, native !== window.__probeRequest,
+                document.getElementById('player').hasAttribute('data-zigzag-fullscreen'),
+                document.fullscreenElement && document.fullscreenElement.id]
+        """, in: webView) as? [Any]
+        let values = try #require(result)
+        #expect(values[0] as? Int == 0)
+        #expect(values[1] as? Bool == true)
+        #expect(values[2] as? Bool == true)
+        #expect(values[3] as? String == "player")
+    }
+
+    /// A page open while its fill choice changes follows the new choice at once: The Page's fill leaves and the
+    /// Fullscreen API goes back to WebKit; The Whole Screen's is never filled by the script (#464).
+    @Test func aPageFollowsAFillChoiceChangedWhileItsOpen() async throws {
+        let webView = await load(Self.page, fill: .page, probe: Self.nativeProbe)
+        _ = try await page("await document.getElementById('player').requestFullscreen()", in: webView)
+        #expect(try await page("return document.getElementById('player').hasAttribute('data-zigzag-fullscreen')", in: webView) as? Bool == true)
+        _ = try await webView.runOwnScript(PageFullScreen.fillCall(.screen), world: .page)
+        let after = try await page("""
+        const left = [document.getElementById('player').hasAttribute('data-zigzag-fullscreen'),
+                      document.fullscreenElement, Element.prototype.requestFullscreen === window.__probeRequest];
+        try { await document.getElementById('player').requestFullscreen(); } catch (e) {}
+        return left.concat([window.__nativeFullScreenRequests])
+        """, in: webView) as? [Any]
+        let values = try #require(after)
+        #expect(values[0] as? Bool == false)
+        #expect(values[1] is NSNull)
+        #expect(values[2] as? Bool == true)
+        #expect(values[3] as? Int == 1)
     }
 
     @Test func fillingThePageNeedsAClick() async throws {
@@ -154,10 +223,13 @@ struct PageFullScreenTests {
     <div class="bar">Bar</div><div class="label">Label</div></div></div></body></html>
     """
 
-    private func load(_ html: String, heard: Heard? = nil) async -> WKWebView {
+    private func load(_ html: String, fill: PageFullScreen.Fill = .page, probe: String? = nil, heard: Heard? = nil) async -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = true
-        configuration.userContentController.addUserScript(PageFullScreen.script())
+        if let probe {
+            configuration.userContentController.addUserScript(WKUserScript(source: probe, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
+        }
+        configuration.userContentController.addUserScript(PageFullScreen.script(fill: fill))
         if let heard { configuration.userContentController.add(heard, contentWorld: .page, name: PageFullScreen.messageName) }
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700), configuration: configuration)
         let loading = Loading()

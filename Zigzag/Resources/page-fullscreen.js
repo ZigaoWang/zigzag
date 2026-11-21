@@ -1,6 +1,7 @@
-// Full screen in the page (#168, #462): a page asking for full screen (a player's button, Element.requestFullscreen
-// and its webkit names, video.webkitEnterFullscreen) gets its element filling the page's own area. A tab on its own
-// takes the window, with the chrome out of the way; the page never takes the screen. The page is told it's in full
+// Full screen in the page (#168, #462): when a tab's full screen fills The Page, a page asking for full screen (a
+// player's button, Element.requestFullscreen and its webkit names, video.webkitEnterFullscreen) gets its element
+// filling the page's own area. It never takes the screen itself: where The Whole Screen is chosen, the script steps
+// aside and WebKit's own native element full screen runs, as in Safari and Chrome. The page is told it's in full
 // screen as it would be (fullscreenElement, fullscreenchange), its own :fullscreen styles are matched through a
 // mark, and Esc leaves. A frame asks the page around it to fill the page with the frame, all the way up.
 //
@@ -8,11 +9,18 @@
 (() => {
   const KEY = Symbol.for('zigzag.fullscreen');
   if (window[KEY]) return;
+  const FILL = Symbol.for('zigzag.fullscreen.fill');
+  const FILL_MESSAGE = '__zigzagFullScreenFill';
   const MARK = 'data-zigzag-fullscreen';
   const ANCESTOR = 'data-zigzag-fullscreen-ancestor';
   const PAGE = 'data-zigzag-fullscreen-page';
   const MESSAGE = '__zigzagFullScreen';
   const isTop = window === window.top;
+  // The fill Zigzag resolved for this tab: The Page fills here; The Whole Screen is WebKit's own, and the script
+  // installs nothing over the Fullscreen API (a page already open that changes its choice does either at once).
+  const fillsPage = () => {
+    try { return window[FILL] === 'page'; } catch (e) { return false; }
+  };
 
   // Page globals captured before its scripts run, so redefinitions aren't called.
   const call = Function.prototype.call.bind(Function.prototype.call);
@@ -153,7 +161,7 @@
   const post = (target, type, extra) => { try { target.postMessage(Object.assign({ [MESSAGE]: type }, extra || {}), '*'); } catch (e) {} };
 
   function enter(el, video) {
-    if (current === el) return;
+    if (!fillsPage() || current === el) return;
     if (current) leave({ quiet: true });
     current = el;
     viaVideo = !!video;
@@ -195,23 +203,36 @@
   const later = (work) => new Promise((resolve) => setTimeout(() => { work(); resolve(); }, 0));
   const requested = function (fallback) {
     return function (...args) {
-      // No user gesture, or a disallowed frame: defer to WebKit.
-      if (!mayFill()) return fallback ? fallback.apply(this, args) : Promise.reject(new TypeError('Not supported'));
+      // The Whole Screen is WebKit's own, and no user gesture (or a disallowed frame) defers to WebKit too.
+      if (!fillsPage() || !mayFill()) return fallback ? fallback.apply(this, args) : Promise.reject(new TypeError('Not supported'));
       const el = this;
       return later(() => { if (el.isConnected) enter(el, false); });
     };
   };
   const exited = function (fallback) {
     return function (...args) {
-      if (!current) return fallback ? fallback.apply(this, args) : Promise.reject(new TypeError('Not in full screen'));
+      if (!fillsPage() || !current) return fallback ? fallback.apply(this, args) : Promise.reject(new TypeError('Not in full screen'));
       return later(() => leave());
     };
   };
-  // The standard names always; WebKit's own only where this WebKit still has them.
+  // The standard names always; WebKit's own only where this WebKit still has them. Each one put back exactly as it
+  // was when the choice is The Whole Screen, so WebKit's native full screen runs untouched.
   const standard = new Set(['requestFullscreen', 'exitFullscreen', 'fullscreenElement', 'fullscreen']);
+  let intercepting = false;
+  const overrides = [];
   const define = (o, n, value) => {
     if (!o || !(n in o) && !standard.has(n)) return;
-    try { Object.defineProperty(o, n, Object.assign({ configurable: true }, value.descriptor)); } catch (e) {}
+    const before = own(o, n);
+    try {
+      Object.defineProperty(o, n, Object.assign({ configurable: true }, value.descriptor));
+      overrides.push([o, n, before]);
+    } catch (e) {}
+  };
+  const restore = () => {
+    while (overrides.length) {
+      const [o, n, before] = overrides.pop();
+      try { if (before) Object.defineProperty(o, n, before); else delete o[n]; } catch (e) {}
+    }
   };
   const method = (fn) => ({ descriptor: { value: fn, writable: true, enumerable: false } });
   const getter = (fn) => ({ descriptor: { get: fn, enumerable: true } });
@@ -226,47 +247,70 @@
   };
   const read = (descriptor) => function () { return seen(this) || (descriptor ? descriptor.get.call(this) : null); };
 
-  define(E, 'requestFullscreen', method(requested(native.request)));
-  define(E, 'webkitRequestFullscreen', method(requested(native.webkitRequest)));
-  define(E, 'webkitRequestFullScreen', method(requested(native.webkitRequestS)));
-  define(D, 'exitFullscreen', method(exited(native.exit)));
-  define(D, 'webkitExitFullscreen', method(exited(native.webkitExit)));
-  define(D, 'webkitCancelFullScreen', method(exited(native.webkitCancel)));
-  define(D, 'fullscreenElement', getter(read(native.element)));
-  define(D, 'webkitFullscreenElement', getter(read(native.webkitElement)));
-  define(D, 'webkitCurrentFullScreenElement', getter(read(native.webkitCurrent)));
-  define(D, 'webkitIsFullScreen', getter(function () { return !!seen(this) || !!(native.webkitIs && native.webkitIs.get.call(this)); }));
-  define(D, 'fullscreen', getter(function () { return !!seen(this) || !!(native.fullscreen && native.fullscreen.get.call(this)); }));
-  if (V) {
-    const videoEnter = (fallback) => function (...args) {
-      if (!mayFill()) return fallback ? fallback.apply(this, args) : undefined;
-      if (this.isConnected) enter(this, true);
-    };
-    const videoExit = (fallback) => function (...args) {
-      if (current !== this) return fallback ? fallback.apply(this, args) : undefined;
-      leave();
-    };
-    define(V, 'webkitEnterFullscreen', method(videoEnter(native.videoEnter)));
-    define(V, 'webkitEnterFullScreen', method(videoEnter(native.videoEnterS)));
-    define(V, 'webkitExitFullscreen', method(videoExit(native.videoExit)));
-    define(V, 'webkitExitFullScreen', method(videoExit(native.videoExitS)));
-    define(V, 'webkitDisplayingFullscreen', getter(function () { return current === this || !!(native.videoDisplaying && native.videoDisplaying.get.call(this)); }));
-    define(V, 'webkitPresentationMode', getter(function () { return current === this && viaVideo ? 'fullscreen' : native.videoMode ? native.videoMode.get.call(this) : 'inline'; }));
+  function intercept() {
+    if (intercepting || !fillsPage()) return;
+    intercepting = true;
+    define(E, 'requestFullscreen', method(requested(native.request)));
+    define(E, 'webkitRequestFullscreen', method(requested(native.webkitRequest)));
+    define(E, 'webkitRequestFullScreen', method(requested(native.webkitRequestS)));
+    define(D, 'exitFullscreen', method(exited(native.exit)));
+    define(D, 'webkitExitFullscreen', method(exited(native.webkitExit)));
+    define(D, 'webkitCancelFullScreen', method(exited(native.webkitCancel)));
+    define(D, 'fullscreenElement', getter(read(native.element)));
+    define(D, 'webkitFullscreenElement', getter(read(native.webkitElement)));
+    define(D, 'webkitCurrentFullScreenElement', getter(read(native.webkitCurrent)));
+    define(D, 'webkitIsFullScreen', getter(function () { return !!seen(this) || !!(native.webkitIs && native.webkitIs.get.call(this)); }));
+    define(D, 'fullscreen', getter(function () { return !!seen(this) || !!(native.fullscreen && native.fullscreen.get.call(this)); }));
+    if (V) {
+      const videoEnter = (fallback) => function (...args) {
+        if (!fillsPage() || !mayFill()) return fallback ? fallback.apply(this, args) : undefined;
+        if (this.isConnected) enter(this, true);
+      };
+      const videoExit = (fallback) => function (...args) {
+        if (!fillsPage() || current !== this) return fallback ? fallback.apply(this, args) : undefined;
+        leave();
+      };
+      define(V, 'webkitEnterFullscreen', method(videoEnter(native.videoEnter)));
+      define(V, 'webkitEnterFullScreen', method(videoEnter(native.videoEnterS)));
+      define(V, 'webkitExitFullscreen', method(videoExit(native.videoExit)));
+      define(V, 'webkitExitFullScreen', method(videoExit(native.videoExitS)));
+      define(V, 'webkitDisplayingFullscreen', getter(function () { return current === this || !!(native.videoDisplaying && native.videoDisplaying.get.call(this)); }));
+      define(V, 'webkitPresentationMode', getter(function () { return current === this && viaVideo ? 'fullscreen' : native.videoMode ? native.videoMode.get.call(this) : 'inline'; }));
+    }
+  }
+
+  // The Whole Screen: leave The Page's fill if it was on, and give the Fullscreen API back to WebKit.
+  function stepAside() {
+    if (current) leave();
+    if (!intercepting) return;
+    intercepting = false;
+    restore();
+  }
+
+  // Zigzag's current choice for this tab, and its word to pages around this one.
+  function setFill(value) {
+    const next = value === 'page' ? 'page' : 'screen';
+    try { window[FILL] = next; } catch (e) {}
+    if (next === 'page') intercept(); else stepAside();
+    for (let i = 0; i < window.frames.length; i++) {
+      try { window.frames[i].postMessage({ [FILL_MESSAGE]: next }, '*'); } catch (e) {}
+    }
   }
 
   // Esc leaves, before the page hears it, as it does WebKit's full screen.
   window.addEventListener('keydown', (event) => {
-    if (!current || event.key !== 'Escape' || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    if (!fillsPage() || !current || event.key !== 'Escape' || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
     event.stopImmediatePropagation();
     event.preventDefault();
     leave();
   }, true);
 
   // Full screen WebKit started itself (a video's own controls): back out of it, and fill the page with the same
-  // element. Only WebKit's own events count: the ones told here are the page's to hear.
+  // element. Only WebKit's own events count: the ones told here are the page's to hear. The Whole Screen is
+  // WebKit's own, so there it is left to run.
   let backingOut = false;
   const tookScreen = (event) => {
-    if (!event.isTrusted || backingOut) return;
+    if (!fillsPage() || !event.isTrusted || backingOut) return;
     const el = nativeElement();
     if (!el) return;
     backingOut = true;
@@ -279,7 +323,7 @@
   // A video's own full screen, apart from the page's.
   document.addEventListener('webkitbeginfullscreen', (event) => {
     const video = event.target;
-    if (!event.isTrusted || !(video instanceof HTMLVideoElement) || !native.videoExit) return;
+    if (!fillsPage() || !event.isTrusted || !(video instanceof HTMLVideoElement) || !native.videoExit) return;
     event.stopImmediatePropagation();
     try { native.videoExit.call(video); } catch (e) {}
     setTimeout(() => { if (video.isConnected) enter(video, true); }, 0);
@@ -287,7 +331,14 @@
 
   window.addEventListener('message', (event) => {
     const data = event.data;
-    if (!data || typeof data !== 'object' || !(MESSAGE in data)) return;
+    if (!data || typeof data !== 'object') return;
+    // Zigzag's choice, passed down to frames as it changes.
+    if (FILL_MESSAGE in data) {
+      if (event.source !== window && event.source !== window.parent) return;
+      setFill(data[FILL_MESSAGE]);
+      return;
+    }
+    if (!(MESSAGE in data)) return;
     const type = data[MESSAGE];
     if (event.source === window.parent && !isTop) {
       if (type === 'exit' && current) leave({ fromParent: true });
@@ -297,15 +348,17 @@
     if (!frame) return;
     // A frame fills the page only if allowed full screen and on a user gesture (which reaches the parent pages too); the
     // message alone could come from anyone.
-    if (type === 'enter' && mayFill() && frameMayFill(frame)) enter(frame, false);
+    if (type === 'enter' && fillsPage() && mayFill() && frameMayFill(frame)) enter(frame, false);
     if (type === 'exit' && current === frame) leave({ fromChild: true });
   });
 
-  // A page that starts is never in full screen, whatever the one before it was.
+  // A page that starts follows the fill it was given, and is never in full screen, whatever the one before it was.
+  if (fillsPage()) intercept();
   report();
   Object.defineProperty(window, KEY, {
     value: Object.freeze({
       exit: () => { if (current) { leave(); return true; } return false; },
+      fill: setFill,
       get active() { return !!current; },
     }),
     enumerable: false, configurable: false, writable: false,
