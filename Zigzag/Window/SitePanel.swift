@@ -2153,6 +2153,8 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         if selector == #selector(NSResponder.cancelOperation(_:)) { endTyping(commit: false); return true }
+        // Return is handled here: left to the field, it selects the text again and takes the focus back.
+        if selector == #selector(NSResponder.insertNewline(_:)) { endTyping(commit: true); return true }
         return false
     }
 
