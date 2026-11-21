@@ -73,7 +73,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         self.app = app
         tab = Tab(url: app.url, spaceID: Self.space(for: app))
         // As in Zigzag Mini: no PDF viewer or mini player of a browser window's tabs.
-        tab.isPeek = true
+        tab.isOutsideTabList = true
         tab.keepsSite = true
         let area = NSScreen.main?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
         let size = NSSize(width: min(Tokens.Metric.webAppWindowSize.width, area.width), height: min(Tokens.Metric.webAppWindowSize.height, area.height))

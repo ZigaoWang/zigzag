@@ -47,7 +47,7 @@ enum Tokens {
         static let small: CGFloat = 4
         /// Grouped cards on a window's background: Settings and Passwords groups, the site panel's sections.
         static let group: CGFloat = 10
-        /// Floating surfaces: command bar, peek, previews, menus.
+        /// Floating surfaces: command bar, previews, menus.
         static let panel: CGFloat = 14
         /// Large floating surfaces that hold rounded things of their own: the tab switcher, Reader's options, the tour.
         static let large: CGFloat = 16
@@ -117,7 +117,8 @@ enum Tokens {
         static let switcherThumbWidth: CGFloat = 224
         /// The narrowest a Control+Tab card gets before the cards go into rows: its title still reads.
         static let switcherThumbMinWidth: CGFloat = 184
-        static let peekInsetRatio: CGFloat = 0.08
+        /// How far a zoomed pane's card sits in from the page area's edges.
+        static let zoomInsetRatio: CGFloat = 0.08
         static let findBarWidth: CGFloat = 320
         static let popupDefaultSize = NSSize(width: 520, height: 640)
         /// Zigzag Mini, for one page opened from another app: big enough to read, small enough to stay out of the way.
@@ -155,10 +156,6 @@ enum Tokens {
         static let floatingButton: CGFloat = Space.x8 + Space.x1
         /// A tab preview's caption under the picture.
         static let previewCaptionHeight: CGFloat = Space.x12
-        /// Peek's top strip: a split view pane's, so the page under it gets the room.
-        static let peekHeaderHeight: CGFloat = Pane.height
-        /// Peek's rim around its page, at the sides and below: enough to hold the page, not a frame around it.
-        static let peekInset: CGFloat = 2
         /// Capture's toolbar (⇧⌘2): a capsule of control-height buttons, `Space.x1 + 2` in from its edge.
         static let captureToolbarHeight: CGFloat = controlHeight + (Space.x1 + 2) * 2
         /// The round grips on a captured area's corners and sides.
@@ -366,7 +363,7 @@ enum Tokens {
         static let height: CGFloat = 30
         static let button: CGFloat = 24
         static let glyph: CGFloat = 13
-        /// The page's icon in a strip (Peek's): a favicon at the sidebar's Medium size, whatever size the sidebar is.
+        /// The page's icon in a strip: a favicon at the sidebar's Medium size, whatever size the sidebar is.
         static let favicon: CGFloat = 16
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
@@ -967,7 +964,7 @@ enum Tokens {
             CATransaction.commit()
         }
 
-        /// Fades a backdrop (sheet scrim, peek dimming) in or out from its current opacity, eased; crossfade with
+        /// Fades a backdrop (sheet scrim, a zoomed pane's dimming) in or out from its current opacity, eased; crossfade with
         /// Reduce Motion. `evenFromKeyboard` false: appears instantly from a key, like the command bar.
         static func fadeBackdrop(_ view: NSView, entering: Bool, evenFromKeyboard: Bool = true, completion: (@MainActor () -> Void)? = nil) {
             if let layer = view.layer, layer.animation(forKey: "opacity") != nil, let shown = layer.presentation()?.opacity {
@@ -1478,8 +1475,8 @@ enum Tokens {
         static let unfocusedPaneAlpha: CGFloat = 0.45
         /// Selected text in our own fields (the command bar, its inline completion), in the accent at this opacity.
         static let textSelectionAlpha: CGFloat = 0.26
-        /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.
-        static let peekScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
+        /// A firmer dim than `scrim`, under a zoomed pane: a page above the page should read as a layer.
+        static let zoomScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
         /// Capture's dim over the page around what's picked: firm enough that the clear part reads at once.
         static let captureScrim = dynamic(light: hex(0x000000, alpha: 0.3), dark: hex(0x000000, alpha: 0.5))
         /// The edge of a picked area: a light line that reads on the dim and on the page it frames.
@@ -1502,7 +1499,7 @@ enum Tokens {
         /// Status: done and fine.
         static let success = NSColor.systemGreen
 
-        /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in Peek):
+        /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in a strip):
         /// near-white on dark colors, near-black on light ones.
         static func ink(on color: NSColor) -> NSColor {
             guard let c = color.usingColorSpace(.sRGB) else { return textPrimary }

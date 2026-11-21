@@ -42,6 +42,7 @@ enum Tutorial {
                     : String(localized: "Pinned tabs stay, even after you quit", comment: "Under a step's title in the getting-started guide, a card in the window."),
                  done: String(localized: "Pinned", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: String(localized: "It stays at the top of this space", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
+            // Its id is from when this step was Peek, kept so a guide already done stays done.
             Task(id: "peek",
                  title: String(localized: "Shift-click a blue link", comment: "A step's title in the getting-started guide, a card in the window."),
                  keys: ["⇧", String(localized: "Click", comment: "A key in the getting-started guide, after ⇧: click with the mouse or trackpad.")],

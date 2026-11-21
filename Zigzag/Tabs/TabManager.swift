@@ -441,7 +441,7 @@ final class TabManager {
     /// favorite: those keep their places), in the group the last of them is in.
     private func newTabPlacement(in space: UUID, opener: Tab?, select: Bool, site page: URL?) -> (index: Int, parent: UUID?) {
         let nodes = treeNodes(in: space)
-        if Self.nestsOpenedLinks, let opener, opener.bookmarkID == nil, !opener.isPeek, opener.spaceID == space,
+        if Self.nestsOpenedLinks, let opener, opener.bookmarkID == nil, !opener.isOutsideTabList, opener.spaceID == space,
            let at = TabTree.childIndex(of: opener.id, in: nodes) {
             return (at, opener.id)
         }
@@ -625,7 +625,7 @@ final class TabManager {
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
     }
 
-    /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
+    /// Adds a tab that already has a page (from another window or Zigzag Mini) at `index` and shows it.
     func insert(_ tab: Tab, at index: Int = 0, under parent: UUID?? = nil) {
         tab.host = host
         tab.setSpace(currentSpaceID)
@@ -638,7 +638,7 @@ final class TabManager {
         tabsBySpace[currentSpaceID] = list
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         structureChanged()
-        // A Peek made a tab still goes back to the page it came from.
+        // A page from Zigzag Mini made a tab still goes back to the page it came from.
         if tab.opener != nil { openedSinceSwitch.insert(tab.id) }
         selectQuietly(tab)
     }

@@ -274,8 +274,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private init(tab: Tab, frame: NSRect, overFullScreen: Bool) {
         self.tab = tab
         // Zigzag's own PDF viewer and Back to the page that opened it belong to a browser window's tabs; here the page
-        // is shown as in peek, and becomes a full tab once it moves.
-        tab.isPeek = true
+        // is shown outside a tab list, and becomes a full tab once it moves.
+        tab.isOutsideTabList = true
 
         let window = BrowserWindow(contentRect: frame)
         window.minSize = Tokens.Metric.miniWindowMinSize
@@ -751,7 +751,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         tab.pageHolder?.removeFromSuperview()
-        tab.isPeek = false
+        tab.isOutsideTabList = false
     }
 
     /// ⌘Z after Open in Zigzag Mini: the page goes back to the browser window it came from, and this window closes at

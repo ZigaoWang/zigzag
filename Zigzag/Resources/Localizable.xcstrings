@@ -6629,17 +6629,6 @@
         }
       }
     },
-    "Close Peek" : {
-      "comment" : "Tooltip of the close button in Peek's top strip.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭速览"
-          }
-        }
-      }
-    },
     "Close Side Panel" : {
       "comment" : "Tooltip of the close button on an extension's side panel.",
       "localizations" : {
@@ -14636,17 +14625,6 @@
         }
       }
     },
-    "Open Peek as Tab" : {
-      "comment" : "Tooltip of the button in Peek's top strip that keeps the page as a tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将速览作为标签页打开"
-          }
-        }
-      }
-    },
     "Open Pinned Tab" : {
       "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the pinned tab.",
       "localizations" : {
@@ -15667,17 +15645,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "蜜桃"
-          }
-        }
-      }
-    },
-    "Peek" : {
-      "comment" : "Accessibility label of Peek's top strip. Peek shows a link's page in a panel over the current one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速览"
           }
         }
       }

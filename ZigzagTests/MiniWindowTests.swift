@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// Where a mini window opens, and which links from other apps go to one.
@@ -314,5 +315,83 @@ struct MiniFromPageTests {
         #expect(list.contains { $0 === b })
         // An anchor that isn't in the space in front: nothing placed.
         #expect(!manager.insert(Tab(url: nil, spaceID: space), after: Tab(url: nil, spaceID: space)))
+    }
+
+    /// The pointer and the wheel over the Mini reach its page: it's what a click in the middle of the window hits.
+    @Test func theMinisPageIsWhatThePointerHits() async throws {
+        try await inWindow { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            let window = try #require(mini.window)
+            let page = try #require(mini.tab.webView)
+            window.layoutIfNeeded()
+            let frame = try #require(window.contentView?.superview)
+            let point = page.convert(NSPoint(x: page.bounds.midX, y: page.bounds.midY), to: nil)
+            #expect(frame.hitTest(frame.convert(point, from: nil)) === page)
+        }
+    }
+
+    /// Extensions see a Mini from a page as a window with one active tab, told as it opens and as it closes (#374);
+    /// a private one only to extensions allowed in private windows.
+    @available(macOS 15.4, *)
+    @Test func extensionsSeeTheMiniAsAWindowWithOneActiveTab() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0"}"#.utf8).write(to: folder.appendingPathComponent("manifest.json"))
+        let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+        try await inWindow { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            let page = mini.tab
+            #expect(page.toldTo != nil && page.toldTo === page.extensionHost)
+            #expect(page.window(for: context) === mini)
+            #expect(page.isSelected(for: context))
+            #expect(mini.tabs(for: context).count == 1)
+            #expect(!mini.isPrivate(for: context))
+            mini.window?.close()
+            #expect(page.toldTo == nil)
+        }
+        try await inWindow(isPrivate: true) { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            #expect(mini.isPrivate(for: context))
+            #expect(mini.tabs(for: context).isEmpty && mini.activeTab(for: context) == nil)
+        }
+    }
+
+    /// A link followed inside the Mini turns Back on, which walks the Mini's own pages (#463).
+    @Test func aLinkFollowedInTheMiniGoesBackAndForward() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let first = folder.appendingPathComponent("first.html"), second = folder.appendingPathComponent("second.html")
+        try "<p>First</p>".write(to: first, atomically: true, encoding: .utf8)
+        try "<p>Second</p>".write(to: second, atomically: true, encoding: .utf8)
+        try await inWindow { controller, source in
+            let mini = MiniWindowController.open(fromPage: first, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            let page = mini.tab
+            for _ in 0..<200 where page.isLoading || page.url != first { try await Task.sleep(for: .milliseconds(20)) }
+            #expect(mini.debugState["backEnabled"] as? Bool == false)
+            page.load(second)
+            for _ in 0..<200 where !page.canGoBack { try await Task.sleep(for: .milliseconds(20)) }
+            #expect(mini.debugState["backEnabled"] as? Bool == true)
+            #expect(mini.debugState["forwardEnabled"] as? Bool == false)
+            mini.goBack(nil)
+            for _ in 0..<200 where !page.canGoForward { try await Task.sleep(for: .milliseconds(20)) }
+            #expect(page.url?.lastPathComponent == "first.html")
+            #expect(mini.debugState["forwardEnabled"] as? Bool == true)
+            // The tab it came from stays where it was.
+            #expect(controller.tabManager.selectedTab === source)
+        }
+    }
+
+    /// The strip names a local file by its name, a web page by its site.
+    @Test func theStripNamesAFileOrASite() {
+        let title = MiniTitleView()
+        title.show(Tab(url: URL(fileURLWithPath: "/tmp/Notes.html"), title: "Notes", spaceID: UUID()))
+        #expect(title.text == "Notes.html")
+        title.show(Tab(url: URL(string: "https://www.example.com/a"), title: "Example", spaceID: UUID()))
+        #expect(title.text.contains("example.com"))
     }
 }

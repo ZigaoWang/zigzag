@@ -25,8 +25,8 @@ final class GuidedTour: NSView {
     /// The step shown being done, in the window itself, on your own tabs and buttons.
     private lazy var demo = TourDemo(in: layer!)
     /// Where the ⇧-click step's link is on the page, looked up now and then as you scroll.
-    private var peekLink: CGPoint?
-    private var peekLinkAsked = Date.distantPast
+    private var shiftClickLink: CGPoint?
+    private var shiftClickLinkAsked = Date.distantPast
     private var tokens: [SignalToken] = []
     private var watch: Timer?
     private var ending = false
@@ -202,18 +202,18 @@ final class GuidedTour: NSView {
     private func tick() {
         guard let controller, !ending else { return }
         // Other panels (site controls, downloads) come first: the guide steps aside.
-        let bar = controller.commandBar.isVisible, peek = controller.hasMiniFromPage
+        let bar = controller.commandBar.isVisible, mini = controller.hasMiniFromPage
         let editing = SpaceEditorPanel.current != nil
         let spaceStep = editingNewSpace || confirming?.id == "space"
         // The tab overview is the overview step's own screen: the guide stays, to say what to do there.
         let overviewStep = controller.desk.isVisible && (Tutorial.current?.id == "overview" || confirming?.id == "overview")
-        let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek") || (editing && spaceStep) || overviewStep
-        let aside = !relevant && (controller.hasFloatingPanel || peek)
+        let relevant = (bar && Tutorial.current?.id == "newTab") || (mini && Tutorial.current?.id == "peek") || (editing && spaceStep) || overviewStep
+        let aside = !relevant && (controller.hasFloatingPanel || mini)
         // During the ⇧-click step the card stays on top, beside the Zigzag Mini, so "Close it" is right there;
         // otherwise it stays beneath everything that floats.
         if let overlay = superview {
             // Over the tab overview too, while it's the step: "every tab, at a glance" is said over it.
-            let onTop = (peek && Tutorial.current?.id == "peek") || overviewStep
+            let onTop = (mini && Tutorial.current?.id == "peek") || overviewStep
             if onTop, overlay.subviews.last !== self { overlay.addSubview(self) }
             if !onTop, overlay.subviews.first !== self { overlay.addSubview(self, positioned: .below, relativeTo: nil) }
         }
@@ -291,7 +291,7 @@ final class GuidedTour: NSView {
         }
         if task.id == "peek", controller.hasMiniFromPage {
             return Display(keys: ["Esc"], title: String(localized: "Close it", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while a link is open in Zigzag Mini, the small window over the page. The Esc key is shown beside it."),
-                           note: String(localized: "Or press ⌘O to keep it as a tab", comment: "Under the hint to close Zigzag Mini, the small window a shift-clicked link opened in, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "peek")
+                           note: String(localized: "Or press ⌘O to keep it as a tab", comment: "Under the hint to close Zigzag Mini, the small window a shift-clicked link opened in, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "mini")
         }
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article") }
         // In the overview: what it's for is in front of you, so the hint is how to get back to a page.
@@ -332,7 +332,7 @@ final class GuidedTour: NSView {
         case "bar": return controller.commandBar.panelView
         case "pin", "done.newTab", "done.pin": return row ?? controller.sidebar.list
         // Zigzag Mini is a window of its own, over the page.
-        case "peek", "done.peek", "article": return controller.root.card
+        case "mini", "done.peek", "article": return controller.root.card
         case "split": return splitCandidate.flatMap { controller.sidebar.list.row(for: $0) }
         case "done.split", "overview", "done.overview": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
@@ -536,7 +536,7 @@ final class GuidedTour: NSView {
         // Nothing is dimmed: the window stays as it is, and a soft ring marks only small things to click.
         let cut = CGMutablePath()
         let page = controller?.root.cardFrame ?? bounds
-        let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "peek", "addmenu"].contains(d.target)
+        let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "mini", "addmenu"].contains(d.target)
         // Something as small as a space's dot gets a round ring; anything bigger, a rounded rectangle.
         let radius = max(hole.width, hole.height) < Tokens.Tour.ringRoundBelow ? min(hole.width, hole.height) / 2 : Tokens.Radius.tile
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
@@ -597,7 +597,7 @@ final class GuidedTour: NSView {
         } else if d.target == "bar" || d.target == "editor" {
             // Right under the bar or the editor: next to what you're looking at.
             frame = NSRect(x: d.target == "bar" ? hole.midX - size.width / 2 : hole.minX, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
-        } else if d.target == "peek", let sidebar = controller?.root.sidebarContainer.frame, sidebar.width > size.width * 0.8 {
+        } else if d.target == "mini", let sidebar = controller?.root.sidebarContainer.frame, sidebar.width > size.width * 0.8 {
             // Zigzag Mini sits over the middle of the page, so the pill waits in the sidebar, clear of it.
             frame = NSRect(x: sidebar.midX - size.width / 2, y: bounds.midY - size.height / 2, width: size.width, height: size.height)
         } else if hole.width > page.width * 0.6 {
@@ -684,17 +684,17 @@ final class GuidedTour: NSView {
             let band = NSRect(x: list.minX, y: list.minY + min(list.height, 240) / 2 - 20, width: list.width, height: 40)
             return list.width > 0 ? .swipe(across: band, toRight: d.target == "switch") : nil
         case "article":
-            findPeekLink()
-            return peekLink.map { .click(at: $0, holding: "⇧") }
+            findShiftClickLink()
+            return shiftClickLink.map { .click(at: $0, holding: "⇧") }
         default:
             return nil
         }
     }
 
     /// Finds a link in the article you can see, for the ⇧-click step to click on, now and then as you scroll.
-    private func findPeekLink() {
-        guard Date().timeIntervalSince(peekLinkAsked) > 1, let webView = controller?.selectedWebView else { return }
-        peekLinkAsked = Date()
+    private func findShiftClickLink() {
+        guard Date().timeIntervalSince(shiftClickLinkAsked) > 1, let webView = controller?.selectedWebView else { return }
+        shiftClickLinkAsked = Date()
         let script = """
         (() => {
           const links = document.querySelectorAll('#mw-content-text p a[href^="/wiki/"], main p a[href], article p a[href], p a[href]');
@@ -708,13 +708,13 @@ final class GuidedTour: NSView {
         webView.runOwnScript(script) { [weak self, weak webView] answer in
             let result = try? answer.get()
             MainActor.assumeIsolated {
-                guard let self, let webView, let point = result as? [Double], point.count == 2 else { self?.peekLink = nil; return }
+                guard let self, let webView, let point = result as? [Double], point.count == 2 else { self?.shiftClickLink = nil; return }
                 let zoom = webView.pageZoom * webView.magnification
                 let inPage = NSPoint(x: point[0] * zoom, y: point[1] * zoom)
                 let flipped = webView.isFlipped ? inPage : NSPoint(x: inPage.x, y: webView.bounds.height - inPage.y)
                 let spot = webView.convert(flipped, to: self)
-                guard spot != self.peekLink else { return }
-                self.peekLink = spot
+                guard spot != self.shiftClickLink else { return }
+                self.shiftClickLink = spot
                 self.needsLayout = true
             }
         }
