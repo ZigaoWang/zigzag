@@ -979,7 +979,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func layoutRenameField() {
         guard let field = renameField else { return }
         let height = ceil(field.intrinsicContentSize.height)
-        let y = (bounds.height - height) / 2
+        // On the title's line, so the name doesn't move as editing starts.
+        let y = title.frame.midY - height / 2
         guard isSplit else {
             let x = title.frame.minX
             field.frame = NSRect(x: x, y: y, width: max(0, bounds.width - x - Self.inset), height: height)
@@ -1392,7 +1393,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
         if let field = renameField {
             let height = ceil(field.intrinsicContentSize.height)
-            field.frame = NSRect(x: title.frame.minX, y: (bounds.height - height) / 2, width: max(0, bounds.width - title.frame.minX - Self.inset), height: height)
+            // On the title's line, so the name doesn't move as editing starts.
+            field.frame = NSRect(x: title.frame.minX, y: title.frame.midY - height / 2, width: max(0, bounds.width - title.frame.minX - Self.inset), height: height)
         }
     }
 

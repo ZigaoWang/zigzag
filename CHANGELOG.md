@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A folder's or group's name in the sidebar takes the space's own ink, as the pinned pages and tabs under it do, instead of plain black or white.
 - Renaming a tab, folder or group in the sidebar keeps the name in the row's own ink while you type, instead of turning it plain black or white.
 - In a split view, a toast like Link copied shows below the pages' strips instead of over their buttons, as the find bar does.
+- Renaming a tab, folder or group in the sidebar keeps the name on its line instead of dropping it half a point as editing starts.
 
 ## [0.9.3] - 2026-11-18
 
