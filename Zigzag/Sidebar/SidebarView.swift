@@ -822,6 +822,10 @@ final class SidebarView: NSView {
     private let dotStrip = DotStrip()
     /// Now Playing cards top to bottom, one per background tab playing (`NowPlayingChoice`), including fading ones.
     private(set) var nowPlayingCards: [NowPlayingView] = []
+    /// Open Minis that aren't in front, above Now Playing (#304). Their own heading keeps them apart from tabs.
+    private let miniHeading = Label(String(localized: "Mini windows", comment: "Heading in the sidebar above the open Zigzag Mini windows that aren't in front."),
+                                    font: Tokens.Font.small(), color: Tokens.Color.textTertiary)
+    private var miniRows: [MiniWindowRow] = []
     /// Card title, play button or Play, and close or Hide; with the card's tab.
     var onNowPlayingShow: ((Tab) -> Void)?
     var onNowPlayingToggle: ((Tab) -> Void)?
@@ -882,6 +886,8 @@ final class SidebarView: NSView {
         didSet {
             newSpaceButton.isHidden = isPrivate
             dots.forEach { $0.isHidden = isPrivate }
+            // A private window keeps to itself; it doesn't name the Minis open elsewhere.
+            refreshMiniWindows()
         }
     }
     /// Hairline under the space name while the list is scrolled, like a Mac scroll edge.
@@ -966,6 +972,15 @@ final class SidebarView: NSView {
         bottomBar.addSubview(downloadsButton)
         bottomBar.addSubview(newSpaceButton)
         addSubview(bottomBar)
+        miniHeading.isHidden = true
+        addSubview(miniHeading)
+        NotificationCenter.default.addObserver(self, selector: #selector(miniWindowChanged(_:)),
+                                               name: MiniWindowController.windowsChanged, object: nil)
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                     NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(miniWindowChanged(_:)), name: name, object: nil)
+        }
+        refreshMiniWindows()
         downloadsButton.onClick = { [weak self] _ in
             guard let self else { return }
             self.delegate?.sidebarShowDownloads(from: self.downloadsButton)
@@ -1122,6 +1137,8 @@ final class SidebarView: NSView {
             : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         let frames = bottomFrames()
         for (card, frame) in zip(nowPlayingCards, frames.nowPlaying) { card.frame = frame }
+        miniHeading.frame = frames.miniHeading
+        for (row, frame) in zip(miniRows, frames.minis) { row.frame = frame }
         updateCard.frame = frames.update
         let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
@@ -1441,8 +1458,9 @@ final class SidebarView: NSView {
     var newSpaceAnchor: NSView { newSpaceButton }
     var onEditSpace: ((UUID) -> Void)?
 
-    /// Bottom stack: the update card right above the dots, then Now Playing cards above it, newest nearest the dots.
-    private func bottomFrames() -> (nowPlaying: [NSRect], update: NSRect, listBottom: CGFloat) {
+    /// Bottom stack: the update card right above the dots, then Now Playing cards above it, newest nearest the dots,
+    /// then the open Minis that aren't in front under their heading.
+    private func bottomFrames() -> (nowPlaying: [NSRect], update: NSRect, minis: [NSRect], miniHeading: NSRect, listBottom: CGFloat) {
         let pad = Tokens.Sidebar.edge
         var bottom = bottomBar.frame.minY
         let updateHeight = UpdateCard.height(for: updateCard.state)
@@ -1455,7 +1473,49 @@ final class SidebarView: NSView {
             playing.insert(card, at: 0)
             bottom = card.minY - Tokens.Space.x1
         }
-        return (playing, update, bottom)
+        var minis: [NSRect] = []
+        var heading = NSRect.zero
+        if !miniRows.isEmpty {
+            var cursor = bottom
+            for _ in miniRows {
+                cursor -= MiniWindowRow.height
+                minis.append(NSRect(x: pad, y: cursor, width: bounds.width - pad * 2, height: MiniWindowRow.height))
+                cursor -= Tokens.Space.x1
+            }
+            // Built upward, so the rows' order on screen is the order they were added in.
+            minis.reverse()
+            heading = NSRect(x: pad, y: cursor - MiniWindowRow.headingHeight,
+                             width: bounds.width - pad * 2, height: MiniWindowRow.headingHeight)
+            bottom = heading.minY - Tokens.Space.x1
+        }
+        return (playing, update, minis, heading, bottom)
+    }
+
+    /// A Mini opened, closed, came forward, went back or was minimized: the rows follow.
+    @objc private func miniWindowChanged(_ note: Notification) {
+        if note.name == MiniWindowController.windowsChanged { refreshMiniWindows(); return }
+        guard let window = note.object as? NSWindow,
+              MiniWindowController.all.contains(where: { $0.window === window }) else { return }
+        refreshMiniWindows()
+    }
+
+    /// The Minis that aren't in front, in the order they opened; a row goes when its window comes forward or closes.
+    private func refreshMiniWindows() {
+        let shown = isPrivate ? [] : MiniWindowController.all.filter { mini in
+            guard let window = mini.window, window.isVisible || window.isMiniaturized else { return false }
+            return !window.isKeyWindow
+        }
+        let old = miniRows
+        miniRows = shown.map { mini in
+            if let row = old.first(where: { $0.mini === mini }) { row.refresh(); return row }
+            let row = MiniWindowRow(mini: mini)
+            row.onClick = { [weak mini] _ in mini?.bringForward() }
+            addSubview(row)
+            return row
+        }
+        for row in old where !miniRows.contains(where: { $0 === row }) { row.removeFromSuperview() }
+        miniHeading.isHidden = miniRows.isEmpty
+        needsLayout = true
     }
 
     /// Shows the update card or hides it (nil); `hiding`: closed by you, so it animates out like a Now Playing card.
@@ -2522,5 +2582,61 @@ enum SpaceReorder {
     static func destination(slot: Int, from: Int) -> Int? {
         let to = slot > from ? slot - 1 : slot
         return to == from ? nil : to
+    }
+}
+
+/// A Mini window that isn't in front: its page's name on a row with a window's own edge, apart from the tabs (#304).
+final class MiniWindowRow: InteractiveView {
+    static let height: CGFloat = 30
+    static let headingHeight: CGFloat = 16
+    let mini: MiniWindowController
+    private let icon = NSImageView()
+    private let title = Label("", font: Tokens.Font.control(), color: Tokens.Color.textSecondary)
+
+    init(mini: MiniWindowController) {
+        self.mini = mini
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 6
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1
+        layer?.borderColor = Tokens.Color.separator.cgColor
+        icon.image = Tokens.Symbol.image("macwindow", size: Tokens.Symbol.inline)
+        icon.imageScaling = .scaleNone
+        icon.contentTintColor = Tokens.Color.textTertiary
+        title.lineBreakMode = .byTruncatingTail
+        addSubview(icon)
+        addSubview(title)
+        setAccessibilityRole(.button)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func refresh() {
+        let name = mini.tab.title.isEmpty ? (mini.tab.url?.host ?? MiniWindowController.name) : mini.tab.title
+        title.stringValue = name
+        toolTip = name
+        setAccessibilityLabel(name)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        layer?.borderColor = Tokens.Color.separator.cgColor
+        stateDidChange(animated: false)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        super.stateDidChange(animated: animated)
+        layer?.backgroundColor = (isHovered || isPressed ? Tokens.Color.hoverFill : NSColor.clear).cgColor
+    }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Symbol.inline
+        icon.frame = NSRect(x: 8, y: (bounds.height - side) / 2, width: side, height: side)
+        let x = icon.frame.maxX + 7
+        title.frame = NSRect(x: x, y: (bounds.height - title.lineHeight) / 2,
+                             width: max(0, bounds.width - x - 8), height: title.lineHeight)
     }
 }

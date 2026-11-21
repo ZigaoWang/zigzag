@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Zigzag Mini windows that aren't in front show in the sidebar under Mini windows, with their page's name; clicking one brings it forward, and it leaves the list. Private windows don't show them. ([#304](https://github.com/ZigaoWang/zigzag/issues/304))
+
 ### Fixed
 - Change Icon's face in the sidebar's menus and Site Controls stays an outline in dark mode, like the icons beside it. macOS draws that face filled in dark mode, so it stood out as a solid gray disc.
 - A right-click menu near the bottom of the window slides up only as far as it needs to, as macOS's menus do, instead of opening wholly above the pointer. Its first items stay right by the pointer, so Separate Split View or Reload Page is a short move away wherever you click.

@@ -1238,6 +1238,17 @@
         }
       }
     },
+    "Mini windows" : {
+      "comment" : "Heading in the sidebar above the open Zigzag Mini windows that aren't in front.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mini 窗口"
+          }
+        }
+      }
+    },
     "On battery, Clear shows as Frosted to save power." : {
       "comment" : "Under Glass in the space editor, while the Mac runs on its battery: clear glass shows as frosted until it's plugged in.",
       "localizations" : {

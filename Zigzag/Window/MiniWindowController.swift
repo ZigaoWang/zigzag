@@ -15,9 +15,21 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Open ones, oldest first, for placing the next one and for extensions.
-    private(set) static var all: [MiniWindowController] = []
+    private(set) static var all: [MiniWindowController] = [] {
+        didSet { NotificationCenter.default.post(name: windowsChanged, object: nil) }
+    }
+    /// Sent when a Mini opens or closes, so a sidebar can show the ones not in front (#304).
+    static let windowsChanged = Notification.Name("MiniWindowController.windowsChanged")
     /// The one you're in, if any.
     static var key: MiniWindowController? { all.first { $0.window?.isKeyWindow == true } }
+
+    /// From the sidebar's Mini windows: the window in front, over other apps, even if it was minimized.
+    func bringForward() {
+        guard let window else { return }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
 
     /// What the feature is called wherever Zigzag names it.
     static var name: String { String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.") }
