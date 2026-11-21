@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With Ask before quitting on, choosing Quit Zigzag in the menu quits right away, as in Chrome: only ⌘Q asks. Quitting while files download still asks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 - Zigzag's own pages, like Settings, History and the archive, can't be dragged into Pinned, onto a pinned folder or page, or into Favorites, as ⌘D and the star already refused them. The tab stays where it was. Pin Tab and Add to Favorites aren't offered for them in the tab's menu or the command bar either. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#472](https://github.com/ZigaoWang/zigzag/issues/472))
 - Lots of favorites no longer push the space's name over the bottom of the sidebar and hide your tabs. The favorites take at most half the sidebar's height, and past that they scroll in place, also while you drag a tab or favorite near their top or bottom edge.
+- A Zigzag Mini opened from a private window says Private at its top and Open in Private on its button, where it named a space the page wasn't going to, and the space there no longer looks like something to click.
 
 ## [0.9.4] - 2026-11-21
 
