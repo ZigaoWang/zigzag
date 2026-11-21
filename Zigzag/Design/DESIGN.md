@@ -623,6 +623,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - **Row** (`CardRow`): icon, title, quiet trailing detail; states above.
 - **A row's delete** (`RowDelete`): the compact trash, 8pt before the row's last control, shown while the row is
   pointed at or has keyboard focus, and always with VoiceOver on. Hidden, it keeps its room, so nothing moves.
+  The trash deletes a thing after asking (an extension, a profile, a download rule); a compact × always shown takes
+  one entry off a list at once (a site, a language, a remembered answer, a shortcut's keys).
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.
 - **Pill button** (`PillButton`): capsule, `.plain` on `fieldFill`, `.quiet` fill on hover only, `.prominent` in
   the accent, one per surface; `isDestructive` for what can't be undone. `PrimaryButton` and `TextButton` remain
