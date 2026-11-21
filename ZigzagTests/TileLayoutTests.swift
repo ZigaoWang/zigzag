@@ -701,6 +701,68 @@ struct TileLayoutTests {
         #expect(SplitDropHint.title(for: .replace(0)) != titles[0])
     }
 
+    // MARK: Five and six in rows (#461)
+
+    @Test func sixPagesAreThreeEvenColumnsOfTwo() {
+        let area = CGRect(x: 100, y: 50, width: 1000, height: 600)
+        let grid = TileGrid(threeAcross: true)
+        let frames = grid.frames(in: area, gap: 8)
+        #expect(frames.count == 6)
+        // Equal cells with equal gaps: 1000 - two gaps = 984, a third each.
+        #expect(frames[0] == CGRect(x: 100, y: 50, width: 328, height: 296))
+        #expect(frames[1] == CGRect(x: 436, y: 50, width: 328, height: 296))
+        #expect(frames[2] == CGRect(x: 772, y: 50, width: 328, height: 296))
+        #expect(frames[3] == CGRect(x: 100, y: 354, width: 328, height: 296))
+        for i in 0..<6 { for j in (i + 1)..<6 { #expect(!frames[i].intersects(frames[j])) } }
+        #expect(frames.map(\.minX).min() == area.minX && frames.map(\.maxX).max() == area.maxX)
+        #expect(frames.map(\.minY).min() == area.minY && frames.map(\.maxY).max() == area.maxY)
+    }
+
+    @Test func fivePagesFillThreeOverTwo() {
+        let area = CGRect(x: 0, y: 0, width: 1000, height: 600)
+        let grid = TileGrid(threeAcross: true, pages: 5)
+        #expect(grid.rows.map(\.count) == [3, 2])
+        let frames = grid.frames(in: area, gap: 0)
+        #expect(frames.count == 5)
+        // The bottom row's two pages split the width, so no cell is left blank.
+        #expect(frames[3] == CGRect(x: 0, y: 300, width: 500, height: 300))
+        #expect(frames[4] == CGRect(x: 500, y: 300, width: 500, height: 300))
+        for i in 0..<5 { for j in (i + 1)..<5 { #expect(!frames[i].intersects(frames[j])) } }
+        #expect(frames.map(\.minX).min() == area.minX && frames.map(\.maxX).max() == area.maxX)
+    }
+
+    @Test func sixDownAreTwoColumnsOfThree() {
+        let area = CGRect(x: 0, y: 0, width: 900, height: 900)
+        let grid = TileGrid(threeAcross: false)
+        let frames = grid.frames(in: area, gap: 0)
+        #expect(frames.count == 6 && grid.rows.map(\.count) == [2, 2, 2])
+        // Reading order: across, then down, as a tile group's row has always ordered its pages.
+        #expect(frames[0] == CGRect(x: 0, y: 0, width: 450, height: 300))
+        #expect(frames[1] == CGRect(x: 450, y: 0, width: 450, height: 300))
+        #expect(frames[2] == CGRect(x: 0, y: 300, width: 450, height: 300))
+        #expect(frames[4] == CGRect(x: 0, y: 600, width: 450, height: 300))
+    }
+
+    @Test func aRowLineMovesAndKeepsEveryPaneUsable() {
+        var grid = TileGrid(threeAcross: true)
+        grid.setRowShare(0, to: 0.3, length: 600, minimum: 100)
+        #expect(abs(grid.rowShares[0] - 0.3) < 1e-9)
+        grid.setRowShare(0, to: 0.95, length: 600, minimum: 100)
+        #expect(grid.rowShares[0] < 0.95)
+        grid.evenOut()
+        #expect(grid.isEven)
+    }
+
+    @Test func aPointKnowsItsPage() {
+        let area = CGRect(x: 0, y: 0, width: 600, height: 400)
+        let grid = TileGrid(threeAcross: true)
+        #expect(grid.page(at: CGPoint(x: 10, y: 10), in: area, gap: 0) == 0)
+        #expect(grid.page(at: CGPoint(x: 250, y: 10), in: area, gap: 0) == 1)
+        #expect(grid.page(at: CGPoint(x: 590, y: 10), in: area, gap: 0) == 2)
+        #expect(grid.page(at: CGPoint(x: 10, y: 390), in: area, gap: 0) == 3)
+        #expect(grid.page(at: CGPoint(x: 610, y: 10), in: area, gap: 0) == nil)
+    }
+
     @MainActor @Test func aGroupsStripHasNoSwapOrLayout() {
         // Two buttons fewer (Zoom Pane stays), so the address fits whole sooner than beside them.
         #expect(PaneHeaderView.fit(width: 335, edge: 2, address: 180, splitButtons: false) == .all)

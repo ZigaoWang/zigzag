@@ -509,6 +509,9 @@ nonisolated struct TileDrop: Equatable, Sendable {
         case place(region: TileRegion, regions: [TileRegion])
         /// The new page takes the place of the group's page at this index, which goes back to being a tab of its own.
         case replace(Int)
+        /// The group grows into a grid of rows with the new page among them (#461): a 2×2 dropped on the middle of its
+        /// top or bottom edge becomes three across, on the middle of its side edges three down.
+        case grid(TileGrid)
     }
     var kind: Kind
     /// Where the hint shows: the new page's frame once it's in.
@@ -517,6 +520,15 @@ nonisolated struct TileDrop: Equatable, Sendable {
     /// How far in from the area's edges a drop means a half or a quarter of the whole area.
     static func edge(for area: CGRect) -> CGFloat {
         min(max(min(area.width, area.height) * 0.16, 40), 120)
+    }
+
+    /// The drop at `point` in a grid of five or six (#461): the page under the pointer takes the tab's place, and goes
+    /// back to being a tab of its own. The hint is that page's cell, exactly where it sits.
+    static func target(at point: CGPoint, in area: CGRect, grid: TileGrid, gap: CGFloat) -> TileDrop? {
+        guard let page = grid.page(at: point, in: area, gap: gap) else { return nil }
+        let frames = grid.frames(in: area, gap: gap)
+        guard frames.indices.contains(page) else { return nil }
+        return TileDrop(kind: .replace(page), frame: frames[page])
     }
 
     /// The drop at `point` (in the area's top-down coordinates). `shape` is the group on screen, nil for a page alone.
@@ -555,6 +567,20 @@ nonisolated struct TileDrop: Equatable, Sendable {
         default: nil
         }
         if let corner, let drop = place(corner) { return drop }
+        // The middle of a 2×2's edge grows it into rows of three: across from its top or bottom edge, down from its
+        // sides (#461). Every page moves to fill, and the new one lands at the end of the grid.
+        if shape.regions.count == 4 {
+            let middle = point.x > area.minX + edge && point.x < area.maxX - edge
+                && point.y > area.minY + edge && point.y < area.maxY - edge
+            let acrossEdge = (nearTop || nearBottom) && middle
+            let downEdge = (nearLeft || nearRight) && middle
+            if acrossEdge || downEdge {
+                let grid = TileGrid(threeAcross: acrossEdge, pages: 5)
+                if let frame = grid.frames(in: area, gap: gap).last {
+                    return TileDrop(kind: .grid(grid), frame: frame)
+                }
+            }
+        }
         let half: TileRegion? = nearLeft ? .left : nearRight ? .right : nearTop ? .top : nearBottom ? .bottom : nil
         if corner == nil, let half, let drop = place(half) { return drop }
         // Over a page: it splits, and the new one takes the half of it under the pointer; a quarter can't split, so
@@ -642,12 +668,29 @@ extension TabManager.SplitPair {
         setShape(placed)
     }
 
+    /// A group of `ids` in `grid`, six pages in reading order (#461). Nil unless it is six pages.
+    init?(ids: [UUID], grid: TileGrid) {
+        guard (5...TileGrid.maxPanes).contains(ids.count), grid.count == ids.count, Set(ids).count == ids.count else { return nil }
+        self.init(left: ids[0], right: ids[1])
+        more = Array(ids.dropFirst(2))
+        self.grid = grid
+    }
+
     /// Its pages, in order.
     var ids: [UUID] { [left, right] + more }
     var count: Int { 2 + more.count }
     func contains(_ id: UUID) -> Bool { left == id || right == id || more.contains(id) }
     /// Three or four pages, not a split of two.
     var isGroup: Bool { !more.isEmpty }
+
+    /// Six pages in their grid, nil for two to four.
+    var gridShape: TileGrid? { grid }
+
+    /// Takes the grid's lines, the pages kept.
+    mutating func setLines(of grid: TileGrid) {
+        guard self.grid != nil else { return }
+        self.grid = grid
+    }
 
     /// How its pages share the page area.
     var shape: TileShape {
@@ -664,8 +707,10 @@ extension TabManager.SplitPair {
             : TileShape(regions: [.left, .right], column: CGFloat(ratio), row: CGFloat(otherRatio))
     }
 
-    /// Takes `shape`'s lines, and its places for the pages in order.
+    /// Takes `shape`'s lines, and its places for the pages in order. A six-page group keeps its grid: a shape is not
+    /// how it is laid out.
     private mutating func setShape(_ shape: TileShape) {
+        guard grid == nil else { return }
         if shape.regions.count == 2 {
             vertical = shape.isStacked
             ratio = Double(vertical ? shape.row : shape.column)
@@ -705,7 +750,21 @@ extension TabManager.SplitPair {
     /// Without page `id`: the rest of the group, its room taken by the others; nil when one page would be left,
     /// which is no group.
     func removing(_ id: UUID) -> Self? {
-        guard let index = ids.firstIndex(of: id), let regions = TileShape.removing(index, from: shape.regions) else { return nil }
+        guard let index = ids.firstIndex(of: id) else { return nil }
+        if let grid {
+            var rest = ids
+            rest.remove(at: index)
+            guard rest.count >= 2 else { return nil }
+            if rest.count >= 5 { return Self(ids: rest, grid: TileGrid(threeAcross: grid.isThreeAcross, pages: rest.count)) }
+            // Back under five, the group is one of `TileShape`'s shapes again.
+            let regions: [TileRegion] = switch rest.count {
+            case 2: [.left, .right]
+            case 3: [.left, .topRight, .bottomRight]
+            default: [.topLeft, .topRight, .bottomLeft, .bottomRight]
+            }
+            return Self(ids: rest, shape: TileShape(regions: regions))
+        }
+        guard let regions = TileShape.removing(index, from: shape.regions) else { return nil }
         var rest = ids
         rest.remove(at: index)
         var after = shape
@@ -736,6 +795,9 @@ extension TabManager.SplitPair {
             var after = self
             after.replace(ids[index], with: new)
             return after
+        case .grid(let grid):
+            guard count == 4, grid.count == 5 else { return nil }
+            return Self(ids: ids + [new], grid: grid)
         }
     }
 
@@ -796,5 +858,124 @@ nonisolated struct PaneZoom: Equatable, Sendable {
             return nil
         }
         return index
+    }
+}
+
+/// A tile group of five or six in rows (#461): three across and two down, or two across and three down, as the window
+/// or monitor is turned. Each row splits its pages evenly, so five pages fill the area too — three over two — and a
+/// drop never leaves a blank cell.
+///
+/// Kept apart from `TileShape` deliberately: two, three and four pages keep the shapes they have always had, saved
+/// exactly as they were. A cell is a third or a half of a row, so the lines are the same hot edges `TileShape`
+/// already has, one or two more of them, and past six the panes are too narrow to watch (#461).
+nonisolated struct TileGrid: Codable, Equatable, Sendable {
+    /// The pages in each row, in reading order: `rows.first` is the top row.
+    var rows: [[Int]]
+    /// The share of the height above each line between the rows: `rows.count - 1` of them.
+    var rowShares: [CGFloat]
+
+    /// The most pages a group takes.
+    static let maxPanes = 6
+
+    /// Three rows of two, or two rows of three: `threeAcross` for a wide window, else for a tall one.
+    init(threeAcross: Bool, pages: Int = 6) {
+        let across = threeAcross ? 3 : 2
+        let down = threeAcross ? 2 : 3
+        var remaining = pages, next = 0
+        rows = (0..<down).map { row in
+            // Six fills every row; five leaves the last row with two (or one) and the others whole.
+            let count = min(across, remaining)
+            defer { remaining -= count }
+            let pages = (next..<(next + count)).map { $0 }
+            next += count
+            return pages
+        }
+        rowShares = (1..<max(down, 1)).map { CGFloat($0) / CGFloat(down) }
+        normalize()
+    }
+
+    var count: Int { rows.reduce(0) { $0 + $1.count } }
+    var isThreeAcross: Bool { rows.map(\.count).max() == 3 }
+
+    /// Each page's frame in `area`, in reading order, `gap` apart: a row splits its pages evenly, all `gap` apart.
+    func frames(in area: CGRect, gap: CGFloat) -> [CGRect] {
+        let yLines = Self.lines(shares: rowShares, from: area.minY,
+                                length: max(0, area.height - gap * CGFloat(rows.count - 1)), gap: gap)
+        func span(_ index: Int, _ lines: [CGFloat], _ start: CGFloat, _ end: CGFloat) -> (CGFloat, CGFloat) {
+            (index == 0 ? start : lines[index - 1] + gap, index == lines.count ? end : lines[index])
+        }
+        var frames: [CGRect] = []
+        for (rowIndex, pages) in rows.enumerated() {
+            let (minY, maxY) = span(rowIndex, yLines, area.minY, area.maxY)
+            let width = max(0, area.width - gap * CGFloat(pages.count - 1)) / CGFloat(max(pages.count, 1))
+            for (i, _) in pages.enumerated() {
+                let x = area.minX + floor(CGFloat(i) * (width + gap))
+                frames.append(CGRect(x: x, y: minY, width: floor(width), height: max(0, maxY - minY)))
+            }
+        }
+        return frames
+    }
+
+    private static func lines(shares: [CGFloat], from start: CGFloat, length: CGFloat, gap: CGFloat) -> [CGFloat] {
+        shares.enumerated().map { index, share in start + floor(length * share) + gap * CGFloat(index) }
+    }
+
+    /// The strips between rows you drag to resize them, `slop` wider on both sides. A row's own line between its pages
+    /// goes with the row: dragging it moves that line alone.
+    func segments(in area: CGRect, gap: CGFloat, slop: CGFloat) -> [(axis: TileShape.Segment.Axis, row: Int, page: Int, frame: CGRect)] {
+        let yLines = Self.lines(shares: rowShares, from: area.minY,
+                                length: max(0, area.height - gap * CGFloat(rows.count - 1)), gap: gap)
+        var strips: [(axis: TileShape.Segment.Axis, row: Int, page: Int, frame: CGRect)] = []
+        for index in 0..<yLines.count {
+            strips.append((.row, index, 0, CGRect(x: area.minX, y: yLines[index] - gap - slop,
+                                                  width: area.width, height: gap + slop * 2)))
+        }
+        // Between the pages of each row, where there are two or more.
+        let frames = self.frames(in: area, gap: gap)
+        var start = 0
+        for (rowIndex, pages) in rows.enumerated() {
+            for i in 0..<max(pages.count - 1, 0) {
+                let left = frames[start + i], right = frames[start + i + 1]
+                strips.append((.column, rowIndex, i, CGRect(x: left.maxX, y: left.minY,
+                                                            width: gap + slop * 2, height: left.height)))
+            }
+            start += pages.count
+        }
+        return strips
+    }
+
+    /// Moves the line between the rows to `share` of the height.
+    mutating func setRowShare(_ index: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat) {
+        guard rowShares.indices.contains(index) else { return }
+        let least = max(0.08, minimum / max(length, 1))
+        let lower = (index == 0 ? 0 : rowShares[index - 1]) + least
+        let upper = (index == rowShares.count - 1 ? 1 : rowShares[index + 1]) - least
+        rowShares[index] = lower <= upper ? min(max(share, lower), upper) : (lower + upper) / 2
+    }
+
+    /// Every line in the middle again.
+    mutating func evenOut() {
+        rowShares = (1..<max(rows.count, 1)).map { CGFloat($0) / CGFloat(rows.count) }
+    }
+
+    var isEven: Bool { rowShares == (1..<max(rows.count, 1)).map { CGFloat($0) / CGFloat(rows.count) } }
+
+    /// The shares kept to their count and in order.
+    mutating func normalize() {
+        if rowShares.count != max(0, rows.count - 1) {
+            rowShares = (1..<max(rows.count, 1)).map { CGFloat($0) / CGFloat(rows.count) }
+        }
+        var result: [CGFloat] = []
+        for share in rowShares {
+            let least = (result.last ?? 0) + 0.08
+            result.append(min(max(share, least), 0.92))
+        }
+        rowShares = result
+    }
+
+    /// The page at a point, in reading order.
+    func page(at point: CGPoint, in area: CGRect, gap: CGFloat) -> Int? {
+        guard area.contains(point) else { return nil }
+        return frames(in: area, gap: gap).firstIndex { $0.insetBy(dx: -gap, dy: -gap).contains(point) }
     }
 }

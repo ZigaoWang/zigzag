@@ -7,14 +7,14 @@ import AppKit
 final class PagePicture {
     /// What goes on screen. Its owner places it and sizes it with `layout(size:)`.
     let layer = CALayer()
-    private let panes = (0..<TileShape.maxPanes).map { _ in CALayer() }
-    private let images = (0..<TileShape.maxPanes).map { _ in CALayer() }
+    private let panes = (0..<TileGrid.maxPanes).map { _ in CALayer() }
+    private let images = (0..<TileGrid.maxPanes).map { _ in CALayer() }
     /// The hairlines between the pages: one per stretch of the line between the columns, and one per stretch of the
     /// line between the rows (#316), so a group whose rows have lines of their own draws each where it is.
     private let dividers = (0..<4).map { _ in CALayer() }
     private var shape: TileShape?
     /// Each page's picture's size, in points.
-    private var sizes: [CGSize?] = Array(repeating: nil, count: TileShape.maxPanes)
+    private var sizes: [CGSize?] = Array(repeating: nil, count: TileGrid.maxPanes)
     /// Shows the copies `ReadyPictures` made of the pictures for this size, where there are any, rather than the
     /// pictures themselves, which Core Animation would decode on the main thread as it first draws them.
     var readyCopies: ReadyPictures.Size?

@@ -1137,7 +1137,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.zoomedTabID = paneZoom.tabID
         }
         if let tab, let pair, pages.count == pair.count {
-            root.setTiles(pair.shape, animated: true)
+            root.setTiles(pair.grid == nil ? pair.shape : nil, grid: pair.grid, animated: true)
             root.setZoomedPane(zoomed, animated: true)
             root.isEmpty = false
             let first = pages[0]
@@ -1355,7 +1355,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// The page you're working in: the whole page area, or in split view the focused pane.
     var focusedPaneFrame: NSRect {
-        guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.tiles != nil,
+        guard let tab = tabManager.selectedTab, let pair = tabManager.split(for: tab), root.paneCount > 1,
               let index = pair.ids.firstIndex(of: tab.id) else { return root.cardFrame }
         let frames = root.tileFrames
         return frames.indices.contains(index) ? frames[index] : frames[0]
@@ -2450,10 +2450,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A mouse's side buttons go back and forward (`BrowserWindow.SideButton`). In a split, the page under the
         // pointer is the one that goes, made the one you're in first as a click would, not whichever pane you were
         // last in (#170).
-        if BrowserWindow.SideButton(event.type, button: event.buttonNumber) == .press, root.tiles != nil {
+        if BrowserWindow.SideButton(event.type, button: event.buttonNumber) == .press, root.paneCount > 1 {
             focusPane(at: event.locationInWindow)
         }
-        if event.type == .leftMouseDown, root.tiles != nil { focusPane(at: event.locationInWindow) }
+        if event.type == .leftMouseDown, root.paneCount > 1 { focusPane(at: event.locationInWindow) }
         // A click anywhere else finishes a name being typed into a sidebar row, as in Finder: rows don't take focus,
         // so without this the name stays open through drags and ⌘Z keeps going to it.
         if event.type == .leftMouseDown, let editor = window?.firstResponder as? NSTextView, editor.isFieldEditor,
@@ -3287,7 +3287,9 @@ extension BrowserWindowController: SidebarDelegate {
     /// that half or quarter, with a tick as it moves to another.
     func showDropHint(at windowPoint: NSPoint, beside current: Tab) {
         root.splitDropHint.follow(windowPoint)
-        let drop = root.splitDropHint.drop(at: windowPoint, shape: tabManager.split(for: current)?.shape, gap: root.paneGap)
+        let pair = tabManager.split(for: current)
+        let drop = root.splitDropHint.drop(at: windowPoint, shape: pair?.grid == nil ? pair?.shape : nil,
+                                           grid: pair?.grid, gap: root.paneGap)
         if let drop, drop.kind != root.splitDropHint.drop?.kind { Haptics.snap() }
         root.splitDropHint.show(drop)
     }

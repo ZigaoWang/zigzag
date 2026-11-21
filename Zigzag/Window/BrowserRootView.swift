@@ -368,10 +368,13 @@ final class BrowserRootView: SpaceFrameView {
     /// A tile group's third and fourth pages (#160).
     let thirdCard = PageCardView()
     let fourthCard = PageCardView()
+    /// A grid of six's fifth and sixth pages (#461).
+    let fifthCard = PageCardView()
+    let sixthCard = PageCardView()
     /// Every pane's card, in the group's order: the first is `card`.
-    var paneCards: [PageCardView] { [card, secondCard, thirdCard, fourthCard] }
+    var paneCards: [PageCardView] { [card, secondCard, thirdCard, fourthCard, fifthCard, sixthCard] }
     /// The cards beside the first, there only in split view.
-    private var extraCards: [PageCardView] { [secondCard, thirdCard, fourthCard] }
+    private var extraCards: [PageCardView] { [secondCard, thirdCard, fourthCard, fifthCard, sixthCard] }
     /// The strips between panes you drag to resize them (#316): one per segment of the line between the columns or
     /// between the rows, keyed by the panes they divide, and the squares where a line each way meet (#309).
     private var dividerHandles: [DividerKey: ResizeHandle] = [:]
@@ -408,6 +411,10 @@ final class BrowserRootView: SpaceFrameView {
     }
     /// How the panes share the page area, a split's two or a tile group's three or four; nil with one page.
     private(set) var tiles: TileShape? { didSet { if tiles != oldValue { needsLayout = true } } }
+    /// Five or six pages in rows (#461); nil for two to four, which `tiles` lays out.
+    private(set) var tileGrid: TileGrid? { didSet { if tileGrid != oldValue { needsLayout = true } } }
+    /// How many panes are on screen: the grid's pages, the shape's places, or one page.
+    var paneCount: Int { tileGrid?.count ?? tiles?.regions.count ?? 1 }
     /// Share of the page area the left (or top) pane takes; nil when not split. Set alone, it makes a split of two.
     var splitRatio: CGFloat? {
         get { tiles.map { $0.isStacked ? $0.row : $0.column } }
@@ -429,11 +436,12 @@ final class BrowserRootView: SpaceFrameView {
 
     /// Lays the panes out as `shape` (nil: one page). Panes that stay slide to their new places, new ones fade in
     /// beside, and ones that go stay where they are and fade while the rest grow over their place.
-    func setTiles(_ shape: TileShape?, animated: Bool) {
-        guard shape != tiles else { return }
-        let before = tiles?.regions.count ?? 1, after = shape?.regions.count ?? 1
+    func setTiles(_ shape: TileShape?, grid: TileGrid? = nil, animated: Bool) {
+        guard shape != tiles || grid != tileGrid else { return }
+        let before = paneCount, after = grid?.count ?? shape?.regions.count ?? 1
         let old = paneCards.map(\.frame)
         tiles = shape
+        tileGrid = grid
         // Like the sidebar, a split moves the window's layout: it animates from the keyboard too.
         guard animated, !Tokens.Motion.reduceMotion, window != nil else { needsLayout = true; return }
         placeStrips(animated: true)
@@ -867,6 +875,7 @@ final class BrowserRootView: SpaceFrameView {
 
     /// Every pane's frame inside the page area, in the group's order; the whole of it with one page.
     var tileFrames: [NSRect] {
+        if let tileGrid { return tileGrid.frames(in: cardFrame, gap: paneGap) }
         guard let tiles else { return [cardFrame] }
         return tiles.frames(in: cardFrame, gap: paneGap)
     }
@@ -975,7 +984,7 @@ final class BrowserRootView: SpaceFrameView {
         }
         placeDividers()
         splitDropHint.frame = cardFrame
-        if let zoomed = zoomedPane, tiles != nil, paneCards.indices.contains(zoomed) {
+        if let zoomed = zoomedPane, paneCount > 1, paneCards.indices.contains(zoomed) {
             paneCards[zoomed].band = 0
             paneCards[zoomed].frame = zoomFrame
             zoomScrim.frame = cardFrame
@@ -2076,6 +2085,11 @@ final class SplitDropHint: NSView {
 
     /// What the hint says over where the page would open.
     static func title(for kind: TileDrop.Kind) -> String {
+        if case .grid(let grid) = kind {
+            return grid.isThreeAcross
+                ? String(localized: "Three Across", comment: "Shown over the page while a tab is dragged to the middle of a group of four's top or bottom edge: the group becomes three pages across.")
+                : String(localized: "Three Down", comment: "Shown over the page while a tab is dragged to the middle of a group of four's side edge: the group becomes three pages down.")
+        }
         guard case .place(let region, _) = kind else {
             return String(localized: "Open Here", comment: "Shown over a page of a split view while a tab is dragged there: the tab opens in that page's place, and the page goes back to being a tab of its own.")
         }
@@ -2093,8 +2107,9 @@ final class SplitDropHint: NSView {
 
     /// Where a drop at a window point would go beside the panes on screen (`shape`, nil for a page alone, `gap`
     /// apart), or nil if it isn't over the page.
-    func drop(at windowPoint: NSPoint, shape: TileShape?, gap: CGFloat) -> TileDrop? {
+    func drop(at windowPoint: NSPoint, shape: TileShape?, grid: TileGrid? = nil, gap: CGFloat) -> TileDrop? {
         let p = convert(windowPoint, from: nil)
+        if let grid { return TileDrop.target(at: p, in: bounds, grid: grid, gap: gap) }
         // Beside a page alone, the halves meet in the middle, as they always did.
         return TileDrop.target(at: p, in: bounds, shape: shape, gap: shape == nil ? 0 : gap)
     }
