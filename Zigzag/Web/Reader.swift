@@ -664,7 +664,7 @@ final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
     var onOpenLink: ((URL) -> Void)?
-    /// Shift-click: a look at the link in Peek, over the article. ⌘-click: a tab in the background.
+    /// Shift-click: the link in Zigzag Mini, over the article. ⌘-click: a tab in the background.
     var onPeekLink: ((URL) -> Void)?
     var onBackgroundLink: ((URL) -> Void)?
     var onForegroundLink: ((URL) -> Void)?
