@@ -1531,9 +1531,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         menu.addItem(SidebarMenus.Item(String(localized: "Manage Extensions…", comment: "Item at the bottom of the extensions menu: opens Settings › Extensions."), symbol: "puzzlepiece.extension") { [weak self] in
             if let self { SettingsPage.open(.extensions, in: self) }
         })
-        menu.addItem(SidebarMenus.Item(String(localized: "Get Extensions…", comment: "Item at the bottom of the extensions menu: opens the Chrome Web Store."), symbol: "bag") { [weak self] in
-            self?.tabManager.newTab(url: ExtensionStore.webStoreURL)
+        let get = SidebarMenus.Submenu(String(localized: "Get Extensions", comment: "Item at the bottom of the extensions menu: a submenu of the Chrome Web Store and Firefox Add-ons."),
+                                       ExtensionStore.Shop.allCases.map { shop in
+            SidebarMenus.Item(shop.title) { [weak self] in self?.tabManager.newTab(url: shop.url) }
         })
+        get.image = Tokens.Symbol.image("bag")
+        menu.addItem(get)
         return menu
     }
 
@@ -2514,6 +2517,13 @@ extension BrowserWindowController: TabHost {
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
+        // Pin Link: WebKit named the link the menu was for; it's pinned, and nothing opens.
+        if let shiftHeld = BrowserWebView.takePendingPin(for: tab.webView) {
+            if let url = action.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                saveLinkToPins(url, title: tab.hoveredLink == url ? tab.hoveredLinkTitle ?? "" : "", shiftHeld: shiftHeld)
+            }
+            return nil
+        }
         // Site routes (#286) apply to Open Link in New Tab and clicked new-tab links. Sized windows (sign-in pop-ups)
         // and peeks are skipped.
         if let url = action.request.url, Tab.route(forPageLink: url, from: tab.url) == .load,
@@ -2640,6 +2650,8 @@ extension BrowserWindowController: SidebarDelegate {
     func listClose(_ tabs: [Tab]) { closeManyWithUndo(tabs) }
 
     func listRenameBookmark(_ id: UUID, to name: String) {
+        // Pins and favorites are shared by every window: a private one leaves their names alone.
+        guard !tabManager.isPrivate else { return }
         libraryChange(String(localized: "Rename Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Rename Pinned Tab.")) { Library.shared.updateBookmark(id, title: name) }
     }
 
@@ -2831,17 +2843,20 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {
+        guard !tabManager.isPrivate else { return }
         confirmProfileCrossing(pinned: id, to: spaceID) { [weak self] in
             self?.pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID) }
         }
     }
     /// A pinned page dropped at a place in the list, landing in a folder or out of one.
     func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {
+        guard !tabManager.isPrivate else { return }
         confirmProfileCrossing(pinned: id, to: spaceID) { [weak self] in
             self?.pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(id, to: index, in: spaceID, folder: .some(folder)) }
         }
     }
     func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?) {
+        guard !tabManager.isPrivate else { return }
         pageChange(parent == nil ? String(localized: "Move Folder", comment: "Undo action name, shown in the Edit menu as Undo Move Folder.") : String(localized: "Move into Folder", comment: "Undo action name, shown in the Edit menu as Undo Move into Folder.")) { Library.shared.moveFolder(id, to: index, in: spaceID, parent: .some(parent)) }
     }
     func listSetFolderOpen(_ id: UUID, _ open: Bool) {
@@ -2923,16 +2938,19 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
     func listRenameFolder(_ id: UUID, to name: String) {
+        guard !tabManager.isPrivate else { return }
         libraryChange(String(localized: "Rename Folder", comment: "Undo action name, shown in the Edit menu as Undo Rename Folder.")) { Library.shared.renameFolder(id, to: name) }
     }
     func listAsOne(_ name: String, _ body: @escaping () -> Void) { pageChange(name, body) }
     func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {
+        guard !tabManager.isPrivate else { return }
         pageChange(folderID == nil ? String(localized: "Remove from Folder", comment: "Undo action name, shown in the Edit menu as Undo Remove from Folder.") : String(localized: "Add to Folder", comment: "Undo action name, shown in the Edit menu as Undo Add to Folder.")) { Library.shared.setFolder(of: bookmarkID, to: folderID) }
     }
 
     /// A new folder in the current space, holding these pinned pages (or none), named right away in the sidebar.
     /// `inside`: the folder it goes in; left out, the folder its pages share, if any.
     func newFolder(with bookmarkIDs: [UUID] = [], inside: UUID? = nil) {
+        guard !tabManager.isPrivate else { return }
         var made: BookmarkFolder?
         libraryChange(String(localized: "New Folder", comment: "Undo action name, shown in the Edit menu as Undo New Folder.")) {
             made = Library.shared.addFolder(named: String(localized: "New Folder", comment: "Name a new folder of pinned tabs gets, until it's renamed."), with: bookmarkIDs, in: tabManager.currentSpaceID,
@@ -3165,6 +3183,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// The icon grid beside the sidebar, level with the folder's row; each pick shows at once and can be undone.
     func chooseFolderIcon(_ id: UUID) {
+        guard !tabManager.isPrivate else { return }
         guard let folder = Library.shared.folder(id), let row = sidebar.list.folderRow(id) else { return }
         closeFloatingPanels()
         let panel = IconPickerPanel(noneSymbol: "folder", selected: folder.icon) { [weak self] icon in

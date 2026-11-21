@@ -71,7 +71,8 @@ enum WebStoreButton {
     }
 
     /// Whether the store page may query, add or remove extensions: only the store itself in the tab's main frame, never in
-    /// a private window (no extensions run there, and answers would leak the normal profile's).
+    /// a private window (nothing is installed from there, and answers would leak the profile's extensions, even the
+    /// ones allowed in private windows, #353).
     static func answers(scheme: String, host: String, port: Int, isMainFrame: Bool, page: URL?, isPrivate: Bool) -> Bool {
         !isPrivate && isStore(scheme: scheme, host: host, port: port, isMainFrame: isMainFrame) && isStore(page)
     }

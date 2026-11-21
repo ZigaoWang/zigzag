@@ -119,6 +119,24 @@ struct SidebarMenuTests {
         #expect(MenuPanel.current == nil)
     }
 
+    @Test func aButtonsMenuOpensInwardFromTheRightHalf() throws {
+        let (_, left) = host()
+        let leftMenu = try #require(MenuPanel.show(entries { _ in }, from: left))
+        let leftFrame = leftMenu.convert(leftMenu.bounds, to: nil), leftButton = left.convert(left.bounds, to: nil)
+        leftMenu.close(animated: false)
+        #expect(abs(leftFrame.minX - leftButton.minX) < 0.5)
+
+        let (window, _) = host()
+        let right = NSView(frame: NSRect(x: 680, y: 500, width: 110, height: 28))
+        window.contentView?.addSubview(right)
+        let rightMenu = try #require(MenuPanel.show(entries { _ in }, from: right))
+        defer { rightMenu.close(animated: false) }
+        let frame = rightMenu.convert(rightMenu.bounds, to: nil), button = right.convert(right.bounds, to: nil)
+        #expect(abs(frame.maxX - button.maxX) < 0.5)
+        #expect(abs(frame.maxY - (button.minY - Tokens.Space.x1)) < 0.5)
+        #expect(frame.maxX <= 800)
+    }
+
     @Test func isAMenuOfMenuItemsForVoiceOver() throws {
         let (_, anchor) = host()
         let menu = try #require(MenuPanel.show(entries { _ in }, from: anchor, placement: .aboveTrailing))
@@ -393,6 +411,64 @@ struct SidebarRowMenuTests {
             #expect(!titles(menu).contains("Pin Tab") && !titles(menu).contains("Add to Favorites"))
             let places = try #require(menu.items.first { $0.title == "Move To" }?.submenu)
             #expect(!titles(places).contains("New Window") && !titles(places).contains("Zigzag Mini"))
+        }
+    }
+
+    /// A private window leaves your pins and favorites as they are: no Add to Favorites, Rename or Change Icon on
+    /// them, File › Add to Favorites is off, and a rename that gets through anyway writes nothing.
+    @Test func aPrivateWindowNeitherFavoritesNorRenamesYourPins() throws {
+        try inWindow(["A", "B"], isPrivate: true) { controller, _, space in
+            let pin = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/menu/pin")!, title: "Pin", to: space))
+            let favorite = Library.shared.addFavorite(url: URL(string: "https://example.com/menu/favorite")!, title: "Favorite", in: controller.tabManager.profile.id)
+            let writes = ["Add to Favorites", "Rename", "Rename…", SidebarMenus.changeIconTitle]
+            let pinned = titles(SidebarMenus.bookmarkMenu(for: pin, controller: controller))
+            #expect(!pinned.contains { writes.contains($0) }, "\(pinned)")
+            let favorites = titles(SidebarMenus.favoriteMenu(for: favorite, controller: controller))
+            #expect(!favorites.contains { writes.contains($0) }, "\(favorites)")
+
+            // On the pinned page itself, File › Add to Favorites is off and does nothing.
+            let manager = controller.tabManager
+            let tab = manager.pageTab(for: pin)
+            manager.select(tab)
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.addToFavorites(_:)), keyEquivalent: "")
+            #expect(!controller.validateMenuItem(item))
+            controller.addToFavorites(item)
+            #expect(!Library.shared.isFavorite(pin.id))
+
+            BookmarkEditor.edit(pin.id, in: controller)
+            controller.listRenameBookmark(pin.id, to: "Renamed")
+            #expect(Library.shared.bookmark(pin.id)?.title == "Pin")
+        }
+    }
+
+    /// A private window leaves your pins where they are: no filing, moving or folder edits in its menus, and a drop
+    /// or a menu action that gets through anyway changes nothing.
+    @Test func aPrivateWindowLeavesYourPinsWhereTheyAre() throws {
+        try inWindow(["A", "B"], isPrivate: true) { controller, _, space in
+            let first = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/menu/first")!, title: "First", to: space))
+            let second = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/menu/second")!, title: "Second", to: space))
+            let folder = try #require(Library.shared.addFolder(named: "Kept", with: [first.id], in: space))
+            let other = try #require(Library.shared.spaces.first { $0.id != space }?.id)
+            let before = Library.shared.snapshot
+
+            let pinned = titles(SidebarMenus.bookmarkMenu(for: first, controller: controller))
+            for title in ["Add to New Folder", "Add to Folder", "Remove from Folder", "Move to Space"] { #expect(!pinned.contains(title), "\(title)") }
+            let picked = titles(SidebarMenus.markedMenu(for: [.bookmark(first.id), .bookmark(second.id)], controller: controller))
+            #expect(!picked.contains { $0.hasPrefix("Add 2 to") || $0.hasPrefix("Unpin") }, "\(picked)")
+            let shelf = titles(SidebarMenus.folderMenu(for: folder, controller: controller))
+            for title in ["New Folder Inside", "Rename", SidebarMenus.changeIconTitle, "Remove Folder"] { #expect(!shelf.contains(title), "\(title)") }
+            #expect(shelf.contains("Open All in Tabs"))
+
+            controller.listMoveBookmark(second.id, to: 0, in: space, folder: nil)
+            controller.listMoveBookmark(second.id, to: Int.max, in: other)
+            controller.listSetFolder(of: second.id, to: folder.id)
+            controller.listMoveFolder(folder.id, to: Int.max, in: other, parent: nil)
+            controller.listRenameFolder(folder.id, to: "Renamed")
+            controller.newFolder(with: [second.id])
+            controller.fileMarked([.bookmark(second.id)], in: nil)
+            controller.unpinMarked([second.id])
+            controller.favoriteMarked([.bookmark(second.id)])
+            #expect(Library.shared.snapshot == before)
         }
     }
 }

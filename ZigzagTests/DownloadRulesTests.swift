@@ -95,7 +95,7 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.filename(for: URL(string: "https://example.com/")!, suggested: "") == "example.com")
     }
 
-    /// A script name alone resolves to the scripts folder in Documents; a path is used as given.
+    /// A script name alone resolves to Zigzag's Scripts folder in Application Support; a path is used as given.
     @Test func aRuleNamesAScriptInItsOneFolder() {
         let folder = Paths.scripts.standardizedFileURL
         #expect(folder == Paths.support.appendingPathComponent("Scripts", isDirectory: true).standardizedFileURL)

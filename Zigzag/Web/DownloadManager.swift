@@ -54,7 +54,7 @@ final class DownloadItem {
     }
 }
 
-/// Files downloaded from pages. Saved straight to ~/Downloads, no questions asked.
+/// Files downloaded from pages, saved to the Downloads folder setting unless a rule or a question says otherwise.
 final class DownloadManager: NSObject {
     static let shared = DownloadManager()
 
@@ -192,6 +192,8 @@ final class DownloadManager: NSObject {
         let storeID: String?
     }
     private var pendingExtensionInstalls: [ObjectIdentifier: PendingExtensionInstall] = [:]
+    /// Downloads a click on AMO's button started, with the file AMO's API named for them at the click.
+    private var addonsFiles: [ObjectIdentifier: ExtensionStore.PublishedAddonsFile] = [:]
 
     private static func isPrivate(_ download: WKDownload) -> Bool {
         !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)
@@ -199,8 +201,10 @@ final class DownloadManager: NSObject {
 
 @discardableResult
     func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil,
-               openedByRule: Bool = false, rulesAlreadyDeclined: Bool = false) -> DownloadItem {
+               openedByRule: Bool = false, rulesAlreadyDeclined: Bool = false,
+               addonsFile: ExtensionStore.PublishedAddonsFile? = nil) -> DownloadItem {
         let identifier = ObjectIdentifier(download)
+        if let addonsFile { addonsFiles[identifier] = addonsFile } else { addonsFiles.removeValue(forKey: identifier) }
         if openedByRule { ruleOpenedDownloads.insert(identifier) } else { ruleOpenedDownloads.remove(identifier) }
         if rulesAlreadyDeclined { ruleDeclinedDownloads.insert(identifier) } else { ruleDeclinedDownloads.remove(identifier) }
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
@@ -568,17 +572,13 @@ extension DownloadManager: WKDownloadDelegate {
             try? FileManager.default.removeItem(at: earlier)
             return earlier
         }
-        // Add to Firefox: a clicked AMO listing and an AMO file go to a temporary file and the install sheet, not
-        // the download list. Save Page As and the bridge keep their chosen file.
-        let fromAMO = download.originalRequest?.mainDocumentURL.flatMap(ExtensionStore.addonsSlug)
-            ?? (download.webView as? BrowserWebView)?.owner?.url.flatMap(ExtensionStore.addonsSlug)
-        // Only a click opens the sheet: a script on the store's own page can't.
-        let clicked = (download.webView as? BrowserWebView)?.owner?.mainFrameWasClicked == true
-        if let slug = fromAMO, clicked, chosenDestinations[identifier] == nil,
+        // Add to Firefox: the tab checked the click, its listing and the API's file when the response came (#429), so
+        // the file goes to a temporary file and the install sheet, not the download list. Save Page As and the
+        // bridge keep their chosen file.
+        if let published = addonsFiles.removeValue(forKey: identifier), chosenDestinations[identifier] == nil,
            ExtensionStore.isAddonsFile(download.originalRequest?.url),
            DownloadPolicy.isExtensionPackage(mimeType: response.mimeType, filename: name),
-           let published = await ExtensionStore.publishedAddonsFile(slug: slug),
-           // The file fetched, after redirects, must be the one the API names; anything else is a plain download.
+           // The file fetched, after redirects, must be the one the API names.
            ExtensionStore.isPublishedAddonsFile(response.url ?? download.originalRequest?.url, published: published.url) {
             let file = FileManager.default.temporaryDirectory
                 .appendingPathComponent("Zigzag-\(UUID().uuidString)-\(Self.safeFilename(name))")
@@ -796,7 +796,7 @@ extension DownloadManager: WKDownloadDelegate {
         }
     }
 
-    private static func noticeCouldNotAdd(_ message: String, in host: NSView) {
+    static func noticeCouldNotAdd(_ message: String, in host: NSView) {
         ConfirmSheet.notice(in: host,
                             title: String(localized: "Couldn’t add this extension",
                                           comment: "Title of the notice when a picked extension file can't be added."),
@@ -840,6 +840,7 @@ extension DownloadManager: WKDownloadDelegate {
         origins.removeValue(forKey: ObjectIdentifier(download))
         windows.removeValue(forKey: ObjectIdentifier(download))
         chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
+        addonsFiles.removeValue(forKey: ObjectIdentifier(download))
         guard let item = item(for: download) else { return }
         // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
         if item.state == .paused { return }

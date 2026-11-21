@@ -119,7 +119,7 @@ enum SidebarMenus {
                 controller.favoriteMarked(items)
             })
         }
-        if !isPrivate || rows.isEmpty {
+        if !isPrivate {
             organize += folderItems(new: String(localized: "Add \(count) to New Folder", comment: "Menu item for several picked sidebar rows"),
                                     add: String(localized: "Add \(count) to Folder", comment: "Menu item for several picked sidebar rows"),
                                     folders: Library.shared.folders(in: manager.currentSpaceID),
@@ -314,35 +314,37 @@ enum SidebarMenus {
         let page = [Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.copyLink(bookmark.url, title: bookmark.title) }]
 
         var organize: [NSMenuItem] = []
-        // Pins are shared by every window: a private one doesn't take them away.
+        // Pins are shared by every window: a private one leaves them as they are.
         if !isPrivate {
             let unpin = Library.shared.pinnedGroup(containing: bookmark.id) != nil ? unpinGroupTitle
                 : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
                 : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
             organize.append(Item(unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+            organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
+                controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
+                live?.isFavorite = true
+            })
         }
-        organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
-            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
-            live?.isFavorite = true
-        })
         // Folders of this space's pinned pages.
         let folder = Library.shared.folderID(containing: bookmark.id)
         let spaceFolders = Library.shared.spaceID(ofBookmark: bookmark.id).map { Library.shared.folders(in: $0) } ?? []
-        organize += folderItems(new: String(localized: "Add to New Folder", comment: "Item in a pinned tab's context menu in the sidebar."),
-                                add: String(localized: "Add to Folder", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of folders."),
-                                folders: spaceFolders.filter { $0.id != folder },
-                                new: { controller.newFolder(with: [bookmark.id]) }, into: { controller.listSetFolder(of: bookmark.id, to: $0.id) })
-        if folder != nil {
-            organize.append(Item(String(localized: "Remove from Folder", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.listSetFolder(of: bookmark.id, to: nil) })
-        }
-        if Library.shared.spaces.count > 1 {
-            organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces."),
-                                    spaceItems(excluding: Library.shared.spaceID(ofBookmark: bookmark.id)) { space in
-                // Its open page goes with it: to another profile's space, that's asked first.
-                controller.confirmProfileCrossing([live].compactMap { $0 }, to: space.id) {
-                    controller.libraryChange(String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.moveBookmark(bookmark.id, to: Int.max, in: space.id) }
-                }
-            }))
+        if !isPrivate {
+            organize += folderItems(new: String(localized: "Add to New Folder", comment: "Item in a pinned tab's context menu in the sidebar."),
+                                    add: String(localized: "Add to Folder", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of folders."),
+                                    folders: spaceFolders.filter { $0.id != folder },
+                                    new: { controller.newFolder(with: [bookmark.id]) }, into: { controller.listSetFolder(of: bookmark.id, to: $0.id) })
+            if folder != nil {
+                organize.append(Item(String(localized: "Remove from Folder", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.listSetFolder(of: bookmark.id, to: nil) })
+            }
+            if Library.shared.spaces.count > 1 {
+                organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces."),
+                                        spaceItems(excluding: Library.shared.spaceID(ofBookmark: bookmark.id)) { space in
+                    // Its open page goes with it: to another profile's space, that's asked first.
+                    controller.confirmProfileCrossing([live].compactMap { $0 }, to: space.id) {
+                        controller.libraryChange(String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.moveBookmark(bookmark.id, to: Int.max, in: space.id) }
+                    }
+                }))
+            }
         }
 
         var view: [NSMenuItem] = []
@@ -353,10 +355,10 @@ enum SidebarMenus {
 
         // A pinned split's row is named after both its pages, so renaming one of them from it would be a puzzle.
         var edit: [NSMenuItem] = []
-        if pinned == nil {
+        // A private window never writes a name or an icon into your pins.
+        if pinned == nil, !isPrivate {
             edit.append(Item(String(localized: "Rename", comment: "Item in a pinned tab's context menu in the sidebar.")) { BookmarkEditor.edit(bookmark.id, in: controller) })
-            // So is its icon, which a private window never writes into your pins.
-            if !isPrivate { edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: bookmark.id) }) }
+            edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: bookmark.id) })
         }
 
         var close: [NSMenuItem] = []
@@ -415,6 +417,8 @@ enum SidebarMenus {
         let close = [Item(String(localized: "Remove Folder", comment: "Item in a folder's context menu in the sidebar. The folder goes; its pinned tabs stay.")) {
             controller.libraryChange(String(localized: "Remove Folder", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.removeFolder(folder.id) }
         }]
+        // A private window opens and folds folders but leaves them as they are.
+        if controller.tabManager.isPrivate { return menu([open, view]) }
         return menu([open, view, organize, edit, close])
     }
 
@@ -487,13 +491,14 @@ enum SidebarMenus {
 
         let page = [Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu.")) { controller.copyLink(favorite.url, title: favorite.title) }]
         // Favorites are shared by every window: a private one doesn't take them away.
-        let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
+        let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
 
         // Not a split favorite: a new name or icon would only reach its left page.
         var edit: [NSMenuItem] = []
-        if pair == nil {
+        // A private window never writes a name or an icon into your favorites.
+        if pair == nil, !isPrivate {
             edit.append(Item(String(localized: "Rename…", comment: "Item in a favorite's context menu.")) { BookmarkEditor.edit(favorite.id, in: controller) })
-            if !isPrivate { edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: favorite.id) }) }
+            edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: favorite.id) })
         }
 
         var close: [NSMenuItem] = []
@@ -664,6 +669,8 @@ enum SpaceEditor {
 
 enum BookmarkEditor {
     static func edit(_ id: UUID, in controller: BrowserWindowController) {
+        // Pins and favorites are shared by every window: a private one leaves their names alone.
+        guard !controller.tabManager.isPrivate else { return }
         // A favorite has no row to type in; it's renamed in a small field on the page instead.
         if controller.sidebar.list.beginRenaming(bookmark: id) { return }
         guard let bookmark = Library.shared.bookmark(id) else { return }
@@ -767,6 +774,7 @@ extension BrowserWindowController {
     }
 
     func unpinMarked(_ pins: [UUID]) {
+        guard !tabManager.isPrivate else { return }
         var pages: [Tab] = []
         pageChange(String(localized: "Unpin Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
             pages = []
@@ -792,6 +800,7 @@ extension BrowserWindowController {
 
     /// Into a folder of this space (nil: a new one, named right away), the tabs among them pinned first.
     func fileMarked(_ items: [SidebarItem], in folder: UUID?) {
+        guard !tabManager.isPrivate else { return }
         var ids: [UUID] = []
         var made: BookmarkFolder?
         pageChange(folder == nil ? String(localized: "New Folder", comment: "Undo action name, shown in Edit › Undo.") : String(localized: "Add to Folder", comment: "Undo action name, shown in Edit › Undo.")) { [self] in
@@ -810,6 +819,7 @@ extension BrowserWindowController {
 
     /// Into the favorites, in order. They leave the list for the grid, so nothing stays picked.
     func favoriteMarked(_ items: [SidebarItem]) {
+        guard !tabManager.isPrivate else { return }
         pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
             Library.shared.together {
                 for item in items {

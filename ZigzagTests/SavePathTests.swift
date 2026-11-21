@@ -35,6 +35,184 @@ import Testing
         #expect(library.folderID(containing: bookmark?.id ?? UUID()) == nil, "the top level", sourceLocation: sourceLocation)
     }
 
+    /// A favorite filed into Pinned or a folder, from the picker or the toast, leaves Favorites: one page, never both.
+    @Test func aFavoriteFiledInASpaceLeavesFavorites() throws {
+        try scratch { space, _, folder in
+            let profile = library.profileID(ofSpace: space)
+            for move in 0..<3 {
+                let favorite = library.addFavorite(url: URL(string: "https://example.com/favorite\(move)")!, title: "Favorite", in: profile)
+                defer { library.removeBookmark(favorite.id) }
+                switch move {
+                case 0: #expect(SavePath.moveToTop(favorite.id, in: space))
+                case 1:
+                    #expect(SavePath.move(favorite.id, to: SavePath.place(in: space, folder: folder.id)))
+                    #expect(library.folderID(containing: favorite.id) == folder.id)
+                default: #expect(SavePath.move(favorite.id, to: SavePath.place(in: space, folder: nil, atTop: true)))
+                }
+                #expect(!library.isFavorite(favorite.id), "move \(move)")
+                #expect(library.spaceID(ofBookmark: favorite.id) == space, "move \(move)")
+                #expect(library.bookmarks(in: space).filter { $0.id == favorite.id }.count == 1, "move \(move)")
+            }
+        }
+    }
+
+    /// ⇧ on a click of Pin Tab asks where; keys of yours for Pin Tab that hold ⇧ pin and unpin as they always did.
+    @Test func pinTabsOwnKeysNeverAsk() {
+        #expect(BrowserWindowController.shiftAsks(event: .leftMouseUp, shiftHeld: true))
+        #expect(BrowserWindowController.shiftAsks(event: nil, shiftHeld: true))
+        #expect(!BrowserWindowController.shiftAsks(event: .keyDown, shiftHeld: true))
+        #expect(!BrowserWindowController.shiftAsks(event: .leftMouseUp, shiftHeld: false))
+    }
+
+    // MARK: Groups and split views move as one
+
+    /// Tabs in the scratch space, adopted by a manager of their own.
+    private func tabs(_ count: Int, in space: UUID, _ body: (TabManager, [Tab]) throws -> Void) rethrows {
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = (0..<count).map { Tab(url: URL(string: "https://example.com/unit/\($0)")!, title: "Unit \($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        try body(manager, tabs)
+    }
+
+    /// What's pinned says what it is, and the picker's words follow it.
+    @Test func thePickerNamesWhatItPins() throws {
+        try scratch { space, _, _ in
+            try tabs(4, in: space) { manager, tabs in
+                #expect(SavePath.kind(of: tabs[0], in: manager) == .page)
+                manager.makeSplit(tabs[0], with: tabs[1])
+                #expect(SavePath.kind(of: tabs[0], in: manager) == .split)
+                _ = try #require(manager.makeGroup(with: [tabs[2], tabs[3]], name: "Reading"))
+                #expect(SavePath.kind(of: tabs[3], in: manager) == .group(name: "Reading", folder: nil))
+                #expect(SavePlaceSheet.words(for: .page, space: "S").title == String(localized: "Pin Page", comment: "Title of the sheet that pins the page you're on, with where in the space it goes and its name."))
+                #expect(SavePlaceSheet.words(for: .split, space: "S").title == String(localized: "Pin Split View", comment: "Title of the sheet that pins the split view you're in, with where in the space it goes and its name."))
+                #expect(SavePlaceSheet.words(for: .group(name: "Reading", folder: nil), space: "S").title == String(localized: "Pin Group", comment: "Title of the sheet that pins the tab group you're in as a folder, with where in the space it goes and its name."))
+            }
+        }
+    }
+
+    /// A group pinned with the picker into a folder: its own folder goes inside that one, every page still in it, named
+    /// as the picker said.
+    @Test func aGroupPinnedIntoAFolderGoesWhole() throws {
+        try scratch { space, _, folder in
+            try tabs(3, in: space) { manager, tabs in
+                _ = try #require(manager.makeGroup(with: tabs, name: "Reading list"))
+                let page = try #require(SavePath.Page(tab: tabs[1]))
+                _ = SavePath.save(page, to: SavePath.place(in: space, folder: folder.id), in: manager, name: "Weekend")
+                let group = try #require(tabs[1].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+                #expect(group.bookmarkIDs == tabs.compactMap(\.bookmarkID))
+                #expect(group.bookmarkIDs.count == 3)
+                #expect(group.name == "Weekend")
+                #expect(Library.shared.folder(group.id)?.parentID == folder.id)
+                #expect(Library.shared.allBookmarkIDs(inFolder: folder.id).count == 3)
+            }
+        }
+    }
+
+    /// A pinned group moved to a folder, to the top or into a new folder, by the picker or the toast, moves its folder
+    /// and never pulls a page out of it. Its own folder isn't offered, nor Favorites.
+    @Test func aPinnedGroupMovesAsItsFolder() throws {
+        try scratch { space, _, folder in
+            try tabs(3, in: space) { manager, tabs in
+                _ = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/first")!, title: "First", to: space))
+                _ = try #require(manager.makeGroup(with: tabs, name: "Reading"))
+                manager.bookmarkTab(tabs[0], in: space)
+                let member = try #require(tabs[2].bookmarkID)
+                let group = try #require(Library.shared.pinnedGroup(containing: member))
+                let pages = group.bookmarkIDs
+
+                let entries = SavePath.placeEntries(of: member, in: space)
+                #expect(!entries.contains { $0.kind == .everySpace })
+                #expect(!entries.contains { $0.kind == .folder(group.id) })
+                #expect(entries.contains { $0.kind == .folder(folder.id) })
+
+                #expect(SavePath.move(member, to: SavePath.place(in: space, folder: folder.id)))
+                #expect(Library.shared.folder(group.id)?.parentID == folder.id)
+                #expect(Library.shared.folder(group.id)?.bookmarkIDs == pages)
+                #expect(SavePath.placeEntries(of: member, in: space).first { $0.kind == .folder(folder.id) }?.isOn == true)
+
+                #expect(SavePath.moveToTop(member, in: space))
+                #expect(Library.shared.folder(group.id)?.parentID == nil)
+                #expect(Array(Library.shared.bookmarks(in: space).prefix(3).map(\.id)) == pages)
+                #expect(Library.shared.folder(group.id)?.bookmarkIDs == pages)
+
+                #expect(SavePath.move(member, to: SavePath.place(in: space, folder: nil, newFolder: "Later")))
+                let made = try #require(Library.shared.folders(in: space).first { $0.name == "Later" })
+                #expect(Library.shared.folder(group.id)?.parentID == made.id)
+                #expect(Library.shared.folder(group.id)?.bookmarkIDs == pages)
+
+                // ⇧⌘D on a page of the pinned group: the picker files the group too.
+                let page = try #require(SavePath.Page(tab: tabs[1]))
+                _ = SavePath.save(page, to: SavePath.place(in: space, folder: folder.id), in: manager, name: "Reading")
+                #expect(Library.shared.folder(group.id)?.parentID == folder.id)
+                #expect(Library.shared.folder(group.id)?.bookmarkIDs == pages)
+            }
+        }
+    }
+
+    /// A split view pinned into a folder, then moved by the toast to another folder and the top: both pages go each
+    /// time, and they stay a split.
+    @Test func aSplitViewMovesAsOne() throws {
+        try scratch { space, _, folder in
+            try tabs(2, in: space) { manager, tabs in
+                manager.makeSplit(tabs[0], with: tabs[1])
+                let page = try #require(SavePath.Page(tab: tabs[0]))
+                _ = SavePath.save(page, to: SavePath.place(in: space, folder: folder.id), in: manager)
+                let ids = tabs.compactMap(\.bookmarkID)
+                #expect(ids.count == 2)
+                #expect(Library.shared.pinnedSplit(containing: ids[0])?.ids.sorted { $0.uuidString < $1.uuidString } == ids.sorted { $0.uuidString < $1.uuidString })
+                #expect(Set(Library.shared.folder(folder.id)?.bookmarkIDs ?? []) == Set(ids))
+
+                let other = try #require(Library.shared.addFolder(named: "Other", with: [], in: space))
+                #expect(SavePath.move(ids[1], to: SavePath.place(in: space, folder: other.id)))
+                #expect(Set(Library.shared.folder(other.id)?.bookmarkIDs ?? []) == Set(ids))
+                #expect(Library.shared.folder(folder.id)?.bookmarkIDs.isEmpty != false)
+
+                #expect(SavePath.moveToTop(ids[1], in: space))
+                #expect(ids.allSatisfy { Library.shared.folderID(containing: $0) == nil })
+                #expect(Set(Library.shared.bookmarks(in: space).prefix(2).map(\.id)) == Set(ids))
+                #expect(Library.shared.pinnedSplit(containing: ids[0]) != nil)
+            }
+        }
+    }
+
+    /// The toast keeps the pin and its space from when it was made: after a switch to another space, its menu moves
+    /// that pin in its own space, and each move is one ⌘Z.
+    @Test func theToastMovesItsOwnPinInItsOwnSpaceUndoably() throws {
+        try scratch { space, elsewhere, folder in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let tab = Tab(url: URL(string: "https://example.com/toast")!, spaceID: space)
+            manager.adopt([tab], in: space)
+            manager.select(tab)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            _ = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/top")!, title: "Top", to: space))
+            // One group per step, as each click is in the app.
+            let undo = controller.sidebarUndo
+            undo.groupsByEvent = false
+            func step(_ body: () -> Void) { undo.beginUndoGrouping(); body(); undo.endUndoGrouping() }
+            step { controller.saveFromStar() }
+            let item = try #require(controller.pinnedItem(of: tab))
+            #expect(item.spaceID == space)
+            manager.switchToSpace(elsewhere)
+            #expect(manager.currentSpaceID == elsewhere)
+
+            step { controller.moveSaved(item, to: .folder(folder.id)) }
+            #expect(Library.shared.spaceID(ofBookmark: item.bookmarkID) == space)
+            #expect(Library.shared.folderID(containing: item.bookmarkID) == folder.id)
+            step { controller.moveSaved(item, to: .top) }
+            #expect(Library.shared.bookmarks(in: space).first?.id == item.bookmarkID)
+            #expect(Library.shared.bookmarks(in: elsewhere).isEmpty)
+
+            undo.undo()
+            #expect(Library.shared.folderID(containing: item.bookmarkID) == folder.id)
+            undo.undo()
+            #expect(Library.shared.folderID(containing: item.bookmarkID) == nil)
+            #expect(Library.shared.bookmarks(in: space).last?.id == item.bookmarkID)
+        }
+    }
+
     // MARK: Quick save, no question
 
     /// The star, ⌘D and Save in a page's or a link's menu ask nothing: unmodified, each is the quick save.
@@ -253,6 +431,14 @@ import Testing
             #expect(controller.sidebar.address.isSaved)
 
             controller.saveFromStar()
+            #expect(tab.bookmarkID == nil)
+            #expect(!controller.sidebar.address.isSaved)
+
+            controller.toggleBookmark(nil)
+            #expect(tab.bookmarkID != nil)
+            #expect(controller.sidebar.address.isSaved)
+
+            controller.toggleBookmark(nil)
             #expect(tab.bookmarkID == nil)
             #expect(!controller.sidebar.address.isSaved)
         }

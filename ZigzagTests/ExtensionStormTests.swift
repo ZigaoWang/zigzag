@@ -185,6 +185,119 @@ struct ExtensionStormTests {
         #expect(state.carried(enabled: true).offSites == nil)
     }
 
+    // MARK: BackgroundWake
+
+    /// The wake on a stand-in runtime whose sendMessage answers only when `answer(i)` is called. `told` lists what Zigzag heard.
+    private func wakeWorld() throws -> JSContext {
+        let context = try #require(JSContext())
+        context.exceptionHandler = { _, value in Issue.record("JavaScript: \(value?.toString() ?? "?")") }
+        context.evaluateScript("""
+        var t = 0, timers = new Map(), next = 1, told = [], sent = [];
+        var later = (f, ms) => { const id = next++; timers.set(id, { at: t + ms, f }); return id; };
+        var cancel = (id) => timers.delete(id);
+        var advance = (ms) => {
+          const end = t + ms;
+          for (const [id, timer] of [...timers].sort((a, b) => a[1].at - b[1].at)) {
+            if (timer.at > end) break;
+            timers.delete(id); t = timer.at; timer.f();
+          }
+          t = end;
+        };
+        var runtime = {
+          lastError: undefined,
+          sendMessage(...args) {
+            const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+            const entry = { args };
+            sent.push(entry);
+            if (callback) { entry.answer = (v) => callback(v); return undefined; }
+            return new Promise((resolve) => { entry.answer = resolve; });
+          },
+        };
+        """)
+        context.evaluateScript(BackgroundWake.source)
+        context.evaluateScript("var installed = __zigzagBackgroundWake(runtime, later, cancel, () => t, (info) => told.push(info));")
+        return context
+    }
+
+    @Test func anUnansweredMessageAsksForTheBackgroundOnce() throws {
+        let context = try wakeWorld()
+        #expect(context.evaluateScript("installed")?.toBool() == true)
+        context.evaluateScript("var got; runtime.sendMessage({ name: 'fill' }).then((v) => { got = v; });")
+        context.evaluateScript("advance(\(BackgroundWake.wait - 1))")
+        #expect(number(context, "told.length") == 0)
+        context.evaluateScript("advance(1)")
+        #expect(number(context, "told.length") == 1)
+        #expect(context.evaluateScript("told[0].kind")?.toString() == BackgroundWake.kind)
+        // More waiting within the gap: still once.
+        context.evaluateScript("runtime.sendMessage({ name: 'again' }); advance(\(BackgroundWake.wait))")
+        #expect(number(context, "told.length") == 1)
+        context.evaluateScript("advance(\(BackgroundWake.gap)); runtime.sendMessage({ name: 'later' }); advance(\(BackgroundWake.wait))")
+        #expect(number(context, "told.length") == 2)
+    }
+
+    @Test func answeredMessagesPassThroughUntouched() async throws {
+        let context = try wakeWorld()
+        // A promise answer, and a callback answer, both in time.
+        context.evaluateScript("""
+        var got, heard;
+        runtime.sendMessage('other-extension', { name: 'ping' }, {}).then((v) => { got = v; });
+        runtime.sendMessage({ name: 'cb' }, (v) => { heard = v; });
+        sent[0].answer('pong'); sent[1].answer(42);
+        """)
+        // Promise callbacks run once the script returns.
+        try await Task.sleep(for: .milliseconds(50))
+        context.evaluateScript("advance(\(BackgroundWake.wait * 2))")
+        #expect(number(context, "told.length") == 0)
+        #expect(context.evaluateScript("got")?.toString() == "pong")
+        #expect(number(context, "heard") == 42)
+        #expect(context.evaluateScript("sent[0].args.length")?.toInt32() == 3)
+        #expect(context.evaluateScript("sent[0].args[0]")?.toString() == "other-extension")
+        #expect(context.evaluateScript("runtime.sendMessage.__zigzagWakes")?.toBool() == true)
+        // Installing twice wraps once.
+        #expect(context.evaluateScript("__zigzagBackgroundWake(runtime, later, cancel, () => t, () => {})")?.toBool() == false)
+    }
+
+    @Test func aMessageThatThrowsStopsItsTimer() throws {
+        let context = try wakeWorld()
+        context.evaluateScript("""
+        var throwing = { sendMessage() { throw new Error('Extension context invalidated.'); } };
+        __zigzagBackgroundWake(throwing, later, cancel, () => t, (info) => told.push(info));
+        var caught = null;
+        try { throwing.sendMessage({}); } catch (e) { caught = e.message; }
+        advance(\(BackgroundWake.wait * 2));
+        """)
+        #expect(context.evaluateScript("caught")?.toString() == "Extension context invalidated.")
+        #expect(number(context, "told.length") == 0)
+    }
+
+    /// A background that keeps not starting writes one line per extension, and one more, with the count, once it does.
+    @Test func aFailingWakeIsLoggedOnceAndItsEndOnce() {
+        var log = BackgroundWake.Log()
+        #expect(log.started("a", name: "A", first: true) != nil)
+        #expect(log.started("a", name: "A", first: false) == nil)
+        #expect(log.failed("b", name: "B", error: "no") != nil)
+        #expect(log.failed("b", name: "B", error: "no") == nil)
+        #expect(log.failed("b", name: "B", error: "no") == nil)
+        #expect(log.failed("c", name: "C", error: "no") != nil)
+        #expect(log.started("b", name: "B", first: false)?.contains("3") == true)
+        #expect(log.started("b", name: "B", first: false) == nil)
+        #expect(log.failed("b", name: "B", error: "no") != nil)
+    }
+
+    @Test func zigzagAsksAtMostOncePerGap() {
+        let now = Date()
+        #expect(BackgroundWake.due(last: nil, now: now))
+        #expect(!BackgroundWake.due(last: now.addingTimeInterval(-1), now: now))
+        #expect(BackgroundWake.due(last: now.addingTimeInterval(-Double(BackgroundWake.gap) / 1000), now: now))
+    }
+
+    @Test func contentScriptsGetTheWakeAfterTheGuard() throws {
+        let all = ExtensionStore.contentScriptsFirst
+        let guardAt = try #require(all.range(of: ConnectGuard.source))
+        let wakeAt = try #require(all.range(of: BackgroundWake.source))
+        #expect(guardAt.upperBound <= wakeAt.lowerBound)
+    }
+
     @MainActor @Test func privatePagesAreNotNamedInTheLog() {
         let url = URL(string: "https://secret.example.com/page")
         #expect(ExtensionStorms.loggedSite(url, isPrivate: true) == "a private page")

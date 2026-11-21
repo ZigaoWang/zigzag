@@ -1139,6 +1139,50 @@
         }
       }
     },
+    "Chrome Web Store" : {
+      "comment" : "Item in the Get Extensions menu: opens the Chrome Web Store.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chrome 网上应用店"
+          }
+        }
+      }
+    },
+    "Firefox Add-ons" : {
+      "comment" : "Item in the Get Extensions menu: opens addons.mozilla.org, Mozilla's store of Firefox extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 附加组件"
+          }
+        }
+      }
+    },
+    "Firefox Add-ons didn’t answer, so this extension couldn’t be checked and wasn’t added. Try again in a moment." : {
+      "comment" : "Shown when Add to Firefox on addons.mozilla.org was clicked but the store's API couldn't be reached to check the file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 附加组件没有回应，无法检查这个扩展，所以没有添加。请稍后再试。"
+          }
+        }
+      }
+    },
+    "Find one in the Chrome Web Store or Firefox Add-ons and choose Add to Zigzag." : {
+      "comment" : "Explanation under “No extensions yet” in Settings › Extensions. Firefox Add-ons is addons.mozilla.org.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Chrome 网上应用店或 Firefox 附加组件中找一个扩展，然后选择“添加到 Zigzag”。"
+          }
+        }
+      }
+    },
     "I Understand" : {
       "comment" : "Button that acknowledges the briefing and turns the setting on.",
       "localizations" : {
@@ -1146,6 +1190,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我已了解"
+          }
+        }
+      }
+    },
+    "In Low Power Mode, Clear shows as Frosted to save power." : {
+      "comment" : "Under Glass in the space editor, while Low Power Mode is on: clear glass shows as frosted until it's off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低电量模式下，“透明”会显示为“磨砂”以节省电量。"
           }
         }
       }
@@ -1179,6 +1234,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许网站访问这台 Mac 上的 App"
+          }
+        }
+      }
+    },
+    "On battery, Clear shows as Frosted to save power." : {
+      "comment" : "Under Glass in the space editor, while the Mac runs on its battery: clear glass shows as frosted until it's plugged in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用电池时，“透明”会显示为“磨砂”以节省电量。"
           }
         }
       }
@@ -10032,17 +10098,6 @@
         }
       }
     },
-    "Find one in the Chrome Web Store and choose Add to Zigzag." : {
-      "comment" : "Explanation under “No extensions yet” in Settings › Extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Chrome 网上应用店中找一个扩展，然后选择“添加到 Zigzag”。"
-          }
-        }
-      }
-    },
     "Find your extensions in site controls, by the address. You can bring more over anytime from Settings." : {
       "comment" : "Import window when the import is done and only extensions came over. Site controls is the panel by the address.",
       "localizations" : {
@@ -10407,23 +10462,12 @@
       }
     },
     "Get Extensions" : {
-      "comment" : "Button in Settings › Extensions: opens the Chrome Web Store.\nRow in the Extensions section of Site Controls when you have none: opens the Chrome Web Store.",
+      "comment" : "Button in Settings › Extensions: opens a menu of the Chrome Web Store and Firefox Add-ons.\nItem at the bottom of the extensions menu: a submenu of the Chrome Web Store and Firefox Add-ons.\nRow in the Extensions section of Site Controls when you have none: opens the Chrome Web Store.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "获取扩展"
-          }
-        }
-      }
-    },
-    "Get Extensions…" : {
-      "comment" : "Item at the bottom of the extensions menu: opens the Chrome Web Store.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "获取扩展…"
           }
         }
       }
@@ -12635,7 +12679,7 @@
       }
     },
     "Move to Tabs" : {
-      "comment" : "Item in a favorite's context menu. Turns the favorite back into a pinned tab.\nMenu bar item: moves the favorite back to the tabs.\nUndo action name, shown in the Edit menu as Undo Move to Tabs.",
+      "comment" : "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in.\nMenu bar item: moves the favorite back to the tabs.\nUndo action name, shown in the Edit menu as Undo Move to Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14568,7 +14612,7 @@
       }
     },
     "Open on the Left" : {
-      "comment" : "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.",
+      "comment" : "Shown over the left half of the page while a tab is dragged there, to open it in a split view.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14579,7 +14623,7 @@
       }
     },
     "Open on the Right" : {
-      "comment" : "Shown over the right half of the page while a link or tab is dragged there, to open it in a split view.",
+      "comment" : "Shown over the right half of the page while a tab is dragged there, to open it in a split view.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15429,7 +15473,7 @@
       }
     },
     "Pin Group" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.\nUndo action name, shown in the Edit menu as Undo Pin Group.",
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.\nUndo action name, shown in the Edit menu as Undo Pin Group.\nTitle and button of the sheet that pins the tab group you're in as a folder, with where in the space it goes and its name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15440,7 +15484,7 @@
       }
     },
     "Pin Split View" : {
-      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
+      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.\nTitle and button of the sheet that pins the split view you're in, with where in the space it goes and its name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -25625,6 +25669,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "页面会固定在“%@”中。“添加到收藏”则会让它显示在个人资料的所有空间中。"
+          }
+        }
+      }
+    },
+    "The group is pinned in %@ as a folder, with all of its tabs." : {
+      "comment" : "Under the title of the sheet that pins a tab group: the space it's pinned in as a folder, which the sheet doesn't let you change. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分组会作为文件夹固定在“%@”中，里面的标签页都会一起固定。"
+          }
+        }
+      }
+    },
+    "The split view is pinned in %@. Add to Favorites shows it in all of the profile’s spaces instead." : {
+      "comment" : "Under the title of the sheet that pins a split view: the space it's pinned in, which the sheet doesn't let you change, and what Add to Favorites means. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分屏浏览会固定在“%@”中。“添加到收藏”则会让它显示在个人资料的所有空间中。"
           }
         }
       }

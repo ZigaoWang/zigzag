@@ -106,10 +106,14 @@ nonisolated struct TileShape: Equatable, Sendable {
     private var spansColumns: Bool { regions.contains(where: \.isRowHalf) }
 
     /// One line where the pages need one: a page spanning both rows makes the column line one, a page spanning both
-    /// columns makes the row line one, and a grid of four keeps the line between its rows one.
+    /// columns makes the row line one. A grid of four can part either pair of lines, never both: four rectangles
+    /// covering the area leave no room for two broken pairs, so parting one pair joins the other.
     mutating func normalize() {
         if spansRows { columnShares[1] = columnShares[0] }
-        if spansColumns || regions.count == 4 { rowShares[1] = rowShares[0] }
+        if spansColumns { rowShares[1] = rowShares[0] }
+        guard isGrid else { return }
+        if columnsApart { rowShares[1] = rowShares[0] }
+        else if rowsApart { columnShares[1] = columnShares[0] }
     }
 
     /// Pages that cover the area once each: two to four of them, none overlapping, nothing left over.
@@ -133,8 +137,9 @@ nonisolated struct TileShape: Equatable, Sendable {
         let width = max(0, area.width - gap), height = max(0, area.height - gap)
         let xs: [CGFloat]
         let ys: [CGFloat]
-        if spansRows {
-            // A page runs down both rows: one line between the columns, and a line in each column between the rows.
+        if spansRows || rowsApart {
+            // A page runs down both rows, or a grid's rows are parted: one line between the columns, and a line in
+            // each column between the rows.
             let x = area.minX + floor(width * columnShares[0])
             xs = [x, x]
             ys = rowShares.map { area.minY + floor(height * $0) }
@@ -256,25 +261,39 @@ nonisolated struct TileShape: Equatable, Sendable {
     var isGrid: Bool { regions.count == 4 }
 
     /// A grid whose rows have moved their lines between the columns apart (#316).
-    var isParted: Bool { isGrid && abs(columnShares[0] - columnShares[1]) > 0.0001 }
+    var isParted: Bool { columnsApart || rowsApart }
+
+    /// A grid of four with its line between the columns parted, a segment per row.
+    var columnsApart: Bool { isGrid && abs(columnShares[0] - columnShares[1]) > 0.0001 }
+
+    /// A grid of four with its line between the rows parted, a segment per column (#316).
+    var rowsApart: Bool { isGrid && abs(rowShares[0] - rowShares[1]) > 0.0001 }
 
     /// Moves the line between the columns in `row` to `share` of the width, kept so no page gets smaller than `minimum`
     /// points. `whole`, or any layout but a grid: every row's line moves together, the old full-height split;
     /// otherwise only the segment in `row` moves (#316).
     mutating func moveColumnLine(in row: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
         let value = Self.clamped(share, length: length, minimum: minimum)
-        if whole || !isGrid {
+        guard !whole, isGrid, columnShares.indices.contains(row) else {
             columnShares = [value, value]
-        } else if columnShares.indices.contains(row) {
-            columnShares[row] = value
+            return
         }
+        columnShares[row] = value
+        // Parting one pair of lines joins the other: the rows are one line while the columns are apart.
+        if columnsApart { joinRows() }
     }
 
-    /// Moves the line between the rows to `share` of the height. It is one line in every layout: a grid's runs across
-    /// both columns, and elsewhere only one column has one, so the other column's share follows it.
+    /// Moves the line between the rows in `column` to `share` of the height. `whole`, or any layout but a grid: one
+    /// line, both columns' shares moving together; otherwise only this column's segment moves (#316), and the columns
+    /// join into one line, since a grid parts one pair of lines at a time.
     mutating func moveRowLine(in column: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
         let value = Self.clamped(share, length: length, minimum: minimum)
-        rowShares = [value, value]
+        guard !whole, isGrid, rowShares.indices.contains(column) else {
+            rowShares = [value, value]
+            return
+        }
+        rowShares[column] = value
+        if rowsApart { joinColumns() }
     }
 
     /// Moves a corner to `point` (in the area's top-down coordinates): the line between the columns there and the line
@@ -283,10 +302,15 @@ nonisolated struct TileShape: Equatable, Sendable {
     mutating func moveCorner(_ corner: Corner, to point: CGPoint, in area: CGRect, minimumWidth: CGFloat, minimumHeight: CGFloat, whole: Bool = false) {
         let x = Self.clamped((point.x - area.minX) / max(area.width, 1), length: area.width, minimum: minimumWidth)
         let y = Self.clamped((point.y - area.minY) / max(area.height, 1), length: area.height, minimum: minimumHeight)
-        rowShares = [y, y]
         if whole || !isGrid {
             columnShares = [x, x]
+            rowShares = [y, y]
+        } else if rowsApart {
+            // The rows are parted: the column line is one, and only the row segments that meet here move.
+            columnShares = [x, x]
+            for column in corner.columns where rowShares.indices.contains(column) { rowShares[column] = y }
         } else {
+            rowShares = [y, y]
             for row in corner.rows where columnShares.indices.contains(row) { columnShares[row] = x }
         }
     }
@@ -296,37 +320,94 @@ nonisolated struct TileShape: Equatable, Sendable {
         columnShares.allSatisfy { abs($0 - 0.5) < 0.001 } && rowShares.allSatisfy { abs($0 - 0.5) < 0.001 }
     }
 
-    /// Whether `share` is within `points` of the middle of a line `length` long: the drag shows the even guide and
-    /// snaps on release unless Shift holds it away.
+    /// Whether `share` is within `points` of the middle of a line `length` long. On a parted grid of four, the drag
+    /// then shows the even guide and snaps on release unless Shift holds it away; other drags never snap.
     static func nearEven(_ share: CGFloat, length: CGFloat, points: CGFloat = 8) -> Bool {
         abs(share - 0.5) * max(length, 1) <= points
     }
 
-    /// Whether the line between the columns in `row` is near the middle: one row's segment, or the whole line where
-    /// the rows share it, or `whole` (#316).
-    func columnLineIsNearEven(in row: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
-        let shares = whole || !isGrid ? columnShares : columnShares.indices.contains(row) ? [columnShares[row]] : []
-        return !shares.isEmpty && shares.allSatisfy { Self.nearEven($0, length: length, points: points) }
-    }
-
-    /// Whether the line between the rows is near the middle; it is one line in every layout.
-    func rowLineIsNearEven(in column: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
-        rowShares.allSatisfy { Self.nearEven($0, length: length, points: points) }
-    }
-
-    /// Puts the line between the columns in `row` back in the middle, exactly: the snap when a drag lets go near
-    /// even. `whole`, or the rows sharing one line, puts every row's line there.
-    mutating func snapColumnLine(in row: Int, whole: Bool = false) {
-        if whole || !isGrid {
-            columnShares = [0.5, 0.5]
-        } else if columnShares.indices.contains(row) {
-            columnShares[row] = 0.5
+    /// Where the line between the columns in `row` would snap to, if it is close enough: the middle, or the other
+    /// row's line, so two segments come together into one line (#316). `whole`, or any layout but a grid, has only
+    /// the middle.
+    func columnSnapShare(in row: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> CGFloat? {
+        guard !whole, isGrid, columnShares.indices.contains(row) else {
+            return columnShares.allSatisfy { Self.nearEven($0, length: length, points: points) } ? 0.5 : nil
         }
+        return Self.snapShare(columnShares[row], also: columnShares[1 - row], length: length, points: points)
     }
 
-    /// Puts the line between the rows back in the middle, exactly: the snap when a drag lets go near even.
-    mutating func snapRowLine(in column: Int, whole: Bool = false) {
-        rowShares = [0.5, 0.5]
+    /// Where the line between the rows in `column` would snap to, if it is close enough: the middle, or the other
+    /// column's line (#316).
+    func rowSnapShare(in column: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> CGFloat? {
+        guard !whole, isGrid, rowShares.indices.contains(column) else {
+            return rowShares.allSatisfy { Self.nearEven($0, length: length, points: points) } ? 0.5 : nil
+        }
+        return Self.snapShare(rowShares[column], also: rowShares[1 - column], length: length, points: points)
+    }
+
+    /// The share a dragged line snaps to: the middle or `also`, whichever it is closer to within `points`. `also`
+    /// matters only after a grid is parted, when two segments can meet and become one line again.
+    private static func snapShare(_ share: CGFloat, also other: CGFloat, length: CGFloat, points: CGFloat) -> CGFloat? {
+        var best: (distance: CGFloat, share: CGFloat)?
+        for candidate in [0.5, other] {
+            let distance = abs(share - candidate) * max(length, 1)
+            if distance <= points, best == nil || distance < best!.distance { best = (distance, candidate) }
+        }
+        return best?.share
+    }
+
+    /// Whether the line between the columns in `row` is near a snap: the middle, or the other row's line.
+    func columnLineIsNearEven(in row: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
+        columnSnapShare(in: row, whole: whole, length: length, points: points) != nil
+    }
+
+    /// Whether the line between the rows in `column` is near a snap: the middle, or the other column's line.
+    func rowLineIsNearEven(in column: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
+        rowSnapShare(in: column, whole: whole, length: length, points: points) != nil
+    }
+
+    /// Puts the line between the columns in `row` at `share` exactly: the snap when a drag lets go near one. Landing
+    /// on the other row's line makes the two one line again. `whole`, or any layout but a grid, moves every line.
+    mutating func snapColumnLine(in row: Int, to share: CGFloat, whole: Bool = false) {
+        guard !whole, isGrid, columnShares.indices.contains(row) else {
+            columnShares = [share, share]
+            return
+        }
+        columnShares[row] = share
+        if abs(share - columnShares[1 - row]) < 0.0001 { columnShares = [share, share] }
+        if columnsApart { joinRows() }
+    }
+
+    /// Puts the line between the rows in `column` at `share` exactly: the snap when a drag lets go near one.
+    mutating func snapRowLine(in column: Int, to share: CGFloat, whole: Bool = false) {
+        guard !whole, isGrid, rowShares.indices.contains(column) else {
+            rowShares = [share, share]
+            return
+        }
+        rowShares[column] = share
+        if abs(share - rowShares[1 - column]) < 0.0001 { rowShares = [share, share] }
+        if rowsApart { joinColumns() }
+    }
+
+    /// One line between the rows, where the two segments were.
+    private mutating func joinRows() {
+        let one = (rowShares[0] + rowShares[1]) / 2
+        rowShares = [one, one]
+    }
+
+    /// One line between the columns, where the two segments were.
+    private mutating func joinColumns() {
+        let one = (columnShares[0] + columnShares[1]) / 2
+        columnShares = [one, one]
+    }
+
+    /// Whether a drag on `axis` moves one segment alone: that line is parted already, or Shift parts it while the
+    /// other line is one (#316). Anything else moves the whole line, as a split always did.
+    func movesAlone(_ axis: Segment.Axis, shift: Bool) -> Bool {
+        guard isGrid else { return false }
+        let own = axis == .column ? columnsApart : rowsApart
+        let other = axis == .column ? rowsApart : columnsApart
+        return own || (shift && !other)
     }
 
     /// The even grid again: every line at the middle.
@@ -633,6 +714,10 @@ extension TabManager.SplitPair {
         if shape.isParted, let half = regions.firstIndex(where: \.isColumn),
            let grown = ids.firstIndex(of: rest[half]) {
             after.column = shape.columnShares[shape.regions[grown].rows.lowerBound]
+        }
+        // A grid parted between its rows keeps the row line of the column still split in two.
+        if shape.rowsApart, let half = regions.first(where: \.isColumn) {
+            after.row = shape.rowShares[half == .left ? 1 : 0]
         }
         return Self(ids: rest, shape: after)
     }

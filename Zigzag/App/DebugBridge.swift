@@ -2540,6 +2540,8 @@ enum DebugBridge {
         // settingspane <name>: that pane of Settings (tabs, appearance…).
         case "settingspane": if let pane = SettingsPane(rawValue: arg) { SettingsPage.open(pane, in: controller) }
         case "flipblocking": controller.tabManager.selectedTab?.settingsView?.debugFlipBlocking()
+        // getextensions: Settings › Extensions' Get Extensions menu, open.
+        case "getextensions": controller.tabManager.selectedTab?.settingsView?.debugShowGetExtensionsMenu()
         case "shortcutrecord":
             // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts.
             func rows(in view: NSView) -> [ShortcutRow] { view.subviews.flatMap { ($0 as? ShortcutRow).map { [$0] } ?? rows(in: $0) } }
@@ -2928,7 +2930,7 @@ enum DebugBridge {
                 let state: String
                 if let w = tab.webView, w.responds(to: NSSelectorFromString("_isPlayingAudio")) { state = "\(w.value(forKey: "_isPlayingAudio") ?? "?")" } else { state = "n/a" }
                 let muted = tab.webView.flatMap { $0.responds(to: NSSelectorFromString("_mediaMutedState")) ? $0.value(forKey: "_mediaMutedState") : nil }
-                debugLog("audio \(tab.displayTitle.prefix(30)) playing=\(tab.isPlayingAudio) kvo=\(state) muted=\(tab.isMuted) webkitMuted=\(muted.map { "\($0)" } ?? "n/a")")
+                debugLog("audio \(tab.displayTitle.prefix(30)) playing=\(tab.isPlayingAudio) kvo=\(state) media=\(tab.webView.map { PageVideos.shared.playsSound(in: $0) } ?? false) muted=\(tab.isMuted) webkitMuted=\(muted.map { "\($0)" } ?? "n/a")")
             }
         case "closeurl":
             for tab in controller.tabManager.allTabs where tab.url?.absoluteString.contains(arg) == true { controller.tabManager.close(tab) }

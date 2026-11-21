@@ -430,9 +430,10 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   divides panes. Panes sit `Metric.paneGutter` (4) apart where the page meets the window's edges, the frame's
   inset (8) framed and 1 edge to edge; a narrower gap keeps the inset's drag strip. A plain drag moves a whole line, as a split always did, and a double-click puts it back in the middle;
   where a line each way meet, a square a little larger than the crossing drags both, with the diagonal resize cursor
-  (#309). In a grid of four, ⇧-dragging the line between the columns parts it, a segment per row (#316); parted, each
-  segment drags alone, snaps to the middle near it, and the strip's Reset Tile Layout evens the grid. A grid keeps one
-  line between its rows, since four rectangles covering the page can't hold both pairs apart. A tab dragged over
+  (#309). In a grid of four, ⇧-dragging a line parts it, a segment per row or column (#316, #426); parted, each
+  segment drags alone, snaps to the middle or the other segment, whichever is nearer, and the strip's Reset Tile Layout
+  evens the grid. One line is parted at a time, since four rectangles covering the page can't hold both pairs apart:
+  while one is, the other moves whole even with ⇧. A tab dragged over
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
   page alone, the left or right half, as always), and a quarter that can't split takes the tab in its place. The drop
   hint shows where it lands, in the split's one style, named for the place ("Open Top Left") on a toast's pill so it
@@ -540,7 +541,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   colors it was made with), six presets in light and deep pairs, Background (the empty page's picture, a dashed slot
   until there is one, then its thumbnail with a × on hover) and Custom, ringed when the colors are none of the
   others, which unfolds the wheel and Shade. Under them Effects, folded under a disclosure (`DisclosureRow`): a
-  second color and its direction, See-through, Grain. Effects opens by itself when the space uses any of them. Last,
+  second color and its direction, See-through, Glass (Clear or Frosted, for a see-through space), Grain. While
+  Clear shows as frosted on battery or in Low Power Mode, a line in the explanation style under Glass says so. Effects opens by itself when the space uses any of them. Last,
   under a hairline, Profile: a dropdown of the profiles, with New Profile at its end (a profile of the space's own,
   named after it and following its name while you type it, in one step with no sheet); its tooltip says spaces on
   the same profile share sign-ins, history and extensions. The
@@ -553,7 +555,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   surface and its one shadow, `Radius.panel`, a hairline `panelEdge`. `body` items
   `Metric.controlHeight` tall with `Radius.row`, inset 4pt; every item has its picture slot, a neutral globe where a
   site's icon is missing; the chosen item has a check at its trailing end in the window's accent. An item's shortcut,
-  as the menu bar has it now, sits at the trailing end in `textTertiary`, as the Mac's menus set it. The sidebar's +
+  as the menu bar has it now, sits at the trailing end in `textTertiary`, as the Mac's menus set it. A button's menu
+  opens 4pt under it, its leading edge on the button's, or its trailing edge on the button's when the button sits in
+  the window's right half, never past the window's edge. The sidebar's +
   opens its menu (New Tab, New Folder, New Space) 4pt above it, the trailing edges lined up; a right-click on the
   sidebar's empty space opens the same items, with Edit Space…, under the pointer. Keys: Up and Down,
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu

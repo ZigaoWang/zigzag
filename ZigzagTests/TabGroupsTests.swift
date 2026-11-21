@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -316,6 +317,66 @@ struct TabGroupRulesTests {
             manager.select(t[2])
             manager.close(t[2])
             #expect(manager.selectedTab === t[1])
+        }
+    }
+
+    /// A window over a manager of its own, with the library put back afterwards.
+    private func inWindow(_ titles: [String], _ body: (BrowserWindowController, [Tab]) throws -> Void) rethrows {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = titles.map { Tab(url: nil, title: $0, spaceID: space) }
+        manager.adopt(tabs, in: space)
+        if let first = tabs.first { manager.select(first) }
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        try body(controller, tabs)
+    }
+
+    /// ⌘W on a pinned page or a favorite unloads it and keeps it; opened again, it's a fresh page at its saved address.
+    @Test func closingAPinnedPageOrFavoriteUnloadsItAndKeepsIt() throws {
+        try inWindow(["Tab"]) { controller, tabs in
+            let manager = controller.tabManager
+            let pinned = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/close/pinned")!, title: "Pinned", to: space))
+            let favorite = Library.shared.addFavorite(url: URL(string: "http://127.0.0.1:9/close/favorite")!, title: "Favorite",
+                                                      in: Library.shared.profileID(ofSpace: space))
+            for mark in [pinned, favorite] {
+                manager.openBookmark(mark)
+                let page = try #require(manager.bookmarkTab(for: mark.id))
+                #expect(manager.selectedTab === page)
+                controller.closeTab(nil)
+                #expect(page.isClosed, "\(mark.title)")
+                #expect(manager.bookmarkTab(for: mark.id) == nil, "\(mark.title)")
+                #expect(Library.shared.bookmark(mark.id) != nil, "\(mark.title)")
+                #expect(manager.tabs(in: space).map(\.id) == [tabs[0].id])
+                manager.openBookmark(mark)
+                let again = try #require(manager.bookmarkTab(for: mark.id))
+                #expect(again !== page)
+                #expect(again.url == mark.url)
+                controller.closeTab(nil)
+            }
+        }
+    }
+
+    /// ⌘W on the space's last tab goes to the page you were on before it in the space; with none, the space is empty.
+    @Test func closingTheLastTabGoesToTheSpacesRecentPageElseEmpty() throws {
+        try inWindow(["Last"]) { controller, tabs in
+            let manager = controller.tabManager
+            let pinned = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/close/recent")!, title: "Recent", to: space))
+            manager.openBookmark(pinned)
+            let page = try #require(manager.bookmarkTab(for: pinned.id))
+            manager.select(tabs[0])
+            controller.closeTab(nil)
+            #expect(manager.tabs(in: space).isEmpty)
+            #expect(manager.selectedTab === page)
+        }
+        try inWindow(["Only"]) { controller, _ in
+            let manager = controller.tabManager
+            controller.closeTab(nil)
+            #expect(manager.tabs(in: space).isEmpty)
+            #expect(manager.selectedTab == nil)
+            #expect(manager.currentSpaceID == space)
         }
     }
 }

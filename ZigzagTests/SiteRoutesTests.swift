@@ -368,13 +368,24 @@ struct SiteRoutesTests {
             #expect(SiteRoutes.route(for: url("https://github.com" + suffix), in: [rule]) == rule)
         }
         for address in ["https://github.com/org10", "https://github.com/ORG10", "https://github.com/org1%2Frepo",
-                        "https://gist.github.com/org1", "https://www.github.com/org1"] {
+                        "https://gist.github.com/org1", "https://www.gist.github.com/org1"] {
             #expect(SiteRoutes.route(for: url(address), in: [rule]) == nil)
         }
         #expect(SiteRoutes.entry(from: "https://GitHub.com/org1/?q=a#x", match: .path) == rule.site)
         #expect(SiteRoutes.entry(from: "github.com", match: .path) == nil)
         #expect(SiteRoutes.entry(from: "https://name:password@example.com/path", match: .path) == nil)
         #expect(SiteRoutes.suggestedMatch(for: "github.com/org1") == .path)
+    }
+
+    @Test func aPathRuleCoversTheSitesWWWAddress() {
+        let bare = SiteRoutes.Route(match: .path, site: "github.com/org1", spaceID: work)
+        let www = SiteRoutes.Route(match: .path, site: "www.github.com/org1", spaceID: work)
+        for rule in [bare, www] {
+            #expect(SiteRoutes.route(for: url("https://github.com/org1/repo"), in: [rule]) == rule)
+            #expect(SiteRoutes.route(for: url("https://www.github.com/ORG1"), in: [rule]) == rule)
+            #expect(SiteRoutes.route(for: url("https://www.github.com/org10"), in: [rule]) == nil)
+            #expect(SiteRoutes.route(for: url("https://gist.github.com/org1"), in: [rule]) == nil)
+        }
     }
 
     @Test func reorderingChangesWinnerAndWarningsTogether() {

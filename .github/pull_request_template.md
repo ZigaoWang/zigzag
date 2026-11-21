@@ -1,8 +1,18 @@
-## What and why
+## What
 
-<!-- What this changes for the person using Zigzag, and why. One change per pull request. -->
+<!-- What this changes for the person using Zigzag. One change per pull request. -->
+
+## Why
+
+<!-- The reason, and the issue it's for. -->
 
 Fixes #
+
+## Behavior changes
+
+<!-- None, or each way something that already worked now works differently. -->
+
+None.
 
 ## How I tested it
 
@@ -14,7 +24,9 @@ Fixes #
 
 ## Checklist
 
-- [ ] The app builds and `xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag` passes.
+- [ ] The app builds and `TEST_RUNNER_ZIGZAG_TEST_VAULT=memory xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag` passes.
 - [ ] Logic I changed has tests in `ZigzagTests`.
+- [ ] A changelog line under `[Unreleased]` in both `CHANGELOG.md` and `CHANGELOG.zh-Hans.md`.
+- [ ] `specs/` updated if behavior changed.
 - [ ] New or changed strings use `String(localized:comment:)` and have Chinese in `Localizable.xcstrings`.
-- [ ] New UI uses Zigzag's own controls from `Zigzag/Design` and looks right in light and dark.
+- [ ] UI changes use Zigzag's own controls from `Zigzag/Design`, with screenshots in light and dark.

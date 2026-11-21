@@ -14,6 +14,8 @@ import WebKit
         @objc func savePageAs(_ sender: Any?) {}
         @objc func goBack(_ sender: Any?) {}
         @objc func toggleBookmark(_ sender: Any?) {}
+        @objc func nextSpace(_ sender: Any?) {}
+        @objc func previousSpace(_ sender: Any?) {}
     }
 
     private func menu() -> NSMenu {
@@ -29,8 +31,10 @@ import WebKit
         add(#selector(Target.reopenClosedTab(_:)), "t", [.command, .shift])
         add(#selector(Target.savePageAs(_:)), "s")
         add(#selector(Target.goBack(_:)), "[")
-        // A shortcut moved in Settings: New Tab on ⌘K now.
+        // A shortcut moved in Settings: New Tab on ⌥⌘K now.
         add(#selector(Target.newTab(_:)), "k", [.command, .option])
+        add(#selector(Target.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option])
+        add(#selector(Target.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option])
         let top = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
         top.submenu = sub
         menu.addItem(top)
@@ -51,6 +55,13 @@ import WebKit
         #expect(BrowserWindow.browserKeeps(key("k", [.command, .option]), in: menu))
     }
 
+    /// ⌥⌘← and ⌥⌘→ switch spaces even on a page that uses them.
+    @Test func theSpaceKeysStayTheBrowsers() {
+        let menu = menu()
+        #expect(BrowserWindow.browserKeeps(key(String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]), in: menu))
+        #expect(BrowserWindow.browserKeeps(key(String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]), in: menu))
+    }
+
     @Test func everythingElseIsThePagesFirst() {
         let menu = menu()
         // A Zigzag item a page may also use (⌘S saves in an editor, ⌘[ indents in Docs), and keys no item has.
@@ -63,8 +74,14 @@ import WebKit
 
     @Test func zigzagsRealMenuKeepsTabsAndWindows() {
         // The shipped list names actions that exist on the browser window's controller.
-        for name in ["newTab:", "closeTab:", "openLocation:", "reloadPage:", "selectTabByNumber:", "reopenClosedTab:"] {
+        for name in ["newTab:", "closeTab:", "openLocation:", "reloadPage:", "selectTabByNumber:", "reopenClosedTab:",
+                     "nextSpace:", "previousSpace:"] {
             #expect(BrowserWindow.browserActions.contains(name))
+        }
+        // Each one is an action something in Zigzag has.
+        let owners: [AnyClass] = [BrowserWindowController.self, WebAppWindowController.self, AppDelegate.self, NSApplication.self, NSWindow.self]
+        for name in BrowserWindow.browserActions {
+            #expect(owners.contains { $0.instancesRespond(to: NSSelectorFromString(name)) }, "\(name)")
         }
         #expect(!BrowserWindow.browserActions.contains("savePageAs:"))
         #expect(!BrowserWindow.browserActions.contains("selectAll:"))

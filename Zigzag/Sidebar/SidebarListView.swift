@@ -1057,7 +1057,13 @@ final class SidebarListView: NSView {
             let row = TabRowView()
             row.isBookmark = true
             // In a pinned split's or group's row, the part double-clicked is the page renamed.
-            row.onDoubleClick = { [weak row] in row?.beginRename(at: Self.pointer(in: row)) }
+            row.onDoubleClick = { [weak self, weak row] in
+                guard let row else { return }
+                let point = Self.pointer(in: row)
+                // A private window never renames your pins; a tab split beside one still takes a name.
+                if self?.manager?.isPrivate == true, !(point.flatMap(row.page(at:)).map { $0.bookmarkID == nil } ?? false) { return }
+                row.beginRename(at: point)
+            }
             row.onRename = { [weak self, weak row] name in
                 // The tab split beside the pinned page, riding in its row, keeps a name of its own.
                 if let page = row?.renamingPage, page.bookmarkID == nil {

@@ -21,9 +21,24 @@ enum Shortcuts {
     static func id(_ item: NSMenuItem) -> String? {
         // Hidden aliases (⌘= beside ⌘+, ⌘← beside ⌘[) share their item's action and tag; they keep their own keys and
         // aren't listed, so changing or resetting the visible one never rewrites them.
-        guard let action = item.action, !item.isAlternate, !(item.isHidden && item.allowsKeyEquivalentWhenHidden),
+        guard let action = item.action, !item.isAlternate,
+              !(item.isHidden && item.allowsKeyEquivalentWhenHidden && !isListedWhenHidden(item)),
               item.identifier != MainMenu.pageSizeItemID else { return nil }
         return NSStringFromSelector(action) + "#\(item.tag)"
+    }
+
+    /// Close Tabs Below has no line in the menu bar and no shipped keys, but is listed in Settings › Shortcuts so it
+    /// can be given some.
+    static func isListedWhenHidden(_ item: NSMenuItem) -> Bool {
+        item.action == #selector(BrowserWindowController.closeTabsBelow(_:))
+    }
+
+    /// Whether Settings › Shortcuts lists this item: ones with keys, ones whose keys you took away (so you can give
+    /// them back), and Close Tabs Below.
+    static func isListed(_ item: NSMenuItem) -> Bool {
+        guard !item.isAlternate, item.submenu == nil, !item.isSeparatorItem else { return false }
+        if isListedWhenHidden(item) { return id(item) != nil }
+        return !item.isHidden && (!item.keyEquivalent.isEmpty || isCustom(item))
     }
 
     private static var overrides: [String: Combo] {
@@ -119,16 +134,16 @@ enum Shortcuts {
 
     /// A fixed shortcut Zigzag keeps for itself (⌘1–9 for tabs, ⌃1–9 for spaces, ⌘= beside ⌘+): its title, if
     /// these keys are one. They can't be given to anything else, or one of the two would silently stop working.
-    static func reserved(_ combo: Combo) -> String? {
+    static func reserved(_ combo: Combo, in menu: NSMenu? = NSApp.mainMenu) -> String? {
         guard !combo.key.isEmpty else { return nil }
         func walk(_ menu: NSMenu) -> String? {
             for item in menu.items {
                 if let sub = item.submenu, let found = walk(sub) { return found }
-                if item.isHidden, item.allowsKeyEquivalentWhenHidden, Self.combo(of: item) == combo { return item.title }
+                if item.isHidden, item.allowsKeyEquivalentWhenHidden, !isListedWhenHidden(item), Self.combo(of: item) == combo { return item.title }
             }
             return nil
         }
-        return NSApp?.mainMenu.flatMap(walk)
+        return menu.flatMap(walk)
     }
 
     /// The item that already answers to these keys, other than `item`.

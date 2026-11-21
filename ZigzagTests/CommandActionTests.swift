@@ -47,6 +47,15 @@ struct CommandActionTests {
         #expect(titles("save", blank).isEmpty)
     }
 
+    /// A private window adds nothing to Favorites, a pinned page included.
+    @Test func aPrivateWindowOffersNoFavorite() {
+        #expect(titles("fav", onATab).contains("Add to Favorites"))
+        var pinned = onATab
+        pinned.isPinned = true
+        pinned.isPrivate = true
+        #expect(!titles("fav", pinned).contains("Add to Favorites"))
+    }
+
     @Test func splitOrSeparate() {
         #expect(titles("split", onATab).contains("Open in Split View"))
         var split = onATab

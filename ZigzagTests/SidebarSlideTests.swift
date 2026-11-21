@@ -108,6 +108,15 @@ struct SidebarSlideTests {
         #expect(window.isOpaque)
     }
 
+    @Test func theEditorSaysWhenClearShowsAsFrosted() {
+        #expect(SpaceLookEditor.glassNote(clearChosen: true, onBattery: false, lowPowerMode: false) == nil)
+        #expect(SpaceLookEditor.glassNote(clearChosen: false, onBattery: true, lowPowerMode: true) == nil)
+        let battery = SpaceLookEditor.glassNote(clearChosen: true, onBattery: true, lowPowerMode: false)
+        let lowPower = SpaceLookEditor.glassNote(clearChosen: true, onBattery: false, lowPowerMode: true)
+        #expect(battery != nil && lowPower != nil && battery != lowPower)
+        #expect(SpaceLookEditor.glassNote(clearChosen: true, onBattery: true, lowPowerMode: true) == battery)
+    }
+
     @Test func theWindowKeepsTheGlassItShows() {
         let frame = SpaceFrameView()
         frame.setGlass(true, clear: true, tint: .systemPink)

@@ -264,6 +264,21 @@ extension ExtensionBridgeTests {
             await fetch(other, { ...json, credentials: 'same-origin' });
             const defaults = calls.length === 10 && calls[0].args[0].credentials === 'include'
               && calls[8].args[0].credentials === 'same-origin' && calls[9].args[0].credentials === 'same-origin';
+            // Form data, a Blob or a buffer crosses as base64 bytes, matching the Content-Type its request made.
+            const form = new FormData();
+            form.append('data[gpg_auth][keyid]', 'FP');
+            await fetch(other, { credentials: 'include', method: 'POST', body: form });
+            await fetch(other, { ...json, body: new Uint8Array([255, 0]) });
+            await fetch(other, { ...json, body: new Blob(['x']) });
+            const [sentForm, sentBuffer, sentBlob] = calls.slice(10).map(c => c.args[0]);
+            const formType = new Map(sentForm.headers).get('content-type') || '';
+            const boundary = formType.split('boundary=')[1];
+            const formText = atob(sentForm.body);
+            const binaryBodies = calls.length === 13 && sentForm.encoding === 'base64' && formType.startsWith('multipart/form-data')
+              && !!boundary && formText.includes('--' + boundary) && formText.includes('name="data[gpg_auth][keyid]"')
+              && sentBuffer.encoding === 'base64' && sentBuffer.body === btoa(String.fromCharCode(255, 0))
+              && sentBlob.encoding === 'base64' && sentBlob.body === btoa('x') && calls[6].args[0].encoding === undefined;
+            calls.length = 10;
             const request = new Request(other, json);
             const fallback = await fetch(request);
             const untouched = !request.bodyUsed && normal[0][0] === request;
@@ -274,7 +289,6 @@ extension ExtensionBridgeTests {
             streamController.close();
             await streaming;
             const cases = [
-              [other, { ...json, body: new Uint8Array([255, 0]) }], [other, { ...json, body: new Blob(['x']) }],
               [other, { credentials: 'omit' }], [other, { credentials: 'include', method: 'PROPFIND' }],
               [other, { credentials: 'include', mode: 'same-origin' }], [other, { credentials: 'include', mode: 'no-cors' }],
               [other, { credentials: 'include', integrity: 'sha256-test' }],
@@ -304,13 +318,13 @@ extension ExtensionBridgeTests {
             ongoingController.abort();
             try { await ongoing; } catch (error) { aborted = aborted && error.name === 'AbortError'; }
             const cancelForwarded = calls.at(-1).fn === 'cancel' && calls.at(-1).args[0] === calls.at(-2).args[0].requestID;
-            return { binary, cloneOK, shared, defaults, untouched, streamUntouched, fallback: await fallback.text(),
+            return { binary, cloneOK, shared, defaults, binaryBodies, untouched, streamUntouched, fallback: await fallback.text(),
                      unsupportedSkippedBridge, declinedOnce, noRetry, aborted, preAbortedSkippedBridge, cancelForwarded };
             """, arguments: ["bridge": ExtensionBridgeScript.source, "extensionID": extensionID], in: nil, contentWorld: .page) as? [String: Any]
         let value = try #require(result)
         #expect(value["binary"] as? String == "0,255,128,65")
         #expect(value["fallback"] as? String == "original")
-        for key in ["cloneOK", "shared", "defaults", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
+        for key in ["cloneOK", "shared", "defaults", "binaryBodies", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
             #expect(value[key] as? Bool == true, "Failed fetch behavior: \(key)")
         }
     }
@@ -339,6 +353,26 @@ extension ExtensionBridgeTests {
         let response = try #require(try await bridge.response([:], url: url.appendingPathComponent("binary"), extensionID: "test", store: store) as? [String: Any])
         let encoded = try #require(response["body"] as? String)
         #expect(Data(base64Encoded: encoded) == Data([0, 255, 128, 65]))
+    }
+
+    /// Passbolt signs in with form data (#393): its bytes reach the site as written, and the session cookie the
+    /// answer sets lands in the profile, where the next request and chrome.cookies find it.
+    @Test func formDataWritesSendTheirBytesAndKeepTheSessionCookie() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start().appendingPathComponent("echo")
+        defer { server.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        let form = Data("--b\r\nContent-Disposition: form-data; name=\"data[gpg_auth][keyid]\"\r\n\r\nFP\r\n--b--\r\n".utf8) + Data([0, 255])
+        let response = try #require(try await ExtensionFetchRequests().response(
+            ["method": "POST", "credentials": "include", "body": form.base64EncodedString(), "encoding": "base64",
+             "headers": [["content-type", "multipart/form-data; boundary=b"]]],
+            url: url, extensionID: "test", store: store) as? [String: Any])
+        let echoed = try #require((response["body"] as? String).flatMap { Data(base64Encoded: $0) })
+        #expect(echoed == form)
+        #expect(await store.httpCookieStore.allCookies().contains { $0.name == "refreshed" && $0.sameSitePolicy == .sameSiteLax })
+        #expect(ExtensionFetchRequests.body(["body": "plain", "encoding": "base64"]) == nil)
+        #expect(ExtensionFetchRequests.body(["body": "plain"]) == Data("plain".utf8))
+        #expect(ExtensionFetchRequests.body(["body": "AP8=", "encoding": "base64"]) == Data([0, 255]))
     }
 
     @Test func logoutPreservesExtensionOriginAndDeletesOnlyItsProfilesCookie() async throws {
@@ -1244,5 +1278,69 @@ struct SiteAccessContentScriptTests {
         #expect(ExtensionHost.asksFor(URL(string: "https://later.example/"), in: ext))
         #expect(!ExtensionHost.asksFor(URL(string: "https://bank.example/"), in: ext))
         #expect(!ExtensionHost.asksFor(nil, in: ext))
+    }
+}
+
+extension ExtensionBridgeTests {
+    /// tabs.query lists every space's tabs in a window, this space's first, as Chrome lists every tab in a window;
+    /// the active one is the one the window gives, even with nothing open in the space in front.
+    @available(macOS 15.4, *)
+    @Test func extensionsListTabsOfEverySpaceInTheWindow() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0","permissions":["tabs"]}"#.utf8).write(to: folder.appendingPathComponent("manifest.json"))
+        let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let home = Library.shared.spaces[0].id
+        let work = Library.shared.addSpace(name: "Tabs query").id
+        let manager = TabManager(spaceID: home)
+        defer { manager.invalidate() }
+        let first = Tab(url: URL(string: "https://one.example/"), title: "One", spaceID: home)
+        let second = Tab(url: URL(string: "https://two.example/"), title: "Two", spaceID: home)
+        let away = Tab(url: URL(string: "https://away.example/"), title: "Away", spaceID: work)
+        manager.adopt([first, second], in: home)
+        manager.adopt([away], in: work)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { controller.window?.close() }
+        manager.select(second)
+        // Loaded with the tabs' profile's extensions, so they're its to see.
+        let extensions = first.profile.extensions.controller
+        try extensions.load(context)
+        defer { try? extensions.unload(context) }
+
+        let listed = { controller.tabs(for: context).compactMap { $0 as? Tab } }
+        #expect(listed().map(\.displayTitle) == ["One", "Two", "Away"])
+        #expect(away.window(for: context) === controller)
+        #expect(away.indexInWindow(for: context) == 2)
+        #expect(second.isSelected(for: context) && !first.isSelected(for: context) && !away.isSelected(for: context))
+
+        // In the other space, its tabs come first and its tab is the active one.
+        manager.switchToSpace(work)
+        manager.select(away)
+        #expect(listed().map(\.displayTitle) == ["Away", "One", "Two"])
+        #expect(away.isSelected(for: context) && !second.isSelected(for: context))
+
+        // A space with nothing open: the window's active tab is the one left selected elsewhere, and a query finds it.
+        let empty = Library.shared.addSpace(name: "Tabs query empty").id
+        manager.switchToSpace(empty)
+        #expect(listed().count == 3)
+        let active = try #require(controller.activeTab(for: context) as? Tab)
+        #expect(listed().filter { $0.isSelected(for: context) }.map(ObjectIdentifier.init) == [ObjectIdentifier(active)])
+
+        // A private window stays hidden from an extension not allowed there.
+        let hidden = TabManager(spaceID: home, isPrivate: true)
+        defer { hidden.invalidate() }
+        hidden.adopt([Tab(url: URL(string: "https://private.example/"), title: "Private", spaceID: home)], in: home)
+        let privateWindow = BrowserWindowController(tabManager: hidden, frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { privateWindow.window?.close() }
+        #expect(!context.hasAccessToPrivateData)
+        #expect(privateWindow.tabs(for: context).isEmpty)
+        #expect(privateWindow.activeTab(for: context) == nil)
+        // Allowed there, it lists them.
+        context.hasAccessToPrivateData = true
+        #expect(privateWindow.tabs(for: context).compactMap { ($0 as? Tab)?.displayTitle } == ["Private"])
     }
 }

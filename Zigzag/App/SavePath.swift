@@ -19,6 +19,32 @@ enum SavePath {
         case linkMenu
     }
 
+    /// What one pin is: a page, the pages of a split view, or a tab group pinned as a folder. Each moves as one: a
+    /// group's pages and a split's halves are never pulled apart by a pin.
+    enum Kind: Equatable {
+        case page
+        case split
+        /// A tab group, pinned or to be pinned as a folder; `folder` is that folder once it's pinned.
+        case group(name: String, folder: UUID?)
+    }
+
+    /// What pinning `tab` pins, or what it is pinned as.
+    @MainActor static func kind(of tab: Tab, in manager: TabManager?) -> Kind {
+        if let saved = tab.bookmarkID { return kind(ofPinned: saved) }
+        if let manager, manager.pinsGroup(tab), let groupID = tab.groupID {
+            return .group(name: manager.group(groupID)?.name ?? "", folder: nil)
+        }
+        if manager?.split(for: tab) != nil { return .split }
+        return .page
+    }
+
+    /// What a pinned page is part of: its tab group's folder, its split view, or nothing.
+    static func kind(ofPinned id: UUID) -> Kind {
+        if let group = Library.shared.pinnedGroup(containing: id) { return .group(name: group.name, folder: group.id) }
+        if Library.shared.pinnedSplit(containing: id) != nil { return .split }
+        return .page
+    }
+
     /// What an entry point asks for: the quick pin, or the place picker.
     enum Request: Equatable {
         case quick
@@ -114,12 +140,22 @@ enum SavePath {
             if let saved = tab.bookmarkID {
                 // Saved already: the picker files it where you said, rather than saving it twice.
                 file(saved, into: place, folder: folder)
+                if case .group(let groupName, let groupFolder?) = kind(ofPinned: saved) {
+                    if let typed = named(typed), typed != groupName { Library.shared.renameFolder(groupFolder, to: typed) }
+                    return Library.shared.bookmark(saved)
+                }
                 id = saved
             } else {
                 // It stays open as the saved page's, as saving has always kept it.
                 guard let manager else { return nil }
                 manager.bookmarkTab(tab, at: place.index, in: place.spaceID)
                 guard let saved = tab.bookmarkID else { return nil }
+                // A tab group pins as its own folder: that folder goes where you said, its pages all in it.
+                if let group = Library.shared.pinnedGroup(containing: saved) {
+                    if let folder { Library.shared.moveFolder(group.id, to: Int.max, in: place.spaceID, parent: .some(folder)) }
+                    if let typed = named(typed), typed != group.name { Library.shared.renameFolder(group.id, to: typed) }
+                    return Library.shared.bookmark(saved)
+                }
                 if let folder { Library.shared.setFolder(of: saved, to: folder) }
                 id = saved
             }
@@ -153,6 +189,14 @@ enum SavePath {
     struct Options: Equatable {
         var spaceID: UUID
         var folders: [BookmarkFolder]
+    }
+
+    /// The folders of a space a pin can go into: for a pinned group, never its own folder or one inside it.
+    static func folders(in spaceID: UUID, for kind: Kind) -> [BookmarkFolder] {
+        let all = Library.shared.folders(in: spaceID)
+        guard case .group(_, let group?) = kind else { return all }
+        let inside = Set(Library.shared.subfolderIDs(of: group)).union([group])
+        return all.filter { !inside.contains($0.id) }
     }
 
     static func options(in spaceID: UUID) -> Options {
@@ -208,6 +252,16 @@ enum SavePath {
     /// Files a page already pinned where the picker said. Its folder is left as it was unless one was chosen.
     private static func file(_ id: UUID, into place: Place, folder: UUID?) {
         if place.newFolder == nil, place.folderID == nil, place.index == nil { return }
+        // A page of a pinned tab group moves the group's folder, with every page in it.
+        if case .group(_, let group?) = kind(ofPinned: id) {
+            if let folder {
+                Library.shared.moveFolder(group, to: Int.max, in: place.spaceID, parent: .some(folder))
+            } else if let index = place.index {
+                Library.shared.moveFolder(group, to: index, in: place.spaceID, parent: .some(nil))
+            }
+            return
+        }
+        leaveFavorites(id, for: place.spaceID)
         if Library.shared.spaceID(ofBookmark: id) != place.spaceID {
             Library.shared.moveBookmark(id, to: Int.max, in: place.spaceID, folder: .some(folder))
         } else {
@@ -288,11 +342,27 @@ enum SavePath {
 
     /// Every place a saved page can be moved to, in menu order, with the one it is in ticked. A favorite lives in
     /// every space, so the space's own places aren't ticked for it; a saved page without a folder is at the top.
-    static func placeEntries(folders: [BookmarkFolder], folderID: UUID?, inEverySpace: Bool, isAtTop: Bool) -> [PlaceEntry] {
-        var entries = [PlaceEntry(kind: .everySpace, isOn: inEverySpace),
-                       PlaceEntry(kind: .top, isOn: !inEverySpace && folderID == nil && isAtTop)]
+    static func placeEntries(folders: [BookmarkFolder], folderID: UUID?, inEverySpace: Bool, isAtTop: Bool,
+                             offersEverySpace: Bool = true) -> [PlaceEntry] {
+        var entries = offersEverySpace ? [PlaceEntry(kind: .everySpace, isOn: inEverySpace)] : []
+        entries.append(PlaceEntry(kind: .top, isOn: !inEverySpace && folderID == nil && isAtTop))
         entries += folders.map { PlaceEntry(kind: .folder($0.id), isOn: !inEverySpace && $0.id == folderID) }
         return entries
+    }
+
+    /// The places a pin can move to in `spaceID`, as the toast's chevron lists them, ticked where it is. A tab group's
+    /// folder can go into another folder or to the top, never into itself, and isn't offered Favorites.
+    static func placeEntries(of id: UUID, in spaceID: UUID) -> [PlaceEntry] {
+        let kind = kind(ofPinned: id)
+        let folders = folders(in: spaceID, for: kind)
+        let first = Library.shared.bookmarks(in: spaceID).first?.id
+        if case .group(_, let group?) = kind {
+            let parent = Library.shared.folder(group)?.parentID
+            let isAtTop = parent == nil && first.map { Library.shared.allBookmarkIDs(inFolder: group).contains($0) } == true
+            return placeEntries(folders: folders, folderID: parent, inEverySpace: false, isAtTop: isAtTop, offersEverySpace: false)
+        }
+        return placeEntries(folders: folders, folderID: Library.shared.folderID(containing: id),
+                            inEverySpace: Library.shared.isFavorite(id), isAtTop: first == id)
     }
 
     /// Moves a page already saved into a folder of its space (#326), the toast's chevron: the page keeps its name,
@@ -300,7 +370,7 @@ enum SavePath {
     @discardableResult
     static func move(_ bookmarkID: UUID, to place: Place) -> Bool {
         guard Library.shared.bookmark(bookmarkID) != nil, Library.shared.space(place.spaceID) != nil else { return false }
-        file(bookmarkID, into: place, folder: place.folderID)
+        file(bookmarkID, into: place, folder: folder(for: place))
         return true
     }
 
@@ -308,7 +378,18 @@ enum SavePath {
     @discardableResult
     static func moveToTop(_ bookmarkID: UUID, in spaceID: UUID) -> Bool {
         guard Library.shared.bookmark(bookmarkID) != nil, Library.shared.space(spaceID) != nil else { return false }
+        if case .group(_, let group?) = kind(ofPinned: bookmarkID) {
+            Library.shared.moveFolder(group, to: 0, in: spaceID, parent: .some(nil))
+            return true
+        }
+        leaveFavorites(bookmarkID, for: spaceID)
         Library.shared.moveBookmark(bookmarkID, to: 0, in: spaceID, folder: .some(nil))
         return true
+    }
+
+    /// A favorite filed into a space leaves Favorites first, so it's never a favorite and a pinned page at once.
+    private static func leaveFavorites(_ id: UUID, for spaceID: UUID) {
+        guard Library.shared.isFavorite(id) else { return }
+        Library.shared.pinFavorite(id, in: spaceID, at: Int.max)
     }
 }
