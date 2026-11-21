@@ -19,8 +19,12 @@
 ## The split row
 - A split shows as one sidebar row with a part per page; clicking a part selects that page.
   Test: SplitDropTests.aSplitShowsInOneRow
-- Click × on the row → closes only the page of the part it sits in.
-  Test: SplitCloseTests.theRowsCloseButtonClosesOnePart
+- The row's × sits at its end, where a single tab's does, in the tab list and among the pinned pages.
+  Test: SplitCloseTests.theCloseButtonSitsWhereASingleTabsDoes
+- Click × on the row → closes every page of the split; one ⌘Z brings them all back.
+  Test: SplitCloseTests.theRowsCloseButtonClosesTheSplit
+- A split of two, three or four pages draws the same row in the tab list and among the pinned pages.
+  Test: PinnedGroupTests.bothSectionsDrawTheSameRow
 - Middle-click the row → closes the page of the part under the pointer.
   Test: SplitCloseTests.aMiddleClickClosesThePartUnderThePointer
 - Close Split View in the row's menu → closes every page; one ⌘Z brings them all back.
@@ -33,6 +37,18 @@
   Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
 - Stack Vertically on a split of two → one above the other; the item then reads Side by Side.
   Test: SplitCloseTests.stackVerticallyThenReadsSideBySide
+
+## Pinned splits
+- Pin a split of two, three or four pages → one pinned split with every page in its place; opened or unpinned, it comes back in that shape.
+  Test: PinnedGroupTests.aSplitPinsReopensAndUnpinsWhole
+- Drag a split of four into Pinned and back → the same four pages side by side, each step undoable.
+  Test: PinnedGroupTests.aFourPageSplitDraggedToPinnedAndBack
+- Remove from Split View on one page of a pinned split of three → that page stays pinned on its own; the other two stay a pinned split.
+  Test: PinnedGroupTests.onePageLeavesAPinnedSplitOfThree
+- Close one page of a pinned split → that page unloads; the pin keeps every page.
+  Test: PinnedGroupTests.closingOnePinnedPageKeepsThePin
+- A pinned split saved by an older Zigzag → reads and is written back as before.
+  Test: PinnedGroupTests.olderPinnedSplitsReadAndWriteAsBefore
 
 ## Resizing
 - Plain drag on a line → the whole line moves; in a grid of four, ⇧-drag on either line moves only the segment between two pages.
@@ -67,7 +83,7 @@
   Test: PaneHeaderTests.aFileShowsItsNameAndAWebPageItsAddress
 
 ## Closing and suspending one page
-- Close one page of a split of two (⌘W, or × on its strip or row part) → the one left takes the split row's place as a plain tab.
+- Close one page of a split of two (⌘W, × on its strip, or a middle-click on its row part) → the one left takes the split row's place as a plain tab.
   Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
 - Suspend Page on one page of a split → that page leaves the split and sleeps; the other stays shown.
   Test: SidebarRowMenuTests.onePageOfASplitSleepsAndTheOtherStaysShown

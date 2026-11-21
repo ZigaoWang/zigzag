@@ -19,6 +19,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With no language to always translate, Settings › Translation points to the translate button in the address bar, the quickest way to choose one.
 - The finish you chose for Your Zigzag Card in About has a ring in the accent color, as Reader's colors do, instead of a dark one.
 - The same buttons look the same in more places. In the icon choices, Choose Image… and Use Site Icon are the soft pill buttons other panels use, their words lined up with the search field's. In Settings › Downloads, a rule's or file type's trash shows while you point at its row, as it does for extensions and profiles. The menu that fills in passwords highlights the row you're on as Zigzag's other menus do.
+- Split views of three and four pages can be pinned and come back whole: every page, in the places you left them, when you open the pin, after a relaunch, when you unpin it and with ⌘Z. A pinned split's row looks and works the same as in the tab list, and its × sits at the row's end, as on a single tab. The × now closes the whole split in the tab list too, as it unloads a pinned one; a middle-click still closes the one page under the pointer. Remove from Split View takes one page out of a pinned split of three or four, and the menus say Pin Split View and Unpin Split View for every size.
 
 ## [0.9.4] - 2026-11-21
 
