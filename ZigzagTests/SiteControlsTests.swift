@@ -455,6 +455,25 @@ struct ZoomStepperTests {
         #expect(ZoomLevels.percent(1.25) == "125%")
     }
 
+    /// A percentage typed in is the zoom itself, not snapped to a preset; the stepper's own ends bound it (#395).
+    @Test func aTypedPercentageIsTheZoomItself() {
+        #expect(ZoomLevels.typed("130%") == 1.3)
+        #expect(ZoomLevels.typed(" 80 % ") == 0.8)
+        #expect(ZoomLevels.typed("abc") == nil)
+        #expect(ZoomLevels.typed("0") == nil)
+        let stepper = ZoomStepper()
+        var changes: [CGFloat] = []
+        stepper.onChange = { changes.append($0) }
+        stepper.debugType("130%")
+        #expect(stepper.zoom == 1.3)
+        stepper.debugType("1000")
+        #expect(stepper.zoom == 3)
+        stepper.debugType("10")
+        #expect(stepper.zoom == 0.5)
+        stepper.debugType("130%")
+        #expect(changes == [1.3, 3, 0.5, 1.3])
+    }
+
     @Test func percentageResetsTo100() {
         let stepper = ZoomStepper()
         var changes: [CGFloat] = []
@@ -467,6 +486,19 @@ struct ZoomStepperTests {
         stepper.debugPress("reset")
         #expect(changes == [1.75, 1.5, 1])
         #expect(stepper.zoom == 1)
+    }
+
+    /// The typing tip belongs to the caller, and the parts are a line apart: the sidebar size's tooltip isn't about
+    /// typing a zoom (#395).
+    @Test func theTypingTipIsTheCallersAndItsPartsAreLinesApart() {
+        let stepper = ZoomStepper()
+        stepper.resetTip = "Actual Size"
+        stepper.typingTip = "⇧-click to type a zoom"
+        #expect(stepper.debugPercentToolTip == "Actual Size\n⇧-click to type a zoom")
+        stepper.typingTip = nil
+        #expect(stepper.debugPercentToolTip == "Actual Size")
+        stepper.typingTip = "⇧-click to type a size"
+        #expect(stepper.debugPercentToolTip == "Actual Size\n⇧-click to type a size")
     }
 
     /// The stepper takes the steps of what it sets (#361): the sidebar size's 5% steps from 75% to 150%, its
@@ -711,15 +743,15 @@ struct SitePanelRowsTests {
         #expect(SitePanelRows.links(c).isEmpty)
     }
 
-    /// Dark page is one dropdown (#134): Automatic, On, Off and Force, in that order, and no row of its own for Force.
+    /// Dark page is one dropdown (#134): Follow Setting, Always, Off and Force Dark, in that order, and no row of its own for Force.
     @Test func darkPageIsOneDropdown() {
         #expect(DarkPages.SiteChoice.allCases == [.automatic, .on, .off, .force])
-        #expect(DarkPages.SiteChoice.allCases.map(SitePanel.title(of:)) == ["Automatic", "On", "Off", "Force Dark"])
+        #expect(DarkPages.SiteChoice.allCases.map(SitePanel.title(of:)) == ["Follow Setting", "Always", "Off", "Force Dark"])
         #expect(SitePanelRows.rows(Context()).filter { $0 == .darkPage }.count == 1)
     }
 
-    /// Under Dark page, what it does here now: Automatic says whether Settings has it on, Force that it's always
-    /// dark, and On and Off nothing more, unless the site is dark on its own or the developer tools chose its look.
+    /// Under Dark page, what it does here now: Follow Setting says whether Settings has it on, Force Dark that it's
+    /// always dark, and Always and Off nothing more, unless the site is dark on its own or the developer tools chose its look.
     @Test func darkPageSaysWhatItDoesNow() {
         typealias S = SitePanel.DarkStatus
         #expect(S.of(.automatic, wanted: true, native: false, developerLook: false) == .nowOn)

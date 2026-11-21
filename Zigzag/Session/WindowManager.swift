@@ -327,6 +327,9 @@ final class WindowManager {
     /// from elsewhere doesn't get to choose that.
     func openExternal(_ url: URL) { open(url, fromAnotherApp: true) }
 
+    /// A page handed off from another device: routed like a link from another app, but always a tab, never Zigzag Mini.
+    func openHandedOff(_ url: URL) { open(url, fromAnotherApp: true, allowsMini: false) }
+
     /// A page Zigzag itself opens (About's links, Send Feedback, release notes): a tab in the front window, as any
     /// link inside Zigzag, never Zigzag Mini, which is for links from other apps.
     func openFromZigzag(_ url: URL) {
@@ -334,10 +337,10 @@ final class WindowManager {
         NSApp.activate()
     }
 
-    private func open(_ url: URL, fromAnotherApp: Bool) {
+    private func open(_ url: URL, fromAnotherApp: Bool, allowsMini: Bool = true) {
         // Settings › Zigzag Mini can send links to a Zigzag Mini of their own instead; files and links before onboarding
         // still open here. Zigzag Mini is never saved, so nothing about the session changes.
-        if fromAnotherApp, opensInMini(url) {
+        if fromAnotherApp, allowsMini, opensInMini(url) {
             MiniWindowController.open(url: url, fromAnotherApp: true)
             return
         }

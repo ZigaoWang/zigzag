@@ -786,6 +786,7 @@ final class ReaderOptions: FloatingPanelView {
         size.moreTip = String(localized: "Larger Text", comment: "VoiceOver label of the button in Reader's text choices that makes the text larger.")
         size.resetTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.")
         size.percentName = String(localized: "Text %@, Actual Size", comment: "VoiceOver name of the percentage on Reader's Text Size row: the size now, then what pressing it does.")
+        size.typingTip = nil
         rows = [.custom(String(localized: "Text Size", comment: "Row in Reader's text and color choices: the − 100% + stepper."), control: size),
                 .custom(typeface, control: Fixed(face, NSSize(width: 136, height: Tokens.Metric.controlHeight))),
                 .custom(width, control: Fixed(measure, NSSize(width: 212, height: Tokens.Metric.controlHeight))),
