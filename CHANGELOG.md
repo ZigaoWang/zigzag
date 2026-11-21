@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Reader looks and works like the rest of Zigzag. Wide now fills the window inside its margins instead of stopping at a narrow column, Medium stays a book's line length, and Narrow is a little narrower. Large pictures and code blocks run past the text into the margins when the window has room, and pictures are centered rather than on the text's left edge. Aa opens Zigzag's own panel, with each choice named: Text Size steps as page zoom does (− 100% +, the percentage puts it back), Typeface, Column Width, and Colors as round swatches. Auto takes a faint tint of the space's color, the text as dark (or light) as before. Changing a choice keeps the line you were reading in place, and the text settles in as Reader opens, a plain fade with Reduce Motion. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+
 ## [0.9.3] - 2026-11-21
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, cookies you can keep when clearing, space rules for paths of a site, Suspend Page, Check for Updates for extensions, extensions in private windows when you allow them, Firefox extensions, address bar keywords for extensions, tiles you can resize freely, pinning a page from its address, Zigzag's own right-click menus in the sidebar, and fixes for split views, closing and reopening tabs as in Chrome, smooth scrolling at 120 Hz, the Passwords list, tab keys, extension site access, full screen, passkeys, Proton Pass, Passbolt, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
