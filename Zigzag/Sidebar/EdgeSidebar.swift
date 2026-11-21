@@ -173,6 +173,17 @@ final class EdgeSidebar {
             MainActor.assumeIsolated { self?.moved(event) }
             return event
         }) { monitors.append(local) }
+        // Esc puts the panel away. The lens consumes its own Esc first; once it has collapsed, the next Esc is the
+        // sidebar's. A field being edited keeps its Esc to cancel the edit.
+        if let esc = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self, event.keyCode == 53, self.panel?.isKeyWindow == true,
+                      !self.isCommandBarOpen else { return event }
+                if self.panel?.firstResponder is NSTextView { return event }
+                self.hide()
+                return nil
+            }
+        }) { monitors.append(esc) }
         target = WindowManager.shared.keyController ?? target
     }
 
@@ -188,6 +199,21 @@ final class EdgeSidebar {
 
     /// The Peek keeps the panel out while its page is attached, whatever the pointer does.
     func holdForPeek(_ hold: Bool) { holdsForPeek = hold }
+
+    /// Whether the pointer is still in the strip that keeps the panel out.
+    var pointerInEdgeZone: Bool {
+        guard isShowing, let visible = shownScreen, let zone = zone(in: visible) else { return false }
+        return zone.keeps(at: EdgeSidebarLayout.point(NSEvent.mouseLocation, in: visible))
+    }
+
+    /// Whether the panel could stay out at all: the browser coming forward takes that away.
+    var canStayOut: Bool { !isBrowserInFront }
+
+    /// The edge panel takes the keyboard back after the lens closes without hiding it.
+    func makeKey() {
+        guard isShowing else { return }
+        panel?.makeKey()
+    }
 
     /// A preview or a row was clicked: the lens opens for that tab. Until the lens itself is wired, this is the same
     /// path as picking the row.
@@ -423,6 +449,8 @@ final class EdgeSidebar {
 
     /// Puts the panel away. Without the slide for a pick, so its window can come forward at once.
     func hide(animated: Bool = true) {
+        // The lens and the sidebar are one session: the lens collapses first, and only then does the sidebar follow.
+        guard !EdgeLensPolicy.blocksSidebarHide(lensOpen: EdgePeek.shared.isVisible) else { return }
         // The panel's popout is its page: it goes with the panel, however the panel goes.
         target?.edgePopoutDidDismiss()
         stopDeciding(dismiss: true)
@@ -545,13 +573,15 @@ final class EdgeSidebarHost: NSView {
 @MainActor final class EdgeSitePanelHost: SitePanelPageHost {
     let tab: Tab
     let overlay: PassthroughView
+    private let hostWindow: NSWindow?
 
-    init(tab: Tab, overlay: PassthroughView) {
+    init(tab: Tab, overlay: PassthroughView, window: NSWindow? = nil) {
         self.tab = tab
         self.overlay = overlay
+        self.hostWindow = window
     }
 
-    var window: NSWindow? { EdgeSidebar.shared.panelWindow }
+    var window: NSWindow? { hostWindow ?? EdgeSidebar.shared.panelWindow }
     var listsExtensions: Bool { false }
 
     func copyPageURL(_ sender: Any?) {

@@ -2,42 +2,43 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// The edge sidebar's popout lifecycle (#363): it stays while the panel is being used, closes when the panel goes
-/// or a click lands outside it, and its own shortcuts work from a non-activating panel.
+/// The edge sidebar's lens lifecycle (#363/#365): the panel and the lens are one session, each dismissal says what
+/// it closes, and the lens joins another app's Space without bringing Zigzag forward.
 @MainActor
 struct EdgeSidebarLifecycleTests {
-    @Test func thePanelStaysWhileThePopoutIsHeld() {
+    @Test func thePanelStaysWhileTheLensIsHeld() {
         #expect(EdgeSidebarLayout.keepsPanelOnActivation(holdsForPeek: true))
         #expect(!EdgeSidebarLayout.keepsPanelOnActivation(holdsForPeek: false))
     }
 
-    @Test func anOutsideClickClosesThePopout() {
-        let mini = NSWindow()
-        let panel = NSWindow()
-        // A click in another app has no window here.
-        #expect(EdgePopoutPolicy.closesOnOutsideClick(eventWindow: nil, mini: mini, panel: panel))
-        // Its own page and the sidebar that opened it are not outside.
-        #expect(!EdgePopoutPolicy.closesOnOutsideClick(eventWindow: mini, mini: mini, panel: panel))
-        #expect(!EdgePopoutPolicy.closesOnOutsideClick(eventWindow: panel, mini: mini, panel: panel))
-        #expect(EdgePopoutPolicy.closesOnOutsideClick(eventWindow: NSWindow(), mini: mini, panel: panel))
+    @Test func aSidebarActionClosesOnlyTheLens() {
+        for reason in [EdgeLensReason.sameTab, .sidebarClick, .escape] {
+            #expect(EdgeLensPolicy.dismissal(for: reason) == .lensOnly)
+        }
     }
 
-    @Test func anInternalPageClosesOnTheFirstEscape() {
-        #expect(EdgePopoutPolicy.closesOnFirstEscape(isInternalPage: true, isLeaving: false, commandBarVisible: false))
-        #expect(!EdgePopoutPolicy.closesOnFirstEscape(isInternalPage: false, isLeaving: false, commandBarVisible: false))
-        #expect(!EdgePopoutPolicy.closesOnFirstEscape(isInternalPage: true, isLeaving: true, commandBarVisible: false))
-        #expect(!EdgePopoutPolicy.closesOnFirstEscape(isInternalPage: true, isLeaving: false, commandBarVisible: true))
+    @Test func aClosedWindowTakesTheSidebarWithTheLens() {
+        for reason in [EdgeLensReason.windowClose, .featureOff] {
+            #expect(EdgeLensPolicy.hidesSidebar(after: reason, pointerInEdgeZone: true, panelCanShow: true))
+        }
     }
 
-    @Test func commandOReturnsFromThePopout() {
-        #expect(EdgePopoutPolicy.isReturnKey(command: true, key: "o"))
-        #expect(EdgePopoutPolicy.isReturnKey(command: true, key: "O"))
-        #expect(!EdgePopoutPolicy.isReturnKey(command: false, key: "o"))
-        #expect(!EdgePopoutPolicy.isReturnKey(command: true, key: "p"))
+    @Test func anotherAppLeavesTheSidebarToItsProximity() {
+        #expect(!EdgeLensPolicy.hidesSidebar(after: .altTab, pointerInEdgeZone: true, panelCanShow: true))
+        #expect(EdgeLensPolicy.hidesSidebar(after: .altTab, pointerInEdgeZone: false, panelCanShow: true))
     }
 
-    @Test func thePopoutJoinsTheSpaceWithoutActivating() {
+    @Test func theLensJoinsTheSpaceWithoutActivating() {
         #expect(EdgePopoutPolicy.ordersFrontRegardless(floating: true))
-        #expect(!EdgePopoutPolicy.ordersFrontRegardless(floating: false))
+    }
+
+    @Test func aSpaceChangeEndsTheLens() {
+        #expect(EdgePeekRouting.closesOnSpaceChange(peekVisible: true))
+        #expect(!EdgePeekRouting.closesOnSpaceChange(peekVisible: false))
+    }
+
+    @Test func aPageOpenedFromTheLensStaysInTheLens() {
+        #expect(EdgePeekRouting.newPage(peekVisible: true) == .peek)
+        #expect(EdgePeekRouting.newPage(peekVisible: false) == .browser)
     }
 }

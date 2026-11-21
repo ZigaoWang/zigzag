@@ -49,6 +49,9 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
 
     /// The live page's shape, width over height, for the lens's frame.
     private(set) var pageAspect: CGFloat = 16.0 / 10.0
+
+    /// The caption's height while the card is the lens: no notes, so the fixed footer.
+    var lensCaptionHeight: CGFloat { Self.footerHeight }
     static let footerHeight = Tokens.Metric.previewCaptionHeight
     /// The caption's height in a card this wide: taller by its note while a page in it is in Developer Mode or sleeps
     /// (three lines at most, when it's half of a split).
@@ -146,7 +149,12 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
         liveClip.addSubview(holder)
         holder.frame = liveClip.bounds
         holder.autoresizingMask = [.width, .height]
+        liveClip.alphaValue = 0
         liveClip.isHidden = false
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            liveClip.animator().alphaValue = 1
+        }
     }
 
     /// The page left: the snapshot is the card's picture again.
@@ -168,6 +176,12 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
     @objc func submitLensAddress() {
         onLensAddress?(lensAddress.stringValue)
         window?.makeFirstResponder(nil)
+    }
+
+    /// ⌘L in the lens: the address is selected, ready to type over.
+    func focusLensAddress() {
+        window?.makeFirstResponder(lensAddress)
+        lensAddress.currentEditor()?.selectAll(nil)
     }
 
     func controlTextDidBeginEditing(_ obj: Notification) {
