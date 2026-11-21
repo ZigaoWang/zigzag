@@ -738,7 +738,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let site = isPrivate ? nil : ContentBlocker.site(of: tab?.url)
         let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all && !profile.extensions.asksForSitesOnlyOptionally(id) ? .on : .off
-        let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
+        let click = SidebarMenus.Item(String(localized: "On Click", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
         click.state = access == .click ? .on : .off
         menu.addItem(all)
         menu.addItem(click)
