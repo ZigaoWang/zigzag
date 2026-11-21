@@ -441,7 +441,7 @@ final class TabManager {
     /// favorite: those keep their places), in the group the last of them is in.
     private func newTabPlacement(in space: UUID, opener: Tab?, select: Bool, site page: URL?) -> (index: Int, parent: UUID?) {
         let nodes = treeNodes(in: space)
-        if Self.nestsOpenedLinks, let opener, opener.bookmarkID == nil, !opener.isPeek, opener.spaceID == space,
+        if Self.nestsOpenedLinks, let opener, opener.bookmarkID == nil, !opener.isOutsideTabList, opener.spaceID == space,
            let at = TabTree.childIndex(of: opener.id, in: nodes) {
             return (at, opener.id)
         }
@@ -625,7 +625,7 @@ final class TabManager {
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
     }
 
-    /// Adds a tab that already has a page (a promoted peek) to the top of the list and shows it.
+    /// Adds a tab that already has a page (from another window or Zigzag Mini) at `index` and shows it.
     func insert(_ tab: Tab, at index: Int = 0, under parent: UUID?? = nil) {
         tab.host = host
         tab.setSpace(currentSpaceID)
@@ -638,7 +638,7 @@ final class TabManager {
         tabsBySpace[currentSpaceID] = list
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         structureChanged()
-        // A Peek made a tab still goes back to the page it came from.
+        // A page from Zigzag Mini made a tab still goes back to the page it came from.
         if tab.opener != nil { openedSinceSwitch.insert(tab.id) }
         selectQuietly(tab)
     }
@@ -666,6 +666,16 @@ final class TabManager {
     func insertAsNewTab(_ tab: Tab) {
         if let place = sameSitePlacement(in: currentSpaceID, opener: nil, site: tab.url) { return insert(tab, at: place.index, under: place.parent) }
         insert(tab, at: newTabIndex(in: currentSpaceID, opener: nil, select: true))
+    }
+
+    /// A page from outside the list (a Zigzag Mini opened from a link) right after the tab it came from, and shown.
+    /// False when that tab isn't in the space in front.
+    @discardableResult
+    func insert(_ tab: Tab, after anchor: Tab) -> Bool {
+        guard let at = (tabsBySpace[currentSpaceID] ?? []).firstIndex(where: { $0 === anchor }) else { return false }
+        tab.groupID = anchor.groupID
+        insert(tab, at: TabTree.subtreeEnd(at: at, in: treeNodes(in: currentSpaceID)), under: .some(anchor.parentID))
+        return true
     }
 
     /// Inserts already-built tabs (session restore, imports) without selecting.

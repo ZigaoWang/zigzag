@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// Unclicked `window.open` asks where to go (this tab, a new tab, or Mini), and the answer can be kept for the site.
-/// Clicked pop-ups and Zigzag's own windows (Open in New Tab, New Window, Peek) open at once.
+/// Clicked pop-ups and Zigzag's own windows (Open in New Tab, New Window, Zigzag Mini) open at once.
 @MainActor
 enum PopupNotice {
     /// The site's kept pop-up destination: `"automatic"` (tab for a plain `window.open`, window for a sized one),

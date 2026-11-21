@@ -53,14 +53,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
     /// With the sidebar hidden, notes a link opened in a background tab (#272).
     lazy var newTabNote = NewTabNote(controller: self)
-    lazy var peek = PeekController(controller: self)
     /// Capture (⇧⌘2): the mode over the page and the card it leaves.
     lazy var capture = PageCapture(controller: self)
     /// A playing video you've left, in a small card over the page.
     lazy var miniPlayer = MiniPlayer(controller: self)
-    var peekController: PeekController? { peek }
-    /// The page in this window's Peek, while it's up.
-    var peekedTab: Tab? { peek.tab }
 
     init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat? = nil) {
         self.tabManager = tabManager
@@ -84,7 +80,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.layoutTrafficLights()
             self.commandBar.reposition()
             self.findBar.reposition()
-            self.peek.reposition()
             self.capture.reposition()
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
@@ -121,7 +116,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self?.commandBar.isVisible == true || SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window)
                 || ReaderOptions.isOpen(in: self?.window)
         }
-        // A click beside a zoomed pane puts it back, as one beside Peek puts it away.
+        // A click beside a zoomed pane puts it back.
         root.zoomScrim.onClick = { [weak self] in self?.unzoomPane() }
         root.onTilesChange = { [weak self] shape, final in
             guard let self, let tab = self.tabManager.selectedTab else { return }
@@ -709,8 +704,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if SitePanel.isOpen(in: window), SitePanel.shown?.describes(tab) == false { SitePanel.closeCurrent() }
         updateHandoff()
         if tab !== shownTab {
-            // A peek is a look from the page you were on: going to another tab or space puts it away.
-            peek.close()
             // So is Capture.
             capture.cancel()
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
@@ -1085,13 +1078,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showPages()
     }
 
-    /// While a pane is zoomed, Esc puts it back, as it puts Peek away; other keys go to the page as usual.
+    /// While a pane is zoomed, Esc puts it back; other keys go to the page as usual.
     private func refreshZoomEsc() {
         if paneZoom.isZoomed, zoomEscMonitor == nil {
             zoomEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self, self.paneZoom.isZoomed, event.keyCode == 53, event.window === self.window,
                       event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
-                      !(self.window?.firstResponder is NSText), self.peekController?.isVisible != true else { return event }
+                      !(self.window?.firstResponder is NSText) else { return event }
                 self.unzoomPane()
                 return nil
             }
@@ -1736,9 +1729,28 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// back keeps going (#465).
     private static let translationTimeout: TimeInterval = 45
 
-    /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
+    /// The page in view: a Zigzag Mini's, or the tab you're on.
     private func translationInView(_ tab: Tab) -> Bool {
-        PageTranslator.isInView(tab, selected: tabManager.selectedTab, peeked: peek.isVisible ? peek.tab : nil)
+        translationMini(tab) != nil || PageTranslator.isInView(tab, selected: tabManager.selectedTab)
+    }
+
+    /// The Zigzag Mini showing `tab`, which this window translates: that page's toasts go over the Mini.
+    private func translationMini(_ tab: Tab) -> MiniWindowController? {
+        MiniWindowController.all.first { $0.tab === tab && $0.holdsPage }
+    }
+
+    /// A translation toast over the page it's about: a Zigzag Mini's, or this window's.
+    private func translationToast(_ tab: Tab, _ text: String, symbol: String, action: (title: String, run: () -> Void)? = nil,
+                                  duration: TimeInterval, announces: Bool = true) {
+        if let mini = translationMini(tab) {
+            Toast.show(text, symbol: symbol, action: action, duration: duration, over: mini.overlay, area: mini.overlay.bounds, announces: announces)
+        } else {
+            Toast.show(text, symbol: symbol, action: action, duration: duration, announces: announces, in: self)
+        }
+    }
+
+    private func hideTranslationToast(_ tab: Tab) {
+        if let mini = translationMini(tab) { Toast.hide(over: mini.overlay) } else { Toast.hide(in: self) }
     }
 
     /// The page the visible translation offer is for; removed when the tab or page changes.
@@ -1748,8 +1760,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// out to be in your language.
     private func withdrawStaleTranslationOffer() {
         guard let tab = Toast.owner(in: self) as? Tab else { return }
-        let inView = peek.isVisible ? peek.tab : tabManager.selectedTab
-        if tab !== inView || !PageTranslator.offerStands(offeredFor: translationOfferPage, now: tab.url, foreign: tab.foreignLanguage != nil, translated: tab.isTranslated) {
+        if tab !== tabManager.selectedTab || !PageTranslator.offerStands(offeredFor: translationOfferPage, now: tab.url, foreign: tab.foreignLanguage != nil, translated: tab.isTranslated) {
             Toast.hide(for: tab, in: self)
         }
     }
@@ -1767,6 +1778,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showTranslationOffer(_ tab: Tab, language: Locale.Language) {
+        if let mini = translationMini(tab) {
+            Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
+                       action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
+                           if let tab { self?.translatePage(tab: tab) }
+                       }), duration: 6, closes: true, over: mini.overlay, area: mini.overlay.bounds)
+            return
+        }
         translationOfferPage = tab.url
         Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
                    action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
@@ -1774,7 +1792,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                    }), duration: 6, closes: true, owner: tab, in: self)
     }
 
-    /// Translates the current tab or `chosen` (sidebar tab menu, page menu, Peek), or reverts it. Tabs translate
+    /// Translates the current tab or `chosen` (sidebar tab menu, page menu, Zigzag Mini), or reverts it. Tabs translate
     /// independently; toasts show only while the page is in view. `asked` is false for automatic translation, which
     /// never opens macOS's download sheet (#231).
     func translatePage(tab chosen: Tab? = nil, asked: Bool = true) {
@@ -1791,7 +1809,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             PageTranslator.restore(in: webView)
             tab.isTranslated = false
             if let site { translatedSites[site] = nil }
-            if translationInView(tab) { Toast.hide(in: self) }
+            if translationInView(tab) { hideTranslationToast(tab) }
             return
         }
         planningTranslation.insert(key)
@@ -1824,9 +1842,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard !groups.isEmpty else {
                 guard self.translationInView(tab) else { return }
                 if let language = unsupported.first {
-                    Toast.show(String(localized: "Can’t translate \(PageTranslator.name(of: language)) on this Mac", comment: "Toast when the page's text is in a language Apple's translation can't translate on this Mac. The language is its name, like Latin."), symbol: "translate", duration: 3, in: self)
+                    self.translationToast(tab, String(localized: "Can’t translate \(PageTranslator.name(of: language)) on this Mac", comment: "Toast when the page's text is in a language Apple's translation can't translate on this Mac. The language is its name, like Latin."), symbol: "translate", duration: 3)
                 } else {
-                    Toast.show(String(localized: "Nothing on this page needed translating", comment: "Toast when Translate finds no text on the page that isn't already in the person's language."), symbol: "translate", duration: 2, in: self)
+                    self.translationToast(tab, String(localized: "Nothing on this page needed translating", comment: "Toast when Translate finds no text on the page that isn't already in the person's language."), symbol: "translate", duration: 2)
                 }
                 return
             }
@@ -1836,15 +1854,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func showTranslating(_ run: PageTranslation, announces: Bool = true) {
         guard let tab = run.tab else { return }
-        translationToastTab = tab
+        let inMini = translationMini(tab) != nil
+        if !inMini { translationToastTab = tab }
         let percent = PageTranslator.percent(run.fraction)
         let text = percent > 0
             ? String(localized: "Translating from \(run.name)… \(percent)%", comment: "Toast while a page is translated, with how much is done. The language is its name, like French; then a percent, like 40%.")
             : String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French.")
-        Toast.show(text, symbol: "translate", duration: Self.translationTimeout + 5, announces: announces, in: self)
+        translationToast(tab, text, symbol: "translate", duration: Self.translationTimeout + 5, announces: announces)
     }
 
-    /// Another page came into view (another tab chosen, Peek opened or put away): the toast of a translation
+    /// Another page came into view (another tab chosen): the toast of a translation
     /// running for the page that left goes, and the one for the page now in view, if it's translating, shows.
     func translationViewChanged() {
         withdrawStaleTranslationOffer()
@@ -1852,8 +1871,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             translationToastTab = nil
             Toast.hide(in: self)
         }
-        let inView = peek.isVisible ? peek.tab : tabManager.selectedTab
-        if translationToastTab == nil, let inView, let run = translations.run(for: ObjectIdentifier(inView)) { showTranslating(run) }
+        if translationToastTab == nil, let inView = tabManager.selectedTab, let run = translations.run(for: ObjectIdentifier(inView)) { showTranslating(run) }
     }
 
     private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], shown: Set<Int>, groups: [PageTranslator.Group],
@@ -1863,7 +1881,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let run = PageTranslation(tab: tab, webView: webView, name: Words.list(names), site: site, source: groups.first?.source)
         let key = ObjectIdentifier(tab)
         guard translations.begin(run, for: key) else { return }
-        root.overlay.addSubview(run.host.view)
+        (translationMini(tab)?.overlay ?? root.overlay).addSubview(run.host.view)
         // Another page in the tab: that page isn't translated, and there's nothing to say.
         run.token = tab.changed.observe { [weak self, weak run, weak tab] change in
             guard change == .url, let self, let run, tab?.webView?.url != run.page else { return }
@@ -1875,7 +1893,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             run.lastProgress = Date()
             run.fraction = fraction
-            if let tab = run.tab, self.translationToastTab === tab, self.translationInView(tab) { self.showTranslating(run, announces: false) }
+            if let tab = run.tab, self.translationToastTab === tab || self.translationMini(tab) != nil, self.translationInView(tab) { self.showTranslating(run, announces: false) }
         }, completion: { [weak self, weak run, weak tab] result in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             self.endTranslation(run, for: key)
@@ -1887,10 +1905,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 tab.isTranslated = true
                 if let site = run.site, let source = run.source { self.translatedSites[site] = source }
                 guard inView else { return }
-                Toast.show(String(localized: "Translated from \(run.name)", comment: "Toast after a page is translated. The language is its name, like French."), symbol: "translate",
-                           action: (title: String(localized: "Show Original", comment: "Button in the toast after a page is translated: shows it untranslated again."), run: { [weak self, weak tab] in
-                               if let tab { self?.translatePage(tab: tab) }
-                           }), duration: 4, in: self)
+                self.translationToast(tab, String(localized: "Translated from \(run.name)", comment: "Toast after a page is translated. The language is its name, like French."), symbol: "translate",
+                                      action: (title: String(localized: "Show Original", comment: "Button in the toast after a page is translated: shows it untranslated again."), run: { [weak self, weak tab] in
+                                          if let tab { self?.translatePage(tab: tab) }
+                                      }), duration: 4)
             case .failure:
                 // Half done is no use to read: the page goes back to how it was.
                 if let webView = tab.webView { PageTranslator.restore(in: webView) }
@@ -1908,13 +1926,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self, let tab, !tab.isClosed, self.translationInView(tab) else { return }
             let message = PageTranslator.failureMessage(notDownloaded: missing)
             guard missing != nil else {
-                Toast.show(message, symbol: "exclamationmark.triangle", duration: 3, in: self)
+                self.translationToast(tab, message, symbol: "exclamationmark.triangle", duration: 3)
                 return
             }
-            Toast.show(message, symbol: "translate",
-                       action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
-                           if let tab { self?.translatePage(tab: tab) }
-                       }), duration: 6, in: self)
+            self.translationToast(tab, message, symbol: "translate",
+                                  action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
+                                      if let tab { self?.translatePage(tab: tab) }
+                                  }), duration: 6)
         }
     }
 
@@ -1929,7 +1947,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 self.watchTranslation(run, for: key, after: left)
                 return
             }
-            if self.window?.attachedSheet != nil {
+            if (run.host.view.window ?? self.window)?.attachedSheet != nil {
                 if self.translationInView(tab) { self.showTranslating(run) }
                 self.watchTranslation(run, for: key)
                 return
@@ -1950,6 +1968,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         run.host.view.removeFromSuperview()
         run.token = nil
         run.timeout?.cancel()
+        if let tab = run.tab, translationMini(tab) != nil { hideTranslationToast(tab) }
         if let tab = run.tab, translationToastTab === tab {
             translationToastTab = nil
             Toast.hide(in: self)
@@ -1985,9 +2004,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return selectedWebView
     }
 
-    /// What Print and Export as PDF take: the peek in front, the article Reader shows, or the page.
+    /// What Print and Export as PDF take: the article Reader shows, or the page.
     var printableWebView: WKWebView? {
-        if peek.isVisible, let webView = peek.tab?.webView { return webView }
         if let reader, readerTab === tabManager.selectedTab { return reader.webView }
         return selectedWebView
     }
@@ -2062,7 +2080,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         view.onOptions = { [weak self] in self?.toggleReaderOptions() }
         // The article's links are the page's, wherever they open.
         view.onOpenLink = { [weak self] link in self?.closeReader(); tab.load(link, by: .page) }
-        view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
+        view.onPeekLink = { [weak self] link in self?.open(link, disposition: .mini, opener: tab, by: .page) }
         view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
         view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
         view.currentSpace = { [weak self] in self?.tabManager.currentSpace }
@@ -2082,9 +2100,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Opened again quickly: one listener, never two.
         if let old = readerKeyMonitor { NSEvent.removeMonitor(old) }
         readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // A peek opened from the article is in front: Esc closes that first, and Reader stays. So does the
-            // command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
-            guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil, !self.peek.isVisible,
+            // The command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
+            guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil,
                   !self.hasFloatingPanel, (self.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
             self.closeReader()
             return nil
@@ -2453,8 +2470,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fadeTimer?.invalidate()
         numberHints?.stop()
         Autofill.shared.forget(windowOf: window)
-        // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
-        peek.close()
+        // A private window's Zigzag Minis are private too: they go with it.
+        if tabManager.isPrivate { MiniWindowController.all.filter { $0.source === self }.forEach { $0.window?.close() } }
         capture.cancel()
         capture.dismissPreview()
         // The mini player floats in a panel of its own: it goes with the window too.
@@ -2481,7 +2498,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens a URL as requested, switching to an existing tab if the page is open. `sender`: who gave the address; a
     /// page's link (⌘-click, Reader) is `.page`. `httpFallback`: `url` is https for a scheme-less address, retried over
-    /// http if unreachable (`CommandRanker.Destination`); Peek and new windows don't fall back.
+    /// http if unreachable (`CommandRanker.Destination`); Zigzag Mini and new windows don't fall back.
     func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true, by sender: Tab.LoadSender = .zigzag,
               httpFallback: Bool = false) {
         // A page that comes to the front, say a link from Mail, isn't left under the command bar the empty window opened with.
@@ -2504,8 +2521,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let tab = tabManager.newTab(url: url, select: false, opener: opener, by: sender, httpFallback: httpFallback)
             // Background link with the sidebar hidden: show a note. Not for tabs Zigzag opened itself (guide, restore).
             if sender == .page { newTabNote.show(tab) }
-        case .peek:
-            showPeek(url: url, configuration: nil, by: sender)
+        case .mini:
+            openInMini(url, configuration: nil, opener: opener ?? tabManager.selectedTab, by: sender)
         case .newWindow:
             // A private window's links stay private.
             WindowManager.shared.newWindow(url: url, isPrivate: tabManager.isPrivate)
@@ -2514,10 +2531,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Whether a Zigzag Mini opened from this window's pages is up, for the getting-started guide.
+    var hasMiniFromPage: Bool { MiniWindowController.all.contains { $0.source === self && $0.holdsPage } }
+
+    /// A link in Zigzag Mini over this window (⇧-click, Open Link in Zigzag Mini), in its page's profile and privacy.
     @discardableResult
-    func showPeek(url: URL?, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
+    func openInMini(_ url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
         commandBar.dismiss(restoringFocus: false)
-        return peek.show(url: url, configuration: configuration, opener: tabManager.selectedTab, by: sender)
+        return MiniWindowController.open(fromPage: url, configuration: configuration, opener: opener, in: self, by: sender).tab.webView
     }
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
@@ -2532,13 +2553,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Whether the view a point hits is the sidebar's, not something floating over it.
     static func isInSidebar(_ hit: NSView?, _ container: NSView) -> Bool {
         hit?.isDescendant(of: container) ?? false
-    }
-
-    /// Closes the peek, which floats above the page, so ⌘W puts it away before the tab. Find belongs to the tab and
-    /// goes with it, as in Safari; Esc closes find on its own. Returns true if something closed.
-    func dismissFloatingContent() -> Bool {
-        if peek.isVisible { peek.close(); return true }
-        return false
     }
 
     // MARK: Event interception
@@ -2582,9 +2596,7 @@ extension BrowserWindowController: TabHost {
     var hostWindow: NSWindow? { window }
 
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
-        // Inside peek, another peek just navigates the card.
         // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
-        if tab.isPeek, disposition == .peek { tab.load(url, by: sender); return }
         // A result opened from a search page keeps the search one Back away.
         if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
            let history = tab.interactionStateForSaving {
@@ -2609,7 +2621,7 @@ extension BrowserWindowController: TabHost {
             return nil
         }
         // Site routes (#286) apply to Open Link in New Tab and clicked new-tab links. Sized windows (sign-in pop-ups)
-        // and peeks are skipped.
+        // and Zigzag Mini are skipped.
         if let url = action.request.url, Tab.route(forPageLink: url, from: tab.url) == .load,
            features.width == nil, features.height == nil {
             let pending = BrowserWebView.pendingDisposition(for: tab.webView)
@@ -2624,7 +2636,7 @@ extension BrowserWindowController: TabHost {
             }
         }
         if let pending = BrowserWebView.takePendingDisposition(for: tab.webView) {
-            if pending == .peek { return showPeek(url: nil, configuration: configuration) }
+            if pending == .mini { return openInMini(nil, configuration: configuration, opener: tab, by: .page) }
             // A new window gets its own fresh page, not one tied to this tab (and a private one never shares anything).
             // From a private window, it is private too. Only a link to the web: an app's asks from the page here.
             if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
@@ -2638,12 +2650,6 @@ extension BrowserWindowController: TabHost {
             let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab, site: action.request.url)
             if pending == .backgroundTab { newTabNote.show(newTab, site: action.request.url) }
             return newTab.ensureWebView()
-        }
-        // Peeked pages open their links in the card itself, as the page's doing: an app's link asks, as it would
-        // from the page, and the site's Block holds.
-        if tab.isPeek, features.width == nil, features.height == nil, let url = action.request.url {
-            tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
-            return nil
         }
         // Search folding: a result that wants a new tab replaces the search instead, so Back returns to it.
         if action.navigationType == .linkActivated, action.modifierFlags.intersection([.command, .shift, .option]).isEmpty,
@@ -2663,8 +2669,6 @@ extension BrowserWindowController: TabHost {
     }
 
     func tabDidRequestClose(_ tab: Tab) {
-        // A peeked link that only fetched a file (or a page that closed itself): the card goes, not a tab.
-        if tab.isPeek, peek.tab === tab { peek.close(); return }
         tabManager.close(tab)
     }
 
@@ -2690,9 +2694,9 @@ extension BrowserWindowController: TabHost {
     }
 
     func tab(_ tab: Tab, hoveringLink url: URL?) {
-        guard tab === tabManager.selectedTab || tab.isPeek else { return }
+        guard tab === tabManager.selectedTab else { return }
         // Nothing about the page while a panel is over it.
-        linkStatus.show(hasFloatingPanel ? nil : url, in: tab.isPeek ? peek.contentFrame : root.cardFrame)
+        linkStatus.show(hasFloatingPanel ? nil : url, in: root.cardFrame)
     }
 
     /// One floating thing at a time: the command bar, site panel, downloads and space editor each close the
@@ -3582,8 +3586,6 @@ extension BrowserWindowController: CommandBarHost {
         DownloadsPanel.closeCurrent()
         ReaderOptions.closeCurrent()
         SpaceEditorPanel.current?.close()
-        // Over a peek, Esc and ⌘L would go to the peek's page or the tab behind it: put the peek away first.
-        peek.close()
         previews.hide()
         linkStatus.show(nil, in: root.cardFrame)
         // The sidebar slid out over the page steps aside too: the bar would open over its edge, and typing is no

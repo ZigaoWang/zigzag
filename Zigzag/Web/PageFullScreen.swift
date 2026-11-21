@@ -192,13 +192,13 @@ enum PageFullScreen {
 
     /// Esc with the keyboard somewhere else in the window (the sidebar, a pane beside it) leaves a page's full
     /// screen too: the one you're on first, else one beside it in a split. In the page itself, the page hears it.
-    /// What else is open over the page (a panel, Peek, the command bar) takes it first, and so does a field.
+    /// What else is open over the page (a panel, the command bar) takes it first, and so does a field.
     private static func watchEsc() {
         guard escMonitor == nil else { return }
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.keyCode == 53, !event.isARepeat, event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
                   let window = event.window, let controller = window.windowController as? BrowserWindowController,
-                  !controller.hasFloatingPanel, !controller.peek.isVisible, !controller.commandBar.isVisible,
+                  !controller.hasFloatingPanel, !controller.commandBar.isVisible,
                   !(window.firstResponder is NSText), let tab = pageInFullScreen(in: controller) else { return event }
             if let responder = window.firstResponder as? NSView, let webView = tab.webView, responder.isDescendant(of: webView) { return event }
             exit(tab)

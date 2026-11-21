@@ -1385,7 +1385,7 @@ final class ScrimView: ColorView {
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
 
     /// Fades in from its current opacity, reversing a fade-out instead of flashing. `evenFromKeyboard`: fade even from
-    /// a key (a peek), unlike the command bar. `animated` false: shown at once.
+    /// a key (a sheet), unlike the command bar. `animated` false: shown at once.
     func show(evenFromKeyboard: Bool = false, animated: Bool = true) {
         isLeaving = false
         let shown = layer?.presentation()?.opacity
@@ -1394,7 +1394,7 @@ final class ScrimView: ColorView {
         Tokens.Motion.fadeBackdrop(self, entering: true, evenFromKeyboard: evenFromKeyboard)
     }
 
-    /// `evenFromKeyboard`: it fades with something that leaves even from a key (a peek), rather than going at once
+    /// `evenFromKeyboard`: it fades with something that leaves even from a key (a sheet), rather than going at once
     /// with the command bar.
     func hide(evenFromKeyboard: Bool = false) {
         isLeaving = true

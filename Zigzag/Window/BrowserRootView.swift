@@ -474,16 +474,16 @@ final class BrowserRootView: SpaceFrameView {
     // MARK: Zoom (#160)
 
     /// The pane enlarged over the others for a moment (its index in the group), nil for none. Nothing in the layout
-    /// changes: the others stay where they are, live, under Peek's dimming, and the pane goes back to its place.
+    /// changes: the others stay where they are, live, under a firm dimming, and the pane goes back to its place.
     private(set) var zoomedPane: Int?
-    /// Over the other panes, under the enlarged one, dimmed as under Peek; a click on it puts the pane back.
+    /// Over the other panes, under the enlarged one, dimmed; a click on it puts the pane back.
     let zoomScrim = ScrimView()
 
-    /// The enlarged pane's frame: the page area inset as Peek's card is, so it reads as the same layer over the page.
+    /// The enlarged pane's frame: the page area inset, so it reads as a layer over the page.
     var zoomFrame: NSRect {
         let area = cardFrame
-        let dx = max(Tokens.Space.x8, Tokens.Space.snap(area.width * Tokens.Metric.peekInsetRatio))
-        let dy = max(Tokens.Space.x6, Tokens.Space.snap(area.height * Tokens.Metric.peekInsetRatio * 0.6))
+        let dx = max(Tokens.Space.x8, Tokens.Space.snap(area.width * Tokens.Metric.zoomInsetRatio))
+        let dy = max(Tokens.Space.x6, Tokens.Space.snap(area.height * Tokens.Metric.zoomInsetRatio * 0.6))
         return area.insetBy(dx: dx, dy: dy)
     }
 
@@ -497,7 +497,7 @@ final class BrowserRootView: SpaceFrameView {
         let cards = paneCards
         if let index {
             if zoomScrim.superview !== self { addSubview(zoomScrim) }
-            zoomScrim.color = Tokens.Color.peekScrim
+            zoomScrim.color = Tokens.Color.zoomScrim
             zoomScrim.frame = cardFrame
             orderForZoom(cards[index])
             zoomScrim.show(evenFromKeyboard: true, animated: animated)
@@ -585,7 +585,7 @@ final class BrowserRootView: SpaceFrameView {
     /// Glow on the sidebar edge while a question waits that this window can't show.
     private let attentionEdge = AttentionEdge()
     private var attentionToken: SignalToken?
-    /// Floating surfaces (command bar, previews, peek) live here, above everything.
+    /// Floating surfaces (command bar, previews) live here, above everything.
     let overlay = PassthroughView()
     /// An extension's side panel, docked right of the page while open.
     let sidePanel = ExtensionSidePanelView()
