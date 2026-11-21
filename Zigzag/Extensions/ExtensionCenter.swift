@@ -65,16 +65,6 @@ enum ExtensionCenter {
     }
     static func tabChanged(_ tab: Tab, _ change: Tab.Change) { tab.extensionHost?.tabChanged(tab, change) }
 
-    /// A Peek page is a tab of its window, the active one while it's up (#374).
-    static func peekOpened(_ tab: Tab, over previous: Tab?) {
-        tabOpened(tab)
-        tabActivated(tab, previous: previous)
-    }
-    /// The Peek put away: its page closes, and the tab under it is the active one again, if still selected.
-    static func peekClosed(_ tab: Tab, backTo under: Tab?) {
-        tabClosed(tab)
-        if let under { tabActivated(under, previous: nil) }
-    }
 
     // MARK: Windows
 

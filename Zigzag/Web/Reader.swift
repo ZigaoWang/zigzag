@@ -1228,7 +1228,7 @@ extension ReaderView: WKNavigationDelegate {
                 return .cancel
             }
             let flags = navigationAction.modifierFlags
-            // The same as on any page: ⌘ for a tab behind, ⌘⇧ for one in front, ⇧ alone to peek.
+            // The same as on any page: ⌘ for a tab behind, ⌘⇧ for one in front, ⇧ alone for Zigzag Mini.
             if flags.contains(.command) || navigationAction.buttonNumber == 4 {
                 if flags.contains(.shift) { onForegroundLink?(url) } else { onBackgroundLink?(url) }
             } else if flags.contains(.shift) { onPeekLink?(url) }

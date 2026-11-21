@@ -181,7 +181,7 @@ enum Brand {
             }
         }
 
-        /// A floating panel's surface (the command bar, menus, find, downloads, Peek): nearly white by day and a deep
+        /// A floating panel's surface (the command bar, menus, find, downloads): nearly white by day and a deep
         /// gray at night, each leaning just perceptibly toward the space, so a panel belongs to the window it's in
         /// and its text always reads.
         var panel: NSColor {

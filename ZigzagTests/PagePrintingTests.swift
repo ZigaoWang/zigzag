@@ -11,7 +11,7 @@ import WebKit
         #expect(Tab.instancesRespond(to: NSSelectorFromString("_webView:printFrame:")))
     }
 
-    /// Popups answer a page's print() as tabs do (Zigzag Mini, installed apps and Peek pages are tabs).
+    /// Popups answer a page's print() as tabs do (Zigzag Mini and installed apps are tabs).
     @Test func aPopupAnswersAPagesPrintRequest() {
         #expect(PopupWindowController.instancesRespond(to: NSSelectorFromString("_webView:printFrame:pdfFirstPageSize:completionHandler:")))
         #expect(PopupWindowController.instancesRespond(to: NSSelectorFromString("_webView:printFrame:")))
