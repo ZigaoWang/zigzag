@@ -823,9 +823,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let showClose = (isHovered || resting) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil && number == nil
         closeButton.isHidden = !showClose
         // The × closes the whole row, a split's or group's every page as a single tab's one.
+        let withTab = parts.contains { $0.page.map { $0.bookmarkID == nil } ?? false }
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
-            : isBookmark && isSplit ? String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")
-            : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.")
+            : isBookmark && isSplit && !withTab ? String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")
+            : isBookmark && !isSplit ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.")
             : isSplit ? String(localized: "Close Split View", comment: "Item in a tab's context menu in the sidebar, for a page of a split view: closes all its pages.")
             : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil

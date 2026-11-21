@@ -82,6 +82,23 @@ import Testing
         }
     }
 
+    /// A pinned page split with a tab: its × closes the split, so it says so; two pinned pages' says it unloads them.
+    @Test func aPinnedPageWithATabSaysItClosesTheSplit() throws {
+        try inWindow(["A", "B", "C"]) { _, tabs in
+            tabs[0].bookmarkID = UUID()
+            @MainActor func tip(_ partner: Tab) -> String? {
+                let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
+                row.isBookmark = true
+                row.configure(tab: tabs[0])
+                row.configure(parts: [TabRowView.Part(page: partner)])
+                return row.closeButton.toolTip
+            }
+            #expect(tip(tabs[1]) == "Close Split View")
+            tabs[2].bookmarkID = UUID()
+            #expect(tip(tabs[2]) == "Unload Pages")
+        }
+    }
+
     /// The row's × closes every page of the split, and one ⌘Z brings them back side by side.
     @Test func theRowsCloseButtonClosesTheSplit() throws {
         try inWindow(["A", "B", "C"]) { controller, tabs in
