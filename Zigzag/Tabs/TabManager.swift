@@ -668,6 +668,16 @@ final class TabManager {
         insert(tab, at: newTabIndex(in: currentSpaceID, opener: nil, select: true))
     }
 
+    /// A page from outside the list (a Zigzag Mini opened from a link) right after the tab it came from, and shown.
+    /// False when that tab isn't in the space in front.
+    @discardableResult
+    func insert(_ tab: Tab, after anchor: Tab) -> Bool {
+        guard let at = (tabsBySpace[currentSpaceID] ?? []).firstIndex(where: { $0 === anchor }) else { return false }
+        tab.groupID = anchor.groupID
+        insert(tab, at: TabTree.subtreeEnd(at: at, in: treeNodes(in: currentSpaceID)), under: .some(anchor.parentID))
+        return true
+    }
+
     /// Inserts already-built tabs (session restore, imports) without selecting.
     func adopt(_ tabs: [Tab], in spaceID: UUID) {
         for tab in tabs { tab.host = host; watch(tab) }

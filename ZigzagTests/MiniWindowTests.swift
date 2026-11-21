@@ -226,3 +226,93 @@ struct MiniWindowTests {
         }
     }
 }
+
+/// Zigzag Mini opened from a link on a page: over that window, in the page's profile and privacy, and ⌘O puts the
+/// page right after the tab it came from.
+@MainActor
+struct MiniFromPageTests {
+    private func inWindow(isPrivate: Bool = false, _ body: (BrowserWindowController, Tab) async throws -> Void) async rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space, isPrivate: isPrivate)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: nil, spaceID: space)
+        let source = manager.newTab(url: nil, spaceID: space)
+        _ = manager.newTab(url: nil, spaceID: space, select: false)
+        _ = first
+        manager.select(source)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.orderBack(nil)
+        controller.window?.layoutIfNeeded()
+        try await body(controller, source)
+    }
+
+    @Test func itOpensOverTheWindowsPage() async throws {
+        try await inWindow { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            let window = try #require(controller.window)
+            let root = controller.root
+            let page = window.convertToScreen(root.convert(root.cardFrame, to: nil))
+            let frame = try #require(mini.window?.frame)
+            let area = try #require((window.screen ?? NSScreen.main)?.visibleFrame)
+            #expect(area.contains(frame))
+            #expect(frame.size == MiniWindowController.openingSize || frame.width <= area.width)
+            // Centered on the page as far as the screen allows.
+            if area.insetBy(dx: 1, dy: 1).contains(NSRect(x: page.midX - frame.width / 2, y: page.midY - frame.height / 2, width: frame.width, height: frame.height)) {
+                #expect(abs(frame.midX - page.midX) <= 1 && abs(frame.midY - page.midY) <= 1)
+            }
+            #expect(mini.fromPage && mini.source === controller)
+            #expect(mini.tab.spaceID == controller.tabManager.currentSpaceID)
+            #expect(!mini.isPrivate)
+        }
+    }
+
+    @Test func aPrivateWindowsMiniIsPrivate() async throws {
+        try await inWindow(isPrivate: true) { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            #expect(mini.isPrivate)
+            let store = try #require(mini.tab.webView?.configuration.websiteDataStore)
+            #expect(!store.isPersistent)
+            #expect(store === controller.tabManager.privateStore)
+            #expect(mini.savedForRelaunch == nil)
+        }
+    }
+
+    @Test func openInZigzagPutsItRightAfterTheTabItCameFrom() async throws {
+        try await inWindow { controller, source in
+            let manager = controller.tabManager
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).html")
+            try "<p>Mini</p>".write(to: file, atomically: true, encoding: .utf8)
+            defer { try? FileManager.default.removeItem(at: file) }
+            let mini = MiniWindowController.open(fromPage: file, configuration: nil, opener: source, in: controller)
+            let page = mini.tab
+            for _ in 0..<200 where page.url == nil { try await Task.sleep(for: .milliseconds(20)) }
+            mini.openInZigzag()
+            for _ in 0..<200 where !manager.tabs(in: manager.currentSpaceID).contains(where: { $0 === page }) { try await Task.sleep(for: .milliseconds(20)) }
+            let list = manager.tabs(in: manager.currentSpaceID)
+            let at = try #require(list.firstIndex { $0 === source })
+            #expect(list.indices.contains(at + 1) && list[at + 1] === page)
+            #expect(manager.selectedTab === page)
+            // The same live page, never reloaded.
+            #expect(page.webView != nil && !page.isClosed)
+        }
+    }
+
+    @Test func aTabFromOutsideGoesRightAfterItsAnchor() {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let a = manager.newTab(url: nil, spaceID: space)
+        let b = manager.newTab(url: nil, spaceID: space)
+        let page = Tab(url: nil, spaceID: space)
+        #expect(manager.insert(page, after: a))
+        let list = manager.tabs(in: space)
+        #expect(list.firstIndex { $0 === page } == list.firstIndex { $0 === a }.map { $0 + 1 })
+        #expect(list.contains { $0 === b })
+        // An anchor that isn't in the space in front: nothing placed.
+        #expect(!manager.insert(Tab(url: nil, spaceID: space), after: Tab(url: nil, spaceID: space)))
+    }
+}

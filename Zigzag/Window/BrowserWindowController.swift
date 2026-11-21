@@ -1738,7 +1738,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
     private func translationInView(_ tab: Tab) -> Bool {
-        PageTranslator.isInView(tab, selected: tabManager.selectedTab, peeked: peek.isVisible ? peek.tab : nil)
+        translationMini(tab) != nil || PageTranslator.isInView(tab, selected: tabManager.selectedTab, peeked: peek.isVisible ? peek.tab : nil)
+    }
+
+    /// The Zigzag Mini showing `tab`, which this window translates: that page's toasts go over the Mini.
+    private func translationMini(_ tab: Tab) -> MiniWindowController? {
+        MiniWindowController.all.first { $0.tab === tab && $0.holdsPage }
+    }
+
+    /// A translation toast over the page it's about: a Zigzag Mini's, or this window's.
+    private func translationToast(_ tab: Tab, _ text: String, symbol: String, action: (title: String, run: () -> Void)? = nil,
+                                  duration: TimeInterval, announces: Bool = true) {
+        if let mini = translationMini(tab) {
+            Toast.show(text, symbol: symbol, action: action, duration: duration, over: mini.overlay, area: mini.overlay.bounds, announces: announces)
+        } else {
+            Toast.show(text, symbol: symbol, action: action, duration: duration, announces: announces, in: self)
+        }
+    }
+
+    private func hideTranslationToast(_ tab: Tab) {
+        if let mini = translationMini(tab) { Toast.hide(over: mini.overlay) } else { Toast.hide(in: self) }
     }
 
     /// The page the visible translation offer is for; removed when the tab or page changes.
@@ -1767,6 +1786,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showTranslationOffer(_ tab: Tab, language: Locale.Language) {
+        if let mini = translationMini(tab) {
+            Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
+                       action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
+                           if let tab { self?.translatePage(tab: tab) }
+                       }), duration: 6, closes: true, over: mini.overlay, area: mini.overlay.bounds)
+            return
+        }
         translationOfferPage = tab.url
         Toast.show(String(localized: "This page is in \(PageTranslator.name(of: language))", comment: "Toast offering to translate a page. The language is its name, like French."), symbol: "translate",
                    action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
@@ -1791,7 +1817,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             PageTranslator.restore(in: webView)
             tab.isTranslated = false
             if let site { translatedSites[site] = nil }
-            if translationInView(tab) { Toast.hide(in: self) }
+            if translationInView(tab) { hideTranslationToast(tab) }
             return
         }
         planningTranslation.insert(key)
@@ -1824,9 +1850,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard !groups.isEmpty else {
                 guard self.translationInView(tab) else { return }
                 if let language = unsupported.first {
-                    Toast.show(String(localized: "Can’t translate \(PageTranslator.name(of: language)) on this Mac", comment: "Toast when the page's text is in a language Apple's translation can't translate on this Mac. The language is its name, like Latin."), symbol: "translate", duration: 3, in: self)
+                    self.translationToast(tab, String(localized: "Can’t translate \(PageTranslator.name(of: language)) on this Mac", comment: "Toast when the page's text is in a language Apple's translation can't translate on this Mac. The language is its name, like Latin."), symbol: "translate", duration: 3)
                 } else {
-                    Toast.show(String(localized: "Nothing on this page needed translating", comment: "Toast when Translate finds no text on the page that isn't already in the person's language."), symbol: "translate", duration: 2, in: self)
+                    self.translationToast(tab, String(localized: "Nothing on this page needed translating", comment: "Toast when Translate finds no text on the page that isn't already in the person's language."), symbol: "translate", duration: 2)
                 }
                 return
             }
@@ -1836,12 +1862,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func showTranslating(_ run: PageTranslation, announces: Bool = true) {
         guard let tab = run.tab else { return }
-        translationToastTab = tab
+        let inMini = translationMini(tab) != nil
+        if !inMini { translationToastTab = tab }
         let percent = PageTranslator.percent(run.fraction)
         let text = percent > 0
             ? String(localized: "Translating from \(run.name)… \(percent)%", comment: "Toast while a page is translated, with how much is done. The language is its name, like French; then a percent, like 40%.")
             : String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French.")
-        Toast.show(text, symbol: "translate", duration: Self.translationTimeout + 5, announces: announces, in: self)
+        translationToast(tab, text, symbol: "translate", duration: Self.translationTimeout + 5, announces: announces)
     }
 
     /// Another page came into view (another tab chosen, Peek opened or put away): the toast of a translation
@@ -1863,7 +1890,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let run = PageTranslation(tab: tab, webView: webView, name: Words.list(names), site: site, source: groups.first?.source)
         let key = ObjectIdentifier(tab)
         guard translations.begin(run, for: key) else { return }
-        root.overlay.addSubview(run.host.view)
+        (translationMini(tab)?.overlay ?? root.overlay).addSubview(run.host.view)
         // Another page in the tab: that page isn't translated, and there's nothing to say.
         run.token = tab.changed.observe { [weak self, weak run, weak tab] change in
             guard change == .url, let self, let run, tab?.webView?.url != run.page else { return }
@@ -1875,7 +1902,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             run.lastProgress = Date()
             run.fraction = fraction
-            if let tab = run.tab, self.translationToastTab === tab, self.translationInView(tab) { self.showTranslating(run, announces: false) }
+            if let tab = run.tab, self.translationToastTab === tab || self.translationMini(tab) != nil, self.translationInView(tab) { self.showTranslating(run, announces: false) }
         }, completion: { [weak self, weak run, weak tab] result in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             self.endTranslation(run, for: key)
@@ -1887,10 +1914,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 tab.isTranslated = true
                 if let site = run.site, let source = run.source { self.translatedSites[site] = source }
                 guard inView else { return }
-                Toast.show(String(localized: "Translated from \(run.name)", comment: "Toast after a page is translated. The language is its name, like French."), symbol: "translate",
-                           action: (title: String(localized: "Show Original", comment: "Button in the toast after a page is translated: shows it untranslated again."), run: { [weak self, weak tab] in
-                               if let tab { self?.translatePage(tab: tab) }
-                           }), duration: 4, in: self)
+                self.translationToast(tab, String(localized: "Translated from \(run.name)", comment: "Toast after a page is translated. The language is its name, like French."), symbol: "translate",
+                                      action: (title: String(localized: "Show Original", comment: "Button in the toast after a page is translated: shows it untranslated again."), run: { [weak self, weak tab] in
+                                          if let tab { self?.translatePage(tab: tab) }
+                                      }), duration: 4)
             case .failure:
                 // Half done is no use to read: the page goes back to how it was.
                 if let webView = tab.webView { PageTranslator.restore(in: webView) }
@@ -1908,13 +1935,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self, let tab, !tab.isClosed, self.translationInView(tab) else { return }
             let message = PageTranslator.failureMessage(notDownloaded: missing)
             guard missing != nil else {
-                Toast.show(message, symbol: "exclamationmark.triangle", duration: 3, in: self)
+                self.translationToast(tab, message, symbol: "exclamationmark.triangle", duration: 3)
                 return
             }
-            Toast.show(message, symbol: "translate",
-                       action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
-                           if let tab { self?.translatePage(tab: tab) }
-                       }), duration: 6, in: self)
+            self.translationToast(tab, message, symbol: "translate",
+                                  action: (title: String(localized: "Translate", comment: "Button in the toast that offers to translate a page."), run: { [weak self, weak tab] in
+                                      if let tab { self?.translatePage(tab: tab) }
+                                  }), duration: 6)
         }
     }
 
@@ -1929,7 +1956,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 self.watchTranslation(run, for: key, after: left)
                 return
             }
-            if self.window?.attachedSheet != nil {
+            if (run.host.view.window ?? self.window)?.attachedSheet != nil {
                 if self.translationInView(tab) { self.showTranslating(run) }
                 self.watchTranslation(run, for: key)
                 return
@@ -1950,6 +1977,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         run.host.view.removeFromSuperview()
         run.token = nil
         run.timeout?.cancel()
+        if let tab = run.tab, translationMini(tab) != nil { hideTranslationToast(tab) }
         if let tab = run.tab, translationToastTab === tab {
             translationToastTab = nil
             Toast.hide(in: self)
@@ -2455,6 +2483,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         // The peeked page isn't one of the window's tabs: it goes with the window, not whenever this is freed.
         peek.close()
+        // A private window's Zigzag Minis are private too: they go with it.
+        if tabManager.isPrivate { MiniWindowController.all.filter { $0.source === self }.forEach { $0.window?.close() } }
         capture.cancel()
         capture.dismissPreview()
         // The mini player floats in a panel of its own: it goes with the window too.

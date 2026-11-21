@@ -1347,13 +1347,14 @@ final class ExtensionHost: NSObject {
     // Zigzag Mini windows: a window with its one tab, like a sign-in popup. Its tab is a real one, so its changes are told
     // as any tab's are.
     func miniOpened(_ mini: MiniWindowController) {
+        guard tells(mini.tab) else { return }
         controller.didOpenWindow(mini)
         controller.didOpenTab(mini.tab)
         controller.didFocusWindow(mini)
         controller.didActivateTab(mini.tab, previousActiveTab: nil)
     }
-    func miniFocused(_ mini: MiniWindowController) { controller.didFocusWindow(mini) }
-    func miniClosed(_ mini: MiniWindowController) { controller.didCloseWindow(mini) }
+    func miniFocused(_ mini: MiniWindowController) { if tells(mini.tab) { controller.didFocusWindow(mini) } }
+    func miniClosed(_ mini: MiniWindowController) { if tells(mini.tab) { controller.didCloseWindow(mini) } }
     func windowClosed(_ window: BrowserWindowController) {
         guard !window.tabManager.isPrivate || runsInPrivate else { return }
         controller.didCloseWindow(window)

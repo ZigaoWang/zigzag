@@ -990,9 +990,12 @@ enum Toast {
     }
 
     /// Takes down the toast showing in this window, if any.
-    static func hide(in controller: BrowserWindowController) {
-        let state = state(for: controller.root.overlay)
-        guard let toast = state.toast, toast.superview === controller.root.overlay else { return }
+    static func hide(in controller: BrowserWindowController) { hide(over: controller.root.overlay) }
+
+    /// Takes down the toast showing over `host`, if any.
+    static func hide(over host: NSView) {
+        let state = state(for: host)
+        guard let toast = state.toast, toast.superview === host else { return }
         state.hideWork?.cancel()
         toast.dismiss()
         state.toast = nil

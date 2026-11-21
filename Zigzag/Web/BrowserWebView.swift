@@ -200,8 +200,8 @@ final class BrowserWebView: WKWebView {
         }
         addOpenSelection(to: menu)
         addSaveToPins(to: menu)
-        // Only in a browser window's page, which does the translating; not Zigzag Mini's or a web app's.
-        if let owner, WindowManager.shared.controller(for: window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
+        // In a browser window's page or Zigzag Mini's, which a browser window translates; not a web app's.
+        if let owner, WindowManager.shared.controller(for: window) != nil || MiniWindowController.showing(window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
         Self.placeInspectElementLast(in: menu)
         #if DEBUG
@@ -383,6 +383,7 @@ final class BrowserWebView: WKWebView {
     static let translateItemIdentifier = "ZigzagTranslatePage"
 
     @objc private func translatePage(_ sender: NSMenuItem) {
+        if let mini = MiniWindowController.showing(window) { mini.translatePage(sender); return }
         guard let owner, let controller = WindowManager.shared.controller(for: window) else { return }
         controller.translatePage(tab: owner)
     }
