@@ -17,6 +17,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 翻译很长的网页不会再在 45 秒后放弃了。屏幕上看得到的部分先翻，翻好一段就换上一段，提示里会显示翻到多少了；只有连续 45 秒什么都没翻出来才会报错。感谢 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
 - 红黄绿按钮和旁边的按钮现在正好在窗口顶部和地址栏中间，上下留白一样，不再偏下。
 - 为了修好 macOS 26 上 Mac 的密码列表，Zigzag 会在你的 Mac 上记一份很小的步骤日志，绝不记你的登录信息，放在 ~/Library/Logs/Zigzag/passwords.log。“帮助 › 报告问题”会附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+- 轻扫后退或前进时，箭头不会再扫到一半就变成实心，手指一停又变回空心。现在只有扫得够远箭头才会变实心，手指停住不动时箭头保持原样。手指还在移动时快速一扫松手，照样会后退或前进。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 
 ## [0.9.4] - 2026-11-21
 
