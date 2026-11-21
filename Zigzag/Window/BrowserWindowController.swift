@@ -1703,6 +1703,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let host = TranslationHost()
         var token: SignalToken?
         var timeout: DispatchWorkItem?
+        /// When the last batch came back, or it started: the time limit counts from here.
+        var lastProgress = Date()
+        /// How much of it is done, 0 to 1.
+        var fraction: Double = 0
 
         init(tab: Tab, webView: WKWebView, name: String, site: String?, source: Locale.Language?) {
             self.tab = tab
@@ -1724,8 +1728,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var translationOffered: Set<String> = []
     /// Sites translated this session and their source language; their other pages auto-translate when in that language.
     private var translatedSites: [String: Locale.Language] = [:]
-    /// How long a translation may take before it says so instead of spinning on: Apple's translation can wait on
-    /// a prompt that never comes up, or not answer at all.
+    /// How long a translation may go without a batch coming back before it says so instead of spinning on: Apple's
+    /// translation can wait on a prompt that never comes up, or not answer at all. A long page that keeps coming
+    /// back keeps going (#465).
     private static let translationTimeout: TimeInterval = 45
 
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
@@ -1822,14 +1827,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 }
                 return
             }
-            self.startTranslating(tab, webView: webView, pieces: text.pieces, groups: groups, into: target, site: site)
+            self.startTranslating(tab, webView: webView, pieces: text.pieces, shown: Set(text.shown ?? []), groups: groups, into: target, site: site)
         }
     }
 
-    private func showTranslating(_ run: PageTranslation) {
+    private func showTranslating(_ run: PageTranslation, announces: Bool = true) {
         guard let tab = run.tab else { return }
         translationToastTab = tab
-        Toast.show(String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French."), symbol: "translate", duration: Self.translationTimeout + 5, in: self)
+        let percent = PageTranslator.percent(run.fraction)
+        let text = percent > 0
+            ? String(localized: "Translating from \(run.name)… \(percent)%", comment: "Toast while a page is translated, with how much is done. The language is its name, like French; then a percent, like 40%.")
+            : String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French.")
+        Toast.show(text, symbol: "translate", duration: Self.translationTimeout + 5, announces: announces, in: self)
     }
 
     /// Another page came into view (another tab chosen, Peek opened or put away): the toast of a translation
@@ -1844,7 +1853,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if translationToastTab == nil, let inView, let run = translations.run(for: ObjectIdentifier(inView)) { showTranslating(run) }
     }
 
-    private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], groups: [PageTranslator.Group],
+    private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], shown: Set<Int>, groups: [PageTranslator.Group],
                                   into target: Locale.Language, site: String?) {
         var names: [String] = []
         for group in groups where !names.contains(PageTranslator.name(of: group.source)) { names.append(PageTranslator.name(of: group.source)) }
@@ -1859,7 +1868,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         if translationInView(tab) { showTranslating(run) }
         watchTranslation(run, for: key)
-        run.host.translate(webView, pieces: pieces, groups: groups, into: target, progress: { _ in }, completion: { [weak self, weak run, weak tab] result in
+        run.host.translate(webView, pieces: pieces, shown: shown, groups: groups, into: target, progress: { [weak self, weak run] fraction in
+            guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
+            run.lastProgress = Date()
+            run.fraction = fraction
+            if let tab = run.tab, self.translationToastTab === tab, self.translationInView(tab) { self.showTranslating(run, announces: false) }
+        }, completion: { [weak self, weak run, weak tab] result in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             self.endTranslation(run, for: key)
             guard let tab, !tab.isClosed, tab.webView?.url == run.page else { return }
@@ -1903,10 +1917,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// No answer in time: it stops, the page goes back to how it was, and it says it couldn't. While macOS asks
     /// to download the language (its sheet on this window), it waits for you, however long that takes.
-    private func watchTranslation(_ run: PageTranslation, for key: ObjectIdentifier) {
+    private func watchTranslation(_ run: PageTranslation, for key: ObjectIdentifier, after wait: TimeInterval = translationTimeout) {
         let work = DispatchWorkItem { [weak self, weak run] in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             guard let tab = run.tab, !tab.isClosed else { self.endTranslation(run, for: key); return }
+            // A batch came back since: the limit runs from that one.
+            if let left = PageTranslator.waitLeft(lastProgress: run.lastProgress, now: Date(), limit: Self.translationTimeout) {
+                self.watchTranslation(run, for: key, after: left)
+                return
+            }
             if self.window?.attachedSheet != nil {
                 if self.translationInView(tab) { self.showTranslating(run) }
                 self.watchTranslation(run, for: key)
@@ -1918,7 +1937,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.showTranslationFailed(tab, from: run.source.map { [$0] } ?? [], into: PageTranslator.readerLanguage)
         }
         run.timeout = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.translationTimeout, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
     }
 
     /// Done, given up, or its page gone: its session stops and its toast, if showing, goes.
