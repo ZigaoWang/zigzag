@@ -10,6 +10,14 @@ struct TopBarTests {
     let bar = TopBarView.height
     let inset = Tokens.Metric.cardInset
 
+    /// With the sidebar away the bar is the address's only home, and the lights' room with it (#469).
+    @Test func theAddressGoesToTheBarWhenTheSidebarIsAway() {
+        #expect(BrowserRootView.AddressPlacement.inBar(addressAbovePage: false, sidebarVisible: false))
+        #expect(BrowserRootView.AddressPlacement.inBar(addressAbovePage: true, sidebarVisible: false))
+        #expect(BrowserRootView.AddressPlacement.inBar(addressAbovePage: true, sidebarVisible: true))
+        #expect(!BrowserRootView.AddressPlacement.inBar(addressAbovePage: false, sidebarVisible: true))
+    }
+
     @Test func barSitsOnTheTrafficLightsLine() {
         #expect(bar / 2 == Tokens.Sidebar.lightsCenter)
         let frames = TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: 6)
