@@ -137,7 +137,7 @@ struct WebAppWindowTests {
         #expect(hide?.action == #selector(WebAppWindowController.hideWebApp(_:)))
         let all = items(built.menu)
         // Nothing that ends Zigzag, or opens a tab or a browser window by surprise.
-        let browserOnly: [Selector] = [#selector(NSApplication.terminate(_:)), #selector(BrowserWindowController.newTab(_:)),
+        let browserOnly: [Selector] = [#selector(NSApplication.terminate(_:)), #selector(AppDelegate.quitFromMenu(_:)), #selector(BrowserWindowController.newTab(_:)),
                                        #selector(AppDelegate.newWindow(_:)), #selector(AppDelegate.newPrivateWindow(_:)),
                                        #selector(BrowserWindowController.openLocation(_:)), #selector(BrowserWindowController.installAsApp(_:)),
                                        #selector(BrowserWindowController.reopenClosedTab(_:)), #selector(AppDelegate.showHistory(_:)),

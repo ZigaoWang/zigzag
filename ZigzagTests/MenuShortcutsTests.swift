@@ -65,6 +65,22 @@ import Testing
     }
 
     /// ⌘T opens the command bar for a new tab; ⌘T again closes it.
+    @Test func onlyTheCommandQKeyCountsAsTheQuitToAskAbout() {
+        let quit = MainMenu.build().items.first?.submenu?.items.first { $0.keyEquivalent == "q" }
+        #expect(quit?.action == #selector(AppDelegate.quitFromMenu(_:)))
+        func key(_ characters: String, _ flags: NSEvent.ModifierFlags) -> NSEvent? {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                             characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: 12)
+        }
+        #expect(AppDelegate.isQuitKey(key("q", .command)))
+        // Return on the highlighted item, a click, or no event at all is choosing it in the menu.
+        #expect(!AppDelegate.isQuitKey(key("\r", [])))
+        #expect(!AppDelegate.isQuitKey(key("q", [.command, .option])))
+        #expect(!AppDelegate.isQuitKey(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                          context: nil, eventNumber: 0, clickCount: 1, pressure: 0)))
+        #expect(!AppDelegate.isQuitKey(nil))
+    }
+
     @Test func commandTOpensTheNewTabBarAndAgainClosesIt() async throws {
         #expect(keys(#selector(BrowserWindowController.newTab(_:))) == ["⌘t"])
         try await inWindow([nil]) { controller, _ in

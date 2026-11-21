@@ -111,7 +111,7 @@ enum MainMenu {
             item(String(localized: "Hide Others", comment: "Zigzag menu item."), #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
             item(String(localized: "Show All", comment: "Zigzag menu item."), #selector(NSApplication.unhideAllApplications(_:)), ""),
             .separator(),
-            item(String(localized: "Quit Zigzag", comment: "Zigzag menu item."), #selector(NSApplication.terminate(_:)), "q"),
+            item(String(localized: "Quit Zigzag", comment: "Zigzag menu item."), #selector(AppDelegate.quitFromMenu(_:)), "q"),
         ]))
 
         main.addItem(submenu(String(localized: "File", comment: "A menu in the menu bar."), [
