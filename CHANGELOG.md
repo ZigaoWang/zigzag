@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A split view page's strip keeps as much room above its buttons and address as below them, instead of sitting half a point high.
 - A split view page on plain http shows the not-secure mark in its strip's address, as the sidebar's address does.
 - A local file open in a split view shows its name in its strip's address instead of "file:", and History and Settings show their names too.
+- A folder's or group's name in the sidebar takes the space's own ink, as the pinned pages and tabs under it do, instead of plain black or white.
 
 ## [0.9.3] - 2026-11-18
 

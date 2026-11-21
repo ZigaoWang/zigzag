@@ -1354,6 +1354,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         setAccessibilityLabel(tabGroup ? String(localized: "\(name), group, \(count) tabs", comment: "Accessibility label of a group of tabs in the sidebar: its name, then how many tabs it holds.")
                               : String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
         setAccessibilityValue(open ? 1 : 0)
+        title.textColor = Brand.Theme.for(self).rowInk
         needsLayout = true
     }
 
@@ -1395,6 +1396,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func stateDidChange(animated: Bool) {
         super.stateDidChange(animated: animated)
+        // The space's ink, as the pinned pages under it.
+        title.textColor = Brand.Theme.for(self).rowInk
         if isDropTarget {
             // The one drop target look, as on the favorites and a split's half.
             setLifted(false)
