@@ -467,16 +467,20 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   that paper (`Palette.space`): text 11:1 where the paper allows and never under 7:1, links 7:1, soft words 4.5:1,
   tested in every curated color, custom hues at every strength and every shade. It changes in place when you switch
   spaces or edit the color. The site's icon in the header sits on the text's left edge, the host 8pt after it.
-  Nothing floats on the article. The address's Reader button is the one control: off, it turns Reader on; on (shown
-  pressed, "Reader Options"), it opens `ReaderOptions` 4pt under the field, placed as Site Controls is (along the
-  field's edge in the sidebar, under the button's end above the page), one floating thing at a time with the
-  others. With no address on screen (the sidebar hidden and the address not above the page) it opens from the
-  page's top-right corner instead, from View › Reader Text and Colors. Its rows are the site panel's (`PanelRow`):
-  Text Size (`ZoomStepper`, − 100% +, the percentage back to 100%, the same steps as ⌘+ and ⌘−), Typeface and
-  Column Width (`SlidingSwitch`), and Colors, round swatches as the space editor's (Auto, Light, Sepia, Dark,
-  Space; ringed when chosen, a faint ring under the pointer, nothing moving), then Turn Off Reader, a
-  `PanelLinkRow` as Reset Permissions is. A change keeps the line you were on in place. Esc and ⌥⌘R turn Reader off
-  directly.
+  The address's Reader button is a plain toggle: off, it turns Reader on; on, shown pressed ("Hide Reader"), it turns
+  it off, as Esc and ⌥⌘R do. How it reads is chosen in the page: Aa (`ReaderOptionsButton`, `textformat.size`), a
+  regular icon button 16pt in from the article's top-right corner, on the article's own paper and in its light or
+  dark look, with the on-page hover washes. It shows when Reader opens, at the top, on the way back up and with the
+  pointer in the top band, and fades out over `state` as you read on (`Reader.ButtonPresence`: 8pt of scroll counts as
+  a direction); never while its panel is open; with Reduce Motion it shows and goes at once. It opens `ReaderOptions`
+  4pt under it, its right edge with the button's and whole inside the page, one floating thing at a time with the
+  others; View › Reader Text and Colors opens the same. Its rows are the site panel's (`PanelRow`, 16pt margins to
+  the ink): Text Size (`ZoomStepper`, − 100% +, the percentage back to 100%, the same steps as ⌘+ and ⌘−), Typeface
+  and Column Width (`SlidingSwitch`), and Colors, a row of round dots as macOS picks an accent color: each its paper,
+  Auto split corner to corner between its day and night papers, Space the space's paper, drawn as the space editor's
+  swatches (`SwatchRing`: 24pt with a 20pt dot and a hairline edge, 4pt apart; chosen, a 2pt ring in the accent with a
+  gap; a faint ring under the pointer, nothing moving), each named in its tooltip and for VoiceOver. A change keeps
+  the line you were on in place.
 - **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card that
   floats in a panel of its own (`MiniPlayerPanel`, #172), over the window and other apps, on every space and beside a
   full screen window, as Picture in Picture does: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving

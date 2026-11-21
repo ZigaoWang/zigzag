@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- The Reader button in the address bar is a plain toggle again: click it to turn Reader on, click it again to turn it off. It shows pressed while Reader is on. Reader's text and color choices moved back into the page: a small Aa button sits in the article's top-right corner, fades away as you read down and comes back when you scroll up or move the pointer near the top, and opens the choices right under it. View › Reader Text and Colors still opens them, and Esc and ⌥⌘R still turn Reader off. The Turn Off Reader row is gone. Colors are now plain round dots, like picking an accent color in System Settings, with Auto split between its light and dark paper and Space in your space's color; the chosen one has a ring in the accent color. ([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, a calmer Settings, and Your Zigzag Card.
