@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A right-click menu near the bottom of the window slides up only as far as it needs to, as macOS's menus do, instead of opening wholly above the pointer. Its first items stay right by the pointer, so Separate Split View or Reload Page is a short move away wherever you click.
 - Choose Image… and Use Site Icon under the icon grid line up with the search field above them, and the grid's panel keeps the same margin below them as at its sides. Their hover fill reached out toward the panel's edge and nearly touched its bottom corners.
 - The numbers that holding ⌘ or ⌃ shows stay up while you keep holding it and press ⌘1–⌘9 or ⌃1–⌃9, following the tab or space you went to, so you can go on to the next. They went away at the first number. Any other key, a click or letting go still hides them, and a quick ⌘1 never shows them.
+- Icons in buttons sit on the screen's pixels where their ink is centered, instead of snapping to the nearest whole point, so some no longer sit half a point off.
 
 ## [0.9.3] - 2026-11-18
 
