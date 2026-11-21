@@ -587,6 +587,33 @@ struct PageLanguageChoiceTests {
         }
     }
 
+    /// A Never chosen while a site was translated this session wins at once: the site, or every site translated from
+    /// that language, no longer translates its next page on its own.
+    @Test func aNeverChoiceStopsASiteTranslatedThisSession() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR"), german = Locale.Language(identifier: "de")
+            let sites: [String: Locale.Language] = ["lemonde.fr": french, "liberation.fr": french, "spiegel.de": german]
+            @MainActor func automatic(_ site: String, _ translated: [String: Locale.Language]) -> PageTranslator.Automatic {
+                choices.automatic(language: translated[site] ?? french, site: site, translatedHere: translated[site] != nil,
+                                  offers: true, offered: true)
+            }
+            #expect(automatic("lemonde.fr", sites) == .translate)
+            // Never This Site, from another tab of the site: only that site stops.
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            let afterSite = PageTranslator.translated(sites, neverSite: "lemonde.fr")
+            #expect(afterSite.keys.sorted() == ["liberation.fr", "spiegel.de"])
+            #expect(automatic("lemonde.fr", afterSite) == .nothing)
+            #expect(automatic("liberation.fr", afterSite) == .translate)
+            // Never French: every site translated from French stops, German ones go on.
+            choices.setNever(true, "fr")
+            let afterLanguage = PageTranslator.translated(afterSite, neverLanguage: "fr")
+            #expect(afterLanguage.keys.sorted() == ["spiegel.de"])
+            #expect(automatic("liberation.fr", afterLanguage) == .nothing)
+            #expect(choices.automatic(language: german, site: "spiegel.de", translatedHere: afterLanguage["spiegel.de"] != nil,
+                                      offers: true, offered: true) == .translate)
+        }
+    }
+
     @Test func aPrivateWindowKeepsNoSites() {
         withChoices { choices in
             #expect(!choices.setNeverSite(true, "lemonde.fr", isPrivate: true))

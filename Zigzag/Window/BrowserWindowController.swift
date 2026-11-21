@@ -1838,7 +1838,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             entries.append(.item(MenuPanel.Item(title: String(localized: "Never Translate \(name)", comment: "Item in the translate menu: pages in this language are never offered or translated on their own. The name is a language's, like French."),
                                                 isChecked: never) { [weak self, weak tab] in
                 choices.setNever(!never, code)
-                if !never, let self, let tab { self.stopOffering(tab) }
+                guard !never, let self else { return }
+                self.translatedSites = PageTranslator.translated(self.translatedSites, neverLanguage: code)
+                if let tab { self.stopOffering(tab) }
             }))
         }
         if let site = ContentBlocker.site(of: tab.url) {
@@ -1852,6 +1854,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                     return
                 }
                 if !choices.setNeverSite(true, site, isPrivate: self.tabManager.isPrivate) { self.neverTranslatedHere.insert(site) }
+                self.translatedSites = PageTranslator.translated(self.translatedSites, neverSite: site)
                 if let tab { self.stopOffering(tab) }
             }))
         }

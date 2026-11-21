@@ -112,6 +112,12 @@ enum PageTranslator {
 
     enum Automatic: Equatable { case translate, offer, nothing }
 
+    /// The sites translated this session, after a Never choice: the site chosen, or every site translated from the
+    /// language chosen, stops translating its pages on its own, so the Never holds at once.
+    static func translated(_ sites: [String: Locale.Language], neverSite site: String? = nil, neverLanguage code: String? = nil) -> [String: Locale.Language] {
+        sites.filter { entry in entry.key != site && (code == nil || self.code(of: entry.value) != code) }
+    }
+
     /// Languages Apple can translate into on this Mac, by name, for the Settings menu.
     @concurrent nonisolated static func targetLanguages() async -> [(id: String, name: String)] {
         let supported = await LanguageAvailability().supportedLanguages
