@@ -191,6 +191,8 @@ final class SidebarListView: NSView {
     /// A tab or page picked with a click: the edge sidebar sets this to bring its window forward. The window's own
     /// list leaves it nil, and its delegate selects as before.
     var onPickTab: ((Tab) -> Void)?
+    /// A pinned page picked with a click: the edge sidebar's own hook, or the window's delegate.
+    var onOpenBookmark: ((Bookmark) -> Void)?
     /// New Tab picked with a click: the edge sidebar sets this to open the browser's bar over the screen, in place.
     /// The window's own list leaves it nil, and its delegate opens it in the window.
     var onNewTab: (() -> Void)?
@@ -1091,7 +1093,9 @@ final class SidebarListView: NSView {
                         return
                     }
                 }
-                if let bookmark = Library.shared.bookmark(opening) { self.delegate?.listOpenBookmark(bookmark) }
+                if let bookmark = Library.shared.bookmark(opening) {
+                    if let onOpenBookmark { onOpenBookmark(bookmark) } else { self.delegate?.listOpenBookmark(bookmark) }
+                }
             }
             // A pinned split's or group's row unloads all its pages, the one you're on last.
             let unload = { [weak self, weak row] in

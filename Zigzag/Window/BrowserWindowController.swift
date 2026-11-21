@@ -23,10 +23,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     let tabManager: TabManager
     let sidebar = SidebarView()
     /// The live second sidebar the hot screen edge shows (#363), made the first time it comes out.
-    private var edgeSidebar: SidebarView?
+    private(set) var edgeSidebar: SidebarView?
     /// The floating Mini the edge sidebar borrowed a tab into, if one is out.
     private var edgeMini: MiniWindowController?
     private var edgeContainer: SidebarContainer?
+    /// The panel's Site Controls host, kept for as long as its panel is open.
+    private var edgeSiteHost: EdgeSitePanelHost?
     /// The command bar is open over the screen in the edge panel, not in this window.
     private(set) var edgeCommandBarInPlace = false
     let root: BrowserRootView
@@ -3592,6 +3594,8 @@ extension BrowserWindowController {
         // A click picks a tab; a drag would leave the panel, so its rows stay put.
         mirror.list.allowsDragging = false
         mirror.list.onPickTab = { [weak self] tab in self?.pickFromEdgeSidebar(tab) }
+        // A pinned page opens in the popout too, whether it is open in a window already or made here.
+        mirror.list.onOpenBookmark = { [weak self] bookmark in self?.openBookmarkFromEdgeSidebar(bookmark) }
         // Its New Tab row opens the browser's bar over the screen, not in the window behind the panel.
         mirror.list.onNewTab = { EdgeSidebar.shared.newTabInPlace() }
         // A click on empty space puts the panel away, as the pointer leaving it does.
@@ -3704,21 +3708,25 @@ extension BrowserWindowController {
             open(destination.url, disposition: .currentTab, httpFallback: destination.httpFallback)
             return true
         }
-        let sitePanel = { [weak self] in
-            guard let self else { return }
-            // The site panel is at home in the window, under its own address; the panel makes way for it.
-            bringForwardForEdge()
-            SitePanel.toggle(in: self, from: sidebar.address)
+        // The star saves the popout's page, as the window's star saves the page on screen.
+        mirror.address.saveButton.onClick = { [weak self] _ in self?.saveFromEdgeStar() }
+        // A button's click and right-click hand back the event; the button is the mirror's own.
+        let sitePanel: (NSEvent) -> Void = { [weak self] _ in
+            guard let self, let mirror = self.edgeSidebar else { return }
+            // Site Controls opens in the panel, over the page it is about, not by bringing the window forward.
+            self.showEdgeSiteControls(from: mirror.address.siteControlsButton)
         }
-        mirror.address.onRightClick = { _ in sitePanel(); return nil }
-        mirror.address.siteControlsButton.onClick = { _ in sitePanel() }
-        mirror.address.siteControlsButton.onRightClick = { _ in sitePanel(); return nil }
+        mirror.address.onRightClick = { event in sitePanel(event); return nil }
+        mirror.address.siteControlsButton.onClick = { event in sitePanel(event) }
+        mirror.address.siteControlsButton.onRightClick = { event in sitePanel(event); return nil }
 
         mirror.favorites.onOpen = { [weak self] favorite in
             guard let self else { return }
             self.tabManager.openBookmark(favorite)
             // A page opened from the edge sidebar comes out in the popout, not in the window behind it.
-            if let tab = self.tabManager.selectedTab { EdgePeek.shared.show(tab: tab, from: self) }
+            if let tab = self.tabManager.bookmarkTab(for: favorite.id) ?? self.tabManager.selectedTab {
+                self.pickFromEdgeSidebar(tab)
+            }
         }
         mirror.favorites.onMenu = { [weak self] favorite in
             guard let self else { return nil }
@@ -3781,9 +3789,64 @@ extension BrowserWindowController {
             self.edgeMini = nil
             self.setEdgePeek(nil)
             EdgeSidebar.shared.holdForPeek(false)
+            // The page went back on its own (Esc, a click away, Return): the panel goes with it. Picking the same
+            // row again clears `edgeMini` first, so the panel stays for that toggle.
+            EdgeSidebar.shared.hide(animated: false)
         }
         setEdgePeek(tab.id)
         EdgeSidebar.shared.holdForPeek(true)
+    }
+
+    /// The page the edge panel is showing: the popout's, or the one the panel's rows are on.
+    var edgePanelTab: Tab? { edgeMini?.tab ?? EdgePeek.shared.tab ?? tabManager.selectedTab }
+
+    /// A pinned page picked in the edge panel: its live tab, opened in the popout like a tab row.
+    private func openBookmarkFromEdgeSidebar(_ bookmark: Bookmark) {
+        tabManager.openBookmark(bookmark)
+        guard let tab = tabManager.bookmarkTab(for: bookmark.id) ?? tabManager.selectedTab else { return }
+        pickFromEdgeSidebar(tab)
+    }
+
+    /// The address star in the edge panel: the popout's page if it is out, else the page on screen. It stays in the
+    /// panel; nothing comes forward.
+    func saveFromEdgeStar() {
+        guard let tab = edgePanelTab else { return }
+        save(tab, request: SavePath.request(for: .star, shiftHeld: Self.shiftHeld))
+    }
+
+    /// Site Controls from the panel's address: the page's own panel, over the sidebar, in the window the button is in.
+    private func showEdgeSiteControls(from button: IconButton) {
+        guard let tab = edgePanelTab, let overlay = EdgeSidebar.shared.panelOverlay,
+              EdgeSidebar.shared.panelWindow != nil else { return }
+        let host = EdgeSitePanelHost(tab: tab, overlay: overlay)
+        edgeSiteHost = host
+        SitePanel.toggle(in: host, from: button)
+    }
+
+    /// The panel went away: the popout and its site panel go with it, whichever of them was out.
+    func edgePopoutDidDismiss() {
+        if SitePanel.isOpen(in: EdgeSidebar.shared.panelWindow) { SitePanel.closeCurrent() }
+        if let mini = edgeMini {
+            edgeMini = nil
+            mini.closeBorrowed()
+            setEdgePeek(nil)
+            EdgeSidebar.shared.holdForPeek(false)
+        }
+        if EdgePeek.shared.isVisible { EdgePeek.shared.close(duration: 0.15) }
+    }
+
+    /// Return or Expand from the edge overlay: the browser takes the display with its own full screen, and the app
+    /// that was underneath keeps its own Space beside it. macOS decides the Space animation; nothing here moves
+    /// another app's window.
+    func takeOverFromEdgeOverlay() {
+        guard let window else { return }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        bringForwardHere()
+        guard !window.styleMask.contains(.fullScreen) else { return }
+        DispatchQueue.main.async {
+            guard !window.styleMask.contains(.fullScreen) else { return }
+            window.toggleFullScreen(nil)
+        }
     }
 
     /// Zigzag comes forward for something in the edge sidebar. The panel goes with it, unless what was picked hangs

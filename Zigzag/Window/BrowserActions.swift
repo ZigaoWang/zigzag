@@ -529,8 +529,10 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// The star shows the selected tab's saved state. Saving reloads the list and the favorites, not the address row,
     /// so the row is told directly here (#326).
     private func refreshSavedState(of tab: Tab) {
-        guard tab === tabManager.selectedTab else { return }
-        sidebar.update(tab: tab)
+        // The window's address shows the page on screen; the edge panel may be showing another tab, so its star is
+        // told about the page that was actually saved.
+        if tab === tabManager.selectedTab { sidebar.update(tab: tab) }
+        edgeSidebar?.update(tab: tab)
     }
 
     /// Every save ends here (#326), so no two ways in can drift: `request` says whether it was the quick save or the

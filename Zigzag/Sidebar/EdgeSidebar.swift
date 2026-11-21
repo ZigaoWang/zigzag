@@ -38,6 +38,36 @@ enum EdgeSidebarLayout {
     static func canShow(appIsActive: Bool) -> Bool {
         !appIsActive
     }
+
+    /// The panel stays while the page is attached beside it: the popout taking the keyboard is the panel working,
+    /// not the browser coming forward.
+    static func keepsPanelOnActivation(holdsForPeek: Bool) -> Bool { holdsForPeek }
+}
+
+/// What ends the panel's popout, and how a non-activating panel joins another app's Space rather than bringing
+/// Zigzag's own Space forward (#363).
+enum EdgePopoutPolicy {
+    /// A click outside the popout and the panel that opened it puts it away.
+    static func closesOnOutsideClick(eventWindow: NSWindow?, mini: NSWindow?, panel: NSWindow?) -> Bool {
+        eventWindow !== mini && eventWindow !== panel
+    }
+
+    /// Zigzag's own pages (Settings, History, Archive) are not a web site with a field or a dialog to back out of
+    /// first: Esc closes the popout at once, as it closes a page in the browser.
+    static func closesOnFirstEscape(isInternalPage: Bool, isLeaving: Bool, commandBarVisible: Bool) -> Bool {
+        isInternalPage && !isLeaving && !commandBarVisible
+    }
+
+    /// ⌘O is the Return button's shortcut. A status-bar panel over another app does not get the main menu's key
+    /// equivalents, so the panel reads this one itself.
+    static func isReturnKey(command: Bool, key: String?) -> Bool {
+        command && key?.lowercased() == "o"
+    }
+
+    /// A floating popout is ordered front regardless and made key without activating Zigzag: the way the edge panel
+    /// and the Peek join another app's Space, full-screen included. `showWindow`/`makeKeyAndOrderFront` asks the app
+    /// to come forward, and its own Space with it.
+    static func ordersFrontRegardless(floating: Bool) -> Bool { floating }
 }
 
 /// The sidebar's hot screen edge (#363): one switch, and the one panel that comes out of it.
@@ -117,6 +147,8 @@ final class EdgeSidebar {
             MainActor.assumeIsolated {
                 DispatchQueue.main.async {
                     guard let self, self.isBrowserInFront else { return }
+                    // The popout taking key is the panel working, not the browser coming forward.
+                    guard !EdgeSidebarLayout.keepsPanelOnActivation(holdsForPeek: self.holdsForPeek) else { return }
                     self.hide(animated: false)
                 }
             }
@@ -159,6 +191,9 @@ final class EdgeSidebar {
 
     /// The panel's window, so the Peek can tell a click on the sidebar from a click outside.
     var panelWindow: NSWindow? { panel }
+
+    /// Where Site Controls and other floating pieces sit over the panel's card.
+    var panelOverlay: PassthroughView? { host?.overlay }
 
     /// The panel is along the screen's right edge; the page attaches on the other side of it.
     var panelOnRight: Bool { sideIsRight }
@@ -382,6 +417,8 @@ final class EdgeSidebar {
 
     /// Puts the panel away. Without the slide for a pick, so its window can come forward at once.
     func hide(animated: Bool = true) {
+        // The panel's popout is its page: it goes with the panel, however the panel goes.
+        target?.edgePopoutDidDismiss()
         stopDeciding(dismiss: true)
         holdsForPeek = false
         // The bar and the downloads list open over the screen go with the panel.
@@ -427,6 +464,9 @@ final class EdgeSidebar {
         panel.animationBehavior = .none
         let host = EdgeSidebarHost()
         panel.contentView = host
+        host.overlay.frame = host.bounds
+        host.overlay.autoresizingMask = [.width, .height]
+        host.addSubview(host.overlay)
         self.host = host
         self.panel = panel
         return panel
@@ -444,6 +484,8 @@ final class EdgeSidebarPanel: NSPanel {
 /// the panel's other edge, which is the page's side. The panel is the card and that gutter, so the card is what shows.
 final class EdgeSidebarHost: NSView {
     private(set) weak var container: SidebarContainer?
+    /// Where the site panel and other floating pieces sit, above the card.
+    let overlay = PassthroughView()
     let inset = Tokens.Metric.cardInset
     /// The panel is along the screen's right edge: its gutter is on the right.
     var onRight = false { didSet { placeCard() } }
@@ -458,11 +500,13 @@ final class EdgeSidebarHost: NSView {
         self.container = container
         container.autoresizingMask = []
         addSubview(container)
+        addSubview(overlay, positioned: .above, relativeTo: container)
         placeCard()
     }
 
     func placeCard() {
         container?.frame = cardFrame
+        overlay.frame = bounds
     }
 
     /// File › New Tab (⌘T) with the panel key: the browser's own bar, in place over the screen.
@@ -487,6 +531,34 @@ final class EdgeSidebarHost: NSView {
             return true
         }
         return super.performKeyEquivalent(with: event)
+    }
+}
+
+/// The edge panel as a place for Site Controls: the page is the one the popout is showing, and the panel opens over
+/// the sidebar card instead of bringing the browser window forward.
+@MainActor final class EdgeSitePanelHost: SitePanelPageHost {
+    let tab: Tab
+    let overlay: PassthroughView
+
+    init(tab: Tab, overlay: PassthroughView) {
+        self.tab = tab
+        self.overlay = overlay
+    }
+
+    var window: NSWindow? { EdgeSidebar.shared.panelWindow }
+    var listsExtensions: Bool { false }
+
+    func copyPageURL(_ sender: Any?) {
+        guard let url = tab.url else { return }
+        CleanLink.write(url, title: tab.displayTitle)
+        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
+    }
+
+    func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab) {
+        BrowserWindowController.confirmClear(kind, of: tab, over: overlay) { [weak self] text in
+            guard let self else { return }
+            Toast.show(text, symbol: "checkmark.circle", over: self.overlay, area: self.overlay.bounds)
+        }
     }
 }
 

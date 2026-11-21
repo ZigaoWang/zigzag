@@ -504,22 +504,15 @@ final class EdgePeek {
         panel?.orderOut(nil)
     }
 
-    /// Hands the page to its tab and brings that browser window to this space, filled to the frame: the peek
-    /// becomes the app. This is the only path that moves the browser window; the sidebar and page hide into it.
+    /// Hands the page to its tab and gives the browser the display: Expand accepts the browser for this screen, so
+    /// it takes the whole screen and the app that was underneath keeps its own Space beside it.
     func expand() {
         guard let tab, let controller, let window = controller.window else { return }
-        let screen = NSScreen.screens.first { $0.visibleFrame.contains(NSEvent.mouseLocation) } ?? window.screen ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? window.frame
-        let frame = EdgePeekLayout.expandedFrame(in: visible, onRight: EdgeSidebar.shared.panelOnRight)
         controller.tabManager.select(tab)
         if window.isMiniaturized { window.deminiaturize(nil) }
-        if !window.styleMask.contains(.fullScreen) { window.setFrame(frame, display: true) }
-        window.collectionBehavior.insert(.moveToActiveSpace)
-        window.makeKeyAndOrderFront(nil)
-        window.collectionBehavior.remove(.moveToActiveSpace)
-        NSApp.activate()
         close(duration: 0)
-        window.makeFirstResponder(tab.webView)
         EdgeSidebar.shared.hide(animated: false)
+        controller.takeOverFromEdgeOverlay()
+        window.makeFirstResponder(tab.webView)
     }
 }
