@@ -104,59 +104,31 @@ extension Array where Element == BookmarkFolder {
 /// Pinned pages that open side by side, as the split view or tile group (#160, #203) they were pinned from: two
 /// halves, or three or four pages in their places. Its pages stay in the space's own list in its order (the group's
 /// reading order), one right after another, in the same folder; its first page's row (or tile) carries the rest.
+///
+/// It is the split a window keeps on screen (`TabManager.SplitPair`) with the pinned pages' ids in it: one model, one
+/// layout and one reading of what's saved, for two pages or four.
 nonisolated struct PinnedSplit: Codable, Sendable {
-    var left: UUID
-    var right: UUID
-    /// Share of the width (or height, when vertical) the left page gets. In a group of more, the share of the width
-    /// left of the line between the columns.
-    var ratio = 0.5
-    /// Stacked top and bottom instead of side by side.
-    var vertical = false
-    /// A tile group's third and fourth pages.
-    var more: [UUID] = []
-    /// Where each page of a group of more than two sits, in `ids` order; nil for two, whose halves `vertical` says.
-    var regions: [TileRegion]? = nil
-    /// The other line's share: in a group of more, of the height above the line between the rows.
-    var otherRatio = 0.5
-    /// A group's own lines (#316): the line between the columns in the top row and in the bottom, then the line
-    /// between the rows in the left column and in the right; nil for two, or a group saved before its rows had lines
-    /// of their own.
-    var shares: [Double]? = nil
+    /// Its pages, by their pinned ids, and how they're laid out.
+    var layout: TabManager.SplitPair
 
     init(left: UUID, right: UUID) {
-        self.left = left
-        self.right = right
+        layout = TabManager.SplitPair(left: left, right: right)
+    }
+
+    init(layout: TabManager.SplitPair) {
+        self.layout = layout
     }
 
     /// Pages `ids` (in `pair`'s order) laid out as `pair` lays out its own; nil when the two don't match.
     init?(_ ids: [UUID], as pair: TabManager.SplitPair) {
-        guard ids.count == pair.more.count + 2, Set(ids).count == ids.count else { return nil }
-        left = ids[0]
-        right = ids[1]
-        more = Array(ids.dropFirst(2))
-        ratio = pair.ratio
-        vertical = pair.vertical
-        regions = more.isEmpty ? nil : pair.regions
-        otherRatio = pair.otherRatio
-        shares = more.isEmpty ? nil : pair.shares
+        guard let layout = pair.withPages(ids) else { return nil }
+        self.layout = layout
     }
 
+    /// Read as a split on screen is: a two-page record of any age as it always was, a group whose pages or places
+    /// don't add up as the split of its first two.
     init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        left = try c.decode(UUID.self, forKey: .left)
-        right = try c.decode(UUID.self, forKey: .right)
-        ratio = try c.decodeIfPresent(Double.self, forKey: .ratio) ?? 0.5
-        vertical = try c.decodeIfPresent(Bool.self, forKey: .vertical) ?? false
-        otherRatio = (try? c.decodeIfPresent(Double.self, forKey: .otherRatio)) ?? 0.5
-        // A group whose pages or places don't add up opens as the split of its first two.
-        let more = ((try? c.decodeIfPresent([UUID].self, forKey: .more)) ?? nil) ?? []
-        let regions = (try? c.decodeIfPresent([TileRegion].self, forKey: .regions)) ?? nil
-        if !more.isEmpty, let regions, regions.count == more.count + 2, TileShape.isValid(regions),
-           Set([left, right] + more).count == more.count + 2 {
-            self.more = more
-            self.regions = regions
-            shares = ((try? c.decodeIfPresent([Double].self, forKey: .shares)) ?? nil).flatMap { $0.count == 4 ? $0 : nil }
-        }
+        layout = try TabManager.SplitPair(from: decoder)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -176,29 +148,27 @@ nonisolated struct PinnedSplit: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case left, right, ratio, vertical, more, regions, otherRatio, shares }
 
+    var left: UUID { get { layout.left } set { layout.left = newValue } }
+    var right: UUID { get { layout.right } set { layout.right = newValue } }
+    var ratio: Double { get { layout.ratio } set { layout.ratio = newValue } }
+    var vertical: Bool { get { layout.vertical } set { layout.vertical = newValue } }
+    var more: [UUID] { layout.more }
+    var regions: [TileRegion]? { layout.regions }
+    var otherRatio: Double { layout.otherRatio }
+    var shares: [Double]? { layout.shares }
+    /// How its pages share the page area: the same shape the group had on screen.
+    var shape: TileShape { layout.shape }
+
     /// Its pages, in order.
-    var ids: [UUID] { [left, right] + more }
+    var ids: [UUID] { layout.ids }
     /// The pages that ride in the first one's row or tile.
     var riders: ArraySlice<UUID> { ids.dropFirst() }
     /// Three or four pages, not a split of two.
-    var isGroup: Bool { !more.isEmpty }
-    func contains(_ id: UUID) -> Bool { left == id || right == id || more.contains(id) }
+    var isGroup: Bool { layout.isGroup }
+    func contains(_ id: UUID) -> Bool { layout.contains(id) }
 
     /// How it opens: tabs `tabIDs` (one for each of its pages, in its order) side by side as it was laid out.
-    func pair(of tabIDs: [UUID]) -> TabManager.SplitPair? {
-        guard tabIDs.count == ids.count, Set(tabIDs).count == tabIDs.count else { return nil }
-        var pair = TabManager.SplitPair(left: tabIDs[0], right: tabIDs[1])
-        pair.ratio = ratio
-        pair.vertical = vertical
-        pair.otherRatio = otherRatio
-        if isGroup {
-            guard let regions, regions.count == tabIDs.count, TileShape.isValid(regions) else { return nil }
-            pair.more = Array(tabIDs.dropFirst(2))
-            pair.regions = regions
-            pair.shares = shares
-        }
-        return pair
-    }
+    func pair(of tabIDs: [UUID]) -> TabManager.SplitPair? { layout.withPages(tabIDs) }
 }
 
 /// The same pinned split keeps the same pages in the same order. Its size and direction are left out, so resizing it

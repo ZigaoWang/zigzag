@@ -629,7 +629,7 @@ nonisolated struct PaneMove: Equatable, Sendable {
     }
 }
 
-extension TabManager.SplitPair {
+nonisolated extension TabManager.SplitPair {
     /// A group of `ids` laid out as `shape`: two in their usual order (left or top first); nil if it isn't a group.
     init?(ids: [UUID], shape: TileShape) {
         guard ids.count == shape.regions.count, shape.isValid, Set(ids).count == ids.count else { return nil }
@@ -645,6 +645,18 @@ extension TabManager.SplitPair {
     /// Its pages, in order.
     var ids: [UUID] { [left, right] + more }
     var count: Int { 2 + more.count }
+
+    /// The same places and lines with pages `ids` in them, in order (a group's tabs as its pinned pages, and back);
+    /// nil unless there's one for each place, all different.
+    func withPages(_ ids: [UUID]) -> Self? {
+        guard ids.count == count, Set(ids).count == ids.count else { return nil }
+        if isGroup { guard let regions, regions.count == count, TileShape.isValid(regions) else { return nil } }
+        var after = self
+        after.left = ids[0]
+        after.right = ids[1]
+        after.more = Array(ids.dropFirst(2))
+        return after
+    }
     func contains(_ id: UUID) -> Bool { left == id || right == id || more.contains(id) }
     /// Three or four pages, not a split of two.
     var isGroup: Bool { !more.isEmpty }

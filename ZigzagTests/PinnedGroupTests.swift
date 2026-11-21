@@ -450,6 +450,74 @@ import Testing
         #expect(folder.name == "Old")
         #expect(folder.bookmarkIDs == [page])
     }
+
+    // MARK: One split, in the tabs and among the pins
+
+    /// Two, three and four tabs side by side pin as one pinned split holding every page and its shape, open again in
+    /// that shape after their pages are unloaded, and unpin back to tabs in it.
+    @Test(arguments: shapes) func aSplitPinsReopensAndUnpinsWhole(shape: TileShape) throws {
+        try withTabs(shape.regions.indices.map(String.init)) { manager, tabs, space in
+            manager.makeGroup(tabs, shape: shape)
+            manager.bookmarkTab(tabs[0], in: space)
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == tabs.count)
+            let pinned = try #require(Library.shared.pinnedSplit(containing: marks[0]))
+            #expect(pinned.ids == marks)
+            #expect(pinned.shape == shape)
+            #expect(manager.tabs(in: space).isEmpty)
+            // Unloaded, then opened from any page: all of it, side by side as it was.
+            manager.close(tabs)
+            #expect(marks.allSatisfy { manager.bookmarkTab(for: $0) == nil })
+            manager.openBookmark(try #require(Library.shared.bookmark(marks[marks.count - 1])))
+            let pages = marks.compactMap(manager.bookmarkTab(for:))
+            #expect(pages.count == marks.count)
+            let open = try #require(manager.split(for: pages[0]))
+            #expect(open.ids == pages.map(\.id))
+            #expect(open.shape == shape)
+            // Unpinned: the same pages as tabs, the same shape.
+            let back = try #require(manager.unbookmark(marks[1], toIndex: 0))
+            #expect(Library.shared.pinnedSplit(containing: marks[0]) == nil)
+            #expect(marks.allSatisfy { Library.shared.bookmark($0) == nil })
+            let tabsBack = manager.tabs(in: space)
+            #expect(tabsBack.count == marks.count && tabsBack.contains { $0 === back })
+            let after = try #require(manager.split(for: back))
+            #expect(after.ids == tabsBack.map(\.id))
+            #expect(after.shape == shape)
+        }
+    }
+
+    /// A pinned split saved by an older Zigzag, with only its two pages (and maybe their size and direction), reads as
+    /// that split and is written back the same way; a group of more round-trips with its places.
+    @Test func olderPinnedSplitsReadAndWriteAsBefore() throws {
+        let a = UUID(), b = UUID()
+        let oldest = try JSONDecoder().decode(PinnedSplit.self, from: Data(#"{"left":"\#(a)","right":"\#(b)"}"#.utf8))
+        #expect(oldest.ids == [a, b] && oldest.ratio == 0.5 && !oldest.vertical && !oldest.isGroup)
+        #expect(oldest.shape == TileShape(regions: [.left, .right]))
+        let sized = try JSONDecoder().decode(PinnedSplit.self, from: Data(#"{"left":"\#(a)","right":"\#(b)","ratio":0.3,"vertical":true}"#.utf8))
+        #expect(sized.ids == [a, b] && sized.ratio == 0.3 && sized.vertical)
+        #expect(sized.shape.regions == [.top, .bottom] && sized.shape.row == 0.3)
+        // Written back with the keys it always had, and read again the same.
+        let written = try JSONSerialization.jsonObject(with: JSONEncoder().encode(sized)) as! [String: Any]
+        #expect(Set(written.keys) == ["left", "right", "ratio", "vertical"])
+        let again = try JSONDecoder().decode(PinnedSplit.self, from: JSONEncoder().encode(sized))
+        #expect(again.ids == sized.ids && again.ratio == sized.ratio && again.vertical == sized.vertical)
+        // Opened as tabs, it's the split it was.
+        let tabs = [UUID(), UUID()]
+        #expect(sized.pair(of: tabs)?.shape == sized.shape)
+        // A four-page group as written now round-trips whole.
+        let grid = try #require(PinnedSplit(pins(4).map(\.id), as: group(Self.shapes[4])))
+        let read = try JSONDecoder().decode(PinnedSplit.self, from: JSONEncoder().encode(grid))
+        #expect(read.ids == grid.ids && read.shape == grid.shape)
+    }
+
+    /// A space saved with an older pinned split reads with it, the split kept whole by the library's tidying.
+    @Test func anOlderLibrarysPinnedSplitStaysWhole() throws {
+        let marks = pins(3)
+        let split = try JSONDecoder().decode(PinnedSplit.self, from: Data(#"{"left":"\#(marks[2].id)","right":"\#(marks[0].id)","ratio":0.6,"vertical":false}"#.utf8))
+        let (bookmarks, _, splits) = Library.tidied(marks, [], [split])
+        #expect(splits.count == 1 && splits[0].ids == [marks[2].id, marks[0].id] && splits[0].ratio == 0.6)
+        #expect(bookmarks.map(\.id) == [marks[1].id, marks[2].id, marks[0].id])
+    }
 }
 
 /// How a favorite group's tile shows its pages (#203): a small icon for each, placed as the pages share the window, and
