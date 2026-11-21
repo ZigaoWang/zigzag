@@ -389,4 +389,32 @@ struct DragZoneTests {
         #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
     }
 
+    /// ⌘Z for one group's lines leaves another group alone, even where both are two pages (#435).
+    @Test func undoDoesNotMoveAnotherGroupsLines() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let ids = (0..<4).map { _ in Tab(url: nil, title: "Page", spaceID: space) }
+        manager.adopt(ids, in: space)
+        manager.makeSplit(ids[0], with: ids[1], vertical: true)
+        manager.makeSplit(ids[2], with: ids[3], vertical: true)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(ids[0])
+        let window = try #require(controller.window)
+        window.layoutIfNeeded()
+        let even = try #require(manager.split(for: ids[0])?.shape)
+        var lower = even
+        lower.moveRowLine(in: 0, to: 0.6, length: 600, minimum: 100)
+        controller.applyTileShape(lower, undoTo: manager.split(for: ids[0])?.shape)
+        #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
+
+        manager.select(ids[2])
+        let other = try #require(manager.split(for: ids[2])?.shape)
+        controller.sidebarUndo.undo()
+        #expect(manager.split(for: ids[2])?.shape == other)
+        #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
+    }
+
 }

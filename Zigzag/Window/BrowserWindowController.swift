@@ -353,18 +353,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435). The
-    /// group must still be the one on screen: a drag that ends on another tab changes nothing.
+    /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435).
     func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?) {
-        guard let tab = tabManager.selectedTab, let current = tabManager.split(for: tab)?.shape else { return }
-        guard current.regions == shape.regions, current != shape else { return }
+        guard let tab = tabManager.selectedTab, let group = tabManager.split(for: tab) else { return }
+        applyTileShape(shape, undoTo: inverse, in: group.ids)
+    }
+
+    /// As above, for the group of `ids`: a group's pages, not just where its lines were, so ⌘Z after selecting another
+    /// split leaves that one alone (#435).
+    private func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?, in ids: [UUID]) {
+        guard let tab = tabManager.selectedTab, let group = tabManager.split(for: tab), group.ids == ids else { return }
+        guard group.shape.regions == shape.regions, group.shape != shape else { return }
         tabManager.setTileShape(shape, for: tab)
         root.setTiles(shape, animated: true)
         root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
         onStateChange?()
         guard let inverse else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in
-            controller.applyTileShape(inverse, undoTo: shape)
+            controller.applyTileShape(inverse, undoTo: shape, in: ids)
         }
         sidebarUndo.setActionName(String(localized: "Resize Tiles", comment: "Undo action name, shown in the Edit menu as Undo Resize Tiles."))
     }
