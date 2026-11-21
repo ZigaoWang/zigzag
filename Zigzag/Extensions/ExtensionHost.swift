@@ -442,7 +442,7 @@ final class ExtensionHost: NSObject {
     }
 
     /// The window to point at `id`'s app in while a connection that began at `since` waits: only when you used the
-    /// extension, or a field in a page, around then (`CompanionAppNotice`). Answers at most once per use.
+    /// extension, or a sign-in field in a page, around then (`CompanionAppNotice`). Answers at most once per use.
     fileprivate func windowForAppNotice(_ id: String, waitingSince since: Date, found: @escaping (BrowserWindowController) -> Void) {
         let now = Date()
         if let mark = ownUses[id], let window = mark.window.value, appNoticeUse[id] != mark.at,
@@ -451,7 +451,7 @@ final class ExtensionHost: NSObject {
             found(window)
             return
         }
-        // A page click or key counts when it left a field focused: a login you're filling, or the extension's menu in it.
+        // A page click or key counts when it left a sign-in field focused, or 1Password's menu in the page (#387).
         guard let page = pageUse, let tab = page.tab.value, let webView = tab.webView, appNoticeUse[id] != page.at,
               CompanionAppNotice.follows(use: page.at, waitingSince: since, now: now) else { return }
         appNoticeUse[id] = page.at
@@ -1395,12 +1395,18 @@ enum CompanionAppNotice {
         return now.timeIntervalSince(use) <= useWindow + patience
     }
 
-    /// Whether the page's focus is in a field, through shadow roots; an extension's menu frame counts too.
+    /// Whether the page's focus is where 1Password fills: a sign-in or password field, or its own menu in the page.
+    /// A search box or any other field doesn't count.
     static let fieldFocusedScript = """
     (() => {
+      \(Autofill.signInCheck)
       let e = document.activeElement;
       while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
-      return !!e && (e.matches('input, textarea, select, iframe') || e.isContentEditable);
+      if (!e) return false;
+      if (e.tagName === 'INPUT' && e.type === 'password') return true;
+      if (signIn(e)) return true;
+      if (e.tagName === 'IFRAME' && (e.getAttribute('src') || '').startsWith('webkit-extension://')) return true;
+      return e.tagName.toLowerCase().startsWith('com-1password');
     })()
     """
 }

@@ -14,17 +14,17 @@ enum ExtensionImport {
 
     struct Steps<Prepared> {
         /// Download, verify and read one, without adding it.
-        var prepare: (String) async -> Result<Prepared, ExtensionStore.InstallError>
+        var prepare: @MainActor (String) async -> Result<Prepared, ExtensionStore.InstallError>
         /// Add one already prepared, and load it. Returns its name.
-        var finish: (Prepared) async -> Result<String, ExtensionStore.InstallError>
+        var finish: @MainActor (Prepared) async -> Result<String, ExtensionStore.InstallError>
         /// Throw away one prepared but not added.
-        var discard: (Prepared) -> Void
+        var discard: @MainActor (Prepared) -> Void
         /// A breath between one extension loading and the next, so each settles first.
         var pause: Duration = .milliseconds(400)
     }
 
     /// Gets each one ready, in order. Stopped (the window closed), what was ready is thrown away.
-    static func prepare<P>(_ found: [ChromiumExtensions.Found], with steps: Steps<P>,
+    @MainActor static func prepare<P>(_ found: [ChromiumExtensions.Found], with steps: Steps<P>,
                            progress: (Int) -> Void = { _ in }) async -> (ready: [(ChromiumExtensions.Found, P)], failed: [Failure]) {
         var ready: [(ChromiumExtensions.Found, P)] = [], failed: [Failure] = []
         for (index, item) in found.enumerated() {
@@ -42,7 +42,7 @@ enum ExtensionImport {
     }
 
     /// Adds the prepared ones, one after another. Stopped, the rest are thrown away, never half added.
-    static func install<P>(_ ready: [(ChromiumExtensions.Found, P)], with steps: Steps<P>,
+    @MainActor static func install<P>(_ ready: [(ChromiumExtensions.Found, P)], with steps: Steps<P>,
                            progress: (Int, ChromiumExtensions.Found) -> Void = { _, _ in }) async -> (added: [(ChromiumExtensions.Found, String)], failed: [Failure]) {
         var added: [(ChromiumExtensions.Found, String)] = [], failed: [Failure] = []
         for (index, (item, prepared)) in ready.enumerated() {

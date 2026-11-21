@@ -202,6 +202,21 @@ struct SystemPasswordsTests {
         #expect(window.firstResponder === stand)
     }
 
+    @Test func appKitPairsTheFieldsBeforeTheListIsAskedFor() throws {
+        let (_, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        let detection = try #require(SystemPasswordPicker.autoFillDetection)
+        var group: NSDictionary?
+        // AppKit's own pair as the list is asked for: what it fills a picked login into.
+        picker.present(over: NSRect(x: 40, y: 60, width: 280, height: 32), in: overlay, restoringFocusTo: stand, ask: { _ in
+            group = detection.perform(NSSelectorFromString("autoFillGroup"))?.takeUnretainedValue() as? NSDictionary
+            return true
+        }) { _ in }
+        #expect(group?[NSTextContentType.username.rawValue] as AnyObject? === picker.usernameField)
+        #expect(group?[NSTextContentType.password.rawValue] as AnyObject? === picker.passwordView)
+        picker.cancel()
+    }
+
     @Test func whatAutoFillPutsInIsReadThenEmptied() async throws {
         let (window, overlay, stand) = host()
         let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
