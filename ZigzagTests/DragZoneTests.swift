@@ -392,9 +392,8 @@ struct DragZoneTests {
         window.layoutIfNeeded()
         let card = BrowserRootView.sidebarFrame(in: root.bounds, width: root.sidebarWidth, visible: false,
                                                revealed: true, onRight: root.sidebarOnRight)
-        let band = BrowserRootView.revealedResizeHandleFrame(in: root.bounds, sidebarWidth: root.sidebarWidth,
-                                                             onRight: root.sidebarOnRight)
-        #expect(abs(band.midX - (root.sidebarOnRight ? card.maxX : card.minX)) <= 1)
+        #expect(!root.resizeHandle.isHidden)
+        #expect(abs(root.resizeHandle.frame.midX - (root.sidebarOnRight ? card.maxX : card.minX)) <= 1)
         // Dragged wider, it keeps the width past this window.
         root.debugEdgeDrag("begin")
         let to = root.convert(NSPoint(x: root.sidebarWidth + 40, y: 300), to: nil).x
@@ -405,8 +404,11 @@ struct DragZoneTests {
         let second = BrowserWindowController(tabManager: TabManager(spaceID: space), frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
         defer { second.window?.close() }
         #expect(second.root.sidebarWidth == kept)
-        // Double-clicking the edge puts the usual width back.
+        // Double-clicking the edge puts the usual width back, and the next window hears about it.
         root.debugEdgeDrag("reset")
         #expect(root.sidebarWidth == Tokens.Metric.sidebarWidth)
+        let third = BrowserWindowController(tabManager: TabManager(spaceID: space), frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { third.window?.close() }
+        #expect(third.root.sidebarWidth == Tokens.Metric.sidebarWidth)
     }
 }

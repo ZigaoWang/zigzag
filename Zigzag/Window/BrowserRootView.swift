@@ -574,7 +574,8 @@ final class BrowserRootView: SpaceFrameView {
     }
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
-    private let resizeHandle = ResizeHandle()
+    /// The band over the sidebar's edge, shown and on the popout's card edge while the sidebar is out (#431).
+    private(set) var resizeHandle = ResizeHandle()
     /// The strips and squares between the panes (#316, #309), under the page's own surfaces (a question, the command
     /// bar) and the bar above it.
     private let tileHandles = PassthroughView()
@@ -738,6 +739,7 @@ final class BrowserRootView: SpaceFrameView {
         resizeHandle.onDoubleClick = { [weak self] in
             guard let self else { return }
             self.sidebarWidth = Tokens.Metric.sidebarWidth
+            self.saveSidebarWidth()
             self.needsLayout = true
             self.layoutSubtreeIfNeeded()
             self.onSidebarWidthChange?(self.sidebarWidth)
@@ -1334,9 +1336,12 @@ final class BrowserRootView: SpaceFrameView {
         sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
-        resizeHandle.frame = Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
+        // The popout's inner edge takes the pointer too: its card is inset, so the band follows the card (#431).
+        resizeHandle.frame = sidebarRevealed && !sidebarVisible
+            ? Self.revealedResizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
+            : Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
         resizeHandle.line = Self.resizeHandleLine(onRight: sidebarOnRight)
-        resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
+        resizeHandle.isHidden = !sidebarVisible && !sidebarRevealed && !isDraggingSidebarEdge
         // With the sidebar hidden, the glow goes on the window edge, not at the resize handle, which would sit inside
         // the page.
         attentionEdge.frame = Self.attentionEdgeFrame(in: bounds, onRight: sidebarOnRight)
@@ -1738,6 +1743,8 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func followPointer() {
+        // A drag on the edge is not the pointer leaving: the band reaches past the card, and the width follows it.
+        guard !isDraggingSidebarEdge else { return }
         guard let point = pointer, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
         let wasLeaving = edgeReveal.isLeaving
         let held = isHeld || NSEvent.pressedMouseButtons != 0
