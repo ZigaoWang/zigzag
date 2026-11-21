@@ -1124,7 +1124,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return row
     }()
     private let newTabPlace = DropdownButton()
-    private var newTabRow: FormRow?
+    private var newTabRow: FormRow!
     private let controlTabOrder = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
@@ -1643,9 +1643,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index]
             self?.refreshNewTabPlace()
         }
-        let newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
-                                control: newTabPlace)
-        self.newTabRow = newTabRow
+        newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
+                            detail: nil, control: newTabPlace)
         // There's no homepage: a new tab opens the address bar. This is the setting nearest to one.
         newTabRow.keywords = String(localized: "new tab homepage home page start page position order same site domain group organize", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
         tabsGroup.add(newTabRow)
@@ -3876,14 +3875,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     /// Pure black backgrounds shows only while dark pages are on.
-    /// The New tabs open row says where a page goes when its site has no tabs open yet, for the choice that needs
-    /// telling: Next to Tabs from the Same Site has nowhere to go, and follows the fallback below it.
+    /// Under “New tabs open”: with Next to Tabs from the Same Site, where a page from a site with no tabs open goes.
     private func refreshNewTabPlace() {
         guard let newTabRow else { return }
-        guard TabManager.newTabPlace == .sameSite else {
-            newTabRow.detailText = String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs.")
-            return
-        }
+        let general = String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs.")
+        guard TabManager.newTabPlace == .sameSite else { newTabRow.detailText = general; return }
         newTabRow.detailText = switch TabManager.otherNewTabPlace {
         case .top: String(localized: "A page from a site with no tabs open goes at the top.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
         case .bottom: String(localized: "A page from a site with no tabs open goes at the bottom.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
@@ -3959,6 +3955,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         controlTabOrder.selectedIndex = TabSwitcher.Order.allCases.firstIndex(of: TabSwitcher.order) ?? 0
+        refreshNewTabPlace()
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
         shareTabsToggle.isOn = TabStore.windowsShareTabs
