@@ -503,10 +503,9 @@ final class AddressView: InteractiveView {
     var starInPill = false {
         didSet {
             guard starInPill != oldValue else { return }
-            // However the pill left the star (hidden on a page with nothing to pin), the field draws it from
-            // scratch when it comes back (#443).
+            // However the pill left the star, the field draws it from scratch when it comes back, by its own rule (#443).
             drawn.remove(ObjectIdentifier(saveButton))
-            if starInPill { saveButton.removeFromSuperview() } else { addSubview(saveButton) }
+            if starInPill { saveButton.removeFromSuperview() } else { saveButton.isHidden = !canSave; addSubview(saveButton) }
             reflow(animated: true)
         }
     }

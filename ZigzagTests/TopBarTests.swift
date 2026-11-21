@@ -651,17 +651,26 @@ struct TopBarTests {
     @Test func theAddressGivesTheStarToThePillAndBack() {
         let address = AddressView()
         address.frame = NSRect(x: 0, y: 0, width: 400, height: Tokens.Sidebar.addressHeight)
+        address.setSaved(false, canSave: true)
         address.layoutSubtreeIfNeeded()
         let wide = address.buttonsWidth
         address.starInPill = true
         #expect(address.saveButton.superview == nil)
         #expect(address.buttonsWidth < wide)
-        // The pill hid it for a page with nothing to pin; back in the field it draws again.
+        // The pill left it hidden; back in the field, on a page that can be pinned, it draws again.
         address.saveButton.isHidden = true
         address.starInPill = false
         address.layoutSubtreeIfNeeded()
         #expect(address.saveButton.superview === address)
         #expect(!address.saveButton.isHidden)
         #expect(address.buttonsWidth == wide)
+        // With nothing to pin, it stays out of the field (#442).
+        address.starInPill = true
+        address.setSaved(false, canSave: false)
+        address.saveButton.isHidden = false
+        address.starInPill = false
+        address.layoutSubtreeIfNeeded()
+        #expect(address.saveButton.isHidden)
+        #expect(address.buttonsWidth < wide)
     }
 }
