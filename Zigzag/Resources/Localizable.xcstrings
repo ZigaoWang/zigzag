@@ -17001,17 +17001,6 @@
         }
       }
     },
-    "Resize Tiles" : {
-      "comment" : "Undo action name, shown in the Edit menu as Undo Resize Tiles.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "调整分屏大小"
-          }
-        }
-      }
-    },
     "Restart" : {
       "comment" : "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General.",
       "localizations" : {
