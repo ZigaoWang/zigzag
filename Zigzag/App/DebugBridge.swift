@@ -2054,6 +2054,14 @@ enum DebugBridge {
 
             debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
+        case "seedfavorites":
+            // seedfavorites <n>: n blank favorites with symbol icons, into a test copy's own data only.
+            guard ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil else { debugLog("seedfavorites refused: not a test copy"); break }
+            let symbols = ["star", "heart", "bolt", "leaf", "flame", "moon", "sun.max", "cloud", "book", "music.note", "camera", "gift"]
+            let marks = (0..<(Int(arg) ?? 45)).compactMap { i in
+                URL(string: "about:blank#fav\(i)").map { Bookmark(url: $0, title: "Favorite \(i + 1)", icon: symbols[i % symbols.count]) }
+            }
+            debugLog("seedfavorites => \(Library.shared.appendFavorites(marks, in: controller.tabManager.profile.id))")
         case "scrolllist":
             // scrolllist <y>: scrolls the sidebar's list to that many points from its top, or as far as it goes.
             if let clip = controller.sidebar.list.enclosingScrollView?.contentView, let y = Double(arg) {
