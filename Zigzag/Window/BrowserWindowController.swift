@@ -2336,6 +2336,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Not in full screen: the lights live in the title bar that comes down with the menu bar there, so a picture of
         // them on the sliding sidebar would only flash and vanish.
         let fullScreen = window.styleMask.contains(.fullScreen)
+        // The page is under the lights only in full screen with neither the bar nor the sidebar there; then they
+        // get a backing so they don't float over it (#462). The bar or sidebar is their backing otherwise.
+        let backing = Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.showsTopBar,
+                                                    sidebarVisible: docked, sidebarFloating: floating)
+        if (fullScreenBar != nil) != backing, !window.fullScreenPhase.isMoving { showFullScreenBar(backing) }
         // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
         // Beside a sidebar on the right, the bar holding the address keeps them there always: the window's top left.
         // Without it they're in the sidebar's top row on either side, the page running up to the top as on the left
@@ -2343,7 +2348,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let onRight = root.sidebarOnRight
         let barKeepsLights = onRight && root.barHoldsAddress
         let inBar = root.showsTopBar && (barKeepsLights || (!docked && !floating))
-        let room = fullScreen || barKeepsLights ? 0 : window.trafficLightsWidth
+        let room = Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
         // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
         // nothing in the row moves while it's on screen; until then their picture rides in it.
         if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
@@ -2362,7 +2367,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
-        root.topBar.trafficLightsWidth = root.showsTopBar && (!docked || barKeepsLights) && !fullScreen ? window.trafficLightsWidth : 0
+        // Full screen included: the lights come down with the menu bar, so the bar leaves their space
+        // rather than drawing its controls under them.
+        root.topBar.trafficLightsWidth = root.showsTopBar && (!docked || barKeepsLights) ? window.trafficLightsWidth : 0
         // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
         // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
         let held = root.showsTopBar && holdsToggle
@@ -2389,9 +2396,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
-    /// Bar behind the traffic lights when they drop down with the menu bar in full screen. AppKit draws nothing there
-    /// when the page runs under the title bar, so with the sidebar hidden the buttons floated over the page. Uses the
-    /// title bar material, like Safari's toolbar.
+    /// The bar behind the traffic lights when the page is under them in full screen (#462). AppKit's title bar is
+    /// transparent, so without it the lights float over the page. Uses the title bar material, as Safari's toolbar.
     private var fullScreenBar: NSVisualEffectView?
 
     private func showFullScreenBar(_ on: Bool) {
@@ -2407,12 +2413,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fullScreenBar = bar
     }
 
+    /// Whether the lights need a backing of their own: in full screen, when the page is under them because neither
+    /// the bar nor the sidebar is. With either there, they sit on Zigzag's own chrome (#462).
+    nonisolated static func needsTrafficLightBacking(fullScreen: Bool, barShown: Bool, sidebarVisible: Bool,
+                                                     sidebarFloating: Bool) -> Bool {
+        fullScreen && !barShown && !sidebarVisible && !sidebarFloating
+    }
+
+    /// The room the lights take in the sidebar's top row. In full screen they are in the title bar, not the sidebar,
+    /// so the sidebar keeps none for them (#462).
+    nonisolated static func trafficLightRoom(fullScreen: Bool, barKeepsLights: Bool, width: CGFloat) -> CGFloat {
+        fullScreen || barKeepsLights ? 0 : width
+    }
+
     /// The window's place before it went full screen: what's saved, so leaving full screen after a relaunch gives
     /// back the window you had, not one the size of the screen.
     private(set) var windowedFrame: NSRect?
 
-    /// In full screen the traffic lights come down with the menu bar, in AppKit's title bar. Transparent, as Zigzag's
-    /// is everywhere else, it left them floating over the page; there it gets the system's bar behind them, as in Safari.
+    /// In full screen the traffic lights come down with the menu bar, in AppKit's title bar. That bar stays
+    /// transparent, so they sit on the bar above the page rather than on a bar of the system's own.
     func windowWillEnterFullScreen(_ notification: Notification) {
         windowedFrame = window?.frame
         fullScreenChanged(.willEnter)
@@ -2447,7 +2466,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
             browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
         }
-        if (fullScreenBar != nil) != phase.showsFullScreenBar { showFullScreenBar(phase.showsFullScreenBar) }
+        if phase.dropsTrafficLightBacking, fullScreenBar != nil { showFullScreenBar(false) }
         guard !phase.isMoving else { return }
         layoutTrafficLights()
         root.needsLayout = true
