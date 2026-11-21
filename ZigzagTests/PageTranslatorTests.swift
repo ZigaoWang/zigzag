@@ -128,6 +128,23 @@ struct PageTranslatorTests {
         #expect(!tab.isTranslated)
     }
 
+    @Test func theAddressBarSaysHowThePageStands() {
+        #expect(PageTranslator.pageState(translating: false, translated: false, foreign: false) == nil)
+        #expect(PageTranslator.pageState(translating: false, translated: false, foreign: true) == .original)
+        #expect(PageTranslator.pageState(translating: true, translated: false, foreign: true) == .translating)
+        #expect(PageTranslator.pageState(translating: false, translated: true, foreign: true) == .translated)
+        // Translated from the page's menu though it reads as yours, it still says so.
+        #expect(PageTranslator.pageState(translating: false, translated: true, foreign: false) == .translated)
+    }
+
+    @Test func aPageLoadedAgainIsNoLongerTranslated() throws {
+        let tab = Tab(url: URL(string: "http://127.0.0.1:1/a.html"), spaceID: UUID())
+        _ = tab.ensureWebView()
+        tab.isTranslated = true
+        tab.webView(try #require(tab.webView), didCommit: nil)
+        #expect(!tab.isTranslated)
+    }
+
     // MARK: Choosing what to translate
 
     private func text(_ blocks: [[String]]) -> PageTranslator.PageText {
@@ -137,6 +154,31 @@ struct PageTranslatorTests {
             blockTexts.append(block.joined(separator: " "))
         }
         return PageTranslator.PageText(pieces: pieces, blocks: places, blockTexts: blockTexts)
+    }
+
+    @Test func whatsOnScreenIsTranslatedFirstInEveryLanguage() {
+        let french = Locale.Language(identifier: "fr"), dutch = Locale.Language(identifier: "nl")
+        let groups = [PageTranslator.Group(source: french, pieces: [0, 1, 2]), PageTranslator.Group(source: dutch, pieces: [3, 4])]
+        #expect(PageTranslator.scheduled(groups, ranks: [2, 0, 1, 0, 2]) == [
+            PageTranslator.Group(source: french, pieces: [1]),
+            PageTranslator.Group(source: dutch, pieces: [3]),
+            PageTranslator.Group(source: french, pieces: [2, 0]),
+            PageTranslator.Group(source: dutch, pieces: [4]),
+        ])
+    }
+
+    @Test func aLanguageOnItsOwnStaysOneRun() {
+        let french = Locale.Language(identifier: "fr")
+        let groups = [PageTranslator.Group(source: french, pieces: [0, 1, 2])]
+        #expect(PageTranslator.scheduled(groups, ranks: [2, 1, 0]) == [PageTranslator.Group(source: french, pieces: [2, 1, 0])])
+    }
+
+    @Test func aTranslationIsRememberedForItsLanguagesOnly() {
+        let memory = TranslationMemory()
+        let french = Locale.Language(identifier: "fr"), dutch = Locale.Language(identifier: "nl")
+        memory[.init("Aide", from: french, to: Self.english)] = "Help"
+        #expect(memory[.init("Aide", from: french, to: Self.english)] == "Help")
+        #expect(memory[.init("Aide", from: dutch, to: Self.english)] == nil)
     }
 
     @Test func aPageAllInTheTargetLanguageHasNothingToTranslate() {
@@ -500,6 +542,16 @@ struct PageLanguageChoiceTests {
         #expect(!PageTranslator.readsLanguage(of: nil, errorPage: false))
         // Error pages are in your language.
         #expect(!PageTranslator.readsLanguage(of: URL(string: "https://expired.badssl.com"), errorPage: true))
+    }
+
+    @Test func theTimeLeftComesFromThePaceSoFar() {
+        // Too little done, or too soon, to tell.
+        #expect(PageTranslator.secondsLeft(share: 0.01, elapsed: 30) == nil)
+        #expect(PageTranslator.secondsLeft(share: 0.5, elapsed: 1) == nil)
+        // A quarter in 20 seconds leaves three times that, in tens of seconds.
+        #expect(PageTranslator.secondsLeft(share: 0.25, elapsed: 20) == 60)
+        #expect(PageTranslator.secondsLeft(share: 0.25, elapsed: 21) == 70)
+        #expect(PageTranslator.secondsLeft(share: 1, elapsed: 60) == 0)
     }
 
     @Test func aLanguageNotDownloadedIsNamedWhenTranslatingFails() {

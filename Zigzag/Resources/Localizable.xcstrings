@@ -21571,6 +21571,28 @@
         }
       }
     },
+    "Translating from %@… %@" : {
+      "comment" : "Toast while a page is translated. The language is its name, like French, then the time left, like 2 minutes left.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从%1$@翻译…%2$@"
+          }
+        }
+      }
+    },
+    "Translating Page…" : {
+      "comment" : "Tooltip of the address bar's Translate button while the page is being translated.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在翻译网页…"
+          }
+        }
+      }
+    },
     "Translation" : {
       "comment" : "A section of Settings: translating web pages.",
       "localizations" : {

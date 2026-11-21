@@ -75,7 +75,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         return String(localized: "\(number) of \(b)", comment: "Under a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.")
     }
 
-    private static func timeLeft(_ seconds: Double) -> String {
+    static func timeLeft(_ seconds: Double) -> String {
         if seconds < 5 { return String(localized: "a few seconds left", comment: "Under a download's name in the downloads panel: time left, after the amount and a comma.") }
         if seconds < 60 {
             let seconds = Int(seconds.rounded())
