@@ -1368,19 +1368,31 @@ final class SitePanel: FloatingPanelView {
             break
         }
 
+        // Spaced by ink: `pad` to the first and last ink, `blockGap` between blocks, `headingGap` under a heading.
+        let blockGap = Tokens.Space.x6, headingGap = Tokens.Space.x3
+        var ink = pad, gap: CGFloat = 0
+        func top(_ slack: CGFloat) -> CGFloat { ink + gap - slack }
+        func ended(_ bottom: CGFloat, next: CGFloat = blockGap) { ink = bottom; gap = next }
+        func finishMain() -> CGFloat { ink + pad }
+        func heading(_ label: Label) {
+            let caps = label.capsSpan
+            let y = top(caps.top)
+            place(label, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: label.lineHeight))
+            ended(y + caps.bottom, next: headingGap)
+        }
+
         // The extensions, below the actions (#215): folded to a header with their strip, or open as tiles.
         func extensions() {
             guard let section = extensionsSection else { return }
-            let column = inner
-            let h = section.height(for: column)
-            place(section, NSRect(x: pad - PanelLinkRow.outset, y: y, width: column + PanelLinkRow.outset * 2, height: h))
-            y += h
+            let h = section.height(for: inner)
+            let y = top(section.topSlack)
+            place(section, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: h))
+            ended(y + h - section.bottomSlack)
         }
         // A new tab has no site: the panel is your extensions alone.
         if isBlank {
             extensions()
-            end(0, slack: extensionsSection.map { $0.isOpen || $0.items.isEmpty ? $0.bottomSlack : $0.foldedSlack } ?? 0)
-            return finish()
+            return finishMain()
         }
 
         // Header: the site's icon and name, and ⋯.
@@ -1390,10 +1402,17 @@ final class SitePanel: FloatingPanelView {
         let lineHeight = connectionLine == nil ? 0 : ConnectionLine.height
         let block = siteName.lineHeight + lineHeight
         let headerHeight = max(block, moreSide)
-        let nameY = y + (headerHeight - block) / 2
-        let moreX = width - pad - moreSide + Tokens.Space.x1
-        place(moreButton, NSRect(x: moreX, y: y + (headerHeight - moreSide) / 2, width: moreSide, height: moreSide))
-        place(icon, NSRect(x: pad, y: y + (headerHeight - iconSide) / 2, width: iconSide, height: iconSide))
+        let nameOffset = (headerHeight - block) / 2
+        let iconOffset = (headerHeight - iconSide) / 2
+        let nameCaps = siteName.capsSpan
+        let textBottom = connectionLine.map { nameOffset + siteName.lineHeight + $0.inkBottom } ?? nameOffset + nameCaps.bottom
+        let headerY = top(min(iconOffset, nameOffset + nameCaps.top))
+        let nameY = headerY + nameOffset
+        // ⋯'s dots end on the text column's edge, as the switches below do.
+        let dots = Tokens.Symbol.inkSize(moreButton.symbol, size: moreButton.symbolSize).width
+        let moreX = (width - pad - moreSide / 2 - dots / 2).rounded()
+        place(moreButton, NSRect(x: moreX, y: headerY + (headerHeight - moreSide) / 2, width: moreSide, height: moreSide))
+        place(icon, NSRect(x: pad, y: headerY + iconOffset, width: iconSide, height: iconSide))
         let textX = pad + iconSide + Tokens.Space.x3
         let textWidth = (moreButton.isHidden ? width - pad : moreX) - textX
         siteName.attributedStringValue = Self.fitted(shownName, in: textWidth)
@@ -1404,44 +1423,40 @@ final class SitePanel: FloatingPanelView {
             // On the name's text column, as wide as its words: the rest of the header stays the name's.
             place(connectionLine, NSRect(x: textX, y: nameY + siteName.lineHeight, width: min(textWidth, connectionLine.fittingWidth), height: lineHeight))
         }
-        y += headerHeight
+        ended(headerY + max(iconOffset + iconSide, textBottom))
         // Why it isn't secure, when that isn't plain to see, under the whole header.
         if !connectionNote.isHidden {
-            y += Tokens.Space.x2
             let w = inner + Label.inset * 2
             let h = ceil(connectionNote.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10_000)).height ?? connectionNote.lineHeight)
+            let caps = connectionNote.capsSpan
+            gap = Tokens.Space.x3
+            let y = top(caps.top)
             place(connectionNote, NSRect(x: pad - Label.inset, y: y, width: w, height: h))
-            y += h
+            ended(y + h - connectionNote.lineHeight + caps.bottom)
         }
-        end(Tokens.Space.x4)
 
         // Actions are named tiles: one row, like the markings along a device's edge. In a narrow panel, where a name
         // wouldn't show whole, they share even rows instead, never one left alone under the rest.
-        if !actionTiles.isEmpty {
-            let layout = Self.actionRows(count: actionTiles.count, width: inner,
-                                         comfortable: actionTiles.map(\.captionWidth).max() ?? 0,
-                                         tightest: actionTiles.map(\.captionTightWidth).max() ?? 0)
-            Self.grid(actionTiles, columns: layout.first ?? 1, gap: 0, centered: true, height: PanelTile.captionedHeight,
+        func tiles(_ tiles: [PanelTile]) {
+            guard let first = tiles.first else { return }
+            let layout = Self.actionRows(count: tiles.count, width: inner,
+                                         comfortable: tiles.map(\.captionWidth).max() ?? 0,
+                                         tightest: tiles.map(\.captionTightWidth).max() ?? 0)
+            let slack = first.captionedSlack(in: PanelTile.captionedHeight)
+            var y = top(slack.top)
+            Self.grid(tiles, columns: layout.first ?? 1, gap: 0, centered: true, height: PanelTile.captionedHeight,
                       x: pad, inner: inner, y: &y, place: place)
-            end(Tokens.Space.x4)
+            ended(y - slack.bottom)
         }
+        tiles(actionTiles)
 
         // The developer tools of a development page that doesn't have them above it, under their own name, laid out as the actions are.
         if !developerTiles.isEmpty {
-            place(developerLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: developerLabel.lineHeight))
-            y += developerLabel.lineHeight + Tokens.Space.x2
-            let layout = Self.actionRows(count: developerTiles.count, width: inner,
-                                         comfortable: developerTiles.map(\.captionWidth).max() ?? 0,
-                                         tightest: developerTiles.map(\.captionTightWidth).max() ?? 0)
-            Self.grid(developerTiles, columns: layout.first ?? 1, gap: 0, centered: true, height: PanelTile.captionedHeight,
-                      x: pad, inner: inner, y: &y, place: place)
-            end(Tokens.Space.x4)
+            heading(developerLabel)
+            tiles(developerTiles)
         }
 
-        if extensionsSection != nil {
-            extensions()
-            end(Tokens.Space.x3)
-        }
+        extensions()
 
         // One line into each of the other pages, each saying what's there; only those that apply.
         var c = SitePanelRows.Context()
@@ -1451,26 +1466,27 @@ final class SitePanel: FloatingPanelView {
         c.styled = styleRow != nil && boost.hasStyle
         let links = SitePanelRows.links(c)
         let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.permissions, permissionsRow), (.zapped, zappedRow), (.style, styleRow)]
-        var placed = false
+        var lastLink: PanelLinkRow?
         for (kind, row) in linkRows {
             guard let row else { continue }
             row.isHidden = !links.contains(kind)
             guard !row.isHidden else { continue }
-            if placed, gapAfter == 0 { y += PanelLinkRow.gap }
-            link(row)
-            placed = true
-            end(0, slack: row.bottomSlack)
+            // One after another, a list: a row's gap between them.
+            if let lastLink { gap = lastLink.bottomSlack + PanelLinkRow.gap + row.topSlack }
+            let y = top(row.topSlack)
+            place(row, NSRect(x: pad - PanelLinkRow.outset, y: y, width: inner + PanelLinkRow.outset * 2, height: PanelLinkRow.height))
+            ended(y + PanelLinkRow.height - row.bottomSlack)
+            lastLink = row
         }
-        if placed { end(Tokens.Space.x4, slack: slack) }
 
         // This site's switches.
         if !rows.isEmpty {
-            place(siteLabel, NSRect(x: pad - Label.inset, y: y, width: inner + Label.inset * 2, height: siteLabel.lineHeight))
-            y += siteLabel.lineHeight + Tokens.Space.x2
-            group(self.group)
-            end(0, slack: self.group.bottomSlack)
+            heading(siteLabel)
+            let y = top(self.group.topSlack)
+            place(self.group, NSRect(x: pad, y: y, width: inner, height: self.group.height))
+            ended(y + self.group.height - self.group.bottomSlack)
         }
-        return finish()
+        return finishMain()
     }
 
     /// Tiles in rows of `columns`, square unless given a height. A shorter last row sits in the middle under the full
@@ -1600,6 +1616,13 @@ final class PanelTile: GlassTile {
     /// A tile with a caption: the icon over its name.
     static let captionedHeight = Tokens.Space.x12 + Tokens.Space.x2
 
+    /// In a captioned tile `height` tall: from its top to the icon, and from its name's baseline to its bottom.
+    func captionedSlack(in height: CGFloat) -> (top: CGFloat, bottom: CGFloat) {
+        guard let caption else { return (0, 0) }
+        let top = (height - (Tokens.Space.x5 + Tokens.Space.x1 + caption.lineHeight)) / 2
+        return (top, height - (top + Tokens.Space.x5 + Tokens.Space.x1 + caption.capsSpan.bottom))
+    }
+
     init(image: NSImage? = nil, symbol: String, caption text: String?) {
         caption = text.map { Label($0, font: .systemFont(ofSize: Tokens.TypeSize.small), color: Tokens.Color.textSecondary) }
         super.init(frame: .zero)
@@ -1669,8 +1692,8 @@ final class PanelGroup: NSView {
     }
 
     var height: CGFloat { CGFloat(rows.count) * PanelRow.height }
-    /// The room left under the last row's words inside its row: the panel's bottom margin counts from the words,
-    /// as its top does, so this much less is added there.
+    /// The room above the first row's ink and below the last's: the panel spaces by the ink.
+    var topSlack: CGFloat { rows.first?.topSlack ?? 0 }
     var bottomSlack: CGFloat { rows.last?.bottomSlack ?? 0 }
 
     override var isFlipped: Bool { true }
@@ -1692,10 +1715,25 @@ final class PanelRow: NSView {
     private let value: Label?
     /// The words' height: the title, and the line under it when there is one.
     var contentHeight: CGFloat { title.lineHeight + (value.flatMap { $0.isHidden ? nil : $0.lineHeight } ?? 0) }
-    /// Space below the text inside the row: cap-aligned for one line, block for two.
-    var bottomSlack: CGFloat {
-        guard value?.isHidden ?? true else { return (Self.height - contentHeight) / 2 }
-        return Self.height - title.centeredY(in: Self.height) - title.lineHeight
+    /// From the row's top to its first ink: the caps of its name, or a control's box.
+    var topSlack: CGFloat { min(textInk.top, controlSlack) }
+    /// From the row's last ink to its bottom: the baseline of its words, or a control's box.
+    var bottomSlack: CGFloat { min(Self.height - textInk.bottom, controlSlack) }
+
+    private var textInk: (top: CGFloat, bottom: CGFloat) {
+        guard let value, !value.isHidden else {
+            let y = title.centeredY(in: Self.height)
+            return (y + title.capsSpan.top, y + title.capsSpan.bottom)
+        }
+        let top = (Self.height - contentHeight) / 2
+        return (top + title.capsSpan.top, top + title.lineHeight + value.capsSpan.bottom)
+    }
+
+    /// Above and below a control with a box of its own; the zoom stepper's bare glyphs count as words.
+    private var controlSlack: CGFloat {
+        guard !(control is ZoomStepper) else { return .greatestFiniteMagnitude }
+        let wanted = control.fittingSize.height > 0 ? control.fittingSize.height : control.intrinsicContentSize.height
+        return (Self.height - wanted) / 2
     }
 
     private init(_ title: String, control: NSView, value: String? = nil) {
@@ -1822,8 +1860,9 @@ final class PanelLinkRow: InteractiveView {
     private let valueLabel = Label("", font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
     private let chevron = NSImageView()
     private let run: () -> Void
-    /// The room under the words inside the row: the panel's bottom margin counts from the words.
-    var bottomSlack: CGFloat { Self.height - title.centeredY(in: Self.height) - title.lineHeight }
+    /// The room above the caps of its name and below their baseline: the panel spaces by the ink.
+    var topSlack: CGFloat { title.centeredY(in: Self.height) + title.capsSpan.top }
+    var bottomSlack: CGFloat { Self.height - title.centeredY(in: Self.height) - title.capsSpan.bottom }
     private var fullText = ""
     var value: String {
         get { fullText }
@@ -1875,7 +1914,9 @@ final class PanelLinkRow: InteractiveView {
     override func layout() {
         super.layout()
         let side = Tokens.Space.x4
-        chevron.frame = NSRect(x: bounds.width - Self.outset - side, y: (bounds.height - side) / 2, width: side, height: side)
+        // The chevron's ink ends on the text column's edge, where the switches and dropdowns end.
+        let ink = Tokens.Symbol.inkOffset("chevron.right", size: Tokens.Symbol.inline).width + Tokens.Symbol.inkSize("chevron.right", size: Tokens.Symbol.inline).width / 2
+        chevron.frame = NSRect(x: (bounds.width - Self.outset - side / 2 - ink).rounded(), y: (bounds.height - side) / 2, width: side, height: side)
         let right = chevron.isHidden ? bounds.width - Self.outset : chevron.frame.minX - Tokens.Space.x1
         // The name whole, the value in the room left; a value too long for it says it the short way.
         let room = right - Self.outset - title.textWidth - Tokens.Space.x2
@@ -2027,6 +2068,11 @@ final class ConnectionLine: InteractiveView {
     var debugText: String { label.stringValue + (warns ? " (warns)" : "") + (opens ? " >" : "") }
 
     private var side: CGFloat { Tokens.Symbol.inline }
+    /// Where its last ink ends, from its top: the words' baseline or the lock's foot.
+    var inkBottom: CGFloat {
+        let lock = Tokens.Symbol.inkSize(warns ? SitePanel.notSecureSymbol : "lock", size: side).height
+        return max(label.centeredY(in: Self.height) + label.capsSpan.bottom, (Self.height + lock) / 2)
+    }
     /// The lock, the words and the chevron, and no more.
     var fittingWidth: CGFloat { ceil(side + Tokens.Space.x1 + label.inkWidth + (opens ? 2 + side : 0)) }
 

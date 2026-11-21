@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Clicking the Custom swatch in the space editor always shows the color wheel and Shade. Clicked while they were already out, it folded them away, and with Effects open below there was no sign of how to bring them back.
 - The space editor opens next to what you opened it from. Edit Space… in the menu of the space's name at the top of the sidebar opened it down by the space icons at the bottom; it now opens beside the name. From a space icon or the + it rises from the bottom as before, and from the menu bar or the command bar it opens beside the space's name. However tall it gets, with the color wheel and Effects open, it stays inside the window, and the wheel gets a little smaller in a short window.
 - Every right-click menu in the sidebar, on tabs, pinned tabs, folders, favorites, split views and spaces, is now Zigzag's own menu, like the one from + and empty space, with an icon on every item and the keyboard shortcuts you've set. Move To and the other lists open beside their item.
+- Site Controls keeps one margin all around and an even rhythm down the panel. The space under the last row was about half the space at the sides; now the top, bottom and sides match, sections sit the same distance apart, and This Site and Extensions sit the same way over their rows. The ⋯ button, the chevrons and the folded extension icons line up with the switches' right edge.
 
 ## [0.9.3] - 2026-11-18
 

@@ -870,6 +870,14 @@ extension NSTextField {
         let y = (height - lineHeight) / 2 + ((superview?.isFlipped ?? true) ? -below : below)
         return (y * scale).rounded() / scale
     }
+
+    /// The caps' top and bottom (the baseline) inside one line box, top down: for spacing by the ink, not the box.
+    var capsSpan: (top: CGFloat, bottom: CGFloat) {
+        let font = font ?? Tokens.Font.body()
+        let lineHeight = ceil(intrinsicContentSize.height)
+        let middle = lineHeight / 2 + Label.capsBelowMiddle(of: font, lineHeight: lineHeight)
+        return (middle - font.capHeight / 2, middle + font.capHeight / 2)
+    }
 }
 
 /// A view that paints a single flat color from a dynamic NSColor, following appearance changes.
