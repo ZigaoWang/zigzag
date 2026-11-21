@@ -444,23 +444,32 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   `exit`; with Reduce Motion (the Mac's or Zigzag's) a crossfade. The page's margins are Zigzag's page gutter in a
   small window, growing to 6% of the width, at most 112pt. One column, in the text's own size (rem) so a line holds
   the same characters at any size: Narrow 28rem, Medium 34rem (about 70 characters), Wide the whole window inside
-  its margins, no cap. The words sit on the column's left edge: the header (the site's icon and name at the row
-  size, the title in the body face at 2.1em, bold, balanced, then the author and the day it was published if the
-  page says), generous space, no rule, then the text. Pictures at their own size, never larger, centered; a large
-  one runs past the text into the margins, up to 8rem a side as the window allows, its caption (row size, soft ink)
-  back on the text's edge. Code's box hangs into the margins up to 2.5rem with its first column on the text's edge,
+  its margins, no cap. The words sit on the column's left edge: the header (the site's icon and name at the body
+  size, the title in the body face at 1.75em, semibold, balanced, then the author and the day it was published if
+  the page says, both in soft ink at the body size), half a line between each, a line and a half below, no rule,
+  then the text. The article's own "By …" line goes when it only names the author the header shows (among its
+  first few blocks, never inside a paragraph). Every space between blocks is a share of one line of the text
+  (`--line`, leading × rem): ¾ between paragraphs, 1 around pictures, quotes, code and tables, 1½ over a heading
+  (semibold, 1.3em and 1.1em) and ½ under it. Pictures at their own size, never larger, centered, with
+  `Radius.thumbnail` corners; a large one runs past the text into the margins, up to 8rem a side as the window
+  allows, its caption (body size, soft ink) ⅜ of a line under it, back on the text's edge. Code's box hangs into the margins up to 2.5rem with its first column on the text's edge,
   and scrolls sideways; tables keep the text's edge and may run on to the right. Inside a list, quote or table
   nothing breaks out. New York at 20px with 1.6 leading by default (SF as Sans); Chinese, Japanese and Korean in
-  PingFang, Hiragino Sans or Apple SD Gothic Neo at 1.8 in either face, never italic. Links in the text's color with
-  a quiet underline, the link color on hover; quotes behind a 2pt rule. Light (warm off-white), Sepia, Dark
-  (`Color.surface` at night) and Auto, from `Reader.Palette`; Auto's paper is a breath of the space
-  (`Theme.readerPaper`, `Frame.reader…`), the white, gray and black spaces keeping the plain papers, with the
-  palettes' inks unchanged (tested in every hue: text 12:1 by day, soft words 4.5:1). Its one control, Aa, sits on
-  the paper at the top right, there at the top and when you scroll back up, away while you read on; it opens a
-  floating panel 4pt under it as a button's menu does, in the site panel's rows (`PanelRow`): Text Size (`ZoomStepper`,
-  − 100% +, the percentage back to 100%, the same steps as ⌘+ and ⌘−), Typeface and Column Width (`SlidingSwitch`),
-  and Colors, round swatches as the space editor's (ringed when chosen, swelling under the pointer). A change keeps
-  the line you were on in place. Reader itself comes and goes with the address's Reader button, ⌥⌘R or Esc.
+  PingFang, Hiragino Sans or Apple SD Gothic Neo at 1.8 in either face, never italic. Links in the text's color over
+  a 1px underline in the link color at half strength, all link color on hover; inline code at .82em on the faint code
+  ground, `Radius.small`; quotes behind a 2pt rule. Light (warm off-white), Sepia, Dark (`Color.surface` at night)
+  and Auto, from `Reader.Palette`; Auto's paper is barely the space's hue (`Theme.readerPaper`, `Frame.reader…`,
+  chroma 0.0035 by day and 0.005 at night), read as paper rather than color, the white, gray and black spaces keeping
+  the plain papers, with the palettes' inks unchanged (tested in every hue: text 12:1 by day, soft words 4.5:1).
+  Nothing floats on the article. While Reader is on, Aa (`textformat.size`) shows in the address field just before
+  the Reader button, which stays put and turns Reader off in one click, as Safari's toolbar does; Aa opens
+  `ReaderOptions` 4pt under the field, placed as Site Controls is (along the field's edge in the sidebar, under the
+  button's end above the page), one floating thing at a time with the others. With no address on screen (the sidebar
+  hidden and the address not above the page) it opens from the page's top-right corner instead, from View › Reader
+  Text and Colors. Its rows are the site panel's (`PanelRow`): Text Size (`ZoomStepper`, − 100% +, the percentage
+  back to 100%, the same steps as ⌘+ and ⌘−), Typeface and Column Width (`SlidingSwitch`), and Colors, round
+  swatches as the space editor's (ringed when chosen, swelling under the pointer). A change keeps the line you were
+  on in place. Reader itself comes and goes with the address's Reader button, ⌥⌘R or Esc.
 - **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card that
   floats in a panel of its own (`MiniPlayerPanel`, #172), over the window and other apps, on every space and beside a
   full screen window, as Picture in Picture does: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving
