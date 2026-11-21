@@ -2779,6 +2779,18 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // viewtree <path>: every view in the window with its frame in window points (top left), for measuring.
+        case "viewtree":
+            guard let content = controller.window?.contentView else { break }
+            var out = ""
+            func walk(_ v: NSView, _ depth: Int) {
+                let r = v.convert(v.bounds, to: nil)
+                let text = (v as? NSTextField)?.stringValue.prefix(40) ?? ""
+                out += String(repeating: " ", count: depth) + "\(type(of: v)) x=\(r.minX) y=\(content.bounds.height - r.maxY) w=\(r.width) h=\(r.height)\(v.isHidden ? " hidden" : "") \(text)\n"
+                if !v.isHidden { v.subviews.forEach { walk($0, depth + 1) } }
+            }
+            walk(content, 0)
+            try? out.write(toFile: arg, atomically: true, encoding: .utf8)
         // quitfromloop: quits from the run loop, as ⌘Q does, not from inside a main-queue block: what quitting waits
         // for (downloads pausing, cookies clearing) comes back on the main queue.
         case "quitfromloop": NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)

@@ -834,7 +834,10 @@ private final class SourceRow: InteractiveView, ImportListItem {
                 fixViews.append(button)
             }
         }
-        superview?.needsLayout = true
+        // The window lays out the rows' heights, not the list they sit in: a count that wraps grows the row.
+        var host = superview
+        while let view = host, !(view is ImportView) { host = view.superview }
+        (host ?? superview)?.needsLayout = true
         needsLayout = true
     }
 
