@@ -543,14 +543,17 @@ enum SwatchRing {
     }
 }
 
-/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard,
-/// a grainy one with its grain. Without a look it's Custom, painted with the hues around the wheel.
+/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one is a piece of its glass:
+/// the color over a faint checkerboard, lit along its top. A grainy one shows its grain. Without a look it's Custom,
+/// painted with the hues around the wheel.
 final class LookSwatch: InteractiveView {
     let look: SpaceLook?
     private let fill = CAGradientLayer()
     private let checker = CALayer()
     private let grain = CALayer()
     private let ring = CALayer()
+    /// The glass's light along its top edge.
+    private let shine = CAGradientLayer()
 
     init(look: SpaceLook?, name: String? = nil) {
         self.look = look
@@ -560,12 +563,19 @@ final class LookSwatch: InteractiveView {
         layer?.addSublayer(fill)
         fill.masksToBounds = true
         checker.masksToBounds = true
-        checker.isHidden = (look?.seeThrough ?? 0) == 0
+        let glass = (look?.seeThrough ?? 0) > 0
+        checker.isHidden = !glass
         checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
+        checker.opacity = 0.45
+        shine.isHidden = !glass
+        shine.colors = [NSColor.white.withAlphaComponent(0.55).cgColor, NSColor.white.withAlphaComponent(0).cgColor]
+        shine.startPoint = CGPoint(x: 0.5, y: 0)
+        shine.endPoint = CGPoint(x: 0.5, y: 0.55)
         grain.isHidden = (look?.grain ?? 0) == 0
         grain.backgroundColor = MaterialImages.grain.cgColor
         grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.5))
         fill.addSublayer(grain)
+        fill.addSublayer(shine)
         if look == nil {
             fill.type = .conic
             fill.startPoint = CGPoint(x: 0.5, y: 0.5)
@@ -604,13 +614,16 @@ final class LookSwatch: InteractiveView {
                 // Each color at its own strength (the space's dot), so the row reads as distinct colors even in dark
                 // mode, where every frame color is deep; white, grays and black as they are.
                 // A designed look (a gradient, smoke) shows its real frame colors.
-                let start = space.isNeutral || look.curated == nil ? space.frameColor : space.swatch
-                // See-through shows the checkerboard through the color, as the window shows the desktop.
-                let alpha = 1 - 0.45 * look.seeThrough
-                fill.colors = [start, space.frameColor2 ?? start].map { $0.withAlphaComponent(alpha).cgColor }
+                let glass = look.seeThrough > 0
+                // Glass shows its color as the window does, a gradient top to bottom; the checkerboard shows through.
+                let start = glass ? space.background : space.isNeutral || look.curated == nil ? space.frameColor : space.swatch
+                let end = glass ? space.background2 ?? start : space.frameColor2 ?? start
+                let alpha = glass ? 0.8 : 1
+                fill.colors = [start, end].map { $0.withAlphaComponent(alpha).cgColor }
                 grain.frame = fill.bounds
-                fill.startPoint = CGPoint(x: 0.2, y: 0.1)
-                fill.endPoint = CGPoint(x: 0.8, y: 0.9)
+                shine.frame = fill.bounds
+                fill.startPoint = glass ? CGPoint(x: 0.5, y: 0) : CGPoint(x: 0.2, y: 0.1)
+                fill.endPoint = glass ? CGPoint(x: 0.5, y: 1) : CGPoint(x: 0.8, y: 0.9)
             }
         }
         setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
