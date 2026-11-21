@@ -60,23 +60,8 @@ struct TopBarTests {
         #expect(topBar.sidebarButton.isHidden)
     }
 
-    /// In full screen the pin is the last control at the trailing end, and the address stops short of it (#462).
-    @Test func thePinTakesTheTrailingEnd() throws {
-        let frames = TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: inset, pin: true)
-        let pin = try #require(frames.pin)
-        #expect(pin.maxX == 1000 - inset)
-        #expect(pin.width == Tokens.Sidebar.button && pin.height == Tokens.Sidebar.button)
-        #expect(frames.address.maxX <= pin.minX - Tokens.Space.x2)
-        // With the sidebar on the right, its own toggle keeps the window's edge and the pin sits just inside it.
-        let right = TopBarView.frames(width: 1000, buttons: 3, sidebarButton: true, onRight: true, trafficLightsWidth: 0, trailingInset: inset, pin: true)
-        let toggle = try #require(right.sidebarButton)
-        let rightPin = try #require(right.pin)
-        #expect(toggle.maxX == 1000 - Tokens.Sidebar.edge)
-        #expect(rightPin.maxX < toggle.minX)
-        #expect(right.address.maxX < rightPin.minX)
-    }
-
-    @Test func theControlsRunFromThePagesLeftEdgeToItsRight() {        let shown = BrowserRootView.topBarFrame(in: window, sidebarVisible: true, sidebarWidth: 240)
+    @Test func theControlsRunFromThePagesLeftEdgeToItsRight() {
+        let shown = BrowserRootView.topBarFrame(in: window, sidebarVisible: true, sidebarWidth: 240)
         // Framed: the back button's edge on the page's left edge, the address's end on its right.
         let framed = BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: false, topBar: true)
         var ends = TopBarView.insets(bar: shown, page: framed, window: window)

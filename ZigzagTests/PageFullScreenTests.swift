@@ -10,6 +10,82 @@ import WebKit
 @MainActor
 @Suite(.serialized)
 struct PageFullScreenTests {
+    // MARK: Deciding
+
+    private func withDefaults(_ body: () throws -> Void) rethrows {
+        let name = "PageFullScreenTests-\(UUID().uuidString)"
+        let saved = PageFullScreen.defaults
+        PageFullScreen.defaults = UserDefaults(suiteName: name)!
+        defer {
+            PageFullScreen.defaults.removePersistentDomain(forName: name)
+            PageFullScreen.defaults = saved
+        }
+        try body()
+    }
+
+    @Test func theWholeScreenUntilChanged() {
+        withDefaults {
+            #expect(PageFullScreen.fill == .screen)
+            #expect(PageFullScreen.fills(for: URL(string: "https://www.youtube.com/watch?v=1")) == .screen)
+        }
+    }
+
+    @Test func aSiteChoiceWinsOverTheSetting() {
+        for setting in PageFullScreen.Fill.allCases {
+            #expect(PageFullScreen.fills(setting: setting, site: nil) == setting)
+            for site in PageFullScreen.Fill.allCases { #expect(PageFullScreen.fills(setting: setting, site: site) == site) }
+        }
+    }
+
+    @Test func aSiteChoiceCoversItsSubdomainsAndCanBeForgotten() {
+        withDefaults {
+            PageFullScreen.setChoice(.page, for: URL(string: "https://www.youtube.com/watch?v=1"))
+            #expect(PageFullScreen.pageSites == ["youtube.com"])
+            #expect(PageFullScreen.defaults.stringArray(forKey: "FullScreenPageSites") == ["youtube.com"])
+            #expect(PageFullScreen.choice(for: URL(string: "https://m.youtube.com/")) == .page)
+            #expect(PageFullScreen.fills(for: URL(string: "https://youtube.com/")) == .page)
+            #expect(PageFullScreen.choice(for: URL(string: "https://notyoutube.com/")) == nil)
+            #expect(PageFullScreen.fills(for: URL(string: "https://vimeo.com/")) == .screen)
+            PageFullScreen.setChoice(nil, for: URL(string: "https://youtube.com/"))
+            #expect(PageFullScreen.pageSites.isEmpty)
+            #expect(PageFullScreen.fills(for: URL(string: "https://youtube.com/")) == .screen)
+        }
+    }
+
+    @Test func aChoiceTheSameAsTheSettingIsntKept() {
+        withDefaults {
+            PageFullScreen.setChoice(.screen, for: URL(string: "https://example.com/"))
+            #expect(PageFullScreen.screenSites.isEmpty)
+            PageFullScreen.fill = .page
+            PageFullScreen.setChoice(.screen, for: URL(string: "https://example.com/"))
+            #expect(PageFullScreen.screenSites == ["example.com"])
+            #expect(PageFullScreen.fills(for: URL(string: "https://example.com/")) == .screen)
+            #expect(PageFullScreen.fills(for: URL(string: "https://example.org/")) == .page)
+            PageFullScreen.fill = .screen
+            PageFullScreen.setChoice(.page, for: URL(string: "https://example.com/"))
+            #expect(PageFullScreen.screenSites.isEmpty)
+            #expect(PageFullScreen.pageSites == ["example.com"])
+            PageFullScreen.forgetAll()
+            #expect(PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty)
+        }
+    }
+
+    @Test func aSubdomainsChoiceReplacesItsParents() {
+        withDefaults {
+            PageFullScreen.setChoice(.page, for: URL(string: "https://example.com/"))
+            PageFullScreen.setChoice(.screen, for: URL(string: "https://video.example.com/"))
+            #expect(PageFullScreen.pageSites.isEmpty)
+            #expect(PageFullScreen.fills(for: URL(string: "https://video.example.com/")) == .screen)
+        }
+    }
+
+    @Test func offeredOnWebPagesOutsidePrivateWindows() {
+        #expect(PageFullScreen.isOffered(for: URL(string: "https://youtube.com/"), isPrivate: false))
+        #expect(!PageFullScreen.isOffered(for: URL(string: "https://youtube.com/"), isPrivate: true))
+        #expect(!PageFullScreen.isOffered(for: URL(fileURLWithPath: "/tmp/a.html"), isPrivate: false))
+        #expect(!PageFullScreen.isOffered(for: nil, isPrivate: false))
+    }
+
     // MARK: The script
 
     /// The page script is ours, in every frame, before the page runs.
@@ -22,16 +98,6 @@ struct PageFullScreenTests {
         #expect(!script.isForMainFrameOnly)
         #expect(script.injectionTime == .atDocumentStart)
         #expect(!PageFullScreen.isOurs(WKUserScript(source: "1", injectionTime: .atDocumentStart, forMainFrameOnly: true)))
-    }
-
-    /// The pin is remembered, and off unless it was chosen (#462).
-    @Test func theChromeStaysPinnedOnlyWhenAsked() {
-        let was = PageFullScreen.pinned
-        defer { PageFullScreen.pinned = was }
-        PageFullScreen.pinned = false
-        #expect(!PageFullScreen.pinned)
-        PageFullScreen.pinned = true
-        #expect(PageFullScreen.pinned)
     }
 
     @Test func fillingThePageNeedsAClick() async throws {        let webView = await load(Self.page)

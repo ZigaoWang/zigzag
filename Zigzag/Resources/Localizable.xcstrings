@@ -3000,13 +3000,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages and cookie banners follow your settings again, every site’s tabs can sleep in the background, no site keeps its cookies when they’re cleared, and zapped elements, site styles and site icons are removed." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, no site keeps its cookies when they’re cleared, and zapped elements, site styles and site icons are removed." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，清除 Cookie 时也不再保留任何网站，隐藏的元素、网站样式和网站图标也会被移除。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，清除 Cookie 时也不再保留任何网站，隐藏的元素、网站样式和网站图标也会被移除。"
           }
         }
       }
@@ -18857,28 +18857,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示边栏"
-          }
-        }
-      }
-    },
-    "Keep the bar and sidebar in full screen" : {
-      "comment" : "Tooltip of the pin in the top bar in full screen: it keeps the bar and sidebar instead of letting them hide.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在全屏幕中保留顶栏和边栏"
-          }
-        }
-      }
-    },
-    "Let the bar and sidebar hide in full screen" : {
-      "comment" : "Tooltip of the pin in the top bar while the bar and sidebar are kept in full screen: pressing it lets them hide again.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在全屏幕中让顶栏和边栏隐藏"
           }
         }
       }

@@ -1,23 +1,97 @@
 import AppKit
 import WebKit
 
-/// Full screen in the page (#168, #462): a page asking for full screen (a player's button, Element.requestFullscreen
-/// and its webkit names, video.webkitEnterFullscreen) gets its element filling the page's own area in the window, and
-/// a tab on its own takes the window with the chrome out of the way. The page never takes the screen. The page is told
-/// it's in full screen as it would be (fullscreenElement, fullscreenchange), its own :fullscreen styles are matched
-/// through a mark, and Esc leaves. A frame asks the page around it to fill the page with the frame, all the way up.
-/// Only a click or key of yours starts it; a frame only where it's allowed full screen.
+/// Where a page's full screen goes (#168, #462): Settings › Tabs › Full screen videos fill decides for every site,
+/// and a site's controls for one site. The Page fills the page's own area in the window, with the chrome around it;
+/// The Whole Screen puts the browser into its own full-screen space, with the page filling it. Either way the page
+/// itself is filled by page-fullscreen.js, in the page's own world: it answers requestFullscreen and the webkit names
+/// for it, and a video's webkitEnterFullscreen, by fixing the element over the page's viewport, telling the page it's
+/// in full screen, matching its :fullscreen rules through a mark, and leaving on Esc or exitFullscreen. A frame has
+/// the page around it fill with the frame. The page never gets a full-screen window of its own.
 enum PageFullScreen {
+    enum Fill: String, CaseIterable {
+        /// The whole screen: the browser's own full-screen space.
+        case screen
+        /// The page's own area in the window.
+        case page
+    }
+
+    /// Where the choices are kept; tests use their own.
+    static var defaults: UserDefaults = .standard
+    /// The setting or a site's choice changed.
+    static let changed = Signal<Void>()
+
+    private static let fillKey = "FullScreenFills"
+    private static let pageKey = "FullScreenPageSites"
+    private static let screenKey = "FullScreenScreenSites"
+
+    /// Settings › Tabs › Full screen videos fill. The whole screen until changed, as it always was.
+    static var fill: Fill {
+        get { defaults.string(forKey: fillKey).flatMap(Fill.init(rawValue:)) ?? .screen }
+        set { defaults.set(newValue.rawValue, forKey: fillKey); changed.send() }
+    }
+
+    /// Sites (hosts without "www.") whose full screen fills the page, or the whole screen, whatever the setting.
+    /// A site covers its subdomains.
+    static var pageSites: Set<String> {
+        get { Set(defaults.stringArray(forKey: pageKey) ?? []) }
+        set { defaults.set(Array(newValue).sorted(), forKey: pageKey) }
+    }
+
+    static var screenSites: Set<String> {
+        get { Set(defaults.stringArray(forKey: screenKey) ?? []) }
+        set { defaults.set(Array(newValue).sorted(), forKey: screenKey) }
+    }
+
+    private static func covers(_ sites: Set<String>, _ site: String) -> Bool {
+        sites.contains { site == $0 || site.hasSuffix("." + $0) }
+    }
+
+    /// The site's own choice, or nil to follow the setting.
+    static func choice(for url: URL?) -> Fill? {
+        guard let site = ContentBlocker.site(of: url) else { return nil }
+        if covers(pageSites, site) { return .page }
+        if covers(screenSites, site) { return .screen }
+        return nil
+    }
+
+    /// The site's own choice first, then the setting.
+    static func fills(setting: Fill, site: Fill?) -> Fill { site ?? setting }
+
+    static func fills(for url: URL?) -> Fill { fills(setting: fill, site: choice(for: url)) }
+
+    /// Sets a site's choice, or back to following the setting (nil). A choice the same as the setting's isn't kept:
+    /// the site simply follows it. Whatever covered the site before (its parent domain's choice too) goes.
+    static func setChoice(_ choice: Fill?, for url: URL?) {
+        guard let site = ContentBlocker.site(of: url) else { return }
+        var page = pageSites.filter { !(site == $0 || site.hasSuffix("." + $0)) }
+        var screen = screenSites.filter { !(site == $0 || site.hasSuffix("." + $0)) }
+        if let choice, choice != fill {
+            if choice == .page { page.insert(site) } else { screen.insert(site) }
+        }
+        pageSites = page
+        screenSites = screen
+        changed.send()
+    }
+
+    /// Every site's choice forgotten (Settings › Privacy › Sites › Reset All).
+    static func forgetAll() {
+        pageSites = []
+        screenSites = []
+        changed.send()
+    }
+
+    /// Whether the site controls offer the choice: for a web page, and not in a private window, whose site would be
+    /// kept in Settings › Privacy › Sites. A private window's pages still follow the choices made elsewhere.
+    static func isOffered(for url: URL?, isPrivate: Bool) -> Bool {
+        !isPrivate && ["http", "https"].contains(url?.scheme?.lowercased() ?? "")
+    }
+
+    // MARK: Pages
+
     static let messageName = "zigzagFullScreen"
     /// The first line of the page script, to tell it from a web view's other scripts.
     static let scriptMark = "/* zigzag page full screen */\n"
-
-    /// The chrome stays in full screen: the bar above the page and the sidebar as it was. Off, the page is edge to
-    /// edge and the bar comes down only when the pointer reaches the top (#462).
-    static var pinned: Bool {
-        get { UserDefaults.standard.bool(forKey: "pageFullScreenPinned") }
-        set { UserDefaults.standard.set(newValue, forKey: "pageFullScreenPinned") }
-    }
 
     /// Isolated from the page.
     static let world = WKContentWorld.world(name: "zigzag-fullscreen")

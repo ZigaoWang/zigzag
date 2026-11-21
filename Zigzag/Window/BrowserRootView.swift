@@ -585,18 +585,6 @@ final class BrowserRootView: SpaceFrameView {
             refreshGlassOcclusion()
         }
     }
-    /// The pin: the bar and sidebar stay, and the page sits below the bar. Off, the page is edge to edge and the bar
-    /// comes down over it from the top.
-    var pinsChrome = false {
-        didSet {
-            guard oldValue != pinsChrome else { return }
-            topBarRevealed = false
-            topBar.isHidden = !chromeBarShown
-            needsLayout = true
-            refreshGlassFrame()
-            refreshGlassOcclusion()
-        }
-    }
     /// True while the bar is down over the page in full screen: an overlay, so the page doesn't move for it.
     private(set) var topBarRevealed = false {
         didSet {
@@ -612,10 +600,10 @@ final class BrowserRootView: SpaceFrameView {
         topBarRevealed = false
     }
 
-    /// The sidebar as the window shows it: hidden in full screen unless the chrome is pinned.
-    var chromeSidebarShown: Bool { sidebarVisible && (!isImmersive || pinsChrome) }
-    /// The bar as the window shows it: in full screen there when pinned, or down from the top edge.
-    var chromeBarShown: Bool { isImmersive ? (pinsChrome || topBarRevealed) : showsTopBar }
+    /// The sidebar as the window shows it: hidden in The Whole Screen's full screen.
+    var chromeSidebarShown: Bool { sidebarVisible && !isImmersive }
+    /// The bar as the window shows it: in The Whole Screen only when it comes down from the top edge.
+    var chromeBarShown: Bool { isImmersive ? topBarRevealed : showsTopBar }
     /// The bar is laid out in full screen even while hidden, ready to come down.
     private var laysOutBar: Bool { showsTopBar || isImmersive }
     /// Highlights where a dragged tab would open beside the current page.
@@ -698,7 +686,7 @@ final class BrowserRootView: SpaceFrameView {
         attentionEdge.onClick = { [weak self] in
             guard let self else { return }
             // In full screen the sidebar is out of the layout: its edge brings it out, the pin keeps it.
-            if self.isImmersive && !self.pinsChrome { self.reveal(true) } else { self.setSidebarVisible(true, animated: true) }
+            if self.isImmersive { self.reveal(true) } else { self.setSidebarVisible(true, animated: true) }
             // Select the tab the question is for so its banner shows.
             if let waiting = self.waitingTabs.first,
                let tabs = (self.window?.windowController as? BrowserWindowController)?.tabManager {
@@ -792,8 +780,8 @@ final class BrowserRootView: SpaceFrameView {
     /// With the sidebar hidden, the page is the whole window, no frame around it; the sidebar that slides out from
     /// the edge is what moves and zooms the window. With the sidebar showing, the page floats in its frame.
     var isEdgeToEdge: Bool {
-        if isImmersive && !pinsChrome { return true }
-        return !chromeSidebarShown && (Self.isBorderless || window?.styleMask.contains(.fullScreen) == true)
+        if isImmersive { return true }
+        return !sidebarVisible && (Self.isBorderless || window?.styleMask.contains(.fullScreen) == true)
     }
 
     /// With the sidebar hidden, the page runs to the window's edges. On unless turned off in Settings.
@@ -873,7 +861,7 @@ final class BrowserRootView: SpaceFrameView {
     /// The page area as a whole, before a side panel takes its share.
     private var pageAreaFrame: NSRect {
         Self.pageArea(in: bounds, sidebarVisible: chromeSidebarShown, sidebarWidth: sidebarWidth, edgeToEdge: isEdgeToEdge,
-                      borderless: Self.isBorderless, topBar: isImmersive ? pinsChrome : showsTopBar, barInset: topBarInset, onRight: sidebarOnRight)
+                      borderless: Self.isBorderless, topBar: isImmersive ? false : showsTopBar, barInset: topBarInset, onRight: sidebarOnRight)
     }
 
     /// Where the pages go. With the bar above the page, they start under it: framed, the bar stands in for the gap
@@ -1657,7 +1645,7 @@ final class BrowserRootView: SpaceFrameView {
     /// In full screen, the pointer at the window's top brings the bar down over the page without moving it, and
     /// leaving the bar puts it away again. The pin keeps it there instead (#462).
     private func revealTopBar(near point: NSPoint) {
-        guard isImmersive, !pinsChrome else { return }
+        guard isImmersive else { return }
         let bar = topBarFrame
         if point.y <= Tokens.Space.x2 || (topBarRevealed && bar.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(point)) {
             if !topBarRevealed { topBarRevealed = true }

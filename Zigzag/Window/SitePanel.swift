@@ -939,6 +939,9 @@ final class SitePanel: FloatingPanelView {
         context.hasPermissions = hasPermissions || context.isWeb
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
         context.clearsCookiesOnQuit = KeptCookies.clearsOnQuit(in: tab.profile.id)
+        // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
+        context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
+            && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
         // Translating is a browser window's (`translatePage`).
         context.foreignLanguage = controller != nil && tab.foreignLanguage != nil
         // This site's own scripts may reach a program listening on this Mac, once Settings allows it at all.
@@ -946,6 +949,17 @@ final class SitePanel: FloatingPanelView {
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         context.manySpaces = Library.shared.spaces.count > 1 && SiteRoutes.site(of: url) != nil
         return context
+    }
+
+    /// The full-screen row's name, here and in Settings › Privacy › Sites: on, a video's full screen stays in the window.
+    static var fullScreenTitle: String {
+        String(localized: "Keep full screen in the window", comment: "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.")
+    }
+
+    /// Under the full-screen row, what full screen does on this site now (#385).
+    static func fullScreenStatus(_ on: Bool) -> String {
+        on ? String(localized: "Videos fill the page, not the screen", comment: "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.")
+            : String(localized: "Videos fill your screen", comment: "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.")
     }
 
     /// The Dark page row, while there is one.
@@ -1027,6 +1041,13 @@ final class SitePanel: FloatingPanelView {
                 }
                 keepCookiesRow = row
                 rows.append(row)
+            case .fullScreenFills:
+                // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
+                rows.append(.toggle(Self.fullScreenTitle,
+                                    on: PageFullScreen.fills(for: url) == .page, status: Self.fullScreenStatus) { [weak self] on in
+                    guard let self else { return }
+                    PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
+                })
             case .openIn:
                 rows.append(openInRow())
                 if let rule = Library.shared.siteRoute(for: url) {
@@ -2144,7 +2165,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, alwaysTranslate, localApps, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, localApps, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2161,6 +2182,8 @@ enum SitePanelRows {
         var siteChoices = true
         /// Settings › Privacy › Clear cookies when Zigzag quits is on for the profile: Keep cookies is everyday then (#383).
         var clearsCookiesOnQuit = false
+        /// Full screen in the page is offered here, and the page has a video or a choice was made.
+        var fullScreen = false
         /// The page is in a language other than yours.
         var foreignLanguage = false
         /// Reader or a PDF covers the page: the page's zoom isn't what you see.
@@ -2187,6 +2210,7 @@ enum SitePanelRows {
             rows.append(.keepAwake)
             if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
         }
+        if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
         // Only while Settings allows websites to reach apps on this Mac: before that there is nothing the switch could
         // do, and the place to turn it on is named there.
