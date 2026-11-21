@@ -108,6 +108,16 @@ import Testing
             #expect(abs(Tokens.Symbol.inkOffset("chevron.left", size: size).height) < 0.2)
         }
     }
+
+    /// The row sits as far below the card's top as above the hairline, to the screen's pixel.
+    @Test func theRowIsCenteredAboveTheHairline() {
+        let header = PaneHeaderView(frame: NSRect(x: 0, y: 0, width: 700, height: PaneHeaderView.height))
+        header.layout()
+        let above = header.back.frame.minY
+        let below = header.bounds.height - Tokens.Metric.hairline - header.back.frame.maxY
+        #expect(abs(above - below) <= 0.5)
+        #expect(header.back.frame.midY == header.reload.frame.midY)
+    }
 }
 
 /// The page area's ground, which moves the window wherever nothing on it takes the press.

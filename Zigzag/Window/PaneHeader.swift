@@ -275,7 +275,9 @@ final class PaneHeaderView: NSView {
         // they keep the card's radius in from its edges, so the first and last clear its rounded corners and sit as far
         // in from one edge as from the other: every pane's strip in a window alike.
         let edge = overCard ? Tokens.Radius.card : 0
-        let y = isInBar ? round((bounds.height - b) / 2) : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
+        // Rounded to pixels, not down, so the row is as far from the top as from the hairline.
+        let scale = window?.backingScaleFactor ?? 2
+        let y = isInBar ? round((bounds.height - b) / 2) : round((bounds.height - Tokens.Metric.hairline - b) / 2 * scale) / scale
         let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth,
                            splitButtons: arrangesSplit, resetLayout: resetsLayout)
         currentFit = fit

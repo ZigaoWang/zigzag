@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The numbers that holding ⌘ or ⌃ shows stay up while you keep holding it and press ⌘1–⌘9 or ⌃1–⌃9, following the tab or space you went to, so you can go on to the next. They went away at the first number. Any other key, a click or letting go still hides them, and a quick ⌘1 never shows them.
 - Icons in buttons sit on the screen's pixels where their ink is centered, instead of snapping to the nearest whole point, so some no longer sit half a point off.
 - In a split view, the reload button on each page's strip lines up with back and forward instead of sitting a little low.
+- A split view page's strip keeps as much room above its buttons and address as below them, instead of sitting half a point high.
 
 ## [0.9.3] - 2026-11-18
 
