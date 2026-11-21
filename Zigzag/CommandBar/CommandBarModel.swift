@@ -238,6 +238,8 @@ enum CommandRanker {
         var isDevelopmentSite = false
         /// The listed page sizes (Settings › Developer), offered by name where Page Size is.
         var pageSizes: [PageSizes.Size] = []
+        /// The page can be captured (⇧⌘2).
+        var canCapture = false
     }
 
     /// The commands about the page and window you're in, each named as in the menu bar, and only those that apply.
@@ -267,6 +269,10 @@ enum CommandRanker {
         } else if c.canSplitWithRecent {
             list.append(Action(id: "split", title: String(localized: "Open in Split View", comment: "A command in the command bar, named as in the menu bar."),
                                keywords: ["open", "split", "view", "side", "two"], symbol: "rectangle.split.2x1"))
+        }
+        if c.canCapture {
+            list.append(Action(id: "capture", title: String(localized: "Capture…", comment: "File menu item, with ⇧⌘2: a mode over the page to take a picture of an area, an element, the whole page or what's on screen."),
+                               keywords: ["capture", "screenshot", "screen", "shot", "picture", "snapshot", "image", "grab"], symbol: "camera.viewfinder"))
         }
         if c.hasOtherTabs {
             list.append(Action(id: "close-others", title: String(localized: "Close Other Tabs", comment: "A command in the command bar, named as in the menu bar."),
@@ -364,6 +370,7 @@ enum CommandRanker {
         let tabs = manager.currentTabs
         guard let tab = manager.selectedTab else { return c }
         c.hasPage = tab.url != nil
+        c.canCapture = WindowManager.shared.controllers.first { $0.tabManager === manager }?.capture.canBegin ?? false
         c.developerTools = DeveloperTool.allCases.filter { $0.isOffered(for: tab, isPrivate: manager.isPrivate, inSplit: manager.split(for: tab) != nil) }
         c.isDevelopmentSite = DevelopmentSites.covers(tab.url)
         c.pageSizes = PageSizes.all

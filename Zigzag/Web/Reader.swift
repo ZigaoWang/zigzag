@@ -88,6 +88,8 @@ enum Reader {
                 const block = img.closest('p, li, td, th, dd');
                 if (block && !img.closest('figure') && block.textContent.trim().length > 0) img.classList.add('inline');
               });
+              // The header names the author; the article's own "By …" line would say it twice.
+              (\(Reader.repeatedBylineScript))(body, article.byline || '', siteName());
               // A wiki's date is when the page was started, not when what you read was written.
               const time = wiki ? null : document.querySelector('article time[datetime], main time[datetime], header time[datetime]');
               const published = wiki ? '' : article.publishedTime || meta('article:published_time') || (time ? time.getAttribute('datetime') : '') || '';
@@ -104,6 +106,34 @@ enum Reader {
         """
         return [WKUserScript(source: readability + "\n" + readerable + "\n" + check, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient)]
     }()
+
+    /// Takes out the article's opening line when it only names the author the header shows: "By Ada Palmer" under a
+    /// header that says Ada Palmer. Compared without case, "By" or extra spaces, and only among the first few blocks,
+    /// never inside a paragraph, so the text itself is left alone.
+    static let repeatedBylineScript = #"""
+    (root, byline, site) => {
+      const norm = s => (s || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase()
+        .replace(/^(?:(?:written|posted|words|story)\s+)?by\s+|^作者\s*[:：]?\s*/, '')
+        .replace(/^[\s|\-–—·•,:：/]+|[\s|\-–—·•,:：/]+$/g, '');
+      const name = norm(byline);
+      if (name.length < 2 || name.length > 60 || /contributors|http|@/.test(name) || name === norm(site)) return;
+      let blocks = 0;
+      const visit = parent => {
+        for (const el of [...parent.children]) {
+          const text = norm(el.textContent);
+          if (!text) { if (el.matches('img, picture, figure, video, svg')) blocks++; continue; }
+          if (text === name) { el.remove(); return true; }
+          if (el.matches('p, h1, h2, h3, h4, h5, h6, li, ul, ol, dl, blockquote, pre, table, figure')) {
+            if (++blocks >= 3) return true;
+            continue;
+          }
+          if (visit(el)) return true;
+        }
+        return false;
+      };
+      visit(root);
+    }
+    """#
 
     private static func resource(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
@@ -413,6 +443,8 @@ enum Reader {
             --sans: system-ui, -apple-system, "Helvetica Neue", sans-serif;
             --mono: ui-monospace, "SF Mono", Menlo, monospace;
             --face: var(--serif); --leading: 1.6;
+            /* One line of the text: every space between blocks is a share of it. */
+            --line: calc(var(--leading) * 1rem);
             font-size: var(--size, 20px);
             /* The page's margins: Zigzag's page gutter in a small window, generous in a big one. */
             --gutter: clamp(\(Int(Tokens.Page.gutter))px, 6vw, 112px);
@@ -446,40 +478,42 @@ enum Reader {
     :root[data-motion="reduce"] main { animation: none; }
     @media (prefers-reduced-motion: reduce) { main { animation: none; } }
 
-    /* The header: where it's from, the title, who and when. Space below it, no rule. */
-    header { margin: 0 0 2.2em; }
-    .site { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font: 500 \(Int(Tokens.TypeSize.row))px/1.4 var(--sans); color: var(--soft); }
-    .site img { display: block; width: 16px; height: 16px; margin: 0; border-radius: 3px; flex: none; }
-    h1.title { margin: 0; font-size: 2.1em; line-height: 1.12; font-weight: 700; letter-spacing: -0.016em; text-wrap: balance; -webkit-hyphens: manual; hyphens: manual; }
-    :root:is(:lang(zh), :lang(ja), :lang(ko)) h1.title { line-height: 1.3; letter-spacing: 0; }
-    .byline { display: flex; flex-wrap: wrap; column-gap: 14px; margin: 14px 0 0; font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); }
-    .byline .author { color: var(--ink); font-weight: 500; }
+    /* The header: where it's from, the title, who and when, in quiet steps of half a line. A line and a half below it, no rule. */
+    header { margin: 0 0 calc(var(--line) * 1.5); }
+    .site { display: flex; align-items: center; gap: 8px; margin: 0 0 calc(var(--line) * .5); font: 500 \(Int(Tokens.TypeSize.body))px/1.4 var(--sans); color: var(--soft); }
+    .site img { display: block; width: 16px; height: 16px; margin: 0; border-radius: \(Int(Tokens.Radius.small) - 1)px; flex: none; }
+    h1.title { margin: 0; font-size: 1.75em; line-height: 1.2; font-weight: 600; letter-spacing: -0.012em; text-wrap: balance; -webkit-hyphens: manual; hyphens: manual; }
+    :root:is(:lang(zh), :lang(ja), :lang(ko)) h1.title { line-height: 1.35; letter-spacing: 0; }
+    .byline { display: flex; flex-wrap: wrap; column-gap: 12px; margin: calc(var(--line) * .5) 0 0; font: \(Int(Tokens.TypeSize.body))px/1.45 var(--sans); color: var(--soft); }
+    .byline .author { font-weight: 500; }
 
-    /* The text's rhythm: a line of space between paragraphs, headings closer to what follows than to what came before. */
+    /* The text's rhythm, in shares of a line: three quarters between paragraphs, a line around pictures, quotes and
+       code, a line and a half over a heading and half a line under it, so it sits with what it heads. */
     article > :first-child { margin-top: 0; }
-    p, ul, ol, dl, blockquote, pre, table, figure, details { margin: 0 0 1em; }
+    p, ul, ol, dl, details { margin: 0 0 calc(var(--line) * .75); }
     p { text-wrap: pretty; }
-    h2, h3, h4, h5, h6 { margin: 1.8em 0 .5em; line-height: 1.25; font-weight: 700; letter-spacing: -0.008em; text-wrap: balance;
+    h2, h3, h4, h5, h6 { margin: calc(var(--line) * 1.5) 0 calc(var(--line) * .5); line-height: 1.3; font-weight: 600; letter-spacing: -0.006em; text-wrap: balance;
                          -webkit-hyphens: manual; hyphens: manual; }
-    h2 { font-size: 1.4em; } h3 { font-size: 1.15em; } h4, h5, h6 { font-size: 1em; }
-    :is(h2, h3, h4) + :is(h3, h4, h5) { margin-top: .9em; }
-    article h1 { font-size: 1.4em; margin: 1.8em 0 .5em; line-height: 1.25; }
+    h2 { font-size: 1.3em; } h3 { font-size: 1.1em; } h4, h5, h6 { font-size: 1em; }
+    :is(h2, h3, h4) + :is(h3, h4, h5) { margin-top: calc(var(--line) * .75); }
+    article h1 { font-size: 1.3em; margin: calc(var(--line) * 1.5) 0 calc(var(--line) * .5); line-height: 1.3; font-weight: 600; }
 
-    /* Links read as part of the sentence: the text's own color, a quiet underline, the link color when pointed at. */
-    a { color: inherit; text-decoration: underline 1px; text-underline-offset: .2em;
-        text-decoration-color: color-mix(in srgb, currentColor 24%, transparent); }
+    /* Links read as part of the sentence: the text's own color over a thin underline in the link color, all link color
+       when pointed at. */
+    a { color: inherit; text-decoration: underline 1px; text-underline-offset: .22em;
+        text-decoration-color: color-mix(in srgb, var(--link) 50%, transparent); }
     a:hover { color: var(--link); text-decoration-color: currentColor; }
     :is(h1, h2, h3, h4, h5, h6) a, figure a { text-decoration: none; }
 
     /* Pictures at their own size, never bigger, centered on the column; a large one runs past the text into the
        margins as far as the window allows. A caption small and quiet under each, on the text's edge. */
     img, video, picture, svg, canvas { max-width: 100%; height: auto; }
-    img, video { display: block; max-width: calc(100% + 2 * var(--bleed)); margin: 1.6em 0 1.6em 50%; transform: translateX(-50%); border-radius: 4px; }
+    img, video { display: block; max-width: calc(100% + 2 * var(--bleed)); margin: var(--line) 0 var(--line) 50%; transform: translateX(-50%); border-radius: \(Int(Tokens.Radius.thumbnail))px; }
     img.inline { display: inline; max-width: 100%; margin: 0; transform: none; vertical-align: middle; border-radius: 0; }
-    figure { margin: 1.8em calc(-1 * var(--bleed)); }
+    figure { margin: var(--line) calc(-1 * var(--bleed)); }
     figure :is(img, video) { max-width: 100%; margin: 0 auto; transform: none; }
     figure > a, picture { display: block; }
-    figcaption { max-width: 40rem; margin: .6em 0 0; padding: 0 var(--bleed); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); text-wrap: pretty; -webkit-hyphens: manual; hyphens: manual; }
+    figcaption { max-width: 40rem; margin: calc(var(--line) * .375) 0 0; padding: 0 var(--bleed); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); text-wrap: pretty; -webkit-hyphens: manual; hyphens: manual; }
     /* Inside a list, a quote or a table, pictures and code keep to their box. */
     :is(li, blockquote, td, th, dd) :is(img, video) { max-width: 100%; margin-left: 0; transform: none; }
     :is(li, blockquote, td, th, dd) figure { margin-inline: 0; }
@@ -490,33 +524,33 @@ enum Reader {
     :is(ul, ol):has(> li img) { list-style: none; padding: 0; }
     li:has(> img, > figure, > a > img) { margin: 0; }
 
-    blockquote { margin: 1.4em 0; padding: 0 0 0 1.1em; border-left: 2px solid var(--rule); color: var(--soft); }
+    blockquote { margin: var(--line) 0; padding: 0 0 0 1.1em; border-left: 2px solid var(--rule); color: var(--soft); }
     blockquote > :last-child { margin-bottom: 0; }
 
-    code, kbd, samp, pre { font-family: var(--mono); font-size: .84em; -webkit-hyphens: none; hyphens: none; }
-    code, kbd { padding: .1em .32em; border-radius: 4px; background: var(--code); }
+    code, kbd, samp, pre { font-family: var(--mono); font-size: .82em; -webkit-hyphens: none; hyphens: none; }
+    code, kbd { padding: .08em .3em; border-radius: \(Int(Tokens.Radius.small))px; background: var(--code); }
     /* Code's box hangs into the margins when there's room, its first column on the text's edge, so long lines get
        more room before they scroll. */
-    pre { margin-inline: calc(-1 * var(--code-bleed)); padding: 14px 16px 14px max(16px, var(--code-bleed)); border-radius: 8px;
+    pre { margin: var(--line) calc(-1 * var(--code-bleed)); padding: 14px 16px 14px max(16px, var(--code-bleed)); border-radius: \(Int(Tokens.Radius.field))px;
           background: var(--code); line-height: 1.55; overflow-x: auto; white-space: pre; tab-size: 4; }
     :is(li, blockquote, td, th, dd) pre { margin-inline: 0; padding-left: 16px; }
     pre code { padding: 0; background: none; font-size: inherit; }
 
-    table { display: block; width: max-content; max-width: calc(100% + var(--bleed)); overflow-x: auto; margin: 1.6em 0; border-collapse: collapse;
+    table { display: block; width: max-content; max-width: calc(100% + var(--bleed)); overflow-x: auto; margin: var(--line) 0; border-collapse: collapse;
             font: 15px/1.5 var(--sans); }
     th, td { padding: 7px 16px 7px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
     th { font-weight: 600; }
     caption { caption-side: bottom; margin-top: .6em; text-align: left; font-size: 14px; color: var(--soft); }
 
     ul, ol { padding-left: 1.4em; }
-    li { margin: .3em 0; } li > :is(p, ul, ol) { margin: .3em 0; }
+    li { margin: calc(var(--line) * .25) 0; } li > :is(p, ul, ol) { margin: calc(var(--line) * .25) 0; }
     li::marker { color: var(--soft); }
-    dt { font-weight: 600; } dd { margin: 0 0 .6em 1.4em; }
-    hr { height: 1px; margin: 2em 0; border: 0; background: var(--rule); }
+    dt { font-weight: 600; } dd { margin: 0 0 calc(var(--line) * .5) 1.4em; }
+    hr { height: 1px; margin: calc(var(--line) * 1.5) 0; border: 0; background: var(--rule); }
     sup, sub { line-height: 0; font-size: .7em; }
     abbr[title] { text-decoration: none; }
 
-    .end { margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--rule); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); }
+    .end { margin-top: calc(var(--line) * 2); padding-top: calc(var(--line) * .75); border-top: 1px solid var(--rule); font: \(Int(Tokens.TypeSize.body))px/1.45 var(--sans); color: var(--soft); }
     .end a { color: inherit; }
 
     /* Leftovers from the page that don't belong in reading. */
@@ -544,8 +578,8 @@ enum Reader {
     }
 }
 
-/// The reading surface shown over a page card. Its one control, Aa, sits quietly at the top right: there at the top
-/// of the article and whenever you scroll back up, out of the way while you read on.
+/// The reading surface shown over a page card: only the article. How it reads is chosen from the address's Aa
+/// (`ReaderOptions`), as Safari's Reader keeps its choices in the toolbar.
 final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
@@ -554,10 +588,12 @@ final class ReaderView: NSView {
     var onPeekLink: ((URL) -> Void)?
     var onBackgroundLink: ((URL) -> Void)?
     var onForegroundLink: ((URL) -> Void)?
-    private let controls = ReaderControls()
+    /// How it reads now, as shown.
+    private(set) var preferences = Reader.Preferences.saved
+    /// Auto's paper, the space's breath of color, for the panel's swatches.
+    private(set) var paper = Reader.AutoPaper()
     /// The page the article came from: the reading page's own address, the one load it makes by itself.
     private var articleURL: URL?
-    private var scrollMonitor: Any?
 
     /// `store`: the one the page it reads is in (its profile's, or its private window's).
     init(store: WKWebsiteDataStore) {
@@ -566,8 +602,6 @@ final class ReaderView: NSView {
         super.init(frame: .zero)
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
-        addSubview(controls)
-        controls.onChange = { [weak self] preferences in self?.apply(preferences) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -577,24 +611,18 @@ final class ReaderView: NSView {
     /// choices.
     @discardableResult
     func stepTextSize(_ delta: Int) -> Reader.Preferences {
-        let preferences = controls.preferences.stepped(delta)
-        controls.preferences = preferences
-        apply(preferences)
-        return preferences
+        let next = preferences.stepped(delta)
+        apply(next)
+        ReaderOptions.showing(next, for: self)
+        return next
     }
 
-    #if DEBUG
-    func debugSet(_ preferences: Reader.Preferences) {
-        controls.preferences = preferences
-        apply(preferences)
-    }
-    #endif
-
-    private func apply(_ preferences: Reader.Preferences) {
+    /// New choices, kept for every article and applied to this one at once.
+    func apply(_ preferences: Reader.Preferences) {
+        self.preferences = preferences
         Reader.Preferences.saved = preferences
         // The page's own scripts are off; this runs in Zigzag's world, so the change is instant.
         webView.runOwnScript(preferences.script)
-        controls.theme = preferences.theme
     }
 
     /// In the store of the page it reads, so the article's pictures are fetched as the page fetched them: one store
@@ -624,159 +652,49 @@ final class ReaderView: NSView {
     override func layout() {
         super.layout()
         webView.frame = bounds
-        let side = ReaderControls.side
-        controls.frame = NSRect(x: bounds.width - side - Tokens.Space.x4, y: Tokens.Space.x4, width: side, height: side)
     }
 
     /// `theme`: the window's space, whose breath of color Auto's paper takes.
     func show(_ article: Reader.Article, from url: URL, icon: NSImage? = nil, theme: Brand.Theme = .navy) {
         articleURL = url
         webView.navigationDelegate = self
-        let preferences = Reader.Preferences.saved
-        let paper = Reader.AutoPaper.of(theme)
+        preferences = Reader.Preferences.saved
+        paper = Reader.AutoPaper.of(theme)
         webView.loadHTMLString(Reader.html(for: article, preferences: preferences, icon: Reader.iconSource(icon), paper: paper,
                                            reducedMotion: Tokens.Motion.reduceMotion), baseURL: url)
-        controls.paper = paper
-        controls.preferences = preferences
-        controls.theme = preferences.theme
     }
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { onClose?() } else { super.keyDown(with: event) }
     }
 
-    /// Scrolling on through the article puts Aa away; scrolling back up brings it back.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
-        scrollMonitor = nil
-        guard window != nil else { return }
-        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            guard let self, event.window === self.window, self.bounds.contains(self.convert(event.locationInWindow, from: nil)) else { return event }
-            if event.scrollingDeltaY < -1 { self.controls.setShown(false) } else if event.scrollingDeltaY > 1 { self.controls.setShown(true) }
-            return event
-        }
-    }
-}
-
-/// Aa, alone at the top right on the article's own paper: how it reads opens in Zigzag's own panel underneath.
-/// Reader itself goes with the address's Reader button, Esc or ⌥⌘R, as it came.
-final class ReaderControls: NSView {
-    var onChange: ((Reader.Preferences) -> Void)?
-    var preferences = Reader.Preferences.saved { didSet { options.preferences = preferences } }
-    /// The article's colors: the button sits on its paper, in its ink, so it reads as part of the page.
-    var theme = Reader.Preferences.Theme.auto { didSet { refreshColors() } }
-    /// Auto's paper, the space's breath of color.
-    var paper = Reader.AutoPaper() { didSet { options.paper = paper; refreshColors() } }
-
-    private let style = IconButton(symbol: "textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the button in Reader's bar that shows its text and color choices."))
-    private let options = ReaderOptions()
-    private var monitor: Any?
-    private var isShown = true
-
-    static var side: CGFloat { Tokens.Metric.iconButton }
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.control
-        layer?.cornerCurve = .continuous
-        addSubview(style)
-        style.onClick = { [weak self] _ in self?.toggleOptions() }
-        options.onChange = { [weak self] preferences in
-            self?.preferences = preferences
-            self?.onChange?(preferences)
-        }
-        refreshColors()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-
-    override func layout() {
-        super.layout()
-        style.frame = bounds
-    }
-
-    /// Put away, it takes no clicks: the article under it does.
-    override func hitTest(_ point: NSPoint) -> NSView? { isShown ? super.hitTest(point) : nil }
-
-    /// Shown at the top and on the way back up, put away on the way down; never while its panel is open.
-    func setShown(_ shown: Bool) {
-        guard shown != isShown, options.superview == nil else { return }
-        isShown = shown
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Tokens.Motion.Role.state.duration() * Tokens.Motion.debugSlowdown
-            ctx.timingFunction = Tokens.Motion.easeOut
-            animator().alphaValue = shown ? 1 : 0
-        }
-    }
-
-    private func refreshColors() {
-        // Light, Sepia and Dark are the page's whatever the Mac's look; Auto follows the Mac, as the page does.
-        appearance = theme == .auto ? nil : NSAppearance(named: theme == .dark ? .darkAqua : .aqua)
-        let color = theme == .auto ? paper.paper(dark: effectiveAppearance.isDark) : theme.palette.paper
-        Tokens.Motion.withoutAnimation { layer?.backgroundColor = Tokens.Color.hex(color).cgColor }
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        refreshColors()
-    }
-
-    #if DEBUG
-    var debugOptions: NSView { options }
-    #endif
-
-    func toggleOptions() {
-        if options.superview != nil { hideOptions(); return }
-        guard let host = superview else { return }
-        setShown(true)
-        options.preferences = preferences
-        let size = options.panelSize
-        // A button's menu: 4pt under it, its trailing edge on the button's, always whole inside the page.
-        let margin = Tokens.Space.x3
-        let x = min(max(margin, frame.maxX - size.width), host.bounds.width - size.width - margin)
-        options.frame = NSRect(x: x, y: frame.maxY + Tokens.Space.x1, width: size.width, height: size.height)
-        options.growsFrom = CGPoint(x: 1, y: 0)
-        host.addSubview(options)
-        options.present()
-        style.isSelected = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak self] event in
-            guard let self else { return event }
-            if event.type == .keyDown { if event.keyCode == 53 { self.hideOptions(); return nil }; return event }
-            let inOptions = self.options.bounds.contains(self.options.convert(event.locationInWindow, from: nil))
-            let onStyle = self.style.bounds.contains(self.style.convert(event.locationInWindow, from: nil))
-            if !inOptions && !onStyle { self.hideOptions() }
-            return event
-        }
-    }
-
-    private func hideOptions() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        style.isSelected = false
-        options.dismiss()
-    }
-
-    override func removeFromSuperview() {
-        if options.superview != nil { hideOptions() }
-        super.removeFromSuperview()
-    }
-
-    /// Reader closed with the panel open: the panel, and its listener for Esc and clicks, go with it.
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil, monitor != nil { hideOptions() }
+        // Reader closed with its panel open: the panel, and its listener for Esc and clicks, go with it.
+        if window == nil { ReaderOptions.close(for: self) }
     }
 }
 
 /// How it reads, as the site panel's rows: each choice named on the left, its control on the right. Text size
-/// steps as the page's zoom does, the face and the width slide, and the colors are round swatches.
-private final class ReaderOptions: FloatingPanelView {
-    var onChange: ((Reader.Preferences) -> Void)?
-    var preferences = Reader.Preferences.saved { didSet { refresh() } }
-    var paper = Reader.AutoPaper() { didSet { swatches.paper = paper } }
+/// steps as the page's zoom does, the face and the width slide, and the colors are round swatches. Opened from the
+/// address's Aa while Reader is on, hanging under it as Site Controls hangs from its button.
+final class ReaderOptions: FloatingPanelView {
+    private static weak var current: ReaderOptions?
+    static func isOpen(in window: NSWindow?) -> Bool { current?.superview != nil && current?.window === window }
+    static func closeCurrent() { current?.close() }
+    /// The panel open for a reading page, if any.
+    static func close(for reader: ReaderView) { if current?.reader === reader { current?.close() } }
+    /// ⌘+ or ⌘− while it's open: its stepper follows.
+    static func showing(_ preferences: Reader.Preferences, for reader: ReaderView) {
+        if let current, current.reader === reader { current.preferences = preferences }
+    }
+
+    private var preferences = Reader.Preferences.saved { didSet { refresh() } }
+    private weak var reader: ReaderView?
+    private weak var opener: IconButton?
+    /// Where it goes for its size, worked out again as the window resizes.
+    private var place: ((NSSize) -> NSPoint)?
+    private var monitor: Any?
 
     private let size = ZoomStepper()
     private let face = SlidingSwitch([.styled(String(localized: "Serif", comment: "Choice of typeface in Reader's text and color choices."), NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
@@ -790,8 +708,71 @@ private final class ReaderOptions: FloatingPanelView {
     private static let padX = Tokens.Space.x4, padY = Tokens.Space.x2
     var panelSize: NSSize { NSSize(width: Self.width, height: Self.padY * 2 + PanelRow.height * CGFloat(rows.count)) }
 
+    /// Opens the panel for `reader` in `overlay`, or closes the one open. `opener`: the button it hangs from, shown
+    /// pressed while it's open; nil when there's none on screen. `recedes`: what fades back under it. `place`: its
+    /// top-left corner for its size.
+    static func toggle(for reader: ReaderView, in overlay: NSView, opener: IconButton?, recedes: [NSView] = [],
+                       place: @escaping (NSSize) -> NSPoint) {
+        if let current, current.superview != nil {
+            let same = current.reader === reader
+            current.close()
+            if same { return }
+        }
+        let panel = ReaderOptions(frame: .zero)
+        panel.reader = reader
+        panel.opener = opener
+        panel.place = place
+        panel.preferences = reader.preferences
+        panel.swatches.paper = reader.paper
+        panel.recedes = recedes
+        let size = panel.panelSize
+        panel.frame = NSRect(origin: place(size), size: size)
+        overlay.addSubview(panel)
+        if let opener, opener.window != nil {
+            let b = opener.convert(opener.bounds, to: overlay)
+            panel.growsFrom = CGPoint(x: min(max((b.midX - panel.frame.minX) / size.width, 0), 1), y: 0)
+        } else {
+            panel.growsFrom = CGPoint(x: 1, y: 0)
+        }
+        panel.present(arrival: .pop)
+        opener?.isSelected = true
+        current = panel
+        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+            guard let panel else { return event }
+            return panel.handle(event)
+        }
+    }
+
+    /// In its own window only: Esc closes it; a click outside it and its button closes it.
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        guard event.window === window, MenuPanel.current == nil else { return event }
+        if event.type == .keyDown {
+            if event.keyCode == 53 { close(); return nil }
+            return event
+        }
+        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
+        let onOpener = opener.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
+        if !inside && !onOpener { close() }
+        return event
+    }
+
+    func close() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        opener?.isSelected = false
+        if Self.current === self { Self.current = nil }
+        dismiss()
+    }
+
+    /// The window grew or shrank under it: back under its button, or in its corner.
+    override func resize(withOldSuperviewSize oldSize: NSSize) {
+        guard let place, monitor != nil else { return }
+        frame.origin = place(frame.size)
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
+        setAccessibilityLabel(String(localized: "Text and Colors", comment: "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors."))
         let typeface = String(localized: "Typeface", comment: "VoiceOver label of the typeface choice in Reader's text and color choices.")
         let width = String(localized: "Column Width", comment: "VoiceOver label of the column width choice in Reader's text and color choices.")
         let colors = String(localized: "Colors", comment: "Row in Reader's text and color choices: the paper and ink the article is shown in.")
@@ -827,7 +808,7 @@ private final class ReaderOptions: FloatingPanelView {
         edit(&next)
         guard next != preferences else { return }
         preferences = next
-        onChange?(next)
+        reader?.apply(next)
     }
 
     private func refresh() {

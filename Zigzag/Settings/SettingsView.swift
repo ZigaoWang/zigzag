@@ -2527,6 +2527,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             guard response == .OK, let url = panel.url, let self else { return }
             // A Firefox package is installed from its file; a folder as before.
             if url.pathExtension.lowercased() == "xpi" { installPickedXPI(url, in: profile); return }
+            if ExtensionStore.folderIsThemeOnly(url) { noticeCouldNotAdd(ExtensionStore.InstallError.theme.message); return }
             confirmUnpacked(url, from: nil) { [weak self] in
                 if await ExtensionStore.loadUnpacked(url, in: profile) == nil, let host = self {
                     ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t load this extension", comment: "Title of the notice when an unpacked extension can't load."),

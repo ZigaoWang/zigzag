@@ -504,4 +504,30 @@ import Testing
             #expect(library.folderID(containing: saved.id) == nil)
         }
     }
+
+
+    /// Zigzag's own views have an address but nothing to pin: the star isn't offered, and the save path refuses them
+    /// as ⌘D and the menus already did (#442).
+    @Test func zigzagsOwnViewsCannotBePinned() throws {
+        #expect(!SavePath.Page.isPinnable(try #require(URL(string: "zigzag://settings"))))
+        #expect(!SavePath.Page.isPinnable(try #require(URL(string: "zigzag://history"))))
+        #expect(!SavePath.Page.isPinnable(try #require(URL(string: "about:blank"))))
+        #expect(SavePath.Page.isPinnable(try #require(URL(string: "https://example.com/a"))))
+        #expect(SavePath.Page.isPinnable(try #require(URL(string: "file:///tmp/a.pdf"))))
+        let space = library.spaces[0].id
+        let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+        #expect(SavePath.Page(tab: settings) == nil)
+        // The star is offered by the same rule the save path uses, so a Zigzag view hides it in the app too.
+        #expect(!AddressView.canSave(for: settings))
+        #expect(!AddressView.canSave(for: nil))
+        let address = AddressView()
+        address.setSaved(false, canSave: AddressView.canSave(for: settings))
+        #expect(address.saveButton.isHidden)
+        let page = Tab(url: try #require(URL(string: "https://example.com/")), title: "Example", spaceID: space)
+        #expect(AddressView.canSave(for: page))
+        address.setSaved(false, canSave: AddressView.canSave(for: page))
+        #expect(!address.saveButton.isHidden)
+        address.setSaved(true, canSave: SavePath.Page(tab: settings) != nil)
+        #expect(address.saveButton.isHidden)
+    }
 }
