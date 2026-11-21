@@ -47,6 +47,10 @@
   Test: PinnedGroupTests.onePageLeavesAPinnedSplitOfThree
 - Close one page of a pinned split → that page unloads; the pin keeps every page.
   Test: PinnedGroupTests.closingOnePinnedPageKeepsThePin
+- Drop a tab or a pinned page on either half of a pinned split's row → it joins as a third or fourth page, as on a split of tabs; at four, the row only moves.
+  Test: PinnedGroupTests.aDropGrowsAPinnedSplitAsATabSplit, PinnedGroupTests.bothSectionsOfferTheSameDrop
+- Drag one page of a pinned split out by its strip → into Pinned it stays pinned on its own there, into the tabs it's a tab; the rest stay a pinned split, or one pinned page.
+  Test: PinnedGroupTests.aPagePulledOutOfAPinnedSplitOfThree
 - A pinned split saved by an older Zigzag → reads and is written back as before.
   Test: PinnedGroupTests.olderPinnedSplitsReadAndWriteAsBefore
 

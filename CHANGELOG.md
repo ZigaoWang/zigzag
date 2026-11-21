@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A pinned split grows and comes apart by dragging, as a split of tabs does. Drop a tab or a pinned page on the left or right half of its row and it joins as a third or fourth page, the half it would take lit while you hold it there; at four pages the row only moves. Drag one page out by the strip above it: let go among the pinned pages and it stays pinned on its own there, let go among the tabs and it's a tab. The rest stay a pinned split, or one pinned page if only one is left. ⌘Z takes back each step.
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, and Your Zigzag Card.
