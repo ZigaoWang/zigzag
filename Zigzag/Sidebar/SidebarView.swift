@@ -52,6 +52,13 @@ final class AddressView: InteractiveView {
     /// Whether the page can be pinned at all (a new tab has no address).
     private(set) var canSave = false
 
+    /// Whether the star is offered for a tab: a page with something to pin, in a window that keeps pins (#442).
+    /// The same rule the save path uses, so the star, ⌘D and the menus can't disagree.
+    static func canSave(for tab: Tab?) -> Bool {
+        guard let tab, !tab.isPrivate else { return false }
+        return SavePath.Page(tab: tab) != nil
+    }
+
     /// The star's state for the page in the field. A page that isn't pinned, or is a private window's, keeps the star.
     func setSaved(_ saved: Bool, canSave: Bool) {
         guard isSaved != saved || self.canSave != canSave else { return }
@@ -1199,7 +1206,7 @@ final class SidebarView: NSView {
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: tab?.url != nil && tab?.isPrivate != true)
+        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

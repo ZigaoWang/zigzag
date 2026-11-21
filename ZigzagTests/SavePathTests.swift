@@ -517,11 +517,15 @@ import Testing
         let space = library.spaces[0].id
         let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
         #expect(SavePath.Page(tab: settings) == nil)
+        // The star is offered by the same rule the save path uses, so a Zigzag view hides it in the app too.
+        #expect(!AddressView.canSave(for: settings))
+        #expect(!AddressView.canSave(for: nil))
         let address = AddressView()
-        address.setSaved(false, canSave: SavePath.Page(tab: settings) != nil)
+        address.setSaved(false, canSave: AddressView.canSave(for: settings))
         #expect(address.saveButton.isHidden)
         let page = Tab(url: try #require(URL(string: "https://example.com/")), title: "Example", spaceID: space)
-        address.setSaved(false, canSave: SavePath.Page(tab: page) != nil)
+        #expect(AddressView.canSave(for: page))
+        address.setSaved(false, canSave: AddressView.canSave(for: page))
         #expect(!address.saveButton.isHidden)
         address.setSaved(true, canSave: SavePath.Page(tab: settings) != nil)
         #expect(address.saveButton.isHidden)

@@ -137,8 +137,12 @@ struct AddressTests {
         AddressView.Pin(id: id, image: nil, label: id, badge: badge, action: { _ in }, menu: { nil })
     }
 
-    /// Room for three pins beside the star and Site Controls.
-    private func field() -> AddressView { AddressView(frame: NSRect(x: 0, y: 0, width: 224 + AddressView.buttonSide + 2, height: 30)) }
+    /// Room for three pins beside the star and Site Controls, on a page that can be pinned.
+    private func field() -> AddressView {
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 224 + AddressView.buttonSide + 2, height: 30))
+        address.setSaved(false, canSave: true)
+        return address
+    }
 
     @Test func aPinKeepsItsButtonAcrossUpdates() {
         let address = field()
@@ -165,6 +169,7 @@ struct AddressTests {
 
     @Test func thePinFurthestFromSiteControlsHidesFirst() {
         let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200 + AddressView.buttonSide + 2, height: 30))
+        address.setSaved(false, canSave: true)
         address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
         #expect(address.visiblePinIDs == ["b", "c"])
         #expect(address.pinButton(for: "a")?.isHidden == true)
@@ -177,6 +182,21 @@ struct AddressTests {
         #expect(address.visiblePinIDs == ["a", "b"])
         #expect(address.saveButton.frame.minX > last.maxX)
         #expect(address.saveButton.frame.maxX < address.siteControlsButton.frame.minX)
+    }
+
+    /// Nothing to pin takes the star's slot away, and the pins that were hidden for it come back (#442).
+    @Test func aHiddenStarGivesItsRoomToThePins() throws {
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200 + AddressView.buttonSide + 2, height: 30))
+        address.setSaved(false, canSave: true)
+        address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
+        #expect(address.visiblePinIDs == ["b", "c"])
+
+        // A Zigzag view: the star goes, and its room goes to the pins.
+        address.setSaved(false, canSave: false)
+        #expect(address.saveButton.isHidden)
+        #expect(address.visiblePinIDs == ["a", "b", "c"])
+        let last = try #require(address.pinButton(for: "c")?.frame)
+        #expect(address.siteControlsButton.frame.minX - last.maxX == 2)
     }
 
     /// Points along the field, from where its pins are laid out, so the buttons after them can change.
@@ -260,6 +280,7 @@ struct AddressTests {
     /// area, the same 2pt between every pair, its icon a site icon's 16pt in the middle.
     @Test func aPinnedButtonIsTheFieldsOwnButton() {
         let address = AddressView(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Sidebar.addressHeight))
+        address.setSaved(false, canSave: true)
         address.setReader(available: true, active: false)
         address.setPins([pin("a", badge: "18"), pin("b")], animated: false)
         guard let a = address.pinButton(for: "a"), let b = address.pinButton(for: "b") else { Issue.record("no pins"); return }
