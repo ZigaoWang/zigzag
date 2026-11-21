@@ -14,6 +14,14 @@ enum PageTranslator {
         return Locale.Language(identifier: Locale.preferredLanguages.first ?? "en")
     }
 
+    /// How a page stands, for the address bar's Translate button.
+    enum PageState { case original, translating, translated }
+
+    /// nil for a page with nothing to say: not translated, and not in another language.
+    nonisolated static func pageState(translating: Bool, translated: Bool, foreign: Bool) -> PageState? {
+        translating ? .translating : translated ? .translated : foreign ? .original : nil
+    }
+
     /// nil follows the system.
     static var chosenLanguage: String? {
         get { UserDefaults.standard.string(forKey: "TranslateInto") }
@@ -199,12 +207,32 @@ enum PageTranslator {
         var pieces: [String]
         var blocks: [Int]
         var blockTexts: [String]
+        /// Where each piece is: 0 on screen, 1 elsewhere on the page, 2 hidden.
+        var ranks: [Int] = []
     }
 
     /// Pieces in one language, translated together.
     struct Group: Equatable {
         let source: Locale.Language
         let pieces: [Int]
+    }
+
+    /// The order to translate in: what's on screen, in every language, then the rest of what shows, then what's
+    /// hidden, so what you can read changes first. Each language goes as one run as far as the order allows.
+    nonisolated static func scheduled(_ groups: [Group], ranks: [Int]) -> [Group] {
+        var passes: [Group] = []
+        for rank in 0...2 {
+            for group in groups {
+                let pieces = group.pieces.filter { ($0 < ranks.count ? ranks[$0] : 2) == rank }
+                guard !pieces.isEmpty else { continue }
+                if let last = passes.last, last.source == group.source {
+                    passes[passes.count - 1] = Group(source: last.source, pieces: last.pieces + pieces)
+                } else {
+                    passes.append(Group(source: group.source, pieces: pieces))
+                }
+            }
+        }
+        return passes
     }
 
     /// The text pieces to translate, in page order, and the blocks they're in. Translations put back with `apply`
@@ -440,6 +468,12 @@ enum PageTranslator {
         }
         return true;
       };
+      // Where a piece is, which decides when it's translated: on screen, elsewhere on the page, or hidden.
+      const rank = (el) => {
+        if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return 2;
+        const box = el.getBoundingClientRect();
+        return box.bottom > 0 && box.top < innerHeight && box.right > 0 && box.left < innerWidth ? 0 : 1;
+      };
       const walk = () => {
         const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
         const found = [];
@@ -479,7 +513,7 @@ enum PageTranslator {
         },
         collect: () => {
           nodes = walk();
-          const pieces = [], blocks = [], blockTexts = [], places = new Map();
+          const pieces = [], blocks = [], blockTexts = [], ranks = [], places = new Map(), ranked = new Map();
           for (const node of nodes) {
             if (!originals.has(node)) originals.set(node, node.nodeValue);
             const text = originals.get(node).trim();
@@ -491,8 +525,11 @@ enum PageTranslator {
             if (blockTexts[place].length < 600) blockTexts[place] += (blockTexts[place] ? ' ' : '') + text;
             pieces.push(text);
             blocks.push(place);
+            const parent = node.parentElement;
+            if (!ranked.has(parent)) ranked.set(parent, rank(parent));
+            ranks.push(ranked.get(parent));
           }
-          return JSON.stringify({ pieces, blocks, blockTexts });
+          return JSON.stringify({ pieces, blocks, blockTexts, ranks });
         },
         apply: (translations) => {
           for (const [index, text] of Object.entries(translations)) {
@@ -576,6 +613,33 @@ extension PageTranslator {
     }
 }
 
+/// Translations made so far, kept until Zigzag quits, so text met again (a site's menus on its next page, a page
+/// translated again) goes straight in. A private tab keeps its own, gone with its translation.
+final class TranslationMemory {
+    static let shared = TranslationMemory()
+
+    struct Key: Hashable {
+        let source: String, target: String, text: String
+
+        init(_ text: String, from source: Locale.Language, to target: Locale.Language) {
+            self.source = source.minimalIdentifier
+            self.target = target.minimalIdentifier
+            self.text = text
+        }
+    }
+
+    private static let limit = 5000
+    private var known: [Key: String] = [:]
+
+    subscript(key: Key) -> String? {
+        get { known[key] }
+        set {
+            if known.count >= Self.limit { known.removeAll() }
+            known[key] = newValue
+        }
+    }
+}
+
 /// The Translation framework hands out sessions through a SwiftUI task, so each translation keeps an invisible host
 /// for it, in its window. It also gives macOS a window to show its own "download this language?" prompt on.
 @MainActor
@@ -596,14 +660,26 @@ final class TranslationHost {
 
     /// Translates the pieces of the page in a web view, a language at a time, into `target`. `pieces` are the
     /// page's text as `PageTranslator.text(in:)` read it, and each group names the pieces in one language.
+    /// Text in `memory` goes straight in, and other text is translated once however often it's on the page.
     /// Calls back with what happened.
     func translate(_ webView: WKWebView, pieces: [String], groups: [PageTranslator.Group], into target: Locale.Language,
-                   progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
+                   memory: TranslationMemory, progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let first = groups.first else { completion(.success(())); return }
-        model.job = Job(webView: webView, url: webView.url, pieces: pieces, groups: groups, target: target,
-                        total: groups.reduce(0) { $0 + $1.pieces.count }, progress: progress, completion: completion)
+        var counted = Set<TranslationMemory.Key>()
+        var total = 0
+        for group in groups {
+            for index in group.pieces where index < pieces.count {
+                let key = TranslationMemory.Key(pieces[index], from: group.source, to: target)
+                if memory[key] == nil, counted.insert(key).inserted { total += Self.work(pieces[index]) }
+            }
+        }
+        model.job = Job(webView: webView, url: webView.url, pieces: pieces, groups: groups, target: target, memory: memory,
+                        total: total, progress: progress, completion: completion)
         model.start(from: first.source, to: target)
     }
+
+    /// About how long a text takes to translate, in characters: each one costs a little, and so does each text.
+    private static func work(_ text: String) -> Int { text.count + 50 }
 
     /// The page went away before it was done: navigated elsewhere, or its tab closed.
     struct Cancelled: Error {}
@@ -615,8 +691,10 @@ final class TranslationHost {
         let pieces: [String]
         let groups: [PageTranslator.Group]
         let target: Locale.Language
+        let memory: TranslationMemory
+        /// The `work` to do, and how much is done.
         let total: Int
-        /// The group being translated now, and how many pieces are done.
+        /// The group being translated now.
         var current = 0
         var done = 0
         let progress: (Double) -> Void
@@ -643,15 +721,32 @@ final class TranslationHost {
             self.job = nil
             guard let webView = job.webView, webView.url == job.url else { job.completion(.failure(Cancelled())); return }
             let group = job.groups[job.current]
+            let key = { [job] (text: String) in TranslationMemory.Key(text, from: group.source, to: job.target) }
+            // Text already translated goes in now; the rest is asked for once, for every place it's in.
+            var known: [Int: String] = [:]
+            var places: [String: [Int]] = [:]
+            var asking: [Int] = []
+            for index in group.pieces where index < job.pieces.count {
+                let text = job.pieces[index]
+                if let translation = job.memory[key(text)] {
+                    known[index] = translation
+                } else {
+                    if places[text] == nil { asking.append(index) }
+                    places[text, default: []].append(index)
+                }
+            }
+            if !known.isEmpty {
+                await PageTranslator.apply(known, in: webView)
+                if isCancelled { return }
+            }
             do {
-                // In page order, a batch at a time, so the top of the page changes first.
+                // A batch at a time, in the order given.
                 let batch = 120
-                for start in stride(from: 0, to: group.pieces.count, by: batch) {
-                    let chunk = group.pieces[start..<min(start + batch, group.pieces.count)]
+                for start in stride(from: 0, to: asking.count, by: batch) {
                     // The framework hands the session to this task alone, and it's used one batch at a time;
                     // its types just aren't marked as safe to pass to the framework's own executor.
-                    nonisolated(unsafe) let requests = chunk.compactMap { index in
-                        index < job.pieces.count ? TranslationSession.Request(sourceText: job.pieces[index], clientIdentifier: String(index)) : nil
+                    nonisolated(unsafe) let requests = asking[start..<min(start + batch, asking.count)].map { index in
+                        TranslationSession.Request(sourceText: job.pieces[index], clientIdentifier: String(index))
                     }
                     nonisolated(unsafe) let session = session
                     // Each piece goes into the page as it comes back, so a long page changes as you watch.
@@ -659,10 +754,13 @@ final class TranslationHost {
                         // Cancelled meanwhile: quietly, with nothing more put in the page.
                         if isCancelled { return }
                         guard webView.url == job.url else { throw Cancelled() }
-                        guard let id = response.clientIdentifier.flatMap(Int.init) else { continue }
-                        await PageTranslator.apply([id: response.targetText], in: webView)
-                        job.done += 1
-                        job.progress(Double(job.done) / Double(max(job.total, 1)))
+                        guard let id = response.clientIdentifier.flatMap(Int.init), id < job.pieces.count else { continue }
+                        let text = job.pieces[id]
+                        job.memory[key(text)] = response.targetText
+                        let translated = Dictionary(uniqueKeysWithValues: (places[text] ?? []).map { ($0, response.targetText) })
+                        await PageTranslator.apply(translated, in: webView)
+                        job.done += TranslationHost.work(text)
+                        job.progress(min(Double(job.done) / Double(max(job.total, 1)), 1))
                     }
                 }
             } catch {

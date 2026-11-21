@@ -40,7 +40,7 @@ enum OpenDisposition {
 /// A tab can be suspended (web view released, state kept) and restored without the user noticing.
 final class Tab: NSObject {
     enum Change {
-        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language
+        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language, document
         /// You renamed it (it also sends `.title`).
         case renamed
         /// Its PDF viewer came or went.
@@ -2209,6 +2209,9 @@ extension Tab: WKNavigationDelegate {
         ruleDeclinedURL = nil
         declinedRuleDownload = false
         forgetPageErrors()
+        // A new document, even at the same address: nothing translated is in it.
+        isTranslated = false
+        changed.send(.document)
         // The new page is here: its address shows.
         addressWaitsForCommit = false
         // Before the address updates, so a pinned page isn't marked as moved on.

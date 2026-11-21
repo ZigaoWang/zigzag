@@ -33,6 +33,20 @@ final class AddressView: InteractiveView {
     /// Shown beside Reader's button while Reader is on: its text and colors.
     let readerOptionsButton = AddressView.button("textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors."))
 
+    /// Shown on pages in another language: plain on the original, in the accent while translating, and in the accent
+    /// on a fill once translated. Click to switch between the two.
+    let translateButton = AddressView.button("translate", toolTip: PageTranslator.menuTitle(translated: false))
+
+    func setTranslation(_ state: PageTranslator.PageState?) {
+        wantsTranslate = state != nil
+        translateButton.isSelected = state == .translated
+        translateButton.tint = state == .translating || state == .translated ? Brand.Theme.for(self).accent : Tokens.Color.icon
+        let words = state == .translating ? String(localized: "Translating Page…", comment: "Tooltip of the address bar's Translate button while the page is being translated.")
+            : PageTranslator.menuTitle(translated: state == .translated)
+        translateButton.toolTip = Shortcuts.tooltip(words, for: #selector(BrowserWindowController.translatePage(_:)))
+        reflow(animated: true)
+    }
+
     func setCapture(camera: Bool, microphone: Bool) {
         wantsCapture = camera || microphone
         captureButton.symbol = camera ? "video.fill" : "mic.fill"
@@ -405,6 +419,8 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        translateButton.isHidden = true
+        addSubview(translateButton)
         readerOptionsButton.isHidden = true
         addSubview(readerOptionsButton)
         saveButton.tint = Tokens.Color.icon
@@ -517,7 +533,7 @@ final class AddressView: InteractiveView {
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReaderOptions ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
+        let count = (wantsTranslate ? 1 : 0) + (wantsReaderOptions ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -545,6 +561,7 @@ final class AddressView: InteractiveView {
     }
 
     private var wantsReader = false
+    private var wantsTranslate = false
     private var wantsReaderOptions = false
     private var wantsCapture = false
     /// The buttons drawn in the field, those leaving aside.
@@ -568,7 +585,7 @@ final class AddressView: InteractiveView {
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
         var others: [IconButton] = []
-        for (button, wanted) in [(readerOptionsButton, wantsReaderOptions), (readerButton, wantsReader), (captureButton, wantsCapture)] {
+        for (button, wanted) in [(translateButton, wantsTranslate), (readerOptionsButton, wantsReaderOptions), (readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         // Without the site, buttons get the whole width, including a gap after the last.
@@ -654,7 +671,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerOptionsButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [translateButton, readerOptionsButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.
