@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - More of Zigzag looks and works the same way everywhere. The command bar's chosen result has the same soft wash as Settings. A space rule's match-type help opens in Zigzag's own panel and closes with Esc or a click outside. Show All Tabs' search shows the accent ring while you type, like every search field. A search that finds nothing says so in one line, "No tabs match “x”." and the like, in the same place in Settings, Show All Tabs, the icon grid, Passwords, History and the archive. The tour, the welcome, Import, the password menu and Show All Tabs use the same buttons as the rest of the app, and the password menu's highlight glides between rows like every other menu's.
 - A Quit shortcut you changed or took away in Settings › Shortcuts stays as you set it. Since the last beta it was back on ⌘Q. ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 - ⌘Q quits again on a page that takes keys for itself, like a web editor or game, as the other browser keys do. ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
+- An older Zigzag can open spaces in the new glass colors. If you go back to an earlier version, your spaces, pinned tabs and favorites are all there, in the nearest color it has, instead of a single new space.
 
 ## [0.9.4] - 2026-11-21
 

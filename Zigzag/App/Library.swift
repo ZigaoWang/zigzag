@@ -418,6 +418,82 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     }
 }
 
+/// Written so an older Zigzag can still read it: `color` and `defaultColor` hold a color it knows, the nearest one,
+/// and a palette color goes under keys of its own, which this one reads first.
+extension SpaceInfo {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, color, bookmarks, folders, pinnedSplits, hue, intensity, appearance, grain, hue2, intensity2, angle,
+             glass, brightness, brightness2, tint, tint2, translucency, clearGlass, icon, importedFrom, defaultColor,
+             routedSites, backgroundImage, paletteColor, paletteDefaultColor
+    }
+
+    /// A stored color's name; one this version doesn't know reads as nil.
+    private static func color(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> SpaceColor? {
+        ((try? c.decodeIfPresent(String.self, forKey: key)) ?? nil).flatMap(SpaceColor.init(rawValue:))
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        // A beta that wrote a palette color into `color` reads as it was, and is written the compatible way next time.
+        color = Self.color(c, .paletteColor) ?? Self.color(c, .color) ?? .graphite
+        defaultColor = Self.color(c, .paletteDefaultColor) ?? Self.color(c, .defaultColor)
+        bookmarks = try c.decodeIfPresent([Bookmark].self, forKey: .bookmarks) ?? []
+        folders = try c.decodeIfPresent([BookmarkFolder].self, forKey: .folders)
+        pinnedSplits = try c.decodeIfPresent([PinnedSplit].self, forKey: .pinnedSplits)
+        hue = try c.decodeIfPresent(Double.self, forKey: .hue)
+        intensity = try c.decodeIfPresent(Double.self, forKey: .intensity)
+        appearance = try c.decodeIfPresent(String.self, forKey: .appearance)
+        grain = try c.decodeIfPresent(Double.self, forKey: .grain)
+        hue2 = try c.decodeIfPresent(Double.self, forKey: .hue2)
+        intensity2 = try c.decodeIfPresent(Double.self, forKey: .intensity2)
+        angle = try c.decodeIfPresent(Double.self, forKey: .angle)
+        glass = try c.decodeIfPresent(Bool.self, forKey: .glass)
+        brightness = try c.decodeIfPresent(Double.self, forKey: .brightness)
+        brightness2 = try c.decodeIfPresent(Double.self, forKey: .brightness2)
+        tint = try c.decodeIfPresent(Double.self, forKey: .tint)
+        tint2 = try c.decodeIfPresent(Double.self, forKey: .tint2)
+        translucency = try c.decodeIfPresent(Double.self, forKey: .translucency)
+        clearGlass = try c.decodeIfPresent(Bool.self, forKey: .clearGlass)
+        icon = try c.decodeIfPresent(String.self, forKey: .icon)
+        importedFrom = try c.decodeIfPresent(String.self, forKey: .importedFrom)
+        routedSites = try c.decodeIfPresent([String].self, forKey: .routedSites)
+        backgroundImage = try c.decodeIfPresent(String.self, forKey: .backgroundImage)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(color.nearestLegacy, forKey: .color)
+        if color != color.nearestLegacy { try c.encode(color, forKey: .paletteColor) }
+        try c.encodeIfPresent(defaultColor?.nearestLegacy, forKey: .defaultColor)
+        if let defaultColor, defaultColor != defaultColor.nearestLegacy { try c.encode(defaultColor, forKey: .paletteDefaultColor) }
+        try c.encode(bookmarks, forKey: .bookmarks)
+        try c.encodeIfPresent(folders, forKey: .folders)
+        try c.encodeIfPresent(pinnedSplits, forKey: .pinnedSplits)
+        try c.encodeIfPresent(hue, forKey: .hue)
+        try c.encodeIfPresent(intensity, forKey: .intensity)
+        try c.encodeIfPresent(appearance, forKey: .appearance)
+        try c.encodeIfPresent(grain, forKey: .grain)
+        try c.encodeIfPresent(hue2, forKey: .hue2)
+        try c.encodeIfPresent(intensity2, forKey: .intensity2)
+        try c.encodeIfPresent(angle, forKey: .angle)
+        try c.encodeIfPresent(glass, forKey: .glass)
+        try c.encodeIfPresent(brightness, forKey: .brightness)
+        try c.encodeIfPresent(brightness2, forKey: .brightness2)
+        try c.encodeIfPresent(tint, forKey: .tint)
+        try c.encodeIfPresent(tint2, forKey: .tint2)
+        try c.encodeIfPresent(translucency, forKey: .translucency)
+        try c.encodeIfPresent(clearGlass, forKey: .clearGlass)
+        try c.encodeIfPresent(icon, forKey: .icon)
+        try c.encodeIfPresent(importedFrom, forKey: .importedFrom)
+        try c.encodeIfPresent(routedSites, forKey: .routedSites)
+        try c.encodeIfPresent(backgroundImage, forKey: .backgroundImage)
+    }
+}
+
 enum SearchEngine: String, Codable, CaseIterable {
     case google, duckDuckGo, brave, bing, kagi, ecosia, startpage, perplexity, yahoo, baidu, yandex, custom
     /// The one an extension gives ("ChatGPT search"), while it's on: see ExtensionSearchProvider.

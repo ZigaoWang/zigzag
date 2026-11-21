@@ -390,3 +390,65 @@ struct SpaceEditorPlacementTests {
         #expect(SpaceEditorPanel.wheelHeight(overflow: 500) == ColorWheel.minimumHeight)
     }
 }
+
+/// A space with a palette color is still readable by a Zigzag from before the palette, which knows only the older colors.
+@MainActor struct SpaceColorCompatibilityTests {
+    /// What 0.9.3 knew: its colors, and a space made of them.
+    private enum OldColor: String, Decodable { case snow, graphite, ink, sky, sage, sand, rose, lavender, mint, peach }
+    private struct OldSpace: Decodable { var name: String; var color: OldColor; var defaultColor: OldColor? }
+
+    private func encoded(_ space: SpaceInfo) throws -> Data { try JSONEncoder().encode(space) }
+
+    @Test func anOlderZigzagReadsAPaletteSpace() throws {
+        let space = SpaceInfo(name: "Work", color: .lagoon, defaultColor: .lagoon).withDefaultColors(.lagoon)
+        let old = try JSONDecoder().decode(OldSpace.self, from: encoded(space))
+        #expect(old.name == "Work")
+        #expect(old.color.rawValue == SpaceColor.lagoon.nearestLegacy.rawValue)
+        #expect(old.defaultColor?.rawValue == SpaceColor.lagoon.nearestLegacy.rawValue)
+        // Every palette color has an older one to stand in for it.
+        for color in SpaceColor.palette {
+            #expect(SpaceColor.legacyAll.contains(color.nearestLegacy))
+            let data = try encoded(SpaceInfo(name: "S", color: color, defaultColor: color))
+            #expect((try? JSONDecoder().decode(OldSpace.self, from: data)) != nil, "\(color)")
+        }
+    }
+
+    @Test func aPaletteColorComesBack() throws {
+        var space = SpaceInfo(name: "Work", color: .sunset, defaultColor: .forest).withDefaultColors(.sunset)
+        space.icon = "star"
+        space.defaultColor = .forest
+        let back = try JSONDecoder().decode(SpaceInfo.self, from: encoded(space))
+        #expect(back == space)
+        #expect(back.color == .sunset)
+        #expect(back.defaultColor == .forest)
+    }
+
+    @Test func anOlderColorIsWrittenAsBefore() throws {
+        let space = SpaceInfo(name: "Home", color: .sage, defaultColor: .sage)
+        let json = try #require(try JSONSerialization.jsonObject(with: encoded(space)) as? [String: Any])
+        #expect(json["color"] as? String == "sage")
+        #expect(json["paletteColor"] == nil)
+        #expect(json["paletteDefaultColor"] == nil)
+        #expect(try JSONDecoder().decode(SpaceInfo.self, from: encoded(space)) == space)
+    }
+
+    /// The beta that wrote "lagoon" into `color` reads as it was, and its next save is one an older Zigzag reads.
+    @Test func aBetaFileWithAPaletteColorMigrates() throws {
+        let id = UUID()
+        let beta = #"{"id":"\#(id.uuidString)","name":"Personal","color":"lagoon","defaultColor":"lagoon","bookmarks":[],"hue":0.5,"intensity":0.8,"hue2":0.6,"intensity2":0.8,"angle":90,"translucency":0.45}"#
+        let space = try JSONDecoder().decode(SpaceInfo.self, from: Data(beta.utf8))
+        #expect(space.id == id)
+        #expect(space.color == .lagoon)
+        #expect(space.defaultColor == .lagoon)
+        #expect(space.hue == 0.5 && space.hue2 == 0.6 && space.translucency == 0.45)
+        let old = try JSONDecoder().decode(OldSpace.self, from: encoded(space))
+        #expect(old.color.rawValue == SpaceColor.lagoon.nearestLegacy.rawValue)
+        #expect(try JSONDecoder().decode(SpaceInfo.self, from: encoded(space)) == space)
+    }
+
+    /// A color from a newer Zigzag doesn't make the space, and the whole library with it, unreadable.
+    @Test func anUnknownColorReadsAsGraphite() throws {
+        let json = #"{"id":"\#(UUID().uuidString)","name":"Later","color":"aurora","bookmarks":[]}"#
+        #expect(try JSONDecoder().decode(SpaceInfo.self, from: Data(json.utf8)).color == .graphite)
+    }
+}
