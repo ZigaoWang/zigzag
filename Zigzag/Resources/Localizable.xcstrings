@@ -16498,17 +16498,6 @@
         }
       }
     },
-    "Reader Options" : {
-      "comment" : "Tooltip and VoiceOver name of the address bar's Reader button while Reader is on, and VoiceOver name of the panel it opens: text size, typeface, column width, colors and Turn Off Reader.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阅读器选项"
-          }
-        }
-      }
-    },
     "Reader Text and Colors" : {
       "comment" : "View menu item: opens Reader's text size, typeface, column width and color choices.",
       "localizations" : {
@@ -21732,17 +21721,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 %@ 上关闭"
-          }
-        }
-      }
-    },
-    "Turn Off Reader" : {
-      "comment" : "Action at the bottom of Reader's text and color choices: closes Reader and shows the page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭阅读器"
           }
         }
       }
