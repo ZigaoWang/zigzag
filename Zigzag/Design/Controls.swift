@@ -628,6 +628,11 @@ final class IconButton: InteractiveView {
 
     override var intrinsicContentSize: NSSize { frame.size }
 
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        needsLayout = true
+    }
+
     override func layout() {
         super.layout()
         if image != nil {
@@ -636,7 +641,11 @@ final class IconButton: InteractiveView {
         } else if glyph == nil {
             // The symbol's ink, not its image, in the middle.
             let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
-            imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
+            // The image at its own size on the screen's pixels: centered by the image view, it snaps to whole points.
+            let size = imageView.image?.size ?? bounds.size
+            let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+            let x = bounds.midX - size.width / 2 - ink.width, y = bounds.midY - size.height / 2 + (isFlipped ? ink.height : -ink.height)
+            imageView.frame = NSRect(x: round(x * scale) / scale, y: round(y * scale) / scale, width: size.width, height: size.height)
         } else {
             // The glyph's own ink goes in the middle (a play triangle leans right in its image).
             let ink = glyphInk
@@ -977,6 +986,8 @@ final class PrimaryButton: InteractiveView {
     /// Set both to draw the button in other colors, like a light button on the brand's blue.
     var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
     var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
+    /// A hairline in this color around it, kept through hover and press.
+    var customEdge: NSColor? { didSet { stateDidChange(animated: false) } }
     /// Moves the title off center, to leave room for something beside it (a keycap).
     var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
@@ -1017,6 +1028,12 @@ final class PrimaryButton: InteractiveView {
         let theme = Brand.Theme.for(self)
         let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
         label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : customFill.map(Brand.ink(on:)) ?? theme.onAccent))
+        if let customEdge {
+            Tokens.Motion.withoutAnimation {
+                layer?.borderWidth = 1
+                layer?.borderColor = cgColor(customEdge)
+            }
+        }
     }
 }
 
@@ -1950,10 +1967,11 @@ final class MenuPanel: FloatingPanelView {
                 maxY = area.maxY
             }
         case .at(let point):
-            // Under the pointer, as a right-click's menu opens; above it where there's no room below.
+            // Under the pointer, as a right-click's menu opens. Short of room below, it slides up only as far as it
+            // must, as macOS's does, so its first items stay by the pointer (never flipped whole above it).
             x = point.x
-            maxY = fits(point.y) ? point.y : fits(point.y + height) ? point.y + height : area.maxY
-            growsY = maxY == point.y ? 0 : 1
+            maxY = min(max(point.y, area.minY + height), area.maxY)
+            growsY = min(max((maxY - point.y) / max(height, 1), 0), 1)
         }
         x = min(max(x, area.minX), max(area.minX, area.maxX - width))
         let rect = NSRect(x: x, y: maxY - height, width: width, height: height)

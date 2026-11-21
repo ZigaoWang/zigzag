@@ -277,8 +277,6 @@ enum Tokens {
         static var spaceNameText: CGFloat { scaled(26) }
         static var spaceNameHeight: CGFloat { scaledEven(36) }
         /// Tracking for the space's name, in points: display type sits tighter.
-        /// The name's first letter's side bearing at that size, so its ink lands on the icon column.
-        static let spaceNameBearing: CGFloat = 1
         /// A space key in the bottom bar: a small rounded key with its number, 4pt between keys.
         static let spaceKey: CGFloat = 18
         /// Between the favorites and the list.
@@ -589,8 +587,12 @@ enum Tokens {
         /// moves it back so every icon in a row looks evenly spaced.
         @MainActor static func inkOffset(_ name: String, size: CGFloat = pointSize) -> CGSize {
             let box = inkBox(name, size: size)
-            return CGSize(width: box.midX, height: box.midY)
+            guard weightCentered.contains(name) else { return CGSize(width: box.midX, height: box.midY) }
+            return CGSize(width: box.midX, height: inkWeightY["\(name) \(size)"] ?? box.midY)
         }
+
+        /// Centered vertically by ink weight, not box: reload's arrowhead would leave its ring low.
+        static let weightCentered: Set<String> = ["arrow.clockwise"]
 
         /// The size of a symbol's ink, for lining it up by what you see rather than by its image's padding.
         @MainActor static func inkSize(_ name: String, size: CGFloat = pointSize) -> CGSize { inkBox(name, size: size).size }
@@ -623,13 +625,18 @@ enum Tokens {
                 image.draw(in: NSRect(x: 0, y: 0, width: w, height: h))
                 NSGraphicsContext.restoreGraphicsState()
                 var minX = w, maxX = -1, minY = h, maxY = -1
+                var weight = 0.0, weightedY = 0.0
                 if let data = rep.bitmapData {
                     for y in 0..<h {
-                        for x in 0..<w where data[y * rep.bytesPerRow + x * 4 + 3] > 50 {
+                        for x in 0..<w {
+                            let alpha = data[y * rep.bytesPerRow + x * 4 + 3]
+                            weight += Double(alpha); weightedY += Double(alpha) * (Double(y) + 0.5)
+                            guard alpha > 50 else { continue }
                             minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
                         }
                     }
                 }
+                if weight > 0 { inkWeightY[key] = (CGFloat(h) / 2 - CGFloat(weightedY / weight)) / scale }
                 if maxX >= minX {
                     // Bitmap rows run top down.
                     box = CGRect(x: (CGFloat(minX) - CGFloat(w) / 2) / scale, y: (CGFloat(h) / 2 - CGFloat(maxY + 1)) / scale,
@@ -640,6 +647,8 @@ enum Tokens {
             return box
         }
         @MainActor private static var inkBoxes: [String: CGRect] = [:]
+        /// Each measured image's ink weight center from its middle (y up), by the same key.
+        @MainActor private static var inkWeightY: [String: CGFloat] = [:]
 
         /// Offsets (as `inkOffset`) for symbols that take turns in one place (a speaker playing and muted): each is
         /// drawn with its alignment rect's origin, its baseline's start, where the others' is, so what they share (the
@@ -1513,6 +1522,11 @@ enum Tokens {
         static let washChroma = 0.016
         static let washDarkLightness = 0.235
         static let washDarkChroma = 0.016
+        /// Reader's Auto paper: a breath of the space, lighter than a panel by day, so long text keeps its contrast.
+        static let readerLightness = 0.985
+        static let readerChroma = 0.008
+        static let readerDarkLightness = 0.235
+        static let readerDarkChroma = 0.012
     }
 
     /// What sits on the frame (the sidebar's rows, its address and favorites): washes of white, so whatever the

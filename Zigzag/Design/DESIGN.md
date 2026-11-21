@@ -439,17 +439,28 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius as macOS draws it
   (`PageCardView.attachedRadius`, `Radius.attached` where it can't be read), square in full screen, where the window
   has no corners, no outline, no shadow.
-- **Reader** (`Reader.swift`): the article on the page card, scripts off, crossfading in and out in `crossfade`. One
-  column of 34em (the text's own size, so about 70 characters a line; Narrow 29em, Wide 40em), and everything in it
-  on that column's left edge: the header (the site's icon and name at 14pt, the title in the body face at 2.1em,
-  bold, balanced, then the author and the day it was published if the page says), generous space, no rule, then the
-  text. New York at 20px with 1.6 leading by default (SF as Sans); Chinese, Japanese and Korean in PingFang, Hiragino
-  Sans or Apple SD Gothic Neo at 1.8 in either face, never italic. Pictures at their own size or the column's,
-  never larger; captions 14pt in the soft ink under them. Links in the text's color with a quiet underline, the link
-  color on hover; quotes behind a 2pt rule; code and tables scroll sideways. Light (warm off-white), Sepia, Dark
-  (`Color.surface` at night) and Auto, from `Reader.Palette`. Its one control, Aa, sits on the article's paper at
-  the top right, there at the top and when you scroll back up, away while you read on; its panel holds size, face,
-  width and colors. Reader itself comes and goes with the address's Reader button, ⌘⇧R or Esc.
+- **Reader** (`Reader.swift`, #455): the article on the page card, scripts off. Its paper fades in over `enter` while
+  the text settles up `edgeOffset` inside it (the page's own CSS, as the view itself can't move), and fades out over
+  `exit`; with Reduce Motion (the Mac's or Zigzag's) a crossfade. The page's margins are Zigzag's page gutter in a
+  small window, growing to 6% of the width, at most 112pt. One column, in the text's own size (rem) so a line holds
+  the same characters at any size: Narrow 28rem, Medium 34rem (about 70 characters), Wide the whole window inside
+  its margins, no cap. The words sit on the column's left edge: the header (the site's icon and name at the row
+  size, the title in the body face at 2.1em, bold, balanced, then the author and the day it was published if the
+  page says), generous space, no rule, then the text. Pictures at their own size, never larger, centered; a large
+  one runs past the text into the margins, up to 8rem a side as the window allows, its caption (row size, soft ink)
+  back on the text's edge. Code's box hangs into the margins up to 2.5rem with its first column on the text's edge,
+  and scrolls sideways; tables keep the text's edge and may run on to the right. Inside a list, quote or table
+  nothing breaks out. New York at 20px with 1.6 leading by default (SF as Sans); Chinese, Japanese and Korean in
+  PingFang, Hiragino Sans or Apple SD Gothic Neo at 1.8 in either face, never italic. Links in the text's color with
+  a quiet underline, the link color on hover; quotes behind a 2pt rule. Light (warm off-white), Sepia, Dark
+  (`Color.surface` at night) and Auto, from `Reader.Palette`; Auto's paper is a breath of the space
+  (`Theme.readerPaper`, `Frame.reader…`), the white, gray and black spaces keeping the plain papers, with the
+  palettes' inks unchanged (tested in every hue: text 12:1 by day, soft words 4.5:1). Its one control, Aa, sits on
+  the paper at the top right, there at the top and when you scroll back up, away while you read on; it opens a
+  floating panel 4pt under it as a button's menu does, in the site panel's rows (`PanelRow`): Text Size (`ZoomStepper`,
+  − 100% +, the percentage back to 100%, the same steps as ⌘+ and ⌘−), Typeface and Column Width (`SlidingSwitch`),
+  and Colors, round swatches as the space editor's (ringed when chosen, swelling under the pointer). A change keeps
+  the line you were on in place. Reader itself comes and goes with the address's Reader button, ⌥⌘R or Esc.
 - **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card that
   floats in a panel of its own (`MiniPlayerPanel`, #172), over the window and other apps, on every space and beside a
   full screen window, as Picture in Picture does: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving
