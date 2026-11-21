@@ -28,19 +28,89 @@ enum PageTranslator {
 
     /// Languages translated without asking, by language code ("zh", "ja").
     static var alwaysLanguages: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: "TranslateAlways") ?? []) }
-        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: "TranslateAlways") }
+        get { Choices().alwaysLanguages }
+        set { Choices().alwaysLanguages = newValue }
     }
 
     nonisolated static func code(of language: Locale.Language) -> String { language.languageCode?.identifier ?? language.minimalIdentifier }
 
     static func translatesAlways(_ language: Locale.Language) -> Bool { alwaysLanguages.contains(code(of: language)) }
 
-    static func setTranslatesAlways(_ always: Bool, _ language: Locale.Language) {
-        var set = alwaysLanguages
-        if always { set.insert(code(of: language)) } else { set.remove(code(of: language)) }
-        alwaysLanguages = set
+    static func setTranslatesAlways(_ always: Bool, _ language: Locale.Language) { Choices().setAlways(always, code(of: language)) }
+
+    /// Always and Never Translate choices, by language code and by site.
+    struct Choices {
+        var defaults: UserDefaults = .standard
+
+        var alwaysLanguages: Set<String> {
+            get { read("TranslateAlways") }
+            nonmutating set { write(newValue, "TranslateAlways") }
+        }
+        var neverLanguages: Set<String> {
+            get { read("TranslateNever") }
+            nonmutating set { write(newValue, "TranslateNever") }
+        }
+        var neverSites: Set<String> {
+            get { read("TranslateNeverSites") }
+            nonmutating set { write(newValue, "TranslateNeverSites") }
+        }
+
+        private func read(_ key: String) -> Set<String> { Set(defaults.stringArray(forKey: key) ?? []) }
+        private func write(_ value: Set<String>, _ key: String) {
+            if value.isEmpty { defaults.removeObject(forKey: key) } else { defaults.set(value.sorted(), forKey: key) }
+        }
+
+        /// A language is either always or never translated, not both.
+        func setAlways(_ on: Bool, _ code: String) {
+            if on { alwaysLanguages.insert(code); neverLanguages.remove(code) } else { alwaysLanguages.remove(code) }
+        }
+
+        func setNever(_ on: Bool, _ code: String) {
+            if on { neverLanguages.insert(code); alwaysLanguages.remove(code) } else { neverLanguages.remove(code) }
+        }
+
+        /// A private window keeps no list of sites: returns false and writes nothing there.
+        @discardableResult
+        func setNeverSite(_ on: Bool, _ site: String, isPrivate: Bool) -> Bool {
+            guard !isPrivate else { return false }
+            if on { neverSites.insert(site) } else { neverSites.remove(site) }
+            return true
+        }
+
+        /// One line of the lists in Settings › Translation.
+        enum Entry: Hashable {
+            case always(String), neverLanguage(String), neverSite(String)
+        }
+
+        /// Always first, then Never: languages by name, then sites.
+        func entries(name: (String) -> String) -> (always: [Entry], never: [Entry]) {
+            func byName(_ codes: Set<String>) -> [String] { codes.sorted { name($0).localizedStandardCompare(name($1)) == .orderedAscending } }
+            return (byName(alwaysLanguages).map(Entry.always),
+                    byName(neverLanguages).map(Entry.neverLanguage) + neverSites.sorted().map(Entry.neverSite))
+        }
+
+        func remove(_ entry: Entry) {
+            switch entry {
+            case .always(let code): alwaysLanguages.remove(code)
+            case .neverLanguage(let code): neverLanguages.remove(code)
+            case .neverSite(let site): neverSites.remove(site)
+            }
+        }
+
+        /// What happens on its own when a page in `language` opens on `site`. A site translated this session keeps
+        /// translating; Never beats Always; otherwise the offer, once per site.
+        func automatic(language: Locale.Language, site: String, translatedHere: Bool, neverHere: Set<String> = [],
+                       offers: Bool, offered: Bool) -> Automatic {
+            if translatedHere { return .translate }
+            if neverSites.contains(site) || neverHere.contains(site) { return .nothing }
+            let code = PageTranslator.code(of: language)
+            if neverLanguages.contains(code) { return .nothing }
+            if alwaysLanguages.contains(code) { return .translate }
+            return offers && !offered ? .offer : .nothing
+        }
     }
+
+    enum Automatic: Equatable { case translate, offer, nothing }
 
     /// Languages Apple can translate into on this Mac, by name, for the Settings menu.
     @concurrent nonisolated static func targetLanguages() async -> [(id: String, name: String)] {
@@ -603,12 +673,8 @@ extension PageTranslator {
         return page(offeredFor) == page(now)
     }
 
-    /// Whether a tab's translation toasts show: only while its page is the one in view, the page peeked at while
-    /// Peek is open, otherwise the tab you're on.
-    static func isInView(_ tab: AnyObject, selected: AnyObject?, peeked: AnyObject?) -> Bool {
-        if let peeked { return peeked === tab }
-        return selected === tab
-    }
+    /// Whether a browser window's tab's translation toasts show: only while it's the tab you're on.
+    static func isInView(_ tab: AnyObject, selected: AnyObject?) -> Bool { selected === tab }
 }
 
 /// The Translation framework hands out sessions through a SwiftUI task, so each translation keeps an invisible host

@@ -273,6 +273,32 @@ function recoverSolver(reason) {
         #expect(context.evaluateScript("__modified.prevented")?.toBool() == false)
     }
 
+    /// The ⌘-click script is in every site's page world, but it listens only on x.com and twitter.com, and once.
+    @Test func theModifiedClickScriptActsOnlyOnItsSites() throws {
+        let other = bridgePage()
+        other.evaluateScript("location.hostname = 'github.com'")
+        other.evaluateScript(OldTwitterSolver.modified)
+        #expect(other.exception == nil)
+        #expect(other.evaluateScript("__document.length")?.toInt32() == 0)
+        #expect(other.evaluateScript("window.__zigzagOldTwitterModified")?.isUndefined == true)
+
+        let x = bridgePage()
+        x.evaluateScript(OldTwitterSolver.modified)
+        x.evaluateScript(OldTwitterSolver.modified)
+        #expect(x.exception == nil)
+        #expect(x.evaluateScript("__document.length")?.toInt32() == 2) // mousedown, click
+    }
+
+    /// The bridge leaves every other site alone.
+    @Test func theBridgeActsOnlyOnItsSites() throws {
+        let context = bridgePage()
+        context.evaluateScript("location.hostname = 'github.com'")
+        context.evaluateScript(OldTwitterSolver.bridge)
+        #expect(context.exception == nil)
+        #expect(context.evaluateScript("__document.length")?.toInt32() == 0)
+        #expect(context.evaluateScript("window.__zigzagOldTwitterBridge")?.isUndefined == true)
+    }
+
     /// A right press puts the quote's link back for the menu and marks it, and the observer leaves it until the
     /// menu has been built. The next press takes it off again, as a ⌘ or middle press keeps its own.
     @Test func aRightPressKeepsTheQuotesLinkForItsMenu() throws {

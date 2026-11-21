@@ -144,8 +144,6 @@ enum SiteRoutes {
         case mini
         /// A site installed as an app.
         case webApp
-        /// A peeked link (⇧-click).
-        case peek
     }
 
     // MARK: Sites
@@ -329,7 +327,7 @@ extension SiteRoutes.Route {
 extension BrowserWindowController {
     /// The space a route sends `url` to. `tab`: the tab the link came from (else the window's space).
     func routedSpace(for url: URL, arrival: SiteRoutes.Arrival, from tab: Tab? = nil) -> UUID? {
-        let place: SiteRoutes.Place = tabManager.isPrivate ? .privateWindow : tab?.isPeek == true ? .peek : .browser
+        let place: SiteRoutes.Place = tabManager.isPrivate ? .privateWindow : tab?.isOutsideTabList == true ? .mini : .browser
         let target = SiteRoutes.target(for: url, arrival: arrival, from: tab?.spaceID ?? tabManager.currentSpaceID, place: place,
                                        routes: Library.shared.siteRoutes)
         return target.flatMap { Library.shared.space($0) != nil ? $0 : nil }

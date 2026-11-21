@@ -47,8 +47,8 @@
   Test: SiteRoutesTests.whatThePageDoesOnItsOwnIsNot
 - A link to a sign-in page → stays in the tab that sent you; typed, it still goes to its space.
   Test: SiteRoutesTests.aSignInALinkSendsYouToStaysPut
-- Private windows, Zigzag Mini, Peek and site apps → never sent anywhere; Open in Zigzag from Mini is.
-  Test: SiteRoutesTests.miniPeekAndAppsKeepTheirPages
+- Private windows, Zigzag Mini and site apps → never sent anywhere; Open in Zigzag from Mini is.
+  Test: SiteRoutesTests.miniAndAppsKeepTheirPages
 
 ## Profiles
 - New Profile in the space editor → a profile named after the space, holding only that space.

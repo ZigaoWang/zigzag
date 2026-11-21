@@ -251,11 +251,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         return MiniWindowController.all.first { $0.tab.webView === webView }?.overlay
     }
 
-    /// The page is the one on screen in its window: the selected tab's, the page peeked at over it (a sign-in a
-    /// site opens in a window of its own comes up there), or Zigzag Mini's only page.
+    /// The page is the one on screen in its window: the selected tab's, or Zigzag Mini's only page.
     static func isInFront(_ webView: WKWebView) -> Bool {
         if let controller = WindowManager.shared.controller(for: webView.window) {
-            if controller.peek.isVisible { return controller.peek.tab?.webView === webView }
             return controller.selectedWebView === webView
         }
         return MiniWindowController.all.contains { $0.tab.webView === webView && $0.window === webView.window }
