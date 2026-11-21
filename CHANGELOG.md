@@ -22,6 +22,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The space's name at the top of the sidebar starts on the same line as the icons and the Tabs label below it. At row size it sat a point to the right, and a large name half a point.
 - The Tabs label in the sidebar starts on the icons' line instead of half a point to the right.
 - In the command bar, the Tab key shown beside Search Wikipedia and the other site searches ends where the Return key on the chosen result does, instead of 2 points further in.
+- Peek names a local file by its name in its strip, as the sidebar does, instead of showing nothing beside the icon.
 
 ## [0.9.3] - 2026-11-18
 
