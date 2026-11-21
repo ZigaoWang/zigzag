@@ -65,6 +65,8 @@ struct TrafficLightTests {
         for phase in [FullScreenPhase.windowed, .entering, .fullScreen, .exiting] {
             #expect(phase.titlebarAppearsTransparent, "\(phase)")
         }
+        #expect(FullScreenPhase.fullScreen.after(.willExit).dropsTrafficLightBacking)
+        for phase in [FullScreenPhase.windowed, .entering, .fullScreen] { #expect(!phase.dropsTrafficLightBacking, "\(phase)") }
     }
 
     /// The lights get a backing in full screen only when the page, not the bar or sidebar, is under them (#462).

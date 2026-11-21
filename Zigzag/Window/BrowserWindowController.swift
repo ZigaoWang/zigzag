@@ -2461,6 +2461,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
             browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
         }
+        if phase.dropsTrafficLightBacking, fullScreenBar != nil { showFullScreenBar(false) }
         guard !phase.isMoving else { return }
         layoutTrafficLights()
         root.needsLayout = true
