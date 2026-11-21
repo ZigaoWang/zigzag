@@ -60,7 +60,7 @@ enum Shortcuts {
         return result
     }
 
-    private static func combo(of item: NSMenuItem) -> Combo {
+    static func combo(of item: NSMenuItem) -> Combo {
         Combo(key: item.keyEquivalent, modifiers: item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask).rawValue)
     }
 

@@ -81,6 +81,23 @@ import Testing
         #expect(!AppDelegate.isQuitKey(nil))
     }
 
+    @Test func aQuitShortcutSetInSettingsIsTheOneThatAsks() {
+        func key(_ characters: String, _ flags: NSEvent.ModifierFlags) -> NSEvent? {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                             characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: 0)
+        }
+        let custom = Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags([.command, .option]).rawValue)
+        #expect(AppDelegate.isQuitKey(key("q", [.command, .option]), combo: custom))
+        #expect(!AppDelegate.isQuitKey(key("q", .command), combo: custom))
+        // Recorded with ⇧, or shipped as an uppercase key: either way ⇧ is part of it.
+        let shifted = Shortcuts.Combo(key: "x", modifiers: NSEvent.ModifierFlags([.command, .shift]).rawValue)
+        #expect(AppDelegate.isQuitKey(key("X", [.command, .shift]), combo: shifted))
+        #expect(AppDelegate.isQuitKey(key("X", [.command, .shift]), combo: Shortcuts.Combo(key: "X", modifiers: NSEvent.ModifierFlags.command.rawValue)))
+        #expect(!AppDelegate.isQuitKey(key("x", .command), combo: shifted))
+        // Taken away in Settings: no key asks.
+        #expect(!AppDelegate.isQuitKey(key("q", .command), combo: .none))
+    }
+
     @Test func onlyTheQuitKeyAsksButDownloadsAlwaysDo() {
         // The menu and the Dock quit at once; the key asks while the setting is on.
         #expect(AppDelegate.asks(fromKey: true, setting: true, downloading: 0))

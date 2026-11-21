@@ -247,11 +247,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         (setting && fromKey) || downloading > 0
     }
 
-    /// Whether the event is the ⌘Q key, the one quit the setting asks about.
-    static func isQuitKey(_ event: NSEvent?) -> Bool {
-        guard let event, event.type == .keyDown else { return false }
-        return event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
-            && event.charactersIgnoringModifiers?.lowercased() == "q"
+    /// Quit Zigzag's shortcut as it is now, after Settings › Shortcuts; ⌘Q before the menu bar is built.
+    static var quitCombo: Shortcuts.Combo {
+        Shortcuts.allItems.first { $0.action == #selector(quitFromMenu(_:)) }.map(Shortcuts.combo(of:))
+            ?? Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags.command.rawValue)
+    }
+
+    /// Whether the event is Quit's shortcut, the one quit the setting asks about.
+    static func isQuitKey(_ event: NSEvent?, combo: Shortcuts.Combo = quitCombo) -> Bool {
+        guard let event, event.type == .keyDown, !combo.key.isEmpty, let pressed = Shortcuts.combo(from: event) else { return false }
+        let wanted = combo.flags.intersection([.command, .option, .control, .shift])
+        // An uppercase key equivalent carries ⇧ by itself.
+        let flags = combo.key.lowercased() != combo.key ? wanted.union(.shift) : wanted
+        return pressed.key == combo.key.lowercased() && pressed.flags == flags
     }
 
     @objc func quitFromMenu(_ sender: Any?) {
@@ -301,10 +309,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                      comment: "Message of the sheet that asks before quitting while files download.")
         ConfirmSheet.show(in: host, title: String(localized: "Quit Zigzag?", comment: "Title of the sheet that asks before quitting."), message: message,
                           confirmTitle: String(localized: "Quit", comment: "Button of the sheet that asks before quitting.")) { answer($0) }
-        // While it asks, ⌘Q again means yes (macOS doesn't ask the app a second time on its own).
+        // While it asks, the Quit key again means yes (macOS doesn't ask the app a second time on its own).
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                  event.charactersIgnoringModifiers?.lowercased() == "q" else { return event }
+            guard Self.isQuitKey(event) else { return event }
             host.subviews.compactMap { $0 as? ConfirmSheet }.forEach { $0.removeFromSuperview() }
             answer(true)
             return nil
