@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- The whole screen uses WebKit's own native full screen again, as in Safari and Chrome, and The Page fills the page's part of the window, with the setting, the per-site switch and the expand button kept. ([#462](https://github.com/ZigaoWang/zigzag/issues/462))
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, a calmer Settings, and Your Zigzag Card.
