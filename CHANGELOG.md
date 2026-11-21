@@ -5,36 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Change Icon's face in the sidebar's menus and Site Controls stays an outline in dark mode, like the icons beside it. macOS draws that face filled in dark mode, so it stood out as a solid gray disc.
-- A right-click menu near the bottom of the window slides up only as far as it needs to, as macOS's menus do, instead of opening wholly above the pointer. Its first items stay right by the pointer, so Separate Split View or Reload Page is a short move away wherever you click.
-- Choose Image… and Use Site Icon under the icon grid line up with the search field above them, and the grid's panel keeps the same margin below them as at its sides. Their hover fill reached out toward the panel's edge and nearly touched its bottom corners.
-- The numbers that holding ⌘ or ⌃ shows stay up while you keep holding it and press ⌘1–⌘9 or ⌃1–⌃9, following the tab or space you went to, so you can go on to the next. They went away at the first number. Any other key, a click or letting go still hides them, and a quick ⌘1 never shows them.
-- Icons in buttons sit on the screen's pixels where their ink is centered, instead of snapping to the nearest whole point, so some no longer sit half a point off.
-- In a split view, the reload button on each page's strip lines up with back and forward instead of sitting a little low.
-- A split view page's strip keeps as much room above its buttons and address as below them, instead of sitting half a point high.
-- A split view page on plain http shows the not-secure mark in its strip's address, as the sidebar's address does.
-- A local file open in a split view shows its name in its strip's address instead of "file:", and History and Settings show their names too.
-- A folder's or group's name in the sidebar takes the space's own ink, as the pinned pages and tabs under it do, instead of plain black or white.
-- Renaming a tab, folder or group in the sidebar keeps the name in the row's own ink while you type, instead of turning it plain black or white.
-- In a split view, a toast like Link copied shows below the pages' strips instead of over their buttons, as the find bar does.
-- Renaming a tab, folder or group in the sidebar keeps the name on its line instead of dropping it half a point as editing starts.
-- The space's name at the top of the sidebar starts on the same line as the icons and the Tabs label below it. At row size it sat a point to the right, and a large name half a point.
-- The Tabs label in the sidebar starts on the icons' line instead of half a point to the right.
-- In the command bar, the Tab key shown beside Search Wikipedia and the other site searches ends where the Return key on the chosen result does, instead of 2 points further in.
-- Peek names a local file by its name in its strip, as the sidebar does, instead of showing nothing beside the icon.
-- A confirmation's message lines up with its title instead of starting 2 points further in, in sheets and forms alike.
-- What's New lines up the app icon's edge with the headings and points under it, instead of sitting 5 points in.
-- A toast with an icon, like the zoom level's, keeps as much room after its words as before its icon, instead of 3 points more on the right.
-- Reader on a local file names it in its header and in Read the original at the end, instead of leaving them blank.
-- In the welcome window's yes-or-no steps, the answer you didn't pick keeps its outline. It lost it as soon as the button was drawn again, so Show Ads and Not Now read as plain text beside the picked answer.
-- The welcome window's Skip sits on the same line as the progress dots, instead of 3 points below them.
-- The welcome window's Back starts on the card's left edge, as Continue ends on its right one, instead of 3 points in.
-- In the welcome window's Pin the sites you use, each site's icon and name sit in the middle of its tile, so a picked tile's tint has even room above and below them. They sat 4 points from its top and 11 from its bottom.
-- In the welcome window's import step, a browser's hover fill is rounded on every row, as the list's box is, and Stay signed in to your sites has the same corners. Only the first row's top was rounded, by the box clipping it, and every other fill had square corners against the lines between rows.
-- In the column of Settings, the Translation symbol is drawn at the size of the others. It was half as wide again as the rest, 23 points against about 16.
-- In the Import window, a browser whose count runs to two lines, like Chrome with its extensions, gets a row tall enough for them. The second line ran out of its row, onto the edge of the chosen row's tint.
-
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, cookies you can keep when clearing, space rules for paths of a site, Suspend Page, Check for Updates for extensions, extensions in private windows when you allow them, Firefox extensions, address bar keywords for extensions, tiles you can resize freely, pinning a page from its address, Zigzag's own right-click menus in the sidebar, and fixes for split views, closing and reopening tabs as in Chrome, smooth scrolling at 120 Hz, the Passwords list, tab keys, extension site access, full screen, passkeys, Proton Pass, Passbolt, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
@@ -184,6 +154,34 @@ Links from other apps open in Zigzag Mini, a site can have an icon of its own, a
 - The space editor opens next to what you opened it from. Edit Space… in the menu of the space's name at the top of the sidebar opened it down by the space icons at the bottom; it now opens beside the name. From a space icon or the + it rises from the bottom as before, and from the menu bar or the command bar it opens beside the space's name. However tall it gets, with the color wheel and Effects open, it stays inside the window, and the wheel gets a little smaller in a short window.
 - Every right-click menu in the sidebar, on tabs, pinned tabs, folders, favorites, split views and spaces, is now Zigzag's own menu, like the one from + and empty space, with an icon on every item and the keyboard shortcuts you've set. Move To and the other lists open beside their item.
 - Site Controls keeps one margin all around and an even rhythm down the panel. The space under the last row was about half the space at the sides; now the top, bottom and sides match, sections sit the same distance apart, and This Site and Extensions sit the same way over their rows. The ⋯ button, the chevrons and the folded extension icons line up with the switches' right edge.
+- Change Icon's face in the sidebar's menus and Site Controls stays an outline in dark mode, like the icons beside it. macOS draws that face filled in dark mode, so it stood out as a solid gray disc.
+- A right-click menu near the bottom of the window slides up only as far as it needs to, as macOS's menus do, instead of opening wholly above the pointer. Its first items stay right by the pointer, so Separate Split View or Reload Page is a short move away wherever you click.
+- Choose Image… and Use Site Icon under the icon grid line up with the search field above them, and the grid's panel keeps the same margin below them as at its sides. Their hover fill reached out toward the panel's edge and nearly touched its bottom corners.
+- The numbers that holding ⌘ or ⌃ shows stay up while you keep holding it and press ⌘1–⌘9 or ⌃1–⌃9, following the tab or space you went to, so you can go on to the next. They went away at the first number. Any other key, a click or letting go still hides them, and a quick ⌘1 never shows them.
+- Icons in buttons sit on the screen's pixels where their ink is centered, instead of snapping to the nearest whole point, so some no longer sit half a point off.
+- In a split view, the reload button on each page's strip lines up with back and forward instead of sitting a little low.
+- A split view page's strip keeps as much room above its buttons and address as below them, instead of sitting half a point high.
+- A split view page on plain http shows the not-secure mark in its strip's address, as the sidebar's address does.
+- A local file open in a split view shows its name in its strip's address instead of "file:", and History and Settings show their names too.
+- A folder's or group's name in the sidebar takes the space's own ink, as the pinned pages and tabs under it do, instead of plain black or white.
+- Renaming a tab, folder or group in the sidebar keeps the name in the row's own ink while you type, instead of turning it plain black or white.
+- In a split view, a toast like Link copied shows below the pages' strips instead of over their buttons, as the find bar does.
+- Renaming a tab, folder or group in the sidebar keeps the name on its line instead of dropping it half a point as editing starts.
+- The space's name at the top of the sidebar starts on the same line as the icons and the Tabs label below it. At row size it sat a point to the right, and a large name half a point.
+- The Tabs label in the sidebar starts on the icons' line instead of half a point to the right.
+- In the command bar, the Tab key shown beside Search Wikipedia and the other site searches ends where the Return key on the chosen result does, instead of 2 points further in.
+- Peek names a local file by its name in its strip, as the sidebar does, instead of showing nothing beside the icon.
+- A confirmation's message lines up with its title instead of starting 2 points further in, in sheets and forms alike.
+- What's New lines up the app icon's edge with the headings and points under it, instead of sitting 5 points in.
+- A toast with an icon, like the zoom level's, keeps as much room after its words as before its icon, instead of 3 points more on the right.
+- Reader on a local file names it in its header and in Read the original at the end, instead of leaving them blank.
+- In the welcome window's yes-or-no steps, the answer you didn't pick keeps its outline. It lost it as soon as the button was drawn again, so Show Ads and Not Now read as plain text beside the picked answer.
+- The welcome window's Skip sits on the same line as the progress dots, instead of 3 points below them.
+- The welcome window's Back starts on the card's left edge, as Continue ends on its right one, instead of 3 points in.
+- In the welcome window's Pin the sites you use, each site's icon and name sit in the middle of its tile, so a picked tile's tint has even room above and below them. They sat 4 points from its top and 11 from its bottom.
+- In the welcome window's import step, a browser's hover fill is rounded on every row, as the list's box is, and Stay signed in to your sites has the same corners. Only the first row's top was rounded, by the box clipping it, and every other fill had square corners against the lines between rows.
+- In the column of Settings, the Translation symbol is drawn at the size of the others. It was half as wide again as the rest, 23 points against about 16.
+- In the Import window, a browser whose count runs to two lines, like Chrome with its extensions, gets a row tall enough for them. The second line ran out of its row, onto the edge of the chosen row's tint.
 
 ## [0.9.2] - 2026-11-18
 
