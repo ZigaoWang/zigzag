@@ -2544,6 +2544,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Whether a Zigzag Mini opened from this window's pages is up, for the getting-started guide.
+    var hasMiniFromPage: Bool { MiniWindowController.all.contains { $0.source === self && $0.holdsPage } }
+
     /// A link in Zigzag Mini over this window (⇧-click, Open Link in Zigzag Mini), in its page's profile and privacy.
     @discardableResult
     func openInMini(_ url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {

@@ -23,6 +23,17 @@
         }
       }
     },
+    "Or press ⌘O to keep it as a tab" : {
+      "comment" : "Under the hint to close Zigzag Mini, the small window a shift-clicked link opened in, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或者按 ⌘O 把它留作标签页"
+          }
+        }
+      }
+    },
     "Since %@" : {
       "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
       "localizations" : {
@@ -30,6 +41,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自 %@ 起"
+          }
+        }
+      }
+    },
+    "That’s Zigzag Mini" : {
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window: a shift-clicked link opened in Zigzag Mini, the small window for one page. Keep Zigzag Mini in Latin letters.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这就是 Zigzag Mini"
           }
         }
       }
@@ -2436,7 +2458,7 @@
       }
     },
     "A quick look, without losing your place" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window. Peek is a Zigzag feature's name.",
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window, after a link opened in Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6709,7 +6731,7 @@
       }
     },
     "Close it" : {
-      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it.",
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a link is open in Zigzag Mini, the small window over the page. The Esc key is shown beside it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14966,17 +14988,6 @@
         }
       }
     },
-    "Or click outside it" : {
-      "comment" : "Under the hint to close a Peek, in the getting-started guide, a card in the window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "或者点按它外面的地方"
-          }
-        }
-      }
-    },
     "Or have Zigzag ask where, each time." : {
       "comment" : "Explanation under “Save downloads to” in Settings › General.",
       "localizations" : {
@@ -20230,17 +20241,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "该标签页不在这个窗口中。"
-          }
-        }
-      }
-    },
-    "That’s Peek" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这就是速览"
           }
         }
       }
