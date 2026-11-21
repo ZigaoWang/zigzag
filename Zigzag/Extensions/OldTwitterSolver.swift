@@ -188,6 +188,9 @@ final class OldTwitterSolver: NSObject {
     /// press puts the quoted tweet's link back and marks it, so every handler can tell that click is the browser's.
     static let modified = """
     (() => {
+      // It is added to every site's page world; it acts only on x.com and twitter.com.
+      const host = location.hostname;
+      if (host !== "x.com" && host !== "twitter.com") return;
       if (window.__zigzagOldTwitterModified) return;
       window.__zigzagOldTwitterModified = true;
       document.addEventListener("mousedown", (event) => {
