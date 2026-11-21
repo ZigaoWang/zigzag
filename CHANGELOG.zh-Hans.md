@@ -22,6 +22,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 全屏时，关闭、最小化和全屏按钮跟着菜单栏一起出现，下面有工具栏或边栏时不再有自己的灰色条，只有网页在下面时才有背景。感谢 [Lakeland97](https://github.com/Lakeland97)。([#469](https://github.com/ZigaoWang/zigzag/issues/469))
 - 速览现在就是 Zigzag Mini：按住 Shift 键点按链接（或选“在 Zigzag Mini 中打开链接”），它会在你的窗口上方的 Mini 里打开，和从其他 App 打开的链接一样；⌘O 把它移到一个标签页里，就放在你点按的那个标签页旁边，Esc 关闭它。它在这个页面自己的空间和个人资料里打开，从无痕浏览窗口打开时也是无痕的，不会记进历史记录。链接右键菜单里的“在速览中打开链接”改成了“在 Zigzag Mini 中打开链接”，入门指南里按住 Shift 键点按的那一步也改成了 Zigzag Mini。没有设置改名。
 - Zigzag Mini 里也能翻译网页了，在“显示”菜单或页面的右键菜单里选，提示会显示在 Mini 上。
+- OldTwitter 在 x.com 上的图标和字体能正常显示了：扩展自己的文件现在按 Zigzag 的地址读取，网站的安全策略允许这个地址，所以它的图标字体、加载图片、列表图标和标签页图标不再显示成空白方块。引用推文里的视频会就地播放，点按引用推文只会打开它自己的内容。感谢 [datarip](https://github.com/datarip)。
 
 ## [0.9.4] - 2026-11-21
 
@@ -167,7 +168,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 点分屏浏览里某一页顶栏上的地址，现在会在地址原来的位置、按原来的大小编辑，颜色跟着这一页的深浅，和 Zigzag Mini 的顶栏一样。以前不管页面是什么颜色，都会弹出一个更高的白色框，盖住顶栏上的按钮。
 - 点弹出窗口的地址时，地址会显示在和 Zigzag Mini、分屏顶栏一样的地址框里并被选中，字体和选中颜色也一样，不再是一行普通文字。
 - 轻扫后退或前进时，箭头填满那一下触控板只震一次，不管扫得多快。以前用中等速度轻扫，箭头会在快要松手就跳转的位置反复填满又变空，每次都震一下。现在填满后会一直保持，直到往回扫一点，或者快速一扫后停在半路，松手的结果和箭头显示的一致。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
-- OldTwitter 在 x.com 上又能用了。它给请求签名时要用到一个沙箱页面，而 WebKit 里 X 的安全策略会挡住它；现在 Zigzag 会把扩展自己的沙箱脚本放在一个独立的内容环境里运行，这个环境拿不到扩展 API，网站自己的安全策略保持不变。图标和字体也能正常载入了：扩展的页面用 Chrome 的 `chrome-extension://` 地址引用自己的文件，现在 Zigzag 会把它当作自己的地址来读。感谢 [datarip](https://github.com/datarip)。([#417](https://github.com/ZigaoWang/zigzag/issues/417))
+- OldTwitter 在 x.com 上又能用了。它给请求签名时要用到一个沙箱页面，而 WebKit 里 X 的安全策略会挡住它；现在 Zigzag 会把扩展自己的沙箱脚本放在一个独立的内容环境里运行，这个环境拿不到扩展 API，网站自己的安全策略保持不变。感谢 [datarip](https://github.com/datarip)。([#417](https://github.com/ZigaoWang/zigzag/issues/417))
 - 密码菜单里的“密码…”第一次点按就有效，会直接在栏位旁打开 Mac 的密码列表，不再先闪出一个 macOS 自己的“密码”小菜单。连按两下也不会再把光标放进下一个栏位，或者把列表打开在屏幕角落。滚动网页、前进或后退、切换标签页、移动窗口或调整窗口大小时，列表会关上，和 Safari 一样。现在菜单一出现，“密码…”就能点；填写登录信息的那几行仍然要等半秒，免得网页让你在点别处时选中它。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 在四个页面的分屏浏览里，按住 ⇧ 拖动上下页面之间的分隔线，只会移动指针这一侧的那一段，这样一个页面可以比旁边的页面更高或更矮，和 ⇧ 拖动左右之间的分隔线一样。一次只能分开一条线：另一条已经分开时，按住 ⇧ 也会移动整条线。分开的一段会吸附到中间或另一段，看哪个更近，参考线会显示它会停在哪里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#426](https://github.com/ZigaoWang/zigzag/issues/426))
 - 链接的右键菜单现在和 Chrome 一样，第一项是“在新标签页中打开链接”，然后是新窗口、无痕浏览窗口和速览。“打开链接”会在当前标签页打开，和直接点按一样，现在放到它们下面，不再排在第一。感谢 [retorquere](https://github.com/retorquere)。([#419](https://github.com/ZigaoWang/zigzag/issues/419))
