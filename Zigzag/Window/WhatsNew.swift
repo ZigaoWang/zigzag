@@ -609,8 +609,10 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
 
     private func layoutPanel() {
         let inner = width - pad * 2
-        icon.frame = NSRect(x: pad, y: pad, width: iconSize, height: iconSize)
-        let textX = pad + iconSize + Tokens.Space.x3
+        // The icon's art fills 824 of its 1024 points: set out by that margin, its edge meets the headings' and bullets'.
+        let margin = round(iconSize * 100 / 1024)
+        icon.frame = NSRect(x: pad - margin, y: pad, width: iconSize, height: iconSize)
+        let textX = icon.frame.maxX - margin + Tokens.Space.x3
         let block = titleLabel.lineHeight + Tokens.Space.x1 + versionLabel.lineHeight
         titleLabel.frame = NSRect(x: textX, y: pad + (iconSize - block) / 2, width: inner - iconSize - Tokens.Space.x3, height: titleLabel.lineHeight)
         versionLabel.frame = NSRect(x: textX, y: titleLabel.frame.maxY + Tokens.Space.x1, width: titleLabel.frame.width, height: versionLabel.lineHeight)

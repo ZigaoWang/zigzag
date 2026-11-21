@@ -143,4 +143,11 @@ import WebKit
         #expect(peeked.isClosed)
         #expect(peeked.toldTo == nil)
     }
+
+    /// The strip names a local file by its name, a web page by its host.
+    @Test func theStripNamesAFileOrAHost() {
+        #expect(PeekController.stripName(for: URL(fileURLWithPath: "/tmp/Notes.html"), title: "Notes") == "Notes.html")
+        #expect(PeekController.stripName(for: URL(string: "https://www.example.com/a"), title: "Example") == "example.com")
+        #expect(PeekController.stripName(for: nil, title: "Untitled") == "Untitled")
+    }
 }

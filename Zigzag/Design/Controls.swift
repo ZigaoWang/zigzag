@@ -989,6 +989,8 @@ final class PrimaryButton: InteractiveView {
     /// Set both to draw the button in other colors, like a light button on the brand's blue.
     var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
     var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
+    /// A hairline in this color around it, kept through hover and press.
+    var customEdge: NSColor? { didSet { stateDidChange(animated: false) } }
     /// Moves the title off center, to leave room for something beside it (a keycap).
     var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
 
@@ -1029,6 +1031,12 @@ final class PrimaryButton: InteractiveView {
         let theme = Brand.Theme.for(self)
         let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
         label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : customFill.map(Brand.ink(on:)) ?? theme.onAccent))
+        if let customEdge {
+            Tokens.Motion.withoutAnimation {
+                layer?.borderWidth = 1
+                layer?.borderColor = cgColor(customEdge)
+            }
+        }
     }
 }
 

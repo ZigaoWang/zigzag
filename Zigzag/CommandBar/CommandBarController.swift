@@ -657,7 +657,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             fieldX = chipRule.frame.maxX + Tokens.Space.x2 + 2
         }
         chipRule.isHidden = !isScoped
-        var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : Tokens.Space.x4)
+        // Unanchored, the Tab key's cap ends where the rows' Return caps do.
+        var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : inset + CardRow.inset)
         if !hint.isHidden {
             let kw = hintKey.width, kh = Tokens.Metric.keyCapHeight
             hintKey.frame = NSRect(x: fieldRight - kw, y: round((fieldHeight - kh) / 2), width: kw, height: kh)
@@ -1299,6 +1300,7 @@ extension CommandBarController {
                 controller.splitWithUndo(tab, with: other)
             }
         case "close-others": controller.closeOtherTabs(nil)
+        case "capture": controller.capture.begin()
         case "close-below": controller.closeTabsBelow(nil)
         case "reopen": controller.reopenClosedTab(nil)
         case "new-space": controller.newSpace(nil)

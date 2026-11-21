@@ -704,7 +704,7 @@ final class Tab: NSObject {
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
             let freed = chosen ? nil : self.memoryInUse(by: webView)
-            self.tearDown(webView)
+            self.tearDown(webView, keepingSettings: self.url.map(SettingsPage.isSettings) ?? false)
             self.freedMemory = freed
             self.sleepCause = chosen ? .chosen : reason == EnergyWatch.sleepReason ? .energy : .memory
             self.changed.send(.webView)
@@ -774,12 +774,14 @@ final class Tab: NSObject {
         }
     }
 
-    private func tearDown(_ webView: BrowserWebView) {
+    /// `keepingSettings`: the page may come back as it was (a sleep), so the Settings view stays for it: building one
+    /// again costs the whole first-open time (#357).
+    private func tearDown(_ webView: BrowserWebView, keepingSettings: Bool = false) {
         Autofill.shared.forget(webView)
         // Tabs that shared the rule keep their images.
         PageImages.set(false, in: webView)
         setPDFViewer(nil)
-        if settingsView != nil {
+        if settingsView != nil, !keepingSettings {
             settingsView = nil
             changed.send(.settings)
         }
@@ -2187,6 +2189,9 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        // A link preview from the page that's going has nothing left to describe, and a hover from it during the
+        // load must not bring the preview back.
+        hoveredLinkChanged(nil)
         isLeavingPage = true
         // The page is going: a socket it opened to this Mac goes with it.
         localReceivers?.closeAllSockets()
@@ -2600,6 +2605,9 @@ extension Tab: WKUIDelegate {
 
     /// Reported by our hover script: the link under the pointer, or nil.
     func hoveredLinkChanged(_ url: URL?, title: String? = nil) {
+        // The page is going: a hover from it is for a page that won't be here, and must not bring the preview back
+        // after the click cleared it.
+        guard !isLeavingPage else { return }
         hoveredLink = url
         hoveredLinkTitle = url == nil ? nil : title
         host?.tab(self, hoveringLink: url)
