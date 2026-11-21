@@ -3698,6 +3698,8 @@ extension BrowserWindowController: CommandBarHost {
     /// shows in the window, not behind the overview.
     func commandBarWillShow() {
         if desk.isVisible { desk.hide(openingTab: nil) }
+        // Typing goes to the bar, not to Capture's keys.
+        capture.cancel()
         SitePanel.closeCurrent()
         DownloadsPanel.closeCurrent()
         ReaderOptions.closeCurrent()

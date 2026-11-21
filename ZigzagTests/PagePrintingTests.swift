@@ -147,3 +147,34 @@ struct PageCaptureGeometryTests {
         #expect(long.hasPrefix(String(repeating: "x", count: 80) + " 2026"))
     }
 }
+
+@MainActor struct PageCaptureKeysTests {
+    private func key(_ characters: String, code: UInt16, flags: NSEvent.ModifierFlags = []) throws -> NSEvent {
+        try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                                      characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
+    }
+
+    /// ⇧⌘2 then ⌘T: the bar takes the typing, so Capture ends; a key Capture has no use for goes on (#457).
+    @Test func theCommandBarEndsCaptureAndOtherKeysGoOn() throws {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "http://127.0.0.1:9/capture")!, title: "Capture", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        controller.capture.begin()
+        #expect(controller.capture.isActive)
+        #expect(!controller.capture.handle(try key("x", code: 7)))
+        #expect(!controller.capture.handle(try key("1", code: 18)))
+        #expect(!controller.capture.handle(try key("f", code: 3, flags: .command)))
+        #expect(controller.capture.isActive)
+        controller.commandBarWillShow()
+        #expect(!controller.capture.isActive)
+        controller.capture.begin()
+        #expect(controller.capture.handle(try key("\u{1b}", code: 53)))
+        #expect(!controller.capture.isActive)
+    }
+}

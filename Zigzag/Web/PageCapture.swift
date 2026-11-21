@@ -216,6 +216,8 @@ final class PageCapture {
     private func installMonitors() {
         let keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.isActive, event.window === self.controller?.window else { return event }
+            // A field taking the typing (the command bar, Find) ends Capture: the keys are the field's.
+            if let text = event.window?.firstResponder as? NSTextView, text.isEditable { self.cancel(); return event }
             return self.handle(event) ? nil : event
         }
         // A click anywhere else in the window (the sidebar, the address) leaves capture mode and goes on.
@@ -229,8 +231,8 @@ final class PageCapture {
         monitors = [keys, clicks].compactMap { $0 }
     }
 
-    /// Esc leaves, Return takes, A, E, F and V pick the mode, the arrows nudge the area (⇧ by 10). Other keys stay out
-    /// of the page while capturing; ⌘ keys go to the menus as ever.
+    /// Esc leaves, Return takes, A, E, F and V pick the mode, the arrows nudge the area (⇧ by 10). True for a key it
+    /// used; any other key goes on, ⌘ keys to the menus as ever.
     func handle(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
         if flags.contains(.command) || flags.contains(.control) { return false }
@@ -253,7 +255,7 @@ final class PageCapture {
         }
         let typed = event.charactersIgnoringModifiers?.lowercased() ?? ""
         if let mode = Mode.allCases.first(where: { $0.key == typed }) { choose(mode); return true }
-        return true
+        return false
     }
 
     // MARK: Pointing at elements
