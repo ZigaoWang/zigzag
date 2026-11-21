@@ -64,7 +64,7 @@ enum ProblemReport {
         let destination = file
         return await Task.detached(priority: .userInitiated) { () -> URL? in
             try? FileManager.default.createDirectory(at: CrashReports.folder, withIntermediateDirectories: true)
-            let text = summary + recent + crashes + freezes + extensionLog
+            let text = summary + recent + crashes + freezes + extensionLog + passwordsLog
             return (try? Data(text.utf8).write(to: destination, options: .atomic)) == nil ? nil : destination
         }.value
     }
@@ -120,6 +120,13 @@ enum ProblemReport {
         }
         guard !problems.isEmpty else { return "" }
         return (["", "Extension errors, latest"] + problems.suffix(20).map { Diagnostics.clean($0) }).joined(separator: "\n") + "\n"
+    }
+
+    /// The Mac's Passwords list steps, when it was used: facts only, never a login (#378).
+    nonisolated static var passwordsLog: String {
+        let lines = PasswordsLog.recent(80)
+        guard !lines.isEmpty else { return "" }
+        return (["", "Passwords list steps, latest last"] + lines).joined(separator: "\n") + "\n"
     }
 
     /// What the main thread was running in Zigzag's last few freezes, when there were any.

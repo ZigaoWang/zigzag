@@ -582,7 +582,8 @@ final class BrowserRootView: SpaceFrameView {
     }
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
-    private let resizeHandle = ResizeHandle()
+    /// The band over the sidebar's edge, on the card's inner edge while the sidebar is out over the page (#431).
+    let resizeHandle = ResizeHandle()
     /// The strips and squares between the panes (#316, #309), under the page's own surfaces (a question, the command
     /// bar) and the bar above it.
     private let tileHandles = PassthroughView()
@@ -605,7 +606,22 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     var sidebarVisible = true
-    var sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth
+    /// The sidebar's width, kept across windows and launches: dragging its edge sets it, double-clicking that edge
+    /// puts it back to the default (#431).
+    var sidebarWidth: CGFloat = BrowserRootView.storedSidebarWidth
+
+    static let sidebarWidthKey = "SidebarWidth"
+    /// What keeps it, so a test can swap in its own suite instead of the dev app's defaults.
+    static var defaults: UserDefaults = .standard
+
+    private static var storedSidebarWidth: CGFloat {
+        let stored = defaults.double(forKey: sidebarWidthKey)
+        return stored > 0 ? min(max(CGFloat(stored), Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth) : Tokens.Metric.sidebarWidth
+    }
+
+    private func saveSidebarWidth() {
+        Self.defaults.set(Double(sidebarWidth), forKey: Self.sidebarWidthKey)
+    }
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?
     /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation) and its curve, so what rides
@@ -694,6 +710,17 @@ final class BrowserRootView: SpaceFrameView {
             // Dragged well past its narrowest, it closes, as a Mac sidebar does; dragged back out in the same drag, it
             // opens again. Closed this way it keeps the width it had, for when it opens next.
             let closesAt = Tokens.Metric.sidebarMinWidth / 2
+            // Out over the page, the edge sets the width and nothing else: it stays out until the pointer leaves.
+            if self.sidebarRevealed, !self.sidebarVisible {
+                // The card floats a frame's inset in from the window edge, so the width is the pointer's reach less it.
+                let reach = x - Tokens.Metric.cardInset
+                let width = Tokens.Space.snap(min(max(reach, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
+                guard width != self.sidebarWidth else { return }
+                self.sidebarWidth = width
+                self.needsLayout = true
+                self.layoutSubtreeIfNeeded()
+                return
+            }
             if self.sidebarVisible, x < closesAt {
                 self.sidebarWidth = self.widthBeforeDrag
                 self.setSidebarVisible(false, animated: true)
@@ -714,7 +741,17 @@ final class BrowserRootView: SpaceFrameView {
         resizeHandle.onEnd = { [weak self] _ in
             guard let self else { return }
             self.isDraggingSidebarEdge = false
+            self.saveSidebarWidth()
             self.needsLayout = true
+            self.onSidebarWidthChange?(self.sidebarWidth)
+        }
+        // Double-clicking the edge puts the sidebar back to its usual width.
+        resizeHandle.onDoubleClick = { [weak self] in
+            guard let self else { return }
+            self.sidebarWidth = Tokens.Metric.sidebarWidth
+            self.saveSidebarWidth()
+            self.needsLayout = true
+            self.layoutSubtreeIfNeeded()
             self.onSidebarWidthChange?(self.sidebarWidth)
         }
         // Links and files dropped on the page area open as tabs too: an empty window, or with the sidebar hidden.
@@ -1256,6 +1293,15 @@ final class BrowserRootView: SpaceFrameView {
         return mirrored(NSRect(x: bounds.minX + sidebarWidth - inside, y: bounds.minY, width: inside + out, height: bounds.height), in: bounds, if: onRight)
     }
 
+    /// The band over the popout's inner edge: the same reach either side of the card's edge, the card being inset in
+    /// the window rather than flush. The page faces the card's inner side, `maxX` on the left and `minX` on the right.
+    static func revealedResizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
+        let card = sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: onRight)
+        let width = Tokens.Metric.resizeHandleWidth
+        let edge = onRight ? card.minX : card.maxX
+        return NSRect(x: edge - width / 2, y: card.minY, width: width, height: card.height)
+    }
+
     static func resizeHandlePageReach(onRight: Bool) -> CGFloat { onRight ? Tokens.Metric.dragReach / 2 : Tokens.Metric.dragReach }
 
     /// The sidebar's edge across its handle: from the left, past the part over the sidebar, or the part over the page.
@@ -1301,9 +1347,12 @@ final class BrowserRootView: SpaceFrameView {
         sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
-        resizeHandle.frame = Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
+        // The popout's inner edge takes the pointer too: its card is inset, so the band follows the card (#431).
+        resizeHandle.frame = sidebarRevealed && !sidebarVisible
+            ? Self.revealedResizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
+            : Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
         resizeHandle.line = Self.resizeHandleLine(onRight: sidebarOnRight)
-        resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
+        resizeHandle.isHidden = !sidebarVisible && !sidebarRevealed && !isDraggingSidebarEdge
         // With the sidebar hidden, the glow goes on the window edge, not at the resize handle, which would sit inside
         // the page.
         attentionEdge.frame = Self.attentionEdgeFrame(in: bounds, onRight: sidebarOnRight)
@@ -1705,6 +1754,8 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func followPointer() {
+        // A drag on the edge is not the pointer leaving: the band reaches past the card, and the width follows it.
+        guard !isDraggingSidebarEdge else { return }
         guard let point = pointer, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
         let wasLeaving = edgeReveal.isLeaving
         let held = isHeld || NSEvent.pressedMouseButtons != 0
@@ -1726,6 +1777,8 @@ final class BrowserRootView: SpaceFrameView {
         revealMeter.begin(show ? "out" : "in", in: self)
         #endif
         sidebarRevealed = show
+        // The edge handle follows the card, and only layout moves it.
+        needsLayout = true
         let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
         // Out, it slides all the way before the pointer can send it back: one slide, never cut short and begun again.
         let slide = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown : curve.duration
@@ -1827,6 +1880,7 @@ final class BrowserRootView: SpaceFrameView {
         switch step {
         case "begin": resizeHandle.onBegin?()
         case "end": resizeHandle.onEnd?(false)
+        case "reset": resizeHandle.onDoubleClick?()
         default: if let x = Double(step) { resizeHandle.onDrag?(CGFloat(x), false) }
         }
     }

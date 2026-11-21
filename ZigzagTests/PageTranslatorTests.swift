@@ -424,6 +424,45 @@ struct PageTranslatorTests {
         #expect(!PageTranslator.isInView(tab, selected: tab, peeked: peeked))
         #expect(PageTranslator.isInView(peeked, selected: tab, peeked: peeked))
     }
+
+    /// A long page goes in small requests, on-screen text first, so each comes back well inside the limit (#465).
+    @Test func aLongPageIsTranslatedInSmallBatchesOnScreenFirst() {
+        let pieces = (0..<100).map { "Paragraphe numéro \($0)." }
+        let batches = PageTranslator.batches(Array(0..<100), pieces: pieces, shown: [40, 41, 42], maxPieces: 24, maxCharacters: 10_000)
+        #expect(batches.first?.prefix(3) == [40, 41, 42])
+        #expect(batches.allSatisfy { $0.count <= 24 })
+        #expect(batches.flatMap { $0 }.sorted() == Array(0..<100))
+        // The rest follows in page order.
+        #expect(Array(batches.flatMap { $0 }.dropFirst(3).prefix(3)) == [0, 1, 2])
+        // Long paragraphs cut a request short by characters; one longer than the cap still goes, alone.
+        let long = [String(repeating: "a", count: 1500), String(repeating: "b", count: 1500), String(repeating: "c", count: 5000), "d"]
+        #expect(PageTranslator.batches([0, 1, 2, 3], pieces: long, maxPieces: 24, maxCharacters: 2400) == [[0], [1], [2], [3]])
+        // Places past the page's text are skipped.
+        #expect(PageTranslator.batches([0, 9], pieces: ["x"]) == [[0]])
+    }
+
+    /// The limit is on going quiet: each batch that comes back starts it again, so a page that keeps coming back
+    /// keeps going (#465).
+    @Test func theTimeLimitRunsFromTheLastBatch() {
+        let start = Date(timeIntervalSinceReferenceDate: 0)
+        #expect(PageTranslator.waitLeft(lastProgress: start, now: start.addingTimeInterval(10), limit: 45) == 35)
+        #expect(PageTranslator.waitLeft(lastProgress: start, now: start.addingTimeInterval(45), limit: 45) == nil)
+        // Two minutes in, with a batch back 5 seconds ago, it waits on.
+        let recent = start.addingTimeInterval(115)
+        #expect(PageTranslator.waitLeft(lastProgress: recent, now: start.addingTimeInterval(120), limit: 45) == 40)
+        #expect(PageTranslator.percent(0) == 0)
+        #expect(PageTranslator.percent(0.426) == 42)
+        #expect(PageTranslator.percent(1) == 99)
+    }
+
+    /// Reading the page marks what's on screen, so it's translated first.
+    @Test func theTextOnScreenIsMarked() async {
+        let (webView, loading) = await page("<html><body style='margin:0'><p>En haut de la page.</p><div style='height:3000px'></div><p>Tout en bas de la page.</p></body></html>")
+        defer { _ = loading }
+        let text = await PageTranslator.text(in: webView)
+        #expect(text.pieces == ["En haut de la page.", "Tout en bas de la page."])
+        #expect(text.shown == [0])
+    }
 }
 
 /// Page language from its text and declared lang, and which page an offer belongs to.

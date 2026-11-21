@@ -190,6 +190,13 @@ enum Brand {
                                         dark: SpaceColor.tone(hue: h, lightness: Tokens.Frame.panelDarkLightness, chroma: Tokens.Frame.panelDarkChroma))
         }
 
+        /// Reader's Auto paper, day and night, in the space's hue; nil for white, grays and black.
+        var readerPaper: (light: NSColor, dark: NSColor)? {
+            guard let h = surfaceHue else { return nil }
+            return (SpaceColor.tone(hue: h, lightness: Tokens.Frame.readerLightness, chroma: Tokens.Frame.readerChroma),
+                    SpaceColor.tone(hue: h, lightness: Tokens.Frame.readerDarkLightness, chroma: Tokens.Frame.readerDarkChroma))
+        }
+
         /// A page's quiet column or header (Settings, History, Passwords): a light tint of the space, between the
         /// frame and the white page.
         var wash: NSColor {

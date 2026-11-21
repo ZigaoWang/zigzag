@@ -1300,6 +1300,7 @@ extension CommandBarController {
                 controller.splitWithUndo(tab, with: other)
             }
         case "close-others": controller.closeOtherTabs(nil)
+        case "capture": controller.capture.begin()
         case "close-below": controller.closeTabsBelow(nil)
         case "reopen": controller.reopenClosedTab(nil)
         case "new-space": controller.newSpace(nil)

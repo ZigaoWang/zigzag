@@ -598,13 +598,20 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// Fills what the Mac's list gave into the page Passwords… was chosen on, then lets go of it.
     func fillFromSystem(username: SecretString, password: SecretString, into request: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)) {
         let webView = request.webView
-        guard Self.systemFillAllowed(asked: request.origin, now: webView.url, inFront: Self.isInFront(webView)) else { Self.tell(Self.pageMovedOn, about: webView); return }
+        guard Self.systemFillAllowed(asked: request.origin, now: webView.url, inFront: Self.isInFront(webView)) else {
+            PasswordsLog.write("page-fill", ["allowed": .flag(false)])
+            Self.tell(Self.pageMovedOn, about: webView)
+            return
+        }
         Task {
             // Passed as arguments, never pasted into the script's source, held only for the call, and not marked as
             // Zigzag's own fill: signing in with it never offers to save it.
             let arguments: [String: Any] = ["username": username.withUnsafeString { String($0) }, "password": password.withUnsafeString { String($0) },
                                             "expectedOrigin": request.origin.description, "mark": false]
             let filled = try? await webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: request.frame, contentWorld: .defaultClient) as? [String: Any]
+            PasswordsLog.write("page-fill", ["answered": .flag(filled != nil), "moved": .flag(filled?["moved"] as? Bool == true),
+                                             "username": .flag(filled?["username"] as? Bool == true), "password": .flag(filled?["password"] as? Bool == true),
+                                             "usernameEmpty": .flag(filled?["usernameEmpty"] as? Bool == true)])
             guard let filled, filled["moved"] as? Bool != true else { Self.tell(Self.pageMovedOn, about: webView); return }
             guard filled["password"] as? Bool == true || filled["username"] as? Bool == true else { Self.tell(Self.noPasswordField, about: webView); return }
             // Only a password came back, and the username field is still empty: say so, or it looks like a slip.

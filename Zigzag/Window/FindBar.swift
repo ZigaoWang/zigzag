@@ -1016,9 +1016,10 @@ enum Toast {
     /// button.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      actionMenu: (() -> NSMenu?)? = nil,
-                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, onClose: (() -> Void)? = nil,
-                     in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, actionMenu: actionMenu, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller), onClose: onClose)
+                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, announces: Bool = true,
+                     onClose: (() -> Void)? = nil, in controller: BrowserWindowController) {
+        show(text, symbol: symbol, action: action, actionMenu: actionMenu, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller),
+             announces: announces, onClose: onClose)
         state(for: controller.root.overlay).owner = owner
     }
 
@@ -1082,7 +1083,7 @@ enum Toast {
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      actionMenu: (() -> NSMenu?)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
-                     onClose: (() -> Void)? = nil) {
+                     announces: Bool = true, onClose: (() -> Void)? = nil) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1096,7 +1097,8 @@ enum Toast {
             isNew = true
         }
         toast.label.stringValue = text
-        Announcement.post(text, priority: action == nil ? .medium : .high)
+        // A progress update to a toast already up isn't read out again.
+        if announces { Announcement.post(text, priority: action == nil ? .medium : .high) }
         // Busy: an empty picture keeps the icon's place for the spinner.
         toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }
         busy ? toast.spinner.startAnimation(nil) : toast.spinner.stopAnimation(nil)

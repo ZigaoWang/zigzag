@@ -30,6 +30,8 @@ final class AddressView: InteractiveView {
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
     /// Shown on articles: opens Reader.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
+    /// Shown beside Reader's button while Reader is on: its text and colors.
+    let readerOptionsButton = AddressView.button("textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors."))
 
     func setCapture(camera: Bool, microphone: Bool) {
         wantsCapture = camera || microphone
@@ -52,6 +54,13 @@ final class AddressView: InteractiveView {
     /// Whether the page can be pinned at all (a new tab has no address).
     private(set) var canSave = false
 
+    /// Whether the star is offered for a tab: a page with something to pin, in a window that keeps pins (#442).
+    /// The same rule the save path uses, so the star, ⌘D and the menus can't disagree.
+    static func canSave(for tab: Tab?) -> Bool {
+        guard let tab, !tab.isPrivate else { return false }
+        return SavePath.Page(tab: tab) != nil
+    }
+
     /// The star's state for the page in the field. A page that isn't pinned, or is a private window's, keeps the star.
     func setSaved(_ saved: Bool, canSave: Bool) {
         guard isSaved != saved || self.canSave != canSave else { return }
@@ -60,6 +69,8 @@ final class AddressView: InteractiveView {
         saveButton.symbol = saved ? "star.fill" : "star"
         saveButton.tint = saved ? Brand.Theme.for(saveButton).accent : Tokens.Color.icon
         saveButton.isEnabled = canSave
+        // Nothing to pin, nothing to offer: the star goes rather than sitting greyed out (#442).
+        saveButton.isHidden = !canSave
         saveButton.toolTip = saved
             ? String(localized: "Pinned", comment: "Tooltip of the address bar's star button for a page that's pinned: it says the page is pinned.")
             : String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where.")
@@ -394,6 +405,8 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        readerOptionsButton.isHidden = true
+        addSubview(readerOptionsButton)
         saveButton.tint = Tokens.Color.icon
         saveButton.isHidden = true
         addSubview(saveButton)
@@ -418,6 +431,7 @@ final class AddressView: InteractiveView {
 
     func setReader(available: Bool, active: Bool) {
         wantsReader = available || active
+        wantsReaderOptions = active
         readerButton.isSelected = active
         readerButton.toolTip = Shortcuts.tooltip(active ? String(localized: "Hide Reader", comment: "Tooltip of the address bar's Reader button while Reader is on.")
                                                          : String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."),
@@ -485,12 +499,25 @@ final class AddressView: InteractiveView {
         }
     }
 
+    /// Whether the star is in the top bar's pill instead, with the address above the page (#437).
+    var starInPill = false {
+        didSet {
+            guard starInPill != oldValue else { return }
+            // However the pill left the star, the field draws it from scratch when it comes back, by its own rule (#443).
+            drawn.remove(ObjectIdentifier(saveButton))
+            if starInPill { saveButton.removeFromSuperview() } else { saveButton.isHidden = !canSave; addSubview(saveButton) }
+            reflow(animated: true)
+        }
+    }
+
     /// The buttons always at the field's end, after the pins.
-    private var endButtons: [IconButton] { [saveButton, siteControlsButton] }
+    private var endButtons: [IconButton] {
+        (starInPill ? [siteControlsButton] : [saveButton, siteControlsButton]).filter { !$0.isHidden }
+    }
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
+        let count = (wantsReaderOptions ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -518,6 +545,7 @@ final class AddressView: InteractiveView {
     }
 
     private var wantsReader = false
+    private var wantsReaderOptions = false
     private var wantsCapture = false
     /// The buttons drawn in the field, those leaving aside.
     private var drawn = Set<ObjectIdentifier>()
@@ -540,7 +568,7 @@ final class AddressView: InteractiveView {
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
         var others: [IconButton] = []
-        for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
+        for (button, wanted) in [(readerOptionsButton, wantsReaderOptions), (readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         // Without the site, buttons get the whole width, including a gap after the last.
@@ -626,7 +654,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [readerOptionsButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.
@@ -1088,8 +1116,9 @@ final class SidebarView: NSView {
     /// Where the traffic lights start, from the sidebar's left edge.
     static let trafficLightsX = Tokens.Sidebar.lightsX
 
-    /// The y position (from the top) where the traffic lights should be centered.
-    var trafficLightCenterY: CGFloat { Tokens.Sidebar.lightsCenter + topRowDrop }
+    /// The y position (from the top) where the traffic lights should be centered: midway down to the address when the
+    /// sidebar holds it, so the row has as much room above as below; on the bar's line when the bar holds it.
+    var trafficLightCenterY: CGFloat { (holdsAddress ? Tokens.Sidebar.addressTop / 2 : Tokens.Sidebar.lightsCenter) + topRowDrop }
     /// How far the top row sits below its usual line: framed, the bar above the page starts the frame's inset down,
     /// and the lights and the sidebar's toggle stay on its middle line with its buttons (set by the window).
     var topRowDrop: CGFloat = 0 { didSet { if topRowDrop != oldValue { needsLayout = true } } }
@@ -1198,7 +1227,7 @@ final class SidebarView: NSView {
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: tab?.url != nil && tab?.isPrivate != true)
+        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.
