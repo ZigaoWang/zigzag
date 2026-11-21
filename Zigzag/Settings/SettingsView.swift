@@ -405,7 +405,7 @@ enum SettingsVersionRow {
         let toggle = Toggle(isOn: Updater.getsBetas)
         toggle.onChange = { on in Updater.getsBetas = on }
         let row = FormRow(title: String(localized: "Beta updates", comment: "A setting in Settings › General."),
-                          detail: String(localized: "Try new versions first, on your own tabs and data.", comment: "Explanation under “Beta updates” in Settings › General."),
+                          detail: String(localized: "A beta can break.", comment: "Explanation under “Beta updates” in Settings › General."),
                           control: toggle)
         row.keywords = String(localized: "beta channel prerelease", comment: "Words that find the Beta updates setting with Find a setting in Settings. Not shown.")
         return row
@@ -457,7 +457,7 @@ enum ExtensionSiteAccessRows {
     static func title(_ access: ExtensionInstalls.SiteAccess) -> String {
         switch access {
         case .all: String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")
-        case .click: String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")
+        case .click: String(localized: "On Click", comment: "Site Access choice: the extension works on a site only after its button is clicked.")
         case .sites: String(localized: "On Specific Sites", comment: "Site Access choice in Settings › Extensions: the extension works only on the sites listed under it.")
         }
     }
@@ -526,7 +526,6 @@ enum ExtensionPrivateRow {
         toggle.setAccessibilityLabel(String(localized: "Allow \(name) in private windows", comment: "VoiceOver name of the switch that lets an extension run in private windows, in Settings › Extensions. The placeholder is the extension's name."))
         toggle.onChange = { on in installs.setAllowsPrivate(id, on) }
         let row = FormRow(title: String(localized: "Allow in private windows", comment: "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first."),
-                          detail: String(localized: "It can see and change your pages in private windows.", comment: "Under “Allow in private windows” in Settings › Extensions."),
                           control: toggle)
         row.isIndented = true
         let words = String(localized: "incognito private browsing", comment: "Words that find an extension's Allow in private windows setting with Find a setting in Settings. Not shown.")
@@ -1119,13 +1118,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let pureBlackToggle = Toggle()
     private lazy var pureBlackRow: FormRow = {
         let row = FormRow(title: String(localized: "Pure black backgrounds", comment: "A setting in Settings › Appearance, under Dark pages and shown while it's on: darkened websites are black instead of dark gray."),
-                          detail: String(localized: "Darkened websites are black instead of dark gray.", comment: "Explanation under “Pure black backgrounds” in Settings › Appearance."),
+                          detail: String(localized: "Black, not dark gray.", comment: "Explanation under “Pure black backgrounds” in Settings › Appearance."),
                           control: pureBlackToggle)
         row.keywords = String(localized: "black pure true black oled amoled dark mode", comment: "Words that find the Pure black backgrounds setting with Find a setting in Settings. Not shown.")
         return row
     }()
     private let newTabPlace = DropdownButton()
-    private var newTabRow: FormRow!
     private let controlTabOrder = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
@@ -1334,7 +1332,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         versionGroup.add(SettingsVersionRow.betas())
         if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
         let defaultRow = FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
-                                 detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
                                  control: defaultControl)
         defaultRow.keywords = String(localized: "default app links open launch", comment: "Words that find the Default browser setting with Find a setting in Settings. Not shown.")
         generalGroup.add(defaultRow)
@@ -1345,8 +1342,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             languagePicker.selectedIndex = AppLanguage.choices.firstIndex { $0.code == AppLanguage.chosen } ?? 0
             languagePicker.onSelect = { [weak self] index in self?.chooseLanguage(AppLanguage.choices[index].code) }
             generalGroup.add(FormRow(title: String(localized: "Language", comment: "A setting in Settings › General."),
-                                     detail: String(localized: "Zigzag follows your Mac’s language unless you pick one here.",
-                                                    comment: "Explanation under “Language” in Settings › General."),
                                      control: languagePicker))
         }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
@@ -1390,7 +1385,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: importButton))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
-                              detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                               control: quitToggle)
         // There's no startup setting: your tabs always come back. Quitting is the nearest, and where people look.
         quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.")
@@ -1525,7 +1519,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     control: borderlessToggle))
         addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
         let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
-                                 detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
                                  control: addressAboveToggle)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
@@ -1535,7 +1528,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         ]
         sidebarSide.onSelect = { index in BrowserRootView.sidebarOnRight = Self.sidebarSides[index] }
         let sideRow = FormRow(title: String(localized: "Sidebar position", comment: "A setting in Settings › Appearance: which edge of the window the sidebar runs along, Left or Right."),
-                              detail: String(localized: "The edge of the window the sidebar runs along. The page sits beside it.", comment: "Explanation under “Sidebar position” in Settings › Appearance."),
                               control: sidebarSide)
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sideRow.keywords = String(localized: "sidebar right left side position move", comment: "Words that find the Sidebar position setting with Find a setting in Settings. Not shown.") + " 侧边栏"
@@ -1633,7 +1625,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshPureBlack()
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         appearanceGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › Appearance."),
-                                    detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › Appearance."),
                                     control: motionToggle))
 
         // Tabs
@@ -1646,16 +1637,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             return DropdownButton.Option(title: title)
         }
-        newTabPlace.onSelect = { [weak self] index in
+        newTabPlace.onSelect = { index in
             TabManager.newTabPlace = TabManager.NewTabPlace.allCases[index]
-            self?.refreshNewTabPlace()
         }
-        newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
-                            detail: nil, control: newTabPlace)
+        let newTabRow = FormRow(title: String(localized: "New tabs open", comment: "A setting in Settings › Tabs: where a new tab goes in the sidebar's list."),
+                                control: newTabPlace)
         // There's no homepage: a new tab opens the address bar. This is the setting nearest to one.
         newTabRow.keywords = String(localized: "new tab homepage home page start page position order same site domain group organize", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
         tabsGroup.add(newTabRow)
-        refreshNewTabPlace()
         controlTabOrder.options = TabSwitcher.Order.allCases.map { order in
             let title = switch order {
             case .recent: String(localized: "Recent Tabs", comment: "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab shows the tabs you used last, most recent first.")
@@ -1672,7 +1661,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(controlTabRow)
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
         let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
-                              detail: String(localized: "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
+                              detail: String(localized: "Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
                               control: nestToggle)
         nestRow.keywords = String(localized: "nested tree child command click", comment: "Words that find the Open ⌘-clicked links under their tab setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(nestRow)
@@ -1696,13 +1685,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(energyRow)
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         let videoRow = FormRow(title: String(localized: "Show a mini player when you switch tabs", comment: "A setting in Settings › Tabs."),
-                               detail: String(localized: "A video you’re watching follows you in a small player over the page. Its right-click menu can turn this off too.", comment: "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs."),
+                               detail: String(localized: "Its right-click menu can turn this off too.", comment: "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs."),
                                control: pipToggle)
         videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Show a mini player setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(videoRow)
         leavePipToggle.onChange = { on in AutoPictureInPicture.isOn = on }
         let leaveRow = FormRow(title: String(localized: "Show a mini player when you leave Zigzag", comment: "A setting in Settings › Tabs, below “Show a mini player when you switch tabs”: a playing video moves into Zigzag's small player, over other apps, when you switch to another app or desktop."),
-                               detail: String(localized: "A video you’re watching keeps playing in a small player over other apps and desktops, and goes back in its page when you come back to it.", comment: "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs."),
+                               detail: String(localized: "Floats over other apps and desktops when you switch away, and back in its page when you return.", comment: "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs."),
                                control: leavePipToggle)
         leaveRow.keywords = String(localized: "mini player picture in picture pip floating video other app desktop space leave switch away background automatic", comment: "Words that find the Show a mini player when you leave Zigzag setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(leaveRow)
@@ -1715,7 +1704,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         fullScreenFill.onSelect = { index in PageFullScreen.fill = PageFullScreen.Fill.allCases[index] }
         let fullScreenRow = FormRow(title: String(localized: "Full screen videos fill", comment: "A setting in Settings › Tabs: whether a video put in full screen covers the whole screen or only the page's area in the window. Followed by The Whole Screen or The Page."),
-                                    detail: String(localized: "With The Page, a video in full screen stays inside its tab, or its part of a split. Choose for a single site in its site controls.",
+                                    detail: String(localized: "Choose for a single site in its site controls.",
                                                    comment: "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address."),
                                     control: fullScreenFill)
         fullScreenRow.keywords = String(localized: "full screen fullscreen window tab pane video youtube in window", comment: "Words that find the Full screen videos fill setting with Find a setting in Settings. Not shown.")
@@ -1764,7 +1753,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         customSearch.field.target = self
         customSearch.field.action = #selector(customSearchChanged)
         searchGroup.add(FormRow(title: String(localized: "Search engine", comment: "A setting in Settings › Search."),
-                                detail: String(localized: "Used when what you type isn’t an address.", comment: "Explanation under “Search engine” in Settings › Search."),
                                 control: engine))
         searchGroup.add(customSearchRow)
         refreshCustomSearch()
@@ -3882,18 +3870,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     /// Pure black backgrounds shows only while dark pages are on.
-    /// Under “New tabs open”: with Next to Tabs from the Same Site, where a page from a site with no tabs open goes.
-    private func refreshNewTabPlace() {
-        guard let newTabRow else { return }
-        let general = String(localized: "Where ⌘T and links put a new tab in the sidebar.", comment: "Explanation under “New tabs open” in Settings › Tabs.")
-        guard TabManager.newTabPlace == .sameSite else { newTabRow.detailText = general; return }
-        newTabRow.detailText = switch TabManager.otherNewTabPlace {
-        case .top: String(localized: "A page from a site with no tabs open goes at the top.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
-        case .bottom: String(localized: "A page from a site with no tabs open goes at the bottom.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
-        case .next, .sameSite: String(localized: "A page from a site with no tabs open goes next to the current tab.", comment: "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.")
-        }
-    }
-
     private func refreshPureBlack() {
         let shown = DarkPages.mode != .off
         guard pureBlackRow.isAvailable != shown else { return }
@@ -3962,7 +3938,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
         controlTabOrder.selectedIndex = TabSwitcher.Order.allCases.firstIndex(of: TabSwitcher.order) ?? 0
-        refreshNewTabPlace()
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
         shareTabsToggle.isOn = TabStore.windowsShareTabs
@@ -4221,8 +4196,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: String(localized: "History", comment: "A setting in Settings › Privacy."),
-                                 detail: String(localized: "The pages you’ve visited, used for suggestions in the command bar.", comment: "Explanation under “History” in Settings › Privacy."),
-                                 control: historyButtons))
+                                    control: historyButtons))
 
         // What's cleared is the profile's shown here.
         let store = profile.store
@@ -4257,8 +4231,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let data = NSStackView(views: [cache, cookies])
         data.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: String(localized: "Website data", comment: "A setting in Settings › Privacy."),
-                                 detail: String(localized: "The cache makes pages load faster. Cookies keep you signed in.", comment: "Explanation under “Website data” in Settings › Privacy."),
-                                 control: data))
+                                    control: data))
 
         // Sites whose cookies clearing leaves alone (#334), each with ×, then whether the rest go at quit.
         let kept = KeptCookies.sites(in: profile.id)

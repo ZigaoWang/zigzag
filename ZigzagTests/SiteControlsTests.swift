@@ -711,15 +711,15 @@ struct SitePanelRowsTests {
         #expect(SitePanelRows.links(c).isEmpty)
     }
 
-    /// Dark page is one dropdown (#134): Automatic, On, Off and Force, in that order, and no row of its own for Force.
+    /// Dark page is one dropdown (#134): Follow Setting, Always, Off and Force Dark, in that order, and no row of its own for Force.
     @Test func darkPageIsOneDropdown() {
         #expect(DarkPages.SiteChoice.allCases == [.automatic, .on, .off, .force])
-        #expect(DarkPages.SiteChoice.allCases.map(SitePanel.title(of:)) == ["Automatic", "On", "Off", "Force Dark"])
+        #expect(DarkPages.SiteChoice.allCases.map(SitePanel.title(of:)) == ["Follow Setting", "Always", "Off", "Force Dark"])
         #expect(SitePanelRows.rows(Context()).filter { $0 == .darkPage }.count == 1)
     }
 
-    /// Under Dark page, what it does here now: Automatic says whether Settings has it on, Force that it's always
-    /// dark, and On and Off nothing more, unless the site is dark on its own or the developer tools chose its look.
+    /// Under Dark page, what it does here now: Follow Setting says whether Settings has it on, Force Dark that it's
+    /// always dark, and Always and Off nothing more, unless the site is dark on its own or the developer tools chose its look.
     @Test func darkPageSaysWhatItDoesNow() {
         typealias S = SitePanel.DarkStatus
         #expect(S.of(.automatic, wanted: true, native: false, developerLook: false) == .nowOn)

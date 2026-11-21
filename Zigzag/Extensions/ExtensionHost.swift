@@ -818,7 +818,7 @@ final class ExtensionHost: NSObject {
         for site in offSites {
             for pattern in patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
-        // When You Click It: a click gives the tab's site through activeTab, which WebKit drops when the tab leaves it.
+        // On Click: a click gives the tab's site through activeTab, which WebKit drops when the tab leaves it.
         if access == .click {
             context.setPermissionStatus(.grantedExplicitly, for: .activeTab)
         } else if !approvesActiveTab {
@@ -827,7 +827,7 @@ final class ExtensionHost: NSObject {
     }
 
     /// The sites a site access choice grants (nil: never chosen). Chosen, "On All Sites" adds the optional host permissions too.
-    /// "When You Click It" grants none: a click gives only the tab it's on.
+    /// "On Click" grants none: a click gives only the tab it's on.
     static func siteAccessPatterns(_ access: ExtensionInstalls.SiteAccess?, approved: [WKWebExtension.MatchPattern],
                                    optional: Set<WKWebExtension.MatchPattern>, sites: [String]) -> [WKWebExtension.MatchPattern] {
         switch access {
@@ -839,7 +839,7 @@ final class ExtensionHost: NSObject {
     }
 
     /// Whether a click (or the extension's shortcut or menu item) gives it the tab's site, as Chrome's activeTab does.
-    /// Under "When You Click It", Zigzag allows activeTab itself, so one that never asked for it gets only sites it asked for.
+    /// Under "On Click", Zigzag allows activeTab itself, so one that never asked for it gets only sites it asked for.
     func grantsTabOnGesture(_ context: WKWebExtensionContext, url: URL?) -> Bool {
         let id = context.uniqueIdentifier
         guard profile.installs.siteAccess(id) == .click,
@@ -870,7 +870,7 @@ final class ExtensionHost: NSObject {
         defer { bridge.userScripts.refresh() }
         let before = Set(profile.installs.state(context.uniqueIdentifier)?.grantedPermissions ?? [])
         var granted = Set(context.grantedPermissions.keys.map(\.rawValue))
-        // The activeTab "When You Click It" lends isn't an approval.
+        // The activeTab "On Click" lends isn't an approval.
         if profile.installs.siteAccess(context.uniqueIdentifier) == .click, !before.union(approving).contains(WKWebExtension.Permission.activeTab.rawValue) {
             granted.remove(WKWebExtension.Permission.activeTab.rawValue)
         }
@@ -1111,7 +1111,7 @@ final class ExtensionHost: NSObject {
             Toast.show(String(localized: "\(attention.title): in its settings, choose Browser, then Add Browser", comment: "Toast when an extension needs a step in its own app. The placeholder is a title like “Connect 1Password to Zigzag”. Browser and Add Browser are names in 1Password's settings."), symbol: "exclamationmark.triangle",
                        action: open, duration: 6, in: controller)
         }
-        // "When You Click It": the click gives it this tab's site until the tab leaves it or closes (activeTab).
+        // "On Click": the click gives it this tab's site until the tab leaves it or closes (activeTab).
         if profile.installs.siteAccess(item.id) == .click, let tab { item.context.userGesturePerformed(in: tab) }
         // A click always does something: if the extension has no popup at all and opens no page, its options page
         // opens instead. One with a popup is left alone, however long it takes: a locked 1Password is slow, not broken.

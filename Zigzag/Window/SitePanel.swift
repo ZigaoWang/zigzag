@@ -863,8 +863,8 @@ final class SitePanel: FloatingPanelView {
     /// A choice in the Dark page row's dropdown.
     static func title(of choice: DarkPages.SiteChoice) -> String {
         switch choice {
-        case .automatic: String(localized: "Automatic", comment: "A choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.")
-        case .on: String(localized: "dark-page.on", defaultValue: "On", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are drawn dark.")
+        case .automatic: String(localized: "Follow Setting", comment: "A choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.")
+        case .on: String(localized: "dark-page.on", defaultValue: "Always", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are drawn dark.")
         case .off: String(localized: "dark-page.off", defaultValue: "Off", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are never drawn dark, and are asked for their light look.")
         case .force: String(localized: "Force Dark", comment: "A choice in the Dark page dropdown of the site panel: this site is drawn dark even where it looks dark on its own, for a site that leaves parts of itself light.")
         }
@@ -906,8 +906,8 @@ final class SitePanel: FloatingPanelView {
     }
 
     /// The JavaScript row's choices (#282).
-    static let javaScriptAllowed = String(localized: "javascript.allowed", defaultValue: "Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages run their scripts.")
-    static let javaScriptNotAllowed = String(localized: "javascript.not-allowed", defaultValue: "Not Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages don't run their scripts.")
+    static let javaScriptAllowed = String(localized: "javascript.allowed", defaultValue: "Allow", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages run their scripts.")
+    static let javaScriptNotAllowed = String(localized: "javascript.not-allowed", defaultValue: "Block", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages don't run their scripts.")
 
     /// JavaScript row subtitle explaining a broken-looking page: off by the setting, or a site choice that differs from
     /// it. Nil when it matches the setting.
