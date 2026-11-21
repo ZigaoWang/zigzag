@@ -3325,7 +3325,7 @@ extension BrowserWindowController: SidebarDelegate {
         }
         // An empty grid still takes drops in the band under the address, or under the top row with the address above
         // the page.
-        var zone = favorites.convert(favorites.bounds, to: nil)
+        var zone = favorites.convert(favorites.visibleRect, to: nil)
         if favorites.isHidden {
             let above: NSView = sidebar.holdsAddress ? sidebar.address : favorites
             let edge = above.convert(above.bounds, to: nil)

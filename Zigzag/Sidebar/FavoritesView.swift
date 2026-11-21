@@ -27,6 +27,7 @@ final class FavoritesView: NSView {
         didSet {
             guard oldValue != isDropTarget else { return }
             if !isDropTarget {
+                scrollNearEdge(at: nil)
                 dropIndex = nil
                 showSplit(nil)
                 dropBar.isHidden = true
@@ -47,7 +48,51 @@ final class FavoritesView: NSView {
     /// split (nil: it can't open beside a favorite).
     func hoverDrop(at windowPoint: NSPoint, carrying: TabManager.SplitSide?) {
         aim(at: convert(windowPoint, from: nil), carried: carrying, moving: nil)
+        scrollNearEdge(at: windowPoint) { [weak self] in
+            guard let self, self.isDropTarget else { return }
+            self.aim(at: self.convert(windowPoint, from: nil), carried: carrying, moving: nil)
+        }
     }
+
+    /// How close to the grid's top or bottom a carried item scrolls it, while it's taller than its room.
+    static let edgeScrollZone: CGFloat = 16
+    private var edgeScrollTimer: Timer?
+
+    /// Held near the top or bottom of a grid that scrolls: it scrolls that way, a step a frame, `moved` after each.
+    /// Nil, or away from the edges: stops.
+    func scrollNearEdge(at windowPoint: NSPoint?, _ moved: @escaping () -> Void = {}) {
+        let visible = visibleRect
+        var direction: CGFloat = 0
+        if let windowPoint, let clip = enclosingScrollView?.contentView, bounds.height > visible.height + 1 {
+            let y = convert(windowPoint, from: nil).y
+            let zone = Self.edgeScrollZone
+            if y < visible.minY + zone, y > visible.minY - zone, visible.minY > 0 { direction = -1 }
+            if y > visible.maxY - zone, y < visible.maxY + zone, visible.maxY < bounds.height { direction = 1 }
+            if direction != 0 {
+                guard edgeScrollTimer == nil else { edgeScrollDirection = direction; edgeScrollMoved = moved; return }
+                edgeScrollDirection = direction
+                edgeScrollMoved = moved
+                let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self, weak clip] _ in
+                    MainActor.assumeIsolated {
+                        guard let self, let clip, let scroll = self.enclosingScrollView else { return }
+                        let limit = max(0, self.bounds.height - clip.bounds.height)
+                        let y = min(max(clip.bounds.minY + self.edgeScrollDirection * 4, 0), limit)
+                        guard y != clip.bounds.minY else { self.scrollNearEdge(at: nil); return }
+                        clip.scroll(to: NSPoint(x: 0, y: y))
+                        scroll.reflectScrolledClipView(clip)
+                        self.edgeScrollMoved()
+                    }
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                edgeScrollTimer = timer
+                return
+            }
+        }
+        edgeScrollTimer?.invalidate()
+        edgeScrollTimer = nil
+    }
+    private var edgeScrollDirection: CGFloat = 0
+    private var edgeScrollMoved: () -> Void = {}
 
     /// Where something carried over the grid would go, from a point in this view: beside a favorite as a split, or
     /// between two. `moving`: a favorite of this grid being moved, which stays where it is meanwhile.
@@ -243,7 +288,10 @@ final class FavoritesView: NSView {
         for tile in tiles {
             guard let id = tile.bookmark?.id else { continue }
             let ids = [id] + tile.partners.map(\.id)
+            let wasSelected = tile.isSelected
             tile.isSelected = selectedID.map(ids.contains) ?? false
+            // Opened from a key or the menu while scrolled out of the grid's room: it comes into view.
+            if tile.isSelected, !wasSelected { tile.scrollToVisible(tile.bounds) }
             tile.track(tabs[id], partners: tile.partners.map { tabs[$0.id] })
             tile.refreshIcon()
         }
@@ -279,10 +327,16 @@ final class FavoritesView: NSView {
             last = window.convertPoint(toScreen: event.locationInWindow)
             copy.follow(last)
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
-            inside = self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
+            inside = self.visibleRect.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
             if inside { self.aim(at: local, carried: carried, moving: tile) } else { self.clearAim() }
+            let point = window.convertPoint(fromScreen: last)
+            self.scrollNearEdge(at: inside ? point : nil) { [weak self] in
+                guard let self, let window = self.window else { return }
+                self.aim(at: self.convert(window.convertPoint(fromScreen: last), from: nil), carried: carried, moving: tile)
+            }
             copy.showsAlternate = self.onDragMove?(favorite, last) ?? false
         }
+        scrollNearEdge(at: nil)
         let split = splitTarget, index = dropIndex
         clearAim()
         var landing: NSView? = tile
@@ -300,6 +354,7 @@ final class FavoritesView: NSView {
             copy.showsAlternate = false
             layoutSubtreeIfNeeded()
             landing = self.tile(for: favorite.id)
+            landing?.scrollToVisible(landing?.bounds ?? .zero)
         } else if let dropped = onDrop?(favorite, last), dropped.handled {
             landing = dropped.landing
         } else {

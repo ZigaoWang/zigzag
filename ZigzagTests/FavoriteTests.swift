@@ -124,6 +124,49 @@ struct FavoriteTests {
     }
 }
 
+/// Many favorites never push the space's name over the footer: past its cap the grid scrolls in its own room.
+@MainActor struct FavoriteGridCapTests {
+    private func sidebar(favorites count: Int, height: CGFloat = 600) -> SidebarView {
+        let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: height))
+        let marks = (0..<count).map { (Bookmark(url: URL(string: "about:blank#\($0)")!, title: "F\($0)"), partners: [Bookmark]()) }
+        sidebar.favorites.reload(favorites: marks, selectedID: nil)
+        sidebar.layoutSubtreeIfNeeded()
+        return sidebar
+    }
+
+    @Test func fortyFiveFavoritesLeaveTheTitleAndTabsAboveTheFooter() throws {
+        let sidebar = sidebar(favorites: 45)
+        let list = try #require(sidebar.list.enclosingScrollView).frame
+        let footer = try #require(sidebar.downloadsButton.superview).frame
+        let title = NSRect(x: list.minX, y: list.minY, width: list.width, height: sidebar.list.headerHeight)
+        #expect(title.maxY <= footer.minY)
+        #expect(!title.intersects(footer))
+        #expect(list.height - sidebar.list.headerHeight > 0)
+        // The grid ends above the title and scrolls for the rest.
+        #expect(sidebar.favoritesScroll.frame.maxY < title.minY)
+        #expect(sidebar.favorites.frame.height > sidebar.favoritesScroll.frame.height)
+    }
+
+    @Test func aFewFavoritesShowWhole() {
+        for count in [3, 12] {
+            let sidebar = sidebar(favorites: count, height: 800)
+            #expect(sidebar.favoritesScroll.frame.height == sidebar.favorites.frame.height)
+        }
+        #expect(sidebar(favorites: 0).favoritesScroll.isHidden)
+    }
+
+    @Test func theCapIsWholeRowsInHalfTheRoom() {
+        let stride = FavoritesView.tileHeight + Tokens.Sidebar.favoriteGap
+        for room: CGFloat in [60, 200, 500, 900] {
+            let cap = SidebarView.favoritesCap(room: room)
+            let rows = (cap + Tokens.Sidebar.favoriteGap) / stride
+            #expect(cap >= FavoritesView.tileHeight)
+            #expect(cap <= max(room / 2, FavoritesView.tileHeight))
+            #expect(rows == rows.rounded())
+        }
+    }
+}
+
 struct BookmarkTitleTests {
     @Test func homePageTakesTheSiteName() {
         #expect(TabManager.bookmarkTitle("Inbox (3) - Gmail", url: URL(string: "https://gmail.com/")!) == "Gmail")

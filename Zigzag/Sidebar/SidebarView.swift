@@ -843,6 +843,10 @@ final class SidebarView: NSView {
     let sidebarButton = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false), toolTip: String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows."))
     let address = AddressView()
     let favorites = FavoritesView()
+    /// Holds the grid; past its cap the grid scrolls inside it, so the list and footer keep their room.
+    let favoritesScroll = NSScrollView()
+    /// Tiles running on below the grid's cap fade out there, as tabs do at the list's foot.
+    private let favoritesFade = CAGradientLayer()
     let list = SidebarListView()
     private let scrollView = NSScrollView()
     /// Tabs running on below the bottom of the list fade out there, rather than being sliced off by the footer.
@@ -961,7 +965,20 @@ final class SidebarView: NSView {
         trafficLightsPicture.isHidden = true
         addSubview(trafficLightsPicture)
         addSubview(address)
-        addSubview(favorites)
+        favoritesScroll.drawsBackground = false
+        favoritesScroll.hasHorizontalScroller = false
+        favoritesScroll.hasVerticalScroller = true
+        favoritesScroll.scrollerStyle = .overlay
+        favoritesScroll.autohidesScrollers = true
+        favoritesScroll.horizontalScrollElasticity = .none
+        favoritesScroll.verticalScrollElasticity = .none
+        favoritesScroll.automaticallyAdjustsContentInsets = false
+        favoritesScroll.contentView.postsBoundsChangedNotifications = true
+        favoritesScroll.documentView = favorites
+        favoritesScroll.wantsLayer = true
+        favoritesScroll.layer?.mask = favoritesFade
+        addSubview(favoritesScroll)
+        NotificationCenter.default.addObserver(self, selector: #selector(favoritesScrolled), name: NSView.boundsDidChangeNotification, object: favoritesScroll.contentView)
         favorites.onHeightChange = { [weak self] in self?.needsLayout = true }
         // Settings › Appearance › Sidebar size: the address and favorites take their new heights, the list moves.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
@@ -1152,12 +1169,17 @@ final class SidebarView: NSView {
         // Its buttons sit as far from the bottom edge as from the side.
         let buttonInset = (bottomHeight - Tokens.Sidebar.button) / 2
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
-        let favoritesHeight = favorites.preferredHeight(for: width - pad * 2)
-        favorites.isHidden = favoritesHeight == 0
-        favorites.frame = NSRect(x: pad, y: topEdge, width: width - pad * 2, height: favoritesHeight)
-        let listTop = favoritesHeight > 0 ? favorites.frame.maxY + Tokens.Sidebar.sectionGap
-            : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         let frames = bottomFrames()
+        let gridHeight = favorites.preferredHeight(for: width - pad * 2)
+        let favoritesHeight = min(gridHeight, Self.favoritesCap(room: frames.listBottom - topEdge))
+        favorites.isHidden = gridHeight == 0
+        favoritesScroll.isHidden = gridHeight == 0
+        favoritesScroll.frame = NSRect(x: pad, y: topEdge, width: width - pad * 2, height: favoritesHeight)
+        favoritesScroll.verticalScrollElasticity = gridHeight > favoritesHeight ? .allowed : .none
+        favorites.frame = NSRect(x: 0, y: 0, width: width - pad * 2, height: gridHeight)
+        updateFavoritesFade()
+        let listTop = favoritesHeight > 0 ? favoritesScroll.frame.maxY + Tokens.Sidebar.sectionGap
+            : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         for (card, frame) in zip(nowPlayingCards, frames.nowPlaying) { card.frame = frame }
         updateCard.frame = frames.update
         let listBottom = frames.listBottom
@@ -1173,6 +1195,22 @@ final class SidebarView: NSView {
 
     private func updateBottomFade() {
         Self.fade(bottomFade, for: scrollView, list: list)
+    }
+
+    /// The most of `room` (from the grid's top to the list's foot) the favorites take: whole rows in half of it, at
+    /// least one. Past that the grid scrolls.
+    static func favoritesCap(room: CGFloat) -> CGFloat {
+        let gap = Tokens.Sidebar.favoriteGap, stride = FavoritesView.tileHeight + gap
+        let rows = max(1, Int((room / 2 + gap) / stride))
+        return CGFloat(rows) * stride - gap
+    }
+
+    private func updateFavoritesFade() {
+        Self.fade(favoritesFade, for: favoritesScroll, list: favorites)
+    }
+
+    @objc private func favoritesScrolled() {
+        updateFavoritesFade()
     }
 
     /// Fade tabs at the bottom of a list only; the top has the pinned space name and its hairline.
