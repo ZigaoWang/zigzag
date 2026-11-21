@@ -63,10 +63,10 @@ final class AddressView: InteractiveView {
     private(set) var canSave = false
 
     /// Whether the star is offered for a tab: a page with something to pin, in a window that keeps pins (#442).
-    /// The same rule the save path uses, so the star, ⌘D and the menus can't disagree.
+    /// The same rule the save path uses, so the star, ⌘D and the menus can't disagree. A pinned tab can always unpin.
     static func canSave(for tab: Tab?) -> Bool {
         guard let tab, !tab.isPrivate else { return false }
-        return SavePath.Page(tab: tab) != nil
+        return tab.bookmarkID != nil || SavePath.Page(tab: tab) != nil
     }
 
     /// The star's state for the page in the field. A page that isn't pinned, or is a private window's, keeps the star.

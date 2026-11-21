@@ -531,6 +531,37 @@ import Testing
         #expect(address.saveButton.isHidden)
     }
 
+    /// A pinned tab gone to a Zigzag view or about:blank still unpins with ⌘D and keeps its filled star; a new pin of
+    /// one is still refused (#472).
+    @Test func aPinnedTabShowingAZigzagViewStillUnpins() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let blank = Tab(url: try #require(URL(string: "about:blank")), title: "Blank", spaceID: space)
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            manager.adopt([blank, settings], in: space)
+            manager.select(blank)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            #expect(!controller.save(settings, request: .quick))
+            #expect(settings.bookmarkID == nil)
+            #expect(!AddressView.canSave(for: blank))
+
+            let pinned = SavePath.Page(url: try #require(URL(string: "https://example.com/pinned")), title: "Pinned", tab: blank)
+            let saved = try #require(SavePath.save(pinned, to: SavePath.quickPlace(in: space), in: manager))
+            #expect(blank.bookmarkID == saved.id)
+            #expect(AddressView.canSave(for: blank))
+            let address = AddressView()
+            address.setSaved(true, canSave: AddressView.canSave(for: blank))
+            #expect(!address.saveButton.isHidden)
+            #expect(address.saveButton.symbol == "star.fill")
+
+            #expect(controller.save(blank, request: .quick))
+            #expect(blank.bookmarkID == nil)
+            #expect(library.bookmark(saved.id) == nil)
+        }
+    }
+
     /// Dragged into Pinned, onto a folder or a pinned page, into the favorites, or from the command bar, a Zigzag view
     /// stays a tab (#472). A page split beside one doesn't take it along either.
     @Test func zigzagsOwnViewsCannotBeDraggedIntoPinned() throws {

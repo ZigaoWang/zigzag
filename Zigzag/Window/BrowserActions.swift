@@ -532,10 +532,11 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// picker, and both land in `SavePath.save` as one ⌘Z.
     @discardableResult
     func save(_ tab: Tab, request: SavePath.Request, at index: Int? = nil, then done: (() -> Void)? = nil) -> Bool {
-        guard !tabManager.isPrivate, let page = SavePath.Page(tab: tab) else { return false }
+        guard !tabManager.isPrivate else { return false }
+        // A saved page's quick save is its unsave, as the star and ⌘D have always toggled, whatever it shows now.
+        if request != .picker, tab.bookmarkID != nil { return toggleSavedState(of: tab) }
+        guard let page = SavePath.Page(tab: tab) else { return false }
         guard request == .picker else {
-            // A saved page's quick save is its unsave, as the star and ⌘D have always toggled.
-            if tab.bookmarkID != nil { return toggleSavedState(of: tab) }
             // A tab in a group saves as the group, as it has since #325: one folder, one undo.
             if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
                 bookmarkWithUndo(tab, at: index, in: tab.spaceID)
