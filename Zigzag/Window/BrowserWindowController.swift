@@ -69,11 +69,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
+        if !sidebarVisible {
+            // The bar comes for the address once the window is up: a window restored with the sidebar away has it.
+            DispatchQueue.main.async { [weak self] in self?.placeAddress() }
+        }
         // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
         // view keeps the width dragged out last time, which every window shares (#431).
         if let sidebarWidth {
             // A window restored from a session keeps its own; the shared width is written only by a drag (#431).
             root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        }
+        root.onSidebarVisibilityWillChange = { [weak self] visible in
+            guard let self else { return }
+            self.moveAddress(above: BrowserRootView.AddressPlacement.inBar(
+                addressAbovePage: BrowserRootView.addressAbovePage, sidebarVisible: visible))
         }
         root.onLayoutChange = { [weak self] in
             guard let self else { return }
@@ -611,7 +620,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
     /// from them is put away first. At once: a setting you change, not a layout you watch.
     @objc func placeAddress() {
-        let above = BrowserRootView.addressAbovePage
+        moveAddress(above: BrowserRootView.AddressPlacement.inBar(addressAbovePage: BrowserRootView.addressAbovePage,
+                                                                  sidebarVisible: root.sidebarVisible))
+    }
+
+    /// The address above the page (`above`) or back in the sidebar. Used for the setting, and for the sidebar going
+    /// or coming: with it away the bar is the address's only home, so the bar is there with it (#469).
+    func moveAddress(above: Bool) {
         guard sidebar.holdsAddress == above else { return }
         if window?.isVisible == true { closeFloatingPanels() }
         sidebar.holdsAddress = !above
@@ -2425,11 +2440,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Not in full screen: the lights live in the title bar that comes down with the menu bar there, so a picture of
         // them on the sliding sidebar would only flash and vanish.
         let fullScreen = window.styleMask.contains(.fullScreen)
-        // The page is under the lights only in full screen with neither the bar nor the sidebar there; then they
-        // get a backing so they don't float over it (#462). The bar or sidebar is their backing otherwise.
-        let backing = Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.showsTopBar,
-                                                    sidebarVisible: docked, sidebarFloating: floating)
-        if (fullScreenBar != nil) != backing, !window.fullScreenPhase.isMoving { showFullScreenBar(backing) }
         // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
         // Beside a sidebar on the right, the bar holding the address keeps them there always: the window's top left.
         // Without it they're in the sidebar's top row on either side, the page running up to the top as on the left
@@ -2485,30 +2495,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
-    /// The bar behind the traffic lights when the page is under them in full screen (#462). AppKit's title bar is
-    /// transparent, so without it the lights float over the page. Uses the title bar material, as Safari's toolbar.
-    private var fullScreenBar: NSVisualEffectView?
-
-    private func showFullScreenBar(_ on: Bool) {
-        fullScreenBar?.removeFromSuperview()
-        fullScreenBar = nil
-        guard on, let titlebar = browserWindow.standardWindowButton(.closeButton)?.superview else { return }
-        let bar = NSVisualEffectView(frame: titlebar.bounds)
-        bar.material = .titlebar
-        bar.blendingMode = .behindWindow
-        bar.state = .followsWindowActiveState
-        bar.autoresizingMask = [.width, .height]
-        titlebar.addSubview(bar, positioned: .below, relativeTo: nil)
-        fullScreenBar = bar
-    }
-
-    /// Whether the lights need a backing of their own: in full screen, when the page is under them because neither
-    /// the bar nor the sidebar is. With either there, they sit on Zigzag's own chrome (#462).
-    nonisolated static func needsTrafficLightBacking(fullScreen: Bool, barShown: Bool, sidebarVisible: Bool,
-                                                     sidebarFloating: Bool) -> Bool {
-        fullScreen && !barShown && !sidebarVisible && !sidebarFloating
-    }
-
     /// The room the lights take in the sidebar's top row. In full screen they are in the title bar, not the sidebar,
     /// so the sidebar keeps none for them (#462).
     nonisolated static func trafficLightRoom(fullScreen: Bool, barKeepsLights: Bool, width: CGFloat) -> CGFloat {
@@ -2555,7 +2541,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
             browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
         }
-        if phase.dropsTrafficLightBacking, fullScreenBar != nil { showFullScreenBar(false) }
         guard !phase.isMoving else { return }
         layoutTrafficLights()
         root.needsLayout = true
