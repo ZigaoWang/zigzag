@@ -5,7 +5,7 @@ import AppKit
 enum SiteExtensionAccess: Equatable {
     /// It reads this site, or never needs to: a popup of its own works anywhere.
     case runs
-    /// It wants this site and gets it from a click on its button ("When You Click It").
+    /// It wants this site and gets it from a click on its button ("On Click").
     case onClick
     /// It wants this site and hasn't been given it.
     case blocked
@@ -24,7 +24,7 @@ enum SiteExtensionAccess: Equatable {
     var note: String? {
         switch self {
         case .runs: nil
-        case .onClick: String(localized: "Runs on this site when you click it", comment: "Tooltip line under an extension's name in Site Controls: its site access is When You Click It, and it hasn't been clicked on this site yet.")
+        case .onClick: String(localized: "Runs on this site when you click it", comment: "Tooltip line under an extension's name in Site Controls: its site access is On Click, and it hasn't been clicked on this site yet.")
         case .blocked: String(localized: "Can’t read this site", comment: "Tooltip line under an extension's name in Site Controls: the extension wants this site but its site access doesn't include it.")
         case .offHere: String(localized: "Extensions are off on this site", comment: "Tooltip line under an extension's name in Site Controls: the Extensions switch is off for this site.")
         }

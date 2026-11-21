@@ -1,6 +1,61 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
+      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
+          }
+        }
+      }
+    },
+    "Where ⌘T and links put a new tab in the sidebar." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘T 和链接打开的新标签页在边栏中的位置。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes at the top." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在顶部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes at the bottom." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在底部。"
+          }
+        }
+      }
+    },
+    "A page from a site with no tabs open goes next to the current tab." : {
+      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有打开标签页的网站，新页面放在当前标签页旁边。"
+          }
+        }
+      }
+    },
     "#%lld on GitHub" : {
       "comment" : "Tooltip of an issue number at the end of a point in What’s New, like “#32 on GitHub”.",
       "localizations" : {
@@ -1134,6 +1189,23 @@
         }
       }
     },
+    "A beta can break." : {
+      "comment" : "Explanation under “Beta updates” in Settings › General.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A beta can break."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta 版可能不稳定。"
+          }
+        }
+      }
+    },
     "A site you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to talk to a program on this Mac, over loopback only. Never the local network, and a page can’t switch itself on." : {
       "comment" : "Explanation under the apps-on-this-Mac setting in Settings › Privacy. fetch, XMLHttpRequest and WebSocket are API names: keep them as they are.",
       "localizations" : {
@@ -1156,6 +1228,40 @@
         }
       }
     },
+    "Black, not dark gray." : {
+      "comment" : "Explanation under “Pure black backgrounds” in Settings › Appearance.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Black, not dark gray."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "纯黑，而非深灰。"
+          }
+        }
+      }
+    },
+    "Choose for a single site in its site controls." : {
+      "comment" : "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Choose for a single site in its site controls."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "也可以在网站设置里为单个网站选择。"
+          }
+        }
+      }
+    },
     "Chrome Web Store" : {
       "comment" : "Item in the Get Extensions menu: opens the Chrome Web Store.",
       "localizations" : {
@@ -1163,6 +1269,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chrome 网上应用店"
+          }
+        }
+      }
+    },
+    "Drag a tab out to make it a tab of its own." : {
+      "comment" : "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Drag a tab out to make it a tab of its own."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把标签页拖出来，就会成为独立的一个标签页。"
           }
         }
       }
@@ -1200,6 +1323,17 @@
         }
       }
     },
+    "The video floats over other apps and desktops, and goes back in its page when you return." : {
+      "comment" : "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频会在其他 App 和桌面上方浮动，回到 Zigzag 时再回到页面里。"
+          }
+        }
+      }
+    },
     "I Understand" : {
       "comment" : "Button that acknowledges the briefing and turns the setting on.",
       "localizations" : {
@@ -1218,6 +1352,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "低电量模式下，“透明”会显示为“磨砂”以节省电量。"
+          }
+        }
+      }
+    },
+    "The mini player’s right-click menu can turn this off too." : {
+      "comment" : "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The mini player’s right-click menu can turn this off too."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "也可以在小播放器的右键菜单里关闭。"
           }
         }
       }
@@ -2240,50 +2391,6 @@
         }
       }
     },
-    "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own." : {
-      "comment" : "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在新标签页中打开的链接会放在它来自的页面下面。把标签页拖出来，它就成为独立的标签页。"
-          }
-        }
-      }
-    },
-    "A page from a site with no tabs open goes at the bottom." : {
-      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有打开标签页的网站，新页面放在底部。"
-          }
-        }
-      }
-    },
-    "A page from a site with no tabs open goes at the top." : {
-      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有打开标签页的网站，新页面放在顶部。"
-          }
-        }
-      }
-    },
-    "A page from a site with no tabs open goes next to the current tab." : {
-      "comment" : "Explanation under “New tabs open” in Settings › Tabs when Next to Tabs from the Same Site is chosen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有打开标签页的网站，新页面放在当前标签页旁边。"
-          }
-        }
-      }
-    },
     "A password can’t be empty." : {
       "comment" : "Toast when saving a login with its password cleared.",
       "localizations" : {
@@ -2440,28 +2547,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没在用却一直占用大量资源的标签页会休眠，再次打开时唤醒。要让某个网站的标签页保持唤醒，请在它的网站设置中打开“标签页保持唤醒”。"
-          }
-        }
-      }
-    },
-    "A video you’re watching follows you in a small player over the page. Its right-click menu can turn this off too." : {
-      "comment" : "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你正在看的视频会在页面上方的小播放器里跟着你。也可以在小播放器的右键菜单里关闭。"
-          }
-        }
-      }
-    },
-    "A video you’re watching keeps playing in a small player over other apps and desktops, and goes back in its page when you come back to it." : {
-      "comment" : "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你正在看的视频会在其他 App 和桌面上方的小播放器里继续播放；回到它的页面时，再回到页面里。"
           }
         }
       }
@@ -3254,12 +3339,23 @@
       }
     },
     "Allow in private windows" : {
-      "comment" : "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first.",
+      "comment" : "A setting under an extension in Settings › Extensions, and the switch in a download rule's sheet: whether it works in private windows too. Off at first.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许在无痕浏览窗口中使用"
+          }
+        }
+      }
+    },
+    "Allow in private windows affects only Open, not Save." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“允许在无痕浏览窗口中使用”只影响“打开”，不影响“存储”。"
           }
         }
       }
@@ -3985,17 +4081,6 @@
         }
       }
     },
-    "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
-      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
-          }
-        }
-      }
-    },
     "Background" : {
       "comment" : "Tooltip and accessibility label of the swatch in a space's editor that chooses the picture its empty page shows.",
       "localizations" : {
@@ -4461,17 +4546,6 @@
         }
       }
     },
-    "The edge of the window the sidebar runs along. The page sits beside it." : {
-      "comment" : "Explanation under “Sidebar position” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏靠窗口哪一边放，网页在它旁边。"
-          }
-        }
-      }
-    },
     "Videos fill the page, not the screen" : {
       "comment" : "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.",
       "localizations" : {
@@ -4671,7 +4745,7 @@
 
 
     "Follow Setting" : {
-      "comment" : "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript.",
+      "comment" : "A choice for JavaScript in Settings › Privacy › Sites, and for Dark page in the site panel: the site follows the matching setting.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7667,17 +7741,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "深色网页"
-          }
-        }
-      }
-    },
-    "Darkened websites are black instead of dark gray." : {
-      "comment" : "Explanation under “Pure black backgrounds” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "以深色显示的网站用纯黑代替深灰。"
           }
         }
       }
@@ -11070,7 +11133,7 @@
       }
     },
     "Hide Reader" : {
-      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.\nTooltip of the address bar's Reader button while Reader is on.",
+      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11550,17 +11613,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它可以读取和更改此网站及其子域名上的页面。"
-          }
-        }
-      }
-    },
-    "It can see and change your pages in private windows." : {
-      "comment" : "Under “Allow in private windows” in Settings › Extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它可以读取和更改你在无痕浏览窗口里打开的网页。"
           }
         }
       }
@@ -12234,17 +12286,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他 App 的链接会在这里打开"
-          }
-        }
-      }
-    },
-    "Links from other apps open here." : {
-      "comment" : "Explanation under “Default browser” in Settings › General.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "来自其他 App 的链接会在这里打开。"
           }
         }
       }
@@ -14171,6 +14212,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在所有网站上"
+          }
+        }
+      }
+    },
+    "On Click" : {
+      "comment" : "Site Access choice: the extension works on a site only after its button is clicked.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按时"
           }
         }
       }
@@ -16435,6 +16487,17 @@
         }
       }
     },
+    "Reader Options" : {
+      "comment" : "Tooltip and VoiceOver name of the address bar's Reader button while Reader is on, and VoiceOver name of the panel it opens: text size, typeface, column width, colors and Turn Off Reader.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读器选项"
+          }
+        }
+      }
+    },
     "Reader Text and Colors" : {
       "comment" : "View menu item: opens Reader's text size, typeface, column width and color choices.",
       "localizations" : {
@@ -17117,6 +17180,17 @@
         }
       }
     },
+    "Resize Tiles" : {
+      "comment" : "Undo action name, shown in the Edit menu as Undo Resize Tiles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整平铺大小"
+          }
+        }
+      }
+    },
     "Reset All" : {
       "comment" : "Button beside Always Translate in Settings › Translation.\nButton of the sheet that forgets the choices made for single sites.\nButton of the sheet that puts every shortcut back.",
       "localizations" : {
@@ -17480,17 +17554,6 @@
         }
       }
     },
-    "Run in private windows affects Open. A file type that saves still saves there." : {
-      "comment" : "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“在无痕浏览窗口中运行”只影响“打开”。设为存储的文件类型仍会存储到那里。"
-          }
-        }
-      }
-    },
     "Run Script" : {
       "comment" : "An action a download rule can take, in its editor: run an executable with the link as an argument.",
       "localizations" : {
@@ -17520,17 +17583,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在后台运行它自己的隐藏页面"
-          }
-        }
-      }
-    },
-    "Run in private windows" : {
-      "comment" : "Label of the switch in a download rule's sheet that lets the rule run in private windows.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在隐私窗口中运行"
           }
         }
       }
@@ -17569,7 +17621,7 @@
       }
     },
     "Runs on this site when you click it" : {
-      "comment" : "Tooltip line under an extension's name in Site Controls: its site access is When You Click It, and it hasn't been clicked on this site yet.",
+      "comment" : "Tooltip line under an extension's name in Site Controls: its site access is On Click, and it hasn't been clicked on this site yet.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19356,17 +19408,6 @@
         }
       }
     },
-    "So ⌘Q never closes everything by accident." : {
-      "comment" : "Explanation under “Ask before quitting” in Settings › General.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这样 ⌘Q 就不会意外关闭所有内容。"
-          }
-        }
-      }
-    },
     "Solid" : {
       "comment" : "VoiceOver, the See-through slider's value when nothing shows through.",
       "localizations" : {
@@ -19478,7 +19519,7 @@
       }
     },
     "Space" : {
-      "comment" : "VoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19506,6 +19547,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空间 %lld"
+          }
+        }
+      }
+    },
+    "Space: your space’s colors" : {
+      "comment" : "Tooltip of the Space color choice in Reader: the article takes the colors of the space you're in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间：你所在空间的颜色"
           }
         }
       }
@@ -20094,17 +20146,6 @@
         }
       }
     },
-    "Text and Colors" : {
-      "comment" : "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文字和颜色"
-          }
-        }
-      }
-    },
     "Thanks for trying Zigzag. I made it to be a calm home for everything you do on the web. I hope it feels that way." : {
       "comment" : "Thank-you note from the maker at the end of the getting-started guide, a card in the window, signed by him.",
       "localizations" : {
@@ -20364,17 +20405,6 @@
         }
       }
     },
-    "The cache makes pages load faster. Cookies keep you signed in." : {
-      "comment" : "Explanation under “Website data” in Settings › Privacy.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "缓存能让页面载入更快。Cookie 能让你保持登录。"
-          }
-        }
-      }
-    },
     "The connection dropped" : {
       "comment" : "Why a download failed, under its name in the downloads panel.",
       "localizations" : {
@@ -20481,17 +20511,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "页面直接贴合窗口边缘，而不是浮在窗口中。按住 ⌥⌘ 在网页任意位置拖动，即可移动窗口。"
-          }
-        }
-      }
-    },
-    "The pages you’ve visited, used for suggestions in the command bar." : {
-      "comment" : "Explanation under “History” in Settings › Privacy.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你访问过的页面，用于命令栏中的建议。"
           }
         }
       }
@@ -20811,17 +20830,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这台 Mac 会忘掉它们。标签页、已固定标签页和密码会保留。"
-          }
-        }
-      }
-    },
-    "Things appear in place instead of sliding or growing. Fades stay." : {
-      "comment" : "Explanation under “Reduce motion” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "内容直接出现，而不是滑入或放大。淡入淡出效果保留。"
           }
         }
       }
@@ -21574,6 +21582,17 @@
         }
       }
     },
+    "Translating from %@… %lld%%" : {
+      "comment" : "Toast while a page is translated, with how much is done. The language is its name, like French; then a percent, like 40%.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从%@翻译… %lld%%"
+          }
+        }
+      }
+    },
     "Translation" : {
       "comment" : "A section of Settings: translating web pages.",
       "localizations" : {
@@ -21625,17 +21644,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请稍后再试。"
-          }
-        }
-      }
-    },
-    "Try new versions first, on your own tabs and data." : {
-      "comment" : "Explanation under “Beta updates” in Settings › General.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在你自己的标签页和数据上抢先试用新版本。"
           }
         }
       }
@@ -21713,6 +21721,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 %@ 上关闭"
+          }
+        }
+      }
+    },
+    "Turn Off Reader" : {
+      "comment" : "Action at the bottom of Reader's text and color choices: closes Reader and shows the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭阅读器"
           }
         }
       }
@@ -22493,17 +22512,6 @@
         }
       }
     },
-    "Used when what you type isn’t an address." : {
-      "comment" : "Explanation under “Search engine” in Settings › Search.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在你键入的内容不是网址时使用。"
-          }
-        }
-      }
-    },
     "User Agent" : {
       "comment" : "Submenu of View › Developer and heading in the ⋯ menu of the developer tools above the page: the browser a development site's page is told it's in.",
       "localizations" : {
@@ -23072,17 +23080,6 @@
         }
       }
     },
-    "When You Click It" : {
-      "comment" : "Site Access choice: the extension works on a site only after its button is clicked.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在你点按它时"
-          }
-        }
-      }
-    },
     "When a page is in another language, Zigzag asks once per site." : {
       "comment" : "Explanation under “Offer to translate” in Settings › Translation.",
       "localizations" : {
@@ -23112,17 +23109,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要在哪里打开"
-          }
-        }
-      }
-    },
-    "Where ⌘T and links put a new tab in the sidebar." : {
-      "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⌘T 和链接打开的新标签页在边栏中的位置。"
           }
         }
       }
@@ -23202,17 +23188,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "With The Page, a video in full screen stays inside its tab, or its part of a split. Choose for a single site in its site controls." : {
-      "comment" : "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择“网页”时，全屏视频会留在它的标签页里，或分屏里它所在的那一栏。也可以在网站设置里为单个网站选择。"
           }
         }
       }
@@ -23817,17 +23792,6 @@
         }
       }
     },
-    "Zigzag follows your Mac’s language unless you pick one here." : {
-      "comment" : "Explanation under “Language” in Settings › General.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zigzag 跟随你的 Mac 的语言，除非你在这里另选一种。"
-          }
-        }
-      }
-    },
     "Zigzag has a blocker built in. Pages load faster, with fewer trackers." : {
       "comment" : "Line under the title of the welcome window’s ad blocking step.",
       "localizations" : {
@@ -24302,13 +24266,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "On"
+            "value" : "Always"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开"
+            "value" : "始终"
           }
         }
       }
@@ -25562,7 +25526,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Allowed"
+            "value" : "Allow"
           }
         },
         "zh-Hans" : {
@@ -25580,13 +25544,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Not Allowed"
+            "value" : "Block"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不允许"
+            "value" : "阻止"
           }
         }
       }
@@ -25807,6 +25771,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "边栏里的下一个标签页"
+          }
+        }
+      }
+    },
+    "⇧-click to type a zoom" : {
+      "comment" : "After Actual Size in the percentage's tooltip on the Zoom row: Shift-clicking it lets you type a zoom.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 ⇧ 点按可输入缩放比例"
           }
         }
       }

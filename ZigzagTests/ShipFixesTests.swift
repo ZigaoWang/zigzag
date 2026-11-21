@@ -453,31 +453,71 @@ struct BookmarkFolderTests {
         #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }
 
-    /// Taps a swipe would give over these steps of (progress, speed), and whether letting go at the end navigates.
-    private func arm(_ steps: [(CGFloat, CGFloat)]) -> (taps: Int, armed: Bool) {
+    /// Taps a swipe would give over these steps of progress, and whether letting go at the end navigates at `speed`.
+    private func arm(_ steps: [CGFloat], speed: CGFloat = 0) -> (taps: Int, goes: Bool) {
         var arming = SwipeArming()
-        let taps = steps.filter { arming.step(progress: $0.0, speed: $0.1) }.count
-        return (taps, arming.armed)
+        let taps = steps.filter { arming.step(progress: $0) }.count
+        return (taps, arming.release(progress: steps.last ?? 0, speed: speed))
     }
 
     @Test func swipeTapsOnceAsItArms() {
-        // Mid speed: around a flick's speed, well past its start, the arrow arms once (#377).
-        let mid: [(CGFloat, CGFloat)] = (0..<12).map { (i: Int) -> (CGFloat, CGFloat) in
-            let speed: CGFloat = i % 2 == 0 ? 750 : 650
-            return (0.4 + CGFloat(i) * 0.05, speed)
-        }
-        #expect(arm(mid) == (1, true))
-        // Slow, hovering right at the distance.
-        #expect(arm([(0.9, 100), (1.01, 100), (0.98, 50), (1.02, 80), (0.96, 0), (1.0, 40)]) == (1, true))
-        // A flick that arms and goes on past the distance.
-        #expect(arm([(0.2, 1500), (0.45, 1800), (0.8, 1600), (1.2, 900)]) == (1, true))
+        // Slow, hovering right at the distance: one tap (#377).
+        #expect(arm([0.9, 1.01, 0.98, 1.02, 0.96, 1.0]) == (1, true))
+        // Fast past the distance.
+        #expect(arm([0.2, 0.45, 0.8, 1.2]) == (1, true))
         // Pulled well back, it disarms, and crossing again is a second tap.
-        #expect(arm([(1.05, 100), (0.7, -300), (1.05, 200)]) == (2, true))
-        #expect(arm([(1.05, 100), (0.7, -300)]) == (1, false))
-        // Armed by a flick, then the fingers stop short: letting go there doesn't navigate.
-        #expect(arm([(0.5, 900), (0.55, 400), (0.55, 0)]) == (1, false))
-        // Never armed, never a tap.
-        #expect(arm([(0.2, 300), (0.5, 600), (0.8, 200)]) == (0, false))
+        #expect(arm([1.05, 0.7, 1.05]) == (2, true))
+        #expect(arm([1.05, 0.7]) == (1, false))
+        // Short of the distance and stopped: no tap, and letting go doesn't navigate.
+        #expect(arm([0.2, 0.5, 0.8]) == (0, false))
+        // A flick still moving as the fingers lift goes, short of the distance.
+        #expect(arm([0.2, 0.5], speed: 900) == (0, true))
+        #expect(!arm([0.2, 0.5], speed: -900).goes)
+    }
+
+    /// What the arrow shows (ring, filled) after each scroll of `deltas`, one every 8 ms toward back, then at each of
+    /// `rest` later moments with no new events, and whether letting go at the end navigates, as SwipeNavigator does.
+    private func replay(_ deltas: [CGFloat], rest: [TimeInterval], distance: CGFloat = 200)
+        -> (shown: [(ring: CGFloat, filled: Bool)], goes: Bool) {
+        var arming = SwipeArming(), dx: CGFloat = 0, now: TimeInterval = 1
+        var shown: [(ring: CGFloat, filled: Bool)] = []
+        var samples: [(time: TimeInterval, dx: CGFloat)] = []
+        func show() {
+            _ = arming.step(progress: dx / distance)
+            shown.append((min(dx / distance, 1), arming.armed))
+        }
+        for delta in deltas {
+            now += 0.008
+            dx += delta
+            samples.append((now, dx))
+            show()
+        }
+        let last = now
+        for wait in rest {
+            now = last + wait
+            show()
+        }
+        return (shown, arming.release(progress: dx / distance, speed: SwipeDecision.speed(samples, at: now, direction: -1)))
+    }
+
+    @Test func restingFingersKeepTheArrowAsItIs() {
+        // The tester's swipe: fast to about halfway, a zero-delta scroll or two, then the fingers rest (#377).
+        let fast = replay(Array(repeating: 12, count: 9) + [0, 0], rest: [0.05, 0.1, 0.5, 1.5])
+        let moved = fast.shown[8]
+        #expect(!moved.filled)
+        #expect(fast.shown.dropFirst(8).allSatisfy { $0.ring == moved.ring && $0.filled == moved.filled })
+        // Shown short, and let go after resting: it doesn't navigate.
+        #expect(!fast.goes)
+        // Past the distance, then resting: the full ring and fill stay, and letting go goes.
+        let far = replay(Array(repeating: 25, count: 9) + [0], rest: [0.05, 0.1, 1.5])
+        #expect(far.shown.dropFirst(8).allSatisfy { $0.ring == 1 && $0.filled })
+        #expect(far.goes)
+        // Only moving back takes them away.
+        let back = replay(Array(repeating: 25, count: 9) + [-40, -40, -40], rest: [0.2])
+        #expect(back.shown.last.map { !$0.filled && $0.ring < 1 } == true)
+        #expect(!back.goes)
+        // A flick let go while still moving goes, though it never reached the distance.
+        #expect(replay(Array(repeating: 12, count: 9), rest: []).goes)
     }
 
     @Test func swipeScriptLooksPastShadowRoots() throws {

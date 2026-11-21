@@ -70,7 +70,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The page in this window's Peek, while it's up.
     var peekedTab: Tab? { peek.tab }
 
-    init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth) {
+    init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat? = nil) {
         self.tabManager = tabManager
         root = BrowserRootView(sidebar: sidebar)
         let rect = frame ?? BrowserWindowController.defaultFrame()
@@ -81,8 +81,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
-        // A width saved before the toolbar's buttons grew can be narrower than they now need.
-        root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
+        // view keeps the width dragged out last time, which every window shares (#431).
+        if let sidebarWidth {
+            // A window restored from a session keeps its own; the shared width is written only by a drag (#431).
+            root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        }
         root.onLayoutChange = { [weak self] in
             guard let self else { return }
             self.layoutTrafficLights()
@@ -132,8 +136,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // The reset button shows while a grid's line is parted, and goes when it's one line again.
             self.root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
             guard final else { return }
-            self.tabManager.setTileShape(shape, for: tab)
-            self.onStateChange?()
+            // A whole drag is one change: the group's lines when it began are what ⌘Z puts back (#435).
+            self.applyTileShape(shape, undoTo: self.tabManager.split(for: tab)?.shape)
         }
 
         sidebar.delegate = self
@@ -157,8 +161,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
             return nil
         }
-        sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
-        sidebar.address.readerOptionsButton.onClick = { [weak self] _ in self?.toggleReaderOptions() }
+        sidebar.address.readerButton.onClick = { [weak self] _ in self?.pressReaderButton() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
@@ -365,6 +368,34 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435).
+    func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?) {
+        guard let tab = tabManager.selectedTab, let group = tabManager.split(for: tab) else { return }
+        applyTileShape(shape, undoTo: inverse, in: group.ids)
+    }
+
+    /// As above, for the group of `ids`: a group's pages, not just where its lines were, so ⌘Z after selecting another
+    /// split leaves that one alone (#435).
+    private func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?, in ids: [UUID]) {
+        // The group the drag was in, wherever it is: another split can be showing when ⌘Z runs, and the step must
+        // still put its lines back rather than be used up doing nothing (#435).
+        guard let group = tabManager.splits.first(where: { $0.ids == ids }) else { return }
+        guard group.shape.regions == shape.regions, group.shape != shape else { return }
+        guard let page = group.ids.compactMap({ tabManager.tab(with: $0) }).first else { return }
+        tabManager.setTileShape(shape, for: page)
+        // Only the group on screen is drawn; the other split is left as it is.
+        if let shown = tabManager.selectedTab, tabManager.split(for: shown)?.ids == ids {
+            root.setTiles(shape, animated: true)
+            root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
+        }
+        onStateChange?()
+        guard let inverse else { return }
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            controller.applyTileShape(inverse, undoTo: shape, in: ids)
+        }
+        sidebarUndo.setActionName(String(localized: "Resize Tiles", comment: "Undo action name, shown in the Edit menu as Undo Resize Tiles."))
+    }
 
     static func defaultFrame() -> NSRect {
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -597,9 +628,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if window?.isVisible == true { closeFloatingPanels() }
         sidebar.holdsAddress = !above
         if above {
-            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
+            sidebar.address.starInPill = true
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
             let tab = tabManager.selectedTab
             root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+            root.topBar.showPin(sidebar.address.canSave)
+        } else {
+            root.topBar.pin = nil
+            sidebar.address.starInPill = false
         }
         root.barHoldsAddress = above
         showTopBar()
@@ -704,6 +741,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+        root.topBar.showPin(sidebar.address.canSave)
         paintTopBar()
         // A collapsed pinned section and a folded tab group (#209) show the current tab, so they update with the
         // selection.
@@ -739,7 +777,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let site = isPrivate ? nil : ContentBlocker.site(of: tab?.url)
         let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all && !profile.extensions.asksForSitesOnlyOptionally(id) ? .on : .off
-        let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
+        let click = SidebarMenus.Item(String(localized: "On Click", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
         click.state = access == .click ? .on : .off
         menu.addItem(all)
         menu.addItem(click)
@@ -886,7 +924,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 guard !finished else { return }
                 switch stage {
                 case .added: finished = true; done.resume(returning: true)
-                case .failed, .cancelled: finished = true; done.resume(returning: false)
+                case .failed, .cancelled, .theme: finished = true; done.resume(returning: false)
                 case .downloading, .reviewing, .adding: break
                 }
             })
@@ -895,7 +933,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed.
     enum InstallStage {
-        case downloading, reviewing, adding, added(String), failed(String), cancelled
+        case downloading, reviewing, adding, added(String), failed(String), cancelled, theme
         var isReviewing: Bool { if case .reviewing = self { true } else { false } }
     }
 
@@ -913,6 +951,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             switch stage {
             case .downloading: Toast.show(String(localized: "Downloading extension…", comment: "Toast while an extension downloads from the Chrome Web Store."), symbol: "arrow.down.circle", duration: 3600, in: self)
             case .reviewing, .cancelled: Toast.hide(in: self)
+            case .theme: Toast.show(ExtensionStore.InstallError.theme.message, symbol: "exclamationmark.triangle", duration: 4, in: self)
             case .adding: Toast.show(String(localized: "Adding…", comment: "Toast while an extension is being added."), symbol: "arrow.down.circle", duration: 3600, in: self)
             case .added(let name): Toast.show(String(localized: "Added \(name)", comment: "Toast after an extension is added. The name is the extension's."), symbol: "checkmark.circle", duration: 2, in: self)
             case .failed(let message): Toast.show(message, symbol: "exclamationmark.triangle", duration: 4, in: self)
@@ -923,6 +962,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let result = await ExtensionStore.prepareInstall(id)
             guard let self else { return }
             switch result {
+            case .failure(.theme):
+                // A theme has nothing for Zigzag to install: the store bar says so in its line, anywhere else a toast does (#454).
+                report(.theme)
             case .failure(let error):
                 report(.failed(error.message))
             case .success(let prepared):
@@ -1627,6 +1669,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             sidebar.update(tab: tab)
             root.topBar.showPage(url: tab.url, notSecure: tab.isNotSecure)
+            root.topBar.showPin(sidebar.address.canSave)
             paintTopBar()
             updateWindowTitle()
             offerWebStoreExtension()
@@ -1672,6 +1715,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let host = TranslationHost()
         var token: SignalToken?
         var timeout: DispatchWorkItem?
+        /// When the last batch came back, or it started: the time limit counts from here.
+        var lastProgress = Date()
+        /// How much of it is done, 0 to 1.
+        var fraction: Double = 0
 
         init(tab: Tab, webView: WKWebView, name: String, site: String?, source: Locale.Language?) {
             self.tab = tab
@@ -1693,8 +1740,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var translationOffered: Set<String> = []
     /// Sites translated this session and their source language; their other pages auto-translate when in that language.
     private var translatedSites: [String: Locale.Language] = [:]
-    /// How long a translation may take before it says so instead of spinning on: Apple's translation can wait on
-    /// a prompt that never comes up, or not answer at all.
+    /// How long a translation may go without a batch coming back before it says so instead of spinning on: Apple's
+    /// translation can wait on a prompt that never comes up, or not answer at all. A long page that keeps coming
+    /// back keeps going (#465).
     private static let translationTimeout: TimeInterval = 45
 
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
@@ -1791,14 +1839,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 }
                 return
             }
-            self.startTranslating(tab, webView: webView, pieces: text.pieces, groups: groups, into: target, site: site)
+            self.startTranslating(tab, webView: webView, pieces: text.pieces, shown: Set(text.shown ?? []), groups: groups, into: target, site: site)
         }
     }
 
-    private func showTranslating(_ run: PageTranslation) {
+    private func showTranslating(_ run: PageTranslation, announces: Bool = true) {
         guard let tab = run.tab else { return }
         translationToastTab = tab
-        Toast.show(String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French."), symbol: "translate", duration: Self.translationTimeout + 5, in: self)
+        let percent = PageTranslator.percent(run.fraction)
+        let text = percent > 0
+            ? String(localized: "Translating from \(run.name)… \(percent)%", comment: "Toast while a page is translated, with how much is done. The language is its name, like French; then a percent, like 40%.")
+            : String(localized: "Translating from \(run.name)…", comment: "Toast while a page is translated. The language is its name, like French.")
+        Toast.show(text, symbol: "translate", duration: Self.translationTimeout + 5, announces: announces, in: self)
     }
 
     /// Another page came into view (another tab chosen, Peek opened or put away): the toast of a translation
@@ -1813,7 +1865,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if translationToastTab == nil, let inView, let run = translations.run(for: ObjectIdentifier(inView)) { showTranslating(run) }
     }
 
-    private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], groups: [PageTranslator.Group],
+    private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], shown: Set<Int>, groups: [PageTranslator.Group],
                                   into target: Locale.Language, site: String?) {
         var names: [String] = []
         for group in groups where !names.contains(PageTranslator.name(of: group.source)) { names.append(PageTranslator.name(of: group.source)) }
@@ -1828,7 +1880,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         if translationInView(tab) { showTranslating(run) }
         watchTranslation(run, for: key)
-        run.host.translate(webView, pieces: pieces, groups: groups, into: target, progress: { _ in }, completion: { [weak self, weak run, weak tab] result in
+        run.host.translate(webView, pieces: pieces, shown: shown, groups: groups, into: target, progress: { [weak self, weak run] fraction in
+            guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
+            run.lastProgress = Date()
+            run.fraction = fraction
+            if let tab = run.tab, self.translationToastTab === tab, self.translationInView(tab) { self.showTranslating(run, announces: false) }
+        }, completion: { [weak self, weak run, weak tab] result in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             self.endTranslation(run, for: key)
             guard let tab, !tab.isClosed, tab.webView?.url == run.page else { return }
@@ -1872,10 +1929,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// No answer in time: it stops, the page goes back to how it was, and it says it couldn't. While macOS asks
     /// to download the language (its sheet on this window), it waits for you, however long that takes.
-    private func watchTranslation(_ run: PageTranslation, for key: ObjectIdentifier) {
+    private func watchTranslation(_ run: PageTranslation, for key: ObjectIdentifier, after wait: TimeInterval = translationTimeout) {
         let work = DispatchWorkItem { [weak self, weak run] in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             guard let tab = run.tab, !tab.isClosed else { self.endTranslation(run, for: key); return }
+            // A batch came back since: the limit runs from that one.
+            if let left = PageTranslator.waitLeft(lastProgress: run.lastProgress, now: Date(), limit: Self.translationTimeout) {
+                self.watchTranslation(run, for: key, after: left)
+                return
+            }
             if self.window?.attachedSheet != nil {
                 if self.translationInView(tab) { self.showTranslating(run) }
                 self.watchTranslation(run, for: key)
@@ -1887,7 +1949,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.showTranslationFailed(tab, from: run.source.map { [$0] } ?? [], into: PageTranslator.readerLanguage)
         }
         run.timeout = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.translationTimeout, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
     }
 
     /// Done, given up, or its page gone: its session stops and its toast, if showing, goes.
@@ -2005,7 +2067,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             view.onPeekLink = { [weak self] link in self?.open(link, disposition: .peek, opener: tab, by: .page) }
             view.onBackgroundLink = { [weak self] link in self?.open(link, disposition: .backgroundTab, opener: tab, by: .page) }
             view.onForegroundLink = { [weak self] link in self?.open(link, disposition: .foregroundTab, opener: tab, allowSwitch: false, by: .page) }
-            view.show(article, from: url, icon: tab.favicon, theme: Brand.Theme.of(self.tabManager.currentSpace))
+            view.currentSpace = { [weak self] in self?.tabManager.currentSpace }
+            view.show(article, from: url, icon: tab.favicon)
             self.reader = view
             self.readerTab = tab
             tab.readerWebView = view.webView
@@ -2035,13 +2098,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Reader's text and colors, under the address's Aa. With no address on screen (the sidebar hidden, the address
-    /// not above the page), from the reading page's top-right corner instead.
+    /// The address's Reader button: off, it turns Reader on; on, it opens Reader's options, where it turns off.
+    func pressReaderButton() {
+        if isReaderOnHere { toggleReaderOptions() } else { toggleReader() }
+    }
+
+    /// Reader's text and colors, under the address's Reader button. With no address on screen (the sidebar hidden,
+    /// the address not above the page), from the reading page's top-right corner instead.
     func toggleReaderOptions() {
         guard let reader, readerTab === tabManager.selectedTab else { return }
         let overlay = root.overlay
         let address = sidebar.address
-        let button = address.readerOptionsButton
+        let button = address.readerButton
         let aboveThePage = root.barHoldsAddress
         let docked = root.sidebarVisible && !root.isSidebarFloatingVisible
         let onScreen = !button.isHidden && (aboveThePage || root.sidebarVisible || root.isSidebarFloatingVisible)
@@ -2419,7 +2487,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.isOnRight = onRight
         // The sidebar's own, where the docked sidebar puts it.
         root.topBar.heldSidebarButtonOrigin = held && docked
-            ? NSPoint(x: dockedMinX + sidebar.sidebarButton.frame.minX, y: Tokens.Sidebar.lightsCenter + root.sidebarTopRowDrop - SidebarView.toolbarButton / 2) : nil
+            ? NSPoint(x: dockedMinX + sidebar.sidebarButton.frame.minX, y: sidebar.trafficLightCenterY - SidebarView.toolbarButton / 2) : nil
         sidebar.sidebarButton.alphaValue = held ? 0 : 1
         sidebar.sidebarButton.toolTip = Shortcuts.tooltip(docked ? String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows.")
                                                                   : String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."),

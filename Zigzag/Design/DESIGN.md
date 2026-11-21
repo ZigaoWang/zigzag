@@ -133,7 +133,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 
 | Element | Size |
 |---|---|
-| Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (`Sidebar.lightsCenter`, 22), reload's ink as far from the right edge as the lights from the left |
+| Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (midway down to the address, 20; `Sidebar.lightsCenter`, 22, with the address in the bar), reload's ink as far from the right edge as the lights from the left |
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 26pt with 14pt glyphs; up to 3 pinned extensions before Site Controls, dragged to reorder as the space icons are (the pin stays faint in its place, a see-through copy follows the pointer, a 2pt accent line marks the gap), hiding from the left before the host or the prompt is cut (and never below 72pt for it), each pin the same 26pt button as Reader and Site Controls with the extension's icon at 16pt in the middle, 2pt between every button; a count is a 12pt dark pill with 9pt semibold white figures in the button's bottom-right corner, 1pt inside it (the same pill, 3pt in, on a Site Controls tile); in Site Controls a 16pt round pin button (control fill, hairline, 9pt glyph, 20pt target) 2pt inside the tile's top-right corner, the top-left when the tile has a count: always there and filled (pin.fill) while pinned, an outline pin on hover otherwise, dimmed at the limit, and Pin to Address in the tile's menu; the accent ring from the keyboard |
 | Favorites | As many to a row as fit 56pt wide (3 at the usual width), or 2, 3 or 4 as chosen in Settings; 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is loaded (not while it sleeps or waits since a relaunch), the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
 | Space name | As typed, its ink on the icon column: 13 semibold in a 30pt slot; large, 26 light (`Font.spaceName`), kern -0.6, 36pt slot |
@@ -461,15 +461,22 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   and Auto, from `Reader.Palette`; Auto's paper is barely the space's hue (`Theme.readerPaper`, `Frame.reader…`,
   chroma 0.0035 by day and 0.005 at night), read as paper rather than color, the white, gray and black spaces keeping
   the plain papers, with the palettes' inks unchanged (tested in every hue: text 12:1 by day, soft words 4.5:1).
-  Nothing floats on the article. While Reader is on, Aa (`textformat.size`) shows in the address field just before
-  the Reader button, which stays put and turns Reader off in one click, as Safari's toolbar does; Aa opens
-  `ReaderOptions` 4pt under the field, placed as Site Controls is (along the field's edge in the sidebar, under the
-  button's end above the page), one floating thing at a time with the others. With no address on screen (the sidebar
-  hidden and the address not above the page) it opens from the page's top-right corner instead, from View › Reader
-  Text and Colors. Its rows are the site panel's (`PanelRow`): Text Size (`ZoomStepper`, − 100% +, the percentage
-  back to 100%, the same steps as ⌘+ and ⌘−), Typeface and Column Width (`SlidingSwitch`), and Colors, round
-  swatches as the space editor's (ringed when chosen, swelling under the pointer). A change keeps the line you were
-  on in place. Reader itself comes and goes with the address's Reader button, ⌥⌘R or Esc.
+  Space takes the window's space: its paper is the sidebar's own color (the first, solid; `Theme.spacePaper`), by
+  day and at night as the space has it, held out of the middle tones (OKLCH lightness at least 0.86 or at most 0.3)
+  and no richer than chroma 0.05, so white stays white and black black; the inks are the space's hue solved against
+  that paper (`Palette.space`): text 11:1 where the paper allows and never under 7:1, links 7:1, soft words 4.5:1,
+  tested in every curated color, custom hues at every strength and every shade. It changes in place when you switch
+  spaces or edit the color. The site's icon in the header sits on the text's left edge, the host 8pt after it.
+  Nothing floats on the article. The address's Reader button is the one control: off, it turns Reader on; on (shown
+  pressed, "Reader Options"), it opens `ReaderOptions` 4pt under the field, placed as Site Controls is (along the
+  field's edge in the sidebar, under the button's end above the page), one floating thing at a time with the
+  others. With no address on screen (the sidebar hidden and the address not above the page) it opens from the
+  page's top-right corner instead, from View › Reader Text and Colors. Its rows are the site panel's (`PanelRow`):
+  Text Size (`ZoomStepper`, − 100% +, the percentage back to 100%, the same steps as ⌘+ and ⌘−), Typeface and
+  Column Width (`SlidingSwitch`), and Colors, round swatches as the space editor's (Auto, Light, Sepia, Dark,
+  Space; ringed when chosen, a faint ring under the pointer, nothing moving), then Turn Off Reader, a
+  `PanelLinkRow` as Reset Permissions is. A change keeps the line you were on in place. Esc and ⌥⌘R turn Reader off
+  directly.
 - **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card that
   floats in a panel of its own (`MiniPlayerPanel`, #172), over the window and other apps, on every space and beside a
   full screen window, as Picture in Picture does: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving
@@ -556,7 +563,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of swatches: Default (the
   colors it was made with), six presets in light and deep pairs, Background (the empty page's picture, a dashed slot
   until there is one, then its thumbnail with a × on hover) and Custom, ringed when the colors are none of the
-  others, which unfolds the wheel and Shade. Under them Effects, folded under a disclosure (`DisclosureRow`): a
+  others, which unfolds the wheel and Shade. Under the pointer a swatch shows a faint ring (`Color.swatchHoverRing`)
+  and keeps its size, as Reader's do. Under them Effects, folded under a disclosure (`DisclosureRow`): a
   second color and its direction, See-through, Glass (Clear or Frosted, for a see-through space), Grain. While
   Clear shows as frosted on battery or in Low Power Mode, a line in the explanation style under Glass says so. Effects opens by itself when the space uses any of them. Last,
   under a hairline, Profile: a dropdown of the profiles, with New Profile at its end (a profile of the space's own,
