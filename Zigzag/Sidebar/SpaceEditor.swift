@@ -85,7 +85,7 @@ final class ColorWheel: NSView {
     /// Room for a whole knob, and a little more, around the dots, so one at the rim never leaves the wheel's frame.
     private var radius: CGFloat { min(bounds.width, bounds.height) / 2 - 14 }
 
-    private func point(_ spot: Spot) -> CGPoint {
+    func point(_ spot: Spot) -> CGPoint {
         let a = spot.hue * 2 * .pi - .pi / 2
         let r = radius * CGFloat(spot.amount)
         return CGPoint(x: center.x + cos(a) * r, y: center.y + sin(a) * r)
@@ -205,34 +205,55 @@ final class ColorWheel: NSView {
     /// Within a knob's reach, clicking takes hold of it without moving it.
     private func knob(at p: CGPoint) -> Int? {
         let distances = spots.indices.map { (index: $0, distance: hypot(point(spots[$0]).x - p.x, point(spots[$0]).y - p.y)) }
-        // Over both, the selected one wins, since it's drawn on top.
+        // Over both, the nearer one wins; the selected one only when they sit on the same spot.
         let hits = distances.filter { $0.distance <= 14 }
-        return hits.first { $0.index == selected }?.index ?? hits.min { $0.distance < $1.distance }?.index
+        guard let nearest = hits.min(by: { $0.distance < $1.distance }) else { return nil }
+        return hits.first { $0.index == selected && $0.distance - nearest.distance < 1 }?.index ?? nearest.index
     }
 
-    override func mouseDown(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        let index = knob(at: p) ?? selected
+    /// A press on the wheel: the knob it holds, how far off that knob's center, and whether it has moved it yet.
+    struct Grab: Equatable {
+        let index: Int
+        let grip: CGPoint
+        var moved: Bool
+    }
+
+    /// On a knob it takes hold of it; anywhere else the selected knob comes there.
+    func press(at p: CGPoint) -> Grab {
+        let held = knob(at: p)
+        let index = held ?? selected
         // Grabbed off-center, a knob keeps that offset rather than jumping under the pointer.
-        let grip = knob(at: p).map { CGPoint(x: point(spots[$0]).x - p.x, y: point(spots[$0]).y - p.y) } ?? .zero
+        let grip = held.map { CGPoint(x: point(spots[$0]).x - p.x, y: point(spots[$0]).y - p.y) } ?? .zero
         if index != selected {
             selected = index
             onSelect?(index)
         }
         pressed = index
-        var moved = knob(at: p) == nil
-        if moved { move(index, to: p, final: false) } else { placeKnobs(animated: false) }
+        let grab = Grab(index: index, grip: grip, moved: held == nil)
+        if grab.moved { move(index, to: p, final: false) } else { placeKnobs(animated: false) }
+        return grab
+    }
+
+    func drag(_ grab: inout Grab, to p: CGPoint) {
+        grab.moved = true
+        move(grab.index, to: CGPoint(x: p.x + grab.grip.x, y: p.y + grab.grip.y), final: false)
+    }
+
+    func release(_ grab: Grab, at p: CGPoint) {
+        pressed = nil
+        if grab.moved { move(grab.index, to: CGPoint(x: p.x + grab.grip.x, y: p.y + grab.grip.y), final: true) } else { placeKnobs(animated: false) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        var grab = press(at: convert(event.locationInWindow, from: nil))
         window?.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
             let q = self.convert(event.locationInWindow, from: nil)
-            let target = CGPoint(x: q.x + grip.x, y: q.y + grip.y)
             if event.type == .leftMouseUp {
                 stop.pointee = true
-                self.pressed = nil
-                if moved { self.move(index, to: target, final: true) } else { self.placeKnobs(animated: false) }
+                self.release(grab, at: q)
             } else {
-                moved = true
-                self.move(index, to: target, final: false)
+                self.drag(&grab, to: q)
             }
         }
     }

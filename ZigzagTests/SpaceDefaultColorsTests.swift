@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -130,5 +130,100 @@ struct SpaceDefaultColorsTests {
         let mine = SpaceLookEditor(space: chosen, defaultColor: .sky, dark: true)
         mine.follow(dark: false)
         #expect(abs(mine.shownDepth - 0.8) < 0.001)
+    }
+}
+
+/// The color wheel's two knobs, for a gradient: each one takes a press and follows a drag.
+@MainActor
+struct ColorWheelDragTests {
+    private func wheel(_ spots: [ColorWheel.Spot], selected: Int = 0) -> ColorWheel {
+        let wheel = ColorWheel(frame: NSRect(x: 0, y: 0, width: 276, height: 200))
+        wheel.show(spots, depths: spots.map { _ in 0.3 }, selected: selected, animated: false)
+        return wheel
+    }
+
+    private let gradient = [ColorWheel.Spot(hue: 0.9, amount: 0.5), ColorWheel.Spot(hue: 0.6, amount: 1)]
+
+    @Test func eitherKnobTakesThePress() {
+        for index in 0..<2 {
+            let wheel = wheel(gradient)
+            let grab = wheel.press(at: wheel.point(gradient[index]))
+            #expect(grab.index == index)
+            #expect(!grab.moved)
+            #expect(wheel.selected == index)
+        }
+    }
+
+    /// Pale colors sit near the middle, their knobs close together: a press on either one takes that one.
+    @Test func closeKnobsEachTakeTheirPress() {
+        let close = [ColorWheel.Spot(hue: 0.6, amount: 0.1), ColorWheel.Spot(hue: 0.82, amount: 0.1)]
+        for selected in 0..<2 {
+            for index in 0..<2 {
+                let wheel = wheel(close, selected: selected)
+                let a = wheel.point(close[index]), b = wheel.point(close[1 - index])
+                // On its center, and on its far side from the other knob.
+                let far = CGPoint(x: a.x + (a.x - b.x) * 0.4, y: a.y + (a.y - b.y) * 0.4)
+                #expect(wheel.press(at: a).index == index)
+                #expect(self.wheel(close, selected: selected).press(at: far).index == index)
+            }
+        }
+    }
+
+    @Test func theSecondKnobFollowsADrag() {
+        let wheel = wheel(gradient)
+        var changes: [(Int, ColorWheel.Spot, Bool)] = []
+        wheel.onChange = { changes.append(($0, $1, $2)) }
+        let start = wheel.point(gradient[1])
+        // Grabbed a little off its center.
+        var grab = wheel.press(at: CGPoint(x: start.x + 4, y: start.y - 3))
+        let target = wheel.point(ColorWheel.Spot(hue: 0.25, amount: 0.6))
+        wheel.drag(&grab, to: CGPoint(x: target.x + 4, y: target.y - 3))
+        wheel.release(grab, at: CGPoint(x: target.x + 4, y: target.y - 3))
+        #expect(abs(wheel.spots[1].hue - 0.25) < 0.01)
+        #expect(abs(wheel.spots[1].amount - 0.6) < 0.01)
+        #expect(wheel.spots[0] == gradient[0])
+        #expect(changes.allSatisfy { $0.0 == 1 })
+        #expect(changes.last?.2 == true)
+    }
+
+    @Test func aDragStaysOnTheWheel() {
+        let wheel = wheel(gradient, selected: 1)
+        var grab = wheel.press(at: wheel.point(gradient[1]))
+        wheel.drag(&grab, to: CGPoint(x: -500, y: 900))
+        #expect(wheel.spots[1].amount == 1)
+        #expect(wheel.bounds.insetBy(dx: 12, dy: 12).contains(wheel.point(wheel.spots[1])))
+    }
+
+    @Test func aClickOffTheKnobsBringsTheSelectedOne() {
+        let wheel = wheel(gradient, selected: 1)
+        let spot = ColorWheel.Spot(hue: 0.1, amount: 0.8)
+        let grab = wheel.press(at: wheel.point(spot))
+        #expect(grab.index == 1 && grab.moved)
+        wheel.release(grab, at: wheel.point(spot))
+        #expect(abs(wheel.spots[1].hue - 0.1) < 0.01)
+        #expect(wheel.spots[0] == gradient[0])
+    }
+
+    /// In the editor, dragging the second knob changes the gradient's second color and keeps it there.
+    @Test func theEditorKeepsTheSecondColor() throws {
+        var space = SpaceInfo(name: "School", color: .sky)
+        space.hue = 0.9
+        space.tint = 0.5
+        space.brightness = 0.2
+        space.hue2 = 0.6
+        space.brightness2 = 0.36
+        let editor = SpaceLookEditor(space: space, defaultColor: .sky, dark: false)
+        editor.frame = NSRect(x: 0, y: 0, width: 276, height: 600)
+        editor.toggleCustom()
+        editor.layoutSubtreeIfNeeded()
+        let wheel = try #require(editor.subviews.compactMap { $0 as? ColorWheel }.first)
+        var grab = wheel.press(at: wheel.point(wheel.spots[1]))
+        #expect(grab.index == 1)
+        let target = wheel.point(ColorWheel.Spot(hue: 0.3, amount: 0.7))
+        wheel.drag(&grab, to: target)
+        wheel.release(grab, at: target)
+        #expect(abs((editor.look.hue2 ?? 0) - 0.3) < 0.01)
+        #expect(abs(wheel.spots[1].hue - 0.3) < 0.01)
+        #expect(abs((editor.look.hue ?? 0) - 0.9) < 0.001)
     }
 }
