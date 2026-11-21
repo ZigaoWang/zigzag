@@ -21,6 +21,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Renaming a tab, folder or group in the sidebar keeps the name on its line instead of dropping it half a point as editing starts.
 - The space's name at the top of the sidebar starts on the same line as the icons and the Tabs label below it. At row size it sat a point to the right, and a large name half a point.
 - The Tabs label in the sidebar starts on the icons' line instead of half a point to the right.
+- In the command bar, the Tab key shown beside Search Wikipedia and the other site searches ends where the Return key on the chosen result does, instead of 2 points further in.
 
 ## [0.9.3] - 2026-11-18
 
