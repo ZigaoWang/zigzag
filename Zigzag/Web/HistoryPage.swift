@@ -338,7 +338,7 @@ enum HistoryPage {
             "showMore": counted { n in String(localized: "Show \(n) More", comment: "Button under a site's first hundred pages on the History page.") },
             "removePage": String(localized: "Remove from History", comment: "Tooltip of the × on a page on the History page."),
             "removeSession": String(localized: "Remove Session from History", comment: "Tooltip of the × on a session's heading on the History page."),
-            "noMatch": String(localized: "Nothing in your history matches “\("{query}")”.", comment: "On the History page when a search finds nothing. The placeholder is what was typed."),
+            "noMatch": String(localized: "No pages in your history match “\("{query}")”.", comment: "On the History page when a search finds nothing. The placeholder is what was typed."),
             "empty": String(localized: "Pages you visit show up here.", comment: "On the History page while History is empty."),
         ]
         let json = (try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
@@ -422,7 +422,8 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 @media (max-width: 640px) { .pages .row { grid-template-columns: 38px var(--favicon) minmax(0, 1fr) auto 20px; } }
 @media (prefers-reduced-motion: reduce) { .chevron, .page-header { transition: none; } }
 
-.empty { text-align: center; padding: 96px 0; color: var(--muted); }
+.empty { text-align: center; padding: var(--no-match-top) 0; color: var(--muted); }
+.empty.searching svg { display: none; }
 .empty svg { width: var(--empty-mark); height: auto; color: var(--text); opacity: var(--empty-mark-opacity); display: block; margin: 0 auto var(--empty-gap); }
 #more { height: 1px; }
 </style>
@@ -583,6 +584,7 @@ function drawMore() {
 function showEmpty() {
   empty.hidden = sessions.length > 0 || (!done && !searching);
   document.getElementById('emptyText').textContent = searching ? fill(words.noMatch, { query: searching }) : words.empty;
+  empty.classList.toggle('searching', !!searching);
 }
 
 // Removes pages from History, then from the session they were drawn in.

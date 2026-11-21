@@ -161,8 +161,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     private let resultsScroll = NSScrollView()
     private let resultsList = FlippedView()
     private var resultCells: [IconButton] = []
-    private let noResults = Label(String(localized: "No emoji found", comment: "In the icon choices, when no emoji's name matches what's typed in the field under them."),
-                                  font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    private let noResults = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
 
     static let columns = 8
     static let cell: CGFloat = 30
@@ -243,7 +242,8 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         resultsScroll.frame = NSRect(x: 0, y: 0, width: bounds.width, height: Self.gridHeight)
         layoutResults()
         let h = noResults.lineHeight
-        noResults.frame = NSRect(x: 0, y: round((Self.gridHeight - h) / 2), width: bounds.width, height: h)
+        let area = NSRect(x: 0, y: 0, width: bounds.width, height: Self.gridHeight)
+        noResults.frame = NSRect(x: 0, y: Tokens.EmptyState.noMatchY(in: area, lineHeight: h), width: bounds.width, height: h)
         emojiField.frame = NSRect(x: 0, y: Self.gridHeight + Tokens.Space.x3, width: bounds.width, height: Self.fieldHeight)
     }
 
@@ -284,6 +284,8 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         }
         results = EmojiSearch.search(text, in: index)
         showResults()
+        let typed = text.trimmingCharacters(in: .whitespaces)
+        noResults.stringValue = String(localized: "No emoji match “\(typed)”.", comment: "In the icon choices, when no emoji's name matches what's typed in the field under them; what was typed.")
         noResults.isHidden = !results.isEmpty
     }
 

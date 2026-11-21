@@ -3431,9 +3431,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let words = settingSearch.stringValue.trimmingCharacters(in: .whitespaces)
                 let none = made(words) {
                     Label(String(localized: "No settings match “\(words)”.", comment: "In Settings when Find a setting finds nothing; what was typed."),
-                          font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
+                          font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
                 }
-                none.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y, width: contentWidth - Tokens.Page.groupPad, height: none.lineHeight)
+                none.alignment = .center
+                none.frame = NSRect(x: pad, y: y + Tokens.EmptyState.noMatchTop, width: contentWidth, height: none.lineHeight)
                 place(none)
                 y = none.frame.maxY + Tokens.Space.x6
             }

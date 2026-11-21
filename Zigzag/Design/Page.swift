@@ -279,7 +279,7 @@ enum PageStyle {
             "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--label: \(px(size.label))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
             "--empty-mark: \(px(Tokens.EmptyState.markWidth))", "--empty-mark-opacity: \(Tokens.EmptyState.markOpacity)",
             "--empty-gap: \(px(Tokens.EmptyState.markGap))", "--empty-action-gap: \(px(Tokens.EmptyState.actionGap))",
-            "--empty-width: \(px(Tokens.EmptyState.textWidth))",
+            "--empty-width: \(px(Tokens.EmptyState.textWidth))", "--no-match-top: \(px(Tokens.EmptyState.noMatchTop))",
             "--selection: \(Int(Tokens.Color.selectionAlpha * 100))%", "--group-gap: \(px(page.groupGap))",
             "--row-text: \(px(size.row))", "--title: \(px(size.title))", "--favicon: \(px(Tokens.Metric.favicon))",
             "--control-text: \(px(size.body))", "--focus: \(Int(Tokens.Color.focusAlpha * 100))%",

@@ -149,7 +149,7 @@ enum ArchivePage {
         let words: [String: String] = [
             "locale": Words.dates.identifier(.bcp47),
             "restore": String(localized: "Open in \("{space}")", comment: "Tooltip of a row on the Archive page: the tab opens again in the space it came from. The placeholder is the space's name."),
-            "noMatch": String(localized: "No archived tab matches “\("{query}")”.", comment: "On the Archive page when a search finds nothing. The placeholder is what was typed."),
+            "noMatch": String(localized: "No archived tabs match “\("{query}")”.", comment: "On the Archive page when a search finds nothing. The placeholder is what was typed."),
             "empty": String(localized: "Tabs you haven’t used in a while show up here.", comment: "On the Archive page while it's empty and archiving is on."),
             "off": String(localized: "Archived tabs show up here when Settings › Tabs › Archive tabs you haven’t used is on.", comment: "On the Archive page while archiving is off. Name the setting as it reads in Settings › Tabs."),
         ]
@@ -190,7 +190,8 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
   .row { grid-template-columns: var(--favicon) minmax(0, 1fr) minmax(0, 28%) auto; }
   .row .site { display: none; }
 }
-.empty { text-align: center; padding: 96px 0; color: var(--muted); }
+.empty { text-align: center; padding: var(--no-match-top) 0; color: var(--muted); }
+.empty.searching svg { display: none; }
 .empty svg { width: var(--empty-mark); height: auto; color: var(--text); opacity: var(--empty-mark-opacity); display: block; margin: 0 auto var(--empty-gap); }
 .empty #emptyText { max-width: var(--empty-width); margin: 0 auto; }
 .empty .button { margin-top: var(--empty-action-gap); }
@@ -252,7 +253,9 @@ async function load() {
   // Off and empty: show where to turn it on. Off with tabs kept: show them as usual.
   const off = !answer.on && !answer.any;
   settingsButton.hidden = !off;
-  document.getElementById('emptyText').textContent = typed && answer.any ? fill(words.noMatch, { query: typed }) : off ? words.off : words.empty;
+  const searching = typed && answer.any;
+  document.getElementById('emptyText').textContent = searching ? fill(words.noMatch, { query: typed }) : off ? words.off : words.empty;
+  empty.classList.toggle('searching', !!searching);
 }
 window.zigzagRefresh = load;
 

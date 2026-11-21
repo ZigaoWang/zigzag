@@ -558,6 +558,10 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   shape of its own on white with room around it, or the name's first letter on the site's color.
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
+- **A search that finds nothing** says so in one line, "No tabs match “x”.", what was typed in quotes: body type in
+  `textSecondary`, centered, `EmptyState.noMatchTop` (96) below where the results start, or in the middle of a
+  smaller area (`noMatchY`), with no wordmark. Settings, Show All Tabs, the icon grid's emoji, Passwords, History
+  and the Archive. A search inside a list (a pane's sites, Feature Flags) says it in the list's place instead.
 - **A space with no page open** (`EmptyPage`): the page card stays, in the space's wash (`Theme.wash`, the sidebar's
   color a few steps lighter by day, deep and calm at night), with the wordmark engraved in its middle. White, grays,
   black and private windows keep the plain card. A palette look on glass takes a fainter tint (`Frame.glassPage…`), so the

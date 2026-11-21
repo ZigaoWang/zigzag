@@ -116,4 +116,12 @@ extension NSView {
     func selfAndDescendants<T: NSView>(of kind: T.Type) -> [T] {
         ((self as? T).map { [$0] } ?? []) + subviews.flatMap { $0.selfAndDescendants(of: kind) }
     }
+
+    /// A search that finds nothing says so where the results start, or in the middle of a small area.
+    @Test func noMatchSitsWhereTheResultsStart() {
+        let tall = NSRect(x: 0, y: 40, width: 600, height: 800)
+        #expect(Tokens.EmptyState.noMatchY(in: tall, lineHeight: 20) == 40 + Tokens.EmptyState.noMatchTop)
+        let short = NSRect(x: 0, y: 0, width: 300, height: 120)
+        #expect(Tokens.EmptyState.noMatchY(in: short, lineHeight: 20) == 50)
+    }
 }

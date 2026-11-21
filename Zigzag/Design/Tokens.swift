@@ -455,6 +455,13 @@ enum Tokens {
         static let actionGap: CGFloat = Space.x6
         /// The widest the text runs.
         static let textWidth: CGFloat = 360
+        /// A search that finds nothing: its one line this far below the top of where the results go.
+        static let noMatchTop: CGFloat = 96
+
+        /// The top of the no-match line in `area` (flipped): `noMatchTop` down, or the middle of a shorter area.
+        static func noMatchY(in area: NSRect, lineHeight: CGFloat) -> CGFloat {
+            round(min(area.minY + noMatchTop, area.midY - lineHeight / 2))
+        }
     }
 
     // MARK: - Dialogs

@@ -277,7 +277,7 @@ final class DeskController {
     private let searchBox = FilledField.search(String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
     private var searchField: NSTextField { searchBox.field }
     private let searchDelegate = DeskSearchDelegate()
-    private let noMatches = Label(String(localized: "No tabs match", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search."), font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let noMatches = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
     private static let searchHeight = Tokens.Metric.controlHeight
     private static let actionBarHeight = Tokens.Page.controlHeight + Tokens.Space.x2 + 2
@@ -1086,9 +1086,10 @@ final class DeskController {
         }
         noMatches.isHidden = query.isEmpty || !layout.cards.isEmpty
         if !noMatches.isHidden {
-            // In the middle of what you can see, not at the top of the canvas.
+            noMatches.stringValue = String(localized: "No tabs match “\(query)”.", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search; what was typed.")
+            // Where the first card would be, in what you can see.
             let w = noMatches.textWidth + 4, visible = scrollView.documentVisibleRect
-            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: round(visible.midY - noMatches.lineHeight / 2),
+            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: Tokens.EmptyState.noMatchY(in: visible, lineHeight: noMatches.lineHeight),
                                      width: w, height: noMatches.lineHeight)
         }
         for (id, card) in cards {

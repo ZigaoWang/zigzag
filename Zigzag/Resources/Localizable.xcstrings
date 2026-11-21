@@ -8980,17 +8980,6 @@
         }
       }
     },
-    "No archived tab matches “%@”." : {
-      "comment" : "On the Archive page when a search finds nothing. The placeholder is what was typed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有与“%@”匹配的已归档标签页。"
-          }
-        }
-      }
-    },
     "Open in" : {
       "comment" : "Destination space for a rule.\nDestination space in Site Controls.",
       "localizations" : {
@@ -13732,6 +13721,17 @@
         }
       }
     },
+    "No archived tabs match “%@”." : {
+      "comment" : "On the Archive page when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有与“%@”匹配的已归档标签页。"
+          }
+        }
+      }
+    },
     "No color" : {
       "comment" : "VoiceOver, in the space editor's color wheel: the knob sits in the middle, white.",
       "localizations" : {
@@ -13743,13 +13743,13 @@
         }
       }
     },
-    "No emoji found" : {
-      "comment" : "In the icon choices, when no emoji's name matches what's typed in the field under them.",
+    "No emoji match “%@”." : {
+      "comment" : "In the icon choices, when no emoji's name matches what's typed in the field under them; what was typed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未找到表情符号"
+            "value" : "没有与“%@”匹配的表情符号。"
           }
         }
       }
@@ -13838,6 +13838,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在这台 Mac 上没有找到有可导入内容的其他浏览器。"
+          }
+        }
+      }
+    },
+    "No pages in your history match “%@”." : {
+      "comment" : "On the History page when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录中没有与“%@”匹配的页面。"
           }
         }
       }
@@ -13941,13 +13952,13 @@
         }
       }
     },
-    "No tabs match" : {
-      "comment" : "In the tab overview (all spaces' tabs as cards), when no tab matches the search.",
+    "No tabs match “%@”." : {
+      "comment" : "In the tab overview (all spaces' tabs as cards), when no tab matches the search; what was typed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有匹配的标签页"
+            "value" : "没有与“%@”匹配的标签页。"
           }
         }
       }
@@ -14190,17 +14201,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "历史记录中没有匹配项"
-          }
-        }
-      }
-    },
-    "Nothing in your history matches “%@”." : {
-      "comment" : "On the History page when a search finds nothing. The placeholder is what was typed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "历史记录中没有与“%@”匹配的内容。"
           }
         }
       }
