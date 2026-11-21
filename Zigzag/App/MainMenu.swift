@@ -182,6 +182,7 @@ enum MainMenu {
             item(String(localized: "Mute Tab", comment: "View menu item."), #selector(C.toggleMute(_:)), "m", [.command, .shift]),
             item(String(localized: "Picture in Picture", comment: "View menu item."), #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
             item(String(localized: "Show Reader", comment: "View menu item."), #selector(C.toggleReader(_:)), "r", [.command, .option]),
+            item(String(localized: "Reader Text and Colors", comment: "View menu item: opens Reader's text size, typeface, column width and color choices."), #selector(C.showReaderOptions(_:)), ""),
             item(String(localized: "Translate Page", comment: "View menu item."), #selector(C.translatePage(_:)), "t", [.command, .option]),
             .separator(),
             submenu(String(localized: "Developer", comment: "Submenu of the View menu."), [

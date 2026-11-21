@@ -30,6 +30,8 @@ final class AddressView: InteractiveView {
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
     /// Shown on articles: opens Reader.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
+    /// Shown beside Reader's button while Reader is on: its text and colors.
+    let readerOptionsButton = AddressView.button("textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors."))
 
     func setCapture(camera: Bool, microphone: Bool) {
         wantsCapture = camera || microphone
@@ -403,6 +405,8 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        readerOptionsButton.isHidden = true
+        addSubview(readerOptionsButton)
         saveButton.tint = Tokens.Color.icon
         saveButton.isHidden = true
         addSubview(saveButton)
@@ -427,6 +431,7 @@ final class AddressView: InteractiveView {
 
     func setReader(available: Bool, active: Bool) {
         wantsReader = available || active
+        wantsReaderOptions = active
         readerButton.isSelected = active
         readerButton.toolTip = Shortcuts.tooltip(active ? String(localized: "Hide Reader", comment: "Tooltip of the address bar's Reader button while Reader is on.")
                                                          : String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."),
@@ -499,7 +504,7 @@ final class AddressView: InteractiveView {
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
+        let count = (wantsReaderOptions ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -527,6 +532,7 @@ final class AddressView: InteractiveView {
     }
 
     private var wantsReader = false
+    private var wantsReaderOptions = false
     private var wantsCapture = false
     /// The buttons drawn in the field, those leaving aside.
     private var drawn = Set<ObjectIdentifier>()
@@ -549,7 +555,7 @@ final class AddressView: InteractiveView {
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
         var others: [IconButton] = []
-        for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
+        for (button, wanted) in [(readerOptionsButton, wantsReaderOptions), (readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         // Without the site, buttons get the whole width, including a gap after the last.
@@ -635,7 +641,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [readerOptionsButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.

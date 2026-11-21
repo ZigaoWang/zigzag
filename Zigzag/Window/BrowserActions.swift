@@ -429,6 +429,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
+    @objc func showReaderOptions(_ sender: Any?) { toggleReaderOptions() }
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
     @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
 
@@ -1017,6 +1018,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(collapseAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: true)
         case #selector(expandAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: false)
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
+        case #selector(showReaderOptions(_:)): return isReaderOnHere
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil

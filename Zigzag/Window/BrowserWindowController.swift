@@ -108,13 +108,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // So does the guide while it points at something in it.
         root.keepsRevealed = { [weak self] in
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
-                || self?.popupHoldsSidebar == true
+                || ReaderOptions.isOpen(in: self?.window) || self?.popupHoldsSidebar == true
         }
         // One floating thing at a time, the sidebar that slides out included: while the command bar is up, or a panel
         // opened from the bar above the page, the pointer at the window's edge leaves it hidden. It would slide in
         // under them, and under a panel it would then be held there.
         root.blocksEdgeReveal = { [weak self] in
             self?.commandBar.isVisible == true || SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window)
+                || ReaderOptions.isOpen(in: self?.window)
         }
         // A click beside a zoomed pane puts it back, as one beside Peek puts it away.
         root.zoomScrim.onClick = { [weak self] in self?.unzoomPane() }
@@ -149,6 +150,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        sidebar.address.readerOptionsButton.onClick = { [weak self] _ in self?.toggleReaderOptions() }
         wireAddressButtons()
         // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
         // panes; right-click, middle-click and drop act as on the sidebar address.
@@ -1902,6 +1904,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The pane the reading page covers: in a split, the one its tab is in.
     private weak var readerCard: PageCardView?
     var isReaderOpen: Bool { readerCard != nil }
+    /// Reader is on over the page you're in.
+    var isReaderOnHere: Bool { reader != nil && readerTab === tabManager.selectedTab }
     private var readerURL: URL?
     private var readerKeyMonitor: Any?
 
@@ -2022,8 +2026,39 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Reader's text and colors, under the address's Aa. With no address on screen (the sidebar hidden, the address
+    /// not above the page), from the reading page's top-right corner instead.
+    func toggleReaderOptions() {
+        guard let reader, readerTab === tabManager.selectedTab else { return }
+        let overlay = root.overlay
+        let address = sidebar.address
+        let button = address.readerOptionsButton
+        let aboveThePage = root.barHoldsAddress
+        let docked = root.sidebarVisible && !root.isSidebarFloatingVisible
+        let onScreen = !button.isHidden && (aboveThePage || root.sidebarVisible || root.isSidebarFloatingVisible)
+        let card = readerCard ?? root.card
+        if !ReaderOptions.isOpen(in: window) { closeFloatingPanels() }
+        ReaderOptions.toggle(for: reader, in: overlay, opener: onScreen ? button : nil,
+                             recedes: onScreen && docked && !aboveThePage ? [sidebar.list] : []) { [weak self, weak address, weak card] size in
+            let inset = Tokens.Metric.cardInset
+            guard let self else { return .zero }
+            if onScreen, let address, address.window != nil {
+                // As Site Controls: along the field's edge in the sidebar, under the button's end above the page.
+                let field = address.convert(address.bounds, to: overlay)
+                let b = button.convert(button.bounds, to: overlay)
+                let x = aboveThePage || self.root.sidebarOnRight ? b.maxX - size.width : field.minX
+                return NSPoint(x: SitePanelSizing.x(x, alongAddress: !aboveThePage, inset: inset, width: size.width, overlayWidth: overlay.bounds.width),
+                               y: field.maxY + Tokens.Space.x1)
+            }
+            let shown = card ?? self.root.card
+            let page = shown.convert(shown.bounds, to: overlay)
+            return NSPoint(x: max(inset, page.maxX - size.width - Tokens.Space.x3), y: page.minY + Tokens.Space.x3)
+        }
+    }
+
     private func closeReader() {
         guard let view = reader else { return }
+        ReaderOptions.close(for: view)
         reader = nil
         readerTab?.readerWebView = nil
         readerTab = nil
@@ -2606,7 +2641,8 @@ extension BrowserWindowController: TabHost {
     /// One floating thing at a time: the command bar, site panel, downloads and space editor each close the
     /// others when they open, and previews and the link bubble stay away while any of them is up.
     var hasFloatingPanel: Bool {
-        switcher.isActive || commandBar.isVisible || SitePanel.isOpen(in: window) || DownloadsPanel.isOpen(in: window) || SpaceEditorPanel.current != nil || desk.isVisible || iconPicker != nil
+        switcher.isActive || commandBar.isVisible || SitePanel.isOpen(in: window) || DownloadsPanel.isOpen(in: window) || ReaderOptions.isOpen(in: window)
+            || SpaceEditorPanel.current != nil || desk.isVisible || iconPicker != nil
     }
 
     /// A folder's icon picker, when it's open in this window.
@@ -2618,6 +2654,7 @@ extension BrowserWindowController: TabHost {
         if commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
         SitePanel.closeCurrent()
         DownloadsPanel.closeCurrent()
+        ReaderOptions.closeCurrent()
         SpaceEditorPanel.current?.close()
         iconPicker?.close()
         previews.hide()
@@ -3486,6 +3523,7 @@ extension BrowserWindowController: CommandBarHost {
         if desk.isVisible { desk.hide(openingTab: nil) }
         SitePanel.closeCurrent()
         DownloadsPanel.closeCurrent()
+        ReaderOptions.closeCurrent()
         SpaceEditorPanel.current?.close()
         // Over a peek, Esc and ⌘L would go to the peek's page or the tab behind it: put the peek away first.
         peek.close()

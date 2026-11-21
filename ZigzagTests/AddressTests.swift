@@ -296,6 +296,20 @@ struct AddressTests {
         #expect(a.imageSide == 16 && b.imageSide == Tokens.Sidebar.addressIcon)
     }
 
+    /// Reader's Aa shows only while Reader is on, just before Reader's own button, which stays where it was.
+    @Test func readersTextAndColorsShowWhileReaderIsOn() {
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Sidebar.addressHeight))
+        address.setReader(available: true, active: false)
+        let readerX = address.readerButton.frame.minX
+        #expect(address.readerOptionsButton.isHidden)
+        address.setReader(available: true, active: true)
+        #expect(!address.readerOptionsButton.isHidden)
+        #expect(address.readerButton.frame.minX == readerX)
+        #expect(address.readerButton.frame.minX - address.readerOptionsButton.frame.maxX == 2)
+        address.setReader(available: true, active: false)
+        #expect(address.readerOptionsButton.isHidden)
+    }
+
     /// The count is a 12pt pill in the button's bottom-right corner, never past the button's edges, however long.
     @Test(arguments: ["1", "18", "999", "9999", "new"])
     func theCountPillStaysInsideTheButton(text: String) {

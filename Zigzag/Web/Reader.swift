@@ -544,8 +544,8 @@ enum Reader {
     }
 }
 
-/// The reading surface shown over a page card. Its one control, Aa, sits quietly at the top right: there at the top
-/// of the article and whenever you scroll back up, out of the way while you read on.
+/// The reading surface shown over a page card: only the article. How it reads is chosen from the address's Aa
+/// (`ReaderOptions`), as Safari's Reader keeps its choices in the toolbar.
 final class ReaderView: NSView {
     let webView: WKWebView
     var onClose: (() -> Void)?
@@ -554,10 +554,12 @@ final class ReaderView: NSView {
     var onPeekLink: ((URL) -> Void)?
     var onBackgroundLink: ((URL) -> Void)?
     var onForegroundLink: ((URL) -> Void)?
-    private let controls = ReaderControls()
+    /// How it reads now, as shown.
+    private(set) var preferences = Reader.Preferences.saved
+    /// Auto's paper, the space's breath of color, for the panel's swatches.
+    private(set) var paper = Reader.AutoPaper()
     /// The page the article came from: the reading page's own address, the one load it makes by itself.
     private var articleURL: URL?
-    private var scrollMonitor: Any?
 
     /// `store`: the one the page it reads is in (its profile's, or its private window's).
     init(store: WKWebsiteDataStore) {
@@ -566,8 +568,6 @@ final class ReaderView: NSView {
         super.init(frame: .zero)
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
-        addSubview(controls)
-        controls.onChange = { [weak self] preferences in self?.apply(preferences) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -577,24 +577,18 @@ final class ReaderView: NSView {
     /// choices.
     @discardableResult
     func stepTextSize(_ delta: Int) -> Reader.Preferences {
-        let preferences = controls.preferences.stepped(delta)
-        controls.preferences = preferences
-        apply(preferences)
-        return preferences
+        let next = preferences.stepped(delta)
+        apply(next)
+        ReaderOptions.showing(next, for: self)
+        return next
     }
 
-    #if DEBUG
-    func debugSet(_ preferences: Reader.Preferences) {
-        controls.preferences = preferences
-        apply(preferences)
-    }
-    #endif
-
-    private func apply(_ preferences: Reader.Preferences) {
+    /// New choices, kept for every article and applied to this one at once.
+    func apply(_ preferences: Reader.Preferences) {
+        self.preferences = preferences
         Reader.Preferences.saved = preferences
         // The page's own scripts are off; this runs in Zigzag's world, so the change is instant.
         webView.runOwnScript(preferences.script)
-        controls.theme = preferences.theme
     }
 
     /// In the store of the page it reads, so the article's pictures are fetched as the page fetched them: one store
@@ -624,159 +618,49 @@ final class ReaderView: NSView {
     override func layout() {
         super.layout()
         webView.frame = bounds
-        let side = ReaderControls.side
-        controls.frame = NSRect(x: bounds.width - side - Tokens.Space.x4, y: Tokens.Space.x4, width: side, height: side)
     }
 
     /// `theme`: the window's space, whose breath of color Auto's paper takes.
     func show(_ article: Reader.Article, from url: URL, icon: NSImage? = nil, theme: Brand.Theme = .navy) {
         articleURL = url
         webView.navigationDelegate = self
-        let preferences = Reader.Preferences.saved
-        let paper = Reader.AutoPaper.of(theme)
+        preferences = Reader.Preferences.saved
+        paper = Reader.AutoPaper.of(theme)
         webView.loadHTMLString(Reader.html(for: article, preferences: preferences, icon: Reader.iconSource(icon), paper: paper,
                                            reducedMotion: Tokens.Motion.reduceMotion), baseURL: url)
-        controls.paper = paper
-        controls.preferences = preferences
-        controls.theme = preferences.theme
     }
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { onClose?() } else { super.keyDown(with: event) }
     }
 
-    /// Scrolling on through the article puts Aa away; scrolling back up brings it back.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
-        scrollMonitor = nil
-        guard window != nil else { return }
-        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            guard let self, event.window === self.window, self.bounds.contains(self.convert(event.locationInWindow, from: nil)) else { return event }
-            if event.scrollingDeltaY < -1 { self.controls.setShown(false) } else if event.scrollingDeltaY > 1 { self.controls.setShown(true) }
-            return event
-        }
-    }
-}
-
-/// Aa, alone at the top right on the article's own paper: how it reads opens in Zigzag's own panel underneath.
-/// Reader itself goes with the address's Reader button, Esc or ⌥⌘R, as it came.
-final class ReaderControls: NSView {
-    var onChange: ((Reader.Preferences) -> Void)?
-    var preferences = Reader.Preferences.saved { didSet { options.preferences = preferences } }
-    /// The article's colors: the button sits on its paper, in its ink, so it reads as part of the page.
-    var theme = Reader.Preferences.Theme.auto { didSet { refreshColors() } }
-    /// Auto's paper, the space's breath of color.
-    var paper = Reader.AutoPaper() { didSet { options.paper = paper; refreshColors() } }
-
-    private let style = IconButton(symbol: "textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the button in Reader's bar that shows its text and color choices."))
-    private let options = ReaderOptions()
-    private var monitor: Any?
-    private var isShown = true
-
-    static var side: CGFloat { Tokens.Metric.iconButton }
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.control
-        layer?.cornerCurve = .continuous
-        addSubview(style)
-        style.onClick = { [weak self] _ in self?.toggleOptions() }
-        options.onChange = { [weak self] preferences in
-            self?.preferences = preferences
-            self?.onChange?(preferences)
-        }
-        refreshColors()
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-    override var isFlipped: Bool { true }
-
-    override func layout() {
-        super.layout()
-        style.frame = bounds
-    }
-
-    /// Put away, it takes no clicks: the article under it does.
-    override func hitTest(_ point: NSPoint) -> NSView? { isShown ? super.hitTest(point) : nil }
-
-    /// Shown at the top and on the way back up, put away on the way down; never while its panel is open.
-    func setShown(_ shown: Bool) {
-        guard shown != isShown, options.superview == nil else { return }
-        isShown = shown
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Tokens.Motion.Role.state.duration() * Tokens.Motion.debugSlowdown
-            ctx.timingFunction = Tokens.Motion.easeOut
-            animator().alphaValue = shown ? 1 : 0
-        }
-    }
-
-    private func refreshColors() {
-        // Light, Sepia and Dark are the page's whatever the Mac's look; Auto follows the Mac, as the page does.
-        appearance = theme == .auto ? nil : NSAppearance(named: theme == .dark ? .darkAqua : .aqua)
-        let color = theme == .auto ? paper.paper(dark: effectiveAppearance.isDark) : theme.palette.paper
-        Tokens.Motion.withoutAnimation { layer?.backgroundColor = Tokens.Color.hex(color).cgColor }
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        refreshColors()
-    }
-
-    #if DEBUG
-    var debugOptions: NSView { options }
-    #endif
-
-    func toggleOptions() {
-        if options.superview != nil { hideOptions(); return }
-        guard let host = superview else { return }
-        setShown(true)
-        options.preferences = preferences
-        let size = options.panelSize
-        // A button's menu: 4pt under it, its trailing edge on the button's, always whole inside the page.
-        let margin = Tokens.Space.x3
-        let x = min(max(margin, frame.maxX - size.width), host.bounds.width - size.width - margin)
-        options.frame = NSRect(x: x, y: frame.maxY + Tokens.Space.x1, width: size.width, height: size.height)
-        options.growsFrom = CGPoint(x: 1, y: 0)
-        host.addSubview(options)
-        options.present()
-        style.isSelected = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { [weak self] event in
-            guard let self else { return event }
-            if event.type == .keyDown { if event.keyCode == 53 { self.hideOptions(); return nil }; return event }
-            let inOptions = self.options.bounds.contains(self.options.convert(event.locationInWindow, from: nil))
-            let onStyle = self.style.bounds.contains(self.style.convert(event.locationInWindow, from: nil))
-            if !inOptions && !onStyle { self.hideOptions() }
-            return event
-        }
-    }
-
-    private func hideOptions() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        style.isSelected = false
-        options.dismiss()
-    }
-
-    override func removeFromSuperview() {
-        if options.superview != nil { hideOptions() }
-        super.removeFromSuperview()
-    }
-
-    /// Reader closed with the panel open: the panel, and its listener for Esc and clicks, go with it.
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil, monitor != nil { hideOptions() }
+        // Reader closed with its panel open: the panel, and its listener for Esc and clicks, go with it.
+        if window == nil { ReaderOptions.close(for: self) }
     }
 }
 
 /// How it reads, as the site panel's rows: each choice named on the left, its control on the right. Text size
-/// steps as the page's zoom does, the face and the width slide, and the colors are round swatches.
-private final class ReaderOptions: FloatingPanelView {
-    var onChange: ((Reader.Preferences) -> Void)?
-    var preferences = Reader.Preferences.saved { didSet { refresh() } }
-    var paper = Reader.AutoPaper() { didSet { swatches.paper = paper } }
+/// steps as the page's zoom does, the face and the width slide, and the colors are round swatches. Opened from the
+/// address's Aa while Reader is on, hanging under it as Site Controls hangs from its button.
+final class ReaderOptions: FloatingPanelView {
+    private static weak var current: ReaderOptions?
+    static func isOpen(in window: NSWindow?) -> Bool { current?.superview != nil && current?.window === window }
+    static func closeCurrent() { current?.close() }
+    /// The panel open for a reading page, if any.
+    static func close(for reader: ReaderView) { if current?.reader === reader { current?.close() } }
+    /// ⌘+ or ⌘− while it's open: its stepper follows.
+    static func showing(_ preferences: Reader.Preferences, for reader: ReaderView) {
+        if let current, current.reader === reader { current.preferences = preferences }
+    }
+
+    private var preferences = Reader.Preferences.saved { didSet { refresh() } }
+    private weak var reader: ReaderView?
+    private weak var opener: IconButton?
+    /// Where it goes for its size, worked out again as the window resizes.
+    private var place: ((NSSize) -> NSPoint)?
+    private var monitor: Any?
 
     private let size = ZoomStepper()
     private let face = SlidingSwitch([.styled(String(localized: "Serif", comment: "Choice of typeface in Reader's text and color choices."), NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
@@ -790,8 +674,71 @@ private final class ReaderOptions: FloatingPanelView {
     private static let padX = Tokens.Space.x4, padY = Tokens.Space.x2
     var panelSize: NSSize { NSSize(width: Self.width, height: Self.padY * 2 + PanelRow.height * CGFloat(rows.count)) }
 
+    /// Opens the panel for `reader` in `overlay`, or closes the one open. `opener`: the button it hangs from, shown
+    /// pressed while it's open; nil when there's none on screen. `recedes`: what fades back under it. `place`: its
+    /// top-left corner for its size.
+    static func toggle(for reader: ReaderView, in overlay: NSView, opener: IconButton?, recedes: [NSView] = [],
+                       place: @escaping (NSSize) -> NSPoint) {
+        if let current, current.superview != nil {
+            let same = current.reader === reader
+            current.close()
+            if same { return }
+        }
+        let panel = ReaderOptions(frame: .zero)
+        panel.reader = reader
+        panel.opener = opener
+        panel.place = place
+        panel.preferences = reader.preferences
+        panel.swatches.paper = reader.paper
+        panel.recedes = recedes
+        let size = panel.panelSize
+        panel.frame = NSRect(origin: place(size), size: size)
+        overlay.addSubview(panel)
+        if let opener, opener.window != nil {
+            let b = opener.convert(opener.bounds, to: overlay)
+            panel.growsFrom = CGPoint(x: min(max((b.midX - panel.frame.minX) / size.width, 0), 1), y: 0)
+        } else {
+            panel.growsFrom = CGPoint(x: 1, y: 0)
+        }
+        panel.present(arrival: .pop)
+        opener?.isSelected = true
+        current = panel
+        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+            guard let panel else { return event }
+            return panel.handle(event)
+        }
+    }
+
+    /// In its own window only: Esc closes it; a click outside it and its button closes it.
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        guard event.window === window, MenuPanel.current == nil else { return event }
+        if event.type == .keyDown {
+            if event.keyCode == 53 { close(); return nil }
+            return event
+        }
+        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
+        let onOpener = opener.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
+        if !inside && !onOpener { close() }
+        return event
+    }
+
+    func close() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        opener?.isSelected = false
+        if Self.current === self { Self.current = nil }
+        dismiss()
+    }
+
+    /// The window grew or shrank under it: back under its button, or in its corner.
+    override func resize(withOldSuperviewSize oldSize: NSSize) {
+        guard let place, monitor != nil else { return }
+        frame.origin = place(frame.size)
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
+        setAccessibilityLabel(String(localized: "Text and Colors", comment: "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors."))
         let typeface = String(localized: "Typeface", comment: "VoiceOver label of the typeface choice in Reader's text and color choices.")
         let width = String(localized: "Column Width", comment: "VoiceOver label of the column width choice in Reader's text and color choices.")
         let colors = String(localized: "Colors", comment: "Row in Reader's text and color choices: the paper and ink the article is shown in.")
@@ -827,7 +774,7 @@ private final class ReaderOptions: FloatingPanelView {
         edit(&next)
         guard next != preferences else { return }
         preferences = next
-        onChange?(next)
+        reader?.apply(next)
     }
 
     private func refresh() {

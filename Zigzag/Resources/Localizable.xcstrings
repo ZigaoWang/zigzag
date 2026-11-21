@@ -16435,6 +16435,17 @@
         }
       }
     },
+    "Reader Text and Colors" : {
+      "comment" : "View menu item: opens Reader's text size, typeface, column width and color choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读器文字和颜色"
+          }
+        }
+      }
+    },
     "Reading List" : {
       "comment" : "Folder that pages from another browser's reading list are imported into.",
       "localizations" : {
@@ -20084,7 +20095,7 @@
       }
     },
     "Text and Colors" : {
-      "comment" : "Tooltip of the button in Reader's bar that shows its text and color choices.",
+      "comment" : "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
