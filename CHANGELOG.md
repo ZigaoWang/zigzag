@@ -16,6 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Peek is now Zigzag Mini: shift-click a link (or Open Link in Zigzag Mini) and it opens in a Mini over your window, the same as links from other apps; ⌘O moves it into a tab next to where you clicked, Esc closes it. It opens in the page's own space and profile, and from a private window it's private too, never saved to History. Open Link in Peek in a link's menu is now Open Link in Zigzag Mini, and the getting-started guide's shift-click step shows Zigzag Mini. No settings were renamed.
 - Translate Page works in Zigzag Mini, from the View menu or the page's right-click menu, with its notices over the Mini.
 - OldTwitter's icons and fonts show on x.com: the extension's own files are now read at Zigzag's address, which the site's security policy allows, so its icon font, loading picture, list icons and tab icon appear instead of empty squares. A video inside a quoted tweet plays where it is, and a click on a quoted tweet opens only its own view. Thanks to [datarip](https://github.com/datarip).
+- Zigzag no longer quits when you click without dragging while capturing an area.
 
 ## [0.9.4] - 2026-11-21
 

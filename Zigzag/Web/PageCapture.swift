@@ -869,11 +869,21 @@ final class CaptureOverlay: NSView {
         guard mode == .area else { addCursorRect(bounds, cursor: .arrow); return }
         addCursorRect(bounds, cursor: .crosshair)
         guard let selection else { return }
-        addCursorRect(selection.insetBy(dx: Tokens.Metric.captureHandle, dy: Tokens.Metric.captureHandle), cursor: .openHand)
+        for (rect, cursor) in Self.cursorRects(for: selection) { addCursorRect(rect, cursor: cursor) }
+    }
+
+    /// The move area and the grips of `selection`; a click without a drag leaves a selection too small for a move
+    /// area, and AppKit throws on an empty or null cursor rect.
+    static func cursorRects(for selection: NSRect) -> [(NSRect, NSCursor)] {
+        guard selection.minX.isFinite, selection.minY.isFinite, selection.width.isFinite, selection.height.isFinite else { return [] }
+        var rects: [(NSRect, NSCursor)] = []
+        let inner = selection.insetBy(dx: Tokens.Metric.captureHandle, dy: Tokens.Metric.captureHandle)
+        if !inner.isNull, !inner.isEmpty { rects.append((inner, .openHand)) }
+        let side = Tokens.Metric.captureHandle * 2
         for (i, point) in CaptureGeometry.handles(of: selection).enumerated() {
-            let side = Tokens.Metric.captureHandle * 2
-            addCursorRect(NSRect(x: point.x - side / 2, y: point.y - side / 2, width: side, height: side), cursor: Self.resizeCursor(i))
+            rects.append((NSRect(x: point.x - side / 2, y: point.y - side / 2, width: side, height: side), resizeCursor(i)))
         }
+        return rects
     }
 
     /// The Mac's own resize pointers, by grip.
