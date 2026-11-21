@@ -71,3 +71,68 @@ import WebKit
         #expect(PagePrinting.mayPrint(shown: true, lastClosed: now.addingTimeInterval(-PagePrinting.pause - 0.1), now: now))
     }
 }
+
+/// Capture's arithmetic (#457): an area from a drag, its grips and nudges, how an element is taken, the card's
+/// picture and the file's name.
+struct PageCaptureGeometryTests {
+    let bounds = NSRect(x: 0, y: 0, width: 800, height: 600)
+
+    @Test func aDragMakesAnAreaWithinThePage() {
+        #expect(CaptureGeometry.rect(from: NSPoint(x: 300, y: 200), to: NSPoint(x: 100, y: 50), in: bounds) == NSRect(x: 100, y: 50, width: 200, height: 150))
+        #expect(CaptureGeometry.rect(from: NSPoint(x: 700, y: 500), to: NSPoint(x: 900, y: 700), in: bounds) == NSRect(x: 700, y: 500, width: 100, height: 100))
+        #expect(CaptureGeometry.sizeText(NSSize(width: 640.4, height: 359.6)) == "640 × 360")
+    }
+
+    @Test func gripsResizeAndTurnOver() {
+        let r = NSRect(x: 100, y: 100, width: 200, height: 100)
+        #expect(CaptureGeometry.handles(of: r).count == 8)
+        #expect(CaptureGeometry.handles(of: r)[0] == NSPoint(x: 100, y: 100))
+        #expect(CaptureGeometry.handles(of: r)[4] == NSPoint(x: 300, y: 200))
+        #expect(CaptureGeometry.resized(r, handle: 4, to: NSPoint(x: 400, y: 300), in: bounds) == NSRect(x: 100, y: 100, width: 300, height: 200))
+        #expect(CaptureGeometry.resized(r, handle: 1, to: NSPoint(x: 999, y: 50), in: bounds) == NSRect(x: 100, y: 50, width: 200, height: 150))
+        // Past the opposite edge it turns over instead of vanishing.
+        #expect(CaptureGeometry.resized(r, handle: 7, to: NSPoint(x: 350, y: 0), in: bounds) == NSRect(x: 300, y: 100, width: 50, height: 100))
+    }
+
+    @Test func movingKeepsTheSizeAndStopsAtTheEdges() {
+        let r = NSRect(x: 100, y: 100, width: 200, height: 100)
+        #expect(CaptureGeometry.moved(r, by: NSPoint(x: 10, y: -5), in: bounds) == NSRect(x: 110, y: 95, width: 200, height: 100))
+        #expect(CaptureGeometry.moved(r, by: NSPoint(x: 1000, y: 1000), in: bounds) == NSRect(x: 600, y: 500, width: 200, height: 100))
+        #expect(CaptureGeometry.moved(r, by: NSPoint(x: -1000, y: -1000), in: bounds) == NSRect(x: 0, y: 0, width: 200, height: 100))
+    }
+
+    @Test func anElementIsTakenWholeEvenOffScreen() {
+        let screen = NSSize(width: 800, height: 600)
+        func route(_ r: NSRect, inner: Bool = false, pinned: Bool = false) -> CaptureGeometry.Route {
+            CaptureGeometry.route(css: r, viewport: screen, inner: inner, pinned: pinned)
+        }
+        #expect(route(NSRect(x: 10, y: 10, width: 300, height: 200)) == .onScreen)
+        #expect(route(NSRect(x: 10, y: 900, width: 300, height: 200)) == .scrollIntoView)
+        #expect(route(NSRect(x: 10, y: 400, width: 300, height: 400)) == .scrollIntoView)
+        #expect(route(NSRect(x: 10, y: 100, width: 700, height: 2000)) == .whole)
+        #expect(route(NSRect(x: 10, y: 100, width: 700, height: 2000), inner: true) == .visiblePart)
+        #expect(route(NSRect(x: 0, y: 500, width: 800, height: 200), pinned: true) == .visiblePart)
+    }
+
+    @Test func picturesFollowZoomOnWholePixels() {
+        #expect(CaptureGeometry.viewRect(css: NSRect(x: 8, y: 16, width: 100, height: 40), zoom: 1.25) == NSRect(x: 10, y: 20, width: 125, height: 50))
+        #expect(CaptureGeometry.pixelAligned(NSRect(x: 10.3, y: 0.26, width: 100.1, height: 50), scale: 2) == NSRect(x: 10.5, y: 0.5, width: 100, height: 50))
+        #expect(CaptureGeometry.pixelAligned(NSRect(x: 10.3, y: 0.26, width: 100.1, height: 50), scale: 1) == NSRect(x: 10, y: 0, width: 100, height: 50))
+    }
+
+    @Test func theCardShowsATallPictureFromItsTop() {
+        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 1000, height: 500), width: 216, maxHeight: 160) == NSSize(width: 216, height: 108))
+        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 1000, height: 10_000), width: 216, maxHeight: 160) == NSSize(width: 216, height: 160))
+        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 2000, height: 50), width: 216, maxHeight: 160).height == Tokens.Space.x8)
+    }
+
+    @Test func theFileIsNamedAfterThePageAndTheTime() {
+        var parts = DateComponents()
+        (parts.year, parts.month, parts.day, parts.hour, parts.minute, parts.second) = (2026, 11, 21, 14, 3, 22)
+        let date = Calendar.current.date(from: parts)!
+        #expect(CaptureGeometry.fileName(title: "Docs: a/b", date: date) == "Docs- a-b 2026-11-21 at 14.03.22.png")
+        #expect(CaptureGeometry.fileName(title: "  ", date: date) == "Capture 2026-11-21 at 14.03.22.png")
+        let long = CaptureGeometry.fileName(title: String(repeating: "x", count: 200), date: date)
+        #expect(long.hasPrefix(String(repeating: "x", count: 80) + " 2026"))
+    }
+}
