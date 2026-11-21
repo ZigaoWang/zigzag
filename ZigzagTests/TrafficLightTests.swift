@@ -62,10 +62,9 @@ struct TrafficLightTests {
             #expect(phase == end, "\(events)")
             #expect(!phase.isMoving)
         }
-        #expect(FullScreenPhase.windowed.titlebarAppearsTransparent && !FullScreenPhase.windowed.showsFullScreenBar)
-        #expect(!FullScreenPhase.fullScreen.titlebarAppearsTransparent && FullScreenPhase.fullScreen.showsFullScreenBar)
-        #expect(!FullScreenPhase.entering.titlebarAppearsTransparent && !FullScreenPhase.entering.showsFullScreenBar)
-        #expect(FullScreenPhase.exiting.titlebarAppearsTransparent && !FullScreenPhase.exiting.showsFullScreenBar)
+        for phase in [FullScreenPhase.windowed, .entering, .fullScreen, .exiting] {
+            #expect(phase.titlebarAppearsTransparent, "\(phase)")
+        }
     }
 
     /// While AppKit moves the title bar into or out of full screen, Zigzag doesn't move or hide the buttons (#401).
