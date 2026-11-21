@@ -1106,7 +1106,7 @@ final class AutofillMenu: FloatingPanelView {
     override func mouseUp(with event: NSEvent) {}
 
     private var rows: [AutofillRow] = []
-    private let footer = TextButton(title: String(localized: "Passwords", comment: "Link at the bottom of the menu that fills a password into a page: opens the Passwords window."), font: Tokens.Font.small(.medium))
+    private let footer = PillButton(title: String(localized: "Passwords", comment: "Link at the bottom of the menu that fills a password into a page: opens the Passwords window."), style: .quiet)
     private let footerLine = ColorView(color: Tokens.Color.separator)
     private let hasFooter: Bool
     private var selection = -1 {
@@ -1200,7 +1200,8 @@ final class AutofillMenu: FloatingPanelView {
         guard hasFooter else { return }
         let y = pad + CGFloat(rows.count) * rowHeight + pad / 2
         footerLine.frame = NSRect(x: pad + Tokens.Space.x2, y: y, width: bounds.width - (pad + Tokens.Space.x2) * 2, height: Tokens.Metric.hairline)
-        footer.frame = NSRect(x: pad, y: y + pad / 2, width: footer.fittingWidth, height: footerHeight)
+        let fh = Tokens.Page.controlHeight
+        footer.frame = NSRect(x: pad, y: y + pad / 2 + (footerHeight - fh) / 2, width: footer.fittingWidth, height: fh)
     }
 }
 

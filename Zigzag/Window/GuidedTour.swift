@@ -14,10 +14,10 @@ final class GuidedTour: NSView {
     private let title = Label("", font: .systemFont(ofSize: 22, weight: .semibold), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
-    private let skip = TextButton(title: String(localized: "Skip", comment: "Button in the getting-started guide, a card in the window: skips the step."), font: Tokens.Font.small(.medium))
+    private let skip = PillButton(title: String(localized: "Skip", comment: "Button in the getting-started guide, a card in the window: skips the step."), style: .quiet)
     /// Ends the guide for good; Help › Getting Started brings it back.
     private let close = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "End Getting Started", comment: "Tooltip of the close button of the getting-started guide, a card in the window."))
-    private let finish = PrimaryButton(title: String(localized: "Start Browsing", comment: "Button that ends the getting-started guide, a card in the window, after its last step."))
+    private let finish = PillButton(title: String(localized: "Start Browsing", comment: "Button that ends the getting-started guide, a card in the window, after its last step."), style: .prominent)
     // The last card: a note from the person who made Zigzag.
     private let wordmark = WordmarkView()
     private let letter = NSTextField(wrappingLabelWithString: "")
@@ -80,7 +80,6 @@ final class GuidedTour: NSView {
         _ = demo
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display)
-        skip.textColor = NSColor.white.withAlphaComponent(0.6)
         // Dark, whatever the page: a white card on a white page disappears.
         card.surfaceTint = NSColor(white: 0.1, alpha: 1)
         card.tintStrength = 0.94
@@ -761,7 +760,8 @@ final class GuidedTour: NSView {
         let cs = IconButton.Size.compact.side
         close.frame = NSRect(x: width - Tokens.Space.x3 - cs, y: top + (height - cs) / 2, width: cs, height: cs)
         let end = close.isHidden ? width - Tokens.Space.x2 : close.frame.minX - Tokens.Space.x1
-        skip.frame = NSRect(x: end - sw, y: top + (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
+        let sh = Tokens.Page.controlHeight
+        skip.frame = NSRect(x: end - sw, y: top + (height - sh) / 2, width: sw, height: sh)
         let cw = step.textWidth + 2
         step.frame = NSRect(x: skip.frame.minX - Tokens.Space.x1 - cw, y: top + (height - step.lineHeight) / 2, width: cw, height: step.lineHeight)
         // The words take what's left, ending in "…" when the card is as narrow as the page.

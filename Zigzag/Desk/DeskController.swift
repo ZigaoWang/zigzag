@@ -16,7 +16,7 @@ final class DeskHeaderView: InteractiveView {
     }
     private static let dotSize = Tokens.Space.x2
     /// "Close 3 Duplicates", when the space has the same page open more than once.
-    let duplicatesButton = TextButton(title: "", font: Tokens.Font.body())
+    let duplicatesButton = PillButton(style: .quiet)
     var duplicates = 0 {
         didSet {
             duplicatesButton.title = String(localized: "Close \(duplicates) Duplicates", comment: "In the tab overview (all spaces' tabs as cards), a button beside a space's name: closes the tabs that show a page already open.")
