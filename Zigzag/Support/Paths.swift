@@ -26,6 +26,9 @@ nonisolated enum Paths {
     static let library = file("Library.json")
     static let profiles = file("Profiles.json")
     static let session = file("Session.json")
+    /// The session a fresh start passed over (#433): Window › Reopen Last Session brings it back, and saving the
+    /// new session never writes over it.
+    static let previousSession = file("SessionBeforeFreshStart.json")
     static let downloads = file("Downloads.json")
     static let downloadRules = file("DownloadRules.json")
     static let history = file("History.sqlite")

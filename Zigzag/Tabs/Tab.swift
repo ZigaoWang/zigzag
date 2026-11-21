@@ -2240,6 +2240,8 @@ extension Tab: WKNavigationDelegate {
         pdfFailed = []
         checkForPDF(webView, fresh: fresh)
         hasLoadedOnce = true
+        // A page has actually loaded: on a fresh start that's browsing, and the session from before gives way (#433).
+        WindowManager.shared.pageLoaded()
         // The page's own icon as soon as it's here, not only once it finishes (some sites never quite do).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.refreshFavicon() }
         // A new page under a tab that isn't showing: its picture is of the old one, and can't be retaken until it

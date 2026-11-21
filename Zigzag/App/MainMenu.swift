@@ -230,6 +230,9 @@ enum MainMenu {
         main.addItem(history)
 
         let window = submenu(String(localized: "Window", comment: "A menu in the menu bar."), [
+            // What a fresh start passed over at launch (#433): the session from before comes back.
+            item(String(localized: "Reopen Last Session", comment: "Window menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh."), #selector(AppDelegate.reopenLastSession(_:)), ""),
+            .separator(),
             item(String(localized: "Minimize", comment: "Window menu item."), #selector(NSWindow.performMiniaturize(_:)), "m"),
             item(String(localized: "Zoom", comment: "Window menu item."), #selector(NSWindow.performZoom(_:)), ""),
             // No key: ⌥⌘T is Translate Page, and there's no common one for this.

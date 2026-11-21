@@ -1342,15 +1342,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         launchChoice.options = LaunchChoice.allCases.map { choice in
             switch choice {
             case .resume: DropdownButton.Option(title: String(localized: "Pick Up Where You Left Off", comment: "A choice for “On launch” in Settings › General: the last session's windows come back."))
-            case .fresh: DropdownButton.Option(title: String(localized: "Start Fresh", comment: "A choice for “On launch” in Settings › General: one new window, the last session left for Window › Reopen Last Window."))
+            case .fresh: DropdownButton.Option(title: String(localized: "Start Fresh", comment: "A choice for “On launch” in Settings › General: one new window, the last session left for Window › Reopen Last Session."))
             }
         }
         launchChoice.selectedIndex = LaunchChoice.allCases.firstIndex(of: LaunchChoice.choice) ?? 0
         launchChoice.onSelect = { index in LaunchChoice.choice = LaunchChoice.allCases[index] }
         let launchRow = FormRow(title: String(localized: "On launch", comment: "A setting in Settings › General: what a launch does with the last session."),
-                                detail: String(localized: "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for Window › Reopen Last Window.", comment: "Explanation under “On launch” in Settings › General."),
+                                detail: String(localized: "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for Window › Reopen Last Session.", comment: "Explanation under “On launch” in Settings › General."),
                                 control: launchChoice)
-        launchRow.keywords = String(localized: "startup restore session reopen windows fresh blank resume", comment: "Words that find the On launch setting with Find a setting in Settings. Not shown.")
+        launchRow.keywords = String(localized: "startup launch on start restore session reopen windows fresh blank resume", comment: "Words that find the On launch setting with Find a setting in Settings. Not shown.")
         generalGroup.add(launchRow)
         // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
         if Self.hasLanguages {
@@ -1406,8 +1406,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                               detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                               control: quitToggle)
-        // There's no startup setting: your tabs always come back. Quitting is the nearest, and where people look.
-        quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.")
+        quitRow.keywords = String(localized: "quit quitting close command q ask confirm", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Not shown.")
         generalGroup.add(quitRow)
         reloadWebApps()
         webAppsToken = WebAppStore.shared.changed.observe { [weak self] in

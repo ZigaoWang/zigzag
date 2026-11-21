@@ -1,6 +1,61 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Your tabs and spaces are saved, and Window › Reopen Last Session brings them back." : {
+      "comment" : "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the Window menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的标签页和空间都已保存，“窗口 › 重新打开上次会话”可以再把它们带回来。"
+          }
+        }
+      }
+    },
+    "Reopen Last Session" : {
+      "comment" : "Window menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新打开上次会话"
+          }
+        }
+      }
+    },
+    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for Window › Reopen Last Session." : {
+      "comment" : "Explanation under “On launch” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“窗口 › 重新打开上次会话”里找回。"
+          }
+        }
+      }
+    },
+    "startup launch on start restore session reopen windows fresh blank resume" : {
+      "comment" : "Words that find the On launch setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动 开机 恢复 会话 重新打开 窗口 全新 空白 继续 startup launch on start restore session reopen windows fresh blank resume"
+          }
+        }
+      }
+    },
+    "quit quitting close command q ask confirm" : {
+      "comment" : "Words that find the Ask before quitting setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 关闭 命令 q 询问 确认 quit quitting close command q ask confirm"
+          }
+        }
+      }
+    },
     "#%lld on GitHub" : {
       "comment" : "Tooltip of an issue number at the end of a point in What’s New, like “#32 on GitHub”.",
       "localizations" : {
@@ -4365,17 +4420,6 @@
         }
       }
     },
-    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for Window › Reopen Last Window." : {
-      "comment" : "Explanation under “On launch” in Settings › General.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“接着上次继续”会恢复你上次开的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“窗口 › 重新打开上一个窗口”里找回。"
-          }
-        }
-      }
-    },
     "Remember for this site" : {
       "comment" : "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.",
       "localizations" : {
@@ -4410,7 +4454,7 @@
       }
     },
     "Start Fresh" : {
-      "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for Window › Reopen Last Window.",
+      "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for Window › Reopen Last Session.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
