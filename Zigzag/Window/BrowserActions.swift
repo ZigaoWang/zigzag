@@ -972,9 +972,10 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(toggleBookmark(_:)):
             // Same names as the sidebar menus.
-            let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
+            let pinsPair = tab.map(tabManager.pinsSplit) ?? false
             item.title = tab?.isFavorite == true ? String(localized: "Move to Tabs", comment: "Menu bar item: moves the favorite back to the tabs.")
                 : tab?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil ? String(localized: "Unpin Group", comment: "Menu bar item: unpins the whole pinned group the tab is in.")
+                : tab?.bookmarkID.flatMap(Library.shared.pinnedSplit(containing:)) != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
                 : tab?.bookmarkID != nil ? String(localized: "Unpin Tab", comment: "Menu bar item: unpins the tab.")
                 : tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")

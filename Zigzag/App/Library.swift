@@ -1566,6 +1566,24 @@ final class Library {
         commit()
     }
 
+    /// One page out of its pinned or favorite group of three or four: it stays where it's kept, on its own after the
+    /// group, and the rest close up around its place as a group of tabs does; out of a split of two, the split ends.
+    func removeFromPinnedSplit(_ id: UUID) {
+        func shrunk(_ split: PinnedSplit) -> PinnedSplit? { split.layout.removing(id).map(PinnedSplit.init(layout:)) }
+        if let i = favoriteSplits.firstIndex(where: { $0.contains(id) }) {
+            if let rest = shrunk(favoriteSplits[i]) { favoriteSplits[i] = rest } else { favoriteSplits.remove(at: i) }
+            tidyFavorites()
+            commit()
+            return
+        }
+        guard let s = spaces.firstIndex(where: { $0.pinnedSplits?.contains { $0.contains(id) } == true }),
+              let i = spaces[s].pinnedSplits?.firstIndex(where: { $0.contains(id) }), let split = spaces[s].pinnedSplits?[i] else { return }
+        if let rest = shrunk(split) { spaces[s].pinnedSplits?[i] = rest } else { spaces[s].pinnedSplits?.remove(at: i) }
+        if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
+        tidyFolders(s)
+        commit()
+    }
+
     /// Ends a pinned split; both pages stay pinned where they are.
     func removePinnedSplit(containing bookmarkID: UUID) {
         if favoriteSplits.contains(where: { $0.contains(bookmarkID) }) {

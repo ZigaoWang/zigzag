@@ -263,7 +263,7 @@ enum SidebarMenus {
         // Save at the end of Pinned, or with ⇧ held where the picker says (#326). A whole group or a split view saves
         // as one, so the item says which. Pinned pages are shared by every window: a private one's tabs stay out.
         if !isPrivate, tab.bookmarkID == nil, tab.url != nil, manager.canPin(tab) {
-            let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
+            let pinsPair = manager.pinsSplit(tab)
             let saveTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is pinned as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
                 : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar: pins the page into Pinned, and with ⇧ held, asks which folder.")
@@ -341,6 +341,8 @@ enum SidebarMenus {
             context.append(Item(String(localized: "Separate from Pinned Tab", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own."), symbol: Symbol.separate) { manager.separateBookmarkTab(bookmark.id) })
         }
         if let pinned {
+            // One page of three or four can leave, as from a group of tabs; the rest stay one pinned group.
+            if pinned.isGroup, !isPrivate { context.append(Item(removeFromSplitTitle, symbol: Symbol.leaveSplit) { controller.leavePinnedGroupWithUndo(bookmark.id) }) }
             // Both stay pinned, each in a row of its own.
             context.append(Item(separateSplitTitle, symbol: Symbol.separateSplit) {
                 let open = pinned.ids.compactMap(manager.bookmarkTab(for:)).first { manager.split(for: $0) != nil }

@@ -184,6 +184,14 @@ extension BrowserWindowController {
         }
     }
 
+    /// A pinned page out of its pinned group of three or four, undoably; the rest stay one pinned group.
+    func leavePinnedGroupWithUndo(_ bookmarkID: UUID) {
+        guard !tabManager.isPrivate else { return }
+        pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
+            tabManager.leavePinnedGroup(bookmarkID)
+        }
+    }
+
     /// A split favorite parted into two favorites, side by side in the grid; open, its pages part on screen too.
     func separateFavoriteSplitWithUndo(_ favoriteID: UUID) {
         guard let pair = Library.shared.pinnedSplit(containing: favoriteID) else { return }

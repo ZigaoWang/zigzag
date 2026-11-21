@@ -519,6 +519,93 @@ import Testing
         #expect(bookmarks.map(\.id) == [marks[1].id, marks[2].id, marks[0].id])
     }
 
+    /// A four-page split's row dragged among the pins pins it whole, in its shape; dragged back among the tabs it's
+    /// the same four tabs side by side; ⌘Z steps back through both.
+    @Test func aFourPageSplitDraggedToPinnedAndBack() throws {
+        try inWindow(["0", "1", "2", "3"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let shape = Self.shapes[4]
+            manager.makeGroup(tabs, shape: shape)
+            // One group per step, as each drop is in the app.
+            let undo = controller.sidebarUndo
+            undo.groupsByEvent = false
+            func step(_ body: () -> Void) { undo.beginUndoGrouping(); body(); undo.endUndoGrouping() }
+            step { controller.listBookmark(tabs[2], at: 0, in: space) }
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == 4)
+            let pinned = try #require(Library.shared.pinnedSplit(containing: marks[0]))
+            #expect(pinned.ids == marks && pinned.shape == shape)
+            #expect(manager.split(for: tabs[0])?.shape == shape)
+            step { controller.listUnbookmark(marks[0], to: 0) }
+            #expect(Library.shared.pinnedSplit(containing: marks[0]) == nil)
+            #expect(manager.tabs(in: space).map(\.id) == tabs.map(\.id))
+            #expect(manager.split(for: tabs[0])?.ids == tabs.map(\.id))
+            #expect(manager.split(for: tabs[0])?.shape == shape)
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.bookmarks(in: space).isEmpty)
+            #expect(manager.split(for: tabs[0])?.ids == tabs.map(\.id))
+        }
+    }
+
+    /// One page out of a pinned split of three: it stays pinned on its own after the other two, which stay one
+    /// pinned split, on screen too; ⌘Z puts all three back together.
+    @Test func onePageLeavesAPinnedSplitOfThree() throws {
+        try inWindow(["0", "1", "2"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.makeGroup(tabs, shape: Self.shapes[2])
+            manager.bookmarkTab(tabs[0], in: space)
+            let marks = tabs.compactMap(\.bookmarkID)
+            manager.select(tabs[0])
+            let menu = SidebarMenus.bookmarkMenu(for: try #require(Library.shared.bookmark(marks[1])), controller: controller)
+            #expect(menu.items.contains { $0.title == SidebarMenus.removeFromSplitTitle })
+            controller.leavePinnedGroupWithUndo(marks[1])
+            let rest = try #require(Library.shared.pinnedSplit(containing: marks[0]))
+            #expect(rest.ids == [marks[0], marks[2]])
+            #expect(Library.shared.pinnedSplit(containing: marks[1]) == nil)
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == [marks[0], marks[2], marks[1]])
+            #expect(manager.split(for: tabs[0])?.ids == [tabs[0].id, tabs[2].id])
+            #expect(manager.split(for: tabs[1]) == nil)
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            #expect(manager.split(for: tabs[0])?.ids == tabs.map(\.id))
+        }
+    }
+
+    /// Closing one page of a pinned split unloads that page and keeps the pin whole, for four pages as for two.
+    @Test(arguments: [2, 4]) func closingOnePinnedPageKeepsThePin(count: Int) throws {
+        try inWindow((0..<count).map(String.init)) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.makeGroup(tabs, shape: count == 2 ? Self.shapes[0] : Self.shapes[4])
+            manager.bookmarkTab(tabs[0], in: space)
+            let marks = tabs.compactMap(\.bookmarkID)
+            manager.close(tabs[1])
+            #expect(manager.bookmarkTab(for: marks[1]) == nil)
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            #expect(tabs.indices.filter { $0 != 1 }.allSatisfy { manager.bookmarkTab(for: marks[$0]) === tabs[$0] })
+        }
+    }
+
+    /// A tab of three or four side by side says it pins the split view, as one of two does, in its menu and the
+    /// menu bar; a pinned one's says it unpins the split view.
+    @Test func theItemsNameTheSplitForEveryCount() throws {
+        try inWindow(["0", "1", "2", "3"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.makeGroup(tabs, shape: Self.shapes[4])
+            manager.select(tabs[1])
+            let pin = String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
+            #expect(SidebarMenus.tabMenu(for: tabs[1], controller: controller).items.contains { $0.title == pin })
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleBookmark(_:)), keyEquivalent: "d")
+            #expect(controller.validateMenuItem(item))
+            #expect(item.title == pin)
+            controller.toggleBookmark(item)
+            #expect(controller.validateMenuItem(item))
+            #expect(item.title == String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned."))
+            _ = space
+        }
+    }
+
     /// The tab list and the pinned pages draw a split's row with the same view, laid out the same: its parts,
     /// hairlines and × in the same places.
     @Test(arguments: [2, 3, 4]) func bothSectionsDrawTheSameRow(count: Int) throws {

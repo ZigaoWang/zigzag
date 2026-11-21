@@ -1210,6 +1210,14 @@ final class TabManager {
         return partners.filter { $0.bookmarkID == nil && $0.url != nil }.allSatisfy(pinnable)
     }
 
+    /// Whether pinning this tab pins its split view or tile group with it, every page side by side: all its pages
+    /// are tabs with a page, two of them or four.
+    func pinsSplit(_ tab: Tab) -> Bool {
+        guard tab.bookmarkID == nil, let pair = split(for: tab) else { return false }
+        let pages = pair.ids.compactMap { self.tab(with: $0) }
+        return pages.count == pair.count && pages.allSatisfy { $0.bookmarkID == nil && $0.url != nil }
+    }
+
     /// Pins a whole tab group (#325) as one folder at a place among the pinned pages; nil if it can't be pinned whole.
     @discardableResult
     func pinGroup(_ id: UUID, at index: Int? = nil, in spaceID: UUID? = nil) -> BookmarkFolder? {
@@ -1258,8 +1266,8 @@ final class TabManager {
             structureChanged()
             return
         }
-        if let pair = split(for: tab), case let pages = pair.ids.compactMap({ self.tab(with: $0) }), pages.count == pair.count,
-           pages.allSatisfy({ $0.bookmarkID == nil && $0.url != nil }) {
+        if pinsSplit(tab), let pair = split(for: tab) {
+            let pages = pair.ids.compactMap { self.tab(with: $0) }
             let marks = pages.map { page in
                 let mark = Bookmark(url: page.url ?? url, title: Self.bookmarkTitle(page.displayTitle, url: page.url ?? url), icon: page.customIcon)
                 removeFromList(page)
@@ -2025,6 +2033,20 @@ final class TabManager {
         let shape = rest.shape
         let taker = rest.ids.indices.first { shape.regions[$0].cells & gone != 0 } ?? 0
         return self.tab(with: rest.ids[taker])
+    }
+
+    /// One pinned page out of its pinned group of three or four, as `leaveGroup` takes a tab out of a group of tabs:
+    /// it stays pinned on its own, and the rest stay one pinned group, closed up around its place, on screen too.
+    func leavePinnedGroup(_ bookmarkID: UUID) {
+        guard let pinned = Library.shared.pinnedSplit(containing: bookmarkID), pinned.isGroup else { return }
+        // On screen first, so the group there still matches its pinned one once the library changes.
+        if let tab = bookmarkTabs[bookmarkID], let index = splits.firstIndex(where: { $0.contains(tab.id) }),
+           let rest = splits[index].removing(tab.id) {
+            splits[index] = rest
+        }
+        Library.shared.removeFromPinnedSplit(bookmarkID)
+        structureChanged()
+        selectionChanged()
     }
 
     /// Two to four tabs of one space side by side as a tile group laid out as `shape`, ending any splits they were in
