@@ -1450,20 +1450,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func nowPlayingMenu(for tab: Tab) -> NSMenu? {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.")) { [weak self] in
+        typealias S = SidebarMenus.Symbol
+        menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound."), symbol: S.showTab) { [weak self] in
             self?.tabManager.select(tab)
         })
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item(isPausedForNowPlaying(tab) ? String(localized: "Play", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
-                                       : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) { [weak self] in
+                                       : String(localized: "Pause", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."),
+                                       symbol: isPausedForNowPlaying(tab) ? S.play : S.pause) { [weak self] in
             self?.toggleNowPlaying(tab)
         })
         menu.addItem(SidebarMenus.Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")
-                                       : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.")) {
+                                       : String(localized: "Mute Tab", comment: "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background."),
+                                       symbol: tab.isMuted ? S.unmute : S.mute) {
             tab.setMuted(!tab.isMuted)
         })
         menu.addItem(.separator())
-        menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing.")) { [weak self] in
+        menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing."), symbol: S.close) { [weak self] in
+
             self?.hideNowPlaying(tab)
         })
         return menu
@@ -3387,7 +3391,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listMenu(for item: SidebarItem) -> NSMenu? {
         switch item {
-        case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID)
+        case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID, anchor: sidebar.list.headerView)
         case .tab(let id): return tabManager.tab(with: id).map { SidebarMenus.tabMenu(for: $0, controller: self) }
         case .bookmark(let id): return Library.shared.bookmark(id).map { SidebarMenus.bookmarkMenu(for: $0, controller: self) }
         case .folder(let id): return Library.shared.folder(id).map { SidebarMenus.folderMenu(for: $0, controller: self) }
@@ -3403,8 +3407,11 @@ extension BrowserWindowController: SidebarDelegate {
     /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
     func sidebarDoubleClickedBlank() { if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) } }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
-    func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
-        let menu = SidebarMenus.spaceMenu(for: id, controller: self)
+    /// A space dot's menu: Edit Space… opens at the dot.
+    func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }
+
+    private func sidebarSpaceMenu(for id: UUID, anchor: NSView?) -> NSMenu? {
+        let menu = SidebarMenus.spaceMenu(for: id, controller: self, anchor: anchor)
         return menu.items.isEmpty ? nil : menu
     }
 }

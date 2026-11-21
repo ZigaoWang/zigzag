@@ -259,7 +259,7 @@ enum CommandRanker {
         }
         if c.hasPage, !c.isFavorite, !c.isPrivate {
             list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
-                               keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: "star"))
+                               keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: SidebarMenus.Symbol.favorite))
         }
         if c.inSplit {
             list.append(Action(id: "separate", title: String(localized: "Separate Tabs", comment: "A command in the command bar, named as in the menu bar."),
@@ -274,7 +274,7 @@ enum CommandRanker {
         }
         if c.hasTabsBelow {
             list.append(Action(id: "close-below", title: String(localized: "Close Tabs Below", comment: "A command in the command bar, named as in the menu bar."),
-                               keywords: ["close", "tabs", "below", "under"], symbol: "xmark.circle"))
+                               keywords: ["close", "tabs", "below", "under"], symbol: SidebarMenus.Symbol.closeBelow))
         }
         if c.canReopen {
             list.append(Action(id: "reopen", title: String(localized: "Reopen Closed Tab", comment: "A command in the command bar, named as in the menu bar."),
