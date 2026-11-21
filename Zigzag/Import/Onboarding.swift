@@ -332,6 +332,12 @@ private final class StepPage: NSView {
         // The title sits at the same height on every step, so going from one to the next only changes what's under
         // it; a step with a tall card starts a little higher to make room, never under the progress.
         var y = max(76, min(Self.titleTop, round(footY - 28 - want)))
+        if content.isQuestion {
+            // A question's few lines and its answers sit in the middle, between the progress and the bottom row.
+            let shown = head + Self.cardPad + content.preferredHeight(for: width - Self.cardPad * 2)
+            let top = dotY + Tokens.Welcome.dot
+            y = max(76, round(top + (footY - top - shown) / 2))
+        }
         title.frame = NSRect(x: x, y: y, width: width, height: th)
         y = title.frame.maxY + 10
         let bh = ceil(body.sizeThatFits(NSSize(width: width - 80, height: 200)).height)

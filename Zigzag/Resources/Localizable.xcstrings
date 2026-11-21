@@ -12,6 +12,17 @@
         }
       }
     },
+    "Since %@" : {
+      "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自 %@ 起"
+          }
+        }
+      }
+    },
     "Where ⌘T and links put a new tab in the sidebar." : {
       "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
       "localizations" : {
@@ -11133,7 +11144,7 @@
       }
     },
     "Hide Reader" : {
-      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.\nTooltip of the address bar's Reader button while Reader is on.",
+      "comment" : "Menu bar item: closes Reader.\nTooltip of the Reader action in the site panel, while Reader is on.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18639,7 +18650,7 @@
       }
     },
     "Share…" : {
-      "comment" : "File menu item.",
+      "comment" : "Button under Your Zigzag Card: opens the Mac's share menu with its picture.\nFile menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19508,7 +19519,7 @@
       }
     },
     "Space" : {
-      "comment" : "VoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19536,6 +19547,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空间 %lld"
+          }
+        }
+      }
+    },
+    "Space: your space’s colors" : {
+      "comment" : "Tooltip of the Space color choice in Reader: the article takes the colors of the space you're in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间：你所在空间的颜色"
           }
         }
       }
@@ -20120,17 +20142,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字大小"
-          }
-        }
-      }
-    },
-    "Text and Colors" : {
-      "comment" : "Tooltip of the address bar's Aa button while Reader is on, and VoiceOver name of the panel it opens: Reader's text size, typeface, column width and colors.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文字和颜色"
           }
         }
       }
@@ -21567,6 +21578,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在从%@翻译…"
+          }
+        }
+      }
+    },
+    "Translating from %@… %lld%%" : {
+      "comment" : "Toast while a page is translated, with how much is done. The language is its name, like French; then a percent, like 40%.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从%@翻译… %lld%%"
           }
         }
       }
@@ -25914,6 +25936,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建文件夹…"
+          }
+        }
+      }
+    },
+    "Your Zigzag Card…" : {
+      "comment" : "Zigzag menu item: opens a card with your name and the day you started using Zigzag, to keep or share.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Zigzag 卡片…"
+          }
+        }
+      }
+    },
+    "Your Zigzag Card" : {
+      "comment" : "Title of the window with Your Zigzag Card, and its name for VoiceOver.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Zigzag 卡片"
+          }
+        }
+      }
+    },
+    "Save as Image…" : {
+      "comment" : "Button under Your Zigzag Card: saves it as a PNG picture, asking where.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储为图片…"
+          }
+        }
+      }
+    },
+    "Zigzag Card" : {
+      "comment" : "File name of Your Zigzag Card saved as a picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 卡片"
           }
         }
       }

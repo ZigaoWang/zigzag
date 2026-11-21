@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -95,6 +96,18 @@ struct UpdateReadyTests {
         #expect(UpdateCard.amount(12_000_000, of: 40_000_000) == "12.0 of 40.0 MB")
         #expect(UpdateCard.amount(50_000_000, of: 40_000_000) == "40.0 of 40.0 MB")
         #expect(UpdateCard.amount(400_400, of: 900_000) == "400 of 900 KB")
+    }
+
+    /// While downloading, the amount and the bar end as far from the card's right as the icon's art starts from its left.
+    @MainActor @Test func theDownloadingCardHasEqualSideInsets() throws {
+        let card = UpdateCard(frame: NSRect(x: 0, y: 0, width: 208, height: Tokens.Sidebar.updateCardBusyHeight))
+        card.show(.downloading(version: "0.9.9", received: 12_000_000, total: 40_000_000))
+        card.layoutSubtreeIfNeeded()
+        let parts = Dictionary(uniqueKeysWithValues: Mirror(reflecting: card).children.compactMap { child in (child.value as? NSView).map { (child.label ?? "", $0) } })
+        let icon = try #require(parts["icon"]), amount = try #require(parts["amount"]), bar = try #require(parts["bar"])
+        let art = icon.frame.minX + round(icon.frame.width * 100 / 1024 * 2) / 2
+        #expect(card.bounds.width - (amount.frame.maxX - Label.inset) == art)
+        #expect(card.bounds.width - bar.frame.maxX == art)
     }
 
     @MainActor @Test func aCheckYouAskedForShowsOnTheCard() {

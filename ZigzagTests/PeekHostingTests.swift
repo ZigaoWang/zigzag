@@ -144,6 +144,61 @@ import WebKit
         #expect(peeked.toldTo == nil)
     }
 
+    /// A link followed inside the Peek gives its strip back and forward, which walk the Peek's own pages (#463).
+    @Test func aLinkFollowedInPeekShowsBackAndForward() async throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let under = Tab(url: nil, title: "Under", spaceID: space)
+        manager.adopt([under], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(under)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let first = folder.appendingPathComponent("first.html"), second = folder.appendingPathComponent("second.html")
+        try "<p>First</p>".write(to: first, atomically: true, encoding: .utf8)
+        try "<p>Second</p>".write(to: second, atomically: true, encoding: .utf8)
+
+        controller.peek.show(url: first, configuration: nil, opener: under)
+        let peeked = try #require(controller.peek.tab)
+        let strip = controller.peek.headerView
+        for _ in 0..<200 where peeked.isLoading || peeked.url != first { try await Task.sleep(for: .milliseconds(20)) }
+        // One page: nothing to go back to, so no buttons.
+        #expect(!strip.showsHistory)
+        peeked.load(second)
+        for _ in 0..<200 where !peeked.canGoBack { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(strip.showsHistory)
+        #expect(strip.back.isEnabled)
+        #expect(!strip.forward.isEnabled)
+        strip.layoutSubtreeIfNeeded()
+        #expect(strip.icon.frame.minX > strip.forward.frame.maxX)
+        // Back, as ⌘[ does while Peek is up: the Peek's page, not the tab under it.
+        controller.goBack(nil)
+        for _ in 0..<200 where !peeked.canGoForward { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(peeked.url?.lastPathComponent == "first.html")
+        #expect(strip.showsHistory)
+        #expect(!strip.back.isEnabled)
+        #expect(strip.forward.isEnabled)
+        controller.peek.close()
+    }
+
+    @Test func theStripHidesBackAndForwardWithNoHistory() {
+        let strip = PeekHeaderView(frame: NSRect(x: 0, y: 0, width: 600, height: Tokens.Metric.peekHeaderHeight))
+        strip.layoutSubtreeIfNeeded()
+        #expect(strip.back.isHidden && strip.forward.isHidden)
+        let alone = strip.icon.frame.minX
+        strip.showHistory(back: false, forward: true)
+        strip.layoutSubtreeIfNeeded()
+        #expect(!strip.back.isHidden && !strip.forward.isHidden)
+        #expect(!strip.back.isEnabled && strip.forward.isEnabled)
+        #expect(strip.icon.frame.minX > alone)
+        strip.showHistory(back: false, forward: false)
+        #expect(strip.back.isHidden && strip.forward.isHidden)
+    }
+
     /// The strip names a local file by its name, a web page by its host.
     @Test func theStripNamesAFileOrAHost() {
         #expect(PeekController.stripName(for: URL(fileURLWithPath: "/tmp/Notes.html"), title: "Notes") == "Notes.html")

@@ -199,6 +199,45 @@ enum PageTranslator {
         var pieces: [String]
         var blocks: [Int]
         var blockTexts: [String]
+        /// Pieces on screen when it was read, translated first.
+        var shown: [Int]? = nil
+    }
+
+    /// Most pieces in one request to Apple's translation.
+    nonisolated static let batchPieces = 24
+    /// Most characters in one request, so a request of long paragraphs still comes back well inside the time limit.
+    nonisolated static let batchCharacters = 2400
+
+    /// A group's pieces in the order they're translated, cut into requests: the ones on screen first, then the rest,
+    /// each in page order; a request ends at `maxPieces` pieces or `maxCharacters` characters (#465).
+    nonisolated static func batches(_ group: [Int], pieces: [String], shown: Set<Int> = [],
+                                    maxPieces: Int = batchPieces, maxCharacters: Int = batchCharacters) -> [[Int]] {
+        let order = group.filter { shown.contains($0) } + group.filter { !shown.contains($0) }
+        var batches: [[Int]] = [], current: [Int] = [], characters = 0
+        for index in order where index < pieces.count {
+            let size = pieces[index].count
+            if !current.isEmpty, current.count >= maxPieces || characters + size > maxCharacters {
+                batches.append(current)
+                current = []
+                characters = 0
+            }
+            current.append(index)
+            characters += size
+        }
+        if !current.isEmpty { batches.append(current) }
+        return batches
+    }
+
+    /// How much longer to wait for the next translated batch, or nil when it's been `limit` since the last one:
+    /// the limit is on a translation going quiet, not on the whole page (#465).
+    nonisolated static func waitLeft(lastProgress: Date, now: Date, limit: TimeInterval) -> TimeInterval? {
+        let left = limit - now.timeIntervalSince(lastProgress)
+        return left > 0 ? left : nil
+    }
+
+    /// The whole percent done, for the toast; never 100 before it's done.
+    nonisolated static func percent(_ fraction: Double) -> Int {
+        min(99, max(0, Int((fraction * 100).rounded(.down))))
     }
 
     /// Pieces in one language, translated together.
@@ -472,8 +511,11 @@ enum PageTranslator {
         },
         collect: () => {
           nodes = walk();
-          const pieces = [], blocks = [], blockTexts = [], places = new Map();
+          const pieces = [], blocks = [], blockTexts = [], shown = [], places = new Map();
+          const height = window.innerHeight, width = window.innerWidth;
           for (const node of nodes) {
+            const box = node.parentElement && node.parentElement.getBoundingClientRect();
+            if (box && box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < height && box.right > 0 && box.left < width) shown.push(pieces.length);
             if (!originals.has(node)) originals.set(node, node.nodeValue);
             const text = originals.get(node).trim();
             let block = node.parentElement;
@@ -485,7 +527,7 @@ enum PageTranslator {
             pieces.push(text);
             blocks.push(place);
           }
-          return JSON.stringify({ pieces, blocks, blockTexts });
+          return JSON.stringify({ pieces, blocks, blockTexts, shown });
         },
         apply: (translations) => {
           for (const [index, text] of Object.entries(translations)) {
@@ -590,10 +632,10 @@ final class TranslationHost {
     /// Translates the pieces of the page in a web view, a language at a time, into `target`. `pieces` are the
     /// page's text as `PageTranslator.text(in:)` read it, and each group names the pieces in one language.
     /// Calls back with what happened.
-    func translate(_ webView: WKWebView, pieces: [String], groups: [PageTranslator.Group], into target: Locale.Language,
+    func translate(_ webView: WKWebView, pieces: [String], shown: Set<Int> = [], groups: [PageTranslator.Group], into target: Locale.Language,
                    progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let first = groups.first else { completion(.success(())); return }
-        model.job = Job(webView: webView, url: webView.url, pieces: pieces, groups: groups, target: target,
+        model.job = Job(webView: webView, url: webView.url, pieces: pieces, shown: shown, groups: groups, target: target,
                         total: groups.reduce(0) { $0 + $1.pieces.count }, progress: progress, completion: completion)
         model.start(from: first.source, to: target)
     }
@@ -606,6 +648,7 @@ final class TranslationHost {
         /// The page it was asked for: a different page in the same web view is never translated by it.
         let url: URL?
         let pieces: [String]
+        let shown: Set<Int>
         let groups: [PageTranslator.Group]
         let target: Locale.Language
         let total: Int
@@ -637,10 +680,9 @@ final class TranslationHost {
             guard let webView = job.webView, webView.url == job.url else { job.completion(.failure(Cancelled())); return }
             let group = job.groups[job.current]
             do {
-                // In page order, a batch at a time, so the top of the page changes first.
-                let batch = 120
-                for start in stride(from: 0, to: group.pieces.count, by: batch) {
-                    let chunk = group.pieces[start..<min(start + batch, group.pieces.count)]
+                // On-screen text first, in small batches, each put in the page as it comes back.
+                var finished = 0
+                for chunk in PageTranslator.batches(group.pieces, pieces: job.pieces, shown: job.shown) {
                     // The framework hands the session to this task alone, and it's used one batch at a time;
                     // its types just aren't marked as safe to pass to the framework's own executor.
                     nonisolated(unsafe) let requests = chunk.compactMap { index in
@@ -654,7 +696,8 @@ final class TranslationHost {
                     if isCancelled { return }
                     guard webView.url == job.url else { throw Cancelled() }
                     await PageTranslator.apply(translated, in: webView)
-                    job.progress(Double(job.done + start + chunk.count) / Double(max(job.total, 1)))
+                    finished += chunk.count
+                    job.progress(Double(job.done + finished) / Double(max(job.total, 1)))
                 }
             } catch {
                 job.completion(.failure(error))
