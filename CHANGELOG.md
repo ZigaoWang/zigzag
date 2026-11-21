@@ -7,6 +7,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Add on the bar over a Chrome Web Store theme ends with one line saying Zigzag doesn't use browser themes, and the bar no longer offers Try Again, which could only fail the same way. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#454](https://github.com/ZigaoWang/zigzag/issues/454))
+- A link followed inside Peek can be walked back. Once the Peek has gone to another page, back and forward buttons show in its top strip, and ⌘[ and ⌘] or a two-finger swipe work there as in a tab. Esc still closes the whole Peek. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#463](https://github.com/ZigaoWang/zigzag/issues/463))
+- Translating a long page no longer gives up after 45 seconds. The text on screen is translated first and each part appears as soon as it's ready, the toast shows how far along it is, and it only stops with an error when nothing has come back for 45 seconds. Thanks to [orisred](https://github.com/orisred). ([#465](https://github.com/ZigaoWang/zigzag/issues/465))
+- The traffic lights and the buttons beside them sit midway between the top of the window and the address field, with as much room above them as below, instead of lower down.
+- To help fix the Mac's Passwords list on macOS 26, Zigzag keeps a small log of its steps on your Mac, never your logins, in ~/Library/Logs/Zigzag/passwords.log. Help › Report a Problem includes it. ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+- A swipe back or forward no longer fills its arrow partway and then empties it when your fingers stop. The arrow now fills only once you've swiped far enough, and with your fingers resting it stays exactly as it is. A quick flick let go while your fingers are still moving still goes back or forward. Thanks to [frarees](https://github.com/frarees). ([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 
 ## [0.9.4] - 2026-11-21
 
