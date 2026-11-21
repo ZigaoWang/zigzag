@@ -574,8 +574,8 @@ final class BrowserRootView: SpaceFrameView {
     }
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
-    /// The band over the sidebar's edge, shown and on the popout's card edge while the sidebar is out (#431).
-    private(set) var resizeHandle = ResizeHandle()
+    /// The band over the sidebar's edge, on the card's inner edge while the sidebar is out over the page (#431).
+    let resizeHandle = ResizeHandle()
     /// The strips and squares between the panes (#316, #309), under the page's own surfaces (a question, the command
     /// bar) and the bar above it.
     private let tileHandles = PassthroughView()
@@ -1768,7 +1768,7 @@ final class BrowserRootView: SpaceFrameView {
         revealMeter.begin(show ? "out" : "in", in: self)
         #endif
         sidebarRevealed = show
-        // The handle's place follows the card, and only layout moves it; the test was laying out by hand and hiding this.
+        // The edge handle follows the card, and only layout moves it.
         needsLayout = true
         let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
         // Out, it slides all the way before the pointer can send it back: one slide, never cut short and begun again.
