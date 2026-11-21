@@ -589,8 +589,12 @@ enum Tokens {
         /// moves it back so every icon in a row looks evenly spaced.
         @MainActor static func inkOffset(_ name: String, size: CGFloat = pointSize) -> CGSize {
             let box = inkBox(name, size: size)
-            return CGSize(width: box.midX, height: box.midY)
+            guard weightCentered.contains(name) else { return CGSize(width: box.midX, height: box.midY) }
+            return CGSize(width: box.midX, height: inkWeightY["\(name) \(size)"] ?? box.midY)
         }
+
+        /// Centered vertically by ink weight, not box: reload's arrowhead would leave its ring low.
+        static let weightCentered: Set<String> = ["arrow.clockwise"]
 
         /// The size of a symbol's ink, for lining it up by what you see rather than by its image's padding.
         @MainActor static func inkSize(_ name: String, size: CGFloat = pointSize) -> CGSize { inkBox(name, size: size).size }
@@ -623,13 +627,18 @@ enum Tokens {
                 image.draw(in: NSRect(x: 0, y: 0, width: w, height: h))
                 NSGraphicsContext.restoreGraphicsState()
                 var minX = w, maxX = -1, minY = h, maxY = -1
+                var weight = 0.0, weightedY = 0.0
                 if let data = rep.bitmapData {
                     for y in 0..<h {
-                        for x in 0..<w where data[y * rep.bytesPerRow + x * 4 + 3] > 50 {
+                        for x in 0..<w {
+                            let alpha = data[y * rep.bytesPerRow + x * 4 + 3]
+                            weight += Double(alpha); weightedY += Double(alpha) * (Double(y) + 0.5)
+                            guard alpha > 50 else { continue }
                             minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
                         }
                     }
                 }
+                if weight > 0 { inkWeightY[key] = (CGFloat(h) / 2 - CGFloat(weightedY / weight)) / scale }
                 if maxX >= minX {
                     // Bitmap rows run top down.
                     box = CGRect(x: (CGFloat(minX) - CGFloat(w) / 2) / scale, y: (CGFloat(h) / 2 - CGFloat(maxY + 1)) / scale,
@@ -640,6 +649,8 @@ enum Tokens {
             return box
         }
         @MainActor private static var inkBoxes: [String: CGRect] = [:]
+        /// Each measured image's ink weight center from its middle (y up), by the same key.
+        @MainActor private static var inkWeightY: [String: CGFloat] = [:]
 
         /// Offsets (as `inkOffset`) for symbols that take turns in one place (a speaker playing and muted): each is
         /// drawn with its alignment rect's origin, its baseline's start, where the others' is, so what they share (the

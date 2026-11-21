@@ -542,7 +542,7 @@ final class SitePanel: FloatingPanelView {
         }
         // A site-wide icon (#310).
         if canSetIcon {
-            entries.append(.item(.init(title: Self.siteIconTitle, symbol: "face.smiling") { [weak self] in self?.chooseSiteIcon() }))
+            entries.append(.item(.init(title: Self.siteIconTitle, symbol: SidebarMenus.Symbol.changeIcon) { [weak self] in self?.chooseSiteIcon() }))
         }
         if canClear, canBoost || canSetIcon { entries.append(.separator) }
         guard canClear else { MenuPanel.show(entries, from: moreButton); return }
