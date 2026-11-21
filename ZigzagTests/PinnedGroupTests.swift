@@ -780,6 +780,24 @@ import Testing
             #expect(Library.shared.pinnedSplit(containing: marks[1])?.ids == marks)
         }
     }
+
+    /// A pinned page split with a plain tab, dragged by its strip to the list, leaves the split on screen too.
+    @Test(arguments: [true, false]) func aPinnedPagePulledOutOfASplitWithATab(intoPinned: Bool) throws {
+        try inWindow(["0", "1"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.bookmarkTab(tabs[0], in: space)
+            let mark = try #require(tabs[0].bookmarkID)
+            manager.makeSplit(tabs[0], with: tabs[1])
+            #expect(Library.shared.pinnedSplit(containing: mark) == nil)
+            #expect(controller.canMovePane(tabs[0], toListOf: controller))
+            controller.movePaneToList(tabs[0], of: controller, at: (intoPinned ? .bookmarks : .tabs, 0, nil))
+            #expect(manager.split(for: tabs[0]) == nil)
+            #expect(manager.split(for: tabs[1]) == nil)
+            #expect(tabs[0].bookmarkID == (intoPinned ? mark : nil))
+            controller.sidebarUndo.undo()
+            #expect(manager.split(for: tabs[1])?.ids.count == 2)
+        }
+    }
 }
 
 /// How a favorite group's tile shows its pages (#203): a small icon for each, placed as the pages share the window, and

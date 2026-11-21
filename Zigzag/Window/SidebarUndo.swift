@@ -144,7 +144,7 @@ extension BrowserWindowController {
     func movePaneToList(_ tab: Tab, of target: BrowserWindowController, at place: (section: SidebarListView.Section, index: Int, folder: UUID?)) {
         guard canMovePane(tab, toListOf: target) else { return }
         if let id = tab.bookmarkID {
-            movePinnedPaneToList(id, at: place)
+            movePinnedPaneToList(tab, id, at: place)
             return
         }
         let index = place.index
@@ -170,13 +170,15 @@ extension BrowserWindowController {
 
     /// A pinned pane out of its pinned split, the rest closing up as Remove from Split View leaves them, then onto the
     /// list as its row dropped there: moved among the pinned pages, or unpinned into the tabs. One step to undo.
-    private func movePinnedPaneToList(_ id: UUID, at place: (section: SidebarListView.Section, index: Int, folder: UUID?)) {
+    private func movePinnedPaneToList(_ tab: Tab, _ id: UUID, at place: (section: SidebarListView.Section, index: Int, folder: UUID?)) {
         let space = tabManager.currentSpaceID
         pageChange(Self.moveTabName) { [weak self] in
             guard let self else { return }
             // The list counted this page where it sat in its split; once out, the place after it is one less.
             let was = Library.shared.bookmarks(in: space).firstIndex { $0.id == id }
-            if let rest = tabManager.leavePinnedGroup(id) { tabManager.select(rest) }
+            // A pinned page split with a plain tab has no saved pinned split: it leaves the one on screen.
+            let saved = Library.shared.pinnedSplit(containing: id) != nil
+            if let rest = saved ? tabManager.leavePinnedGroup(id) : tabManager.leaveGroup(tab) { tabManager.select(rest) }
             switch place.section {
             case .bookmarks:
                 let index = was.map { place.index > $0 ? place.index - 1 : place.index } ?? place.index
