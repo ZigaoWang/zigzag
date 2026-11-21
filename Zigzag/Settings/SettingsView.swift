@@ -4214,7 +4214,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: String(localized: "History", comment: "A setting in Settings › Privacy."),
-                                    control: historyButtons))
+                                 control: historyButtons))
 
         // What's cleared is the profile's shown here.
         let store = profile.store
@@ -4249,7 +4249,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let data = NSStackView(views: [cache, cookies])
         data.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: String(localized: "Website data", comment: "A setting in Settings › Privacy."),
-                                    control: data))
+                                 control: data))
 
         // Sites whose cookies clearing leaves alone (#334), each with ×, then whether the rest go at quit.
         let kept = KeptCookies.sites(in: profile.id)
