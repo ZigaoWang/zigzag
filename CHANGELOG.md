@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A Zigzag Mini opened from a private window says Private at its top and Open in Private on its button, where it named a space the page wasn't going to, and the space there no longer looks like something to click.
 - With no language to always translate, Settings › Translation points to the translate button in the address bar, the quickest way to choose one.
 - The finish you chose for Your Zigzag Card in About has a ring in the accent color, as Reader's colors do, instead of a dark one.
+- The same buttons look the same in more places. In the icon choices, Choose Image… and Use Site Icon are the soft pill buttons other panels use, their words lined up with the search field's. In Settings › Downloads, a rule's or file type's trash shows while you point at its row, as it does for extensions and profiles. The menu that fills in passwords highlights the row you're on as Zigzag's other menus do.
 
 ## [0.9.4] - 2026-11-21
 
