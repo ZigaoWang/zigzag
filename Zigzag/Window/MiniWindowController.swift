@@ -505,12 +505,19 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// "Open in Work": what the button and ⌘O's menu item say, with the space the page goes to.
     private var openTitle: String {
-        String(localized: "Open in \(space.name)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
+        String(localized: "Open in \(placeName)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
+    }
+
+    /// Where Open in takes the page: its space, or Private as a private window's sidebar heads itself.
+    private var placeName: String {
+        isPrivate ? String(localized: "Private", comment: "The heading at the top of a private window's sidebar, where a space's name would be.") : space.name
     }
 
     private func refreshStrip() {
         strip.title.show(tab)
-        strip.spaceChip.show(space)
+        strip.spaceChip.show(space, name: isPrivate ? placeName : nil)
+        // A private page keeps to its window's space: nothing to choose.
+        strip.spaceChip.isEnabled = !isPrivate
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
         strip.openButton.isEnabled = tab.url != nil
         strip.copyButton.isEnabled = tab.url != nil
@@ -1367,11 +1374,11 @@ final class MiniSpaceChip: InteractiveView {
         space.icon.map { IconChoice.image($0, size: size) }
     }
 
-    func show(_ space: SpaceInfo) {
-        picture.image = Self.picture(of: space, size: Self.side)
+    func show(_ space: SpaceInfo, name: String? = nil) {
+        picture.image = name == nil ? Self.picture(of: space, size: Self.side) : nil
         picture.isHidden = picture.image == nil
-        label.stringValue = space.name
-        setAccessibilityValue(space.name)
+        label.stringValue = name ?? space.name
+        setAccessibilityValue(label.stringValue)
         needsLayout = true
     }
 
@@ -1391,9 +1398,10 @@ final class MiniSpaceChip: InteractiveView {
     override func stateDidChange(animated: Bool) {
         // Plain on the strip at rest; under the pointer and while its menu is open, the buttons' neutral wash, which
         // shows on the page's color whatever it is. Its ink is the strip's, light or dark for that color.
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
+        let lit = isEnabled && (isHovered || isSelected)
+        let fill: NSColor? = isEnabled && isPressed ? Tokens.Color.pressedFill : lit ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
-        let ink = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        let ink = lit ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         label.textColor = ink
         picture.contentTintColor = ink
     }

@@ -279,6 +279,9 @@ struct MiniFromPageTests {
             #expect(!store.isPersistent)
             #expect(store === controller.tabManager.privateStore)
             #expect(mini.savedForRelaunch == nil)
+            // Open in names the private window, not a space the page won't go to.
+            let place = String(localized: "Private", comment: "The heading at the top of a private window's sidebar, where a space's name would be.")
+            #expect(mini.debugState["open"] as? String == String(localized: "Open in \(place)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name."))
         }
     }
 
