@@ -207,6 +207,47 @@ struct LastSessionKeptTests {
     }
 }
 
+/// Reopen Last Session brings back only the kept windows not open again, never a tab that's already open (#433).
+@MainActor
+struct ReopenLastSessionTests {
+    private let space = UUID()
+
+    private func window(_ ids: [UUID]) -> SessionState.WindowState {
+        SessionState.WindowState(
+            frame: [], sidebarVisible: true, sidebarWidth: 240, currentSpaceID: space,
+            spaces: [SessionState.SpaceTabs(spaceID: space, tabs: ids.map { id in
+                SessionState.TabState(id: id, url: URL(string: "https://kept.example/\(id)"), title: "Kept",
+                                      lastActivated: Date(), createdAt: Date())
+            }, selectedTabID: ids.first)],
+            bookmarkTabs: [])
+    }
+
+    private func tabIDs(_ windows: [SessionState.WindowState]) -> [UUID] { windows.flatMap { $0.spaces.flatMap { $0.tabs.map(\.id) } } }
+
+    @Test func sharedTabsWindowsAreBackWithTheWindowHoldingTheTabs() {
+        let a = UUID(), b = UUID()
+        let saved = SessionState(windows: [window([a, b]), window([]), window([])])
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: true).count == 3)
+        #expect(WindowManager.windowsToReopen(saved, open: [a], shares: true).isEmpty)
+    }
+
+    @Test func onlyWindowsNotOpenAgainComeBack() {
+        let a = UUID(), b = UUID(), c = UUID()
+        let saved = SessionState(windows: [window([a]), window([b, c])])
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: false).count == 2)
+        // One reopened window closed again: only it comes back, the open one isn't made twice.
+        let again = WindowManager.windowsToReopen(saved, open: [b, c], shares: false)
+        #expect(tabIDs(again) == [a])
+        #expect(WindowManager.windowsToReopen(saved, open: [a, b], shares: false).isEmpty)
+    }
+
+    @Test func aSessionWithNoTabsHasNothingToReopen() {
+        let saved = SessionState(windows: [window([]), window([])])
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: true).isEmpty)
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: false).isEmpty)
+    }
+}
+
 /// What makes a fresh start count as used (#433): only a page in a browser window, never a private window, Zigzag
 /// Mini, or one of Zigzag's own pages such as Settings.
 @MainActor

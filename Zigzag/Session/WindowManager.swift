@@ -530,25 +530,30 @@ final class WindowManager {
 
     /// Whether the kept session at `kept` still has a window that isn't already open.
     func hasSessionToReopen(at kept: URL) -> Bool {
-        guard let saved = JSONStore.load(SessionState.self, from: kept),
-              saved.windows.contains(where: { !$0.hasNoTabs }) else { return false }
-        let open = openTabIDs
-        return saved.windows.contains { window in
-            !isBack(window, open: open)
-        }
+        guard let saved = JSONStore.load(SessionState.self, from: kept) else { return false }
+        return !Self.windowsToReopen(saved, open: openTabIDs, shares: TabStore.windowsShareTabs).isEmpty
+    }
+
+    /// The kept session's windows not open again, so reopening never brings back a tab that's open. A window saved
+    /// without tabs (#162) is back once any of the session's tabs is.
+    static func windowsToReopen(_ saved: SessionState, open: Set<UUID>, shares: Bool) -> [SessionState.WindowState] {
+        guard saved.windows.contains(where: { !$0.hasNoTabs }) else { return [] }
+        let windows = (shares ? saved : saved.givingWindowsTheirOwnTabs()).windows
+        let anyBack = windows.contains { isBack($0, open: open) }
+        return windows.filter { $0.hasNoTabs ? !anyBack : !isBack($0, open: open) }
     }
 
     /// History › Reopen Last Session: the windows and tabs a fresh start passed over come back, with the back/forward
     /// lists kept beside them, and the fresh session stays until the next launch writes over it.
     func reopenLastSession(kept: URL = Paths.previousSession, keptTabStates: URL = Paths.previousTabState,
                            tabStates: URL = Paths.tabState) {
-        guard let saved = JSONStore.load(SessionState.self, from: kept),
-              saved.windows.contains(where: { !$0.hasNoTabs }) else { return }
-        Self.restoreKeptTabStates(of: saved, from: keptTabStates, to: tabStates)
+        guard let saved = JSONStore.load(SessionState.self, from: kept) else { return }
         let shares = TabStore.windowsShareTabs
-        let state = shares ? saved : saved.givingWindowsTheirOwnTabs()
+        let windows = Self.windowsToReopen(saved, open: openTabIDs, shares: shares)
+        guard !windows.isEmpty else { return }
+        Self.restoreKeptTabStates(of: SessionState(windows: windows), from: keptTabStates, to: tabStates)
         let store: TabStore? = shares ? sharedStore ?? TabStore() : nil
-        for windowState in state.windows { restoreWindow(windowState, store: store) }
+        for windowState in windows { restoreWindow(windowState, store: store) }
     }
 
     /// The back/forward lists of a session being kept: copied now, before the fresh session's saves can clean up the
@@ -635,7 +640,7 @@ final class WindowManager {
         if let front, front.isPrivate { return front.lastClosedTab.map { (.tab, front, $0.id) } }
         let tab = latestClosedTab(from: front)
         let open = openTabIDs
-        let window = closedWindows.last { !isBack($0.state, open: open) }
+        let window = closedWindows.last { !Self.isBack($0.state, open: open) }
         switch Self.lastClosed(tab: tab?.tab.closedAt, tabOfClosedWindow: orphanedClosedTabs.last?.closedAt, window: window?.closedAt) {
         case .tab: return tab.map { (.tab, $0.manager, $0.tab.id) }
         case .tabOfClosedWindow: return (.tabOfClosedWindow, nil, nil)
@@ -671,7 +676,7 @@ final class WindowManager {
 
     var canReopenClosedWindow: Bool {
         let open = openTabIDs
-        return closedWindows.contains { !isBack($0.state, open: open) }
+        return closedWindows.contains { !Self.isBack($0.state, open: open) }
     }
 
     /// Brings back the last closed window, its spaces, tabs, history and place on screen.
@@ -680,7 +685,7 @@ final class WindowManager {
         // so it's passed over for the one closed before it.
         let open = openTabIDs
         while let closed = closedWindows.popLast() {
-            guard !isBack(closed.state, open: open) else { continue }
+            guard !Self.isBack(closed.state, open: open) else { continue }
             restoreWindow(closed.state, history: closed.history, store: sharedStore)
             return
         }
@@ -689,7 +694,7 @@ final class WindowManager {
     /// Reopenable closed windows, newest first, for History › Recently Closed, with tab count and shown tab.
     var recentlyClosedWindows: [(id: UUID, tabCount: Int, shown: SessionState.TabState?)] {
         let open = openTabIDs
-        return closedWindows.reversed().filter { !isBack($0.state, open: open) }.map { closed in
+        return closedWindows.reversed().filter { !Self.isBack($0.state, open: open) }.map { closed in
             let state = closed.state
             let tabs = state.spaces.flatMap(\.tabs) + state.bookmarkTabs.map(\.tab)
             let space = state.spaces.first { $0.spaceID == state.currentSpaceID }
@@ -702,13 +707,13 @@ final class WindowManager {
     func reopenClosedWindow(_ id: UUID) {
         guard let index = closedWindows.firstIndex(where: { $0.id == id }) else { return }
         let closed = closedWindows.remove(at: index)
-        guard !isBack(closed.state, open: openTabIDs) else { return }
+        guard !Self.isBack(closed.state, open: openTabIDs) else { return }
         restoreWindow(closed.state, history: closed.history, store: sharedStore)
     }
 
     private var openTabIDs: Set<UUID> { Set(openTabs.map(\.id)) }
 
-    private func isBack(_ state: SessionState.WindowState, open: Set<UUID>) -> Bool {
+    private static func isBack(_ state: SessionState.WindowState, open: Set<UUID>) -> Bool {
         let ids = state.spaces.flatMap { $0.tabs.map(\.id) } + state.bookmarkTabs.map(\.tab.id)
         return ids.contains(where: open.contains)
     }
