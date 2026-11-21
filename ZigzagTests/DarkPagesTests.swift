@@ -79,8 +79,8 @@ struct DarkPagesTests {
         }
     }
 
-    /// A choice is kept as made, the same as the setting or not: the dropdown has Automatic to follow it, and On
-    /// chosen while the setting is Always stays On when the setting changes (#134).
+    /// A choice is kept as made, the same as the setting or not: the dropdown has Follow Setting to follow it, and Always
+    /// chosen while the setting is Always stays Always when the setting changes (#134).
     @Test func aChoiceIsKeptAsMade() {
         withDefaults {
             let url = URL(string: "https://example.com/")

@@ -863,8 +863,8 @@ final class SitePanel: FloatingPanelView {
     /// A choice in the Dark page row's dropdown.
     static func title(of choice: DarkPages.SiteChoice) -> String {
         switch choice {
-        case .automatic: String(localized: "Automatic", comment: "A choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.")
-        case .on: String(localized: "dark-page.on", defaultValue: "On", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are drawn dark.")
+        case .automatic: String(localized: "Follow Setting", comment: "A choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.")
+        case .on: String(localized: "dark-page.on", defaultValue: "Always", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are drawn dark.")
         case .off: String(localized: "dark-page.off", defaultValue: "Off", comment: "A choice in the Dark page dropdown of the site panel: this site's pages are never drawn dark, and are asked for their light look.")
         case .force: String(localized: "Force Dark", comment: "A choice in the Dark page dropdown of the site panel: this site is drawn dark even where it looks dark on its own, for a site that leaves parts of itself light.")
         }
@@ -906,8 +906,8 @@ final class SitePanel: FloatingPanelView {
     }
 
     /// The JavaScript row's choices (#282).
-    static let javaScriptAllowed = String(localized: "javascript.allowed", defaultValue: "Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages run their scripts.")
-    static let javaScriptNotAllowed = String(localized: "javascript.not-allowed", defaultValue: "Not Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages don't run their scripts.")
+    static let javaScriptAllowed = String(localized: "javascript.allowed", defaultValue: "Allow", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages run their scripts.")
+    static let javaScriptNotAllowed = String(localized: "javascript.not-allowed", defaultValue: "Block", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages don't run their scripts.")
 
     /// JavaScript row subtitle explaining a broken-looking page: off by the setting, or a site choice that differs from
     /// it. Nil when it matches the setting.
@@ -915,9 +915,9 @@ final class SitePanel: FloatingPanelView {
         let allowed = SiteJavaScript.allows(url, in: tab)
         if SiteJavaScript.isOwn(url, in: tab) {
             if !allowed { return String(localized: "Off here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site's own choice turns its scripts off.") }
-            return SiteJavaScript.isAllowed ? nil : String(localized: "On here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site runs its scripts, though Settings › Privacy › JavaScript is Not Allowed.")
+            return SiteJavaScript.isAllowed ? nil : String(localized: "On here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site runs its scripts, though Settings › Privacy › JavaScript is set to Block.")
         }
-        return allowed ? nil : String(localized: "Every site", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.")
+        return allowed ? nil : String(localized: "Every site", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Block: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.")
     }
 
     static func darkStatus(tab: Tab, url: URL) -> String? {
@@ -1131,7 +1131,7 @@ final class SitePanel: FloatingPanelView {
             }
             permissionRows.append(row)
         }
-        // JavaScript isn't a WebKit permission but belongs here: Allowed or Not Allowed, overriding Settings › Privacy
+        // JavaScript isn't a WebKit permission but belongs here: Allow or Block, overriding Settings › Privacy
         // › JavaScript. Applies at load, so choosing reloads; private windows keep it per tab.
         if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             let tab = tab, url = url

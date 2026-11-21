@@ -31,7 +31,7 @@ for one of these types, from a hand-edited rules file say, doesn't run: the file
 there, and a later entry can still decide where it goes.
 
 A file type matches a download by its file name, never a link, since a link has no name yet. In a private window,
-Save still applies; Open only runs there when **Run in private windows** is on for that file type.
+Save still applies; Open only runs there when **Allow in private windows** is on for that file type.
 
 ## Handoff rules
 
@@ -121,6 +121,6 @@ its links and downloads are always handled by Zigzag itself.
 
 ### Private windows
 
-A rule stays out of private windows unless **Run in private windows** is turned on in its own sheet. Off, a private
+A rule stays out of private windows unless **Allow in private windows** is turned on in its own sheet. Off, a private
 window never asks and never runs the rule; the link or download carries on as if no rule had matched. A private
 window's address, and the cookies a rule names, are what that promise protects.
