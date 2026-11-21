@@ -589,6 +589,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
             let tab = tabManager.selectedTab
             root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+            root.topBar.showPin(sidebar.address.canSave)
         } else {
             root.topBar.pin = nil
             sidebar.address.starInPill = false
@@ -695,6 +696,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+        root.topBar.showPin(sidebar.address.canSave)
         paintTopBar()
         // A collapsed pinned section and a folded tab group (#209) show the current tab, so they update with the
         // selection.
@@ -1613,6 +1615,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             sidebar.update(tab: tab)
             root.topBar.showPage(url: tab.url, notSecure: tab.isNotSecure)
+            root.topBar.showPin(sidebar.address.canSave)
             paintTopBar()
             updateWindowTitle()
             offerWebStoreExtension()

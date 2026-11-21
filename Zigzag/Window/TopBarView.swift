@@ -80,6 +80,14 @@ final class TopBarView: NSView {
         set { pill.pin = newValue }
     }
 
+    /// Whether the pill's star shows: the page can be pinned (#444). The pill is as wide as its address and the
+    /// star, so the bar lays out again when it changes.
+    func showPin(_ canPin: Bool) {
+        guard pill.showsPin != canPin else { return }
+        pill.showsPin = canPin
+        needsLayout = true
+    }
+
     /// The least the address keeps beside a page's tools, which give way first.
     static let addressMinWidth: CGFloat = 200
 

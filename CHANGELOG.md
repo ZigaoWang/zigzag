@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- With the address bar above the page, the pin star sits at the end of the address pill, so the page can be pinned from there. The star stays inside the pill's rounded end, and is left out on a new tab or in a private window, where there is nothing to pin. ([#437](https://github.com/ZigaoWang/zigzag/issues/437))
+
 ### Fixed
 - A swipe back or forward that arms with a quick flick no longer shows its ring jump to full and then drop back when your fingers stop. The ring now follows how far you've swiped, and the arrow turning filled is what says letting go will go back or forward, so stopping short after a flick only takes the fill away. Thanks to [frarees](https://github.com/frarees). ([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - A private window no longer adds to Favorites or renames, files or moves pinned tabs and their folders; it leaves your saved pages as they are.

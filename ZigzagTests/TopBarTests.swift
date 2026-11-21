@@ -612,35 +612,56 @@ struct TopBarTests {
         }
     }
 
-    /// With the address above the page, the pin star sits inside the URL pill's end (#437), not among the bar's
-    /// trailing buttons.
-    @Test func thePinStarSitsInsideThePillsEnd() {
+    /// With the address above the page, the pin star sits inside the URL pill's end (#437). The pill shows it
+    /// itself, even when the field handed it over hidden, and gives the address its room back when there is
+    /// nothing to pin (#444).
+    @Test func thePillShowsTheStarItselfAndHidesItWithNothingToPin() {
         let pill = PaneAddressView()
         pill.hasSiteControls = false
         pill.text = "example.com"
         let star = PaneHeaderView.button("star", toolTip: "Pin Page")
+        // Straight from a field that never drew it: the star's own hidden flag is still true.
+        star.isHidden = true
         pill.pin = star
         pill.frame = NSRect(x: 0, y: 0, width: 220, height: Tokens.Pane.addressHeight)
         pill.layoutSubtreeIfNeeded()
-        #expect(star.superview === pill)
+        // The pill's rule, not the leftover flag, decides.
+        #expect(star.superview === pill && !star.isHidden)
         #expect(star.frame.maxX <= pill.bounds.maxX - PaneAddressView.buttonInset + 0.5)
         #expect(abs(star.frame.midY - pill.bounds.midY) <= 0.5)
-        // Hidden for a page that can't be pinned, it gives the address its room back.
-        star.isHidden = true
-        pill.needsLayout = true
+        // The pill's rounded end, and the field's rim pressing it too.
+        #expect(star.radius == Tokens.Radius.control - PaneAddressView.buttonInset)
+        #expect(star.pressOutset.top == PaneAddressView.buttonInset)
+        #expect(star.pressOutset.bottom == PaneAddressView.buttonInset)
+        #expect(star.pressOutset.left == 1 && star.pressOutset.right == PaneAddressView.buttonInset)
+        let withStar = pill.fittingWidth
+        // A new tab has nothing to pin: the star goes, and the address takes exactly its room back.
+        pill.showsPin = false
         pill.layoutSubtreeIfNeeded()
-        #expect(!star.frame.isEmpty)
+        #expect(star.isHidden)
+        #expect(abs(withStar - pill.fittingWidth - PaneAddressView.buttonRoom) < 0.5)
+        // And it comes back when there is a page to pin again.
+        pill.showsPin = true
+        pill.layoutSubtreeIfNeeded()
+        #expect(!star.isHidden)
+        #expect(abs(pill.fittingWidth - withStar) < 0.5)
     }
 
     /// The address gives the star up when the pill takes it, and takes it back after.
     @Test func theAddressGivesTheStarToThePillAndBack() {
         let address = AddressView()
+        address.frame = NSRect(x: 0, y: 0, width: 400, height: Tokens.Sidebar.addressHeight)
+        address.layoutSubtreeIfNeeded()
         let wide = address.buttonsWidth
         address.starInPill = true
         #expect(address.saveButton.superview == nil)
         #expect(address.buttonsWidth < wide)
+        // The pill hid it for a page with nothing to pin; back in the field it draws again.
+        address.saveButton.isHidden = true
         address.starInPill = false
+        address.layoutSubtreeIfNeeded()
         #expect(address.saveButton.superview === address)
+        #expect(!address.saveButton.isHidden)
         #expect(address.buttonsWidth == wide)
     }
 }
