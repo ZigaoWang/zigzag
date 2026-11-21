@@ -363,6 +363,64 @@ struct DragZoneTests {
         #expect(!(hit(Tokens.Metric.dragReach + 4) is ResizeHandle))
     }
 
+    /// The popout sidebar's edge takes the pointer, the width it leaves behind is kept for the next window, and a
+    /// double-click puts the usual width back (#431).
+    @Test func thePopoutSidebarEdgeSetsAWidthEveryWindowKeeps() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        let suite = "ZigzagSidebarWidthTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let shared = BrowserRootView.defaults
+        BrowserRootView.defaults = defaults
+        defer {
+            BrowserRootView.defaults = shared
+            defaults.removePersistentDomain(forName: suite)
+            manager.invalidate()
+            Library.shared.restore(before)
+        }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        root.sidebarWidth = Tokens.Metric.sidebarWidth
+        root.sidebarVisible = false
+        window.layoutIfNeeded()
+        root.needsLayout = false
+        root.reveal(true)
+        // A real reveal lays out by itself: the handle leaves the shown sidebar's spot without the test doing it.
+        #expect(root.needsLayout)
+        window.layoutIfNeeded()
+        let card = BrowserRootView.sidebarFrame(in: root.bounds, width: root.sidebarWidth, visible: false,
+                                               revealed: true, onRight: root.sidebarOnRight)
+        #expect(!root.resizeHandle.isHidden)
+        #expect(abs(root.resizeHandle.frame.midX - (root.sidebarOnRight ? card.minX : card.maxX)) <= 1)
+        // Dragged wider, it keeps the width past this window.
+        root.debugEdgeDrag("begin")
+        let to = root.convert(NSPoint(x: root.sidebarWidth + 40, y: 300), to: nil).x
+        root.debugEdgeDrag("\(to)")
+        root.debugEdgeDrag("end")
+        // The card floats a frame's inset in from the window, so the pointer's reach is that much wider than the card.
+        let reach = BrowserRootView.reach(of: to, in: root.bounds, onRight: root.sidebarOnRight)
+        let expected = Tokens.Space.snap(min(max(reach - Tokens.Metric.cardInset,
+                                                 Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
+        #expect(root.sidebarWidth == expected)
+        #expect(root.sidebarWidth > Tokens.Metric.sidebarWidth)
+        let kept = root.sidebarWidth
+        let second = BrowserWindowController(tabManager: TabManager(spaceID: space), frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { second.window?.close() }
+        #expect(second.root.sidebarWidth == kept)
+        // Double-clicking the edge puts the usual width back, and the next window hears about it.
+        root.debugEdgeDrag("reset")
+        #expect(root.sidebarWidth == Tokens.Metric.sidebarWidth)
+        let third = BrowserWindowController(tabManager: TabManager(spaceID: space), frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { third.window?.close() }
+        #expect(third.root.sidebarWidth == Tokens.Metric.sidebarWidth)
+    }
+
     /// ⌘Z puts a group's lines back after a change, and redo moves them forward again (#435).
     @Test func undoPutsTheTileLinesBack() throws {
         let space = Library.shared.spaces[0].id
