@@ -69,6 +69,9 @@ final class BrowserWebView: WKWebView {
     /// The page is a PDF (`Tab.checkForPDF`), in WebKit's viewer unless Zigzag's covers it.
     var isPDF = false
 
+    /// The video under the pointer when the page asked for its menu, for Download Video.
+    var contextVideoSource: URL?
+
     /// Gives WebKit's PDF viewer the page's focus, as a click in it would, then `then`. In Zigzag's own world, so
     /// the page's scripts can't stand in its way.
     static func focusPDF(in webView: WKWebView, then: @escaping @MainActor () -> Void) {
@@ -200,6 +203,7 @@ final class BrowserWebView: WKWebView {
         }
         addOpenSelection(to: menu)
         addSaveToPins(to: menu)
+        addDownloadVideo(to: menu)
         // Only in a browser window's page, which does the translating; not Zigzag Mini's or a web app's.
         if let owner, WindowManager.shared.controller(for: window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
@@ -208,6 +212,26 @@ final class BrowserWebView: WKWebView {
         // What the page's menu holds, with submenus and actions (AutoFill › Passwords… in a field), for scripts.
         debugLog("webmenu " + Self.debugDescribe(menu))
         #endif
+    }
+
+    /// A video under the pointer gets Download Video, which saves it through the page's own session.
+    private func addDownloadVideo(to menu: NSMenu) {
+        defer { contextVideoSource = nil }
+        guard let source = contextVideoSource else { return }
+        let item = NSMenuItem(title: String(localized: "Download Video", comment: "Item in a page's right-click menu over a video: downloads the video."),
+                              action: #selector(downloadVideo(_:)), keyEquivalent: "")
+        item.target = self
+        item.representedObject = source
+        item.image = Tokens.Symbol.image("arrow.down.circle")
+        let index = menu.items.firstIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierInspectElement" }) ?? menu.items.count
+        menu.insertItem(item, at: index)
+    }
+
+    @objc private func downloadVideo(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        startDownload(using: URLRequest(url: url)) { [weak self] download in
+            DownloadManager.shared.track(download, window: self?.window)
+        }
     }
 
     /// A link's menu starts as Chrome's does (#419): Open Link in New Tab, in New Window, in Private Window, then

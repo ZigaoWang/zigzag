@@ -85,6 +85,7 @@ enum WebKitSetup {
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagLinkClick")
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagIcons")
+            configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagVideoMenu")
             configuration.userContentController.addUserScript(PasswordCapture.script)
             configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
             configuration.userContentController.addUserScript(Autofill.script)
@@ -122,7 +123,6 @@ enum WebKitSetup {
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
-            profile.extensions.attachOldTwitterSolver(to: configuration)
             let patterns = profile.installs.externallyConnectablePatterns()
             // Once: a new tab's setup is made and then configured again, which put it in twice.
             if !patterns.isEmpty {
@@ -174,7 +174,9 @@ enum PageScripts {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
         [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark,
-         modifiedLinkClicks, iconWatch]
+         modifiedLinkClicks,
+         WKUserScript(source: videoMenuSource, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient),
+         iconWatch]
     }
 
     /// Tells the browser when the page changes its icon links, as GitHub does for dark mode, so the tab's icon follows (#386).
@@ -251,6 +253,20 @@ enum PageScripts {
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }()
 
+    /// Tells the browser which video a right-click is on, so its menu can offer Download Video.
+    static let videoMenuSource = """
+    (() => {
+      if (!/^https?:$/.test(location.protocol)) return;
+      document.addEventListener('contextmenu', (event) => {
+        const target = event.target;
+        const video = target && target.closest ? target.closest('video') : null;
+        const source = video ? video.querySelector('source') : null;
+        const src = video ? (video.currentSrc || video.src || (source && source.src) || '') : '';
+        try { window.webkit.messageHandlers.zigzagVideoMenu.postMessage(src ? { src } : ''); } catch (error) {}
+      }, true);
+    })();
+    """
+
     /// Tells the browser which link the pointer is over, for the link preview in the corner.
     static let linkHover = """
     (() => {
@@ -320,6 +336,16 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
         case "zigzagIcons":
             guard message.frameInfo.isMainFrame, webView.owner === tab else { return }
             tab.pageIconsChanged()
+        case "zigzagVideoMenu":
+            // The video under the right-click, for the page menu's Download Video. A blob or a stream has no file
+            // behind it, so the menu leaves those alone.
+            guard let body = message.body as? [String: Any], let text = body["src"] as? String,
+                  let url = URL(string: text), let scheme = url.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else {
+                webView.contextVideoSource = nil
+                return
+            }
+            webView.contextVideoSource = url
         default:
             break
         }

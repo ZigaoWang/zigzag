@@ -124,6 +124,29 @@ struct ShipFixesTests {
         card.pageLeftFullScreen(other)
         #expect(other.isDescendant(of: card))
     }
+
+    /// A right-click on a video tells the browser its source, so the page menu can offer Download Video. A right-click
+    /// anywhere else clears it.
+    @Test func aRightClickOnAVideoReportsItsSource() throws {
+        let context = JSContext()!
+        context.evaluateScript("""
+        var __posted = [], __contextmenu = null;
+        var location = { protocol: "https:" };
+        var window = { webkit: { messageHandlers: { zigzagVideoMenu: { postMessage(message) { __posted.push(message); } } } } };
+        var document = { addEventListener(name, run) { if (name === "contextmenu") __contextmenu = run; } };
+        \(PageScripts.videoMenuSource)
+        """)
+        #expect(context.exception == nil)
+        context.evaluateScript("""
+        var __video = { currentSrc: "https://video.example/a.mp4", src: "", querySelector() { return null; } };
+        __contextmenu({ target: { closest(selector) { return selector === "video" ? __video : null; } } });
+        __contextmenu({ target: { closest() { return null; } } });
+        """)
+        #expect(context.exception == nil)
+        #expect(context.evaluateScript("__posted.length")?.toInt32() == 2)
+        #expect(context.evaluateScript("__posted[0].src")?.toString() == "https://video.example/a.mp4")
+        #expect(context.evaluateScript("__posted[1]")?.toString() == "")
+    }
 }
 
 /// Passwords across one site's parts, never across sites, by the Public Suffix List.
@@ -1327,4 +1350,5 @@ struct ZigzagCardTests {
             }
         }
     }
+
 }
