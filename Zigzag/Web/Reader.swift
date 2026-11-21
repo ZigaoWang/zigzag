@@ -264,6 +264,28 @@ enum Reader {
         }
     }
 
+    /// Auto's paper by day and at night: a breath of the window's space, or the plain Light and Dark papers in a
+    /// white, gray or black one. The inks stay the palettes', so the text keeps its contrast.
+    struct AutoPaper: Equatable {
+        var light = Palette.light.paper
+        var dark = Palette.dark.paper
+
+        static func of(_ theme: Brand.Theme) -> AutoPaper {
+            guard let paper = theme.readerPaper else { return AutoPaper() }
+            return AutoPaper(light: hex(paper.light), dark: hex(paper.dark))
+        }
+
+        var css: String { String(format: ":root { --tint: #%06X; --tint-dark: #%06X; }", light, dark) }
+
+        func paper(dark isDark: Bool) -> UInt32 { isDark ? dark : light }
+    }
+
+    static func hex(_ color: NSColor) -> UInt32 {
+        guard let c = color.usingColorSpace(.sRGB) else { return 0 }
+        func byte(_ v: CGFloat) -> UInt32 { UInt32(max(0, min(255, (v * 255).rounded()))) }
+        return byte(c.redComponent) << 16 | byte(c.greenComponent) << 8 | byte(c.blueComponent)
+    }
+
     /// How you like to read, remembered for every article: text size, typeface, column width and colors.
     struct Preferences: Equatable {
         enum Face: String, CaseIterable { case serif, sans }
@@ -273,10 +295,10 @@ enum Reader {
             var palette: Palette { switch self { case .auto, .light: .light; case .sepia: .sepia; case .dark: .dark } }
         }
         /// How wide the column runs, in the text's own size, so a line holds about the same number of characters at
-        /// any size: Medium is the book's 66 to 72, Narrow a column's, Wide fills more of a big window.
+        /// any size: Narrow a column's 55 or so, Medium the book's 66 to 72, Wide the whole window inside its margins.
         enum Width: String, CaseIterable {
             case narrow, medium, wide
-            var measure: String { switch self { case .narrow: "29em"; case .medium: "34em"; case .wide: "40em" } }
+            var measure: String { switch self { case .narrow: "28rem"; case .medium: "34rem"; case .wide: "100vw" } }
         }
         static let sizes = 14...32
         static let defaultSize = 20
@@ -320,17 +342,23 @@ enum Reader {
         /// The size and measure, as the page's root element carries them.
         var rootStyle: String { "--size: \(size)px; --measure: \(width.measure)" }
 
-        /// Applies these to an open reading page, without reloading it (and losing your place).
+        /// Applies these to an open reading page without reloading it, keeping the line you were on in place while
+        /// the text reflows.
         var script: String {
-            "document.documentElement.dataset.theme='\(theme.rawValue)';document.documentElement.dataset.face='\(face.rawValue)';" +
-            "document.documentElement.setAttribute('style','\(rootStyle)');"
+            "(() => { const d = document.documentElement;" +
+            "const a = [...document.querySelectorAll('main :is(p, li, h1, h2, h3, h4, figure, pre, blockquote, table)')].find(e => e.getBoundingClientRect().bottom > 0);" +
+            "const top = a ? a.getBoundingClientRect().top : 0;" +
+            "d.dataset.theme='\(theme.rawValue)';d.dataset.face='\(face.rawValue)';" +
+            "d.style.setProperty('--size','\(size)px');d.style.setProperty('--measure','\(width.measure)');" +
+            "if (a && scrollY > 0) scrollBy(0, a.getBoundingClientRect().top - top); })(); 0"
         }
     }
 
-    /// The reading page: one column at a book's measure, and everything in it (the header, text, pictures, captions,
-    /// quotes, code, tables) on that column's left edge. The header is where it's from, the title, and who wrote it
-    /// and when, if the page says; then the text.
-    static func html(for article: Article, preferences: Preferences = .saved, icon: String? = nil, locale: Locale = .current) -> String {
+    /// The reading page: one column at the chosen measure, its words on that column's left edge, with large pictures
+    /// and code free to run wider when the window has room. The header is where it's from, the title, and who wrote
+    /// it and when, if the page says; then the text. `reducedMotion`: the text doesn't settle in as it opens.
+    static func html(for article: Article, preferences: Preferences = .saved, icon: String? = nil, locale: Locale = .current,
+                     paper: AutoPaper = AutoPaper(), reducedMotion: Bool = false) -> String {
         let author = author(from: article.byline, site: article.site)
         let title = Self.title(article.title, siteNames: [article.site, article.siteTitle ?? ""], author: author)
         let date = publishedDate(article.published, locale: locale)
@@ -344,11 +372,12 @@ enum Reader {
         let source = (article.url ?? "").isEmpty ? "" :
             "<footer class=\"end\"><a href=\"\(escape(article.url ?? ""))\">\(escape(String(localized: "Read the original on \(article.site)", comment: "Link at the end of an article in Reader, to the page it came from. The placeholder is the site's name.")))</a></footer>"
         return """
-        <!doctype html><html lang="\(escape(lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)" style="\(preferences.rootStyle)">
+        <!doctype html><html lang="\(escape(lang))" data-theme="\(preferences.theme.rawValue)" data-face="\(preferences.face.rawValue)"\(reducedMotion ? " data-motion=\"reduce\"" : "") style="\(preferences.rootStyle)">
         <head><meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * data:; media-src *; style-src 'unsafe-inline'; font-src *">
         <title>\(escape(title))</title>
-        <style>\(css)</style></head><body><main>
+        <style>\(paper.css)
+        \(css)</style></head><body><main>
         <header>
         <p class="site">\(iconTag)<span>\(escape(article.site))</span></p>
         <h1 class="title">\(escape(title))</h1>
@@ -383,10 +412,17 @@ enum Reader {
             --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
             --sans: system-ui, -apple-system, "Helvetica Neue", sans-serif;
             --mono: ui-monospace, "SF Mono", Menlo, monospace;
-            --face: var(--serif); --leading: 1.6; }
+            --face: var(--serif); --leading: 1.6;
+            font-size: var(--size, 20px);
+            /* The page's margins: Zigzag's page gutter in a small window, generous in a big one. */
+            --gutter: clamp(\(Int(Tokens.Page.gutter))px, 6vw, 112px);
+            /* How far pictures may run past the text on each side: what the window leaves, up to 8rem. */
+            --bleed: clamp(0px, (100vw - var(--measure, 34rem)) / 2 - var(--gutter), 8rem);
+            --code-bleed: min(var(--bleed), 2.5rem); }
+    :root[data-theme="auto"] { --paper: var(--tint, #\(String(format: "%06X", Palette.light.paper))); }
     :root[data-theme="sepia"] { \(Palette.sepia.css) }
     :root[data-theme="dark"] { \(Palette.dark.css) }
-    @media (prefers-color-scheme: dark) { :root[data-theme="auto"] { \(Palette.dark.css) } }
+    @media (prefers-color-scheme: dark) { :root[data-theme="auto"] { \(Palette.dark.css) --paper: var(--tint-dark, #\(String(format: "%06X", Palette.dark.paper))); } }
     :root[data-face="sans"] { --face: var(--sans); --leading: 1.58; }
     /* Their own faces (there are no italics to fake), and more air between lines. */
     :root:lang(zh) { --serif: "Reader SC", ui-serif, serif; --sans: "Reader SC", system-ui, sans-serif; }
@@ -396,21 +432,27 @@ enum Reader {
     :root:is(:lang(zh), :lang(ja), :lang(ko)) { --leading: 1.8; }
     :is(:lang(zh), :lang(ja), :lang(ko)) :is(em, i, cite, dfn) { font-style: normal; font-weight: 600; }
 
-    html { background: var(--paper); }
+    html { background: var(--paper); overflow-x: hidden; }
     ::selection { background: var(--select); }
-    body { margin: 0; padding: 80px 40px 120px; color: var(--ink); font-family: var(--face); font-size: var(--size, 20px);
+    body { margin: 0; padding: 80px var(--gutter) 120px; color: var(--ink); font-family: var(--face); font-size: 1rem;
            line-height: var(--leading); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
            font-kerning: normal; hanging-punctuation: first allow-end last; overflow-wrap: break-word;
            -webkit-hyphens: auto; hyphens: auto; }
-    main { max-width: var(--measure, 34em); margin: 0 auto; }
+    main { max-width: var(--measure, 34rem); margin: 0 auto; }
+
+    /* Opening, the text settles up into place as the paper fades in (Motion's enter, eased out); never with Reduce Motion. */
+    @keyframes reader-in { from { opacity: 0; transform: translateY(\(Int(Tokens.Motion.edgeOffset))px); } }
+    main { animation: reader-in \(Int(Tokens.Motion.enter * 1000))ms cubic-bezier(0.23, 1, 0.32, 1); }
+    :root[data-motion="reduce"] main { animation: none; }
+    @media (prefers-reduced-motion: reduce) { main { animation: none; } }
 
     /* The header: where it's from, the title, who and when. Space below it, no rule. */
     header { margin: 0 0 2.2em; }
-    .site { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font: 500 14px/1.4 var(--sans); color: var(--soft); }
+    .site { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font: 500 \(Int(Tokens.TypeSize.row))px/1.4 var(--sans); color: var(--soft); }
     .site img { display: block; width: 16px; height: 16px; margin: 0; border-radius: 3px; flex: none; }
     h1.title { margin: 0; font-size: 2.1em; line-height: 1.12; font-weight: 700; letter-spacing: -0.016em; text-wrap: balance; -webkit-hyphens: manual; hyphens: manual; }
     :root:is(:lang(zh), :lang(ja), :lang(ko)) h1.title { line-height: 1.3; letter-spacing: 0; }
-    .byline { display: flex; flex-wrap: wrap; column-gap: 14px; margin: 14px 0 0; font: 14px/1.45 var(--sans); color: var(--soft); }
+    .byline { display: flex; flex-wrap: wrap; column-gap: 14px; margin: 14px 0 0; font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); }
     .byline .author { color: var(--ink); font-weight: 500; }
 
     /* The text's rhythm: a line of space between paragraphs, headings closer to what follows than to what came before. */
@@ -429,14 +471,19 @@ enum Reader {
     a:hover { color: var(--link); text-decoration-color: currentColor; }
     :is(h1, h2, h3, h4, h5, h6) a, figure a { text-decoration: none; }
 
-    /* Pictures at their own size, never bigger, on the column's edge; a caption small and quiet under each. */
+    /* Pictures at their own size, never bigger, centered on the column; a large one runs past the text into the
+       margins as far as the window allows. A caption small and quiet under each, on the text's edge. */
     img, video, picture, svg, canvas { max-width: 100%; height: auto; }
-    img, video { display: block; margin: 1.6em 0; border-radius: 3px; }
-    img.inline { display: inline; margin: 0; vertical-align: middle; border-radius: 0; }
-    figure { margin: 1.8em 0; }
-    figure img, figure video, figure picture { margin: 0; }
+    img, video { display: block; max-width: calc(100% + 2 * var(--bleed)); margin: 1.6em 0 1.6em 50%; transform: translateX(-50%); border-radius: 4px; }
+    img.inline { display: inline; max-width: 100%; margin: 0; transform: none; vertical-align: middle; border-radius: 0; }
+    figure { margin: 1.8em calc(-1 * var(--bleed)); }
+    figure :is(img, video) { max-width: 100%; margin: 0 auto; transform: none; }
     figure > a, picture { display: block; }
-    figcaption { max-width: 36em; margin: .6em 0 0; font: 14px/1.45 var(--sans); color: var(--soft); text-wrap: pretty; -webkit-hyphens: manual; hyphens: manual; }
+    figcaption { max-width: 40rem; margin: .6em 0 0; padding: 0 var(--bleed); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); text-wrap: pretty; -webkit-hyphens: manual; hyphens: manual; }
+    /* Inside a list, a quote or a table, pictures and code keep to their box. */
+    :is(li, blockquote, td, th, dd) :is(img, video) { max-width: 100%; margin-left: 0; transform: none; }
+    :is(li, blockquote, td, th, dd) figure { margin-inline: 0; }
+    :is(li, blockquote, td, th, dd) figcaption { padding: 0; }
     :root:is(:lang(zh), :lang(ja), :lang(ko)) figcaption { line-height: 1.6; }
     figcaption p { margin: 0; }
     /* Picture galleries come as lists: no bullets, just the pictures. */
@@ -448,10 +495,14 @@ enum Reader {
 
     code, kbd, samp, pre { font-family: var(--mono); font-size: .84em; -webkit-hyphens: none; hyphens: none; }
     code, kbd { padding: .1em .32em; border-radius: 4px; background: var(--code); }
-    pre { padding: 14px 16px; border-radius: 8px; background: var(--code); line-height: 1.55; overflow-x: auto; white-space: pre; tab-size: 4; }
+    /* Code's box hangs into the margins when there's room, its first column on the text's edge, so long lines get
+       more room before they scroll. */
+    pre { margin-inline: calc(-1 * var(--code-bleed)); padding: 14px 16px 14px max(16px, var(--code-bleed)); border-radius: 8px;
+          background: var(--code); line-height: 1.55; overflow-x: auto; white-space: pre; tab-size: 4; }
+    :is(li, blockquote, td, th, dd) pre { margin-inline: 0; padding-left: 16px; }
     pre code { padding: 0; background: none; font-size: inherit; }
 
-    table { display: block; width: max-content; max-width: 100%; overflow-x: auto; margin: 1.6em 0; border-collapse: collapse;
+    table { display: block; width: max-content; max-width: calc(100% + var(--bleed)); overflow-x: auto; margin: 1.6em 0; border-collapse: collapse;
             font: 15px/1.5 var(--sans); }
     th, td { padding: 7px 16px 7px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
     th { font-weight: 600; }
@@ -465,7 +516,7 @@ enum Reader {
     sup, sub { line-height: 0; font-size: .7em; }
     abbr[title] { text-decoration: none; }
 
-    .end { margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--rule); font: 14px/1.45 var(--sans); color: var(--soft); }
+    .end { margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--rule); font: \(Int(Tokens.TypeSize.row))px/1.45 var(--sans); color: var(--soft); }
     .end a { color: inherit; }
 
     /* Leftovers from the page that don't belong in reading. */
@@ -474,10 +525,11 @@ enum Reader {
     /* On paper: black on white whatever the theme, the page's margins, nothing split across a page break. */
     @page { margin: 18mm 20mm; }
     @media print {
-      :root, :root[data-theme] { \(Palette.light.css) --ink: #000; }
+      :root, :root[data-theme] { \(Palette.light.css) --ink: #000; --bleed: 0px; --code-bleed: 0px; }
       html, body { background: #fff; }
       body { padding: 0; font-size: 11.5pt; }
-      main { max-width: none; }
+      main { max-width: none; animation: none; }
+      pre { padding-left: 16px; }
       a { text-decoration: none; }
       pre { white-space: pre-wrap; overflow: visible; }
       table { overflow: visible; }
@@ -531,6 +583,13 @@ final class ReaderView: NSView {
         return preferences
     }
 
+    #if DEBUG
+    func debugSet(_ preferences: Reader.Preferences) {
+        controls.preferences = preferences
+        apply(preferences)
+    }
+    #endif
+
     private func apply(_ preferences: Reader.Preferences) {
         Reader.Preferences.saved = preferences
         // The page's own scripts are off; this runs in Zigzag's world, so the change is instant.
@@ -569,11 +628,15 @@ final class ReaderView: NSView {
         controls.frame = NSRect(x: bounds.width - side - Tokens.Space.x4, y: Tokens.Space.x4, width: side, height: side)
     }
 
-    func show(_ article: Reader.Article, from url: URL, icon: NSImage? = nil) {
+    /// `theme`: the window's space, whose breath of color Auto's paper takes.
+    func show(_ article: Reader.Article, from url: URL, icon: NSImage? = nil, theme: Brand.Theme = .navy) {
         articleURL = url
         webView.navigationDelegate = self
         let preferences = Reader.Preferences.saved
-        webView.loadHTMLString(Reader.html(for: article, preferences: preferences, icon: Reader.iconSource(icon)), baseURL: url)
+        let paper = Reader.AutoPaper.of(theme)
+        webView.loadHTMLString(Reader.html(for: article, preferences: preferences, icon: Reader.iconSource(icon), paper: paper,
+                                           reducedMotion: Tokens.Motion.reduceMotion), baseURL: url)
+        controls.paper = paper
         controls.preferences = preferences
         controls.theme = preferences.theme
     }
@@ -596,13 +659,15 @@ final class ReaderView: NSView {
     }
 }
 
-/// Aa, alone at the top right on the article's own paper: how it reads opens in a small panel underneath. Reader
-/// itself goes with the address's Reader button, Esc or ⌘⇧R, as it came.
+/// Aa, alone at the top right on the article's own paper: how it reads opens in Zigzag's own panel underneath.
+/// Reader itself goes with the address's Reader button, Esc or ⌥⌘R, as it came.
 final class ReaderControls: NSView {
     var onChange: ((Reader.Preferences) -> Void)?
     var preferences = Reader.Preferences.saved { didSet { options.preferences = preferences } }
     /// The article's colors: the button sits on its paper, in its ink, so it reads as part of the page.
     var theme = Reader.Preferences.Theme.auto { didSet { refreshColors() } }
+    /// Auto's paper, the space's breath of color.
+    var paper = Reader.AutoPaper() { didSet { options.paper = paper; refreshColors() } }
 
     private let style = IconButton(symbol: "textformat.size", toolTip: String(localized: "Text and Colors", comment: "Tooltip of the button in Reader's bar that shows its text and color choices."))
     private let options = ReaderOptions()
@@ -641,7 +706,7 @@ final class ReaderControls: NSView {
         guard shown != isShown, options.superview == nil else { return }
         isShown = shown
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Tokens.Motion.state * Tokens.Motion.debugSlowdown
+            ctx.duration = Tokens.Motion.Role.state.duration() * Tokens.Motion.debugSlowdown
             ctx.timingFunction = Tokens.Motion.easeOut
             animator().alphaValue = shown ? 1 : 0
         }
@@ -650,8 +715,8 @@ final class ReaderControls: NSView {
     private func refreshColors() {
         // Light, Sepia and Dark are the page's whatever the Mac's look; Auto follows the Mac, as the page does.
         appearance = theme == .auto ? nil : NSAppearance(named: theme == .dark ? .darkAqua : .aqua)
-        let paper = theme == .auto ? (effectiveAppearance.isDark ? Reader.Palette.dark : .light).paper : theme.palette.paper
-        Tokens.Motion.withoutAnimation { layer?.backgroundColor = Tokens.Color.hex(paper).cgColor }
+        let color = theme == .auto ? paper.paper(dark: effectiveAppearance.isDark) : theme.palette.paper
+        Tokens.Motion.withoutAnimation { layer?.backgroundColor = Tokens.Color.hex(color).cgColor }
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -659,16 +724,20 @@ final class ReaderControls: NSView {
         refreshColors()
     }
 
+    #if DEBUG
+    var debugOptions: NSView { options }
+    #endif
+
     func toggleOptions() {
         if options.superview != nil { hideOptions(); return }
         guard let host = superview else { return }
         setShown(true)
         options.preferences = preferences
         let size = options.panelSize
-        // Under the Aa button, its right edge with the button's, but always whole inside the page.
+        // A button's menu: 4pt under it, its trailing edge on the button's, always whole inside the page.
         let margin = Tokens.Space.x3
         let x = min(max(margin, frame.maxX - size.width), host.bounds.width - size.width - margin)
-        options.frame = NSRect(x: x, y: frame.maxY + 6, width: size.width, height: size.height)
+        options.frame = NSRect(x: x, y: frame.maxY + Tokens.Space.x1, width: size.width, height: size.height)
         options.growsFrom = CGPoint(x: 1, y: 0)
         host.addSubview(options)
         options.present()
@@ -702,36 +771,49 @@ final class ReaderControls: NSView {
     }
 }
 
-/// How it reads: size, typeface, colours. Four even rows, each one control across the panel: the size buttons, two
-/// sliding switches, and the theme swatches.
+/// How it reads, as the site panel's rows: each choice named on the left, its control on the right. Text size
+/// steps as the page's zoom does, the face and the width slide, and the colors are round swatches.
 private final class ReaderOptions: FloatingPanelView {
     var onChange: ((Reader.Preferences) -> Void)?
     var preferences = Reader.Preferences.saved { didSet { refresh() } }
+    var paper = Reader.AutoPaper() { didSet { swatches.paper = paper } }
 
-    private let size = ReaderSizeButtons()
+    private let size = ZoomStepper()
     private let face = SlidingSwitch([.styled(String(localized: "Serif", comment: "Choice of typeface in Reader's text and color choices."), NSFont(descriptor: Tokens.Font.body(.medium).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)!),
                                       .text(String(localized: "Sans", comment: "Choice of typeface in Reader's text and color choices: sans serif."))])
     private let measure = SlidingSwitch([.text(String(localized: "Narrow", comment: "Choice of column width in Reader's text and color choices.")), .text(String(localized: "Medium", comment: "Choice of column width in Reader's text and color choices.")),
                                          .text(String(localized: "Wide", comment: "Choice of column width in Reader's text and color choices."))])
-    private var tiles: [(Reader.Preferences.Theme, ThemeTile)] = []
+    private let swatches = ReaderSwatches()
+    private var rows: [PanelRow] = []
 
-    static let width: CGFloat = 252
-    private static let pad = Tokens.Space.x3, row = Tokens.Metric.rowHeight, gap = Tokens.Space.x2
-    var panelSize: NSSize { NSSize(width: Self.width, height: Self.pad * 2 + Self.row * 4 + Self.gap * 3) }
+    static let width: CGFloat = 336
+    private static let padX = Tokens.Space.x4, padY = Tokens.Space.x2
+    var panelSize: NSSize { NSSize(width: Self.width, height: Self.padY * 2 + PanelRow.height * CGFloat(rows.count)) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        radius = Tokens.Radius.large
-        [size, face, measure].forEach { addSubview($0) }
-        face.setAccessibilityLabel(String(localized: "Typeface", comment: "VoiceOver label of the typeface choice in Reader's text and color choices."))
-        measure.setAccessibilityLabel(String(localized: "Column Width", comment: "VoiceOver label of the column width choice in Reader's text and color choices."))
-        for theme in Reader.Preferences.Theme.allCases {
-            let tile = ThemeTile(theme: theme)
-            tile.onClick = { [weak self] _ in self?.change { $0.theme = theme } }
-            addSubview(tile)
-            tiles.append((theme, tile))
+        let typeface = String(localized: "Typeface", comment: "VoiceOver label of the typeface choice in Reader's text and color choices.")
+        let width = String(localized: "Column Width", comment: "VoiceOver label of the column width choice in Reader's text and color choices.")
+        let colors = String(localized: "Colors", comment: "Row in Reader's text and color choices: the paper and ink the article is shown in.")
+        face.setAccessibilityLabel(typeface)
+        measure.setAccessibilityLabel(width)
+        swatches.setAccessibilityLabel(colors)
+        size.steps = stride(from: Reader.Preferences.sizes.lowerBound, through: Reader.Preferences.sizes.upperBound, by: Reader.Preferences.step)
+            .map { CGFloat($0) / CGFloat(Reader.Preferences.defaultSize) }
+        size.reset = { 1 }
+        size.lessTip = String(localized: "Smaller Text", comment: "VoiceOver label of the button in Reader's text choices that makes the text smaller.")
+        size.moreTip = String(localized: "Larger Text", comment: "VoiceOver label of the button in Reader's text choices that makes the text larger.")
+        size.resetTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.")
+        size.percentName = String(localized: "Text %@, Actual Size", comment: "VoiceOver name of the percentage on Reader's Text Size row: the size now, then what pressing it does.")
+        rows = [.custom(String(localized: "Text Size", comment: "Row in Reader's text and color choices: the − 100% + stepper."), control: size),
+                .custom(typeface, control: Fixed(face, NSSize(width: 136, height: Tokens.Metric.controlHeight))),
+                .custom(width, control: Fixed(measure, NSSize(width: 212, height: Tokens.Metric.controlHeight))),
+                .custom(colors, control: swatches)]
+        rows.forEach { addSubview($0) }
+        swatches.onPick = { [weak self] theme in self?.change { $0.theme = theme } }
+        size.onChange = { [weak self] zoom in
+            self?.change { $0.size = Int((zoom * CGFloat(Reader.Preferences.defaultSize)).rounded()) }
         }
-        size.onPick = { [weak self] larger in self?.change { $0 = $0.stepped(larger ? 1 : -1) } }
         face.onChange = { [weak self] index in self?.change { $0.face = index == 0 ? .serif : .sans } }
         measure.onChange = { [weak self] index in self?.change { $0.width = Reader.Preferences.Width.allCases[index] } }
         onLayout = { [weak self] in self?.layoutContent() }
@@ -743,108 +825,93 @@ private final class ReaderOptions: FloatingPanelView {
     private func change(_ edit: (inout Reader.Preferences) -> Void) {
         var next = preferences
         edit(&next)
+        guard next != preferences else { return }
         preferences = next
         onChange?(next)
     }
 
     private func refresh() {
+        size.zoom = CGFloat(preferences.size) / CGFloat(Reader.Preferences.defaultSize)
         face.selectedIndex = preferences.face == .serif ? 0 : 1
         measure.selectedIndex = Reader.Preferences.Width.allCases.firstIndex(of: preferences.width) ?? 1
-        size.canShrink = preferences.size > Reader.Preferences.sizes.lowerBound
-        size.canGrow = preferences.size < Reader.Preferences.sizes.upperBound
-        for (theme, tile) in tiles { tile.isSelected = theme == preferences.theme }
+        swatches.selected = preferences.theme
     }
 
     private func layoutContent() {
-        let pad = Self.pad, inner = bounds.width - pad * 2
-        size.frame = NSRect(x: pad, y: pad, width: inner, height: Self.row)
-        face.frame = NSRect(x: pad, y: size.frame.maxY + Self.gap, width: inner, height: Self.row)
-        measure.frame = NSRect(x: pad, y: face.frame.maxY + Self.gap, width: inner, height: Self.row)
-        let y = measure.frame.maxY + Self.gap, gap = Tokens.Space.x2
-        let w = (inner - gap * CGFloat(tiles.count - 1)) / CGFloat(tiles.count)
-        for (i, (_, tile)) in tiles.enumerated() {
-            tile.frame = NSRect(x: pad + CGFloat(i) * (w + gap), y: y, width: w, height: Self.row)
+        for (i, row) in rows.enumerated() {
+            row.frame = NSRect(x: Self.padX, y: Self.padY + CGFloat(i) * PanelRow.height, width: bounds.width - Self.padX * 2, height: PanelRow.height)
         }
     }
 }
 
-/// Smaller and larger text: two buttons in one soft track, shaped like the sliding switches under them.
-private final class ReaderSizeButtons: NSView {
-    var onPick: ((_ larger: Bool) -> Void)?
-    var canShrink = true { didSet { setEnabled(smaller, canShrink) } }
-    var canGrow = true { didSet { setEnabled(larger, canGrow) } }
-    private let smaller = InteractiveView(), larger = InteractiveView()
-    private let smallLabel = Label("A", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let largeLabel = Label("A", font: Tokens.Font.title(.semibold), color: Tokens.Color.textPrimary)
-    private let divider = ColorView(color: Tokens.Color.separator)
-    /// The same gap as `SlidingSwitch`'s, so the corners are concentric with the track's.
-    private let inset: CGFloat = 3
+/// A control at a set size, so a row can lay it out by what it asks for.
+private final class Fixed: NSView {
+    private let size: NSSize
+
+    init(_ control: NSView, _ size: NSSize) {
+        self.size = size
+        super.init(frame: NSRect(origin: .zero, size: size))
+        addSubview(control)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+    override var intrinsicContentSize: NSSize { size }
+    override var fittingSize: NSSize { size }
+
+    override func layout() {
+        super.layout()
+        subviews.first?.frame = bounds
+    }
+}
+
+/// The four colors in a row of round swatches, as the space editor's.
+private final class ReaderSwatches: NSView {
+    var onPick: ((Reader.Preferences.Theme) -> Void)?
+    var selected = Reader.Preferences.Theme.auto { didSet { for tile in tiles { tile.isSelected = tile.theme == selected } } }
+    var paper = Reader.AutoPaper() { didSet { tiles.forEach { $0.paper = paper } } }
+    private var tiles: [ThemeSwatch] = []
+    private static let side: CGFloat = Tokens.Metric.controlHeight, gap = Tokens.Space.x2
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.field + inset
-        layer?.cornerCurve = .continuous
-        layer?.backgroundColor = cgColor(Tokens.Color.fieldFill)
-        addSubview(divider)
-        for (button, label, name, larger) in [(smaller, smallLabel, String(localized: "Smaller Text", comment: "VoiceOver label of the button in Reader's text choices that makes the text smaller."), false),
-                                                (self.larger, largeLabel, String(localized: "Larger Text", comment: "VoiceOver label of the button in Reader's text choices that makes the text larger."), true)] {
-            button.wantsLayer = true
-            button.layer?.cornerRadius = Tokens.Radius.field
-            button.layer?.cornerCurve = .continuous
-            label.alignment = .center
-            button.addSubview(label)
-            button.setAccessibilityRole(.button)
-            button.setAccessibilityLabel(name)
-            button.onClick = { [weak self, weak button] _ in
-                guard let button, button.isEnabled else { return }
-                self?.onPick?(larger)
-            }
-            button.hoverChanged = { [weak button, weak self] hovering in
-                guard let button, let self else { return }
-                button.layer?.backgroundColor = hovering && button.isEnabled ? self.cgColor(Tokens.Color.hoverFill) : nil
-            }
-            addSubview(button)
+        for theme in Reader.Preferences.Theme.allCases {
+            let tile = ThemeSwatch(theme: theme)
+            tile.onClick = { [weak self] _ in self?.onPick?(theme) }
+            addSubview(tile)
+            tiles.append(tile)
         }
+        setAccessibilityElement(true)
+        setAccessibilityRole(.radioGroup)
     }
 
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    private func setEnabled(_ button: InteractiveView, _ enabled: Bool) {
-        button.isEnabled = enabled
-        (button === smaller ? smallLabel : largeLabel).textColor = enabled ? Tokens.Color.textPrimary : Tokens.Color.textTertiary
-        if !enabled { button.layer?.backgroundColor = nil }
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: Self.side * CGFloat(tiles.count) + Self.gap * CGFloat(tiles.count - 1), height: Self.side)
     }
+    override var fittingSize: NSSize { intrinsicContentSize }
+    override func accessibilityChildren() -> [Any]? { tiles }
 
     override func layout() {
         super.layout()
-        let w = (bounds.width - inset * 2) / 2
-        for (i, (button, label)) in [(smaller, smallLabel), (larger, largeLabel)].enumerated() {
-            button.frame = NSRect(x: inset + CGFloat(i) * w, y: inset, width: w, height: bounds.height - inset * 2)
-            label.frame = NSRect(x: 0, y: (button.bounds.height - label.lineHeight) / 2, width: button.bounds.width, height: label.lineHeight)
+        for (i, tile) in tiles.enumerated() {
+            tile.frame = NSRect(x: CGFloat(i) * (Self.side + Self.gap), y: (bounds.height - Self.side) / 2, width: Self.side, height: Self.side)
         }
-        divider.frame = NSRect(x: bounds.midX, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        layer?.backgroundColor = cgColor(Tokens.Color.fieldFill)
     }
 }
 
-/// One theme as it reads: "Aa" in its own ink on its own paper. Auto is half light, half dark.
-private final class ThemeTile: InteractiveView {
-    private let theme: Reader.Preferences.Theme
+/// One theme as it reads, round as the space editor's swatches: "Aa" in its own ink on its own paper, Auto half
+/// light, half dark. Chosen, it sits inside a fine ring; under the pointer it swells to meet the edge.
+private final class ThemeSwatch: InteractiveView {
+    let theme: Reader.Preferences.Theme
+    var paper = Reader.AutoPaper() { didSet { stateDidChange(animated: false) } }
+    private let ring = CALayer()
+    private let fill = CALayer()
     private let darkHalf = CALayer()
     private let lightInk = CATextLayer()
     private let darkInk = CATextLayer()
-    private let ring = CAShapeLayer()
-
-    /// The article's own paper and ink.
-    private static func colors(_ theme: Reader.Preferences.Theme) -> (paper: NSColor, ink: NSColor) {
-        (Tokens.Color.hex(theme.palette.paper), Tokens.Color.hex(theme.palette.ink))
-    }
 
     private static func name(_ theme: Reader.Preferences.Theme) -> String {
         switch theme {
@@ -859,35 +926,22 @@ private final class ThemeTile: InteractiveView {
         self.theme = theme
         super.init(frame: .zero)
         wantsLayer = true
-        let (paper, ink) = Self.colors(theme)
-        layer?.backgroundColor = paper.cgColor
-        layer?.cornerRadius = Tokens.Radius.field + 3
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-        layer?.borderWidth = Tokens.Metric.hairline
-        layer?.borderColor = NSColor.black.withAlphaComponent(0.1).cgColor
-        if theme == .auto {
-            // Rounded on its own outer corners, so it keeps the swatch's shape whatever clips it.
-            darkHalf.backgroundColor = Tokens.Color.hex(Reader.Palette.dark.paper).cgColor
-            darkHalf.cornerRadius = Tokens.Radius.field + 3
-            darkHalf.cornerCurve = .continuous
-            darkHalf.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
-            layer?.addSublayer(darkHalf)
-        }
-        for (text, color) in [(lightInk, ink), (darkInk, Tokens.Color.hex(Reader.Palette.dark.ink))] {
-            text.string = "Aa"
-            text.font = NSFont(descriptor: Tokens.Font.body(.semibold).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.body)
-            text.fontSize = Tokens.TypeSize.body
-            text.alignmentMode = .center
-            text.foregroundColor = color.cgColor
-            text.contentsScale = 2
-            layer?.addSublayer(text)
-        }
-        darkInk.isHidden = theme != .auto
-        ring.fillColor = nil
-        ring.lineWidth = 2
-        ring.isHidden = true
         layer?.addSublayer(ring)
+        layer?.addSublayer(fill)
+        fill.masksToBounds = true
+        fill.addSublayer(darkHalf)
+        darkHalf.isHidden = theme != .auto
+        for text in [lightInk, darkInk] {
+            text.font = NSFont(descriptor: Tokens.Font.small(.semibold).fontDescriptor.withDesign(.serif)!, size: Tokens.TypeSize.small)
+            text.fontSize = Tokens.TypeSize.small
+            text.alignmentMode = .center
+            text.contentsScale = 2
+            fill.addSublayer(text)
+        }
+        // "A" on the light half, "a" on the dark: the same word, both ways.
+        lightInk.string = theme == .auto ? "A" : "Aa"
+        darkInk.string = "a"
+        darkInk.isHidden = theme != .auto
         toolTip = theme == .auto ? String(localized: "Auto: follows your Mac", comment: "Tooltip of the Auto color choice in Reader: light by day, dark at night, as the Mac is.") : Self.name(theme)
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(Self.name(theme))
@@ -895,32 +949,45 @@ private final class ThemeTile: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override func stateDidChange(animated: Bool) {
-        ring.isHidden = !isSelected
-        if isSelected { ring.strokeColor = cgColor(Brand.Theme.for(self).accent) }
-    }
-
     override func accessibilityValue() -> Any? { isSelected ? 1 : 0 }
 
     override func layout() {
         super.layout()
+        stateDidChange(animated: false)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        stateDidChange(animated: false)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let palette = theme.palette
+        let light = theme == .auto ? paper.light : palette.paper
         Tokens.Motion.withoutAnimation {
-            let h = bounds.height, textH: CGFloat = 18
-            darkHalf.frame = CGRect(x: bounds.midX, y: 0, width: bounds.width / 2, height: h)
-            if theme == .auto {
-                // "A" on the light half, "a" on the dark: the same word, both ways.
-                lightInk.string = "A"
-                darkInk.string = "a"
-                lightInk.frame = CGRect(x: 0, y: (h - textH) / 2, width: bounds.width / 2, height: textH)
-                darkInk.frame = CGRect(x: bounds.midX, y: (h - textH) / 2, width: bounds.width / 2, height: textH)
-            } else {
-                lightInk.frame = CGRect(x: 0, y: (h - textH) / 2, width: bounds.width, height: textH)
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                ring.frame = bounds
+                ring.cornerRadius = bounds.width / 2
+                ring.borderWidth = 2
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : .clear).cgColor
+                let inset: CGFloat = isSelected ? 3.5 : (isHovered ? 0 : 2)
+                fill.frame = bounds.insetBy(dx: inset, dy: inset)
+                fill.cornerRadius = fill.frame.width / 2
+                fill.backgroundColor = Tokens.Color.hex(light).cgColor
+                fill.borderWidth = Tokens.Metric.hairline
+                // A firmer edge than a panel's, so the light papers read on a light panel and Dark on a dark one.
+                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
+                darkHalf.backgroundColor = Tokens.Color.hex(paper.dark).cgColor
+                let w = fill.bounds.width, h = fill.bounds.height, textH = ceil(Tokens.TypeSize.small * 1.3)
+                darkHalf.frame = CGRect(x: w / 2, y: 0, width: w / 2, height: h)
+                lightInk.foregroundColor = Tokens.Color.hex(palette.ink).cgColor
+                darkInk.foregroundColor = Tokens.Color.hex(Reader.Palette.dark.ink).cgColor
+                let y = (h - textH) / 2
+                lightInk.frame = theme == .auto ? CGRect(x: 0, y: y, width: w / 2, height: textH) : CGRect(x: 0, y: y, width: w, height: textH)
+                darkInk.frame = CGRect(x: w / 2, y: y, width: w / 2, height: textH)
             }
-            // Inside the edge, its corners concentric with the swatch's; in the window's accent, as a field's ring is.
-            let r = (layer?.cornerRadius ?? 0) - 1
-            ring.path = CGPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerWidth: r, cornerHeight: r, transform: nil)
-            ring.strokeColor = cgColor(Brand.Theme.for(self).accent)
         }
+        setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
     }
 }
 
