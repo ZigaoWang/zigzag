@@ -26,6 +26,24 @@ final class TopBarView: NSView {
     /// sight with it then. Shown, the sidebar keeps it in its own top row. For a sidebar on the right it's last, at
     /// the bar's trailing end, the side the sidebar comes out of.
     let sidebarButton = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false), toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
+    /// Keeps the bar and sidebar in full screen (#462): the pin is there only in full screen, and its fill says they
+    /// stay. Unpinned, the bar comes down over the page when the pointer reaches the top.
+    let pinButton = SidebarView.chromeButton("pin", toolTip: String(localized: "Keep the bar and sidebar in full screen", comment: "Tooltip of the pin in the top bar in full screen: it keeps the bar and sidebar instead of letting them hide."))
+    /// Whether the pin is in the bar: full screen only.
+    var showsPin = false { didSet { if showsPin != oldValue { refreshPin() } } }
+    /// Whether the chrome stays: the pin is filled.
+    var pinsChrome = false { didSet { if pinsChrome != oldValue { refreshPin() } } }
+    var onPin: (() -> Void)?
+
+    private func refreshPin() {
+        pinButton.isHidden = !showsPin
+        pinButton.symbol = pinsChrome ? "pin.fill" : "pin"
+        pinButton.tint = pinsChrome ? Tokens.Color.accent : Tokens.Color.icon
+        pinButton.toolTip = pinsChrome
+            ? String(localized: "Let the bar and sidebar hide in full screen", comment: "Tooltip of the pin in the top bar while the bar and sidebar are kept in full screen: pressing it lets them hide again.")
+            : String(localized: "Keep the bar and sidebar in full screen", comment: "Tooltip of the pin in the top bar in full screen: it keeps the bar and sidebar instead of letting them hide.")
+        needsLayout = true
+    }
     /// Whether the sidebar is on the window's right: the toggle sits at the bar's trailing end and its glyph mirrors.
     var sidebarOnRight = false {
         didSet {
@@ -57,7 +75,7 @@ final class TopBarView: NSView {
 
     private func refreshOnPage() {
         let onPage = pageColor != nil
-        for case let button as IconButton in [sidebarButton] + buttons { button.isOnPage = onPage; button.ground = pageColor }
+        for case let button as IconButton in [sidebarButton, pinButton] + buttons { button.isOnPage = onPage; button.ground = pageColor }
         (address as? AddressView)?.isOnPage = onPage
         accessory?.isOnPage = onPage
     }
@@ -107,7 +125,10 @@ final class TopBarView: NSView {
         super.init(frame: frame)
         setAccessibilityRole(.toolbar)
         sidebarButton.isHidden = true
+        pinButton.isHidden = true
+        pinButton.onClick = { [weak self] _ in self?.onPin?() }
         addSubview(sidebarButton)
+        addSubview(pinButton)
         addSubview(pill)
         // Settings › Appearance › Sidebar size: the address held here takes its new height.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
@@ -135,6 +156,8 @@ final class TopBarView: NSView {
 
     struct Frames: Equatable {
         var sidebarButton: NSRect?
+        /// The pin at the trailing end in full screen (#462): last, before the sidebar's toggle when that's there.
+        var pin: NSRect?
         var buttons: [NSRect]
         /// The address: its buttons at the room's trailing end when `addressWidth` is given, else the whole room.
         var address: NSRect
@@ -153,7 +176,8 @@ final class TopBarView: NSView {
     /// field's width.
     static func frames(width: CGFloat, buttons: Int, sidebarButton: Bool = false, onRight: Bool = false, trafficLightsWidth: CGFloat,
                        leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat, accessory: CGFloat = 0,
-                       addressWidth: CGFloat? = nil, pill: CGFloat? = nil, pillCenter: CGFloat? = nil, onCard: Bool = false) -> Frames {
+                       addressWidth: CGFloat? = nil, pill: CGFloat? = nil, pillCenter: CGFloat? = nil, onCard: Bool = false,
+                       pin: Bool = false) -> Frames {
         let mid = height / 2, b = Tokens.Sidebar.button
         let leads = sidebarButton && !onRight
         var x = leadX(sidebarButton: leads, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
@@ -164,8 +188,10 @@ final class TopBarView: NSView {
         let first = leads ? next() : nil
         let rects = (0..<buttons).map { _ in next() }
         let last = sidebarButton && onRight ? trailingToggle(width: width) : nil
+        // Last at the trailing end, or just inside the sidebar's own toggle when that's there.
+        let pinRect = pin ? NSRect(x: last.map { $0.minX - b - Tokens.Space.x1 } ?? (width - trailingInset - b), y: mid - b / 2, width: b, height: b) : nil
         let start = x + Tokens.Space.x2, h = Tokens.Sidebar.addressHeight
-        let end = min(width - trailingInset, last.map { $0.minX - Tokens.Space.x2 } ?? .infinity)
+        let end = min(width - trailingInset, (pinRect?.minX ?? .infinity) - Tokens.Space.x2, last.map { $0.minX - Tokens.Space.x2 } ?? .infinity)
         let tools = accessory > 0 ? NSRect(x: max(start, end - accessory), y: 0, width: min(accessory, max(0, end - start)), height: height) : nil
         let addressEnd = tools.map { $0.minX - Tokens.Space.x2 } ?? end
         let room = max(0, addressEnd - start)
@@ -175,7 +201,7 @@ final class TopBarView: NSView {
             let hi = max(start, addressWidth == nil || addressWide <= 0 ? start + room : address.minX - Tokens.Space.x2)
             return PaneHeaderView.pillFrame(center: pillCenter ?? (start + hi) / 2, room: start...hi, fitting: fitting, overCard: onCard, midY: mid)
         }
-        return Frames(sidebarButton: first ?? last, buttons: rects, address: address, pill: pillFrame, accessory: tools)
+        return Frames(sidebarButton: first ?? last, pin: pinRect, buttons: rects, address: address, pill: pillFrame, accessory: tools)
     }
 
     /// The toggle at the bar's trailing end, for a sidebar on the right: `Sidebar.edge` in from the window's edge
@@ -236,7 +262,7 @@ final class TopBarView: NSView {
     }
 
     /// The bar's own back, forward, reload and address, which step aside for the panes' strips.
-    var ownControls: [NSView] { buttons + [address].compactMap { $0 } + (holdsAddress ? [pill] : []) }
+    var ownControls: [NSView] { buttons + [address].compactMap { $0 } + (holdsAddress ? [pill] : []) + (showsPin ? [pinButton] : []) }
 
     struct Strip: Equatable {
         var frame: NSRect
@@ -273,7 +299,8 @@ final class TopBarView: NSView {
             Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton, onRight: sidebarOnRight,
                         trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset, accessory: accessory,
                         addressWidth: alone ? nil : (address as? AddressView)?.buttonsWidth,
-                        pill: holdsAddress && !alone ? pill.fittingWidth : nil, pillCenter: addressCenter, onCard: pageColor != nil)
+                        pill: holdsAddress && !alone ? pill.fittingWidth : nil, pillCenter: addressCenter, onCard: pageColor != nil,
+                        pin: showsPin)
         }
         // The page's tools take what they ask for of the room the address has, less what the address keeps while
         // it's here; with the panes' strips in the row (a split), there are none.
@@ -286,6 +313,7 @@ final class TopBarView: NSView {
         var places: [(view: NSView, frame: NSRect)] = []
         if let accessory, let rect = frames.accessory { places.append((accessory, rect)) }
         if let toggle = frames.sidebarButton { places.append((sidebarButton, toggle)) }
+        if let rect = frames.pin { places.append((pinButton, rect)) }
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
         if let rect = frames.pill { places.append((pill, rect)) }
@@ -329,7 +357,7 @@ final class TopBarView: NSView {
 
     /// Where each control showing is now, in the superview's terms: taken before the sidebar comes or goes.
     var controlPositions: [ObjectIdentifier: NSRect] {
-        Dictionary(uniqueKeysWithValues: ([sidebarButton, pill] + buttons + [address, accessory].compactMap { $0 } + (strips as [NSView]))
+        Dictionary(uniqueKeysWithValues: ([sidebarButton, pinButton, pill] + buttons + [address, accessory].compactMap { $0 } + (strips as [NSView]))
             .filter { $0.superview === self && !$0.isHidden }
             .map { (ObjectIdentifier($0), $0.frame.offsetBy(dx: frame.minX, dy: frame.minY)) })
     }

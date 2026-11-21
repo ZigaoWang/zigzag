@@ -12,6 +12,13 @@ enum PageFullScreen {
     /// The first line of the page script, to tell it from a web view's other scripts.
     static let scriptMark = "/* zigzag page full screen */\n"
 
+    /// The chrome stays in full screen: the bar above the page and the sidebar as it was. Off, the page is edge to
+    /// edge and the bar comes down only when the pointer reaches the top (#462).
+    static var pinned: Bool {
+        get { UserDefaults.standard.bool(forKey: "pageFullScreenPinned") }
+        set { UserDefaults.standard.set(newValue, forKey: "pageFullScreenPinned") }
+    }
+
     /// Isolated from the page.
     static let world = WKContentWorld.world(name: "zigzag-fullscreen")
 

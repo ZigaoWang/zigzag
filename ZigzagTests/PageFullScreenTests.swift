@@ -24,8 +24,17 @@ struct PageFullScreenTests {
         #expect(!PageFullScreen.isOurs(WKUserScript(source: "1", injectionTime: .atDocumentStart, forMainFrameOnly: true)))
     }
 
-    @Test func fillingThePageNeedsAClick() async throws {
-        let webView = await load(Self.page)
+    /// The pin is remembered, and off unless it was chosen (#462).
+    @Test func theChromeStaysPinnedOnlyWhenAsked() {
+        let was = PageFullScreen.pinned
+        defer { PageFullScreen.pinned = was }
+        PageFullScreen.pinned = false
+        #expect(!PageFullScreen.pinned)
+        PageFullScreen.pinned = true
+        #expect(PageFullScreen.pinned)
+    }
+
+    @Test func fillingThePageNeedsAClick() async throws {        let webView = await load(Self.page)
         // Without a user gesture WebKit refuses and the page isn't filled.
         _ = try? await webView.runOwnScript("try { await document.getElementById('player').requestFullscreen(); } catch (e) {} await new Promise(r => setTimeout(r, 10)); return 0",
                                             asFunction: true, world: .page)

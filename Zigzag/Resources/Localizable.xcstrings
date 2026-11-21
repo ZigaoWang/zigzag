@@ -18861,6 +18861,28 @@
         }
       }
     },
+    "Keep the bar and sidebar in full screen" : {
+      "comment" : "Tooltip of the pin in the top bar in full screen: it keeps the bar and sidebar instead of letting them hide.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在全屏幕中保留顶栏和边栏"
+          }
+        }
+      }
+    },
+    "Let the bar and sidebar hide in full screen" : {
+      "comment" : "Tooltip of the pin in the top bar while the bar and sidebar are kept in full screen: pressing it lets them hide again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在全屏幕中让顶栏和边栏隐藏"
+          }
+        }
+      }
+    },
     "Show Spelling and Grammar" : {
       "comment" : "Edit › Spelling and Grammar menu item.",
       "localizations" : {
