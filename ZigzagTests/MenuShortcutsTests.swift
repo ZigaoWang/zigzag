@@ -177,6 +177,31 @@ import Testing
     }
 
     /// ⌘F shows the find bar with its field focused; ⌘F again there hides it. Away from its field, ⌘F goes back to it.
+    /// ⇧⌘2 brings Capture over the page and again takes it away; Esc leaves it too, and so does going to another tab
+    /// (#457).
+    @Test func shiftCommandTwoOpensCaptureAndEscLeaves() async throws {
+        #expect(keys(#selector(BrowserWindowController.takePageScreenshot(_:))) == ["⇧⌘2"])
+        try await pages(["one", "two"]) { urls in
+            try await inWindow(urls) { controller, tabs in
+                #expect(await settled(tabs[0], at: urls[0]))
+                controller.root.layoutSubtreeIfNeeded()
+                controller.takePageScreenshot(nil)
+                #expect(controller.capture.isActive)
+                controller.takePageScreenshot(nil)
+                #expect(!controller.capture.isActive)
+                controller.takePageScreenshot(nil)
+                let esc = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: controller.window?.windowNumber ?? 0,
+                                                        context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+                #expect(controller.capture.handle(esc))
+                #expect(!controller.capture.isActive)
+                controller.takePageScreenshot(nil)
+                #expect(controller.capture.isActive)
+                controller.tabManager.select(tabs[1])
+                #expect(await until(2) { !controller.capture.isActive })
+            }
+        }
+    }
+
     @Test func commandFShowsTheFindBarAndAgainHidesIt() async throws {
         #expect(keys(#selector(BrowserWindowController.showFindBar(_:))) == ["⌘f"])
         try await inWindow([nil]) { controller, _ in

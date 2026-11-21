@@ -95,7 +95,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
 | **Languages** | English and Simplified Chinese. |
-| **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
+| **And** | Reader, PDF viewer, Handoff to your iPhone, iPad or other Mac, full-page screenshots (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
 
 ## What's missing
 
@@ -159,6 +159,8 @@ connections Zigzag makes on its own, apart from the pages you open:
 Translation runs on your Mac, with Apple's on-device Translation. Fraudulent website warnings are WebKit's own,
 the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
 Help › Report a Problem writes a report you can read first, and nothing is sent unless you send it.
+The Mac's Passwords list keeps a small log of its steps in `~/Library/Logs/Zigzag/passwords.log`, never a login or
+a site, and it stays on your Mac.
 
 ## Install
 

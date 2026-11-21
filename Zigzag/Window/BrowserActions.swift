@@ -128,9 +128,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
+    /// File › Capture… (⇧⌘2): Capture's mode over the page, or out of it again.
     @objc func takePageScreenshot(_ sender: Any?) {
-        guard let tab = selectedTab else { return }
-        PageScreenshot.take(tab, in: self)
+        capture.toggle()
     }
 
     @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
@@ -421,14 +421,13 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// again (#316).
     @objc func resetTileLayout(_ sender: Any?) {
         guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, shape.isParted else { return }
+        let before = shape
         shape.evenOut()
-        tabManager.setTileShape(shape, for: tab)
-        root.setTiles(shape, animated: true)
-        root.paneCards.forEach { $0.header.resetsLayout = false }
-        onStateChange?()
+        applyTileShape(shape, undoTo: before)
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
+    @objc func showReaderOptions(_ sender: Any?) { toggleReaderOptions() }
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
     @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
 
@@ -934,7 +933,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
         case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
-        case #selector(takePageScreenshot(_:)): return PageScreenshot.canTake(tab)
+        case #selector(takePageScreenshot(_:)): return capture.isActive || capture.canBegin
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
              #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(showJavaScriptConsole(_:)), #selector(inspectElement(_:)),
@@ -1017,6 +1016,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(collapseAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: true)
         case #selector(expandAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: false)
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
+        case #selector(showReaderOptions(_:)): return isReaderOnHere
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil
@@ -1061,6 +1061,17 @@ enum ZoomLevels {
 
     /// A zoom as people read it: "125%".
     static func percent(_ zoom: CGFloat) -> String { "\(Int((zoom * 100).rounded()))%" }
+
+    /// A typed zoom as a value: "130%", "130" or " 130 % ". Nil when it isn't a number above zero; the caller
+    /// keeps it within its own levels.
+    static func typed(_ text: String) -> CGFloat? {
+        let plain = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "%", with: "")
+            .replacingOccurrences(of: "％", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        guard let percent = Double(plain), percent.isFinite, percent > 0 else { return nil }
+        return CGFloat(percent / 100)
+    }
 
     /// Zoom for sites without their own: Settings › Appearance › Page zoom (100% by default). Actual Size resets to it,
     /// as in Chrome and Safari.
