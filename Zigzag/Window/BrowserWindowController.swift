@@ -617,9 +617,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if window?.isVisible == true { closeFloatingPanels() }
         sidebar.holdsAddress = !above
         if above {
-            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
+            sidebar.address.starInPill = true
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
             let tab = tabManager.selectedTab
             root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+            root.topBar.showPin(sidebar.address.canSave)
+        } else {
+            root.topBar.pin = nil
+            sidebar.address.starInPill = false
         }
         root.barHoldsAddress = above
         showTopBar()
@@ -724,6 +730,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+        root.topBar.showPin(sidebar.address.canSave)
         paintTopBar()
         // A collapsed pinned section and a folded tab group (#209) show the current tab, so they update with the
         // selection.
@@ -1646,6 +1653,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             sidebar.update(tab: tab)
             root.topBar.showPage(url: tab.url, notSecure: tab.isNotSecure)
+            root.topBar.showPin(sidebar.address.canSave)
             paintTopBar()
             updateWindowTitle()
             offerWebStoreExtension()
