@@ -28,7 +28,7 @@ final class AddressView: InteractiveView {
         IconButton(symbol: symbol, size: buttonSide, symbolSize: Tokens.Sidebar.addressGlyph, toolTip: toolTip)
     }
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
-    /// Shown on articles: opens Reader; while Reader is on, its options (`ReaderOptions`).
+    /// Shown on articles: turns Reader on and off.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
 
     func setCapture(camera: Bool, microphone: Bool) {
@@ -427,10 +427,11 @@ final class AddressView: InteractiveView {
 
     func setReader(available: Bool, active: Bool) {
         wantsReader = available || active
-        // Off, a click turns Reader on; on, it opens Reader's options, where Turn Off Reader is (⌥⌘R and Esc still close it).
+        // A toggle: pressed while Reader is on. How it reads is chosen from the page's own Aa button.
         readerButton.isSelected = active
-        readerButton.toolTip = active ? String(localized: "Reader Options", comment: "Tooltip and VoiceOver name of the address bar's Reader button while Reader is on, and VoiceOver name of the panel it opens: text size, typeface, column width, colors and Turn Off Reader.")
-            : Shortcuts.tooltip(String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."), for: #selector(BrowserWindowController.toggleReader(_:)))
+        let title = active ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.")
+            : String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button.")
+        readerButton.toolTip = Shortcuts.tooltip(title, for: #selector(BrowserWindowController.toggleReader(_:)))
         reflow(animated: true)
     }
 
