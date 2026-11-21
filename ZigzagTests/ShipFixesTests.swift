@@ -1296,19 +1296,80 @@ struct ZigzagCardTests {
         #expect(CardFace.day(from: now + 3 * day, to: now, calendar: calendar) == 1)
     }
 
-    /// The saved picture is the card at three times its size, in either appearance.
-    @Test func theSavedPictureIsTheCardAtThreeTimes() throws {
+    /// The finish picked under the card is kept, and an unknown one reads as Space.
+    @Test func theFinishIsKept() throws {
+        let name = "ZigzagCardFinish-\(UUID().uuidString)"
+        let saved = CardFinish.defaults
+        CardFinish.defaults = try #require(UserDefaults(suiteName: name))
+        defer {
+            CardFinish.defaults.removePersistentDomain(forName: name)
+            CardFinish.defaults = saved
+        }
+        #expect(CardFinish.chosen == .space)
+        for finish in CardFinish.allCases {
+            CardFinish.chosen = finish
+            #expect(CardFinish.chosen == finish)
+            #expect(CardFinish.defaults.string(forKey: CardFinish.key) == finish.rawValue)
+        }
+        CardFinish.defaults.set("chrome", forKey: CardFinish.key)
+        #expect(CardFinish.chosen == .space)
+    }
+
+    /// The saved picture is the card at eight times, clear around it for its shadow, solid in the middle and clear at
+    /// the corners, in every finish.
+    @Test func theSavedPictureIsSharpWithClearCorners() throws {
         let face = CardFace(name: "Ada Lovelace", start: now, version: "0.9.4", isExact: true, day: 14)
-        for name in [NSAppearance.Name.aqua, .darkAqua] {
-            let appearance = try #require(NSAppearance(named: name))
-            let data = try #require(CardArt.png(face, palette: CardPalette(hue: 0.6, hue2: nil), appearance: appearance))
+        for finish in CardFinish.allCases {
+            let data = try #require(CardArt.png(face, finish: finish, palette: CardPalette(hue: 0.6, hue2: nil), dark: finish == .graphite))
             let rep = try #require(NSBitmapImageRep(data: data))
-            #expect(rep.pixelsWide == Int(Tokens.Keepsake.size.width * 3))
-            #expect(rep.pixelsHigh == Int(Tokens.Keepsake.size.height * 3))
-            #expect(rep.pixelsWide == 1020 && rep.pixelsHigh == 642)
-            // The face is solid color, and only its rounded corners are clear.
-            #expect(rep.colorAt(x: 510, y: 321)?.alphaComponent == 1, "\(name.rawValue)")
+            let k = Tokens.Keepsake.self
+            #expect(rep.pixelsWide >= 2700, "\(finish)")
+            #expect(rep.pixelsWide == Int((k.size.width + k.exportMargin * 2) * k.exportScale))
+            #expect(rep.pixelsHigh == Int((k.size.height + k.exportMargin * 2) * k.exportScale))
+            #expect(rep.colorAt(x: rep.pixelsWide / 2, y: rep.pixelsHigh / 2)?.alphaComponent == 1, "\(finish)")
             #expect(rep.colorAt(x: 0, y: 0)?.alphaComponent == 0)
+            #expect(rep.colorAt(x: rep.pixelsWide - 1, y: rep.pixelsHigh - 1)?.alphaComponent == 0)
+            // The card's own corner is round: just inside its top left corner is still clear.
+            let m = Int(k.exportMargin * k.exportScale)
+            #expect(rep.colorAt(x: m + 2, y: m + 2)?.alphaComponent ?? 1 < 0.5, "\(finish)")
+        }
+    }
+
+    /// "Since" reads at AA and the name well above it on every finish, by day and at night, wherever the light is.
+    @Test func theWordsReadOnEveryFinish() throws {
+        let face = CardFace(name: "Ada Lovelace", start: now, version: "0.9.4", isExact: true, day: 14)
+        let rects = CardArt.wordRects()
+        let lights = [CardLight.rest] + [CGPoint(x: -1, y: -1), CGPoint(x: 1, y: 1), CGPoint(x: -1, y: 1), CGPoint(x: 1, y: -1), .zero]
+            .map(CardLight.init(point:))
+        for finish in CardFinish.allCases {
+            for dark in [false, true] {
+                let look = CardLook.of(finish, palette: CardPalette(hue: 0.6, hue2: nil), dark: dark)
+                for light in lights {
+                    let image = try #require(CardArt.image(face, look: look, light: light, parts: [.surface, .light], scale: 1))
+                    let rep = NSBitmapImageRep(cgImage: image)
+                    var worst = (ink: Double.infinity, quiet: Double.infinity)
+                    for (rect, quiet) in [(rects.name, false), (rects.since, true)] {
+                        // The ground as an eye reads it behind a letter: averaged over a few points, past the grain.
+                        let cell = 6
+                        for x in stride(from: Int(rect.minX), to: Int(min(rect.maxX, rect.minX + 200)) - cell, by: cell) {
+                            for y in stride(from: Int(rect.minY), to: Int(rect.maxY) - cell, by: cell) {
+                                var sum = (r: 0.0, g: 0.0, b: 0.0)
+                                for i in 0..<cell { for j in 0..<cell {
+                                    guard let c = rep.colorAt(x: x + i, y: y + j)?.usingColorSpace(.sRGB) else { continue }
+                                    sum = (sum.r + c.redComponent, sum.g + c.greenComponent, sum.b + c.blueComponent)
+                                } }
+                                let n = Double(cell * cell)
+                                let ground = NSColor(srgbRed: sum.r / n, green: sum.g / n, blue: sum.b / n, alpha: 1)
+                                let color = (quiet ? look.quiet : look.ink).usingColorSpace(.sRGB)!
+                                let contrast = Brand.contrast(color, ground)
+                                if quiet { worst.quiet = min(worst.quiet, contrast) } else { worst.ink = min(worst.ink, contrast) }
+                            }
+                        }
+                    }
+                    #expect(worst.ink >= 5.5, "\(finish) dark: \(dark) \(light.point) ink \(worst.ink)")
+                    #expect(worst.quiet >= 4.5, "\(finish) dark: \(dark) \(light.point) quiet \(worst.quiet)")
+                }
+            }
         }
     }
 

@@ -58,6 +58,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var isLeaving = false
     /// Opened for a link from another app.
     private var fromAnotherApp = false
+    /// Opened from a link on a page (⇧-click, Open Link in Zigzag Mini): the window and tab it came from.
+    private(set) weak var source: BrowserWindowController?
+    private weak var sourceTab: Tab?
+    private(set) var fromPage = false
+    /// From a private window: its own store, nothing written down.
+    var isPrivate: Bool { tab.isPrivate }
 
     /// Settings › Zigzag Mini: links from other apps open here instead of a tab, as in Little Arc. On by default.
     static var opensExternalLinks: Bool {
@@ -207,6 +213,36 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
+    /// Opens one for a link on a page (⇧-click, Open Link in Zigzag Mini), over the middle of that window's page, in the
+    /// page's profile and space, private from a private window. With a configuration (from WebKit), the page keeps its
+    /// opener and the returned controller's web view is the one WebKit asked for.
+    @discardableResult
+    static func open(fromPage url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, in browser: BrowserWindowController,
+                     by sender: Tab.LoadSender = .page) -> MiniWindowController {
+        let window = browser.window
+        let root = browser.root
+        let page = window.map { $0.convertToScreen(root.convert(root.cardFrame, to: nil)) }
+        let screen = page.flatMap { p in NSScreen.screens.first { $0.frame.contains(NSPoint(x: p.midX, y: p.midY)) } } ?? window?.screen ?? NSScreen.main
+        let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
+        let frame = Self.frame(size: openingSize, in: area, taken: all.compactMap { $0.window?.frame }, around: page.map { NSPoint(x: $0.midX, y: $0.midY) })
+        // With a configuration from the page that opened it, it's in that page's profile, so in its space.
+        let spaceID = (configuration != nil ? opener?.spaceID : nil) ?? browser.tabManager.currentSpaceID
+        let tab = Tab(url: url, spaceID: spaceID, configuration: configuration)
+        tab.privateStore = browser.tabManager.privateStore
+        tab.opener = opener
+        tab.firstLoad.sender = sender
+        let controller = MiniWindowController(tab: tab, frame: frame, overFullScreen: window?.styleMask.contains(.fullScreen) == true)
+        controller.fromPage = true
+        controller.source = browser
+        controller.sourceTab = opener
+        all.append(controller)
+        Diagnostics.note("Zigzag Mini opened", site: url?.host(), "from a page", isPrivate: tab.isPrivate)
+        if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
+        controller.appear(from: nil)
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+        return controller
+    }
+
     /// Whether a tab's page can go into Zigzag Mini: an ordinary tab's web page or file. Not a pinned page's or a
     /// favorite's, which belong to the sidebar, nor Zigzag's own pages, nor a private window's: Zigzag Mini isn't
     /// private.
@@ -238,8 +274,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private init(tab: Tab, frame: NSRect, overFullScreen: Bool) {
         self.tab = tab
         // Zigzag's own PDF viewer and Back to the page that opened it belong to a browser window's tabs; here the page
-        // is shown as in peek, and becomes a full tab once it moves.
-        tab.isPeek = true
+        // is shown outside a tab list, and becomes a full tab once it moves.
+        tab.isOutsideTabList = true
 
         let window = BrowserWindow(contentRect: frame)
         window.minSize = Tokens.Metric.miniWindowMinSize
@@ -346,13 +382,14 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     var space: SpaceInfo { Library.shared.space(tab.spaceID) ?? Library.shared.spaces[0] }
 
     private func paint(animated: Bool) {
-        root.paint(space, isPrivate: false, animated: animated)
+        root.paint(space, isPrivate: isPrivate, animated: animated)
         strip.refreshColors()
     }
 
     /// The spaces, from the strip's space: the one chosen is where Open in takes the page, and the window wears it.
     private func showSpaceMenu() {
-        guard !isLeaving else { return }
+        // A private page keeps to its private window's space.
+        guard !isLeaving, !isPrivate else { return }
         let current = space.id
         func entry(_ other: SpaceInfo) -> MenuPanel.Entry {
             let symbol = other.icon.flatMap { IconChoice.isSymbol($0) ? $0 : nil }
@@ -370,7 +407,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func choose(space id: UUID) {
-        guard id != tab.spaceID, Library.shared.space(id) != nil, let host = window?.contentView else { return }
+        guard !isPrivate, id != tab.spaceID, Library.shared.space(id) != nil, let host = window?.contentView else { return }
         // To a space on another profile the page reloads there: asked first, as in a browser window.
         ProfileSheets.confirmCrossing([tab], to: id, in: host) { [weak self] in
             guard let self else { return }
@@ -628,7 +665,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     var debugState: [String: Any] {
-        ["editing": commandBar.isVisible, "titleShown": !strip.title.isHidden, "title": strip.title.text,
+        ["editing": commandBar.isVisible, "private": isPrivate, "fromPage": fromPage,
+         "sourceWindow": source?.window?.windowNumber ?? 0, "titleShown": !strip.title.isHidden, "title": strip.title.text,
          "space": space.name, "profile": Library.shared.directory.profile(tab.profile.id)?.name ?? "",
          "store": tab.webView?.configuration.websiteDataStore.identifier?.uuidString ?? (tab.webView == nil ? "no page" : "default"),
          "open": strip.openButton.title, "openEnabled": strip.openButton.isEnabled,
@@ -650,6 +688,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             ?? manager.newWindow(showCommandBar: false)
     }
 
+    /// Where this one's pages go: from a page, the window it came from while it's open; private, only a private window.
+    private var browserTarget: BrowserWindowController {
+        if let source, source.window?.isVisible == true { return source }
+        if isPrivate {
+            return WindowManager.shared.controllers.last { $0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false, isPrivate: true)
+        }
+        return Self.browserWindow()
+    }
+
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window
     /// fades away first, then the page is there.
     @objc func openInZigzag(_ sender: Any? = nil) { moveOut() }
@@ -667,10 +714,10 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     @discardableResult
     private func moveIntoZigzag() -> BrowserWindowController {
-        let target = Self.browserWindow()
+        let target = browserTarget
         // Site routes (#286): move the page itself when the space shares the profile, else reopen it there with that
-        // space's sign-ins.
-        let routed = tab.url.flatMap { SiteRoutes.target(for: $0, arrival: .fromMini, from: space.id, place: .mini, routes: Library.shared.siteRoutes) }
+        // space's sign-ins. Never for a private page.
+        let routed = isPrivate ? nil : tab.url.flatMap { SiteRoutes.target(for: $0, arrival: .fromMini, from: space.id, place: .mini, routes: Library.shared.siteRoutes) }
             .flatMap { Library.shared.space($0) != nil ? $0 : nil }
         if let routed, let url = tab.url, Library.shared.profileID(ofSpace: routed) != Library.shared.profileID(ofSpace: space.id) {
             // The page has the other profile's cookies: close this window and reopen it there.
@@ -684,7 +731,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         let spaceID = routed ?? space.id
         letGo()
         target.tabManager.switchToSpace(spaceID)
-        target.tabManager.insertAsNewTab(tab)
+        // From a page: right after the tab it came from, when that's still in this space.
+        let placed = fromPage && routed == nil && target === source && sourceTab.map { target.tabManager.insert(tab, after: $0) } == true
+        if !placed { target.tabManager.insertAsNewTab(tab) }
         window?.close()
         target.window?.makeKeyAndOrderFront(nil)
         if let routed { target.toastRouted(to: routed) }
@@ -702,7 +751,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         tab.pageHolder?.removeFromSuperview()
-        tab.isPeek = false
+        tab.isOutsideTabList = false
     }
 
     /// ⌘Z after Open in Zigzag Mini: the page goes back to the browser window it came from, and this window closes at
@@ -756,6 +805,27 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
+
+    /// Its page still shows here: not moved into a browser window, not closing.
+    var holdsPage: Bool { !movedOut && !isClosing }
+
+    /// The browser window that translates this page, with its toasts over this one: the window it came from, else an
+    /// open one of the same privacy.
+    private var translator: BrowserWindowController? {
+        if let source, source.window?.isVisible == true { return source }
+        return WindowManager.shared.controllers.last { $0.tabManager.isPrivate == isPrivate }
+    }
+
+    /// View › Translate Page, and the page's menu: translates the page here, or shows it as it was.
+    @objc func translatePage(_ sender: Any?) {
+        guard !isLeaving, holdsPage else { return }
+        translator?.translatePage(tab: tab)
+    }
+
+    /// The Zigzag Mini a window is, for a page's menu that asks to translate.
+    static func showing(_ window: NSWindow?) -> MiniWindowController? {
+        window.flatMap { window in all.first { $0.window === window } }
+    }
     @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
     @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
     @objc func useSelectionForFind(_ sender: Any?) {
@@ -827,6 +897,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             tab.close()
         }
         if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
+        // Getting started's ⇧-click step is done once a Mini from a page closes or moves into a tab.
+        if fromPage { Tutorial.complete("peek") }
         keepOnTopToken.map(NotificationCenter.default.removeObserver)
         keepOnTopToken = nil
         Self.all.removeAll { $0 === self }
@@ -875,7 +947,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 extension MiniWindowController {
     /// This window as an update's restart brings it back: its page, back/forward list, space, place and Keep on Top.
     var savedForRelaunch: UpdateRelaunch.Mini? {
-        guard !isLeaving, let window, let url = tab.url else { return nil }
+        guard !isLeaving, !isPrivate, let window, let url = tab.url else { return nil }
         let frame = window.frame
         return UpdateRelaunch.Mini(url: url, title: tab.title, spaceID: tab.spaceID,
                                    frame: [frame.origin.x, frame.origin.y, frame.width, frame.height],
@@ -920,6 +992,10 @@ extension MiniWindowController: NSMenuItemValidation {
         case #selector(stopLoading(_:)): return tab.isLoading
         case #selector(printPage(_:)): return tab.webView != nil && !movedOut && !isLeaving
         case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)): return !isLeaving && madeFindBar?.hasQuery == true
+        case #selector(translatePage(_:)):
+            item.title = tab.isTranslated ? String(localized: "Show Original", comment: "Menu bar item: shows the translated page as it was.")
+                                          : String(localized: "Translate Page", comment: "Menu bar item: translates the page.")
+            return tab.url != nil && !isLeaving && holdsPage && translator != nil
         default: return !isLeaving
         }
     }
@@ -955,11 +1031,11 @@ extension MiniWindowController: CommandBarHost {
     func commandBarAnchor(asked: NSView?) -> NSView? { strip.anchor }
     var commandBarCentersOnAnchor: Bool { true }
     var commandBarFitsAnchor: Bool { true }
-    var commandBarTabs: TabManager? { MiniQuickOpen.tabs }
+    var commandBarTabs: TabManager? { isPrivate ? source?.tabManager : MiniQuickOpen.tabs }
     var commandBarProfile: Profile { tab.profile }
     var commandBarTab: Tab? { tab }
     var commandBarSpace: SpaceInfo? { space }
-    var commandBarIsPrivate: Bool { false }
+    var commandBarIsPrivate: Bool { isPrivate }
 
     func commandBarWillShow() {
         linkStatus.hide()
@@ -1001,12 +1077,12 @@ extension MiniWindowController: TabHost {
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
         switch disposition {
-        case .currentTab, .peek:
+        case .currentTab, .mini:
             tab.load(url, by: sender)
         case .newWindow, .privateWindow:
-            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: sender)
+            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: isPrivate || disposition == .privateWindow, by: sender)
         case .foregroundTab, .backgroundTab:
-            let target = Self.browserWindow()
+            let target = browserTarget
             target.open(url, disposition: disposition, allowSwitch: false, by: sender)
             if disposition == .foregroundTab { target.window?.makeKeyAndOrderFront(nil) }
         }
@@ -1014,9 +1090,14 @@ extension MiniWindowController: TabHost {
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
         let pending = BrowserWebView.takePendingDisposition(for: tab.webView)
+        // Open Link in Zigzag Mini, in Zigzag Mini: the link opens right here, as a ⇧-click on it does.
+        if pending == .mini, let url = action.request.url {
+            tab.load(url, by: .page)
+            return nil
+        }
         if pending == .newWindow || pending == .privateWindow, let url = action.request.url {
             if Tab.route(forPageLink: url, from: tab.url) == .load {
-                WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: pending == .privateWindow, by: .page)
+                WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: isPrivate || pending == .privateWindow, by: .page)
             } else {
                 tab.openFromPage(url, isClick: true, asker: action.sourceFrame.securityOrigin)
             }
@@ -1029,7 +1110,7 @@ extension MiniWindowController: TabHost {
         // A link for a new tab (target=_blank, ⌘-click, Open Link in New Tab) opens in the browser window; ⌘-click
         // and the menu's own items leave you here, a plain click takes you there.
         let background = pending != nil || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
-        let target = Self.browserWindow()
+        let target = browserTarget
         let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration, site: action.request.url)
         if !background { target.window?.makeKeyAndOrderFront(nil) }
         return newTab.ensureWebView()
@@ -1511,11 +1592,13 @@ final class MiniOpenButton: InteractiveView {
 /// Zigzag Mini, for extensions: a popup-type window holding its one tab, as a sign-in popup is.
 @available(macOS 15.4, *)
 extension MiniWindowController: WKWebExtensionWindow {
-    func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { movedOut ? [] : [tab] }
-    func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { movedOut ? nil : tab }
+    // A private page is listed only to an extension allowed in private windows.
+    private func hides(from context: WKWebExtensionContext) -> Bool { movedOut || !PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData) }
+    func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { hides(from: context) ? [] : [tab] }
+    func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { hides(from: context) ? nil : tab }
     func windowType(for context: WKWebExtensionContext) -> WKWebExtension.WindowType { .popup }
     func windowState(for context: WKWebExtensionContext) -> WKWebExtension.WindowState { window?.isMiniaturized == true ? .minimized : .normal }
-    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { isPrivate }
     func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
     func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
 
@@ -1551,7 +1634,7 @@ extension MiniWindowController: PromptHost {
     /// Debug bridge: questions show in Zigzag Mini though its window isn't key.
     static var debugPromptsShow = false
     #endif
-    var promptIsPrivate: Bool { false }
+    var promptIsPrivate: Bool { isPrivate }
     var promptAccent: NSColor { Brand.Theme.of(space).accent }
     /// The page never changes; only key state does, which is when a held question shows (see `promptShows`).
     func observePromptTabs(_ body: @escaping () -> Void) -> SignalToken? {

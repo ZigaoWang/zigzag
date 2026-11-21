@@ -86,7 +86,7 @@ protocol FindBarHost: AnyObject {
     var findBarHeaderHeight: CGFloat { get }
     /// View the bar is added to.
     var findBarOverlay: NSView { get }
-    /// Something over the page (command bar, peek) gets Esc first.
+    /// Something over the page (the command bar) gets Esc first.
     var findBarIsCovered: Bool { get }
     var findableWebView: WKWebView? { get }
     /// Zigzag's PDF viewer, which searches the PDF itself.
@@ -96,7 +96,7 @@ protocol FindBarHost: AnyObject {
 extension BrowserWindowController: FindBarHost {
     var findBarHeaderHeight: CGFloat { root.card.showsHeader ? PaneHeaderView.height : 0 }
     var findBarOverlay: NSView { root.overlay }
-    var findBarIsCovered: Bool { commandBar.isVisible || peek.isVisible }
+    var findBarIsCovered: Bool { commandBar.isVisible }
     var findablePDF: PDFViewerView? { selectedTab?.pdfViewer }
 }
 
@@ -225,7 +225,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.keyCode == 53, self.isVisible, event.window === self.window?.window,
                   event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
-                  // Something else in front (the address bar, peek) takes its own Esc first.
+                  // Something else in front (the address bar) takes its own Esc first.
                   self.window?.findBarIsCovered != true else { return event }
             self.hide()
             return nil
@@ -990,9 +990,12 @@ enum Toast {
     }
 
     /// Takes down the toast showing in this window, if any.
-    static func hide(in controller: BrowserWindowController) {
-        let state = state(for: controller.root.overlay)
-        guard let toast = state.toast, toast.superview === controller.root.overlay else { return }
+    static func hide(in controller: BrowserWindowController) { hide(over: controller.root.overlay) }
+
+    /// Takes down the toast showing over `host`, if any.
+    static func hide(over host: NSView) {
+        let state = state(for: host)
+        guard let toast = state.toast, toast.superview === host else { return }
         state.hideWork?.cancel()
         toast.dismiss()
         state.toast = nil

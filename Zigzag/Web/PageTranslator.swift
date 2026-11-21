@@ -603,12 +603,8 @@ extension PageTranslator {
         return page(offeredFor) == page(now)
     }
 
-    /// Whether a tab's translation toasts show: only while its page is the one in view, the page peeked at while
-    /// Peek is open, otherwise the tab you're on.
-    static func isInView(_ tab: AnyObject, selected: AnyObject?, peeked: AnyObject?) -> Bool {
-        if let peeked { return peeked === tab }
-        return selected === tab
-    }
+    /// Whether a browser window's tab's translation toasts show: only while it's the tab you're on.
+    static func isInView(_ tab: AnyObject, selected: AnyObject?) -> Bool { selected === tab }
 }
 
 /// The Translation framework hands out sessions through a SwiftUI task, so each translation keeps an invisible host
