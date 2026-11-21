@@ -623,7 +623,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
     /// from them is put away first. At once: a setting you change, not a layout you watch.
     @objc func placeAddress() {
-        let above = BrowserRootView.addressAbovePage
+        // While a page has The Whole Screen, the address stays in the bar whatever the setting says (#462).
+        let above = Self.addressBelongsInBar(abovePage: BrowserRootView.addressAbovePage, wholeScreen: pageFullScreenTab != nil)
         guard sidebar.holdsAddress == above else { return }
         if window?.isVisible == true { closeFloatingPanels() }
         sidebar.holdsAddress = !above
@@ -2360,23 +2361,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// In full screen the bar comes down with the address, whatever Settings › Appearance says, so back, forward,
     /// reload and the address are one place.
-    private func holdAddressInBar() {
-        guard sidebar.holdsAddress else { return }
-        sidebar.holdsAddress = false
-        root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
-        let tab = tabManager.selectedTab
-        root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-        root.barHoldsAddress = true
-    }
+    private func holdAddressInBar() { placeAddress() }
 
     /// Back to where Settings › Appearance keeps the address.
-    private func restoreAddressAfterImmersive() {
-        if BrowserRootView.addressAbovePage {
-            if sidebar.holdsAddress { holdAddressInBar() } else { root.barHoldsAddress = true }
-        } else {
-            sidebar.holdsAddress = true
-            root.barHoldsAddress = false
-        }
+    private func restoreAddressAfterImmersive() { placeAddress() }
+
+    /// Whether the address belongs in the bar above the page: when Settings › Appearance says so, and always while
+    /// a page has The Whole Screen (#462).
+    nonisolated static func addressBelongsInBar(abovePage: Bool, wholeScreen: Bool) -> Bool {
+        abovePage || wholeScreen
+    }
+
+    /// Whether The Whole Screen has to give the space back: the selected tab changed, or it's in a split again.
+    /// An expanded split pane is in a split too, but it's the one the space was taken for (#462).
+    nonisolated static func wholeScreenEnds(selectedIsFull: Bool, inSplit: Bool, expandedZoom: Bool) -> Bool {
+        !selectedIsFull || (inSplit && !expandedZoom)
     }
 
     /// Whether the page's expand button shows: a windowed page can be promoted, and so can a page in a split, which
@@ -2402,7 +2401,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// leaves the space; a page that is alone and follows The Whole Screen takes it.
     private func updatePageFullScreenForLayout() {
         guard let tab = tabManager.selectedTab else { return }
-        if let full = pageFullScreenTab, tab !== full || tabManager.split(for: tab) != nil {
+        if let full = pageFullScreenTab,
+           Self.wholeScreenEnds(selectedIsFull: tab === full, inSplit: tabManager.split(for: tab) != nil,
+                                expandedZoom: pageFullScreenExpandedZoom) {
             PageFullScreen.exit(full)
             endWholeScreen()
         }

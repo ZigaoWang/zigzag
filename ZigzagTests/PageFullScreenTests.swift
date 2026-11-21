@@ -100,7 +100,8 @@ struct PageFullScreenTests {
         #expect(!PageFullScreen.isOurs(WKUserScript(source: "1", injectionTime: .atDocumentStart, forMainFrameOnly: true)))
     }
 
-    @Test func fillingThePageNeedsAClick() async throws {        let webView = await load(Self.page)
+    @Test func fillingThePageNeedsAClick() async throws {
+        let webView = await load(Self.page)
         // Without a user gesture WebKit refuses and the page isn't filled.
         _ = try? await webView.runOwnScript("try { await document.getElementById('player').requestFullscreen(); } catch (e) {} await new Promise(r => setTimeout(r, 10)); return 0",
                                             asFunction: true, world: .page)
@@ -286,5 +287,24 @@ struct PageFullScreenTests {
         #expect((values[3] as? Double) == 1000 && (values[4] as? Double) == 700)
         #expect(values[5] is NSNull)
         #expect(values[6] is NSNull)
+    }
+}
+
+/// The layout rules around The Whole Screen (#462): an expanded split pane keeps the space, and the address stays
+/// in the bar while a page has it.
+@MainActor
+struct WholeScreenLayoutTests {
+    @Test func anExpandedSplitPaneStaysInTheWholeScreen() {
+        #expect(!BrowserWindowController.wholeScreenEnds(selectedIsFull: true, inSplit: true, expandedZoom: true))
+        #expect(BrowserWindowController.wholeScreenEnds(selectedIsFull: true, inSplit: true, expandedZoom: false))
+        #expect(!BrowserWindowController.wholeScreenEnds(selectedIsFull: true, inSplit: false, expandedZoom: false))
+        #expect(BrowserWindowController.wholeScreenEnds(selectedIsFull: false, inSplit: false, expandedZoom: false))
+    }
+
+    @Test func theAddressStaysInTheBarWhileThePageHasTheWholeScreen() {
+        #expect(BrowserWindowController.addressBelongsInBar(abovePage: false, wholeScreen: true))
+        #expect(BrowserWindowController.addressBelongsInBar(abovePage: true, wholeScreen: true))
+        #expect(!BrowserWindowController.addressBelongsInBar(abovePage: false, wholeScreen: false))
+        #expect(BrowserWindowController.addressBelongsInBar(abovePage: true, wholeScreen: false))
     }
 }
