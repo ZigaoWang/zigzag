@@ -124,8 +124,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // The reset button shows while a grid's line is parted, and goes when it's one line again.
             self.root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
             guard final else { return }
-            self.tabManager.setTileShape(shape, for: tab)
-            self.onStateChange?()
+            // A whole drag is one change: the group's lines when it began are what ⌘Z puts back (#435).
+            self.applyTileShape(shape, undoTo: self.tabManager.split(for: tab)?.shape)
         }
 
         sidebar.delegate = self
@@ -357,6 +357,34 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435).
+    func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?) {
+        guard let tab = tabManager.selectedTab, let group = tabManager.split(for: tab) else { return }
+        applyTileShape(shape, undoTo: inverse, in: group.ids)
+    }
+
+    /// As above, for the group of `ids`: a group's pages, not just where its lines were, so ⌘Z after selecting another
+    /// split leaves that one alone (#435).
+    private func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?, in ids: [UUID]) {
+        // The group the drag was in, wherever it is: another split can be showing when ⌘Z runs, and the step must
+        // still put its lines back rather than be used up doing nothing (#435).
+        guard let group = tabManager.splits.first(where: { $0.ids == ids }) else { return }
+        guard group.shape.regions == shape.regions, group.shape != shape else { return }
+        guard let page = group.ids.compactMap({ tabManager.tab(with: $0) }).first else { return }
+        tabManager.setTileShape(shape, for: page)
+        // Only the group on screen is drawn; the other split is left as it is.
+        if let shown = tabManager.selectedTab, tabManager.split(for: shown)?.ids == ids {
+            root.setTiles(shape, animated: true)
+            root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
+        }
+        onStateChange?()
+        guard let inverse else { return }
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            controller.applyTileShape(inverse, undoTo: shape, in: ids)
+        }
+        sidebarUndo.setActionName(String(localized: "Resize Tiles", comment: "Undo action name, shown in the Edit menu as Undo Resize Tiles."))
+    }
 
     static func defaultFrame() -> NSRect {
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)

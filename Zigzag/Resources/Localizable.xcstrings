@@ -17169,6 +17169,17 @@
         }
       }
     },
+    "Resize Tiles" : {
+      "comment" : "Undo action name, shown in the Edit menu as Undo Resize Tiles.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整平铺大小"
+          }
+        }
+      }
+    },
     "Reset All" : {
       "comment" : "Button beside Always Translate in Settings › Translation.\nButton of the sheet that forgets the choices made for single sites.\nButton of the sheet that puts every shortcut back.",
       "localizations" : {
