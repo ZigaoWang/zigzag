@@ -647,7 +647,8 @@ private final class OptionRow: InteractiveView {
         name = Label(title, font: Tokens.Font.body(), color: Onboard.ink)
         detail = Label(text, font: Tokens.Font.small(), color: Onboard.dim(0.62))
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.control
+        // The same corners as the list of browsers above it.
+        layer?.cornerRadius = Tokens.Radius.tile
         layer?.cornerCurve = .continuous
         box.wantsLayer = true
         box.layer?.cornerRadius = Tokens.Radius.control
@@ -733,6 +734,9 @@ private final class BrowserRow: InteractiveView {
         self.source = source
         name = Label(source.name, font: Tokens.Font.body(.semibold), color: Onboard.ink)
         super.init(frame: .zero)
+        // The hover fill rounds as the list's box does, on every row, not just where the box clips the first.
+        layer?.cornerRadius = Tokens.Radius.tile
+        layer?.cornerCurve = .continuous
         box.wantsLayer = true
         box.layer?.cornerRadius = Tokens.Radius.control
         box.layer?.borderWidth = Tokens.Metric.fieldRing

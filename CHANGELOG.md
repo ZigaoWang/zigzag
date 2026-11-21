@@ -31,6 +31,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The welcome window's Skip sits on the same line as the progress dots, instead of 3 points below them.
 - The welcome window's Back starts on the card's left edge, as Continue ends on its right one, instead of 3 points in.
 - In the welcome window's Pin the sites you use, each site's icon and name sit in the middle of its tile, so a picked tile's tint has even room above and below them. They sat 4 points from its top and 11 from its bottom.
+- In the welcome window's import step, a browser's hover fill is rounded on every row, as the list's box is, and Stay signed in to your sites has the same corners. Only the first row's top was rounded, by the box clipping it, and every other fill had square corners against the lines between rows.
 
 ## [0.9.3] - 2026-11-18
 
