@@ -233,6 +233,8 @@ final class SidebarListView: NSView {
         var originGroup: UUID?
         /// Group row the dragged tab hovers; dropping adds it to that group.
         var groupTarget: UUID?
+        /// False for Zigzag's own views (#472): Pinned, its folders and the favorites don't take them.
+        var pinnable = true
     }
 
     /// Something carried in from elsewhere (another window's tab, a favorite): where the line shows it would land.
@@ -1949,6 +1951,7 @@ final class SidebarListView: NSView {
             drag?.originParent = manager.tab(with: id)?.parentID
             drag?.originGroup = manager.tab(with: id)?.groupID
         }
+        drag?.pinnable = Self.pinnable(together, in: manager)
         if let start = drag.map({ reorderTarget(pointerY: convert(event.locationInWindow, from: nil).y, dragging: $0) }) {
             drag?.targetSection = start.0
             drag?.targetIndex = start.1
@@ -1963,6 +1966,17 @@ final class SidebarListView: NSView {
         let released = CarriedCopy.track(in: window) { self.dragMoved(to: $0) }
         endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
         return true
+    }
+
+    /// Whether every tab carried can go into Pinned: a group as it pins, whole, and a tab on its own.
+    static func pinnable(_ items: [SidebarItem], in manager: TabManager) -> Bool {
+        items.allSatisfy { item in
+            switch item {
+            case .tab(let id): manager.tab(with: id).map { manager.canPin($0, keepingGroup: false) } ?? true
+            case .tabGroup(let id): manager.tabs(inGroup: id).first.map { manager.canPin($0) } ?? true
+            default: true
+            }
+        }
     }
 
     struct SplitDrop: Equatable {
@@ -2012,6 +2026,8 @@ final class SidebarListView: NSView {
             guard view is TabRowView else { continue }
             let band = view.frame.insetBy(dx: 0, dy: view.frame.height * 0.22)
             guard band.contains(pointer), canSplit(item, onto: candidate) else { continue }
+            // A pinned split would pin what can't be pinned.
+            if case .bookmark = candidate, drag?.pinnable == false { continue }
             switch candidate {
             case .tab(let id), .bookmark(let id): return SplitDrop(id: id, onRight: pointer.x > view.frame.midX)
             default: continue
@@ -2170,7 +2186,7 @@ final class SidebarListView: NSView {
         }
 
         // Over this window's favorites grid: a bar shows where it would go there, and the list's line goes.
-        let overFavorites = drag.item.canBeFavorite && inWindow
+        let overFavorites = drag.item.canBeFavorite && drag.pinnable && inWindow
             ? delegate?.listDragOverFavorites(at: window.convertPoint(fromScreen: mouse), carrying: splitSide(of: drag.item)) ?? false
             : delegate?.listDragOverFavorites(at: nil, carrying: nil) ?? false
         if overFavorites, !wasOverFavorites { Haptics.snap() }
@@ -2192,7 +2208,8 @@ final class SidebarListView: NSView {
             // A page or tab goes in a folder it rests on; so does a folder, if it isn't that folder or one inside it.
             let takes: (UUID) -> Bool = { target in
                 switch drag.item {
-                case .bookmark, .tab: return true
+                case .bookmark: return true
+                case .tab: return drag.pinnable
                 case .folder(let id): return target != id && !Library.shared.subfolderIDs(of: id).contains(target)
                 default: return false
                 }
@@ -2211,6 +2228,8 @@ final class SidebarListView: NSView {
                 // line shows where it would go.
                 candidate = splitTarget(pointer: point, dragging: drag.item)
                 (section, index) = candidate == nil ? reorderTarget(pointerY: point.y, dragging: drag) : (drag.targetSection, drag.targetIndex)
+                // Over Pinned with something that can't be pinned: no line, and letting go puts it back.
+                if section == .bookmarks, !drag.pinnable { section = nil }
             }
         } else if drag.folderTarget != nil || drag.groupTarget != nil {
             drag.folderTarget = nil
@@ -2346,7 +2365,7 @@ final class SidebarListView: NSView {
         }
 
         // Onto the favorites grid, picked rows and all.
-        if drag.item.canBeFavorite, delegate?.listDropOnFavorites(drag.together.filter(\.canBeFavorite), dragged: drag.item) == true {
+        if drag.item.canBeFavorite, drag.pinnable, delegate?.listDropOnFavorites(drag.together.filter(\.canBeFavorite), dragged: drag.item) == true {
             if let tab { return landingView(for: tab) }
             if case .bookmark(let id) = drag.item { return delegate?.listFavoriteTile(for: id) }
             return nil

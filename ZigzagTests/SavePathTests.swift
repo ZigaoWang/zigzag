@@ -530,4 +530,41 @@ import Testing
         address.setSaved(true, canSave: SavePath.Page(tab: settings) != nil)
         #expect(address.saveButton.isHidden)
     }
+
+    /// Dragged into Pinned, onto a folder or a pinned page, into the favorites, or from the command bar, a Zigzag view
+    /// stays a tab (#472). A page split beside one doesn't take it along either.
+    @Test func zigzagsOwnViewsCannotBeDraggedIntoPinned() throws {
+        try scratch { space, _, folder in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            let page = Tab(url: try #require(URL(string: "https://example.com/drag")), title: "Example", spaceID: space)
+            manager.adopt([settings, page], in: space)
+            manager.select(settings)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let pinned = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/pinned")!, title: "Pinned", to: space))
+            let before = Library.shared.bookmarks(in: space).count
+            #expect(!manager.canPin(settings))
+            #expect(!SidebarListView.pinnable([.tab(settings.id)], in: manager))
+            #expect(!SidebarListView.pinnable([.tab(page.id), .tab(settings.id)], in: manager))
+            #expect(SidebarListView.pinnable([.tab(page.id), .bookmark(pinned.id), .folder(folder.id)], in: manager))
+            controller.listBookmark(settings, at: 0, in: space)
+            controller.listPinSplit(settings, onto: pinned.id, tabOnRight: true)
+            controller.favoriteWithUndo(settings)
+            controller.fileMarked([.tab(settings.id)], in: folder.id)
+            #expect(settings.bookmarkID == nil && !settings.isFavorite)
+            #expect(Library.shared.bookmarks(in: space).count == before)
+            let actions = CommandRanker.contextActions(CommandRanker.context(for: manager)).map(\.id)
+            #expect(!actions.contains("pin") && !actions.contains("pin-to-folder") && !actions.contains("favorite"))
+            // Split beside Settings, the page would bring it into Pinned with it.
+            manager.select(page)
+            #expect(CommandRanker.contextActions(CommandRanker.context(for: manager)).map(\.id).contains("pin"))
+            try #require(manager.canSplit(page, with: settings))
+            manager.makeSplit(page, with: settings)
+            #expect(!manager.canPin(page))
+            controller.bookmarkWithUndo(page, at: nil, in: space)
+            #expect(page.bookmarkID == nil && settings.bookmarkID == nil)
+        }
+    }
 }

@@ -262,7 +262,7 @@ enum SidebarMenus {
         var organize: [NSMenuItem] = []
         // Save at the end of Pinned, or with ⇧ held where the picker says (#326). A whole group or a split view saves
         // as one, so the item says which. Pinned pages are shared by every window: a private one's tabs stay out.
-        if !isPrivate, tab.bookmarkID == nil, tab.url != nil {
+        if !isPrivate, tab.bookmarkID == nil, tab.url != nil, manager.canPin(tab) {
             let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
             let saveTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is pinned as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
@@ -880,7 +880,7 @@ extension BrowserWindowController {
             Library.shared.together {
                 for item in items {
                     switch item {
-                    case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.favoriteTab(tab) }
+                    case .tab(let id): if let tab = tabManager.tab(with: id), tabManager.canPin(tab, keepingGroup: false) { tabManager.favoriteTab(tab) }
                     case .bookmark(let id):
                         Library.shared.makeFavorite(id, in: tabManager.profile.id)
                         tabManager.bookmarkTab(for: id)?.isFavorite = true
