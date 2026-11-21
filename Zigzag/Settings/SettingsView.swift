@@ -1566,6 +1566,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sidebarSizeStepper.lessTip = String(localized: "Smaller Sidebar", comment: "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.")
         sidebarSizeStepper.moreTip = String(localized: "Larger Sidebar", comment: "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.")
         sidebarSizeStepper.resetTip = String(localized: "Usual Size", comment: "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.")
+        sidebarSizeStepper.typingTip = nil
         sidebarSizeStepper.percentName = String(localized: "Sidebar size %@, Usual Size", comment: "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.")
         sidebarSizeStepper.onChange = { value in Tokens.Sidebar.customScale = value }
         let sizeControls = NSStackView(views: [sidebarSize, sidebarSizeStepper])
