@@ -507,6 +507,31 @@ enum Tokens {
         static let groupGap: CGFloat = Space.x6 + Space.x1
     }
 
+    /// Your Zigzag Card (Zigzag › Your Zigzag Card…): a bank card's proportions, in a small window of its own.
+    enum Keepsake {
+        static let size = NSSize(width: 340, height: 214)
+        static let radius: CGFloat = Radius.tile
+        /// From the card's edges to what's on it.
+        static let pad: CGFloat = Space.x6
+        static let wordmarkHeight: CGFloat = 16
+        static let nameSize: CGFloat = TypeSize.display
+        /// Room around the card in its window: at the sides, above it (under the traffic lights), and around the buttons.
+        static let margin: CGFloat = Space.x10
+        static let top: CGFloat = Space.x12
+        static let buttonGap: CGFloat = Space.x8
+        static let bottom: CGFloat = Space.x8
+        /// The most it leans toward the pointer, in degrees, and how deep the perspective is.
+        static let tilt: CGFloat = 4
+        static let perspective: CGFloat = 900
+        /// The saved picture's pixels per point.
+        static let exportScale: CGFloat = 3
+        /// Two shadows: a wide soft one it floats on, and a close one where it nearly touches.
+        static let ambientRadius: CGFloat = 22
+        static let ambientDrop: CGFloat = 12
+        static let contactRadius: CGFloat = 3
+        static let contactDrop: CGFloat = 1.5
+    }
+
     // MARK: - Type (SF Pro: six roles, one scale for the whole app)
 
     /// Every text in Zigzag is one of these. Pages, panels and the sidebar share them: the same role is the same size

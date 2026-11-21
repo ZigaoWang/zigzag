@@ -1194,3 +1194,139 @@ struct ControlMenuTests {
         #expect(button.menu(for: rightClick()) == nil)
     }
 }
+
+/// Your Zigzag Card: when you started, kept once and never moved; the beta line; the saved picture's size.
+@MainActor
+@Suite(.serialized)
+struct ZigzagCardTests {
+    private let day: TimeInterval = 24 * 60 * 60
+    private let now = Date(timeIntervalSince1970: 1_795_000_000)
+
+    private func withDefaults(_ body: (URL) throws -> Void) throws {
+        let name = "ZigzagCardTests-\(UUID().uuidString)"
+        let saved = CardStart.defaults
+        CardStart.defaults = try #require(UserDefaults(suiteName: name))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-card-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer {
+            CardStart.defaults.removePersistentDomain(forName: name)
+            CardStart.defaults = saved
+            try? FileManager.default.removeItem(at: root)
+        }
+        try body(root)
+    }
+
+    @Test func aFreshInstallKeepsThisVersionExactly() {
+        let record = CardStart.choose(now: now, version: "0.9.4", dates: [now - 30], lastRun: nil, backups: [], launches: 0)
+        #expect(record == CardStart.Record(date: now - 30, version: "0.9.4", isExact: true))
+    }
+
+    /// Used before the card existed: the earliest date on disk, and the earliest version on record, said as such.
+    @Test func anEarlierInstallTakesTheEarliestItKnows() {
+        let folder = now - 40 * day, backup = now - 20 * day
+        let record = CardStart.choose(now: now, version: "0.9.4", dates: [backup, folder, now - day], lastRun: "0.9.3",
+                                      backups: ["0.9.0-beta.1", "0.8.7"], launches: 12)
+        #expect(record == CardStart.Record(date: folder, version: "0.8.7", isExact: false))
+        // Nothing on record but this version: this version, still not claimed as the first.
+        let only = CardStart.choose(now: now, version: "0.9.4", dates: [folder], lastRun: nil, backups: [], launches: 0)
+        #expect(only == CardStart.Record(date: folder, version: "0.9.4", isExact: false))
+    }
+
+    /// A date from before Zigzag existed, or from the future, is a copied or odd file, never a start.
+    @Test func impossibleDatesAreIgnored() {
+        let record = CardStart.choose(now: now, version: "0.9.4", dates: [Date(timeIntervalSince1970: 0), now + day], lastRun: nil,
+                                      backups: [], launches: 0)
+        #expect(record.date == now)
+        #expect(record.isExact)
+    }
+
+    /// The data folder's creation date and an update backup's date both count, and the kept start never moves.
+    @Test func theStartIsReadFromDiskOnceAndKept() throws {
+        try withDefaults { root in
+            let made = now - 30 * day
+            try FileManager.default.setAttributes([.creationDate: made], ofItemAtPath: root.path)
+            let backups = root.appendingPathComponent("Backups/2026-11-01T09-00-00Z 0.9.1", isDirectory: true)
+            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+            let first = CardStart.settle(now: now, version: "0.9.4", root: root)
+            #expect(first == CardStart.Record(date: made, version: "0.9.1", isExact: false))
+            #expect(CardStart.defaults.object(forKey: CardStart.dateKey) as? Date == made)
+            // Later, with newer data and another version: still the same start.
+            try FileManager.default.setAttributes([.creationDate: now - 90 * day], ofItemAtPath: root.path)
+            #expect(CardStart.settle(now: now + 10 * day, version: "1.0.0", root: root) == first)
+            #expect(CardStart.stored == first)
+        }
+    }
+
+    @Test func theBackupsDateCountsWhenItsEarliest() throws {
+        try withDefaults { root in
+            try FileManager.default.setAttributes([.creationDate: now - day], ofItemAtPath: root.path)
+            let backups = root.appendingPathComponent("Backups/2026-10-30T09-00-00Z 0.9.0", isDirectory: true)
+            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+            let record = CardStart.settle(now: now, version: "0.9.4", root: root)
+            #expect(record.date == UpdateBackup.date(of: "2026-10-30T09-00-00Z"))
+            #expect(record.version == "0.9.0")
+        }
+    }
+
+    @Test func betaIsEverythingBeforeOnePointOh() {
+        #expect(CardStart.isBeta("0.9.4"))
+        #expect(CardStart.isBeta("0.1.3"))
+        #expect(CardStart.isBeta("0.9.2-beta.1"))
+        #expect(!CardStart.isBeta("1.0"))
+        #expect(!CardStart.isBeta("1.0.0-beta.2"))
+        #expect(!CardStart.isBeta("2.1.0"))
+        #expect(!CardStart.isBeta(""))
+        let face = CardFace(name: "", start: now, version: "1.0.0", isExact: true, day: 1)
+        #expect(face.betaLine == nil)
+        #expect(CardFace(name: "", start: now, version: "0.9.4", isExact: true, day: 1).betaLine != nil)
+    }
+
+    @Test func versionsCompareAsReleasesDo() {
+        #expect(CardStart.isEarlier("0.9.2-beta.1", than: "0.9.2"))
+        #expect(CardStart.isEarlier("0.9.2", than: "0.10.0"))
+        #expect(CardStart.isEarlier("0.9.2-beta.1", than: "0.9.2-beta.2"))
+        #expect(!CardStart.isEarlier("0.9.2", than: "0.9.2"))
+        #expect(!CardStart.isEarlier("1.0", than: "0.9.9"))
+    }
+
+    @Test func daysCountFromOne() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        #expect(CardFace.day(from: now, to: now, calendar: calendar) == 1)
+        #expect(CardFace.day(from: now - 13 * day, to: now, calendar: calendar) == 14)
+        // A clock set back never reads below Day 1.
+        #expect(CardFace.day(from: now + 3 * day, to: now, calendar: calendar) == 1)
+    }
+
+    /// The saved picture is the card at three times its size, in either appearance.
+    @Test func theSavedPictureIsTheCardAtThreeTimes() throws {
+        let face = CardFace(name: "Ada Lovelace", start: now, version: "0.9.4", isExact: true, day: 14)
+        for name in [NSAppearance.Name.aqua, .darkAqua] {
+            let appearance = try #require(NSAppearance(named: name))
+            let data = try #require(CardArt.png(face, palette: CardPalette(hue: 0.6, hue2: nil), appearance: appearance))
+            let rep = try #require(NSBitmapImageRep(data: data))
+            #expect(rep.pixelsWide == Int(Tokens.Keepsake.size.width * 3))
+            #expect(rep.pixelsHigh == Int(Tokens.Keepsake.size.height * 3))
+            #expect(rep.pixelsWide == 1020 && rep.pixelsHigh == 642)
+            // The face is solid color, and only its rounded corners are clear.
+            #expect(rep.colorAt(x: 510, y: 321)?.alphaComponent == 1, "\(name.rawValue)")
+            #expect(rep.colorAt(x: 0, y: 0)?.alphaComponent == 0)
+        }
+    }
+
+    /// The quiet lines read at AA on both ends of the face, in every curated hue, by day and at night.
+    @Test func theWordsReadOnEveryColor() throws {
+        for color in SpaceColor.allCases {
+            let palette = CardPalette(hue: color.hue, hue2: nil)
+            for name in [NSAppearance.Name.aqua, .darkAqua] {
+                try #require(NSAppearance(named: name)).performAsCurrentDrawingAppearance {
+                    for ground in [palette.top, palette.bottom] {
+                        let g = ground.usingColorSpace(.sRGB)!
+                        #expect(Brand.contrast(palette.quiet.usingColorSpace(.sRGB)!, g) >= 4.5, "\(color) \(name.rawValue)")
+                        #expect(Brand.contrast(palette.ink.usingColorSpace(.sRGB)!, g) >= 7, "\(color) \(name.rawValue)")
+                    }
+                }
+            }
+        }
+    }
+}
