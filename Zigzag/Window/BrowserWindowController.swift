@@ -3387,7 +3387,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listMenu(for item: SidebarItem) -> NSMenu? {
         switch item {
-        case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID)
+        case .header: return sidebarSpaceMenu(for: tabManager.currentSpaceID, anchor: sidebar.list.headerView)
         case .tab(let id): return tabManager.tab(with: id).map { SidebarMenus.tabMenu(for: $0, controller: self) }
         case .bookmark(let id): return Library.shared.bookmark(id).map { SidebarMenus.bookmarkMenu(for: $0, controller: self) }
         case .folder(let id): return Library.shared.folder(id).map { SidebarMenus.folderMenu(for: $0, controller: self) }
@@ -3403,8 +3403,11 @@ extension BrowserWindowController: SidebarDelegate {
     /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
     func sidebarDoubleClickedBlank() { if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) } }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
-    func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
-        let menu = SidebarMenus.spaceMenu(for: id, controller: self)
+    /// A space dot's menu: Edit Space… opens at the dot.
+    func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }
+
+    private func sidebarSpaceMenu(for id: UUID, anchor: NSView?) -> NSMenu? {
+        let menu = SidebarMenus.spaceMenu(for: id, controller: self, anchor: anchor)
         return menu.items.isEmpty ? nil : menu
     }
 }

@@ -894,7 +894,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
         Tutorial.complete("space")
-        renameSpace(nil)
+        // At the button or menu row it came from; from the menu bar or command bar, beside the space's name.
+        openSpaceEditor(tabManager.currentSpaceID, anchor: sender as? NSView)
         if let madeProfile { SpaceEditorPanel.current?.follow(madeProfile: madeProfile) }
         // Esc while naming it: never mind. Back where you were, without the space, and the guide still asks for one.
         SpaceEditorPanel.current?.onCancel = { [weak self] in

@@ -512,7 +512,8 @@ enum SidebarMenus {
         return menu([context, page, organize, edit, close])
     }
 
-    static func spaceMenu(for id: UUID, controller: BrowserWindowController) -> NSMenu {
+    /// `anchor`: the row or dot the menu opened on, which Edit Space… opens beside.
+    static func spaceMenu(for id: UUID, controller: BrowserWindowController, anchor: NSView? = nil) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         // A private window borrows a space's look but keeps nothing: it can't change the spaces you keep.
@@ -520,8 +521,7 @@ enum SidebarMenus {
         // Its profile on top once there's more than one, as the Move to Space menus head each profile's spaces.
         if let profile = Library.shared.directory.shownName(ofSpace: id, spaceName: space.name) { menu.addItem(.sectionHeader(title: profile)) }
         menu.addItem(Item(String(localized: "Edit Space…", comment: "Item in a space's context menu.")) {
-            let anchor = controller.sidebar.dot(for: id) ?? controller.sidebar.list.headerView
-            controller.openSpaceEditor(id, anchor: anchor)
+            controller.openSpaceEditor(id, anchor: anchor ?? controller.sidebar.list.headerView)
         })
         _ = space
         menu.addItem(useDefaultColorsItem(for: id) { controller.libraryChange($0, $1) })
@@ -542,7 +542,7 @@ enum SidebarMenus {
         large.state = SpaceHeaderView.isLarge ? .on : .off
         menu.addItem(large)
         menu.addItem(.separator())
-        menu.addItem(Item(String(localized: "New Space", comment: "Item in a space's context menu.")) { controller.newSpace(nil) })
+        menu.addItem(Item(String(localized: "New Space", comment: "Item in a space's context menu.")) { controller.newSpace(anchor) })
         menu.addItem(Item(String(localized: "Delete Space", comment: "Item in a space's context menu."), enabled: Library.shared.spaces.count > 1) {
             SpaceEditor.confirmDelete(spaceID: id, in: controller)
         })
@@ -612,25 +612,26 @@ enum SidebarMenus {
     }
 
     static func addPanel(controller: BrowserWindowController) -> [MenuPanel.Entry] {
-        panel(addEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
+        panel(addEntries(isPrivate: controller.tabManager.isPrivate), controller: controller, from: controller.sidebar.newSpaceButton)
     }
 
     static func blankPanel(controller: BrowserWindowController) -> [MenuPanel.Entry] {
         panel(blankEntries(isPrivate: controller.tabManager.isPrivate), controller: controller)
     }
 
-    private static func panel(_ entries: [Entry], controller: BrowserWindowController) -> [MenuPanel.Entry] {
+    /// `from`: the button the menu opened from, where a new space's editor opens.
+    private static func panel(_ entries: [Entry], controller: BrowserWindowController, from button: NSView? = nil) -> [MenuPanel.Entry] {
         entries.map { entry in
             guard entry != .separator else { return .separator }
             let shortcut = action(of: entry).map(Shortcuts.keys(for:)) ?? ""
-            return .item(MenuPanel.Item(title: title(of: entry), symbol: symbol(of: entry), shortcut: shortcut) { [weak controller] in
+            return .item(MenuPanel.Item(title: title(of: entry), symbol: symbol(of: entry), shortcut: shortcut) { [weak controller, weak button] in
                 guard let controller else { return }
                 switch entry {
                 case .newTab: controller.listNewTab()
                 case .newFolder: controller.newFolder()
                 // Beside the space's name, as the View menu's Edit Space… opens it.
                 case .editSpace: controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
-                case .newSpace: controller.newSpace(nil)
+                case .newSpace: controller.newSpace(button)
                 case .separator: break
                 }
             })

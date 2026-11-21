@@ -16,6 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Picking a login in the Mac's Passwords list fills the username as well as the password on macOS 26 and earlier. macOS fills the username only into a field it has paired with the password field, and it never paired the one Zigzag lays over the page, so only the password went in. Thanks to [frarees](https://github.com/frarees). ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - Both knobs of a gradient on the space editor's color wheel drag again. With two pale colors close together near the middle, a press on the second knob took hold of the first one instead; now the knob nearer the pointer is the one that moves.
 - Clicking the Custom swatch in the space editor always shows the color wheel and Shade. Clicked while they were already out, it folded them away, and with Effects open below there was no sign of how to bring them back.
+- The space editor opens next to what you opened it from. Edit Space… in the menu of the space's name at the top of the sidebar opened it down by the space icons at the bottom; it now opens beside the name. From a space icon or the + it rises from the bottom as before, and from the menu bar or the command bar it opens beside the space's name. However tall it gets, with the color wheel and Effects open, it stays inside the window, and the wheel gets a little smaller in a short window.
 
 ## [0.9.3] - 2026-11-18
 

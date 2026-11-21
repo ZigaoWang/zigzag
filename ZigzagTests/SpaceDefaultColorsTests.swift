@@ -238,3 +238,30 @@ struct ColorWheelDragTests {
         #expect(editor.preferredHeight == shown)
     }
 }
+
+/// Where the space editor opens: at what opened it, always inside the window.
+@MainActor
+struct SpaceEditorPlacementTests {
+    @Test func risesFromTheBottomAndHangsFromTheTop() {
+        // The space's name near the top, a space dot or the + at the bottom.
+        #expect(!SpaceEditorPanel.rises(from: NSRect(x: 0, y: 120, width: 200, height: 40), in: 820))
+        #expect(SpaceEditorPanel.rises(from: NSRect(x: 0, y: 780, width: 20, height: 20), in: 820))
+    }
+
+    @Test func staysInTheWindow() {
+        let top = SpaceEditorPanel.topMargin, bottom = SpaceEditorPanel.bottomMargin
+        #expect(SpaceEditorPanel.clampedTop(100, height: 300, in: 820) == 100)
+        // Hanging from a row near the bottom, it moves up to fit.
+        #expect(SpaceEditorPanel.clampedTop(700, height: 300, in: 820) == 820 - 300 - bottom)
+        // Rising from a dot past the top, it moves down.
+        #expect(SpaceEditorPanel.clampedTop(-200, height: 600, in: 820) == top)
+        // Taller than the window: the top shows.
+        #expect(SpaceEditorPanel.clampedTop(50, height: 900, in: 820) == top)
+    }
+
+    @Test func theWheelShrinksInAShortWindow() {
+        #expect(SpaceEditorPanel.wheelHeight(overflow: -50) == ColorWheel.fullHeight)
+        #expect(SpaceEditorPanel.wheelHeight(overflow: 30) == ColorWheel.fullHeight - 30)
+        #expect(SpaceEditorPanel.wheelHeight(overflow: 500) == ColorWheel.minimumHeight)
+    }
+}

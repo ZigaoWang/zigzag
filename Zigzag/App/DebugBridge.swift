@@ -979,6 +979,43 @@ enum DebugBridge {
             if arg.isEmpty { SpaceEditorPanel.current?.debugRemoveBackground() } else { SpaceEditorPanel.current?.debugSetBackground(URL(fileURLWithPath: arg)) }
         // editorcustom: toggles the Custom swatch's wheel and Shade.
         case "editorcustom": SpaceEditorPanel.current?.debugToggleCustom()
+        // editorcustomclick: a click on the Custom swatch.
+        case "editorcustomclick": SpaceEditorPanel.current?.debugClickCustom()
+        // editoreffects, editorsecond: Effects opened or folded, a second color added or removed.
+        case "editoreffects": SpaceEditorPanel.current?.debugToggleEffects()
+        case "editorsecond": SpaceEditorPanel.current?.debugToggleSecondColor()
+        // editordrag <knob> <hue> <amount>: that wheel knob pressed and dragged to the spot (0...1 each).
+        case "editordrag":
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            if n.count == 3 { SpaceEditorPanel.current?.debugDrag(Int(n[0]), to: ColorWheel.Spot(hue: n[1], amount: n[2])) }
+        // editorprobe: the panel's place and what a press on each knob lands on, logged.
+        case "editorprobe": debugLog("editorprobe \(SpaceEditorPanel.current?.debugProbe() ?? "closed")")
+        // editfrom header|dot|dotclick|blank|plus|menubar: opens the editor the way that place does.
+        case "editfrom":
+            let id = controller.tabManager.currentSpaceID
+            let edit = String(localized: "Edit Space…", comment: "Item in a space's context menu.")
+            func perform(_ menu: NSMenu?, _ title: String) {
+                if let menu, case let index = menu.indexOfItem(withTitle: title), index >= 0 { menu.performActionForItem(at: index) }
+            }
+            switch arg {
+            case "header": perform(controller.listMenu(for: .header), edit)
+            case "dot": perform(controller.sidebarSpaceMenu(for: id), edit)
+            case "dotclick": controller.sidebar.onEditSpace?(id)
+            case "blank", "plus":
+                let entries = arg == "blank" ? SidebarMenus.blankPanel(controller: controller) : SidebarMenus.addPanel(controller: controller)
+                let title = arg == "blank" ? edit : String(localized: "New Space", comment: "Item in the menu of the sidebar's + and its empty space: adds a space and opens it to be named.")
+                for case .item(let item) in entries where item.title == title { item.action() }
+            case "menubar":
+                func find(_ menu: NSMenu) -> NSMenuItem? {
+                    for item in menu.items {
+                        if let sub = item.submenu, let found = find(sub) { return found }
+                        if item.title == edit { return item }
+                    }
+                    return nil
+                }
+                if let item = NSApp.mainMenu.flatMap(find), let action = item.action, let window = controller.window { _ = (window.firstResponder ?? window).tryToPerform(action, with: item) }
+            default: break
+            }
         case "tourskip": Tutorial.skip()
         case "tourend": Tutorial.isHidden = true; controller.root.overlay.subviews.compactMap { $0 as? GuidedTour }.forEach { $0.removeFromSuperview() }
         case "fullscreen": controller.window?.toggleFullScreen(nil)

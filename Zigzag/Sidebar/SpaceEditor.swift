@@ -11,6 +11,9 @@ final class ColorWheel: NSView {
         var amount: Double
     }
 
+    /// Its height in the space editor, and the least it shrinks to in a short window.
+    static let fullHeight: CGFloat = 200, minimumHeight: CGFloat = 140
+
     /// One or two: the color, or where a gradient starts and ends.
     private(set) var spots: [Spot] = [Spot(hue: 0.6, amount: 1)]
     /// How deep each knob's color is, for its fill.
@@ -270,6 +273,10 @@ final class ColorWheel: NSView {
         placeKnobs(animated: false)
         onChange?(index, spot, final)
     }
+
+    #if DEBUG
+    func debugKnobs() -> [CGPoint] { spots.map(point) }
+    #endif
 
     /// VoiceOver: more or less color, or the next hue around.
 
@@ -1495,11 +1502,39 @@ final class SpaceLookEditor: NSView {
         changed(final: true, animated: true)
     }
 
+    #if DEBUG
+    func debugKnobs() -> [CGPoint] {
+        let custom = customSwatch.convert(NSPoint(x: customSwatch.bounds.midX, y: customSwatch.bounds.midY), to: nil)
+        return [custom] + (wheel.isHidden ? [] : wheel.debugKnobs().map { wheel.convert($0, to: nil) })
+    }
+    func debugToggleEffects() {
+        showsEffects.toggle()
+        sync(animated: true)
+        onResize?()
+    }
+    func debugToggleSecondColor() { toggleSecondColor() }
+    func debugClickCustom() { customSwatch.onClick?(NSEvent()) }
+    /// Presses a knob's center and drags it to that spot, as the mouse would.
+    func debugDrag(_ index: Int, to spot: ColorWheel.Spot) {
+        guard index < wheel.spots.count else { return }
+        var grab = wheel.press(at: wheel.point(wheel.spots[index]))
+        let target = wheel.point(spot)
+        wheel.drag(&grab, to: target)
+        wheel.release(grab, at: target)
+    }
+    #endif
+
     /// Custom: the wheel and Shade, shown or folded away.
     func toggleCustom() {
         showsCustom.toggle()
         sync(animated: true)
         onResize?()
+    }
+
+    /// The Custom swatch: always shows the wheel and Shade, never folds them.
+    func showCustom() {
+        guard !showsCustom else { return }
+        toggleCustom()
     }
 
     private func changed(final: Bool, animated: Bool) {
@@ -1531,12 +1566,6 @@ final class SpaceLookEditor: NSView {
         shadeSlider.colors = stride(from: 0.0, through: 1, by: 0.2).map { SpaceColor.paint(hue: spot.hue, depth: $0, tint: spot.amount) }
         clearSlider.value = space.seeThrough
         clearSlider.colors = colors
-    /// The Custom swatch: always shows the wheel and Shade, never folds them.
-    func showCustom() {
-        guard !showsCustom else { return }
-        toggleCustom()
-    }
-
         // What you chose, even while battery saving shows frosted for now.
         glassSwitch.selectedIndex = space.clearGlass != false ? 0 : 1
         grainSlider.value = space.grain ?? 0
@@ -1597,7 +1626,8 @@ final class SpaceLookEditor: NSView {
     private let dialSize: CGFloat = 40
     private let disclosureHeight: CGFloat = 28
     /// How tall the wheel is.
-    var wheelHeight: CGFloat = 200 { didSet { needsLayout = true } }
+    var wheelHeight: CGFloat = ColorWheel.fullHeight { didSet { needsLayout = true } }
+    var showsWheel: Bool { showsCustom }
 
     var preferredHeight: CGFloat {
         var h = swatchSize + Tokens.Space.x1 + disclosureHeight
@@ -1801,11 +1831,14 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     /// The panel grows or shrinks between the colors and the icons, keeping the edge nearest what opened it.
     private func resizeToFit() {
-        guard superview != nil, abs(frame.height - contentHeight) > 0.5 else { return }
+        guard let superview else { return }
+        if controller != nil { fitWheel(in: superview.bounds.height) }
+        guard abs(frame.height - contentHeight) > 0.5 else { return }
         var target = frame
         let delta = contentHeight - frame.height
         target.size.height = contentHeight
-        if superview?.isFlipped == true, anchoredBelow == false { target.origin.y -= delta }
+        if superview.isFlipped, anchoredBelow == false { target.origin.y -= delta }
+        if controller != nil { target.origin.y = Self.clampedTop(target.origin.y, height: contentHeight, in: superview.bounds.height) }
         target.origin.y = max(Tokens.Space.x2, target.origin.y)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.reduceMotion ? 0 : Tokens.Motion.standard
@@ -1818,6 +1851,31 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     /// True when it hangs down from what opened it; false when it rises from the dots at the bottom.
     private var anchoredBelow = false
+
+    /// Room left above and below the panel in the window.
+    static let topMargin = Tokens.Space.x2, bottomMargin = Tokens.Space.x4
+
+    /// Whether it rises from what opened it (in the window's lower half) rather than hanging from it.
+    static func rises(from anchor: NSRect, in height: CGFloat) -> Bool { anchor.midY > height / 2 }
+
+    /// Its top, moved so the whole panel stays in the window; the top wins when it can't fit at all.
+    static func clampedTop(_ top: CGFloat, height: CGFloat, in windowHeight: CGFloat) -> CGFloat {
+        max(topMargin, min(top, windowHeight - height - bottomMargin))
+    }
+
+    /// The wheel's height, smaller in a short window so everything fits.
+    static func wheelHeight(overflow: CGFloat) -> CGFloat {
+        min(ColorWheel.fullHeight, max(ColorWheel.minimumHeight, ColorWheel.fullHeight - max(0, overflow)))
+    }
+
+    private func fitWheel(in windowHeight: CGFloat) {
+        let full = contentHeight + (editor.showsWheel ? ColorWheel.fullHeight - editor.wheelHeight : 0)
+        let height = Self.wheelHeight(overflow: full - (windowHeight - Self.topMargin - Self.bottomMargin))
+        if editor.wheelHeight != height {
+            editor.wheelHeight = height
+            layoutContent()
+        }
+    }
 
     private func layoutContent() {
         let width = bounds.width - pad * 2
@@ -1844,32 +1902,28 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let overlay = controller.root.overlay
         // Beside the sidebar, over the page: right of it, or left of it on the right.
         let beside = controller.root.besideSidebar(width: Self.width)
+        let x = min(max(Tokens.Space.x2, beside), overlay.bounds.width - Self.width - Tokens.Space.x2)
+        // What opened it, or the space's name when nothing on screen did (the menu bar, the command bar).
+        var source = anchor?.window != nil ? anchor : nil
+        if source == nil, let header = controller.sidebar.list.headerView, header.window != nil { source = header }
+        let place = source.map { $0.convert($0.bounds, to: overlay) }
+        // Low in the window (a space dot, the +) it rises from there; higher up it hangs from it.
+        let rises = place.map { Self.rises(from: $0, in: overlay.bounds.height) } ?? false
+        anchoredBelow = !rises
+        fitWheel(in: overlay.bounds.height)
         let height = contentHeight
-        let x: CGFloat
         var top: CGFloat
-        if let anchor, anchor.window != nil, anchor is SpaceDotView {
-            // From a space dot: beside the sidebar, its bottom level with the dots, so it covers neither the dots
-            // nor the tabs and the sidebar shows the new look in full.
-            let dot = anchor.convert(anchor.bounds, to: overlay)
-            top = dot.maxY - height
-            x = min(max(Tokens.Space.x2, beside), overlay.bounds.width - Self.width - Tokens.Space.x2)
+        if let place {
+            top = rises ? place.maxY - height : place.minY - Tokens.Space.x2
         } else {
-            // From the space's name: beside the sidebar, level with that header.
             top = controller.root.cardFrame.minY + Tokens.Space.x2
-            if let header = controller.sidebar.list.headerView, header.window != nil {
-                top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
-            }
-            x = beside
-            // Hanging from the header, it grows downward when the icons take the colors' place.
-            anchoredBelow = true
         }
-        top = max(Tokens.Space.x2, min(top, overlay.bounds.height - height - Tokens.Space.x4))
+        top = Self.clampedTop(top, height: height, in: overlay.bounds.height)
         frame = NSRect(x: x, y: top, width: Self.width, height: height)
         overlay.addSubview(self)
-        // From a dot it rises out of the bottom; from the space's name it hangs from the top.
         // Out of the sidebar's side of it: the left, or the right beside a sidebar on the right.
         let right = controller.root.sidebarOnRight
-        growsFrom = anchor is SpaceDotView ? CGPoint(x: right ? 0.9 : 0.1, y: 1) : CGPoint(x: right ? 1 : 0, y: 0.1)
+        growsFrom = rises ? CGPoint(x: right ? 0.9 : 0.1, y: 1) : CGPoint(x: right ? 1 : 0, y: 0.1)
         present(arrival: .pop)
         controller.window?.makeFirstResponder(nameField)
         // The cursor at the end, not the whole name selected: you came to change the color as often as the name. A
@@ -2048,6 +2102,23 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
     func debugRemoveBackground() { clearBackground() }
     func debugToggleCustom() { editor.toggleCustom() }
+    func debugClickCustom() { editor.debugClickCustom() }
+    func debugToggleEffects() { editor.debugToggleEffects() }
+    func debugToggleSecondColor() { editor.debugToggleSecondColor() }
+    func debugDrag(_ index: Int, to spot: ColorWheel.Spot) { editor.debugDrag(index, to: spot) }
+    /// For the debug bridge: what a press on the name, the Custom swatch and each knob lands on, and where the panel is
+    /// (window points, top left).
+    func debugProbe() -> String {
+        guard let window, let frame = window.contentView?.superview else { return "no window" }
+        let height = window.frame.height
+        let name = nameField.convert(NSPoint(x: nameField.bounds.midX, y: nameField.bounds.midY), to: nil)
+        let knobs = ([name] + editor.debugKnobs()).map { p -> String in
+            let hit = frame.hitTest(frame.convert(p, from: nil))
+            return "(\(Int(p.x)),\(Int(height - p.y)))=\(hit.map { "\(type(of: $0))" } ?? "nil")"
+        }
+        let f = convert(bounds, to: nil)
+        return "panel x=\(Int(f.minX)) top=\(Int(height - f.maxY)) bottom=\(Int(height - f.minY)) window=\(Int(height)) " + knobs.joined(separator: " ")
+    }
     #endif
 
     /// A profile created with the space (Settings › Spaces › Give new spaces their own profile, #291); takes the space name
