@@ -715,7 +715,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Favorites are shared by every window: a private one adds none, pinned or not.
         guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate else { return }
         favoriteWithUndo(tab)
-        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "star.fill", in: self)
+        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "heart.fill", in: self)
     }
 
     /// File › Install as App…: the site as an app of its own, with its own Dock icon (#165).
