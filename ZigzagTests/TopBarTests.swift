@@ -611,4 +611,36 @@ struct TopBarTests {
             }
         }
     }
+
+    /// With the address above the page, the pin star sits inside the URL pill's end (#437), not among the bar's
+    /// trailing buttons.
+    @Test func thePinStarSitsInsideThePillsEnd() {
+        let pill = PaneAddressView()
+        pill.hasSiteControls = false
+        pill.text = "example.com"
+        let star = PaneHeaderView.button("star", toolTip: "Pin Page")
+        pill.pin = star
+        pill.frame = NSRect(x: 0, y: 0, width: 220, height: Tokens.Pane.addressHeight)
+        pill.layoutSubtreeIfNeeded()
+        #expect(star.superview === pill)
+        #expect(star.frame.maxX <= pill.bounds.maxX - PaneAddressView.buttonInset + 0.5)
+        #expect(abs(star.frame.midY - pill.bounds.midY) <= 0.5)
+        // Hidden for a page that can't be pinned, it gives the address its room back.
+        star.isHidden = true
+        pill.needsLayout = true
+        pill.layoutSubtreeIfNeeded()
+        #expect(!star.frame.isEmpty)
+    }
+
+    /// The address gives the star up when the pill takes it, and takes it back after.
+    @Test func theAddressGivesTheStarToThePillAndBack() {
+        let address = AddressView()
+        let wide = address.buttonsWidth
+        address.starInPill = true
+        #expect(address.saveButton.superview == nil)
+        #expect(address.buttonsWidth < wide)
+        address.starInPill = false
+        #expect(address.saveButton.superview === address)
+        #expect(address.buttonsWidth == wide)
+    }
 }

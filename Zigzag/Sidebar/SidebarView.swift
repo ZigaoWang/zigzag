@@ -485,8 +485,17 @@ final class AddressView: InteractiveView {
         }
     }
 
+    /// Whether the star is in the top bar's pill instead, with the address above the page (#437).
+    var starInPill = false {
+        didSet {
+            guard starInPill != oldValue else { return }
+            if starInPill { saveButton.removeFromSuperview() } else { addSubview(saveButton) }
+            reflow(animated: true)
+        }
+    }
+
     /// The buttons always at the field's end, after the pins.
-    private var endButtons: [IconButton] { [saveButton, siteControlsButton] }
+    private var endButtons: [IconButton] { starInPill ? [siteControlsButton] : [saveButton, siteControlsButton] }
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {

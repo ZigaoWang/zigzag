@@ -74,6 +74,12 @@ final class TopBarView: NSView {
             needsLayout = true
         }
     }
+    /// The star, when the pill holds it (#437).
+    var pin: NSView? {
+        get { pill.pin }
+        set { pill.pin = newValue }
+    }
+
     /// The least the address keeps beside a page's tools, which give way first.
     static let addressMinWidth: CGFloat = 200
 
@@ -124,9 +130,10 @@ final class TopBarView: NSView {
 
     /// Takes the sidebar's buttons and address, in order; here the address shows only its buttons and the pill shows
     /// the site (the sidebar restores its field when it takes it back).
-    func hold(buttons: [NSView], address: NSView) {
+    func hold(buttons: [NSView], address: NSView, pin: NSView? = nil) {
         self.buttons = buttons
         self.address = address
+        pill.pin = pin
         (address as? AddressView)?.buttonsOnly = true
         (buttons + [address]).forEach(addSubview)
         refreshOnPage()
