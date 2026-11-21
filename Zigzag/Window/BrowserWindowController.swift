@@ -362,11 +362,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// As above, for the group of `ids`: a group's pages, not just where its lines were, so ⌘Z after selecting another
     /// split leaves that one alone (#435).
     private func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?, in ids: [UUID]) {
-        guard let tab = tabManager.selectedTab, let group = tabManager.split(for: tab), group.ids == ids else { return }
+        // The group the drag was in, wherever it is: another split can be showing when ⌘Z runs, and the step must
+        // still put its lines back rather than be used up doing nothing (#435).
+        guard let group = tabManager.splits.first(where: { $0.ids == ids }) else { return }
         guard group.shape.regions == shape.regions, group.shape != shape else { return }
-        tabManager.setTileShape(shape, for: tab)
-        root.setTiles(shape, animated: true)
-        root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
+        guard let page = group.ids.compactMap({ tabManager.tab(with: $0) }).first else { return }
+        tabManager.setTileShape(shape, for: page)
+        // Only the group on screen is drawn; the other split is left as it is.
+        if let shown = tabManager.selectedTab, tabManager.split(for: shown)?.ids == ids {
+            root.setTiles(shape, animated: true)
+            root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
+        }
         onStateChange?()
         guard let inverse else { return }
         sidebarUndo.registerUndo(withTarget: self) { controller in

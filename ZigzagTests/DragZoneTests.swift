@@ -390,7 +390,7 @@ struct DragZoneTests {
     }
 
     /// ⌘Z for one group's lines leaves another group alone, even where both are two pages (#435).
-    @Test func undoDoesNotMoveAnotherGroupsLines() throws {
+    @Test func undoFindsAnotherGroupsLinesWhereverItIs() throws {
         let space = Library.shared.spaces[0].id
         let before = Library.shared.snapshot
         let manager = TabManager(spaceID: space)
@@ -413,8 +413,11 @@ struct DragZoneTests {
         manager.select(ids[2])
         let other = try #require(manager.split(for: ids[2])?.shape)
         controller.sidebarUndo.undo()
+        // The group the drag was in goes back, though another split is showing, and the other is left alone.
+        #expect(manager.split(for: ids[0])?.shape == even)
         #expect(manager.split(for: ids[2])?.shape == other)
-        #expect(manager.split(for: ids[0])?.shape.rowShares == [0.6, 0.6])
+        // The step is still there to redo, not used up doing nothing.
+        #expect(controller.sidebarUndo.canRedo)
     }
 
 }
