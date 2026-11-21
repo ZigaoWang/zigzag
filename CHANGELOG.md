@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - The address field no longer shows the star where there is nothing to pin: on Zigzag's own pages (Settings, History, the archive), a new tab and private windows. It used to sit there dimmed, and the pins beside it now take its place. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#442](https://github.com/ZigaoWang/zigzag/issues/442))
+- Capture works like Arc's. File › Capture… (⇧⌘2), Capture in Site Controls or the command bar dims the page: drag over it to take an area, which you can then move and resize by its corners and sides before pressing Return or Capture, or switch to Element and click the part of the page under the pointer, even one that runs past the window. Full Page takes the whole page as ⇧⌘2 did before, and Visible takes what's on screen. Esc or Cancel leaves. The picture is copied right away and shows in a small card in the page's corner with Save, Share and a thumbnail you can drag into another app; Save puts it in your download folder, named after the page and the time. The picture is as sharp as your screen, at any zoom and in a split, and nothing is kept anywhere else, in private windows too. ([#457](https://github.com/ZigaoWang/zigzag/issues/457))
 
 ## [0.9.3] - 2026-11-21
 
