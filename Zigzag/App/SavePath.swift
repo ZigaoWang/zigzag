@@ -90,10 +90,19 @@ enum SavePath {
             self.tab = tab
         }
 
-        /// The page a tab shows, or nil for a tab with no address (a new tab).
+        /// The page a tab shows, or nil for a tab with nothing to pin: no address (a new tab), or one of Zigzag's
+        /// own views (Settings, History, the archive), which are drawn by the app and can't come back after a launch.
         init?(tab: Tab) {
-            guard let url = tab.url else { return nil }
+            guard let url = tab.url, Self.isPinnable(url) else { return nil }
             self.init(url: url, title: tab.displayTitle, icon: tab.customIcon, tab: tab)
+        }
+
+        /// Whether a page can be pinned. Zigzag's own views can't; a file can, as it always could.
+        static func isPinnable(_ url: URL) -> Bool {
+            switch url.scheme?.lowercased() {
+            case "zigzag", "about": false
+            default: url.isFileURL || url.scheme != nil
+            }
         }
     }
 
