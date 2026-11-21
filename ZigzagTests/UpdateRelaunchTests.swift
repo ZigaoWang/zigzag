@@ -92,6 +92,46 @@ struct RelaunchIgnoresLaunchChoiceTests {
                                                                   miniOnly: false, webAppOnly: false),
                                         relaunch: nil, choice: .fresh))
     }
+
+    @Test func aRelaunchFromAnUnusedFreshStartStartsFreshAgain() {
+        let now = Date()
+        let saved = UpdateRelaunch.Saved(at: now, browserWindowsOpen: true, minis: [], startsFresh: true)
+        let plan = UpdateRelaunch.plan(relaunch: saved, now: now, needsOnboarding: false, miniOnly: false, webAppOnly: false)
+        #expect(UpdateRelaunch.startsFresh(plan: plan, relaunch: saved, choice: .fresh))
+        #expect(!UpdateRelaunch.resumes(plan: plan, relaunch: saved, choice: .fresh))
+        // Set to reopen meanwhile: the session comes back, as before.
+        #expect(UpdateRelaunch.resumes(plan: plan, relaunch: saved, choice: .resume))
+        #expect(!UpdateRelaunch.startsFresh(plan: plan, relaunch: saved, choice: .resume))
+    }
+
+    @Test func aNoteFromBeforeReadsAsNotFresh() throws {
+        let data = Data(#"{"at":0,"browserWindowsOpen":true,"minis":[]}"#.utf8)
+        let saved = try JSONDecoder().decode(UpdateRelaunch.Saved.self, from: data)
+        #expect(saved.startsFresh == nil)
+        let plan = UpdateRelaunch.Plan(restoresSession: true, sessionWaiting: false, restoresMinis: false)
+        #expect(UpdateRelaunch.resumes(plan: plan, relaunch: saved, choice: .fresh))
+    }
+
+    @Test func aLaunchForZigzagMiniStillStartsFresh() {
+        let plan = UpdateRelaunch.plan(relaunch: nil, now: Date(), needsOnboarding: false, miniOnly: true, webAppOnly: false)
+        #expect(plan.sessionWaiting)
+        #expect(UpdateRelaunch.startsFresh(plan: plan, relaunch: nil, choice: .fresh))
+        #expect(!UpdateRelaunch.startsFresh(plan: plan, relaunch: nil, choice: .resume))
+        // Onboarding first: neither.
+        let onboarding = UpdateRelaunch.plan(relaunch: nil, now: Date(), needsOnboarding: true, miniOnly: false, webAppOnly: false)
+        #expect(!UpdateRelaunch.startsFresh(plan: onboarding, relaunch: nil, choice: .fresh))
+    }
+
+    @Test func anUnusedFreshStartNeverRestoresTheSessionItPassedOver() {
+        let manager = WindowManager.shared
+        let was = manager.startingFresh
+        defer { manager.startingFresh = was }
+        guard !manager.sessionWasUsed else { return }
+        manager.startingFresh = true
+        manager.sessionWaiting = true
+        #expect(!manager.restoreSession())
+        #expect(!manager.sessionWaiting)
+    }
 }
 
 /// A fresh start keeps the session it passed over where saving the new one can't reach it, and the copy is made

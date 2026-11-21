@@ -170,9 +170,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WindowManager.shared.sessionWaiting = plan.sessionWaiting
         // Settings › General › On launch: a fresh start keeps the saved session for History › Reopen Last Session
         // instead of bringing it back, and doesn't write over it until the new window is used (#433). An update's
-        // relaunch is never a fresh start: it puts exactly what was open back.
+        // relaunch puts exactly what was open back, unless it interrupted a fresh start still unused.
         let resumes = UpdateRelaunch.resumes(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
-        WindowManager.shared.startingFresh = plan.restoresSession && !resumes
+        WindowManager.shared.startingFresh = UpdateRelaunch.startsFresh(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
         if WindowManager.shared.startingFresh { WindowManager.shared.keepSessionForReopening() }
         let restored = resumes ? WindowManager.shared.restoreSession() : false
         if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }

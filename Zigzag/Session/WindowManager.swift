@@ -376,7 +376,7 @@ final class WindowManager {
         saveDebouncer.cancel()
         guard !controllers.isEmpty, !sessionWaiting else { return }
         // Started fresh and nothing done yet: the session from before is still the one to bring back.
-        if startingFresh, !sessionWasUsed { return }
+        if freshStartUnused { return }
         // Private windows are never written down.
         let saved = controllers.filter { !$0.tabManager.isPrivate }
         guard !saved.isEmpty else { return }
@@ -492,10 +492,15 @@ final class WindowManager {
     /// for the rest of the run even after its tabs close.
     func pageLoaded() { sessionWasUsed = true }
 
+    /// Started fresh and nothing done yet: the session on disk is still the one passed over.
+    var freshStartUnused: Bool { startingFresh && !sessionWasUsed }
+
     /// Brings back every window and tab from the last run, crash or not. Returns false if there was nothing.
     @discardableResult
     func restoreSession() -> Bool {
         sessionWaiting = false
+        // The session on disk is the one a fresh start passed over: it comes back only from History.
+        if freshStartUnused { return false }
         finishSaving()
         guard let saved = JSONStore.load(SessionState.self, from: Paths.session), !saved.windows.isEmpty else { return false }
         // With shared tabs (#162), every window's tabs restore into one list, each once, however saved; otherwise per
