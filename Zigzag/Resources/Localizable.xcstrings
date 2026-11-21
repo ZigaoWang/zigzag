@@ -1201,7 +1201,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "测试版可能不稳定。"
+            "value" : "Beta 版可能不稳定。"
           }
         }
       }
@@ -1257,7 +1257,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可在站点控制中为单个网站选择。"
+            "value" : "也可以在网站设置里为单个网站选择。"
           }
         }
       }
@@ -14222,7 +14222,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点击时"
+            "value" : "点按时"
           }
         }
       }
