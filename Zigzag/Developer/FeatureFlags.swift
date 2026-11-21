@@ -64,9 +64,12 @@ enum FeatureFlags {
     private static let key = "WebKitFeatureFlags"
 
     /// Flags Zigzag sets differently from WebKit on every page, Developer Mode or not; Settings shows them as the
-    /// default. PreferPageRenderingUpdatesNear60FPS: off, as in Chrome; on, pages draw at 60 fps on 120 Hz displays, so
-    /// animations and scrolling stutter next to native scrolling.
-    static let ownDefaults: [String: Bool] = ["PreferPageRenderingUpdatesNear60FPSEnabled": false]
+    /// default. None now. Prefer Page Rendering Updates near 60fps started off here (0.9.3 beta 4) so pages drew at a
+    /// 120 Hz display's full rate, but a heavy page (GitHub, signed in) can't finish a rendering update every 8 ms, so
+    /// its scroll landed at an uneven mix of 8, 17 and 25 ms and stuttered, where a light page kept up. WebKit's
+    /// default, as in Safari, settles the page at a steady 60 while the scroll itself still moves at the display's rate
+    /// (#394). The Feature Flags switch still turns it off.
+    static let ownDefaults: [String: Bool] = [:]
 
     /// The flags you can change, the ones WebKit keeps to itself left out; nil when there's no list to show.
     static var flags: [Flag]? {
