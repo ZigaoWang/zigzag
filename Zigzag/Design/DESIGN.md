@@ -210,7 +210,8 @@ One look for each state, everywhere:
 - Selected / current: in the sidebar the light card of the space's color (`Chrome.card`, `cardEdge`, a shadow-sm);
   on a panel a clear neutral fill, `selectedFill`, with a 1px `selectedEdge` and `setLifted(true)`'s shadow-sm
   (`applyRowStyle`). In a list of places
-  (Settings' sections) and for a keyboard-chosen result: the accent at `Color.selectionAlpha`.
+  (Settings' sections) and for a chosen result (the command bar's): the accent at `Color.selectionAlpha`,
+  `selectionPressedAlpha` pressed.
 - Keyboard highlight in a floating list: `Color.highlight`, one pill gliding between rows (the menus, the password
   menu).
 - Focus: never the system's blue. A field shows the accent at `focusAlpha` (60%), 1.5pt, while typing. A drawn
@@ -342,7 +343,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   alone, the page you're in has the hover wash under its part. The close button comes as a tab's does, over the last
   title's faded end, so nothing moves under the pointer; its room is kept, at rest too, where it would cover too much (icons
   alone, a speaker in the last part, or the last part's whole title), decided by the row's width, never its state. A pinned page split beside a tab carries the pair in its own row, so each page
-  shows once and one row is lit. Pointing at a part names its page, and a double-click renames that page (over its
+  shows once and one row is lit. A pinned split of two, three or four is the same row (`TabRowView`) in Pinned. Its ×
+  closes the whole split in the tab list and unloads a pinned one; a middle-click closes the one page under it.
+  Pointing at a part names its page, and a double-click renames that page (over its
   title, or the row for the moment when the part shows no title).
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size
@@ -635,8 +638,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.
 - **Pill button** (`PillButton`): capsule, `.plain` on `fieldFill`, `.quiet` fill on hover only, `.prominent` in
   the accent, one per surface; `isDestructive` for what can't be undone. The welcome and Import use it too, in the
-  brand's colors (`customFill`, `customInk`, `customEdge`) where they sit on its blue. `TextButton` remains only in
-  the icon grid until rebuilt.
+  brand's colors (`customFill`, `customInk`, `customEdge`) where they sit on its blue. The icon choices' Choose Image…
+  and Use Site Icon are `.quiet` pills.
 - **Dialog** (`Tokens.Dialog`): `DialogHeader` (a picture, the question in the heading's weight, a quiet line under
   it), the explaining text, then `DialogButtons` (the answers at the trailing end, the main one last and filled; a
   quiet choice alone at the leading end). Confirmations, page dialogs, extension and save-password prompts use it.
@@ -645,14 +648,14 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   space editor's `LookSwatch`), or its name typed to remove it. Return confirms once it can be, never what's
   destructive; Tab stays within it.
 - **Buttons** (`ButtonLook`, `applyButtonLook`), capsules `Metric.controlHeight` (28) tall, `Font.control()`:
-  - Secondary (`PillButton` `.plain`, `TextButton.form`): `controlFill` (white; a lighter step of the surface in
+  - Secondary (`PillButton` `.plain`): `controlFill` (white; a lighter step of the surface in
     dark mode), a hairline `controlEdge` and a faint `controlShadow` (1.5pt, 0.5 down). A symbol may lead the title.
   - Primary (`PillButton` `.prominent`): the one thing to do on a surface, a pill filled with the
     space's accent (`Brand.Theme.accent`) and its `onAccent` text, a step lighter under the pointer and deeper
     pressed, as a switch that's on; red only for what can't be undone. `Color.primaryFill` (dark, light at night) is
     left only for the plain `ButtonLook.primary` with no tint.
   - Quiet (`.quiet`): no fill until the pointer is over it.
-  `TextButton` draws the same looks where it's still used; new code uses `PillButton`.
+  Every button is a `PillButton`; `TextButton` is no longer drawn anywhere.
 - **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
   around it) and a small round 14pt knob. Off, a porcelain knob on the left of a neutral track; on, the knob slides
   right, turns white, and the track fills with the space's accent (`Switch.knobOn`, `edgeOn`), a step deeper under
@@ -695,7 +698,8 @@ calm: things drawn as objects under one light straight above. `Materials.swift` 
   pale blue, beveled, by night; a glint follows the pointer only while it's over the mark.
 - **Your Zigzag Card** (`CardStage`, About's hero): a bank card that turns up to `Keepsake.tilt` (8°) toward the
   pointer and settles back on a soft spring; a click turns it over to the wordmark alone. Four finishes, picked with
-  round swatches under it: Space, Holographic, Graphite, Paper. Each has its grain made at the size it's drawn,
+  round swatches under it (`SwatchRing`, the chosen one in the accent ring, as Reader's colors): Space, Holographic,
+  Graphite, Paper. Each has its grain made at the size it's drawn,
   small ribbon Zs pressed into it and the wordmark stamped in foil; only the foil, the sheen and the wordmark's shine
   move with the light. The saved picture is the same drawing at `Keepsake.exportScale`, lit at rest.
 - **A brand moment's words**: the wordmark, one headline (`Material.headline`, semibold) saying plainly what Zigzag
