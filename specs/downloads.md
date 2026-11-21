@@ -48,6 +48,12 @@
 - Open for apps, scripts, installers, archives and web pages → never opens them; they're only saved.
   Test: DownloadRuleTests.anOpenNeverTakesAnAppScriptOrArchive
 
+## Video on a page
+- A streamed video on x.com with OldTwitter → Download Video saves the mp4 the page lists, not the playlist, in WebKit's place.
+  Test: VideoMenuTests.aStreamShowsOneDownloadVideo
+- A video whose source is already a file → WebKit's own Download Video, with nothing added beside it.
+  Test: VideoMenuTests.aFileIsLeftToWebKit
+
 ## Firefox add-ons
 - Add to Zigzag on addons.mozilla.org → the .xpi goes to the install sheet, not to Downloads.
   Test: DownloadPolicyTests.firefoxPackagesAreInstalledNotSaved

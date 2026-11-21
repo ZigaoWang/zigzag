@@ -67,6 +67,24 @@ final class BrowserWebView: WKWebView {
     /// The page is a PDF (`Tab.checkForPDF`), in WebKit's viewer unless Zigzag's covers it.
     var isPDF = false
 
+    /// The video a page reported as its menu opened, for Download Video.
+    var contextVideo: ContextVideo?
+
+    /// The video under a right press: the source Safari plays and the mp4 file the page lists.
+    struct ContextVideo: Equatable {
+        let source: URL
+        let file: URL?
+
+        /// WebKit's own Download Video saves the source when it is a file. On a stream it saves the playlist instead,
+        /// which is a text file, so the page's mp4 is offered in its place.
+        var needsOwnItem: Bool {
+            guard let file, let fileScheme = file.scheme?.lowercased(),
+                  fileScheme == "http" || fileScheme == "https" else { return false }
+            let scheme = source.scheme?.lowercased()
+            return !(scheme == "http" || scheme == "https") || source.pathExtension.lowercased() == "m3u8"
+        }
+    }
+
     /// Gives WebKit's PDF viewer the page's focus, as a click in it would, then `then`. In Zigzag's own world, so
     /// the page's scripts can't stand in its way.
     static func focusPDF(in webView: WKWebView, then: @escaping @MainActor () -> Void) {
@@ -98,11 +116,17 @@ final class BrowserWebView: WKWebView {
 
     override func mouseDown(with event: NSEvent) {
         owner?.scrolledSinceSave = true
-        if event.modifierFlags.contains(.control) { readSelectionForMenu() }
+        if event.modifierFlags.contains(.control) {
+            // A control-click opens the page's menu too: the video it reports is not the last press's.
+            contextVideo = nil
+            readSelectionForMenu()
+        }
         super.mouseDown(with: event)
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        // Read before the page gets the press, so a video it never reports can't leave the last press's own behind.
+        contextVideo = nil
         readSelectionForMenu()
         super.rightMouseDown(with: event)
     }
@@ -198,6 +222,7 @@ final class BrowserWebView: WKWebView {
         }
         addOpenSelection(to: menu)
         addSaveToPins(to: menu)
+        addDownloadVideo(to: menu)
         // In a browser window's page or Zigzag Mini's, which a browser window translates; not a web app's.
         if let owner, WindowManager.shared.controller(for: window) != nil || MiniWindowController.showing(window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
@@ -206,6 +231,31 @@ final class BrowserWebView: WKWebView {
         // What the page's menu holds, with submenus and actions (AutoFill › Passwords… in a field), for scripts.
         debugLog("webmenu " + Self.debugDescribe(menu))
         #endif
+    }
+
+    /// A video whose source WebKit can't save as a video gets Download Video, which saves the page's mp4 instead.
+    func addDownloadVideo(to menu: NSMenu) {
+        defer { contextVideo = nil }
+        guard let video = contextVideo, video.needsOwnItem, let file = video.file else { return }
+        let item = NSMenuItem(title: String(localized: "Download Video", comment: "Item in a page's right-click menu over a video: downloads the video."),
+                              action: #selector(downloadVideo(_:)), keyEquivalent: "")
+        item.target = self
+        item.representedObject = file
+        item.image = Tokens.Symbol.image("arrow.down.circle")
+        // In WebKit's own item's place, which would save the playlist, so the menu shows one Download Video.
+        let webKitItem = menu.items.first { $0.identifier?.rawValue == "WKMenuItemIdentifierDownloadMedia" }
+        webKitItem?.isHidden = true
+        let index = webKitItem.map { menu.index(of: $0) }
+            ?? menu.items.firstIndex { $0.identifier?.rawValue == "WKMenuItemIdentifierInspectElement" }
+            ?? menu.items.count
+        menu.insertItem(item, at: index)
+    }
+
+    @objc private func downloadVideo(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        startDownload(using: URLRequest(url: url)) { [weak self] download in
+            DownloadManager.shared.track(download, window: self?.window)
+        }
     }
 
     /// A link's menu starts as Chrome's does (#419): Open Link in New Tab, in New Window, in Private Window, then

@@ -9574,6 +9574,17 @@
         }
       }
     },
+    "Download Video" : {
+      "comment" : "Item in a page's right-click menu over a video: downloads the video.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载视频"
+          }
+        }
+      }
+    },
     "Download files and manage your downloads" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
       "localizations" : {

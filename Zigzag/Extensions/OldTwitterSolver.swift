@@ -159,6 +159,27 @@ final class OldTwitterSolver: NSObject {
         // nothing follows it in a tab.
         if (quote) event.preventDefault();
       }, true);
+      // A timeline video lists the HLS playlist before its mp4 files, and Safari plays the playlist. WebKit's own
+      // Download Video would save that playlist as a text file, so the menu is told the mp4 the page lists instead.
+      const bestMp4 = (sources) => {
+        let best = "", area = 0;
+        for (const source of sources) {
+          if (source.type !== "video/mp4" || !source.src) continue;
+          const size = source.src.split("/").find((part) => /^[0-9]+x[0-9]+$/.test(part));
+          const pixels = size ? Number(size.split("x")[0]) * Number(size.split("x")[1]) : 0;
+          if (!best || pixels > area) { best = source.src; area = pixels; }
+        }
+        return best;
+      };
+      document.addEventListener("contextmenu", (event) => {
+        const target = event.target;
+        const video = target && target.closest ? target.closest("video") : null;
+        if (!video) return;
+        const sources = video.querySelectorAll ? video.querySelectorAll("source") : [];
+        try {
+          handler.postMessage({ op: "video", src: video.currentSrc || video.src || "", file: bestMp4(sources) });
+        } catch (e) {}
+      }, true);
       // The address is put back for the right-click menu alone, so Open in New Tab still has a link, and taken off
       // again once the menu has it, so a click on the quote or its video never follows it. The right press is marked
       // like a ⌘ or middle one, so the observer below leaves its link in place until the menu is built.
@@ -604,6 +625,17 @@ extension OldTwitterSolver: WKScriptMessageHandlerWithReply {
             return
         }
         switch op {
+        case "video":
+            // The video under a right press, for the page menu's Download Video. The page's own frame reports it.
+            guard message.frameInfo.isMainFrame, let src = body["src"] as? String,
+                  let source = URL(string: src), source.scheme != nil,
+                  let webView = webView as? BrowserWebView else {
+                replyHandler(nil, nil)
+                return
+            }
+            let file = (body["file"] as? String).flatMap { $0.isEmpty ? nil : URL(string: $0) }
+            webView.contextVideo = BrowserWebView.ContextVideo(source: source, file: file)
+            replyHandler(nil, nil)
         case "init":
             guard let data = body["data"] as? [String: Any] else { replyHandler(nil, "Bad challenge data"); return }
             Task { @MainActor in

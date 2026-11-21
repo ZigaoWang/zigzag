@@ -126,9 +126,8 @@ function recoverSolver(reason) {
     private func bridgePage() -> JSContext {
         let context = JSContext()!
         context.evaluateScript(#"""
-        var __document = [], __window = [], __global = [], __timers = [];
+        var __document = [], __window = [], __global = [], __timers = [], __posted = [];
         var __mutationObservers = 0, __resizeObservers = 0, __layers = 0, __watch = null;
-
         function Element() {}
         function addEventListener(name) { __global.push(name); }
         function setTimeout(run) { __timers.push(run); }
@@ -188,7 +187,7 @@ function recoverSolver(reason) {
         };
         var window = {
           addEventListener(name) { __window.push(name); },
-          webkit: { messageHandlers: { zigzagOldTwitterSolver: { postMessage() {} } } },
+          webkit: { messageHandlers: { zigzagOldTwitterSolver: { postMessage(message) { __posted.push(message); } } } },
         };
         var chrome = { runtime: { id: "jgejdcdoeeabklepnkdbglgccjpdgpmf" } };
         var location = { hostname: "x.com" };
@@ -210,7 +209,7 @@ function recoverSolver(reason) {
         context.evaluateScript(OldTwitterSolver.bridge)
         #expect(context.exception == nil)
         #expect(context.evaluateScript("window.__zigzagOldTwitterBridge")?.toBool() == true)
-        #expect(context.evaluateScript("__document.length")?.toInt32() == 2) // click, mousedown
+        #expect(context.evaluateScript("__document.length")?.toInt32() == 3) // click, contextmenu, mousedown
         #expect(context.evaluateScript("__window.length")?.toInt32() == 1) // message
         #expect(context.evaluateScript("__global.length")?.toInt32() == 1) // resize
         #expect(context.evaluateScript("__mutationObservers")?.toInt32() == 1)
@@ -325,6 +324,27 @@ function recoverSolver(reason) {
         press(context, button: 0)
         #expect(context.evaluateScript("__quote.hasAttribute('href')")?.toBool() == false)
         #expect(context.evaluateScript("__quote.hasAttribute('data-zigzag-menu')")?.toBool() == false)
+    }
+
+    /// A right press on a timeline video reports the biggest mp4 the page lists, not the playlist Safari plays.
+    @Test func aRightPressOnAVideoReportsItsMp4() throws {
+        let context = bridgePage()
+        context.evaluateScript(OldTwitterSolver.bridge)
+        context.evaluateScript("""
+        __video.currentSrc = "https://video.example/a.m3u8";
+        __video.querySelectorAll = () => [
+          { type: "application/x-mpegURL", src: "https://video.example/a.m3u8" },
+          { type: "video/mp4", src: "https://video.example/1280x720/high.mp4" },
+          { type: "video/mp4", src: "https://video.example/320x180/low.mp4" },
+          { type: "video/mp4", src: "https://video.example/no-size.mp4" },
+        ];
+        __document.find((pair) => pair[0] === "contextmenu")[1]({ target: __video });
+        """)
+        #expect(context.exception == nil)
+        #expect(context.evaluateScript("__posted.length")?.toInt32() == 1)
+        #expect(context.evaluateScript("__posted[0].op")?.toString() == "video")
+        #expect(context.evaluateScript("__posted[0].src")?.toString() == "https://video.example/a.m3u8")
+        #expect(context.evaluateScript("__posted[0].file")?.toString() == "https://video.example/1280x720/high.mp4")
     }
 
     /// The sandbox has no body of its own in a hidden page, so the parts the challenge reads are made when missing.
