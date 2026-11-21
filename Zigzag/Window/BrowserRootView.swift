@@ -599,17 +599,19 @@ final class BrowserRootView: SpaceFrameView {
     var sidebarVisible = true
     /// The sidebar's width, kept across windows and launches: dragging its edge sets it, double-clicking that edge
     /// puts it back to the default (#431).
-    var sidebarWidth: CGFloat = BrowserRootView.storedSidebarWidth { didSet { saveSidebarWidth() } }
+    var sidebarWidth: CGFloat = BrowserRootView.storedSidebarWidth
 
     static let sidebarWidthKey = "SidebarWidth"
+    /// What keeps it, so a test can swap in its own suite instead of the dev app's defaults.
+    static var defaults: UserDefaults = .standard
 
     private static var storedSidebarWidth: CGFloat {
-        let stored = UserDefaults.standard.double(forKey: sidebarWidthKey)
+        let stored = defaults.double(forKey: sidebarWidthKey)
         return stored > 0 ? min(max(CGFloat(stored), Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth) : Tokens.Metric.sidebarWidth
     }
 
     private func saveSidebarWidth() {
-        UserDefaults.standard.set(Double(sidebarWidth), forKey: Self.sidebarWidthKey)
+        Self.defaults.set(Double(sidebarWidth), forKey: Self.sidebarWidthKey)
     }
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?

@@ -369,10 +369,15 @@ struct DragZoneTests {
         let space = Library.shared.spaces[0].id
         let before = Library.shared.snapshot
         let manager = TabManager(spaceID: space)
+        let suite = "ZigzagSidebarWidthTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let shared = BrowserRootView.defaults
+        BrowserRootView.defaults = defaults
         defer {
+            BrowserRootView.defaults = shared
+            defaults.removePersistentDomain(forName: suite)
             manager.invalidate()
             Library.shared.restore(before)
-            UserDefaults.standard.removeObject(forKey: BrowserRootView.sidebarWidthKey)
         }
         let tab = Tab(url: nil, title: "Page", spaceID: space)
         manager.adopt([tab], in: space)

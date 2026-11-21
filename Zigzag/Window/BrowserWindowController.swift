@@ -74,6 +74,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
         // view keeps the width dragged out last time, which every window shares (#431).
         if let sidebarWidth {
+            // A window restored from a session keeps its own; the shared width is written only by a drag (#431).
             root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
         }
         root.onLayoutChange = { [weak self] in
