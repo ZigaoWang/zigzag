@@ -487,6 +487,26 @@ enum Checker {
     }
 }
 
+/// A round swatch's ring and dot, as the space editor's presets and Reader's colors draw them: a 2pt ring at the
+/// edge, the dot 2pt inside it with a hairline so white reads on a light panel and black on a dark one. Chosen, the
+/// dot draws in from the ring so a gap shows; under the pointer a faint ring, and nothing moves. Call it in the
+/// view's drawing appearance.
+enum SwatchRing {
+    static let side: CGFloat = 24
+
+    static func draw(ring: CALayer, fill: CALayer, in bounds: CGRect, selected: Bool, hovered: Bool, chosen: NSColor) {
+        ring.frame = bounds
+        ring.cornerRadius = bounds.width / 2
+        ring.borderWidth = 2
+        ring.borderColor = (selected ? chosen : hovered ? Tokens.Color.swatchHoverRing : .clear).cgColor
+        let inset: CGFloat = selected ? 3.5 : 2
+        fill.frame = bounds.insetBy(dx: inset, dy: inset)
+        fill.cornerRadius = fill.frame.width / 2
+        fill.borderWidth = Tokens.Metric.hairline
+        fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
+    }
+}
+
 /// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard,
 /// a grainy one with its grain. Without a look it's Custom, painted with the hues around the wheel.
 final class LookSwatch: InteractiveView {
@@ -536,19 +556,10 @@ final class LookSwatch: InteractiveView {
     override func stateDidChange(animated: Bool) {
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                ring.frame = bounds
-                ring.cornerRadius = bounds.width / 2
-                ring.borderWidth = 2
-                // Chosen, the swatch sits inside a fine ring; under the pointer a faint ring shows and nothing moves.
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : isHovered ? Tokens.Color.swatchHoverRing : .clear).cgColor
-                let inset: CGFloat = isSelected ? 3.5 : 2
-                fill.frame = bounds.insetBy(dx: inset, dy: inset)
-                fill.cornerRadius = fill.frame.width / 2
+                SwatchRing.draw(ring: ring, fill: fill, in: bounds, selected: isSelected, hovered: isHovered,
+                                chosen: Tokens.Color.textPrimary.withAlphaComponent(0.85))
                 checker.frame = fill.frame
                 checker.cornerRadius = fill.cornerRadius
-                fill.borderWidth = Tokens.Metric.hairline
-                // A firmer edge than a panel's, so black still reads on a dark panel and white on a light one.
-                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
                 guard let look else {
                     fill.colors = stride(from: 0.0, through: 1, by: 1.0 / 12).map { SpaceColor.paint(hue: $0, depth: 0.3).cgColor }
                     return
@@ -1619,7 +1630,7 @@ final class SpaceLookEditor: NSView {
 
     // MARK: Layout
 
-    private let swatchSize: CGFloat = 24
+    private let swatchSize = SwatchRing.side
     private let chipSize: CGFloat = 26
     private let sliderHeight: CGFloat = 30
     /// The Colors row: as tall as the dial, a little more than a slider.

@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 import Testing
 @testable import Zigzag
 
@@ -118,6 +119,159 @@ function recoverSolver(reason) {
         #expect(ExtensionStore.patchesFit(fits, in: folder))
         let broken = fits + [ExtensionStore.OverlayPatch(file: "a.js", find: "gone", replace: "x")]
         #expect(!ExtensionStore.patchesFit(broken, in: folder))
+    }
+
+    /// A page with one quoted tweet and its video, enough of the DOM for the bridge to run for real: listeners,
+    /// observers, the play layer and the quote's link are all recorded.
+    private func bridgePage() -> JSContext {
+        let context = JSContext()!
+        context.evaluateScript(#"""
+        var __document = [], __window = [], __global = [], __timers = [];
+        var __mutationObservers = 0, __resizeObservers = 0, __layers = 0, __watch = null;
+
+        function Element() {}
+        function addEventListener(name) { __global.push(name); }
+        function setTimeout(run) { __timers.push(run); }
+        function MutationObserver(run) { __mutationObservers++; __watch = run; this.observe = () => {}; }
+        function ResizeObserver(run) { __resizeObservers++; this.observe = () => {}; }
+        function getComputedStyle() { return { position: "relative" }; }
+
+        var __quoteAttributes = { href: "#/example/status/1" };
+        var __quote = {
+          nodeType: 1,
+          tagName: "A",
+          classList: { contains: (name) => name === "tweet-body-quote" },
+          style: {},
+          getAttribute(name) { return __quoteAttributes[name] || null; },
+          setAttribute(name, value) { __quoteAttributes[name] = value; },
+          hasAttribute(name) { return __quoteAttributes[name] !== undefined; },
+          removeAttribute(name) { delete __quoteAttributes[name]; },
+          closest(selector) { return this; },
+        };
+        var __videoAttributes = {};
+        var __holder = {
+          style: {},
+          getBoundingClientRect: () => ({ left: 0, top: 0, width: 320, height: 180 }),
+          appendChild: () => { __layers++; },
+        };
+        var __video = {
+          nodeType: 1,
+          tagName: "VIDEO",
+          parentElement: __holder,
+          preload: "",
+          currentTime: 0,
+          paused: true,
+          getAttribute(name) { return __videoAttributes[name] || null; },
+          setAttribute(name, value) { __videoAttributes[name] = value; },
+          hasAttribute(name) { return __videoAttributes[name] !== undefined; },
+          removeAttribute(name) { delete __videoAttributes[name]; },
+          closest(selector) { return selector === "a.tweet-body-quote" ? __quote : null; },
+          getBoundingClientRect: () => ({ left: 0, top: 0, width: 320, height: 180 }),
+        };
+        var __root = {
+          nodeType: 1,
+          tagName: "HTML",
+          getAttribute() { return null; },
+          querySelectorAll() { return [__video, __quote]; },
+        };
+        var __target = new Element();
+        __target.closest = () => __quote;
+
+        var document = {
+          documentElement: __root,
+          createElement: () => ({ style: {}, setAttribute() {}, addEventListener() {} }),
+          addEventListener(name, run) { __document.push([name, run]); },
+        };
+        var window = {
+          addEventListener(name) { __window.push(name); },
+          webkit: { messageHandlers: { zigzagOldTwitterSolver: { postMessage() {} } } },
+        };
+        var chrome = { runtime: { id: "jgejdcdoeeabklepnkdbglgccjpdgpmf" } };
+        var location = { hostname: "x.com" };
+        """#)
+        #expect(context.exception == nil)
+        return context
+    }
+
+    private func press(_ context: JSContext, button: Int) {
+        context.evaluateScript("__document.find((pair) => pair[0] === 'mousedown')[1]({ button: \(button), target: __target })")
+        #expect(context.exception == nil)
+    }
+
+    /// The bridge comes from the user script and again from a page that was open when OldTwitter started. The second
+    /// run must add nothing: one listener set, one observer, one play layer per video.
+    @Test func theBridgeRunsOncePerWorld() throws {
+        let context = bridgePage()
+        context.evaluateScript(OldTwitterSolver.bridge)
+        context.evaluateScript(OldTwitterSolver.bridge)
+        #expect(context.exception == nil)
+        #expect(context.evaluateScript("window.__zigzagOldTwitterBridge")?.toBool() == true)
+        #expect(context.evaluateScript("__document.length")?.toInt32() == 2) // click, mousedown
+        #expect(context.evaluateScript("__window.length")?.toInt32() == 1) // message
+        #expect(context.evaluateScript("__global.length")?.toInt32() == 1) // resize
+        #expect(context.evaluateScript("__mutationObservers")?.toInt32() == 1)
+        #expect(context.evaluateScript("__resizeObservers")?.toInt32() == 2)
+        #expect(context.evaluateScript("__layers")?.toInt32() == 1)
+        // Even without the window's flag, the mark on the video keeps its one layer.
+        context.evaluateScript("delete window.__zigzagOldTwitterBridge")
+        context.evaluateScript(OldTwitterSolver.bridge)
+        #expect(context.evaluateScript("__layers")?.toInt32() == 1)
+        #expect(context.evaluateScript("__resizeObservers")?.toInt32() == 2)
+        #expect(context.evaluateScript("__video.hasAttribute('data-zigzag-play-video')")?.toBool() == true)
+    }
+
+    /// The ⌘-click script is in every site's page world, but it listens only on x.com and twitter.com, and once.
+    @Test func theModifiedClickScriptActsOnlyOnItsSites() throws {
+        let other = bridgePage()
+        other.evaluateScript("location.hostname = 'github.com'")
+        other.evaluateScript(OldTwitterSolver.modified)
+        #expect(other.exception == nil)
+        #expect(other.evaluateScript("__document.length")?.toInt32() == 0)
+        #expect(other.evaluateScript("window.__zigzagOldTwitterModified")?.isUndefined == true)
+
+        let x = bridgePage()
+        x.evaluateScript(OldTwitterSolver.modified)
+        x.evaluateScript(OldTwitterSolver.modified)
+        #expect(x.exception == nil)
+        #expect(x.evaluateScript("__document.length")?.toInt32() == 2) // mousedown, click
+    }
+
+    /// The bridge leaves every other site alone.
+    @Test func theBridgeActsOnlyOnItsSites() throws {
+        let context = bridgePage()
+        context.evaluateScript("location.hostname = 'github.com'")
+        context.evaluateScript(OldTwitterSolver.bridge)
+        #expect(context.exception == nil)
+        #expect(context.evaluateScript("__document.length")?.toInt32() == 0)
+        #expect(context.evaluateScript("window.__zigzagOldTwitterBridge")?.isUndefined == true)
+    }
+
+    /// A right press puts the quote's link back for the menu and marks it, and the observer leaves it until the
+    /// menu has been built. The next press takes it off again, as a ⌘ or middle press keeps its own.
+    @Test func aRightPressKeepsTheQuotesLinkForItsMenu() throws {
+        let context = bridgePage()
+        context.evaluateScript(OldTwitterSolver.bridge)
+        #expect(context.evaluateScript("__quote.hasAttribute('href')")?.toBool() == false)
+        #expect(context.evaluateScript("__quote.getAttribute('data-zigzag-href')")?.toString() == "#/example/status/1")
+
+        press(context, button: 2)
+        #expect(context.evaluateScript("__quote.hasAttribute('href')")?.toBool() == true)
+        #expect(context.evaluateScript("__quote.hasAttribute('data-zigzag-menu')")?.toBool() == true)
+        // What the observer sees just after the press.
+        context.evaluateScript("__watch([{ type: 'attributes', target: __quote }])")
+        #expect(context.evaluateScript("__quote.hasAttribute('href')")?.toBool() == true)
+        // The menu has it: the mark and the link go, and the quote can open in the extension's viewer again.
+        context.evaluateScript("__timers.shift()()")
+        #expect(context.evaluateScript("__quote.hasAttribute('data-zigzag-menu')")?.toBool() == false)
+        #expect(context.evaluateScript("__quote.hasAttribute('href')")?.toBool() == false)
+        #expect(context.evaluateScript("__quote.getAttribute('data-zigzag-href')")?.toString() == "#/example/status/1")
+
+        // A middle press keeps the link for the browser, and the next left press takes it off.
+        press(context, button: 1)
+        #expect(context.evaluateScript("__quote.hasAttribute('href')")?.toBool() == true)
+        press(context, button: 0)
+        #expect(context.evaluateScript("__quote.hasAttribute('href')")?.toBool() == false)
+        #expect(context.evaluateScript("__quote.hasAttribute('data-zigzag-menu')")?.toBool() == false)
     }
 
     /// The sandbox has no body of its own in a hidden page, so the parts the challenge reads are made when missing.

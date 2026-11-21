@@ -73,7 +73,6 @@
 		1C920D61EF53F49E0B5929EF /* SiteJavaScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76617994AB17E42F03233BF0 /* SiteJavaScriptTests.swift */; };
 		1CB8BE33E2AB5808DEC21270 /* OwnScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF6A2A22DF8C77C3C203284 /* OwnScripts.swift */; };
 		1CDB552BE051BEBF9C1496B7 /* CertificateDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C054793F49E04AC36C79015 /* CertificateDetails.swift */; };
-		1D4EC9B48B966949AEFC99F9 /* PeekHostingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEC406EA31F8BE85011C9FE /* PeekHostingTests.swift */; };
 		1D559D9E556FBB7102DFE892 /* OwnScriptsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B103184C04CE5BBD5558790 /* OwnScriptsTests.swift */; };
 		1DA962212F01E44D0B6D9E0E /* SiteExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A3767514BB748BE54E5B7A /* SiteExtensions.swift */; };
 		1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */; };
@@ -269,6 +268,7 @@
 		793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */; };
 		79B109D184AEBA99124E805F /* ExtensionSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */; };
 		7A6644E5F8E6F88E4D4B80E1 /* AboutWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E9A925D7802ECE0037DA97 /* AboutWindow.swift */; };
+		C4A7D1E20F3B4C5D6E7F8A90 /* ZigzagCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A7D1E20F3B4C5D6E7F8A91 /* ZigzagCard.swift */; };
 		7AB39474A82DB35790BF5AE1 /* PhoneLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A4EB98BE921B92AA85CBF4 /* PhoneLink.swift */; };
 		7C136AE63DBC68A78BFA1EB9 /* SiteRouteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75BA5C343852E0E29D797FC /* SiteRouteSheet.swift */; };
 		7C2FE38D621DB85C0E007C50 /* CleanLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC2746C9940BC684BB9A616 /* CleanLinkTests.swift */; };
@@ -510,7 +510,6 @@
 		E31FC3B636082D37DDFB6A0D /* HistoryClusters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05040A784BBF98D3612C0A6A /* HistoryClusters.swift */; };
 		E341CC4E85411227052D3A17 /* Reader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FC50557675B6C303B2E0AE /* Reader.swift */; };
 		E35DE3455DA23C45B296D4C4 /* SameSiteTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17D0EB87AD6124B7E4334FF /* SameSiteTabsTests.swift */; };
-		E38366D663CE427B640F71A5 /* PeekController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB43BE39C48B06C807284C2 /* PeekController.swift */; };
 		E3A8ED15A7F4B1612C745407 /* LocalReceiversTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D02F02DFE20E463010E54EA /* LocalReceiversTests.swift */; };
 		E3CB22F1889EA1CC95A8B978 /* TopBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81FB8E290856C58E182C447B /* TopBarView.swift */; };
 		E3DB108E2FCB680F0EF592AC /* FindCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FCB792604C01E2E8F11B27E /* FindCountTests.swift */; };
@@ -725,7 +724,6 @@
 		1EE88C88464115895D3647DF /* PopupWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupWindowController.swift; sourceTree = "<group>"; };
 		1F37420ACBC3FE9A04BD9B9C /* SidebarDeleteKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarDeleteKeyTests.swift; sourceTree = "<group>"; };
 		1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxImporter.swift; sourceTree = "<group>"; };
-		1FB43BE39C48B06C807284C2 /* PeekController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekController.swift; sourceTree = "<group>"; };
 		1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChangesTests.swift; sourceTree = "<group>"; };
 		20694AE0469471EFE8837828 /* ReadyPicturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadyPicturesTests.swift; sourceTree = "<group>"; };
 		20E95B7A55D618609EC5AD77 /* CleanLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanLink.swift; sourceTree = "<group>"; };
@@ -933,6 +931,7 @@
 		88B983CBE21557E05E6C3E28 /* PageDialogSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageDialogSheet.swift; sourceTree = "<group>"; };
 		88D86346DE78193D507DCECC /* TabStateCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStateCacheTests.swift; sourceTree = "<group>"; };
 		88E9A925D7802ECE0037DA97 /* AboutWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutWindow.swift; sourceTree = "<group>"; };
+		C4A7D1E20F3B4C5D6E7F8A91 /* ZigzagCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagCard.swift; sourceTree = "<group>"; };
 		88F9F8B1C1119171EFC0072B /* DebugBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugBridge.swift; sourceTree = "<group>"; };
 		89A07EB62BF2057B04CDC41A /* autoconsent.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = autoconsent.info.json; sourceTree = "<group>"; };
 		8A7E9A550FE7FAD6F8CA7697 /* HistoryLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLookup.swift; sourceTree = "<group>"; };
@@ -1165,7 +1164,6 @@
 		EC0CE69695B808069A887E8D /* PaneMoveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneMoveTests.swift; sourceTree = "<group>"; };
 		EC407157FA36197709110D6E /* BridgeProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeProxy.swift; sourceTree = "<group>"; };
 		ECBBB2069512C8FAA5C9183D /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
-		ECEC406EA31F8BE85011C9FE /* PeekHostingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekHostingTests.swift; sourceTree = "<group>"; };
 		ECFB222D7082B8C1D2724708 /* tab-capture.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "tab-capture.js"; sourceTree = "<group>"; };
 		ED6BBDD8A2A81F07A7506CB3 /* EnergyWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyWatch.swift; sourceTree = "<group>"; };
 		EDF5DDEF3F10D52662345203 /* ArcImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArcImporter.swift; sourceTree = "<group>"; };
@@ -1524,14 +1522,6 @@
 			path = Reader;
 			sourceTree = "<group>";
 		};
-		9DC22EE06DF1214E46F4D147 /* Peek */ = {
-			isa = PBXGroup;
-			children = (
-				1FB43BE39C48B06C807284C2 /* PeekController.swift */,
-			);
-			path = Peek;
-			sourceTree = "<group>";
-		};
 		9DF2A2D01D8BD422F0F2323B /* firefox-profile */ = {
 			isa = PBXGroup;
 			children = (
@@ -1670,7 +1660,6 @@
 				B066F09313656E4EA7FC33E2 /* Import */,
 				636215D8485DC12FF869B139 /* MCP */,
 				02EE121D21A28124FDE29A1C /* Passwords */,
-				9DC22EE06DF1214E46F4D147 /* Peek */,
 				55D90FB77989F64B400E175D /* Profiles */,
 				91D29C3019C13466CD1CC5A3 /* Resources */,
 				7F46711B14040569495FEF80 /* Session */,
@@ -1734,6 +1723,7 @@
 				07632F352E115A10525D3A97 /* UpdateReady.swift */,
 				795D70D21D90CC7FB8A2295D /* UpdateRelaunch.swift */,
 				88A5C020C85AEC572EC2BA4A /* ZigzagApplication.swift */,
+				C4A7D1E20F3B4C5D6E7F8A91 /* ZigzagCard.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -1907,7 +1897,6 @@
 				D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */,
 				804A63C8F2764EC4BE20451D /* PasswordStoreTests.swift */,
 				FB15B823891581C7F60D5892 /* PDFSelectAllTests.swift */,
-				ECEC406EA31F8BE85011C9FE /* PeekHostingTests.swift */,
 				B8C22F8949538832D4B24575 /* PendingQuestionsTests.swift */,
 				DEE0E83603E1E4C9E7473B59 /* PermissionPromptTests.swift */,
 				599EFB79C407D6F01A467090 /* PhoneLinkTests.swift */,
@@ -2346,6 +2335,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A6644E5F8E6F88E4D4B80E1 /* AboutWindow.swift in Sources */,
+				C4A7D1E20F3B4C5D6E7F8A90 /* ZigzagCard.swift in Sources */,
 				B0B613E852FA44892B755F04 /* AcknowledgementsWindow.swift in Sources */,
 				548A302B2614C99406A1F549 /* AdFilters.swift in Sources */,
 				21251A414831FB29A32D3804 /* AddressDrop.swift in Sources */,
@@ -2538,7 +2528,6 @@
 				4AD56EAFBF0AFF722B1CBEC0 /* PasswordStore.swift in Sources */,
 				D3829EDACB516F9EE13AA497 /* PasswordsWindow.swift in Sources */,
 				C502A08CD36BC2CD2BD74071 /* Paths.swift in Sources */,
-				E38366D663CE427B640F71A5 /* PeekController.swift in Sources */,
 				EE9A7B05AB9BDA9E496233F5 /* PendingQuestions.swift in Sources */,
 				52CF7F44FA76F5D132C26B9D /* PermissionPolicy.swift in Sources */,
 				7AB39474A82DB35790BF5AE1 /* PhoneLink.swift in Sources */,
@@ -2792,7 +2781,6 @@
 				C8C7123A186337D2903807F1 /* PasswordHealthTests.swift in Sources */,
 				73BEB8BF61DB6AA3E32A3ACB /* PasswordMenuTests.swift in Sources */,
 				A7923325AE8D9FDB8CFECF2D /* PasswordStoreTests.swift in Sources */,
-				1D4EC9B48B966949AEFC99F9 /* PeekHostingTests.swift in Sources */,
 				1B66359E5313EF11AD962735 /* PendingQuestionsTests.swift in Sources */,
 				78A01D8F531F6B66F95A8267 /* PermissionPromptTests.swift in Sources */,
 				3F3737BCE078C7D39FB1FC7B /* PhoneLinkTests.swift in Sources */,
@@ -2999,7 +2987,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 134;
+				CURRENT_PROJECT_VERSION = 135;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -3118,7 +3106,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 134;
+				CURRENT_PROJECT_VERSION = 135;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 432GL3WKY2;

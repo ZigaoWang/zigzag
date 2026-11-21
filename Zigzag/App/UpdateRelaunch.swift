@@ -30,6 +30,13 @@ enum UpdateRelaunch {
         var restoresMinis: Bool
     }
 
+    /// Whether this launch brings the session back: an update's relaunch always does, since it puts exactly what was
+    /// open back; any other launch follows Settings › General › On launch (#433).
+    nonisolated static func resumes(plan: Plan, relaunch: Saved?, choice: LaunchChoice) -> Bool {
+        guard plan.restoresSession else { return false }
+        return relaunch != nil || choice == .resume
+    }
+
     /// A note older than this isn't from the restart that's launching now (an update that never came back up).
     nonisolated static let freshFor: TimeInterval = 30 * 60
 

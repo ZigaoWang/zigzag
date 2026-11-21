@@ -11,7 +11,7 @@ import WebKit
         #expect(Tab.instancesRespond(to: NSSelectorFromString("_webView:printFrame:")))
     }
 
-    /// Popups answer a page's print() as tabs do (Zigzag Mini, installed apps and Peek pages are tabs).
+    /// Popups answer a page's print() as tabs do (Zigzag Mini and installed apps are tabs).
     @Test func aPopupAnswersAPagesPrintRequest() {
         #expect(PopupWindowController.instancesRespond(to: NSSelectorFromString("_webView:printFrame:pdfFirstPageSize:completionHandler:")))
         #expect(PopupWindowController.instancesRespond(to: NSSelectorFromString("_webView:printFrame:")))
@@ -75,6 +75,17 @@ import WebKit
 /// Capture's arithmetic (#457): an area from a drag, its grips and nudges, how an element is taken, the card's
 /// picture and the file's name.
 struct PageCaptureGeometryTests {
+    @MainActor @Test func aClickWithoutADragGivesNoEmptyCursorRect() {
+        // A zero-size selection once handed AppKit a null move area, which it throws on, and Zigzag quit.
+        for selection in [NSRect(x: 200, y: 150, width: 0, height: 0), NSRect(x: 200, y: 150, width: 6, height: 40)] {
+            let rects = CaptureOverlay.cursorRects(for: selection)
+            #expect(rects.allSatisfy { !$0.0.isNull && !$0.0.isEmpty && $0.0.width.isFinite })
+            #expect(rects.count == 8)
+        }
+        #expect(CaptureOverlay.cursorRects(for: NSRect(x: 100, y: 100, width: 200, height: 100)).count == 9)
+        #expect(CaptureOverlay.cursorRects(for: NSRect(x: CGFloat.nan, y: 0, width: 10, height: 10)).isEmpty)
+    }
+
     let bounds = NSRect(x: 0, y: 0, width: 800, height: 600)
 
     @Test func aDragMakesAnAreaWithinThePage() {

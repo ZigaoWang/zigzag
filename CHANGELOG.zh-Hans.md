@@ -13,10 +13,10 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
-- 阅读器多了“空间”颜色：文章用你所在空间的颜色，和边栏同一个颜色，空间是浅色就浅、深色就深，文字和链接的对比度保证读起来轻松。切换空间或改空间颜色时会马上跟着变。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+- “启动时”可以选择“全新开始”：默认是“接着上次继续”，选“全新开始”会打开一个新窗口，把上次的会话（包括前进后退历史）留给“历史记录 › 重新打开上次会话”，并且在真正打开网页之前不会保存新会话。感谢 [Lakeland97](https://github.com/Lakeland97)。([#433](https://github.com/ZigaoWang/zigzag/issues/433))
 
 ### 修复
-- 整块屏幕会再次填满浏览器自己的全屏空间，“页面”则填满窗口里的页面区域；设置、按网站切换和展开按钮都还在，没有固定。([#462](https://github.com/ZigaoWang/zigzag/issues/462))
+- 整块屏幕会再次填满浏览器自己的全屏空间，“页面”则填满窗口里的页面区域；设置、按网站切换和展开按钮都还在。([#462](https://github.com/ZigaoWang/zigzag/issues/462))
 - 在 Chrome 网上应用店的主题页面上点提示栏的“添加”，现在只会显示一行说明 Zigzag 不使用浏览器主题，也不再出现“重试”按钮，因为重试也只会得到同样的结果。感谢 [Lakeland97](https://github.com/Lakeland97)。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
 - 在 Peek 里点了链接之后可以退回去了。Peek 打开过别的页面后，顶部会出现后退和前进按钮，⌘[、⌘] 和双指轻扫也跟在标签页里一样能用。按 Esc 还是直接关掉整个 Peek。感谢 [Lakeland97](https://github.com/Lakeland97)。([#463](https://github.com/ZigaoWang/zigzag/issues/463))
 - 翻译很长的网页不会再在 45 秒后放弃了。屏幕上看得到的部分先翻，翻好一段就换上一段，提示里会显示翻到多少了；只有连续 45 秒什么都没翻出来才会报错。感谢 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
@@ -24,10 +24,18 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 为了修好 macOS 26 上 Mac 的密码列表，Zigzag 会在你的 Mac 上记一份很小的步骤日志，绝不记你的登录信息，放在 ~/Library/Logs/Zigzag/passwords.log。“帮助 › 报告问题”会附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 轻扫后退或前进时，箭头不会再扫到一半就变成实心，手指一停又变回空心。现在只有扫得够远箭头才会变实心，手指停住不动时箭头保持原样。手指还在移动时快速一扫松手，照样会后退或前进。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - 地址栏里的阅读器只剩一个按钮：没开阅读器时点它打开阅读器；开着时点它打开阅读器选项（文字大小、字体、栏宽、颜色），最下面多了“关闭阅读器”。单独的 Aa 按钮去掉了。Esc 和 ⌥⌘R 照样直接关闭阅读器，“显示”菜单里的“阅读器文字和颜色”也照样能打开选项。文章顶部的网站图标现在和正文左边对齐了；阅读器和空间编辑器里的色块鼠标移上去不再放大，只显示一圈淡淡的边。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+- 在 GitHub（已登录）这类较重的网页上，120 Hz 屏幕的滚动流畅了。从 0.9.3 beta 4 起，网页被设成每秒最多画 120 次；较重的网页来不及每 8 毫秒画完一次，滚动就在每秒 60 步和 120 步之间来回跳，看起来一顿一顿的，轻的网页则跟得上。现在网页按 WebKit 和 Safari 的方式绘制，稳定在每秒 60 次，滚动本身照样按屏幕的完整刷新率移动，在同一个网页上实测流畅。想换回完整的绘制速率，可以在“设置 › 开发者 › 功能标志”里关掉 Prefer Page Rendering Updates near 60fps。感谢 [FammasMaz](https://github.com/FammasMaz)。([#394](https://github.com/ZigaoWang/zigzag/issues/394))
+- 地址栏里的阅读器按钮又变回普通开关了：点一下打开阅读器，再点一下关闭，开着时按钮是按下的样子。阅读器的文字和颜色设置回到了页面里：文章右上角有个小小的 Aa 按钮，往下读时会淡出，往上滚或把指针移到顶部附近时又会出现，点它在下面打开设置。“显示”菜单里的“阅读器文字和颜色”照样能打开，Esc 和 ⌥⌘R 照样关闭阅读器。“关闭阅读器”那一行去掉了。颜色改成了简单的圆点，跟系统设置里选强调色一样：“自动”一半浅一半深，“空间”是你空间的颜色，选中的那个外面有一圈强调色。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+- 你的 Zigzag 卡片现在放在“关于 Zigzag”里，不再单独占一个菜单项。卡片下面可以选卡面：空间颜色、镭射、石墨或纸白，选好的会记住。卡片更大了，会跟着指针转动，光泽也跟着走，点一下可以翻到背面。“存储为图片…”存出的图片清晰得多，带柔和的阴影，背景透明。
+- 全屏时，关闭、最小化和全屏按钮跟着菜单栏一起出现，下面有工具栏或边栏时不再有自己的灰色条，只有网页在下面时才有背景。感谢 [Lakeland97](https://github.com/Lakeland97)。([#469](https://github.com/ZigaoWang/zigzag/issues/469))
+- 速览现在就是 Zigzag Mini：按住 Shift 键点按链接（或选“在 Zigzag Mini 中打开链接”），它会在你的窗口上方的 Mini 里打开，和从其他 App 打开的链接一样；⌘O 把它移到一个标签页里，就放在你点按的那个标签页旁边，Esc 关闭它。它在这个页面自己的空间和个人资料里打开，从无痕浏览窗口打开时也是无痕的，不会记进历史记录。链接右键菜单里的“在速览中打开链接”改成了“在 Zigzag Mini 中打开链接”，入门指南里按住 Shift 键点按的那一步也改成了 Zigzag Mini。没有设置改名。
+- Zigzag Mini 里也能翻译网页了，在“显示”菜单或页面的右键菜单里选，提示会显示在 Mini 上。
+- OldTwitter 在 x.com 上的图标和字体能正常显示了：扩展自己的文件现在按 Zigzag 的地址读取，网站的安全策略允许这个地址，所以它的图标字体、加载图片、列表图标和标签页图标不再显示成空白方块。引用推文里的视频会就地播放，点按引用推文只会打开它自己的内容。感谢 [datarip](https://github.com/datarip)。
+- 截取区域时只点一下不拖动，Zigzag 不会再意外退出了。
 
 ## [0.9.4] - 2026-11-21
 
-阅读器重新设计，更像 Zigzag 自己的一部分；像 Arc 一样截图，可以截一块区域、一个元素或整个页面；支持接力到 iPhone、iPad 和其他 Mac；⌘Z 可以撤销分屏调整；侧边栏宽度每个窗口都记得；缩放可以按住连续调，也能直接输入；设置里的文字更简洁。
+阅读器重新设计，更像 Zigzag 自己的一部分；像 Arc 一样截图，可以截一块区域、一个元素或整个页面；支持接力到 iPhone、iPad 和其他 Mac；⌘Z 可以撤销分屏调整；侧边栏宽度每个窗口都记得；缩放可以按住连续调，也能直接输入；设置里的文字更简洁；还有你的 Zigzag 卡片。
 
 ### 新功能
 - 在“网站设置”的缩放一行里按住 − 或 + 不放，缩放会继续变化；按住 ⇧ 点按百分比可以直接输入，比如 130%，不用一档一档点过去。直接点按仍然是回到实际大小。([#395](https://github.com/ZigaoWang/zigzag/issues/395))
@@ -37,11 +45,25 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 地址栏在页面上方时，星标放在地址框的末端，可以直接在那里固定页面。和侧边栏的地址栏一样，没有东西可固定的地方不显示星标：Zigzag 自己的页面、新标签页和无痕浏览窗口。感谢 [Lakeland97](https://github.com/Lakeland97)。([#437](https://github.com/ZigaoWang/zigzag/issues/437))
 - 截图和 Arc 一样好用了。“文件 › 截图…”（⇧⌘2）、网站设置里的“截图”或命令栏都能进入截图：页面会变暗，指针停在哪块就高亮哪块，点一下就截，超出窗口的部分也能截全；也可以拖一下选一块区域，拖角和边可以调大小、拖中间可以挪位置，按 Return 或“截图”就截下来。“整个页面”和以前的 ⇧⌘2 一样截整页，“可见区域”截屏幕上看到的。按 Esc 或“取消”退出。截好的图会马上拷贝，页面角上弹出一张小卡片，可以存储、共享，也能把缩略图直接拖到别的 App；存储会放进下载文件夹，用网页标题和时间命名。图片跟屏幕一样清晰，缩放和分屏都没问题，除了你存的地方和剪贴板，哪里都不留，无痕浏览窗口也一样。([#457](https://github.com/ZigaoWang/zigzag/issues/457))
 - 侧边栏滑出到页面之上时，也可以拖动它的边缘调整宽度，和在窗口里占位置时一样；拖出来的宽度会成为之后每个新窗口的宽度，重启后也一样；连按两下边缘会恢复原来的宽度。([#431](https://github.com/ZigaoWang/zigzag/issues/431))
+- “Zigzag › 你的 Zigzag 卡片…”会显示一张卡片，上面有你的名字和开始用 Zigzag 的日期，颜色跟你的空间走。可以存成图片，也可以共享。卡片就在你的 Mac 上生成，什么都不会发出去。
+- 阅读器多了“空间”颜色：文章用你所在空间的颜色，和边栏同一个颜色，空间是浅色就浅、深色就深，文字和链接的对比度保证读起来轻松。切换空间或改空间颜色时会马上跟着变。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 
 ### 修复
 - 设置里说得更少：只是在重复标题的说明文字都去掉了，留下的说明都在讲后果或提醒；以前用不同说法问同一个问题的选项，现在只用一种说法。扩展的网站访问权限里，“在你点按它时”改成“点按时”。([#448](https://github.com/ZigaoWang/zigzag/issues/448))
 - 地址栏在没有东西可固定的地方不再显示星标：Zigzag 自己的页面（设置、历史记录、归档）、新标签页和无痕浏览窗口。以前它会灰着留在那里，现在旁边固定的扩展会占用它的位置。感谢 [Lakeland97](https://github.com/Lakeland97)。([#442](https://github.com/ZigaoWang/zigzag/issues/442))
 - 来自 Chrome 网上应用店或 Firefox 附加组件的主题，以及用“从文件夹安装”选的主题文件夹，不会再被安装。Zigzag 不使用浏览器主题，所以会直接说明，并提示可以改空间的颜色；以前会把主题当成扩展装上，装好后什么也不做。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
+- 在 Chrome 网上应用店的主题页面上点提示栏的“添加”，现在只会显示一行说明 Zigzag 不使用浏览器主题，也不再出现“重试”按钮，因为重试也只会得到同样的结果。感谢 [Lakeland97](https://github.com/Lakeland97)。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
+- 在 Peek 里点了链接之后可以退回去了。Peek 打开过别的页面后，顶部会出现后退和前进按钮，⌘[、⌘] 和双指轻扫也跟在标签页里一样能用。按 Esc 还是直接关掉整个 Peek。感谢 [Lakeland97](https://github.com/Lakeland97)。([#463](https://github.com/ZigaoWang/zigzag/issues/463))
+- 翻译很长的网页不会再在 45 秒后放弃了。屏幕上看得到的部分先翻，翻好一段就换上一段，提示里会显示翻到多少了；只有连续 45 秒什么都没翻出来才会报错。感谢 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
+- 红黄绿按钮和旁边的按钮现在正好在窗口顶部和地址栏中间，上下留白一样，不再偏下。
+- 为了修好 macOS 26 上 Mac 的密码列表，Zigzag 会在你的 Mac 上记一份很小的步骤日志，绝不记你的登录信息，放在 ~/Library/Logs/Zigzag/passwords.log。“帮助 › 报告问题”会附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+- 轻扫后退或前进时，箭头不会再扫到一半就变成实心，手指一停又变回空心。现在只有扫得够远箭头才会变实心，手指停住不动时箭头保持原样。手指还在移动时快速一扫松手，照样会后退或前进。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
+- 地址栏里的阅读器只剩一个按钮：没开阅读器时点它打开阅读器；开着时点它打开阅读器选项（文字大小、字体、栏宽、颜色），最下面多了“关闭阅读器”。单独的 Aa 按钮去掉了。Esc 和 ⌥⌘R 照样直接关闭阅读器，“显示”菜单里的“阅读器文字和颜色”也照样能打开选项。文章顶部的网站图标现在和正文左边对齐了；阅读器和空间编辑器里的色块鼠标移上去不再放大，只显示一圈淡淡的边。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
+- 在“显示所有标签页”里，卡片滚到搜索框下面时会出现一条细线，不会再像被硬切掉一样。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
+- “新功能”里，下面还有内容时按钮上方会出现一条细线，往下滚后标题下面也会有，说明文字不会再被硬切掉。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
+- 查找栏的关闭按钮和其他所有 ✕ 按钮现在跟旁边的按钮对齐了，不会再低半个点。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
+- 下载更新时，边栏里那张卡片左右两边的边距现在一样了。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
+- 欢迎窗口里只需要选“是/否”的那几步现在放在窗口中间了，底部按钮上方不会再空一大块。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
 
 ## [0.9.3] - 2026-11-21
 
@@ -155,7 +177,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 点分屏浏览里某一页顶栏上的地址，现在会在地址原来的位置、按原来的大小编辑，颜色跟着这一页的深浅，和 Zigzag Mini 的顶栏一样。以前不管页面是什么颜色，都会弹出一个更高的白色框，盖住顶栏上的按钮。
 - 点弹出窗口的地址时，地址会显示在和 Zigzag Mini、分屏顶栏一样的地址框里并被选中，字体和选中颜色也一样，不再是一行普通文字。
 - 轻扫后退或前进时，箭头填满那一下触控板只震一次，不管扫得多快。以前用中等速度轻扫，箭头会在快要松手就跳转的位置反复填满又变空，每次都震一下。现在填满后会一直保持，直到往回扫一点，或者快速一扫后停在半路，松手的结果和箭头显示的一致。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
-- OldTwitter 在 x.com 上又能用了。它给请求签名时要用到一个沙箱页面，而 WebKit 里 X 的安全策略会挡住它；现在 Zigzag 会把扩展自己的沙箱脚本放在一个独立的内容环境里运行，这个环境拿不到扩展 API，网站自己的安全策略保持不变。图标和字体也能正常载入了：扩展的页面用 Chrome 的 `chrome-extension://` 地址引用自己的文件，现在 Zigzag 会把它当作自己的地址来读。感谢 [datarip](https://github.com/datarip)。([#417](https://github.com/ZigaoWang/zigzag/issues/417))
+- OldTwitter 在 x.com 上又能用了。它给请求签名时要用到一个沙箱页面，而 WebKit 里 X 的安全策略会挡住它；现在 Zigzag 会把扩展自己的沙箱脚本放在一个独立的内容环境里运行，这个环境拿不到扩展 API，网站自己的安全策略保持不变。感谢 [datarip](https://github.com/datarip)。([#417](https://github.com/ZigaoWang/zigzag/issues/417))
 - 密码菜单里的“密码…”第一次点按就有效，会直接在栏位旁打开 Mac 的密码列表，不再先闪出一个 macOS 自己的“密码”小菜单。连按两下也不会再把光标放进下一个栏位，或者把列表打开在屏幕角落。滚动网页、前进或后退、切换标签页、移动窗口或调整窗口大小时，列表会关上，和 Safari 一样。现在菜单一出现，“密码…”就能点；填写登录信息的那几行仍然要等半秒，免得网页让你在点别处时选中它。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 在四个页面的分屏浏览里，按住 ⇧ 拖动上下页面之间的分隔线，只会移动指针这一侧的那一段，这样一个页面可以比旁边的页面更高或更矮，和 ⇧ 拖动左右之间的分隔线一样。一次只能分开一条线：另一条已经分开时，按住 ⇧ 也会移动整条线。分开的一段会吸附到中间或另一段，看哪个更近，参考线会显示它会停在哪里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#426](https://github.com/ZigaoWang/zigzag/issues/426))
 - 链接的右键菜单现在和 Chrome 一样，第一项是“在新标签页中打开链接”，然后是新窗口、无痕浏览窗口和速览。“打开链接”会在当前标签页打开，和直接点按一样，现在放到它们下面，不再排在第一。感谢 [retorquere](https://github.com/retorquere)。([#419](https://github.com/ZigaoWang/zigzag/issues/419))

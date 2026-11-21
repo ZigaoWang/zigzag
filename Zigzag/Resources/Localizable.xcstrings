@@ -12,6 +12,50 @@
         }
       }
     },
+    "Open Link in Zigzag Mini" : {
+      "comment" : "Item in a page's right-click menu: opens the link in Zigzag Mini, the small window for one page, over this one (Arc called it Little Arc).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag Mini 中打开链接"
+          }
+        }
+      }
+    },
+    "Or press ⌘O to keep it as a tab" : {
+      "comment" : "Under the hint to close Zigzag Mini, the small window a shift-clicked link opened in, in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或者按 ⌘O 把它留作标签页"
+          }
+        }
+      }
+    },
+    "Since %@" : {
+      "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自 %@ 起"
+          }
+        }
+      }
+    },
+    "That’s Zigzag Mini" : {
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window: a shift-clicked link opened in Zigzag Mini, the small window for one page. Keep Zigzag Mini in Latin letters.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这就是 Zigzag Mini"
+          }
+        }
+      }
+    },
     "Where ⌘T and links put a new tab in the sidebar." : {
       "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
       "localizations" : {
@@ -2414,7 +2458,7 @@
       }
     },
     "A quick look, without losing your place" : {
-      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window. Peek is a Zigzag feature's name.",
+      "comment" : "Under what's said once a step is done, in the getting-started guide, a card in the window, after a link opened in Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6585,17 +6629,6 @@
         }
       }
     },
-    "Close Peek" : {
-      "comment" : "Tooltip of the close button in Peek's top strip.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭速览"
-          }
-        }
-      }
-    },
     "Close Side Panel" : {
       "comment" : "Tooltip of the close button on an extension's side panel.",
       "localizations" : {
@@ -6687,7 +6720,7 @@
       }
     },
     "Close it" : {
-      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it.",
+      "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while a link is open in Zigzag Mini, the small window over the page. The Esc key is shown beside it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -10911,7 +10944,7 @@
       }
     },
     "Graphite" : {
-      "comment" : "Name of a curated space color, in the space editor.",
+      "comment" : "Name of a curated space color, in the space editor.\nFinish of Your Zigzag Card in About: dark brushed metal.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14227,6 +14260,17 @@
         }
       }
     },
+    "On launch" : {
+      "comment" : "A setting in Settings › General: what a launch does with the last session.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动时"
+          }
+        }
+      }
+    },
     "On Specific Sites" : {
       "comment" : "Site Access choice in Settings › Extensions: the extension works only on the sites listed under it.",
       "localizations" : {
@@ -14559,17 +14603,6 @@
         }
       }
     },
-    "Open Link in Peek" : {
-      "comment" : "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在速览中打开链接"
-          }
-        }
-      }
-    },
     "Open Link in Private Window" : {
       "comment" : "Item in a page's right-click menu.",
       "localizations" : {
@@ -14599,17 +14632,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开密码"
-          }
-        }
-      }
-    },
-    "Open Peek as Tab" : {
-      "comment" : "Tooltip of the button in Peek's top strip that keeps the page as a tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将速览作为标签页打开"
           }
         }
       }
@@ -14951,17 +14973,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "或者点按边栏中的 +，然后点按“新建空间”"
-          }
-        }
-      }
-    },
-    "Or click outside it" : {
-      "comment" : "Under the hint to close a Peek, in the getting-started guide, a card in the window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "或者点按它外面的地方"
           }
         }
       }
@@ -15358,7 +15369,7 @@
       }
     },
     "Paper" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
+      "comment" : "Tooltip and accessibility label of a preset look in the space editor.\nFinish of Your Zigzag Card in About: warm linen paper.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15649,17 +15660,6 @@
         }
       }
     },
-    "Peek" : {
-      "comment" : "Accessibility label of Peek's top strip. Peek shows a link's page in a panel over the current one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速览"
-          }
-        }
-      }
-    },
     "Permissions" : {
       "comment" : "Row in the site panel, and the title of its page: the site's camera, location, notifications and pop-ups.",
       "localizations" : {
@@ -15678,6 +15678,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "个人"
+          }
+        }
+      }
+    },
+    "Pick Up Where You Left Off" : {
+      "comment" : "A choice for “On launch” in Settings › General: the last session's windows come back.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接着上次继续"
+          }
+        }
+      }
+    },
+    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session." : {
+      "comment" : "Explanation under “On launch” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“历史记录 › 重新打开上次会话”里找回。"
           }
         }
       }
@@ -16487,17 +16509,6 @@
         }
       }
     },
-    "Reader Options" : {
-      "comment" : "Tooltip and VoiceOver name of the address bar's Reader button while Reader is on, and VoiceOver name of the panel it opens: text size, typeface, column width, colors and Turn Off Reader.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阅读器选项"
-          }
-        }
-      }
-    },
     "Reader Text and Colors" : {
       "comment" : "View menu item: opens Reader's text size, typeface, column width and color choices.",
       "localizations" : {
@@ -17154,6 +17165,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新打开已关闭的窗口"
+          }
+        }
+      }
+    },
+    "Reopen Last Session" : {
+      "comment" : "History menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新打开上次会话"
           }
         }
       }
@@ -18650,7 +18672,7 @@
       }
     },
     "Share…" : {
-      "comment" : "File menu item.",
+      "comment" : "Button in About Zigzag, under Your Zigzag Card: opens the Mac's share menu with its picture.\nFile menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19519,7 +19541,7 @@
       }
     },
     "Space" : {
-      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.\nFinish of Your Zigzag Card in About: the colors of the space you're in.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19668,6 +19690,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从空白开始"
+          }
+        }
+      }
+    },
+    "Start Fresh" : {
+      "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全新开始"
           }
         }
       }
@@ -20230,17 +20263,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "该标签页不在这个窗口中。"
-          }
-        }
-      }
-    },
-    "That’s Peek" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这就是速览"
           }
         }
       }
@@ -21721,17 +21743,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 %@ 上关闭"
-          }
-        }
-      }
-    },
-    "Turn Off Reader" : {
-      "comment" : "Action at the bottom of Reader's text and color choices: closes Reader and shows the page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭阅读器"
           }
         }
       }
@@ -23467,6 +23478,17 @@
         }
       }
     },
+    "Your tabs and spaces are saved, and History › Reopen Last Session brings them back." : {
+      "comment" : "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the History menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的标签页和空间都已保存，“历史记录 › 重新打开上次会话”可以再把它们带回来。"
+          }
+        }
+      }
+    },
     "Your tabs and spaces will be right here when you open it again." : {
       "comment" : "Message of the sheet that asks before quitting; “it” is Zigzag.",
       "localizations" : {
@@ -25191,6 +25213,17 @@
         }
       }
     },
+    "quit quitting close command q ask confirm" : {
+      "comment" : "Words that find the Ask before quitting setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 关闭 命令 q 询问 确认 quit quitting close command q ask confirm"
+          }
+        }
+      }
+    },
     "see your saved passwords" : {
       "comment" : "Why Touch ID is asked for, finishing the sentence macOS starts with “Zigzag is trying to”.",
       "localizations" : {
@@ -25337,13 +25370,13 @@
         }
       }
     },
-    "startup launch on start restore reopen session close quit" : {
-      "comment" : "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.",
+    "startup launch on start restore session reopen windows fresh blank resume" : {
+      "comment" : "Words that find the On launch setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启动 开机 打开时 恢复 重新打开 会话 关闭 退出 startup launch"
+            "value" : "启动 开机 恢复 会话 重新打开 窗口 全新 空白 继续 startup launch on start restore session reopen windows fresh blank resume"
           }
         }
       }
@@ -25947,6 +25980,61 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建文件夹…"
+          }
+        }
+      }
+    },
+    "Your Zigzag Card" : {
+      "comment" : "VoiceOver name of Your Zigzag Card in About Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Zigzag 卡片"
+          }
+        }
+      }
+    },
+    "Save as Image…" : {
+      "comment" : "Button in About Zigzag, under Your Zigzag Card: saves it as a PNG picture, asking where.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储为图片…"
+          }
+        }
+      }
+    },
+    "Zigzag Card" : {
+      "comment" : "File name of Your Zigzag Card saved as a picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 卡片"
+          }
+        }
+      }
+    },
+    "Holographic" : {
+      "comment" : "Finish of Your Zigzag Card in About: iridescent foil.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "镭射"
+          }
+        }
+      }
+    },
+    "Finish" : {
+      "comment" : "VoiceOver name of the row of finishes under Your Zigzag Card in About Zigzag.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卡面"
           }
         }
       }

@@ -122,7 +122,6 @@ enum WebKitSetup {
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
-            profile.extensions.attachOldTwitterSolver(to: configuration)
             let patterns = profile.installs.externallyConnectablePatterns()
             // Once: a new tab's setup is made and then configured again, which put it in twice.
             if !patterns.isEmpty {
@@ -197,7 +196,7 @@ enum PageScripts {
     """, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient)
 
     /// ⌘-click on a web link is stopped before the page (#317); ⇧ and ⌥ reach the page and are reported, so the
-    /// page's navigation right after becomes Peek or a download (#322).
+    /// page's navigation right after becomes Zigzag Mini or a download (#322).
     static let modifiedLinkClicks = WKUserScript(source: """
     (() => {
       if (!/^https?:$/.test(location.protocol)) return;
@@ -316,7 +315,7 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
         case "zigzagLinkClick":
             guard let body = message.body as? [String: Any], let text = body["url"] as? String,
                   let url = URL(string: text) else { return }
-            tab.modifiedClickFollowed(url, peek: body["shift"] as? Bool == true, download: body["alt"] as? Bool == true)
+            tab.modifiedClickFollowed(url, mini: body["shift"] as? Bool == true, download: body["alt"] as? Bool == true)
         case "zigzagIcons":
             guard message.frameInfo.isMainFrame, webView.owner === tab else { return }
             tab.pageIconsChanged()

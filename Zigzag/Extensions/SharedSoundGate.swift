@@ -9,7 +9,7 @@ import WebKit
 // is even recorded), and the tab plays as usual. It carries on once the tab has been alone for a moment.
 
 /// Every web view in Zigzag, whoever made it: tabs in every window (private ones and Zigzag Mini included), pop-up
-/// windows, Peek, extensions' popups, side panels, offscreen and background pages, and Zigzag's own hidden ones.
+/// windows, Zigzag Mini, extensions' popups, side panels, offscreen and background pages, and Zigzag's own hidden ones.
 /// WebKit plays all their sound in the one GPU process, so the guard on a shared capture looks at all of them, and
 /// counting them where they're made means none is missed, including those WebKit makes itself.
 @MainActor

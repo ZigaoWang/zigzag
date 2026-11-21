@@ -47,7 +47,7 @@ enum Tokens {
         static let small: CGFloat = 4
         /// Grouped cards on a window's background: Settings and Passwords groups, the site panel's sections.
         static let group: CGFloat = 10
-        /// Floating surfaces: command bar, peek, previews, menus.
+        /// Floating surfaces: command bar, previews, menus.
         static let panel: CGFloat = 14
         /// Large floating surfaces that hold rounded things of their own: the tab switcher, Reader's options, the tour.
         static let large: CGFloat = 16
@@ -117,7 +117,8 @@ enum Tokens {
         static let switcherThumbWidth: CGFloat = 224
         /// The narrowest a Control+Tab card gets before the cards go into rows: its title still reads.
         static let switcherThumbMinWidth: CGFloat = 184
-        static let peekInsetRatio: CGFloat = 0.08
+        /// How far a zoomed pane's card sits in from the page area's edges.
+        static let zoomInsetRatio: CGFloat = 0.08
         static let findBarWidth: CGFloat = 320
         static let popupDefaultSize = NSSize(width: 520, height: 640)
         /// Zigzag Mini, for one page opened from another app: big enough to read, small enough to stay out of the way.
@@ -155,10 +156,6 @@ enum Tokens {
         static let floatingButton: CGFloat = Space.x8 + Space.x1
         /// A tab preview's caption under the picture.
         static let previewCaptionHeight: CGFloat = Space.x12
-        /// Peek's top strip: a split view pane's, so the page under it gets the room.
-        static let peekHeaderHeight: CGFloat = Pane.height
-        /// Peek's rim around its page, at the sides and below: enough to hold the page, not a frame around it.
-        static let peekInset: CGFloat = 2
         /// Capture's toolbar (⇧⌘2): a capsule of control-height buttons, `Space.x1 + 2` in from its edge.
         static let captureToolbarHeight: CGFloat = controlHeight + (Space.x1 + 2) * 2
         /// The round grips on a captured area's corners and sides.
@@ -366,7 +363,7 @@ enum Tokens {
         static let height: CGFloat = 30
         static let button: CGFloat = 24
         static let glyph: CGFloat = 13
-        /// The page's icon in a strip (Peek's): a favicon at the sidebar's Medium size, whatever size the sidebar is.
+        /// The page's icon in a strip: a favicon at the sidebar's Medium size, whatever size the sidebar is.
         static let favicon: CGFloat = 16
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
@@ -484,8 +481,6 @@ enum Tokens {
     enum Welcome {
         /// The wordmark on the hello screen.
         static let wordmarkHeight: CGFloat = 72
-        /// The wordmark heading a window of the app's own (About, Import).
-        static let smallWordmarkHeight: CGFloat = 22
         /// The glass card a step's choice sits on.
         static let cardWidth: CGFloat = 560
         /// A step's big title, in display weight: the one place type is this large.
@@ -494,9 +489,6 @@ enum Tokens {
         static let countSize: CGFloat = 60
         /// A brand moment's card (onboarding's import card).
         static let cardRadius: CGFloat = 22
-        /// The About window: its width and height, the app icon and the wordmark under it.
-        static let aboutSize = NSSize(width: 320, height: 476)
-        static let aboutIcon: CGFloat = 96
         /// About › Acknowledgments: wide enough for a license's lines as written.
         static let acknowledgementsSize = NSSize(width: 640, height: 600)
         /// The progress dots.
@@ -505,6 +497,45 @@ enum Tokens {
         static let buttonHeight: CGFloat = Space.x10
         static let buttonWidth: CGFloat = 168
         static let groupGap: CGFloat = Space.x6 + Space.x1
+    }
+
+    /// Your Zigzag Card, the hero of About Zigzag: a bank card's proportions.
+    enum Keepsake {
+        static let size = NSSize(width: 420, height: 264)
+        /// A bank card's corner for its width.
+        static let radius: CGFloat = 16
+        /// From the card's edges to what's on it.
+        static let pad: CGFloat = Space.x6 + Space.x1
+        static let wordmarkHeight: CGFloat = 18
+        /// The wordmark alone in the middle of the back.
+        static let backWordmarkHeight: CGFloat = 30
+        static let nameSize: CGFloat = 26
+        /// The ribbon Zs pressed into the surface: their height, the grid they sit on, and how deep they're pressed.
+        static let motifHeight: CGFloat = 9
+        static let motifStep = NSSize(width: 40, height: 32)
+        static let motifDepth: CGFloat = 0.6
+        /// How deep the wordmark is stamped.
+        static let stampDepth: CGFloat = 0.35
+        /// The most it turns toward the pointer, in degrees, and how far the eye is from it.
+        static let tilt: CGFloat = 8
+        static let perspective: CGFloat = 1100
+        /// Turning after the pointer, slow enough to feel its weight; settling back on a soft spring; turning over.
+        static let follow: TimeInterval = Material.follow * 0.5
+        static let settle: TimeInterval = Material.follow
+        static let settleBounce: CGFloat = 0.12
+        static let turn: TimeInterval = Motion.large * 2
+        /// The saved picture's pixels per point, and the clear room around the card for its shadow, in points.
+        static let exportScale: CGFloat = 8
+        static let exportMargin: CGFloat = Space.x10
+        /// Two shadows: a wide soft one it floats on, and a close one where it nearly touches.
+        static let ambientRadius: CGFloat = 24
+        static let ambientDrop: CGFloat = 14
+        static let contactRadius: CGFloat = 3
+        static let contactDrop: CGFloat = 1.5
+        /// Room around it in About: at the sides, above it (under the traffic lights), and under it.
+        static let margin: CGFloat = Space.x10
+        static let top: CGFloat = Space.x12
+        static let gap: CGFloat = Space.x6
     }
 
     // MARK: - Type (SF Pro: six roles, one scale for the whole app)
@@ -608,8 +639,12 @@ enum Tokens {
 
         /// A symbol's ink, in points from the middle of its image (x right, y up).
         @MainActor private static func inkBox(_ name: String, size: CGFloat) -> CGRect {
-            inkBox(of: Self.image(name, size: size), key: "\(name) \(size)")
+            let drawn = measuredAsDrawn.contains(name)
+            return inkBox(of: Self.image(name, size: size), key: "\(name) \(size)", scale: drawn ? 2 : 4, asDrawn: drawn)
         }
+
+        /// Measured as a 2x screen draws them, not scaled up: the screen draws xmark half a point lower than its image.
+        static let measuredAsDrawn: Set<String> = ["xmark"]
 
         /// How far an image's ink sits from its middle (x right, y up), for a symbol drawn some other way (a heavier
         /// weight, a glyph of its own); `key` names it for the cache, `scale` is pixels per point.
@@ -621,17 +656,19 @@ enum Tokens {
         /// The size of an image's ink; `key` names it for the cache.
         @MainActor static func inkSize(of image: NSImage, key: String, scale: CGFloat = 4) -> CGSize { inkBox(of: image, key: key, scale: scale).size }
 
-        @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4) -> CGRect {
-            let key = scale == 4 ? key : "\(key) @\(scale)x"
+        @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4, asDrawn: Bool = false) -> CGRect {
+            let key = scale == 4 ? key : "\(key) @\(scale)x\(asDrawn ? " drawn" : "")"
             if let known = inkBoxes[key] { return known }
             let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
             var box = CGRect.zero
             if w > 0, h > 0, let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,
                                                          samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                                          colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+                // As drawn: the bitmap at the image's size in points, so the symbol snaps to pixels as on screen.
+                if asDrawn { rep.size = image.size }
                 NSGraphicsContext.saveGraphicsState()
                 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-                image.draw(in: NSRect(x: 0, y: 0, width: w, height: h))
+                image.draw(in: asDrawn ? NSRect(origin: .zero, size: image.size) : NSRect(x: 0, y: 0, width: w, height: h))
                 NSGraphicsContext.restoreGraphicsState()
                 var minX = w, maxX = -1, minY = h, maxY = -1
                 var weight = 0.0, weightedY = 0.0
@@ -927,7 +964,7 @@ enum Tokens {
             CATransaction.commit()
         }
 
-        /// Fades a backdrop (sheet scrim, peek dimming) in or out from its current opacity, eased; crossfade with
+        /// Fades a backdrop (sheet scrim, a zoomed pane's dimming) in or out from its current opacity, eased; crossfade with
         /// Reduce Motion. `evenFromKeyboard` false: appears instantly from a key, like the command bar.
         static func fadeBackdrop(_ view: NSView, entering: Bool, evenFromKeyboard: Bool = true, completion: (@MainActor () -> Void)? = nil) {
             if let layer = view.layer, layer.animation(forKey: "opacity") != nil, let shown = layer.presentation()?.opacity {
@@ -1438,8 +1475,8 @@ enum Tokens {
         static let unfocusedPaneAlpha: CGFloat = 0.45
         /// Selected text in our own fields (the command bar, its inline completion), in the accent at this opacity.
         static let textSelectionAlpha: CGFloat = 0.26
-        /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.
-        static let peekScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
+        /// A firmer dim than `scrim`, under a zoomed pane: a page above the page should read as a layer.
+        static let zoomScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
         /// Capture's dim over the page around what's picked: firm enough that the clear part reads at once.
         static let captureScrim = dynamic(light: hex(0x000000, alpha: 0.3), dark: hex(0x000000, alpha: 0.5))
         /// The edge of a picked area: a light line that reads on the dim and on the page it frames.
@@ -1462,7 +1499,7 @@ enum Tokens {
         /// Status: done and fine.
         static let success = NSColor.systemGreen
 
-        /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in Peek):
+        /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in a strip):
         /// near-white on dark colors, near-black on light ones.
         static func ink(on color: NSColor) -> NSColor {
             guard let c = color.usingColorSpace(.sRGB) else { return textPrimary }

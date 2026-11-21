@@ -1,6 +1,23 @@
 import AppKit
 import WebKit
 
+/// What a launch does with the last session: pick it up, or start with one fresh window, the saved session left for
+/// History › Reopen Last Session (#433). Reopening is the default, so nothing changes for anyone who never opens Settings.
+enum LaunchChoice: String, CaseIterable, Sendable {
+    case resume, fresh
+
+    /// Kept in the app's defaults, beside the other settings.
+    static var choice: LaunchChoice {
+        get { LaunchChoice(rawValue: defaults.string(forKey: key) ?? "") ?? .resume }
+        set { defaults.set(newValue.rawValue, forKey: key) }
+    }
+
+    /// What keeps it, so a test can swap in its own suite instead of the dev app's defaults.
+    static var defaults: UserDefaults = .standard
+
+    static let key = "LaunchChoice"
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
     /// Sites installed as apps asked for before launch finished (one opened with Zigzag not running).
@@ -34,6 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !Self.isHostingTests {
             // A new version backs up the data the last one left, and a restore asked for before restarting puts
             // a backup back, both before anything reads it.
+            // The day Zigzag was first used here, kept once, while the last run's version is still on record.
+            CardStart.settle()
             // A new version owes its notes: noted before the backup records this version as the one that ran.
             WhatsNew.noteLaunch()
             let info = Bundle.main.infoDictionary
@@ -149,7 +168,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
                                        miniOnly: miniOnly, webAppOnly: webAppOnly)
         WindowManager.shared.sessionWaiting = plan.sessionWaiting
-        let restored = plan.restoresSession ? WindowManager.shared.restoreSession() : false
+        // Settings › General › On launch: a fresh start keeps the saved session for History › Reopen Last Session
+        // instead of bringing it back, and doesn't write over it until the new window is used (#433). An update's
+        // relaunch is never a fresh start: it puts exactly what was open back.
+        let resumes = UpdateRelaunch.resumes(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
+        WindowManager.shared.startingFresh = plan.restoresSession && !resumes
+        if WindowManager.shared.startingFresh { WindowManager.shared.keepSessionForReopening() }
+        let restored = resumes ? WindowManager.shared.restoreSession() : false
         if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()
@@ -242,9 +267,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Self.quitConfirmed = true
             Self.finishBeforeQuitting(downloading: downloading)
         }
+        // Under Start Fresh the next launch won't bring these back by itself, so the sheet doesn't promise it does.
+        let fresh = LaunchChoice.choice == .fresh
+        let keepsTabs = String(localized: "Your tabs and spaces will be right here when you open it again.",
+                               comment: "Message of the sheet that asks before quitting; “it” is Zigzag.")
+        let freshTabs = String(localized: "Your tabs and spaces are saved, and History › Reopen Last Session brings them back.",
+                               comment: "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the History menu.")
         let message = downloading == 0
-            ? String(localized: "Your tabs and spaces will be right here when you open it again.",
-                     comment: "Message of the sheet that asks before quitting; “it” is Zigzag.")
+            ? (fresh ? freshTabs : keepsTabs)
             : String(localized: "\(downloading) downloads are still in progress. They pause, and you can resume them from Downloads when you open Zigzag again.",
                      comment: "Message of the sheet that asks before quitting while files download.")
         ConfirmSheet.show(in: host, title: String(localized: "Quit Zigzag?", comment: "Title of the sheet that asks before quitting."), message: message,
@@ -430,6 +460,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
     @objc func openDocument(_ sender: Any?) { frontBrowserWindow()?.openDocument(sender) }
     @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
+    /// History › Reopen Last Session: the session a fresh start passed over (#433).
+    @objc func reopenLastSession(_ sender: Any?) { WindowManager.shared.reopenLastSession() }
     /// The latest closed tab or window, as in Chrome; with no window open, that's usually the window.
     @objc func reopenClosedTab(_ sender: Any?) {
         WindowManager.shared.reopenLastClosed(from: WindowManager.shared.controllers.isEmpty ? nil : WindowManager.shared.keyController?.tabManager)
@@ -484,6 +516,11 @@ extension AppDelegate: NSMenuItemValidation {
     /// Reopen Closed Window is dimmed when there's nothing to bring back; Set as Default Browser hides once it is.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        // There when a fresh start is the setting, and dimmed once its session is back.
+        if menuItem.action == #selector(reopenLastSession(_:)) {
+            menuItem.isHidden = LaunchChoice.choice != .fresh
+            return WindowManager.shared.canReopenLastSession
+        }
         // Zigzag Mini names it Open in Zigzag while it's in front; anywhere else it's itself again.
         if menuItem.action == #selector(openDocument(_:)) { menuItem.title = BrowserWindowController.openFileTitle }
         // Shows Restart to Update while an update is ready.

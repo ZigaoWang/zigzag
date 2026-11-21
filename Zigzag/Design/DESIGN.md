@@ -76,7 +76,7 @@ Four layers, front to back. Each has one material and one depth cue; nothing els
 | 0. Frame | The window behind everything: the space's color, gradient, grain, or the desktop through it | Space color (`SpaceColor`), clear glass when see-through | None |
 | 1. Surfaces | The page card; Settings, History, Passwords pages | Opaque `Color.surface`; Settings' and Passwords' column of places a light tint of their window's space (`Theme.wash`); History has no column and stays plain | `Color.cardShadow`, barely there |
 | 2. Cards | The selected tab, a selected favorite; grouped rows and chosen rows on pages and panels | On the frame `Chrome.card`; elsewhere `Color.selectedFill` / `surfaceGroup` | A quiet edge and a shadow-sm (`Chrome.cardEdge`, `cardShadow`; `setLifted`) |
-| 3. Floating | Panels, popovers, menus, the command bar, find, downloads, Peek, the switcher | Opaque, leaning toward the space (`Brand.Theme.panel`) | Hairline `panelEdge` and one soft small shadow (`Shadow.panelRadius` 16, `panelDrop` 3) |
+| 3. Floating | Panels, popovers, menus, the command bar, find, downloads, the switcher | Opaque, leaning toward the space (`Brand.Theme.panel`) | Hairline `panelEdge` and one soft small shadow (`Shadow.panelRadius` 16, `panelDrop` 3) |
 
 The sidebar has no surface of its own: it is the frame, in the space's full color. What sits on it is quiet (rows at
 rest, labels) or a soft wash of that color: the address and the favorites are soft fields (`Chrome.field`) with no
@@ -144,7 +144,6 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Section labels | 11pt medium, the space's quiet ink, on the icon column, low in a 24pt slot; Clear at its end in the same ink |
 | Bottom bar | 14pt glyphs in 26pt buttons; a space dot for each space (`SpaceDotView`) in a 26pt target: a 6pt dot in the space's ink at rest, the one you're in stretched into a 16pt pill in full ink, eased over `standard`; a space with an icon shows it at 14pt in place of its dot, brightest when it's yours. No numbers: the tooltip names the space and its ⌃ key, and holding ⌃ shows the numbers just above |
 | Pane header (split) | 30pt tall, 13pt glyphs in 24pt buttons, the address at 12pt in a 22pt field; narrow, swap and the layout fold into ⋯ first, then Separate, Forward and Reload, so the address keeps 72pt (`Pane.addressMinWidth`) and × is never cut |
-| Peek's strip | The pane header's scale: 30pt tall (`Metric.peekHeaderHeight`), 13pt glyphs in 24pt buttons, the host at 12pt after a 16pt favicon placed as a button's would be; the page 2pt inside the panel's rim at the sides and below (`Metric.peekInset`), its corners concentric. Once the page has a color, the panel and strip take it, the ink light or dark by contrast, as a pane's strip does (`PeekHeaderView.ground`). Pages keep WebKit's own scrollbars, as in Safari: overlay or always shown as the Mac is set, in the page's own light or dark |
 
 ## Spacing
 
@@ -258,7 +257,7 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
     (0.96) with a fade, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). A field's menu grows from its
     edge facing the field (`grow(from:)`), a tab's hover preview from its side facing the sidebar, at the row's
     height. A sheet, a page's dialog too, grows from a little below its middle (`sheetOrigin`), its scrim fading in
-    `enter` and out in `exit` (`Motion.fadeBackdrop`); the dimming under a peek fades with its card the same way.
+    `enter` and out in `exit` (`Motion.fadeBackdrop`); the dimming under a zoomed pane fades with it the same way.
   - `.edge`: a bar that hangs from an edge slides `edgeOffset` (6pt) in from it: the find bar (⌘F) and a toast
     from the page's top, the Desk's and a PDF's bars from the bottom.
   - `.offstage`: a notice from outside (a site's question, Save password?, an offer) comes down from beyond the
@@ -405,8 +404,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Left"): another pane's middle swaps, the page's edges and corners take a half or quarter as for a tab, the sidebar's
   list (its line) makes it a tab of its own there, outside every window a new window (⌥: Zigzag Mini). Esc, or its own
   place, changes nothing; one ⌘Z puts it back. Up in the bar above the page the strip moves the window instead.
-- **Zoom Pane** (#160): a terminal's or editor's "maximize pane", in Peek's look: the pane (live, the same page, never
-  reloaded) grows out of its place to Peek's card frame over the rest, which stay live under Peek's dimming
+- **Zoom Pane** (#160): a terminal's or editor's "maximize pane": the pane (live, the same page, never
+  reloaded) grows out of its place to a card inset over the page area, over the rest, which stay live under a firm dimming
   (`BrowserRootView.setZoomedPane`, `PaneZoom`). From ⇧-clicking its part of the row of the pages on screen (elsewhere
   ⇧ still picks rows), the strip's button (with zoom, swap and the layout, into ⋯ first) or View › Zoom Pane, ⇧⌘↩.
   Esc, a click beside it, zooming it again or going to another pane puts it back; so does any change to the group.
@@ -467,16 +466,20 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   that paper (`Palette.space`): text 11:1 where the paper allows and never under 7:1, links 7:1, soft words 4.5:1,
   tested in every curated color, custom hues at every strength and every shade. It changes in place when you switch
   spaces or edit the color. The site's icon in the header sits on the text's left edge, the host 8pt after it.
-  Nothing floats on the article. The address's Reader button is the one control: off, it turns Reader on; on (shown
-  pressed, "Reader Options"), it opens `ReaderOptions` 4pt under the field, placed as Site Controls is (along the
-  field's edge in the sidebar, under the button's end above the page), one floating thing at a time with the
-  others. With no address on screen (the sidebar hidden and the address not above the page) it opens from the
-  page's top-right corner instead, from View › Reader Text and Colors. Its rows are the site panel's (`PanelRow`):
-  Text Size (`ZoomStepper`, − 100% +, the percentage back to 100%, the same steps as ⌘+ and ⌘−), Typeface and
-  Column Width (`SlidingSwitch`), and Colors, round swatches as the space editor's (Auto, Light, Sepia, Dark,
-  Space; ringed when chosen, a faint ring under the pointer, nothing moving), then Turn Off Reader, a
-  `PanelLinkRow` as Reset Permissions is. A change keeps the line you were on in place. Esc and ⌥⌘R turn Reader off
-  directly.
+  The address's Reader button is a plain toggle: off, it turns Reader on; on, shown pressed ("Hide Reader"), it turns
+  it off, as Esc and ⌥⌘R do. How it reads is chosen in the page: Aa (`ReaderOptionsButton`, `textformat.size`), a
+  regular icon button 16pt in from the article's top-right corner, on the article's own paper and in its light or
+  dark look, with the on-page hover washes. It shows when Reader opens, at the top, on the way back up and with the
+  pointer in the top band, and fades out over `state` as you read on (`Reader.ButtonPresence`: 8pt of scroll counts as
+  a direction); never while its panel is open; with Reduce Motion it shows and goes at once. It opens `ReaderOptions`
+  4pt under it, its right edge with the button's and whole inside the page, one floating thing at a time with the
+  others; View › Reader Text and Colors opens the same. Its rows are the site panel's (`PanelRow`, 16pt margins to
+  the ink): Text Size (`ZoomStepper`, − 100% +, the percentage back to 100%, the same steps as ⌘+ and ⌘−), Typeface
+  and Column Width (`SlidingSwitch`), and Colors, a row of round dots as macOS picks an accent color: each its paper,
+  Auto split corner to corner between its day and night papers, Space the space's paper, drawn as the space editor's
+  swatches (`SwatchRing`: 24pt with a 20pt dot and a hairline edge, 4pt apart; chosen, a 2pt ring in the accent with a
+  gap; a faint ring under the pointer, nothing moving), each named in its tooltip and for VoiceOver. A change keeps
+  the line you were on in place.
 - **Mini player** (`MiniPlayer`): leave a tab while a video you were watching plays and it follows you in a card that
   floats in a panel of its own (`MiniPlayerPanel`, #172), over the window and other apps, on every space and beside a
   full screen window, as Picture in Picture does: one you can hear, or one you started or turned up yourself; never a muted autoplay, a page's moving
@@ -558,7 +561,7 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - **Floating panel** (`FloatingPanelView`): opaque, near white by day and a deep gray at night, each leaning just
   perceptibly toward the window's space (`Brand.Theme.panel`), so the panel belongs to it and text always reads.
   Panel radius, a crisp hairline edge, one soft small shadow, 12pt padding, `CardRow`-style rows inset 4pt. It grows
-  out of what opened it. Command bar, space editor, icon picker, site panel, find, downloads, previews, Peek, and the
+  out of what opened it. Command bar, space editor, icon picker, site panel, find, downloads, previews, and the
   Control-Tab switcher, which centers on the page beside the sidebar.
 - **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of swatches: Default (the
   colors it was made with), six presets in light and deep pairs, Background (the empty page's picture, a dashed slot
@@ -669,6 +672,11 @@ calm: things drawn as objects under one light straight above. `Materials.swift` 
   light. Typing, the accent rings it with a soft glow.
 - **`EmbossedWordmark`**: the drawn ZIGZAG as an object: solid navy with a fine top light by day, the ribbon's
   pale blue, beveled, by night; a glint follows the pointer only while it's over the mark.
+- **Your Zigzag Card** (`CardStage`, About's hero): a bank card that turns up to `Keepsake.tilt` (8°) toward the
+  pointer and settles back on a soft spring; a click turns it over to the wordmark alone. Four finishes, picked with
+  round swatches under it: Space, Holographic, Graphite, Paper. Each has its grain made at the size it's drawn,
+  small ribbon Zs pressed into it and the wordmark stamped in foil; only the foil, the sheen and the wordmark's shine
+  move with the light. The saved picture is the same drawing at `Keepsake.exportScale`, lit at rest.
 - **A brand moment's words**: the wordmark, one headline (`Material.headline`, semibold) saying plainly what Zigzag
   is, one quiet line (`largeText`, `textSecondary`), then the one big action.
 - **Recipes**: `MaterialShape.rounded` (continuous corners as a path), `GradientStroke` (rims, bevels, lips),

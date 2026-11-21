@@ -82,32 +82,38 @@ struct FeatureFlagsTests {
     private static let sixty = FeatureFlags.Flag(key: "PreferPageRenderingUpdatesNear60FPSEnabled", name: "Prefer Page Rendering Updates near 60fps",
                                                  details: "", status: .stable, defaultValue: true)
 
-    @Test func pagesDrawAtTheScreensRateUnlessChanged() throws {
+    @Test func pagesDrawAtWebKitsRateUnlessChanged() throws {
         try with([Self.anchors, Self.sixty]) { engine in
-            // Off on every page, with or without Developer Mode, and listed as off by default.
+            // WebKit's default holds on every page, with or without Developer Mode: nothing is set, and it's listed
+            // as on. Starting it off made heavy pages stutter on a 120 Hz display (#394).
             DeveloperTools.isOn = false
             FeatureFlags.apply(to: WKPreferences())
-            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false"])
+            #expect(engine.applied.isEmpty)
             let listed = try #require(FeatureFlags.flags?.first { $0.key == Self.sixty.key })
-            #expect(!listed.defaultValue && !FeatureFlags.isOn(listed) && !FeatureFlags.isChanged(listed))
-            // Turned on in Settings: stored as a change, applied after Zigzag's default.
+            #expect(listed.defaultValue && FeatureFlags.isOn(listed) && !FeatureFlags.isChanged(listed))
+            // Turned off in Settings: stored as a change, applied while Developer Mode is on.
             DeveloperTools.isOn = true
-            FeatureFlags.set(true, for: listed)
-            #expect(FeatureFlags.overrides == ["PreferPageRenderingUpdatesNear60FPSEnabled": true])
+            FeatureFlags.set(false, for: listed)
+            #expect(FeatureFlags.overrides == ["PreferPageRenderingUpdatesNear60FPSEnabled": false])
             engine.applied = []
             FeatureFlags.apply(to: WKPreferences())
-            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false", "PreferPageRenderingUpdatesNear60FPSEnabled true"])
-            // Back off returns to the default and is forgotten.
-            FeatureFlags.set(false, for: listed)
+            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false"])
+            // Back on returns to the default and is forgotten.
+            FeatureFlags.set(true, for: listed)
             #expect(FeatureFlags.overrides.isEmpty)
         }
     }
 
-    @Test func thisMacsWebKitStillHasTheSixtyFPSFlag() {
-        // Zigzag's default must name an existing WebKit flag, or a rename would silently disable it.
+    @Test func noFlagStartsOtherThanWebKitHasIt() {
+        // Forcing Prefer Page Rendering Updates near 60fps off made heavy pages stutter on a 120 Hz display (#394).
+        #expect(FeatureFlags.ownDefaults.isEmpty)
+    }
+
+    @Test func everyOwnDefaultNamesAFlagThisMacsWebKitHas() {
+        // An own default must name an existing WebKit flag, or a rename would silently drop it.
         let keys = Set((WebKitFeatures().flags ?? []).map(\.key))
         guard !keys.isEmpty else { return }
-        #expect(keys.contains("PreferPageRenderingUpdatesNear60FPSEnabled"))
+        for key in FeatureFlags.ownDefaults.keys { #expect(keys.contains(key)) }
     }
 
     @Test func resetForgetsEveryChange() {

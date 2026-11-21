@@ -415,14 +415,11 @@ struct PageTranslatorTests {
         #expect(runs.all.isEmpty)
     }
 
-    /// A translation's toasts show only while its page is in view: the peeked page while Peek is open, otherwise
-    /// the tab you're on.
+    /// A translation's toasts show only while its page is the tab you're on.
     @Test func toastsFollowThePageInView() {
-        let tab = Run(), other = Run(), peeked = Run()
-        #expect(PageTranslator.isInView(tab, selected: tab, peeked: nil))
-        #expect(!PageTranslator.isInView(tab, selected: other, peeked: nil))
-        #expect(!PageTranslator.isInView(tab, selected: tab, peeked: peeked))
-        #expect(PageTranslator.isInView(peeked, selected: tab, peeked: peeked))
+        let tab = Run(), other = Run()
+        #expect(PageTranslator.isInView(tab, selected: tab))
+        #expect(!PageTranslator.isInView(tab, selected: other))
     }
 
     /// A long page goes in small requests, on-screen text first, so each comes back well inside the limit (#465).
