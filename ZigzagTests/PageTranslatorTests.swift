@@ -502,6 +502,16 @@ struct PageLanguageChoiceTests {
         #expect(!PageTranslator.readsLanguage(of: URL(string: "https://expired.badssl.com"), errorPage: true))
     }
 
+    @Test func theTimeLeftComesFromThePaceSoFar() {
+        // Too little done, or too soon, to tell.
+        #expect(PageTranslator.secondsLeft(share: 0.01, elapsed: 30) == nil)
+        #expect(PageTranslator.secondsLeft(share: 0.5, elapsed: 1) == nil)
+        // A quarter in 20 seconds leaves three times that, in tens of seconds.
+        #expect(PageTranslator.secondsLeft(share: 0.25, elapsed: 20) == 60)
+        #expect(PageTranslator.secondsLeft(share: 0.25, elapsed: 21) == 70)
+        #expect(PageTranslator.secondsLeft(share: 1, elapsed: 60) == 0)
+    }
+
     @Test func aLanguageNotDownloadedIsNamedWhenTranslatingFails() {
         // The download sheet closed without downloading French: say so, not "try again".
         let french = Locale.Language(identifier: "fr")

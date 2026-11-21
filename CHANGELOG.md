@@ -22,6 +22,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - Settings says less: lines under a label that only repeated it are gone, the lines that stay carry a consequence or a warning, and choices that asked the same question in different words now use one. Extension Site Access says On Click. ([#448](https://github.com/ZigaoWang/zigzag/issues/448))
 - The address field no longer shows the star where there is nothing to pin: on Zigzag's own pages (Settings, History, the archive), a new tab and private windows. It used to sit there dimmed, and the pins beside it now take its place. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#442](https://github.com/ZigaoWang/zigzag/issues/442))
 - A theme from the Chrome Web Store or Firefox Add-ons, or a theme folder picked with Install from Folder, isn't installed. Zigzag doesn't use browser themes, so it says that and points to a space's colors, where it used to add the theme as an extension that did nothing. ([#454](https://github.com/ZigaoWang/zigzag/issues/454))
+- Translating a long page no longer gives up after 45 seconds while it's still working. The page changes as each piece of text is translated, the notice shows a progress bar and about how long is left, and Translate only says it couldn't if no text comes back for 45 seconds. ([#465](https://github.com/ZigaoWang/zigzag/issues/465))
 
 ## [0.9.3] - 2026-11-21
 

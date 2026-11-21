@@ -236,6 +236,13 @@ enum PageTranslator {
         return nil
     }
 
+    /// About how long a translation has left, from how long the share done so far took, to the next ten seconds so
+    /// the words don't change with every piece; nil until enough is done to tell.
+    nonisolated static func secondsLeft(share: Double, elapsed: TimeInterval) -> Double? {
+        guard share >= 0.03, elapsed >= 3 else { return nil }
+        return (elapsed * (1 - min(share, 1)) / share / 10).rounded(.up) * 10
+    }
+
     /// Names a missing language and how to get it; otherwise says to try again.
     static func failureMessage(notDownloaded language: Locale.Language?) -> String {
         guard let language else {
@@ -581,7 +588,7 @@ final class TranslationHost {
         view.frame = .zero
     }
 
-    /// Stops it between batches: nothing more is put in the page, and the completion isn't called.
+    /// Stops it between pieces: nothing more is put in the page, and the completion isn't called.
     func cancel() {
         model.isCancelled = true
         model.job = nil
@@ -609,7 +616,7 @@ final class TranslationHost {
         let groups: [PageTranslator.Group]
         let target: Locale.Language
         let total: Int
-        /// The group being translated now, and how many pieces are done before it.
+        /// The group being translated now, and how many pieces are done.
         var current = 0
         var done = 0
         let progress: (Double) -> Void
@@ -647,20 +654,21 @@ final class TranslationHost {
                         index < job.pieces.count ? TranslationSession.Request(sourceText: job.pieces[index], clientIdentifier: String(index)) : nil
                     }
                     nonisolated(unsafe) let session = session
-                    let responses = try await session.translations(from: requests)
-                    var translated: [Int: String] = [:]
-                    for response in responses { if let id = response.clientIdentifier.flatMap(Int.init) { translated[id] = response.targetText } }
-                    // Cancelled meanwhile: quietly, with nothing more put in the page.
-                    if isCancelled { return }
-                    guard webView.url == job.url else { throw Cancelled() }
-                    await PageTranslator.apply(translated, in: webView)
-                    job.progress(Double(job.done + start + chunk.count) / Double(max(job.total, 1)))
+                    // Each piece goes into the page as it comes back, so a long page changes as you watch.
+                    for try await response in session.translate(batch: requests) {
+                        // Cancelled meanwhile: quietly, with nothing more put in the page.
+                        if isCancelled { return }
+                        guard webView.url == job.url else { throw Cancelled() }
+                        guard let id = response.clientIdentifier.flatMap(Int.init) else { continue }
+                        await PageTranslator.apply([id: response.targetText], in: webView)
+                        job.done += 1
+                        job.progress(Double(job.done) / Double(max(job.total, 1)))
+                    }
                 }
             } catch {
                 job.completion(.failure(error))
                 return
             }
-            job.done += group.pieces.count
             job.current += 1
             guard job.current < job.groups.count else { job.completion(.success(())); return }
             // The next language takes a session of its own: the task runs again with it.

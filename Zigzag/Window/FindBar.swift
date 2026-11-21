@@ -881,6 +881,8 @@ final class ToastView: FloatingPanelView {
     let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Not Now", comment: "Tooltip of the close button on a toast that offers something, like translating the page."))
     /// Something under way ("Writing report…"): the ribbon turns where the icon goes.
     let spinner = Spinner()
+    /// How far along something under way is ("Translating from French…"), under its words.
+    let bar = UpdateBar()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -889,8 +891,10 @@ final class ToastView: FloatingPanelView {
         addSubview(icon)
         addSubview(spinner)
         addSubview(label)
+        addSubview(bar)
         addSubview(actionButton)
         addSubview(closeButton)
+        bar.isHidden = true
         actionButton.isHidden = true
         closeButton.isHidden = true
         onLayout = { [weak self] in self?.layoutContent() }
@@ -955,6 +959,7 @@ final class ToastView: FloatingPanelView {
             actionButton.frame = NSRect(x: end - actionWidth, y: (bounds.height - h) / 2, width: actionWidth, height: h)
         }
         let textWidth = bounds.width - chromeWidth
+        bar.frame = NSRect(x: x, y: bounds.height - Tokens.Space.x1 - 3, width: textWidth, height: 3)
         let h = label.usesSingleLineMode ? label.lineHeight : bounds.height - Tokens.Space.x4
         // The text field draws its text Label.inset in from its edges: set it that much wider, so the ink sits
         // exactly where the padding ends, the same both ends.
@@ -1041,6 +1046,20 @@ enum Toast {
         show(text, duration: .greatestFiniteMagnitude, over: controller.root.overlay, area: area(in: controller), busy: true)
     }
 
+    /// The toast shown for `owner`, while it still is, says how far along it is: its words change in place, unannounced,
+    /// and its bar shows `share` (0 to 1), or slides while there's no telling yet.
+    static func update(_ text: String, share: Double?, for owner: AnyObject, in controller: BrowserWindowController) {
+        let state = state(for: controller.root.overlay)
+        guard state.owner === owner, let toast = state.toast, !toast.dismissing else { return }
+        let theme = Brand.Theme.for(toast)
+        toast.bar.tint(track: theme.quietInk, fill: theme.accent)
+        toast.bar.isHidden = false
+        toast.bar.share = share
+        guard toast.label.stringValue != text else { return }
+        toast.label.stringValue = text
+        place(toast, in: area(in: controller))
+    }
+
     /// Top center of the page: where your eyes already are, clear of the content you're reading.
     private static func place(_ toast: ToastView, in area: NSRect) {
         let size = toast.size(maxWidth: max(160, area.width - Tokens.Space.x12))
@@ -1100,6 +1119,7 @@ enum Toast {
         // Busy: an empty picture keeps the icon's place for the spinner.
         toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }
         busy ? toast.spinner.startAnimation(nil) : toast.spinner.stopAnimation(nil)
+        toast.bar.isHidden = true
         toast.actionButton.isHidden = action == nil && actionMenu == nil
         if let actionMenu {
             // A saved toast says where the page went and offers the places it could go instead (#326): a lone
