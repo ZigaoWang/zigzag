@@ -243,9 +243,10 @@ enum SidebarMenus {
             if split.isGroup, tab.bookmarkID == nil { context.append(Item(removeFromSplitTitle, symbol: Symbol.leaveSplit) { controller.leaveGroupWithUndo(tab) }) }
             context.append(keyed(Item(separateSplitTitle, symbol: Symbol.separateSplit) { controller.unsplitWithUndo(tab) }, #selector(C.closeSplitView(_:))))
         }
-        if tab.isPlayingAudio || tab.isMuted {
-            context.append(keyed(Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: tab.isMuted ? Symbol.unmute : Symbol.mute) { tab.setMuted(!tab.isMuted) }, #selector(C.toggleMute(_:))))
-        }
+        let mute = keyed(Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: tab.isMuted ? Symbol.unmute : Symbol.mute) { tab.setMuted(!tab.isMuted) }, #selector(C.toggleMute(_:)))
+        // At the top while it plays or is muted; with the page's actions otherwise, to mute it before it plays (#490).
+        let soundsNow = tab.isPlayingAudio || tab.isMuted
+        if soundsNow { context.append(mute) }
 
         var page: [NSMenuItem] = []
         if tab.url != nil {
@@ -255,6 +256,7 @@ enum SidebarMenus {
             page.append(keyed(Item(suspendTitle(1), symbol: Symbol.suspend) { controller.suspendWithToast([tab]) }, #selector(C.suspendPage(_:))))
         }
         page.append(keyed(Item(String(localized: "Duplicate Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: Symbol.duplicate) { controller.duplicate(tab) }, #selector(C.duplicateTab(_:))))
+        if !soundsNow { page.append(mute) }
         if let url = tab.url {
             page.append(keyed(Item(String(localized: "Copy Link", comment: "Item in a tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(url, title: tab.displayTitle) }, #selector(C.copyPageURL(_:))))
         }
@@ -356,8 +358,13 @@ enum SidebarMenus {
             // Split beside a tab, its row carries the pair, so it ends the split here as a tab's row does.
             context.append(keyed(Item(separateSplitTitle, symbol: Symbol.separateSplit) { controller.unsplitWithUndo(live) }, #selector(BrowserWindowController.closeSplitView(_:))))
         }
+        // At the top while it plays or is muted; with the page's actions otherwise.
+        let mute = pinned == nil ? live.map { live in keyed(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: live.isMuted ? Symbol.unmute : Symbol.mute) { live.setMuted(!live.isMuted) }, #selector(BrowserWindowController.toggleMute(_:))) } : nil
+        let soundsNow = live.map { $0.isPlayingAudio || $0.isMuted } ?? false
+        if soundsNow, let mute { context.append(mute) }
 
-        let page = [Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(bookmark.url, title: bookmark.title) }]
+        var page = [Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(bookmark.url, title: bookmark.title) }]
+        if !soundsNow, let mute { page.insert(mute, at: 0) }
 
         var organize: [NSMenuItem] = []
         // Pins are shared by every window: a private one leaves them as they are.
@@ -533,11 +540,13 @@ enum SidebarMenus {
             }
             context.append(Item(String(localized: "Separate from Favorite", comment: "Item in a favorite's context menu. The page wandered off; this opens it as a tab of its own."), symbol: Symbol.separate) { manager.separateBookmarkTab(favorite.id) })
         }
-        if pair == nil, let live, live.isPlayingAudio || live.isMuted {
-            context.append(keyed(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu."), symbol: live.isMuted ? Symbol.unmute : Symbol.mute) { live.setMuted(!live.isMuted) }, #selector(BrowserWindowController.toggleMute(_:))))
-        }
+        // At the top while it plays or is muted; with the page's actions otherwise.
+        let mute = pair == nil ? live.map { live in keyed(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu."), symbol: live.isMuted ? Symbol.unmute : Symbol.mute) { live.setMuted(!live.isMuted) }, #selector(BrowserWindowController.toggleMute(_:))) } : nil
+        let soundsNow = live.map { $0.isPlayingAudio || $0.isMuted } ?? false
+        if soundsNow, let mute { context.append(mute) }
 
-        let page = [Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu."), symbol: Symbol.copyLink) { controller.copyLink(favorite.url, title: favorite.title) }]
+        var page = [Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu."), symbol: Symbol.copyLink) { controller.copyLink(favorite.url, title: favorite.title) }]
+        if !soundsNow, let mute { page.insert(mute, at: 0) }
         // Favorites are shared by every window: a private one doesn't take them away.
         let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in."), symbol: Symbol.toTabs) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
 

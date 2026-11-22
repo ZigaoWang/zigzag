@@ -63,6 +63,8 @@
 ## Sound
 - A tab playing sound or muted → a speaker after its title; clicking it mutes or unmutes that page.
   Test: RowSpeakerTests.theSpeakerMutesAndUnmutesItsPage
+- A tab's menu, or an open pinned page's or favorite's → Mute Tab or Unmute Tab, even before it plays; it stays muted through a reload and sleep.
+  Test: SidebarRowMenuTests.aTabCanBeMutedBeforeItPlays
 - Pause the video or audio a tab's sound came from → its speaker goes away after a moment, even if WebKit still says it plays.
   Test: MiniPlayerPageTests.aSoundFromAVideoEndsOnceItStops
 

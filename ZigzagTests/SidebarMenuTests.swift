@@ -347,7 +347,7 @@ struct SidebarRowMenuTests {
     @Test func aTabsMenuIsGroupedWithCloseLast() throws {
         try inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
-            #expect(titles(menu) == ["Reload Page", "Duplicate Tab", "Copy Link", "-",
+            #expect(titles(menu) == ["Reload Page", "Duplicate Tab", "Mute Tab", "Copy Link", "-",
                                      "Pin Tab", "Add to Favorites", "New Group with Tab", "-",
                                      "Open in Split View", "Move To", "-",
                                      "Rename", "Change Icon…", "-",
@@ -375,6 +375,32 @@ struct SidebarRowMenuTests {
             #expect(tabs[1].isAsleep && !tabs[1].isLoaded)
             #expect(tabs[1].notLoadedNote == "You put it to sleep. Loads when you click it.")
             #expect(controller.tabManager.selectedTab === tabs[0])
+        }
+    }
+
+    @Test func aTabCanBeMutedBeforeItPlays() throws {
+        try inWindow(["A", "B", "C"], local: true) { controller, tabs, space in
+            // Not running and silent: Mute Tab is with the page's actions.
+            let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
+            #expect(Array(titles(menu).prefix(3)) == ["Reload Page", "Duplicate Tab", "Mute Tab"])
+            try run(menu.items.first { $0.title == "Mute Tab" })
+            #expect(tabs[1].isMuted)
+            // Muted, Unmute Tab leads the menu as it always has.
+            #expect(Array(titles(SidebarMenus.tabMenu(for: tabs[1], controller: controller)).prefix(2)) == ["Unmute Tab", "-"])
+            // Its page starts muted, and stays muted after a reload and after sleeping.
+            let webView = tabs[1].ensureWebView()
+            #expect(webView.pageMutedState.map(WKWebView.isAudioMuted) == true)
+            tabs[1].reload()
+            #expect(webView.pageMutedState.map(WKWebView.isAudioMuted) == true)
+            controller.suspendWithToast([tabs[1]])
+            #expect(tabs[1].isAsleep && tabs[1].isMuted)
+            #expect(tabs[1].ensureWebView().pageMutedState.map(WKWebView.isAudioMuted) == true)
+            // A pinned page that's open has it too.
+            controller.tabManager.bookmarkTab(tabs[2], in: space)
+            let pin = try #require(tabs[2].bookmarkID.flatMap(Library.shared.bookmark))
+            try run(SidebarMenus.bookmarkMenu(for: pin, controller: controller).items.first { $0.title == "Mute Tab" })
+            #expect(tabs[2].isMuted)
+            #expect(SidebarMenus.bookmarkMenu(for: pin, controller: controller).items.first?.title == "Unmute Tab")
         }
     }
 
@@ -491,7 +517,7 @@ struct SidebarRowMenuTests {
             let id = try #require(tabs[0].bookmarkID)
             controller.tabManager.select(tabs[1])
             let menu = SidebarMenus.bookmarkMenu(for: try #require(Library.shared.bookmark(id)), controller: controller)
-            #expect(titles(menu) == ["Copy Link", "-",
+            #expect(titles(menu) == ["Mute Tab", "Copy Link", "-",
                                      "Unpin Tab", "Add to Favorites", "Add to New Folder", "Move to Space", "-",
                                      "Open in Split View", "-",
                                      "Rename", "Change Icon…", "-",
