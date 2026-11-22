@@ -47,8 +47,6 @@
   Test: PinnedGroupTests.closingOnePinnedPageKeepsThePin
 - A pinned split's row has the same × in each part as a split of tabs; click it → only that page unloads.
   Test: PinnedGroupTests.aPinnedPartsCloseButtonUnloadsOnlyIt
-- A split favorite has a × on each page's icon, shown on the page you point at; click it → only that page unloads.
-  Test: PinnedGroupTests.aFavoriteSplitsCloseButtonUnloadsOnlyItsPage
 - Drop a tab or a pinned page on either half of a pinned split's row → it joins as a third or fourth page, as on a split of tabs; at four, the row only moves.
   Test: PinnedGroupTests.aDropGrowsAPinnedSplitAsATabSplit
 - Drag one page of a pinned split out by its strip → into Pinned it stays pinned on its own there, into the tabs it's a tab; the rest stay a pinned split, or one pinned page.

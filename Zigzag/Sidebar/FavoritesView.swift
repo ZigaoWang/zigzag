@@ -6,8 +6,6 @@ final class FavoritesView: NSView {
     var onMenu: ((Bookmark) -> NSMenu?)?
     /// The × on an open favorite: unloads its page, the favorite stays.
     var onClose: ((Bookmark) -> Void)?
-    /// The × on one page of a split favorite: unloads that page alone.
-    var onClosePage: ((Bookmark) -> Void)?
     private var tiles: [FavoriteTile] = []
     #if DEBUG
     func debugTiles() -> [(String, NSRect)] {
@@ -63,7 +61,12 @@ final class FavoritesView: NSView {
     /// Held near the top or bottom of a grid that scrolls: it scrolls that way, a step a frame, `moved` after each.
     /// Nil, or away from the edges: stops.
     func scrollNearEdge(at windowPoint: NSPoint?, _ moved: @escaping () -> Void = {}) {
-        let visible = visibleRect
+        // What shows of the grid, without the room above it for a corner ×.
+        let top = enclosingScrollView?.contentInsets.top ?? 0
+        let visible = enclosingScrollView.map { scroll in
+            let clip = scroll.contentView.bounds
+            return NSRect(x: clip.minX, y: clip.minY + top, width: clip.width, height: clip.height - top)
+        } ?? visibleRect
         var direction: CGFloat = 0
         if let windowPoint, let clip = enclosingScrollView?.contentView, bounds.height > visible.height + 1 {
             let y = convert(windowPoint, from: nil).y
@@ -77,8 +80,8 @@ final class FavoritesView: NSView {
                 let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self, weak clip] _ in
                     MainActor.assumeIsolated {
                         guard let self, let clip, let scroll = self.enclosingScrollView else { return }
-                        let limit = max(0, self.bounds.height - clip.bounds.height)
-                        let y = min(max(clip.bounds.minY + self.edgeScrollDirection * 4, 0), limit)
+                        let limit = max(-top, self.bounds.height - clip.bounds.height)
+                        let y = min(max(clip.bounds.minY + self.edgeScrollDirection * 4, -top), limit)
                         guard y != clip.bounds.minY else { self.scrollNearEdge(at: nil); return }
                         clip.scroll(to: NSPoint(x: 0, y: y))
                         scroll.reflectScrolledClipView(clip)
@@ -230,6 +233,13 @@ final class FavoritesView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// A split favorite's × hangs past its tile's corner, and past this grid's edge in the top row or last column.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        for tile in tiles.reversed() { if let badge = tile.badgeHit(at: convert(local, to: tile)) { return badge } }
+        return super.hitTest(point)
+    }
+
     private var tileCount: Int { tiles.count + (isDropTarget && tiles.isEmpty ? 1 : 0) }
 
     /// How tall the grid is at its own width.
@@ -270,7 +280,6 @@ final class FavoritesView: NSView {
                 tile.onRightClick = { [weak self, weak tile] _ in tile?.bookmark.flatMap { self?.onMenu?($0) } }
                 tile.onClose = { [weak self, weak tile] in if let favorite = tile?.bookmark { self?.onClose?(favorite) } }
                 tile.onMiddleClick = tile.onClose
-                tile.onClosePage = { [weak self] page in self?.onClosePage?(page) }
                 tile.onDragStart = { [weak self, weak tile] event in
                     guard let self, let tile, let favorite = tile.bookmark else { return false }
                     self.drag(tile, favorite: favorite, event: event)
@@ -475,30 +484,19 @@ final class FavoriteTile: InteractiveView {
     /// The page a click at `point` opens: the part of the tile it's in, as the pages share the page area; the first
     /// page for a favorite of one.
     func page(at point: NSPoint) -> Bookmark? {
-        guard let bookmark else { return nil }
-        return ([bookmark] + partners)[pageIndex(at: point)]
-    }
-
-    /// Which page, in order, the part of the tile at `point` belongs to; 0 for a favorite of one.
-    func pageIndex(at point: NSPoint) -> Int {
-        guard !partners.isEmpty else { return 0 }
-        if let regions, regions.count == partners.count + 1 {
+        guard let bookmark, !partners.isEmpty else { return bookmark }
+        let pages = [bookmark] + partners
+        if let regions, regions.count == pages.count {
             let column = point.x > bounds.midX ? 1 : 0
             let row = (point.y > bounds.midY) == isFlipped ? 1 : 0
             let cell: UInt8 = 1 << (row * 2 + column)
-            return regions.firstIndex { $0.cells & cell != 0 } ?? 0
+            return regions.firstIndex { $0.cells & cell != 0 }.map { pages[$0] } ?? bookmark
         }
-        return point.x > bounds.midX ? 1 : 0
+        return point.x > bounds.midX ? partners[0] : bookmark
     }
     var onClose: (() -> Void)?
-    /// A split favorite's × unloads only the page it's on.
-    var onClosePage: ((Bookmark) -> Void)?
-    /// In a split favorite, the page under the pointer, whose icon the × replaces.
-    private var pointedPage: Int? { didSet { if oldValue != pointedPage { needsLayout = true; refreshClose() } } }
-    /// The page the × is on, in order: the one pointed at in a split, else the only one.
-    var closePage: Int { partners.isEmpty ? 0 : pointedPage ?? 0 }
     /// Shown under the pointer on every favorite that's open, the one you're on too, as a tab's is: a small ×
-    /// tucked into the tile's top-right corner, clear of the icon even four to a row, and never past the tile's edge.
+    /// tucked into the tile's top-right corner, clear of the icon even four to a row; a split's hangs on that corner.
     private static let closeSide = Tokens.Sidebar.favoriteClose
     /// From the tile's top and right edges to the button: inside the tile's rounded corner, not on it.
     private static let closeInset = Tokens.Sidebar.favoriteCloseInset
@@ -511,88 +509,68 @@ final class FavoriteTile: InteractiveView {
         button.showsFillAtRest = true
         button.layer?.borderWidth = Tokens.Metric.hairline
         button.layer?.borderColor = cgColor(Tokens.Color.controlEdge)
-        button.onClick = { [weak self] _ in self?.closeClicked() }
+        button.onClick = { [weak self] _ in self?.onClose?() }
         button.isHidden = true
         addSubview(button)
         return button
     }()
 
-    private func closeClicked() {
-        guard let bookmark else { return }
-        guard !partners.isEmpty else { onClose?(); return }
-        let pages = [bookmark] + partners
-        if pages.indices.contains(closePage) { onClosePage?(pages[closePage]) }
+    /// How far a split's × hangs past its tile's corner: nearly half of it, as far as the sidebar's edge allows.
+    static let badgeOverhang = min(Tokens.Sidebar.favoriteClose / 2, Tokens.Sidebar.edge)
+
+    /// A split favorite's ×: one for the whole tile, on its top-right corner, clear of every page's icon.
+    static func badgeFrame(in bounds: NSRect, flipped: Bool) -> NSRect {
+        let side = closeSide, out = badgeOverhang
+        return NSRect(x: bounds.maxX - side + out, y: flipped ? bounds.minY - out : bounds.maxY - side + out, width: side, height: side)
     }
 
-    /// Whether the × shows: on an open favorite under the pointer; in a split, on the pointed page while it's loaded.
-    private var showsClose: Bool {
-        guard isHovered, number == nil, !isPlaceholder else { return false }
-        guard !partners.isEmpty else { return isOpen }
-        let live = livePages
-        return pointedPage.map { live.indices.contains($0) && live[$0]?.isLoaded == true } ?? false
+    /// The × while it shows on a split's corner and `point` (in this tile) is on it, outside the tile too.
+    func badgeHit(at point: NSPoint) -> NSView? {
+        !partners.isEmpty && !closeButton.isHidden && closeButton.frame.contains(point) ? closeButton : nil
     }
 
     private func refreshClose() {
-        closeButton.isHidden = !showsClose
+        closeButton.isHidden = !(isOpen && isHovered) || number != nil || isPlaceholder
         let backed = !closeButton.isHidden && !partners.isEmpty
         if backed, closeBacking == nil {
             let disc = ColorView(color: Tokens.Color.surface)
-            disc.layer?.cornerRadius = closeButton.frame.width / 2
+            disc.layer?.cornerRadius = Self.closeSide / 2
             disc.frame = closeButton.frame
             addSubview(disc, positioned: .below, relativeTo: closeButton)
             closeBacking = disc
         }
         closeBacking?.isHidden = !backed
-        refreshIconAlpha()
     }
 
-    /// Every icon at full strength, but the one a split's × stands in for.
-    private func refreshIconAlpha() {
-        let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
-        let replaced = closeBacking?.isHidden == false ? closePage : nil
-        for (i, view) in pageIcons.enumerated() {
-            let value = i == replaced ? 0 : alpha
-            if view.alphaValue != value { view.alphaValue = value }
-        }
-    }
-
-    /// Under a split's ×, in its icon's place: a solid disc, so nothing shows through the chip.
+    /// Under a split's ×, which sits partly off the tile: a solid disc, so it reads the same over the sidebar.
     private var closeBacking: ColorView?
 
-    private var moveTracking: NSTrackingArea?
+    /// The part of a split's × outside the tile keeps it hovered.
+    private var badgeTracking: NSTrackingArea?
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        if let moveTracking { removeTrackingArea(moveTracking) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInActiveApp, .inVisibleRect], owner: self)
+        if let badgeTracking { removeTrackingArea(badgeTracking) }
+        badgeTracking = nil
+        guard !partners.isEmpty else { return }
+        let area = NSTrackingArea(rect: Self.badgeFrame(in: bounds, flipped: isFlipped), options: [.mouseEnteredAndExited, .activeInActiveApp], owner: self)
         addTrackingArea(area)
-        moveTracking = area
+        badgeTracking = area
     }
 
     override func mouseEntered(with event: NSEvent) {
+        // Only the tile itself lights up; the × past its corner shows once it does.
+        if let badgeTracking, event.trackingArea === badgeTracking { return }
         super.mouseEntered(with: event)
-        trackPointer(event)
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        super.mouseMoved(with: event)
-        trackPointer(event)
     }
 
     override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        pointedPage = nil
-    }
-
-    private func trackPointer(_ event: NSEvent) {
-        guard !partners.isEmpty else { pointedPage = nil; return }
         let point = convert(event.locationInWindow, from: nil)
-        pointedPage = bounds.contains(point) ? pageIndex(at: point) : nil
+        if isHovered, bounds.contains(point) || badgeHit(at: point) != nil { return }
+        super.mouseExited(with: event)
     }
 
     #if DEBUG
-    /// The pointer over one page of a split favorite, in order.
-    func debugPoint(atPage page: Int?) { pointedPage = page }
     var debugCloseButton: IconButton { closeButton }
     #endif
 
@@ -872,14 +850,9 @@ final class FavoriteTile: InteractiveView {
         let side = Self.closeSide, edge = Self.closeInset
         if partners.isEmpty {
             closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
-            closeButton.radius = side / 2
-        } else if pageIcons.indices.contains(closePage) {
-            // In a split the × takes the pointed page's icon's place, at its size.
-            let frame = pageIcons[closePage].frame
-            closeButton.frame = frame
-            closeButton.radius = frame.width / 2
-            closeBacking?.frame = frame
-            closeBacking?.layer?.cornerRadius = frame.width / 2
+        } else {
+            closeButton.frame = Self.badgeFrame(in: bounds, flipped: isFlipped)
+            closeBacking?.frame = closeButton.frame
         }
         if !audioButton.isHidden { layoutSpeaker() }
         layoutNumber()
@@ -914,7 +887,8 @@ final class FavoriteTile: InteractiveView {
             return
         }
         refreshClose()
-        refreshIconAlpha()
+        let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
+        for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
         // Space-tinted tile, lighter on hover; brighter with a fine edge while loaded. The current one uses the selected card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
             : isPressed ? Tokens.Chrome.fieldPressed

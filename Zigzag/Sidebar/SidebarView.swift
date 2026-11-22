@@ -973,6 +973,10 @@ final class SidebarView: NSView {
         favoritesScroll.horizontalScrollElasticity = .none
         favoritesScroll.verticalScrollElasticity = .none
         favoritesScroll.automaticallyAdjustsContentInsets = false
+        // Room above and right of the grid for a split favorite's × on its corner; the tiles stay where they were.
+        let out = FavoriteTile.badgeOverhang
+        favoritesScroll.contentInsets = NSEdgeInsets(top: out, left: 0, bottom: 0, right: 0)
+        favoritesScroll.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: out)
         favoritesScroll.contentView.postsBoundsChangedNotifications = true
         favoritesScroll.documentView = favorites
         favoritesScroll.wantsLayer = true
@@ -1174,7 +1178,8 @@ final class SidebarView: NSView {
         let favoritesHeight = min(gridHeight, Self.favoritesCap(room: frames.listBottom - topEdge))
         favorites.isHidden = gridHeight == 0
         favoritesScroll.isHidden = gridHeight == 0
-        favoritesScroll.frame = NSRect(x: pad, y: topEdge, width: width - pad * 2, height: favoritesHeight)
+        let out = FavoriteTile.badgeOverhang
+        favoritesScroll.frame = NSRect(x: pad, y: topEdge - out, width: width - pad * 2 + out, height: favoritesHeight + out)
         favoritesScroll.verticalScrollElasticity = gridHeight > favoritesHeight ? .allowed : .none
         favorites.frame = NSRect(x: 0, y: 0, width: width - pad * 2, height: gridHeight)
         updateFavoritesFade()
@@ -1206,7 +1211,9 @@ final class SidebarView: NSView {
     }
 
     private func updateFavoritesFade() {
-        Self.fade(favoritesFade, for: favoritesScroll, list: favorites)
+        // The room above the grid shows only a ×; scrolled, tiles passing under it are hidden there.
+        let top = favoritesScroll.contentInsets.top
+        Self.fade(favoritesFade, for: favoritesScroll, list: favorites, top: top, clearsTop: favoritesScroll.contentView.bounds.minY > -top + 0.5)
     }
 
     @objc private func favoritesScrolled() {
@@ -1214,7 +1221,7 @@ final class SidebarView: NSView {
     }
 
     /// Fade tabs at the bottom of a list only; the top has the pinned space name and its hairline.
-    private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
+    private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView, top: CGFloat = 0, clearsTop: Bool = false) {
         let bounds = scrollView.bounds
         let clip = scrollView.contentView.bounds
         let moreBelow = list.frame.height - clip.maxY > 1
@@ -1224,8 +1231,9 @@ final class SidebarView: NSView {
         CATransaction.setDisableActions(true)
         mask.frame = bounds
         // Drawn top to bottom in the list's own terms; the gradient's y runs the other way in an unflipped layer.
-        mask.colors = [solid, solid, moreBelow ? clear : solid]
-        mask.locations = [0, NSNumber(value: Double(1 - fade)), 1]
+        let band = bounds.height > 0 ? Double(top / bounds.height) : 0
+        mask.colors = [clearsTop ? clear : solid, clearsTop ? clear : solid, solid, solid, moreBelow ? clear : solid]
+        mask.locations = [0, NSNumber(value: band), NSNumber(value: band), NSNumber(value: Double(1 - fade)), 1]
         let flipped = scrollView.layer?.isGeometryFlipped == true || scrollView.isFlipped
         mask.startPoint = CGPoint(x: 0.5, y: flipped ? 0 : 1)
         mask.endPoint = CGPoint(x: 0.5, y: flipped ? 1 : 0)

@@ -647,35 +647,6 @@ import Testing
         }
     }
 
-    /// A split favorite's × sits on the page you point at, and unloads that page alone; the favorite keeps every page.
-    @Test(arguments: [2, 4]) func aFavoriteSplitsCloseButtonUnloadsOnlyItsPage(count: Int) throws {
-        try inWindow((0..<count).map(String.init)) { controller, tabs, _ in
-            let manager = controller.tabManager
-            manager.makeGroup(tabs, shape: count == 2 ? Self.shapes[0] : Self.shapes[4])
-            manager.favoriteTab(tabs[0])
-            tabs.forEach { _ = $0.ensureWebView() }
-            let marks = tabs.compactMap(\.bookmarkID)
-            #expect(marks.count == count)
-            let favorites = controller.sidebar.favorites
-            let open = Dictionary(uniqueKeysWithValues: marks.compactMap { id in manager.bookmarkTab(for: id).map { (id, $0) } })
-            favorites.reload(favorites: Library.shared.favoriteTiles(in: manager.profile.id), selectedID: nil, tabs: open)
-            let tile = try #require(favorites.tile(for: marks[0]) as? FavoriteTile)
-            tile.frame = NSRect(x: 0, y: 0, width: 60, height: Tokens.Sidebar.favoriteHeight)
-            tile.isHovered = true
-            tile.debugPoint(atPage: 1)
-            tile.layoutSubtreeIfNeeded()
-            #expect(!tile.debugCloseButton.isHidden)
-            #expect(tile.debugCloseButton.toolTip == "Unload Page")
-            let event = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
-                                                        context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
-            tile.debugCloseButton.onClick?(event)
-            #expect(manager.bookmarkTab(for: marks[1]) == nil)
-            #expect(marks.enumerated().filter { $0.offset != 1 }.allSatisfy { manager.bookmarkTab(for: $0.element) != nil })
-            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
-            #expect(Library.shared.isFavorite(marks[0]))
-        }
-    }
-
     /// Unloading the top-left page of a pinned split of four on screen, by its part's × or a middle-click there: the
     /// other three stay side by side, you stay on one of them, and the pin opens all four again.
     @Test(arguments: [false, true], [0, 3]) func unloadingOnePinnedPageKeepsTheRestOnScreen(middleClick: Bool, selected: Int) throws {
@@ -992,22 +963,20 @@ import Testing
         #expect(tile.page(at: NSPoint(x: 4, y: tile.bounds.height - 4))?.id == pages[0].id)
     }
 
-    /// Pointing at a page of a split favorite puts the × in that page's icon's place: centered on it, its size, clear
-    /// of the other icons.
+    /// A split favorite has one ×, the size of a single favorite's, hanging on the tile's top-right corner, clear of
+    /// every page's icon.
     @Test(arguments: [[TileRegion.left, .right], [.left, .topRight, .bottomRight], [.topLeft, .topRight, .bottomLeft, .bottomRight]],
           [48, 60, 80] as [CGFloat])
-    func aSplitsCloseButtonsSitOnTheirOwnIcons(regions: [TileRegion], width: CGFloat) {
+    func aSplitsCloseButtonHangsOnTheCornerClearOfTheIcons(regions: [TileRegion], width: CGFloat) {
         let (tile, _) = tile(regions)
         tile.frame.size.width = width
+        tile.layoutSubtreeIfNeeded()
+        let close = tile.debugCloseButton.frame, side = Tokens.Sidebar.favoriteClose
+        #expect(close.size == NSSize(width: side, height: side))
+        #expect(abs(close.midX - width) <= 1 && abs(close.midY - 0) <= 1)
+        #expect(close.maxX > width && close.minY < 0)
         let icons = Array(tile.pageIcons.prefix(regions.count))
-        for page in regions.indices {
-            tile.debugPoint(atPage: page)
-            tile.layoutSubtreeIfNeeded()
-            let close = tile.debugCloseButton.frame, own = icons[page].frame
-            #expect(close.midX == own.midX && close.midY == own.midY)
-            #expect(close.size == own.size)
-            #expect(icons.indices.allSatisfy { $0 == page || !close.intersects(icons[$0].frame) })
-        }
+        #expect(icons.allSatisfy { !close.intersects($0.frame) })
     }
 
     /// A favorite of one page keeps its × in the tile's top-right corner.

@@ -150,9 +150,41 @@ struct FavoriteTests {
     @Test func aFewFavoritesShowWhole() {
         for count in [3, 12] {
             let sidebar = sidebar(favorites: count, height: 800)
-            #expect(sidebar.favoritesScroll.frame.height == sidebar.favorites.frame.height)
+            #expect(sidebar.favoritesScroll.frame.height - FavoriteTile.badgeOverhang == sidebar.favorites.frame.height)
         }
         #expect(sidebar(favorites: 0).favoritesScroll.isHidden)
+    }
+
+    /// A split favorite's × on the top row's last tile is inside what the grid shows, scrolled or not, and the
+    /// tiles sit where they did.
+    @Test(arguments: [3, 45]) func aCornerCloseButtonIsNeverCutOff(count: Int) throws {
+        let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 600))
+        let marks = (0..<count).map { i in
+            (Bookmark(url: URL(string: "about:blank#\(i)")!, title: "F\(i)"), partners: [Bookmark(url: URL(string: "about:blank#p\(i)")!, title: "P\(i)")])
+        }
+        sidebar.favorites.reload(favorites: marks, selectedID: nil)
+        sidebar.layoutSubtreeIfNeeded()
+        let scroll = sidebar.favoritesScroll
+        let tiles = sidebar.favorites.subviews.compactMap { $0 as? FavoriteTile }.filter { $0.bookmark != nil }
+        let first = try #require(tiles.first)
+        let last = try #require(tiles.filter { $0.frame.minY == first.frame.minY }.max { $0.frame.maxX < $1.frame.maxX })
+        last.layoutSubtreeIfNeeded()
+        let grid = sidebar.favorites.convert(sidebar.favorites.bounds, to: sidebar)
+        #expect(grid.minX == Tokens.Sidebar.edge)
+        #expect(grid.minY == scroll.frame.minY + FavoriteTile.badgeOverhang)
+        func badge() -> NSRect { last.convert(last.debugCloseButton.frame, to: sidebar) }
+        let shown = scroll.contentView.convert(scroll.contentView.bounds, to: sidebar)
+        #expect(shown.contains(badge()))
+        #expect(sidebar.bounds.contains(badge()))
+        // Scrolled to the end and back to the first tile: the top row and its × show whole again.
+        if count > 20 {
+            let clip = scroll.contentView
+            clip.scroll(to: NSPoint(x: 0, y: sidebar.favorites.bounds.height - clip.bounds.height))
+            scroll.reflectScrolledClipView(clip)
+            first.scrollToVisible(first.bounds)
+            #expect(clip.bounds.minY == -scroll.contentInsets.top)
+            #expect(scroll.contentView.convert(scroll.contentView.bounds, to: sidebar).contains(badge()))
+        }
     }
 
     @Test func theCapIsWholeRowsInHalfTheRoom() {
