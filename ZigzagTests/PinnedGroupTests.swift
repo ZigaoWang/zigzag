@@ -979,14 +979,19 @@ import Testing
         #expect(icons.allSatisfy { !close.intersects($0.frame) })
     }
 
-    /// A favorite of one page keeps its × in the tile's top-right corner.
-    @Test func aSingleFavoritesCloseButtonStaysInTheCorner() {
+    /// A favorite of one page has the same × in the same place as a split's, hanging on the corner clear of its icon.
+    @Test(arguments: [48, 60, 80] as [CGFloat]) func aSingleFavoritesCloseButtonHangsOnTheSameCorner(width: CGFloat) {
         let page = Bookmark(url: URL(string: "https://example.com/")!, title: "0")
-        let tile = FavoriteTile(bookmark: page)
-        tile.frame = NSRect(x: 0, y: 0, width: 60, height: Tokens.Sidebar.favoriteHeight)
-        tile.layoutSubtreeIfNeeded()
-        let side = Tokens.Sidebar.favoriteClose, edge = Tokens.Sidebar.favoriteCloseInset
-        #expect(tile.debugCloseButton.frame == NSRect(x: 60 - side - edge, y: tile.isFlipped ? edge : tile.bounds.height - side - edge, width: side, height: side))
+        let single = FavoriteTile(bookmark: page)
+        single.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.favoriteHeight)
+        single.layoutSubtreeIfNeeded()
+        let (split, _) = tile([.left, .right])
+        split.frame.size.width = width
+        split.layoutSubtreeIfNeeded()
+        let close = single.debugCloseButton.frame
+        #expect(close == FavoriteTile.badgeFrame(in: single.bounds, flipped: single.isFlipped))
+        #expect(close == split.debugCloseButton.frame)
+        #expect(!close.intersects(single.pageIcons[0].frame))
     }
 
     @Test func aPairStillShowsTwoIconsSideBySide() {

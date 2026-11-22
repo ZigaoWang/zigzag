@@ -973,7 +973,7 @@ final class SidebarView: NSView {
         favoritesScroll.horizontalScrollElasticity = .none
         favoritesScroll.verticalScrollElasticity = .none
         favoritesScroll.automaticallyAdjustsContentInsets = false
-        // Room above and right of the grid for a split favorite's × on its corner; the tiles stay where they were.
+        // Room above and right of the grid for a favorite's × on its corner; the tiles stay where they were.
         let out = FavoriteTile.badgeOverhang
         favoritesScroll.contentInsets = NSEdgeInsets(top: out, left: 0, bottom: 0, right: 0)
         favoritesScroll.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: out)
