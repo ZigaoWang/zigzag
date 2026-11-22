@@ -1097,7 +1097,7 @@ private final class AddressHit: NSView {
             }
             let p = next.locationInWindow
             if hypot(p.x - start.x, p.y - start.y) > 3 {
-                window.performDrag(with: event)
+                if window.dragMovesWindow { window.performDrag(with: event) }
                 return
             }
         }
