@@ -963,6 +963,8 @@ final class SidebarView: NSView {
     /// Whether everything in it keeps its hover states while Zigzag is inactive and its panel isn't key: the sidebar
     /// at the screen's edge, which shows over another app.
     var hoversWhileInactive = false
+    /// Whether Zigzag's own pages hide the star and Site Controls here: the panel's mirror, not the window's sidebar.
+    var hidesSystemPageControls = false
 
     private func refreshAddressButtons() {
         let shows = holdsAddress || hasTopBar
@@ -1312,10 +1314,11 @@ final class SidebarView: NSView {
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         let systemPage = tab.map { !EdgeLensPolicy.takesPage(url: $0.url) } ?? false
+        // A system page has no star or site to control in the panel's mirror; the window's own sidebar keeps main's.
+        let hidesSystemPage = hidesSystemPageControls && systemPage
         address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true,
-                         canSave: !systemPage && AddressView.canSave(for: tab))
-        // A system page has no site to control, in the window's sidebar and in the panel's mirror alike.
-        address.setSiteControls(showing: !systemPage)
+                         canSave: !hidesSystemPage && AddressView.canSave(for: tab))
+        address.setSiteControls(showing: !hidesSystemPage)
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

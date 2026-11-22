@@ -10,6 +10,18 @@ enum EdgeSidebarLayout {
         return NSRect(x: onRight ? visible.maxX - width : visible.minX, y: visible.minY, width: width, height: visible.height)
     }
 
+    /// The visible frame stretched to the screen's physical side edge, over a Dock that is always showing there.
+    static func edgeFrame(visible: NSRect, screen: NSRect, onRight: Bool) -> NSRect {
+        var frame = visible
+        if onRight {
+            frame.size.width = max(0, screen.maxX - visible.minX)
+        } else {
+            frame.origin.x = screen.minX
+            frame.size.width = max(0, visible.maxX - screen.minX)
+        }
+        return frame
+    }
+
     /// The pointer's place among the screen's, top-down from the visible frame's top edge, as `SidebarEdgeZone`
     /// reads it. Over the menu bar it's above the top, and so outside.
     static func point(_ point: NSPoint, in visible: NSRect) -> NSPoint {
@@ -20,18 +32,19 @@ enum EdgeSidebarLayout {
     /// screen's edge that opens it.
     static func zone(in visible: NSRect, width: CGFloat, onRight: Bool) -> SidebarEdgeZone {
         let out = frame(in: visible, width: width, onRight: onRight)
-        return SidebarEdgeZone(
+        var zone = SidebarEdgeZone(
             bounds: NSRect(origin: .zero, size: visible.size),
             sidebar: NSRect(x: out.minX - visible.minX, y: 0, width: out.width, height: visible.height),
             onRight: onRight
         )
+        // The screen's corners are the system's hot corners: the strip starts and ends short of them.
+        zone.reservedTop = hotCornerReserve
+        zone.reservedBottom = hotCornerReserve
+        return zone
     }
 
-    /// Which screen a pointer is on: the one whose visible frame holds it, in the order given. None where no visible
-    /// frame reaches, as over a menu bar.
-    static func screen(containing point: NSPoint, in screens: [NSRect]) -> Int? {
-        screens.firstIndex { $0.contains(point) }
-    }
+    /// The corner bands a screen's edge doesn't open from.
+    static let hotCornerReserve: CGFloat = Tokens.Space.x2
 
     /// The page's share of the screen when it is open in the panel: a portrait third, the visible frame's height.
     static let pageShare: CGFloat = 1.0 / 3.0
@@ -191,6 +204,8 @@ final class EdgeSidebar {
     private var followTimer: Timer?
     private var monitors: [Any] = []
     private var observers: [NSObjectProtocol] = []
+    /// The observers that only matter while the switch is on: screen, app and Space changes.
+    private var runtimeObservers: [NSObjectProtocol] = []
     private var isActivated = false
     /// The last moved event's time and speed toward the edge; once the pointer stops, none comes.
     private var lastMoveTime: TimeInterval = 0
@@ -212,13 +227,18 @@ final class EdgeSidebar {
                 Self.isOn ? self.start() : self.stop()
             }
         })
+        if Self.isOn { start() }
+    }
+
+    private func start() {
+        guard monitors.isEmpty, runtimeObservers.isEmpty else { return }
         // A screen coming or going changes the edge under the panel: it goes until it's asked for again.
-        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+        runtimeObservers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hide(animated: false) }
         })
         // Zigzag coming forward with one of its windows puts it back: the panel is for reaching a tab from another
         // app. The panel making itself key is not that: it can make Zigzag active while it is the window in front.
-        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+        runtimeObservers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 DispatchQueue.main.async {
                     guard let self, self.isBrowserInFront else { return }
@@ -229,17 +249,12 @@ final class EdgeSidebar {
             }
         })
         // Another app or another space is a change of context: the panel goes, and the peek closes with it.
-        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+        runtimeObservers.append(NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hide(animated: false) }
         })
-        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+        runtimeObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hide(animated: false) }
         })
-        if Self.isOn { start() }
-    }
-
-    private func start() {
-        guard monitors.isEmpty else { return }
         // The pointer over any app: the global one hears the others', the local one Zigzag's own.
         if let global = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved, handler: { [weak self] event in
             MainActor.assumeIsolated { self?.moved(event) }
@@ -266,9 +281,13 @@ final class EdgeSidebar {
     }
 
     private func stop() {
+        runtimeObservers.forEach(NotificationCenter.default.removeObserver)
+        runtimeObservers = []
         monitors.forEach(NSEvent.removeMonitor)
         monitors = []
         hide(animated: false, force: true)
+        // The mirror is not the window's sidebar: off means it goes, not that it keeps taking updates until restart.
+        target?.discardEdgeSidebar()
         target = nil
     }
 
@@ -587,15 +606,6 @@ final class EdgeSidebar {
         target?.openEdgeLens(for: tab)
     }
 
-    /// Whether a click in the panel is one of the list's own actions (a row, New Tab, blank space), which closes the
-    /// lens, rather than one of the sidebar's controls (back, reload, the address) that act on the lens instead.
-    func clickClosesLens(at point: NSPoint) -> Bool {
-        guard let target else { return true }
-        let (sidebar, _) = target.edgeSidebarForDisplay()
-        let list = sidebar.list
-        return list.convert(list.bounds, to: nil).contains(point)
-    }
-
     /// The panel's window, so the Peek can tell a click on the sidebar from a click outside.
     var panelWindow: NSWindow? { panel }
 
@@ -669,9 +679,11 @@ final class EdgeSidebar {
     /// The screen-sized edge under the pointer: the screen's visible frame stands in for a window's bounds.
     private func zone(at point: NSPoint) -> (SidebarEdgeZone, NSPoint, NSRect)? {
         guard let target else { return nil }
-        let frames = NSScreen.screens.map(\.visibleFrame)
-        guard let index = EdgeSidebarLayout.screen(containing: point, in: frames) else { return nil }
-        let visible = frames[index]
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) else { return nil }
+        // The physical edge on the sidebar's side: a Dock that is always showing there doesn't move the strip inboard
+        // into the app. The menu bar and a bottom Dock still bound the height.
+        let visible = EdgeSidebarLayout.edgeFrame(visible: screen.visibleFrame, screen: screen.frame,
+                                                   onRight: target.edgeSidebarOnRight)
         return (zone(in: visible)!, EdgeSidebarLayout.point(point, in: visible), visible)
     }
 
@@ -953,9 +965,10 @@ final class EdgeSidebar {
 
     private func makePanel() -> EdgeSidebarPanel {
         let panel = EdgeSidebarPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        // Above other apps' windows, on every space and over full-screen apps; never the key window, never in ⌘`.
+        // Above other apps' windows, on every space, over full-screen apps, and out of Stage Manager's window shuffle;
+        // never in ⌘`.
         panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -1097,8 +1110,10 @@ final class EdgeSidebarHost: NSView {
             resizeHandle.onDrag = { x, _ in EdgeSidebar.shared.resizeDragged(toX: x) }
             resizeHandle.onEnd = { _ in EdgeSidebar.shared.resizeEnded() }
             resizeHandle.onDoubleClick = { EdgeSidebar.shared.resetSidebarWidth() }
-            addSubview(resizeHandle)
         }
+        // The card is added again on every show, above the handle; the handle goes back over it, as it is in the
+        // window, so the card's inner edge still takes the drag.
+        addSubview(resizeHandle, positioned: .above, relativeTo: container)
         // Above the card, whatever was added before: showing the panel again re-adds the card, and Site Controls and
         // the rest of the overlay must still draw over it.
         addSubview(overlay, positioned: .above, relativeTo: nil)

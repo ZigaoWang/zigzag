@@ -56,6 +56,18 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
     /// The live page's shape, width over height.
     private(set) var pageAspect: CGFloat = 16.0 / 10.0
 
+    /// The caption height this card declared when it first appeared: a card keeps one size while it is up.
+    private(set) var declaredFooter: CGFloat?
+
+    /// Fixes the caption's height for this card and returns it; later layouts use the same height.
+    @discardableResult
+    func declareFooter(width: CGFloat) -> CGFloat {
+        if let declaredFooter { return declaredFooter }
+        let footer = footerHeight(width: width)
+        declaredFooter = footer
+        return footer
+    }
+
     static let footerHeight = Tokens.Metric.previewCaptionHeight
     /// The caption's height in a card this wide: taller by its note while a page in it is in Developer Mode or sleeps
     /// (three lines at most, when it's half of a split).
@@ -294,7 +306,8 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
 
     private func layoutContent() {
         let pad = Self.inset
-        let footer = footerHeight(width: bounds.width)
+        // The height the card was sized with, not what its caption happens to say this pass.
+        let footer = declaredFooter ?? footerHeight(width: bounds.width)
         if showsLensControls {
             // The lens: the standard bar on top, the page under it, one size for every page.
             lensControls.frame = NSRect(x: Self.textX, y: bounds.height - Self.lensBarHeight,
@@ -326,6 +339,9 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
             note2.frame = NSRect(x: secondX, y: detail2.frame.maxY, width: secondWidth, height: noteH)
         }
     }
+
+    /// The area the pages' pictures fill: what a caption changing must leave exactly where it is.
+    var pictureArea: NSRect { imageClip.frame }
 }
 
 /// Shows previews after a short hover, then follows the pointer from row to row without delay.
@@ -335,6 +351,9 @@ final class TabPreviewController {
     private var showWork: DispatchWorkItem?
     private var hideWork: DispatchWorkItem?
     private var refreshTimer: Timer?
+    /// When the card has finished sliding out. Until then the pictures it shows are the ones it appeared with, so
+    /// tiles don't change size under the entrance as live snapshots land.
+    private var settlesAt: CFTimeInterval = 0
     private weak var tab: Tab?
     private weak var row: NSView?
     private var snapshotTokens: [SignalToken] = []
@@ -439,7 +458,8 @@ final class TabPreviewController {
         }
         snapshotTokens = pages.map { page in
             page.changed.observe { [weak self, weak first] change in
-                guard change == .snapshot, let self, let first, first === self.tab else { return }
+                guard change == .snapshot, let self, let first, first === self.tab,
+                      CACurrentMediaTime() >= self.settlesAt else { return }
                 self.panel?.setImages(refs.map { $0.tab?.snapshot })
             }
         }
@@ -447,7 +467,8 @@ final class TabPreviewController {
         let card = controller.root.cardFrame
         let width = Tokens.Metric.previewWidth
         let aspect = card.height > 0 ? min(card.height / max(card.width, 1), 0.9) : 0.62
-        let height = round(width * aspect) + panel.footerHeight(width: width)
+        // A card declares one size and keeps it, so a note coming or going can't move the pictures under it.
+        let height = isNew ? round(width * aspect) + panel.declareFooter(width: width) : panel.bounds.height
         let rowFrame = row.convert(row.bounds, to: overlay)
         // Beside the sidebar, over the page: right of it, or left of it on the right.
         let x = controller.root.besideSidebar(width: width)
@@ -458,12 +479,23 @@ final class TabPreviewController {
         if isNew {
             panel.frame = frame
             overlay.addSubview(panel)
-            // Slides out from the row's side toward the sidebar, at the row's height.
-            let rowY = overlay.isFlipped ? rowFrame.midY - frame.minY : frame.maxY - rowFrame.midY
-            panel.growsFrom = CGPoint(x: controller.root.sidebarOnRight ? 1 : 0, y: min(max(rowY / max(height, 1), 0), 1))
+            // The card comes out of the sidebar's side at the size it keeps. Growing it from a point scaled every
+            // tile inside by 96% and back, which read as the pane resizing into place rather than the card arriving.
+            panel.attachedEdge = controller.root.sidebarOnRight ? .maxX : .minX
             panel.present()
-        } else if panel.frame != frame {
-            Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { panel.animator().frame = frame }
+            // Tiles 2-4 used to change scale while the card was still sliding out: their cached snapshots were
+            // full-window, the live pages were recaptured the moment the card was asked for, and each new picture
+            // re-covered its tile at a different scale. The hovered page was already fresh, which is why only the
+            // others moved. Let the entrance finish on the pictures it began with.
+            settlesAt = CACurrentMediaTime() + Tokens.Motion.enter * Tokens.Motion.debugSlowdown
+        } else {
+            settlesAt = 0
+            // Only its place follows the pointer; its size stays the one it declared on the way out.
+            var next = frame
+            next.size = panel.bounds.size
+            if panel.frame != next {
+                Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { panel.animator().frame = next }
+            }
         }
         // Live pages refresh while you look at the preview.
         refreshTimer?.invalidate()
@@ -471,8 +503,20 @@ final class TabPreviewController {
         keepWatched()
         watched = live
         if !live.isEmpty {
-            // In memory while you watch; written to disk once, when the preview goes.
-            live.forEach { $0.captureSnapshot(keep: false) }
+            // In memory while you watch; written to disk once, when the preview goes. A card coming out waits for
+            // its entrance to finish, so a snapshot landing mid-slide can't resize a tile under it; one already
+            // out refreshes at once.
+            if isNew {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.standard * Tokens.Motion.debugSlowdown) { [weak self, weak first] in
+                    MainActor.assumeIsolated {
+                        guard let self, let first, self.tab === first else { return }
+                        refs.forEach { if let page = $0.tab, !page.isSuspended { page.captureSnapshot(keep: false) } }
+                        self.panel?.setImages(refs.map { $0.tab?.snapshot })
+                    }
+                }
+            } else {
+                live.forEach { $0.captureSnapshot(keep: false) }
+            }
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated {
                     refs.forEach { if let page = $0.tab, !page.isSuspended { page.captureSnapshot(keep: false) } }

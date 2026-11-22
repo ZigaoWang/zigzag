@@ -21,14 +21,6 @@ enum EdgeLensReason: Equatable {
     case selection
 }
 
-/// What opening a page does to a lens that is already out: a page opened from the lens replaces its page; a sidebar
-/// action closes the lens instead.
-enum EdgeLensOpenAction: Equatable {
-    case open
-    case replace
-    case close
-}
-
 /// What a row picked in the sidebar does while the page is out.
 enum EdgeLensPick: Equatable {
     case open
@@ -51,21 +43,11 @@ enum EdgeLensPolicy {
         }
     }
 
-    /// A page opened from the lens replaces the page it shows; a row or another sidebar action closes the lens instead.
-    static func openAction(isVisible: Bool, replacing: Bool) -> EdgeLensOpenAction {
-        guard isVisible else { return .open }
-        return replacing ? .replace : .close
-    }
-
     /// A row picked while the page is out: the same row locks it, another row brings that page into the panel.
     static func pickAction(isVisible: Bool, sameTab: Bool) -> EdgeLensPick {
         guard isVisible else { return .open }
         return sameTab ? .lock : .replace
     }
-
-    /// Leaving the rows goes back to the tab picked there. Before anything is picked, the preview stays where the
-    /// pointer left it: there is no selected tab to go back to.
-    static func restoresAfterHover(locked: Bool) -> Bool { locked }
 
     /// Whether the panel takes this page. It lends the tab's own page, so a page Zigzag serves itself (Settings,
     /// History, the archive) is not one it can show there: its row stays, greyed, and takes no pick. Hover still

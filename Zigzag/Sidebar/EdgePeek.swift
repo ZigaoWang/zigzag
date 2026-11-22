@@ -1,21 +1,6 @@
 import AppKit
 import WebKit
 
-/// Where the edge lens's page sits: the rest of the screen beside the sidebar, its top and bottom the sidebar card's.
-/// What keeps the lens out when it loses key: the sidebar itself (to pick another tab) and our own menus or sheets.
-/// Everything else, including a third-party switcher that takes key without activating an app, closes it.
-enum EdgePeekFocusPolicy {
-    enum NewKey { case none, sidebar, owned, other }
-
-    static func keepsOpen(newKey: NewKey, menuOpen: Bool) -> Bool {
-        if menuOpen { return true }
-        switch newKey {
-        case .sidebar, .owned: return true
-        case .none, .other: return false
-        }
-    }
-}
-
 /// Whether a page can go back where it came from: never into a closed tab, and not at all when it had no home. A
 /// selection change puts it back only where its card still shows it; elsewhere the card now owns the place and the
 /// page must not be painted over it.
@@ -24,14 +9,6 @@ enum EdgePeekRestorePolicy {
                            cardStillShowsPage: Bool = false) -> Bool {
         guard !isClosed, hasOrigin else { return false }
         return reason != .selection || cardStillShowsPage
-    }
-}
-
-/// Whether the lens can move to another page: not to the page it is on, and not to a closed tab. A page WebKit opened
-/// for the lens has its configuration before its address, so a missing URL never keeps it out.
-enum EdgePeekSwap {
-    static func canTake(_ tab: Tab, from current: Tab?, isClosed: Bool) -> Bool {
-        !isClosed && tab !== current
     }
 }
 
@@ -65,11 +42,6 @@ enum EdgePeekRouting {
         return after == before ? 0 : (after > before ? 1 : -1)
     }
     static func newPage(peekVisible: Bool) -> NewPage { peekVisible ? .peek : .browser }
-    /// A page opened from the lens replaces it; selecting any other tab is leaving the lens.
-    static func selectionKeepsLens(lensTab: Tab?, selected: Tab?) -> Bool {
-        guard let lensTab, let selected, selected !== lensTab else { return false }
-        return selected.opener === lensTab
-    }
 }
 
 /// The edge page, inside the sidebar's own panel (#365 prototype): the panel widens by a third of the screen, and the
@@ -375,9 +347,13 @@ final class EdgePeek {
     /// `fitting`: the page has just arrived in a narrow column, so the PDF fits its width rather than keeping the
     /// window's zoom and its scroll controls.
     private func adoptPDFViewer(of tab: Tab, fitting: Bool) {
-        guard let holder = tab.pageHolder, let pdf = tab.pdfViewer else { return }
+        guard let holder = tab.pageHolder else { return }
         // A viewer left over from an earlier page in this holder must not stay under or over this one: two white
         // documents in one holder read as a PDF with no page card around it.
+        guard let pdf = tab.pdfViewer else {
+            holder.subviews.compactMap { $0 as? PDFViewerView }.forEach { $0.removeFromSuperview() }
+            return
+        }
         for other in holder.subviews.compactMap({ $0 as? PDFViewerView }) where other !== pdf {
             other.removeFromSuperview()
         }
@@ -493,6 +469,12 @@ final class EdgePeek {
                   tab.pageHolder?.window == nil else { return }
             controller.showHere(tab)
         }
+        // Retake the picture at the card's size, not the lens's, once the card has laid the page out there.
+        let refreshPicture = {
+            guard reason != .windowClose, let controller, let tab, !tab.isClosed,
+                  tab.pageHolder?.window === controller.window else { return }
+            DispatchQueue.main.async { MainActor.assumeIsolated { tab.captureSnapshot() } }
+        }
         // Let go of the page before the fold-out finishes so the window can take it back without the panel's claim
         // on it stopping the card.
         releaseObservers()
@@ -510,6 +492,7 @@ final class EdgePeek {
                     restore()
                     EdgeSidebar.shared.pageFoldedIntoNote()
                     showInWindow()
+                    refreshPicture()
                 }
             }
         } else if folding {
@@ -518,12 +501,14 @@ final class EdgePeek {
                 MainActor.assumeIsolated {
                     restore()
                     showInWindow()
+                    refreshPicture()
                 }
             }
         } else {
             restore()
             EdgeSidebar.shared.pageDetached(resize: false)
             showInWindow()
+            refreshPicture()
         }
         // The panel may stay (Esc, a blank click): its rows and address go back to the browser's selected tab.
         controller?.setEdgeSelection(nil)

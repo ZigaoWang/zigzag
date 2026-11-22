@@ -764,6 +764,8 @@ final class PageCardView: NSView {
         clip.addSubview(borrowed, positioned: .below, relativeTo: placeholder)
         needsLayout = true
         layoutSubtreeIfNeeded()
+        // A PDF the panel borrowed comes back out of the holder with it.
+        refreshDocument()
     }
 
     /// A page's full screen ended: WebKit put it back in its holder. Left here behind the page now shown, that holder
@@ -778,45 +780,35 @@ final class PageCardView: NSView {
     /// Puts the shown tab's PDF viewer (or Settings) over its page, or takes it away. Typing goes to it, as it did to
     /// the page.
     private func refreshDocument() {
+        // The panel has the page: the viewer stays in the borrowed holder so a PDF travels with it.
+        if let holder, holder.superview !== clip { return }
         let owner = (webView as? BrowserWebView)?.owner
         let viewer: NSView? = owner?.pdfViewer ?? owner?.settingsView
-        guard viewer !== document else { return }
-        if let document, document.superview != nil {
-            // Typing was in the viewer going away: it goes back to the page rather than nowhere.
-            if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: document) {
-                window.makeFirstResponder(webView)
+        if document !== viewer {
+            if let document, document.superview != nil {
+                // Typing was in the viewer going away: it goes back to the page rather than nowhere.
+                if let window, let webView, let responder = window.firstResponder as? NSView,
+                   responder.isDescendant(of: document) {
+                    window.makeFirstResponder(webView)
+                }
+                document.removeFromSuperview()
             }
-            document.removeFromSuperview()
+            document = viewer
         }
-        document = viewer
         guard let viewer, let webView, let holder else { return }
         needsLayout = true
         viewer.autoresizingMask = [.width, .height]
-        if let pdf = viewer as? PDFViewerView {
-            // A PDF is the page, not something laid over the card: it goes in the holder, so it travels with the page
-            // when another surface borrows it (the edge panel) instead of leaving WebKit's own viewer showing there.
-            // A viewer from an earlier page in the holder goes: the current one is the page.
-            for other in holder.subviews.compactMap({ $0 as? PDFViewerView }) where other !== pdf {
-                other.removeFromSuperview()
-            }
-            pdf.frame = holder.bounds
-            holder.addSubview(pdf)
-            // Borrowed, the page is a narrow column: the PDF fits it rather than keeping the window's zoom and its
-            // scroll controls.
-            if holder.superview !== clip { pdf.pdfView.fitWidth() }
+        // The page's whole room, whatever the page's own size is: a page at a size of its own has a holder
+        // smaller than that. Laid out again with the card.
+        let room = NSRect(x: 0, y: 0, width: clip.bounds.width, height: max(0, clip.bounds.height - contentTop))
+        if glides(viewer) {
+            viewer.frame = room.offsetBy(dx: 0, dy: contentTop)
+            surface.addSubview(viewer, positioned: .above, relativeTo: clip)
         } else {
-            // The page's whole room, whatever the page's own size is: a page at a size of its own has a holder
-            // smaller than that. Laid out again with the card.
-            let room = NSRect(x: 0, y: 0, width: clip.bounds.width, height: max(0, clip.bounds.height - contentTop))
-            if glides(viewer) {
-                viewer.frame = room.offsetBy(dx: 0, dy: contentTop)
-                surface.addSubview(viewer, positioned: .above, relativeTo: clip)
-            } else {
-                viewer.frame = room
-                clip.addSubview(viewer, positioned: .above, relativeTo: holder)
-            }
+            viewer.frame = room
+            clip.addSubview(viewer, positioned: .above, relativeTo: holder)
         }
-        if holder.superview === clip, let window, window.firstResponder === webView {
+        if let window, window.firstResponder === webView {
             window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer)
         }
     }

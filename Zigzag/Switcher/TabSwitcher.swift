@@ -89,6 +89,7 @@ final class PagePicture {
         let w = size.width * scale, h = size.height * scale
         images[index].frame = CGRect(x: 0, y: rect.height - h, width: w, height: h)
     }
+
 }
 
 /// A page thumbnail with its site and title underneath, used by the switcher and desk view.

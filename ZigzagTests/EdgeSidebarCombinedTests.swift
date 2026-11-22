@@ -131,6 +131,24 @@ struct EdgeSidebarCombinedTests {
         #expect(host.subviews.last === host.overlay)
     }
 
+    /// The edge panel comes and goes through the same host, re-adding its sidebar card each time. The card's inner
+    /// edge must still take the pointer: the resize handle has to stay above the card, not only above the page.
+    @Test @MainActor func theSidebarEdgeTakesThePointerWhenThePanelIsShownAgain() {
+        let host = EdgeSidebarHost(frame: NSRect(x: 0, y: 0, width: 500, height: 800))
+        let container = SidebarContainer(sidebar: SidebarView(frame: .zero))
+        host.sidebarWidth = Tokens.Metric.sidebarWidth
+        host.set(container)
+        host.set(container)
+        for onRight in [false, true] {
+            host.onRight = onRight
+            host.placeCard()
+            let card = host.cardFrame
+            let edge = onRight ? card.minX + 2 : card.maxX - 2
+            let point = NSPoint(x: edge, y: card.midY)
+            #expect(host.hitTest(point) === host.resizeHandle, "onRight: \(onRight)")
+        }
+    }
+
     /// A page making way for the note stays in the side until the note's fold has covered it, rather than vanishing
     /// a frame before the note arrives.
     @Test @MainActor func aPageStaysUnderTheNoteUntilTheFoldEnds() {

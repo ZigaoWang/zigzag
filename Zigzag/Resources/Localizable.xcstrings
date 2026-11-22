@@ -19298,13 +19298,13 @@
         }
       }
     },
-    "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to switch to it." : {
+    "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to keep its page open." : {
       "comment" : "Explanation under “Sidebar from the screen edge” in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将指针移到屏幕边缘，即可在其他应用上方拉出边栏。点按标签页即可切换过去。"
+            "value" : "将指针移到屏幕边缘，即可在其他应用上方拉出边栏。点按标签页即可让它的页面留在面板中。"
           }
         }
       }

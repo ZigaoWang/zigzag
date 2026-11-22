@@ -58,12 +58,6 @@ struct EdgeLensTests {
         }
     }
 
-    @Test func aPageOpenedFromTheLensReplacesItsPage() {
-        #expect(EdgeLensPolicy.openAction(isVisible: false, replacing: false) == .open)
-        #expect(EdgeLensPolicy.openAction(isVisible: true, replacing: true) == .replace)
-        #expect(EdgeLensPolicy.openAction(isVisible: true, replacing: false) == .close)
-    }
-
     @Test func theSidebarKeepsTheKeyboardOnlyAfterALensAction() {
         for reason in [EdgeLensReason.sameTab, .sidebarClick, .escape] {
             #expect(EdgeLensPolicy.keepsKey(after: reason))
@@ -141,6 +135,24 @@ struct EdgeLensTests {
         card.layoutSubtreeIfNeeded()
         #expect(view("preview.lensControls", in: card)?.isHidden == true)
         #expect(view("preview.detail", in: card)?.isHidden == false)
+    }
+
+    @Test func aPreviewKeepsItsPictureAreaWhileItsNoteComesAndGoes() {
+        // A page that isn't running yet says so under its title, which makes the card taller. When it loads, that
+        // line goes: the card must keep the height and picture area it declared, not shrink the tiles under it.
+        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 320, height: 233))
+        let tab = Tab(url: URL(string: "https://example.com/")!, title: "Example", spaceID: UUID())
+        card.show(tab: tab, bookmark: nil)
+        let footer = card.declareFooter(width: 320)
+        #expect(footer > TabPreviewView.footerHeight)
+        card.layoutSubtreeIfNeeded()
+        let area = card.pictureArea
+        #expect(area.height > 0)
+
+        card.show(tab: nil, bookmark: nil)
+        card.layoutSubtreeIfNeeded()
+        #expect(card.pictureArea == area)
+        #expect(card.bounds.height == 233)
     }
 
     @Test func theLensBarSitsAtTheTop() {

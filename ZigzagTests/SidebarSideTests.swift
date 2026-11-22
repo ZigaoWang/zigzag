@@ -396,13 +396,41 @@ struct EdgeSidebarLayoutTests {
         #expect(!right.keeps(at: point(1000, 400)))
     }
 
-    @Test func onlyTheScreenUnderThePointerIsConsidered() {
-        let second = NSRect(x: 1440, y: 0, width: 1920, height: 1080)
-        let screens = [screen, second]
-        #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 100, y: 100), in: screens) == 0)
-        #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 2000, y: 100), in: screens) == 1)
-        // Over the menu bar, where no visible frame reaches: on none, so no edge.
-        #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 2000, y: 1100), in: screens) == nil)
+    @Test func aDockOnTheSidebarsSideKeepsTheStripAtTheScreensEdge() {
+        let full = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        // The Dock is always showing on the right: the visible frame stops at its inner edge.
+        let docked = NSRect(x: 0, y: 0, width: 1360, height: 875)
+        let edge = EdgeSidebarLayout.edgeFrame(visible: docked, screen: full, onRight: true)
+        #expect(edge.maxX == full.maxX)
+        #expect(edge.minY == docked.minY && edge.height == docked.height)
+        #expect(EdgeSidebarLayout.frame(in: edge, width: width, onRight: true).maxX == full.maxX)
+        // A point over the Dock, outside the visible frame, is still the screen's edge.
+        let zone = EdgeSidebarLayout.zone(in: edge, width: width, onRight: true)
+        #expect(zone.opens(at: EdgeSidebarLayout.point(NSPoint(x: 1435, y: 400), in: edge)))
+
+        // On the left, the edge extends the other way.
+        let leftDock = NSRect(x: 80, y: 0, width: 1360, height: 875)
+        let left = EdgeSidebarLayout.edgeFrame(visible: leftDock, screen: full, onRight: false)
+        #expect(left.minX == full.minX)
+        #expect(EdgeSidebarLayout.frame(in: left, width: width, onRight: false).minX == full.minX)
+    }
+
+    @Test func theScreensHotCornersDoNotOpenTheEdge() {
+        let zone = EdgeSidebarLayout.zone(in: screen, width: width, onRight: false)
+        #expect(!zone.opens(at: NSPoint(x: 2, y: 1)))
+        #expect(!zone.opens(at: NSPoint(x: 2, y: screen.height - 1)))
+        #expect(zone.opens(at: NSPoint(x: 2, y: EdgeSidebarLayout.hotCornerReserve + 1)))
+    }
+
+    @Test func aSystemPageKeepsItsSiteControlsInTheWindowButNotInTheMirror() {
+        let window = SidebarView(frame: NSRect(x: 0, y: 0, width: 264, height: 800))
+        let mirror = SidebarView(frame: NSRect(x: 0, y: 0, width: 264, height: 800))
+        mirror.hidesSystemPageControls = true
+        let settings = Tab(url: URL(string: "zigzag://settings"), title: "Settings", spaceID: UUID())
+        window.update(tab: settings)
+        mirror.update(tab: settings)
+        #expect(!window.address.siteControlsButton.isHidden)
+        #expect(mirror.address.siteControlsButton.isHidden)
     }
 
     @Test func thePanelComesOutForAnotherAppInFrontWhateverTheWindowSidebarShows() {

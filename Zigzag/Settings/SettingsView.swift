@@ -1600,7 +1600,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(sizeRow)
         edgeSidebarToggle.onChange = { on in EdgeSidebar.isOn = on }
         let edgeRow = FormRow(title: String(localized: "Sidebar from the screen edge", comment: "A setting in Settings › Appearance: moving the pointer to the screen's edge shows the sidebar over other apps, as the Dock does."),
-                              detail: String(localized: "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to switch to it.",
+                              detail: String(localized: "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to keep its page open.",
                                              comment: "Explanation under “Sidebar from the screen edge” in Settings › Appearance."),
                               control: edgeSidebarToggle)
         edgeRow.keywords = String(localized: "edge dock hover peek reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.") + " 边缘 拉出 悬停"

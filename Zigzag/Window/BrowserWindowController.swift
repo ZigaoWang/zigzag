@@ -1243,6 +1243,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.setTiles(pair.shape, animated: true)
             root.setZoomedPane(zoomed, animated: true)
             root.isEmpty = false
+            // The panes' frames, bands and lifted strips are settled before any page is sized: a page is given its
+            // room from its card's current top, and a band or a lifted strip learned a pass later took its height
+            // a frame after the page was shown — the pane resizing into place.
+            root.layoutSubtreeIfNeeded()
             let first = pages[0]
             for (i, card) in cards.enumerated() {
                 guard pages.indices.contains(i) else { clear(card); continue }
@@ -1262,6 +1266,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 card.header.setVertical(pair.vertical)
                 card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: first) }
                 card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: first) }
+                // The header is part of the page's room: it goes on before the page, so the page is laid out once,
+                // at the size it keeps. Set after, a pane coming back from a hidden card lost the header's height a
+                // frame later and resized into place.
+                card.showsHeader = true
                 // A page another sharing window shows stays there; the card says so (#162).
                 if tabManager.mayShow(page) {
                     card.show(page.ensureWebView())
@@ -1272,7 +1280,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 page.reloadIfItStopped()
                 card.isFocusedPane = page === tab
                 card.isUnfocusedPane = page !== tab
-                card.showsHeader = true
                 // Each pane's header, line and address are its own page's, whichever of them you're in.
                 card.header.show(page)
                 card.showLoading(of: page)
@@ -3870,11 +3877,11 @@ extension BrowserWindowController: CommandBarHost {
 // MARK: The sidebar at the screen's edge (#363)
 
 extension BrowserWindowController {
-    /// The whole sidebar the hot screen edge brings out: the window's own sidebar, mirrored. Made once, on first use,
-    /// and kept live from then on. It is never the window's sidebar, so nothing in the window moves or changes.
+    /// The whole sidebar the hot screen edge brings out: the window's own sidebar, mirrored. It is never the window's
+    /// sidebar, so nothing in the window moves or changes; turning the setting off discards it.
     /// The row the peek popout came from: a temporary highlight, not a selection change.
     func setEdgePeek(_ id: UUID?) {
-        edgeSidebarForDisplay().sidebar.list.setPeek(id)
+        edgeSidebar?.list.setPeek(id)
     }
 
     /// The row the panel has selected: clicking a tab there outlines it in the panel, while the window behind keeps
@@ -3890,8 +3897,9 @@ extension BrowserWindowController {
         // A click picks a tab; a drag would leave the panel, so its rows stay put.
         mirror.list.allowsDragging = false
         // Zigzag's own pages (Settings, History, the archive) have no page to lend the panel: their rows grey out and
-        // do nothing, rather than open a blank card.
+        // do nothing, rather than open a blank card. Their star and Site Controls hide here, not in the window.
         mirror.list.refusesSystemPages = true
+        mirror.hidesSystemPageControls = true
         mirror.list.onPickTab = { [weak self] tab in self?.pickFromEdgeSidebar(tab) }
         // A pinned page opens in the popout too, whether it is open in a window already or made here.
         mirror.list.onOpenBookmark = { [weak self] bookmark in self?.openBookmarkFromEdgeSidebar(bookmark) }
@@ -3921,6 +3929,14 @@ extension BrowserWindowController {
         edgeSidebar = mirror
         edgeContainer = container
         return (mirror, container)
+    }
+
+    /// The setting went off: the mirror goes, rather than keeping a second sidebar live until restart.
+    func discardEdgeSidebar() {
+        edgeContainer?.removeFromSuperview()
+        edgeSidebar = nil
+        edgeContainer = nil
+        edgeSiteHost = nil
     }
 
     /// The width the window's sidebar is at now, which the panel's card takes: not a copy of the setting, which a drag

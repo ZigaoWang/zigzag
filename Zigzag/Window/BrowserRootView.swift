@@ -1899,6 +1899,9 @@ struct SidebarEdgeZone: Equatable {
     /// A strip along the top, measured from the window's top, where the edge doesn't open the sidebar: the bar above
     /// the page keeps the traffic lights there.
     var reservedTop: CGFloat = 0
+    /// A strip along the bottom, measured from the window's bottom, where the edge doesn't open it: a screen's hot
+    /// corner already belongs to the system there.
+    var reservedBottom: CGFloat = 0
     /// How far out past the window's edge the pointer still counts as at it. Further out it's somewhere else: on
     /// the desktop, or on the display beside this one.
     var reach: CGFloat = Tokens.Metric.edgeRevealReach
@@ -1920,7 +1923,8 @@ struct SidebarEdgeZone: Equatable {
     /// At the sidebar's edge of the window: in the strip just inside it, or just out past it.
     func opens(at point: NSPoint) -> Bool {
         let point = turned(point)
-        return isBeside(point) && point.x <= stripEnd && point.y >= bounds.minY + reservedTop
+        return isBeside(point) && point.x <= stripEnd
+            && point.y >= bounds.minY + reservedTop && point.y <= bounds.maxY - reservedBottom
     }
 
     /// On the sidebar, a little around it, or past it toward the window's edge as far as the edge reaches: that's
@@ -1941,7 +1945,8 @@ struct SidebarEdgeZone: Equatable {
     /// Leaving the window here meets the edge: through the strip, or out past the reach already, as a quick move
     /// leaves it, the window hearing nothing of it between one moved event inside and the next one far out.
     func meetsLeaving(at point: NSPoint) -> Bool {
-        opens(at: point) || (isPast(point) && point.y >= bounds.minY + reservedTop)
+        opens(at: point)
+            || (isPast(point) && point.y >= bounds.minY + reservedTop && point.y <= bounds.maxY - reservedBottom)
     }
 }
 
