@@ -1721,8 +1721,10 @@ final class SpaceLookEditor: NSView {
     var wheelHeight: CGFloat = ColorWheel.fullHeight { didSet { needsLayout = true } }
     var showsWheel: Bool { showsCustom }
 
-    /// Swatches in each row of the grid.
-    static let columns = 9
+    /// Swatches in each row of the grid: Default, the presets, picture and Custom come out to whole rows of seven.
+    static let columns = 7
+    /// How many swatches the grid has.
+    static var tileCount: Int { 1 + SpaceLook.presets.count + 2 }
     private var swatchRows: Int { (tiles.count + Self.columns - 1) / Self.columns }
     /// The swatch grid's height.
     private var swatchesHeight: CGFloat { CGFloat(swatchRows) * swatchSize + CGFloat(swatchRows - 1) * Tokens.Space.x2 }
