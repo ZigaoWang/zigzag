@@ -8465,6 +8465,24 @@
         }
       }
     },
+    "extension.limit.firefoxProxy" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: Firefox's own proxy API, which VPN and proxy extensions built for Firefox use to send pages through their servers.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Setting a proxy (Firefox’s proxy API)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置代理（Firefox 的代理 API）"
+          }
+        }
+      }
+    },
     "extension.limit.fontSettings" : {
       "comment" : "A Chrome extension feature Zigzag cannot provide: the fontSettings API.",
       "extractionState" : "extracted_with_value",

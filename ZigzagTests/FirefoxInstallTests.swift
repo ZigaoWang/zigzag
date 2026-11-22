@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Testing
+import WebKit
 @testable import Zigzag
 
 struct AddonsMozillaPageTests {
@@ -694,5 +695,31 @@ struct FirefoxInstallTests {
         // Pages get theirs from this list, set before the compatibility layer runs.
         #expect(ExtensionShims.firefoxIDs.contains(firefox))
         #expect(!ExtensionShims.firefoxIDs.contains(chrome))
+    }
+}
+
+/// What the install sheet and Settings say a Firefox package won't do here (#475).
+@MainActor
+struct FirefoxLimitTests {
+    private static let id = "nlbejmccbhkncgokjcmghpfloaajcffj"
+
+    /// A Firefox package asking for the proxy permission says up front that Firefox's proxy API won't work here.
+    @Test func aFirefoxProxyExtensionSaysItsProxyWontWork() async throws {
+        guard #available(macOS 15.4, *) else { return }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let manifest: [String: Any] = ["manifest_version": 2, "name": "Proxy probe", "version": "1.0", "permissions": ["proxy", "<all_urls>"],
+                                       "background": ["scripts": ["bg.js"]], "browser_specific_settings": ["gecko": ["id": "probe@example.com"]]]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("browser.proxy.onRequest.addListener(() => ({ type: 'direct' }), { urls: ['<all_urls>'] });".utf8)
+            .write(to: folder.appendingPathComponent("bg.js"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        let key = ExtensionReport.firefoxProxyKey
+        let firefox = ExtensionReport(extension: ext, manifest: manifest, id: Self.id, firefox: true).limits
+        #expect(firefox.first { $0.catalogKey == key }?.text == "Setting a proxy (Firefox’s proxy API)")
+        #expect(ExtensionReport.limits(for: ext, manifest: manifest, id: Self.id, firefox: true).contains { $0.catalogKey == key })
+        // The same ask from a Chrome package: its proxy.settings works, so no line.
+        #expect(!ExtensionReport(extension: ext, manifest: manifest, id: Self.id).limits.contains { $0.catalogKey == key })
     }
 }

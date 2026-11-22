@@ -2490,7 +2490,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if let manifest = ExtensionStore.manifest(for: id) {
             // The lines only: the overlay is decoded once, behind ExtensionCompatibility.shared, and each row does
             // not build a whole report for them.
-            let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id)
+            let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id, firefox: ExtensionStore.kind(of: id) == .firefox)
             if let first = limits.first {
                 let names = Words.list([first.text] + limits.dropFirst().map { Words.lowercasedForList($0.text) })
                 let note = String(localized: "\(names) won’t work in Zigzag.",

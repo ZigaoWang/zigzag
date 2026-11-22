@@ -662,7 +662,7 @@ enum ExtensionStore {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unsupported)
         }
-        let report = ExtensionReport(extension: ext, manifest: normalized, id: id)
+        let report = ExtensionReport(extension: ext, manifest: normalized, id: id, firefox: true)
         return .success(PreparedInstall(id: id, version: version, kind: .firefox, firefoxID: geckoID,
                                         folder: staging, extensionInfo: ext, report: report))
     }

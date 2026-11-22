@@ -79,6 +79,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 文件夹或空间里的固定页面一下子换了顺序（而不只是挪了一个）时，以及从别的浏览器导入书签开始和结束时，扩展都会收到通知，可以等导入完再处理，不用每加一个书签就反应一次。([#487](https://github.com/ZigaoWang/zigzag/issues/487))
 - 扩展给还没运行内容脚本的标签页发消息时，现在会和 Chrome 一样收到“Could not establish connection. Receiving end does not exist.”错误，扩展就能注入脚本后重试，而不是收不到回应一直等着。内容脚本或扩展页面发出的消息如果扩展里没有任何地方在监听，也会这样报错。有监听器收到但没有回复的消息仍然返回空结果，不报错。([#475](https://github.com/ZigaoWang/zigzag/issues/475))
 - `chrome-extension://` 地址现在和 Chrome 一样会打开对应扩展的页面：在地址栏里输入、由扩展自己打开，或从扩展自己的页面里点过去都可以，比如 Hotspot Shield 的欢迎页和设置页。没有安装的扩展的地址会马上说明，不再先停在空白标签页上；网站上指向这种地址的链接仍然打不开。([#475](https://github.com/ZigaoWang/zigzag/issues/475))
+- 要设置代理的 Firefox 扩展（.xpi），比如为 Firefox 做的 VPN，现在会在安装确认和“设置 › 扩展”里说明：用 Firefox 的代理 API 设置代理在 Zigzag 里无法使用。Zigzag 没有可以运行这个 API 的地方，所以这类扩展在这里没法让页面走它的服务器。([#475](https://github.com/ZigaoWang/zigzag/issues/475))
 
 ## [0.9.3] - 2026-11-21
 

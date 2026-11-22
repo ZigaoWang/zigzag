@@ -34,7 +34,8 @@ struct ExtensionReport {
         var ids: Set<String> = []
     }
 
-    init(extension ext: WKWebExtension, manifest: [String: Any], id: String) {
+    /// `firefox`: the package is a Firefox one (an .xpi), which words some limits differently.
+    init(extension ext: WKWebExtension, manifest: [String: Any], id: String, firefox: Bool = false) {
         let requested = Self.strings(manifest, ["permissions", "optional_permissions"])
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
         // Not a permission, but worth saying up front: it changes what ⌘T does.
@@ -44,22 +45,26 @@ struct ExtensionReport {
         let patterns = ext.allRequestedMatchPatterns.map(\.string)
         abilities = Self.abilities(permissions: requested, patterns: patterns, id: id, replacesNewTab: replacesNewTab, searchEngine: searchEngine)
         asked = Asked(permissions: requested, patterns: Set(patterns), replacesNewTab: replacesNewTab, searchEngines: searchEngine.map { [$0] } ?? [], ids: [id])
-        limits = Self.lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
+        limits = Self.lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true, firefox: firefox)
     }
 
     /// Settings' lines for an extension, without building the whole report. The overlay is decoded once
     /// (`ExtensionCompatibility.shared`).
-    static func limits(for ext: WKWebExtension, manifest: [String: Any], id: String) -> [CompatibilityLimit] {
+    static func limits(for ext: WKWebExtension, manifest: [String: Any], id: String, firefox: Bool = false) -> [CompatibilityLimit] {
         let requested = strings(manifest, ["permissions", "optional_permissions"])
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
-        return lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
+        return lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true, firefox: firefox)
     }
 
     /// Claim lines for a manifest's permissions and keys, minus what a shim prelude covers, plus a line by name for
     /// permissions neither WebKit nor the claims know. Wording only; nothing grants or drops permissions.
     private static func lines(for manifest: [String: Any], requested: Set<String>, recognized: Set<String>,
-                              id: String, log: Bool) -> [CompatibilityLimit] {
+                              id: String, log: Bool, firefox: Bool = false) -> [CompatibilityLimit] {
         var limits = claimedLines(for: requested, manifestKeys: manifestKeys(in: manifest), id: id, log: log)
+        // Firefox's proxy API (proxy.onRequest, and proxy.settings in its own shape) has nothing here to run on.
+        if firefox, requested.contains("proxy") {
+            limits.append(CompatibilityLimit(catalogKey: firefoxProxyKey, group: "proxy", reason: .webkitMissing, status: .unsupported, source: "proxy"))
+        }
         let covered = ExtensionShims.shim(for: id)?.coveredPermissions ?? []
         let claimed = ExtensionCompatibility.shared.overlay.map { Set($0.permissions.keys) } ?? []
         // A permission is a limit only if WebKit drops it; one WebKit supports with no claim still works. MV2 host patterns in
@@ -103,6 +108,8 @@ struct ExtensionReport {
     private static func permission(of limit: CompatibilityLimit) -> String {
         String(limit.source.prefix { $0 != "." })
     }
+
+    static let firefoxProxyKey = "extension.limit.firefoxProxy"
 
     /// Whether a manifest string is a permission name, not an MV2 host pattern.
     private static func isPermissionName(_ name: String) -> Bool {

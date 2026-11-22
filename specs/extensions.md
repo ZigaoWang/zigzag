@@ -19,6 +19,8 @@
   Test: AddonsMozillaPageTests.aCheckedClickAsksOnlyInTheInstallSheet
 - Install from File… in Settings › Extensions → takes a .xpi file or a folder with a manifest.json.
   Test: FirefoxInstallTests.installingAnXPIRecordsItsKindGeckoIDAndOpaqueID
+- A .xpi that asks for the proxy permission → its sheet and its row in Settings say Firefox's proxy API won't work in Zigzag.
+  Test: FirefoxLimitTests.aFirefoxProxyExtensionSaysItsProxyWontWork
 
 ## Updates
 - Extensions from the Chrome Web Store → checked once a day; ones from a .xpi or a folder aren't.
