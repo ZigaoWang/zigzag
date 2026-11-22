@@ -308,7 +308,9 @@ struct SpacePaletteTests {
 extension SpacePaletteTests {
     /// The palette's glass tints the desktop with the color as it is, light by day: clear, never a grayed veil. Deep
     /// at night it covers a little more, so light text holds over a light desktop.
-    @Test func thePalettesGlassIsClear() {
+    /// Power saving frosts all glass (`SpaceInfo.usesClearGlass`), so it runs on power only.
+    @Test(.disabled(if: PowerSaving.onBattery || ProcessInfo.processInfo.isLowPowerModeEnabled, "Power saving frosts the glass"))
+    func thePalettesGlassIsClear() {
         func resolved(_ color: NSColor, dark: Bool) -> NSColor {
             var out = color
             NSAppearance(named: dark ? .darkAqua : .aqua)!.performAsCurrentDrawingAppearance { out = color.usingColorSpace(.sRGB) ?? color }
