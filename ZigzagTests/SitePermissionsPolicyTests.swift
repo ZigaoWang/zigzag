@@ -436,6 +436,28 @@ import WebKit
         #expect(PopupNotice.heldOutcome(for: "deny", sized: true) == .discard)
     }
 
+    /// A pop-up within a second of your own input in its page, window key, main frame, counts as clicked.
+    @Test func aPopUpRightAfterYourInputCountsAsClicked() {
+        #expect(PopupNotice.countsAsClicked(sinceInput: 0.3, windowIsKey: true, fromMainFrame: true))
+        #expect(PopupNotice.countsAsClicked(sinceInput: 1, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: 1.5, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: nil, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: -0.1, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: 0.3, windowIsKey: false, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: 0.3, windowIsKey: true, fromMainFrame: false))
+        #expect(PopupNotice.countedNote(sinceInput: 0.34) == "counted as clicked: input 0.3 s before")
+    }
+
+    /// Input is kept per page: a click in one doesn't count for another's pop-up.
+    @MainActor @Test func yourInputCountsOnlyForItsOwnPage() throws {
+        let clicked = WKWebView(), other = WKWebView()
+        PopupNotice.noteInput(in: clicked, at: 100)
+        let since = try #require(PopupNotice.sinceInput(in: clicked, now: 100.4))
+        #expect(abs(since - 0.4) < 0.001)
+        #expect(PopupNotice.sinceInput(in: other, now: 100.4) == nil)
+        #expect(!PopupNotice.countsAsClicked(sinceInput: PopupNotice.sinceInput(in: other, now: 100.4), windowIsKey: true, fromMainFrame: true))
+    }
+
     /// The diagnostics line for an unclicked pop-up says where it was and whether you had just used a page.
     @Test func anUnclickedPopUpNotesWhereAndYourLastInput() {
         #expect(PopupNotice.unclickedNote(inMini: true, sinceInput: 0.34) == "in Zigzag Mini, a click or key in a page 0.3 s before")

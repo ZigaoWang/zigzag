@@ -505,7 +505,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         guard Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
         // Unclicked pop-ups open only via a kept destination, or ask.
-        if !PopupNotice.isUserInitiated(navigationAction) {
+        if !PopupNotice.isClicked(navigationAction, in: webView, isPrivate: isPrivate) {
             // Any kind of window: a page in Zigzag Mini or an installed app also asks there. Looking up only browser
             // windows dropped those pop-ups silently.
             let parent = WindowManager.shared.promptHost(for: parentWindow) ?? (opener?.host as? PromptHost)

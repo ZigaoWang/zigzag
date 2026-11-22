@@ -57,8 +57,8 @@ enum DebugBridge {
     /// minimenu <char> [cmd|shift|ctrl|opt...], ministate <path> (JSON), minishot <path> (PNG; web content may be
     /// blank), miniclosebrowsers, minijs <script>, miniesc, miniquit, miniask notifications, minianswer
     /// allow|always|alternate|deny|notnow|<action>, minisave save|notnow, minieval <path> <script>, miniswipe <dx> [slow]
-    /// [noend], miniborderless on|off, miniclick x y (a click in its page), miniprompts on|off (questions show though it
-    /// isn't key). Without a mini window, miniask and minianswer use the front browser window.
+    /// [noend], miniborderless on|off, miniclick x y [real] (a click in its page; real counts it for
+    /// pop-ups), minikey on|off (taken for the key window), miniprompts on|off (questions show though it isn't key). Without a mini window, miniask and minianswer use the front browser window.
     /// pageprobe <path> [mark]: each tab's page state as JSON; `mark` tags live pages so a later probe shows which
     /// reloaded.
     /// capture [area|element|full|visible] (Capture begun in that mode, or switched to it), capture toggle (⇧⌘2),
@@ -290,6 +290,11 @@ enum DebugBridge {
                 }
             }
             BrowserWebView.takesFirstMouse = false
+            // `real`: counted as your own click for the page's pop-ups (`PopupNotice.noteInput`).
+            if arg.contains("real"), let webView = mini?.tab.webView { PopupNotice.noteInput(in: webView) }
+        case "minikey":
+            // As if Zigzag Mini were the key window (NSApp.keyWindow), for a test copy kept behind.
+            DebugKeyWindow.pretend(arg == "off" ? nil : mini?.window)
         case "miniesc": mini?.debugEscape()
         case "miniquit": NSApp.terminate(nil)
         case "miniask":

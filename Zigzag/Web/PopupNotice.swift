@@ -75,6 +75,57 @@ enum PopupNotice {
         return [.leftMouseUp, .leftMouseDown, .otherMouseUp, .keyDown].contains(event.type)
     }
 
+    /// Each page's last click or key from you, by its web view, so a pop-up can only count its own page's input.
+    private static let lastInput = NSMapTable<WKWebView, NSNumber>.weakToStrongObjects()
+    /// How long after your click or key a page's pop-up still counts as clicked when WebKit didn't see it so.
+    nonisolated static let inputGrace: TimeInterval = 1
+
+    /// A real event on its way in (`ZigzagApplication.sendEvent`): a click or key that lands in a page is noted for it.
+    /// AI apps' keys don't count.
+    static func noteInput(_ event: NSEvent) {
+        guard [.leftMouseDown, .leftMouseUp, .keyDown].contains(event.type), !MCPKeyDelivery.isAgentEvent(event),
+              let window = event.window else { return }
+        var view: NSView?
+        if event.type == .keyDown {
+            view = window.firstResponder as? NSView
+        } else if let frame = window.contentView?.superview ?? window.contentView {
+            view = frame.hitTest(event.locationInWindow)
+        }
+        while let current = view, !(current is WKWebView) { view = current.superview }
+        if let webView = view as? WKWebView { noteInput(in: webView) }
+    }
+
+    static func noteInput(in webView: WKWebView, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        lastInput.setObject(NSNumber(value: time), forKey: webView)
+    }
+
+    /// Seconds since your last click or key in this page; nil if none.
+    static func sinceInput(in webView: WKWebView, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> TimeInterval? {
+        lastInput.object(forKey: webView).map { now - $0.doubleValue }
+    }
+
+    /// A main-frame pop-up counts as clicked within `inputGrace` of your own click or key in its page while its
+    /// window is key, as with Chrome's transient activation. Frames never do.
+    nonisolated static func countsAsClicked(sinceInput: TimeInterval?, windowIsKey: Bool, fromMainFrame: Bool) -> Bool {
+        guard fromMainFrame, windowIsKey, let sinceInput else { return false }
+        return sinceInput >= 0 && sinceInput <= inputGrace
+    }
+
+    /// Clicked as WebKit saw it, or right after your own click or key in this page (`countsAsClicked`), which is noted
+    /// for Report a Problem.
+    static func isClicked(_ action: WKNavigationAction, in webView: WKWebView, isPrivate: Bool) -> Bool {
+        if isUserInitiated(action) { return true }
+        let since = sinceInput(in: webView)
+        guard countsAsClicked(sinceInput: since, windowIsKey: webView.window != nil && webView.window === NSApp.keyWindow,
+                              fromMainFrame: action.sourceFrame.isMainFrame), let since else { return false }
+        Diagnostics.note("Pop-up without a click", site: webView.url?.host(), countedNote(sinceInput: since), isPrivate: isPrivate)
+        return true
+    }
+
+    nonisolated static func countedNote(sinceInput: TimeInterval) -> String {
+        "counted as clicked: input \(String(format: "%.1f", sinceInput)) s before"
+    }
+
     /// The diagnostics line for a pop-up WebKit saw no click for: where it was, and how long since your last click or
     /// key in a page, if that was in the last 5 seconds.
     nonisolated static func unclickedNote(inMini: Bool, sinceInput: TimeInterval) -> String {

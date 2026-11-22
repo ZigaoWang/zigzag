@@ -2483,7 +2483,7 @@ extension Tab: WKUIDelegate {
     private func newWebView(for webView: WKWebView, configuration: WKWebViewConfiguration, navigationAction: WKNavigationAction,
                             windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Zigzag Mini always opens; a page's own request needs a click or your say.
-        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
+        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isClicked(navigationAction, in: webView, isPrivate: isPrivate) {
             // Page pop-up: a saved destination for the site opens without asking, else the banner asks and nothing
             // opens yet. Zigzag pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
