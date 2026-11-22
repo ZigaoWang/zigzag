@@ -265,5 +265,7 @@ if [[ "${1:-}" == "--publish" ]]; then
     git -C "$TAP" commit -q -am "zigzag $VERSION"
     echo "Homebrew cask bumped to $VERSION in $TAP; push it after the GitHub release is up."
   fi
+  # Its betas and older ones are done with: their GitHub pages go, their tags stay.
+  zsh scripts/prune-betas.sh "$VERSION" || echo "Old beta release pages weren't removed; run scripts/prune-betas.sh $VERSION."
 fi
 echo "Done: $ZIP and $DMG"
