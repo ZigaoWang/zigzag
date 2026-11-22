@@ -291,6 +291,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let pages = ids.compactMap(self.tabManager.bookmarkTab(for:))
             if !pages.isEmpty { self.tabManager.close(pages) }
         }
+        // One page's × in a split favorite unloads that page alone, as a pinned split row's part × does.
+        sidebar.favorites.onClosePage = { [weak self] page in
+            guard let self, let tab = self.tabManager.bookmarkTab(for: page.id) else { return }
+            self.listClose(tab)
+        }
         sidebar.favorites.onMenu = { [weak self] favorite in
             guard let self else { return nil }
             return SidebarMenus.favoriteMenu(for: favorite, controller: self)

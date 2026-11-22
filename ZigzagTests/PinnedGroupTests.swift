@@ -647,6 +647,35 @@ import Testing
         }
     }
 
+    /// A split favorite's × sits on the page you point at, and unloads that page alone; the favorite keeps every page.
+    @Test(arguments: [2, 4]) func aFavoriteSplitsCloseButtonUnloadsOnlyItsPage(count: Int) throws {
+        try inWindow((0..<count).map(String.init)) { controller, tabs, _ in
+            let manager = controller.tabManager
+            manager.makeGroup(tabs, shape: count == 2 ? Self.shapes[0] : Self.shapes[4])
+            manager.favoriteTab(tabs[0])
+            tabs.forEach { _ = $0.ensureWebView() }
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == count)
+            let favorites = controller.sidebar.favorites
+            let open = Dictionary(uniqueKeysWithValues: marks.compactMap { id in manager.bookmarkTab(for: id).map { (id, $0) } })
+            favorites.reload(favorites: Library.shared.favoriteTiles(in: manager.profile.id), selectedID: nil, tabs: open)
+            let tile = try #require(favorites.tile(for: marks[0]) as? FavoriteTile)
+            tile.frame = NSRect(x: 0, y: 0, width: 60, height: Tokens.Sidebar.favoriteHeight)
+            tile.isHovered = true
+            tile.debugPoint(atPage: 1)
+            tile.layoutSubtreeIfNeeded()
+            #expect(!tile.debugCloseButton.isHidden)
+            #expect(tile.debugCloseButton.toolTip == "Unload Page")
+            let event = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                        context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            tile.debugCloseButton.onClick?(event)
+            #expect(manager.bookmarkTab(for: marks[1]) == nil)
+            #expect(marks.enumerated().filter { $0.offset != 1 }.allSatisfy { manager.bookmarkTab(for: $0.element) != nil })
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            #expect(Library.shared.isFavorite(marks[0]))
+        }
+    }
+
     /// A tab of three or four side by side says it pins the split view, as one of two does, in its menu and the
     /// menu bar; a pinned one's says it unpins the split view.
     @Test func theItemsNameTheSplitForEveryCount() throws {
@@ -903,6 +932,34 @@ import Testing
         #expect(frames[1].midX == frames[2].midX && frames[1].midX > frames[0].midX)
         #expect(tile.page(at: NSPoint(x: 4, y: 4))?.id == pages[0].id)
         #expect(tile.page(at: NSPoint(x: 4, y: tile.bounds.height - 4))?.id == pages[0].id)
+    }
+
+    /// Pointing at a page of a split favorite puts the × in that page's icon's place: centered on it, its size, clear
+    /// of the other icons.
+    @Test(arguments: [[TileRegion.left, .right], [.left, .topRight, .bottomRight], [.topLeft, .topRight, .bottomLeft, .bottomRight]],
+          [48, 60, 80] as [CGFloat])
+    func aSplitsCloseButtonsSitOnTheirOwnIcons(regions: [TileRegion], width: CGFloat) {
+        let (tile, _) = tile(regions)
+        tile.frame.size.width = width
+        let icons = Array(tile.pageIcons.prefix(regions.count))
+        for page in regions.indices {
+            tile.debugPoint(atPage: page)
+            tile.layoutSubtreeIfNeeded()
+            let close = tile.debugCloseButton.frame, own = icons[page].frame
+            #expect(close.midX == own.midX && close.midY == own.midY)
+            #expect(close.size == own.size)
+            #expect(icons.indices.allSatisfy { $0 == page || !close.intersects(icons[$0].frame) })
+        }
+    }
+
+    /// A favorite of one page keeps its × in the tile's top-right corner.
+    @Test func aSingleFavoritesCloseButtonStaysInTheCorner() {
+        let page = Bookmark(url: URL(string: "https://example.com/")!, title: "0")
+        let tile = FavoriteTile(bookmark: page)
+        tile.frame = NSRect(x: 0, y: 0, width: 60, height: Tokens.Sidebar.favoriteHeight)
+        tile.layoutSubtreeIfNeeded()
+        let side = Tokens.Sidebar.favoriteClose, edge = Tokens.Sidebar.favoriteCloseInset
+        #expect(tile.debugCloseButton.frame == NSRect(x: 60 - side - edge, y: tile.isFlipped ? edge : tile.bounds.height - side - edge, width: side, height: side))
     }
 
     @Test func aPairStillShowsTwoIconsSideBySide() {
