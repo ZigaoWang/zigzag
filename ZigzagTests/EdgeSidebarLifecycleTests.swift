@@ -32,9 +32,9 @@ struct EdgeSidebarLifecycleTests {
         #expect(EdgePopoutPolicy.ordersFrontRegardless(floating: true))
     }
 
-    @Test func aSpaceChangeEndsTheLens() {
-        #expect(EdgePeekRouting.closesOnSpaceChange(peekVisible: true))
-        #expect(!EdgePeekRouting.closesOnSpaceChange(peekVisible: false))
+    @Test func aSpaceChangeKeepsTheLens() {
+        #expect(EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: true))
+        #expect(!EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: false))
     }
 
     @Test func aPageOpenedFromTheLensStaysInTheLens() {

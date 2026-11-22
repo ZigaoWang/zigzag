@@ -52,12 +52,12 @@ enum EdgePeekHoverPolicy {
     }
 }
 
-/// What the lens does when the browser's context changes under it: a space switch ends it, and a page opened from
-/// it stays in it.
+/// What the lens does when the browser's context changes under it: a space switch hands it the new space's selected
+/// page, and a page opened from it stays in it.
 enum EdgePeekRouting {
     enum NewPage { case peek, browser }
 
-    static func closesOnSpaceChange(peekVisible: Bool) -> Bool { peekVisible }
+    static func keepsLensOnSpaceChange(peekVisible: Bool) -> Bool { peekVisible }
     static func newPage(peekVisible: Bool) -> NewPage { peekVisible ? .peek : .browser }
     /// A page opened from the lens replaces it; selecting any other tab is leaving the lens.
     static func selectionKeepsLens(lensTab: Tab?, selected: Tab?) -> Bool {
@@ -510,13 +510,17 @@ final class EdgePeek {
         }
     }
 
-    /// A space change or the page's tab changing under it: both end it rather than leave a page with no row to come
-    /// from or go back to.
+    /// A space change or the page's tab changing under it: both are dealt with rather than leaving a page with no row
+    /// to come from or go back to.
     private func managerChanged(_ change: TabManager.Change) {
         guard isVisible else { return }
         switch change {
         case .space:
-            if EdgePeekRouting.closesOnSpaceChange(peekVisible: isVisible) { dismiss(.spaceChange) }
+            if EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: isVisible) {
+                transitionToSpace()
+            } else {
+                dismiss(.spaceChange)
+            }
         case .structure:
             if tab?.isClosed == true { dismiss(.sameTab) }
         case .selection:
@@ -538,6 +542,29 @@ final class EdgePeek {
             }
         case .content:
             break
+        }
+    }
+
+    /// The new space's selected tab takes the page's place with the same fold a hover swap uses. A page picked from
+    /// the rows stays picked, now in the new space; a note has no page to keep.
+    private func transitionToSpace() {
+        guard let controller, let selected = controller.tabManager.selectedTab else {
+            dismiss(.spaceChange)
+            return
+        }
+        let keepsPick = lockedTab != nil
+        if EdgeLensPolicy.takesPage(url: selected.url) {
+            show(tab: selected, from: controller)
+            guard tab === selected else { return }
+            if keepsPick {
+                lockedTab = selected
+                controller.setEdgeSelection(selected.id)
+            }
+        } else {
+            showNotice(tab: selected, from: controller)
+            guard noticeTab === selected else { return }
+            lockedTab = nil
+            controller.setEdgeSelection(nil)
         }
     }
 

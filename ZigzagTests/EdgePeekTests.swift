@@ -68,9 +68,9 @@ struct EdgePeekTests {
         #expect(!EdgeLensPolicy.hidesSidebar(after: .spaceChange, pointerInEdgeZone: false, panelCanShow: true))
     }
 
-    @Test func aSpaceChangeEndsTheLens() {
-        #expect(EdgePeekRouting.closesOnSpaceChange(peekVisible: true))
-        #expect(!EdgePeekRouting.closesOnSpaceChange(peekVisible: false))
+    @Test func aSpaceChangeKeepsTheLens() {
+        #expect(EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: true))
+        #expect(!EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: false))
     }
 
     @Test func aNewPageFromTheLensStaysInTheLens() {
