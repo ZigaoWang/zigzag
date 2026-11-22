@@ -84,7 +84,9 @@ struct SidebarSlideTests {
         let clear = WindowGlass(isClear: true, tint: .systemBlue)
         let frosted = WindowGlass(isClear: false, tint: nil)
         #expect(SidebarContainer.usesLiquidGlass(isGlass: true, windowGlass: clear, hasClearGlass: true))
-        #expect(SidebarContainer.usesLiquidGlass(isGlass: true, windowGlass: nil, hasClearGlass: true))
+        // A solid space has no window glass: the frosting, never Liquid Glass, which would hold the window to 80 frames
+        // a second on a ProMotion display even while the sidebar is tucked away (#394).
+        #expect(!SidebarContainer.usesLiquidGlass(isGlass: true, windowGlass: nil, hasClearGlass: true))
         #expect(!SidebarContainer.usesLiquidGlass(isGlass: true, windowGlass: frosted, hasClearGlass: true))
         #expect(!SidebarContainer.usesLiquidGlass(isGlass: true, windowGlass: clear, hasClearGlass: false))
         #expect(!SidebarContainer.usesLiquidGlass(isGlass: false, windowGlass: clear, hasClearGlass: true))
