@@ -186,10 +186,13 @@ final class SidebarContainer: NSView {
         glass.frame = bounds
     }
 
-    /// Floating as glass, Liquid Glass where the Mac has it, unless the window's see-through glass is the frosting:
-    /// then the frosting, as the docked sidebar shows.
+    /// Floating as glass, Liquid Glass only where the window's own glass is clear; frosted and solid spaces get the
+    /// frosting, as the docked sidebar shows. A solid space used to get Liquid Glass here too, and the glass view stays
+    /// in the window while the sidebar is tucked off its edge: Liquid Glass anywhere in a window holds the whole
+    /// window to 80 frames a second on a ProMotion display, so a solid space stuttered with the sidebar on hover and
+    /// was smooth with it docked (#394).
     static func usesLiquidGlass(isGlass: Bool, windowGlass: WindowGlass?, hasClearGlass: Bool = SpaceInfo.hasClearGlass) -> Bool {
-        isGlass && hasClearGlass && windowGlass?.isClear != false
+        isGlass && hasClearGlass && windowGlass?.isClear == true
     }
 
     /// The space's color as it lies over the glass: at the floating cover, see-through spaces too. Docked, a
