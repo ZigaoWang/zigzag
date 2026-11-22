@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Install updates automatically in Settings › General, on by default, can be turned off to stay on the version you have. Zigzag still checks, and a new version shows on the update card as available: Update downloads it and restarts into it, and Skip stops offering that version until a newer one comes out. Check for Updates… still finds a skipped version. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#492](https://github.com/ZigaoWang/zigzag/issues/492))
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, and Your Zigzag Card.

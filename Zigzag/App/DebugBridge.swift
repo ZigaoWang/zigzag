@@ -794,6 +794,9 @@ enum DebugBridge {
         // button; updatestate <path>: menu title and staged update (JSON).
         if name == "updateready" { Updater.shared.debugStage(arg == "off" || arg.isEmpty ? nil : arg); return }
         if name == "updatedismiss" { Updater.shared.dismissCard(); return }
+        // updateoffer <version>|off: a pretend update on offer, as with automatic installs off; updateskip: its Skip.
+        if name == "updateoffer" { Updater.shared.debugOffer(arg == "off" || arg.isEmpty ? nil : arg); return }
+        if name == "updateskip" { Updater.shared.skipOffered(); return }
         // updatesim <version> [share|preparing]: Check for Updates… with a pretend download, held at that step if
         // given.
         if name == "updatesim" {
@@ -803,7 +806,7 @@ enum DebugBridge {
         }
         if name == "updatestate" {
             let readiness = Updater.shared.readiness
-            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats,
+            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats, "offered": Updater.shared.offer.available?.version ?? "",
                                         "shown": !controller.sidebar.updateCard.isHidden, "frame": NSStringFromRect(controller.sidebar.updateCard.frame)]
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
             return

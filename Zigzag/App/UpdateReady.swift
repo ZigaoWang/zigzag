@@ -64,17 +64,27 @@ nonisolated struct UpdateReadiness: Equatable, Sendable {
     }
 }
 
-/// The update card's state for a manual update: downloading, preparing, then ready.
+/// The update card's state for a manual update: downloading, preparing, then ready. `available` is one found with
+/// automatic installs off.
 nonisolated enum UpdateCardState: Equatable, Sendable {
     /// `total` is 0 until the size is known.
     case downloading(version: String, received: UInt64, total: UInt64)
     /// Sparkle is unpacking and checking the signature.
     case preparing(version: String)
     case ready(version: String)
+    case available(version: String)
 
     var version: String {
         switch self {
-        case .downloading(let version, _, _), .preparing(let version), .ready(let version): version
+        case .downloading(let version, _, _), .preparing(let version), .ready(let version), .available(let version): version
+        }
+    }
+
+    /// Downloading or preparing: the bar shows, no buttons.
+    var isBusy: Bool {
+        switch self {
+        case .downloading, .preparing: true
+        case .ready, .available: false
         }
     }
 
@@ -90,6 +100,50 @@ nonisolated enum UpdateCardState: Equatable, Sendable {
     func differsVisibly(from old: UpdateCardState?) -> Bool {
         guard let old, let share, let before = old.share, old.version == version else { return self != old }
         return abs(share - before) >= 0.01 || (share >= 1) != (before >= 1)
+    }
+}
+
+/// An update found while automatic installs are off (#492): offered on the card until you get it or skip it.
+nonisolated struct UpdateOffer: Equatable, Sendable {
+    enum Choice: Equatable, Sendable {
+        /// Download it (and install, as before).
+        case install
+        /// Show it on the card; Sparkle leaves it alone for now.
+        case offer
+        /// Tell Sparkle to skip it, so background checks stop finding it.
+        case skip
+    }
+
+    /// The update on the card.
+    private(set) var available: UpdateReadiness.Staged?
+    /// Build you skipped, until Sparkle records the skip on its next background check.
+    private(set) var skipping: String?
+
+    /// What to do with an update Sparkle found that isn't downloaded yet. `getting` is a click on Update; `background`
+    /// is a check you didn't ask for.
+    mutating func found(_ update: UpdateReadiness.Staged, automatic: Bool, getting: Bool, background: Bool) -> Choice {
+        if automatic || getting { return .install }
+        if background, update.build == skipping {
+            skipping = nil
+            return .skip
+        }
+        // A newer build, or a check you asked for, is offered even after a skip.
+        skipping = nil
+        available = update
+        return .offer
+    }
+
+    /// Skip This Version: off the card now, recorded by Sparkle on the next background check.
+    mutating func skip() {
+        guard let available else { return }
+        skipping = available.build
+        self.available = nil
+    }
+
+    /// Downloaded, gone from the feed, or automatic installs back on.
+    mutating func clear() {
+        available = nil
+        skipping = nil
     }
 }
 

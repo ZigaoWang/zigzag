@@ -219,6 +219,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // quitting.
         sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         sidebar.updateCard.onHide = { Updater.shared.dismissCard() }
+        sidebar.updateCard.onUpdate = { Updater.shared.getUpdate() }
+        sidebar.updateCard.onSkip = { Updater.shared.skipOffered() }
         sidebar.setUpdateCard(Updater.shared.cardState)
         tokens.append(Updater.changed.observe { [weak self] in
             guard let self else { return }
@@ -1314,6 +1316,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         card.isFloating = true
         card.onRestart = { Updater.shared.restartToUpdate() }
         card.onHide = { Updater.shared.dismissCard() }
+        card.onUpdate = { Updater.shared.getUpdate() }
+        card.onSkip = { Updater.shared.skipOffered() }
         panel.addSubview(card)
         panel.onLayout = { [weak panel, weak card] in
             guard let panel, let card else { return }

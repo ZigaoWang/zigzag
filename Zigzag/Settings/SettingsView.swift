@@ -364,15 +364,20 @@ enum SettingsVersionRow {
     /// Shows a ready update with Restart instead of Check for Updates…, live.
     static func make() -> FormRow {
         let update = PillButton(title: checkTitle)
-        update.onClick = { _ in Updater.shared.checkForUpdates() }
+        update.onClick = { _ in
+            let updater = Updater.shared
+            if updater.readiness.staged == nil, updater.offer.available != nil { updater.getUpdate() } else { updater.checkForUpdates() }
+        }
         let row = FormRow(title: "Zigzag", detail: "", control: update)
         row.keywords = String(localized: "check for updates", comment: "Words that find the version row with Find a setting in Settings. Not shown.")
         let refresh = { [weak row, weak update] in
             guard let row, let update else { return }
             let ready = Updater.shared.readiness.staged?.version
-            row.detailText = detail(ready: ready, coming: Updater.shared.activity)
-            update.title = ready == nil ? checkTitle
-                : String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General.")
+            let available = ready == nil ? Updater.shared.offer.available?.version : nil
+            row.detailText = detail(ready: ready, coming: Updater.shared.activity, available: available)
+            update.title = ready != nil ? String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General.")
+                : available != nil ? String(localized: "Update", comment: "Button on the sidebar's update card and in Settings › General while automatic installs are off: downloads the update, then restarts Zigzag into it.")
+                : checkTitle
         }
         refresh()
         // Lives as long as the row.
@@ -380,8 +385,8 @@ enum SettingsVersionRow {
         return row
     }
 
-    /// The version, plus the ready or downloading one, as the update card says.
-    static func detail(ready: String?, coming: UpdateCardState? = nil) -> String {
+    /// The version, plus the ready, downloading or available one, as the update card says.
+    static func detail(ready: String?, coming: UpdateCardState? = nil, available: String? = nil) -> String {
         let version = VersionName.display(VersionName.running)
         switch coming {
         case .downloading(let new, _, _):
@@ -391,6 +396,10 @@ enum SettingsVersionRow {
             return String(localized: "Preparing version \(VersionName.display(new))…",
                           comment: "Under Zigzag's name in Settings › General once an update has downloaded, while it's unpacked and checked. The placeholder is the new version.")
         default: break
+        }
+        if ready == nil, let available = available.map(VersionName.display) {
+            return String(localized: "Version \(available) is available. You have \(version).",
+                          comment: "Under Zigzag's name in Settings › General while automatic installs are off and an update was found, beside Update. The placeholders are the new version and the one running.")
         }
         guard let ready = ready.map(VersionName.display) else { return String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General.") }
         return String(localized: "Version \(ready) is ready to install. You have \(version).",
@@ -408,6 +417,18 @@ enum SettingsVersionRow {
                           detail: String(localized: "A beta can break.", comment: "Explanation under “Beta updates” in Settings › General."),
                           control: toggle)
         row.keywords = String(localized: "beta channel prerelease", comment: "Words that find the Beta updates setting with Find a setting in Settings. Not shown.")
+        return row
+    }
+
+    /// On by default. Off, updates are only offered on the update card (#492).
+    static func automatic() -> FormRow {
+        let toggle = Toggle(isOn: Updater.installsAutomatically)
+        toggle.onChange = { on in Updater.installsAutomatically = on }
+        let row = FormRow(title: String(localized: "Install updates automatically", comment: "A setting in Settings › General."),
+                          detail: String(localized: "When off, Zigzag still checks and asks before downloading an update.",
+                                         comment: "Explanation under “Install updates automatically” in Settings › General."),
+                          control: toggle)
+        row.keywords = String(localized: "automatic updates download install skip version", comment: "Words that find the Install updates automatically setting with Find a setting in Settings. Not shown.")
         return row
     }
 
@@ -1333,6 +1354,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let defaultControl = NSStackView(views: [defaultStatus, defaultButton])
         defaultControl.spacing = Tokens.Space.x2
         versionGroup.add(SettingsVersionRow.make())
+        versionGroup.add(SettingsVersionRow.automatic())
         versionGroup.add(SettingsVersionRow.betas())
         if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
         let defaultRow = FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
