@@ -150,7 +150,7 @@ class ListItem: InteractiveView {
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
         // Monochrome outline symbols in a favicon's slot, as the sidebar's rows have them.
-        icon.image = Tokens.Symbol.image(symbol, size: Tokens.Symbol.row)
+        icon.image = Tokens.Symbol.image(symbol, size: Self.symbolSize(symbol))
         icon.imageScaling = .scaleNone
         count.alignment = .right
         count.isHidden = true
@@ -160,6 +160,14 @@ class ListItem: InteractiveView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// The widest a symbol's ink may run; a wider one (translate) is drawn smaller to match the others.
+    private static let widestInk: CGFloat = 20
+
+    private static func symbolSize(_ symbol: String) -> CGFloat {
+        let width = Tokens.Symbol.inkSize(symbol, size: Tokens.Symbol.row).width
+        return width > widestInk ? floor(Tokens.Symbol.row * widestInk / width) : Tokens.Symbol.row
+    }
 
     override func layout() {
         super.layout()
@@ -271,7 +279,7 @@ enum PageStyle {
             "--radius-panel: \(px(radius.group))", "--radius-float: \(px(radius.panel))", "--small: \(px(size.small))", "--label: \(px(size.label))", "--body: \(px(size.body))", "--heading: \(px(size.heading))",
             "--empty-mark: \(px(Tokens.EmptyState.markWidth))", "--empty-mark-opacity: \(Tokens.EmptyState.markOpacity)",
             "--empty-gap: \(px(Tokens.EmptyState.markGap))", "--empty-action-gap: \(px(Tokens.EmptyState.actionGap))",
-            "--empty-width: \(px(Tokens.EmptyState.textWidth))",
+            "--empty-width: \(px(Tokens.EmptyState.textWidth))", "--no-match-top: \(px(Tokens.EmptyState.noMatchTop))",
             "--selection: \(Int(Tokens.Color.selectionAlpha * 100))%", "--group-gap: \(px(page.groupGap))",
             "--row-text: \(px(size.row))", "--title: \(px(size.title))", "--favicon: \(px(Tokens.Metric.favicon))",
             "--control-text: \(px(size.body))", "--focus: \(Int(Tokens.Color.focusAlpha * 100))%",

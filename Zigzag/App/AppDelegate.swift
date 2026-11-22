@@ -1,8 +1,27 @@
 import AppKit
 import WebKit
 
+/// What a launch does with the last session: pick it up, or start with one fresh window, the saved session left for
+/// History › Reopen Last Session (#433). Reopening is the default, so nothing changes for anyone who never opens Settings.
+enum LaunchChoice: String, CaseIterable, Sendable {
+    case resume, fresh
+
+    /// Kept in the app's defaults, beside the other settings.
+    static var choice: LaunchChoice {
+        get { LaunchChoice(rawValue: defaults.string(forKey: key) ?? "") ?? .resume }
+        set { defaults.set(newValue.rawValue, forKey: key) }
+    }
+
+    /// What keeps it, so a test can swap in its own suite instead of the dev app's defaults.
+    static var defaults: UserDefaults = .standard
+
+    static let key = "LaunchChoice"
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
+    /// Which of `pendingURLs` were handed off from another device: those open in a tab, never Zigzag Mini (#456).
+    private var pendingHandoffs: Set<URL> = []
     /// Sites installed as apps asked for before launch finished (one opened with Zigzag not running).
     private var pendingWebApps: [URL] = []
     private var launched = false
@@ -34,6 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !Self.isHostingTests {
             // A new version backs up the data the last one left, and a restore asked for before restarting puts
             // a backup back, both before anything reads it.
+            // The day Zigzag was first used here, kept once, while the last run's version is still on record.
+            CardStart.settle()
             // A new version owes its notes: noted before the backup records this version as the one that ran.
             WhatsNew.noteLaunch()
             let info = Bundle.main.infoDictionary
@@ -142,7 +163,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Onboarding not finished: it comes first, instead of the window that was waiting behind it. Opened for links that
         // all go to Zigzag Mini, only Zigzag Mini comes up, as Little Arc does; the windows come back when you ask.
-        let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(WindowManager.shared.opensInMini)
+        let handoffs = pendingHandoffs
+        let goesToMini = { (url: URL) in Self.pendingOpensInMini(url, handedOff: handoffs, opensInMini: WindowManager.shared.opensInMini) }
+        let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(goesToMini)
         // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
         // wait until you ask for them.
         let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
@@ -151,18 +174,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
                                        miniOnly: miniOnly, webAppOnly: webAppOnly)
         WindowManager.shared.sessionWaiting = plan.sessionWaiting
-        let restored = plan.restoresSession ? WindowManager.shared.restoreSession() : false
+        // Settings › General › On launch: a fresh start keeps the saved session for History › Reopen Last Session
+        // instead of bringing it back, and doesn't write over it until the new window is used (#433). An update's
+        // relaunch puts exactly what was open back, unless it interrupted a fresh start still unused.
+        let resumes = UpdateRelaunch.resumes(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
+        WindowManager.shared.startingFresh = UpdateRelaunch.startsFresh(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
+        if WindowManager.shared.startingFresh { WindowManager.shared.keepSessionForReopening() }
+        let restored = resumes ? WindowManager.shared.restoreSession() : false
         if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()
         launched = true
         if !pendingURLs.isEmpty {
             // A link for Zigzag Mini opens just that, as it would with Zigzag already running.
-            if !restored, !WindowManager.shared.opensInMini(pendingURLs[0]) {
+            if !restored, !goesToMini(pendingURLs[0]) {
                 WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false)
             }
-            pendingURLs.forEach { WindowManager.shared.openExternal($0) }
+            pendingURLs.forEach { handoffs.contains($0) ? WindowManager.shared.openHandedOff($0) : WindowManager.shared.openExternal($0) }
             pendingURLs = []
+            pendingHandoffs = []
         } else if !restored, !plan.sessionWaiting {
             WindowManager.shared.newWindow()
         }
@@ -186,6 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PictureInPicture.floatPanels()
     }
     func applicationDidResignActive(_ notification: Notification) { MiniLinkWake.appDidResign() }
+    // A hidden Zigzag offers no page to your other devices.
+    func applicationDidHide(_ notification: Notification) { WindowManager.shared.controllers.forEach { $0.updateHandoff() } }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Only a Zigzag Mini up counts as no window: the Dock icon brings the browser back.
@@ -207,10 +239,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var quitConfirmed = false
 
     /// Asks before quitting, in the window, like Zigzag's other confirmations. Never when the Mac is logging out,
-    /// restarting or shutting down, or when an update restarts Zigzag. ⌘Q again, or Return, quits.
+    /// restarting or shutting down, when an update restarts Zigzag, or for Quit chosen in the menu or the Dock: only
+    /// the Quit key asks. ⌘Q again, or Return, quits.
     static var asksBeforeQuitting: Bool {
         get { UserDefaults.standard.object(forKey: "AskBeforeQuitting") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "AskBeforeQuitting") }
+    }
+
+    /// Set while the Quit key quits: choosing Quit anywhere else is the confirmation, as in Chrome (#441).
+    private static var quittingFromKey = false
+
+    /// Whether the setting asks for this quit: only for the Quit key, or always while files download.
+    static func asks(fromKey: Bool, setting: Bool, downloading: Int) -> Bool {
+        (setting && fromKey) || downloading > 0
+    }
+
+    /// Quit Zigzag's shortcut as it is now, after Settings › Shortcuts; ⌘Q before the menu bar is built.
+    static var quitCombo: Shortcuts.Combo {
+        Shortcuts.allItems.first { $0.action == #selector(quitFromMenu(_:)) }.map(Shortcuts.combo(of:))
+            ?? Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags.command.rawValue)
+    }
+
+    /// Whether the event is Quit's shortcut, the one quit the setting asks about.
+    static func isQuitKey(_ event: NSEvent?, combo: Shortcuts.Combo = quitCombo) -> Bool {
+        guard let event, event.type == .keyDown, !combo.key.isEmpty, let pressed = Shortcuts.combo(from: event) else { return false }
+        let wanted = combo.flags.intersection([.command, .option, .control, .shift])
+        // An uppercase key equivalent carries ⇧ by itself.
+        let flags = combo.key.lowercased() != combo.key ? wanted.union(.shift) : wanted
+        guard pressed.flags == flags else { return false }
+        if pressed.key == combo.key.lowercased() { return true }
+        // A layout without Latin letters (Russian, Greek, Hebrew) types its own letter there, and the menu still takes
+        // the key where the letter sits on a US keyboard: so does this.
+        guard !pressed.key.unicodeScalars.allSatisfy(\.isASCII), let code = ansiKeyCode(combo.key) else { return false }
+        return event.keyCode == code
+    }
+
+    /// Where a letter or digit sits on a US keyboard (the kVK_ANSI_ codes).
+    static func ansiKeyCode(_ key: String) -> UInt16? {
+        let codes: [Character: UInt16] = [
+            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
+            "e": 14, "r": 15, "y": 16, "t": 17, "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "9": 25, "7": 26,
+            "8": 28, "0": 29, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46,
+        ]
+        guard key.count == 1, let char = key.lowercased().first else { return nil }
+        return codes[char]
+    }
+
+    @objc func quitFromMenu(_ sender: Any?) {
+        Self.quittingFromKey = Self.isQuitKey(NSApp.currentEvent)
+        defer { Self.quittingFromKey = false }
+        NSApp.terminate(sender)
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -223,7 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .terminateLater
         }
         // Asked already, or not asking: downloads are the one thing worth asking about anyway.
-        guard !Self.quitConfirmed, Self.asksBeforeQuitting || downloading > 0 else { return quitNow() }
+        guard !Self.quitConfirmed, Self.asks(fromKey: Self.quittingFromKey, setting: Self.asksBeforeQuitting, downloading: downloading) else { return quitNow() }
         // Logging out, restarting or shutting down: the system's own reason is on the quit event.
         if let event = NSAppleEventManager.shared().currentAppleEvent,
            event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil { return quitNow() }
@@ -242,17 +320,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Self.quitConfirmed = true
             Self.finishBeforeQuitting(downloading: downloading)
         }
+        // Under Start Fresh the next launch won't bring these back by itself, so the sheet doesn't promise it does.
+        let fresh = LaunchChoice.choice == .fresh
+        let keepsTabs = String(localized: "Your tabs and spaces will be right here when you open it again.",
+                               comment: "Message of the sheet that asks before quitting; “it” is Zigzag.")
+        let freshTabs = String(localized: "Your tabs and spaces are saved, and History › Reopen Last Session brings them back.",
+                               comment: "Message of the sheet that asks before quitting, with On launch set to Start Fresh: the next launch opens a new window, and the session is reopened from the History menu.")
         let message = downloading == 0
-            ? String(localized: "Your tabs and spaces will be right here when you open it again.",
-                     comment: "Message of the sheet that asks before quitting; “it” is Zigzag.")
+            ? (fresh ? freshTabs : keepsTabs)
             : String(localized: "\(downloading) downloads are still in progress. They pause, and you can resume them from Downloads when you open Zigzag again.",
                      comment: "Message of the sheet that asks before quitting while files download.")
         ConfirmSheet.show(in: host, title: String(localized: "Quit Zigzag?", comment: "Title of the sheet that asks before quitting."), message: message,
                           confirmTitle: String(localized: "Quit", comment: "Button of the sheet that asks before quitting.")) { answer($0) }
-        // While it asks, ⌘Q again means yes (macOS doesn't ask the app a second time on its own).
+        // While it asks, the Quit key again means yes (macOS doesn't ask the app a second time on its own).
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                  event.charactersIgnoringModifiers?.lowercased() == "q" else { return event }
+            guard Self.isQuitKey(event) else { return event }
             host.subviews.compactMap { $0 as? ConfirmSheet }.forEach { $0.removeFromSuperview() }
             answer(true)
             return nil
@@ -342,6 +424,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
+    /// Whether a link waiting for launch goes to Zigzag Mini: as the setting says, but never a handed-off page (#456).
+    static func pendingOpensInMini(_ url: URL, handedOff: Set<URL>, opensInMini: (URL) -> Bool) -> Bool {
+        !handedOff.contains(url) && opensInMini(url)
+    }
+
     private func open(_ url: URL) {
         guard launched else { pendingURLs.append(url); return }
         // Zigzag Mini comes forward on its own, as Little Arc does: activating the whole app would bring every browser
@@ -361,12 +448,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return menu
     }
 
-    /// A page handed off from your iPhone or another Mac opens here, like a link from any app.
+    func application(_ application: NSApplication, willContinueUserActivityWithType userActivityType: String) -> Bool {
+        userActivityType == NSUserActivityTypeBrowsingWeb
+    }
+
+    /// A page handed off from your iPhone or another Mac opens in a tab here, routed like a link from any app.
+    /// macOS hands a browsing activity from another device only to the default browser.
     func application(_ application: NSApplication, continue userActivity: NSUserActivity,
                      restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
         guard userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL,
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return false }
-        open(url)
+        guard launched else {
+            pendingURLs.append(url)
+            pendingHandoffs.insert(url)
+            return true
+        }
+        WindowManager.shared.openHandedOff(url)
+        NSApp.activate()
         return true
     }
 
@@ -423,6 +521,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
     @objc func openDocument(_ sender: Any?) { frontBrowserWindow()?.openDocument(sender) }
     @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
+    /// History › Reopen Last Session: the session a fresh start passed over (#433).
+    @objc func reopenLastSession(_ sender: Any?) { WindowManager.shared.reopenLastSession() }
     /// The latest closed tab or window, as in Chrome; with no window open, that's usually the window.
     @objc func reopenClosedTab(_ sender: Any?) {
         WindowManager.shared.reopenLastClosed(from: WindowManager.shared.controllers.isEmpty ? nil : WindowManager.shared.keyController?.tabManager)
@@ -477,6 +577,11 @@ extension AppDelegate: NSMenuItemValidation {
     /// Reopen Closed Window is dimmed when there's nothing to bring back; Set as Default Browser hides once it is.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        // There when a fresh start is the setting, and dimmed once its session is back.
+        if menuItem.action == #selector(reopenLastSession(_:)) {
+            menuItem.isHidden = LaunchChoice.choice != .fresh
+            return WindowManager.shared.canReopenLastSession
+        }
         // Zigzag Mini names it Open in Zigzag while it's in front; anywhere else it's itself again.
         if menuItem.action == #selector(openDocument(_:)) { menuItem.title = BrowserWindowController.openFileTitle }
         // Shows Restart to Update while an update is ready.

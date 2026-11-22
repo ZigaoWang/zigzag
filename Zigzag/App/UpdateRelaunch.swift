@@ -20,6 +20,8 @@ enum UpdateRelaunch {
         /// Browser windows were showing; false when only Zigzag Mini was (opened for a link), or no window at all.
         var browserWindowsOpen: Bool
         var minis: [Mini]
+        /// A fresh start nothing was done in yet: the relaunch starts fresh again (#433).
+        var startsFresh: Bool? = nil
     }
 
     /// What launch brings back.
@@ -28,6 +30,19 @@ enum UpdateRelaunch {
         /// The saved browser windows stay waiting until something asks for one (`WindowManager.sessionWaiting`).
         var sessionWaiting: Bool
         var restoresMinis: Bool
+    }
+
+    /// Whether this launch brings the session back: an update's relaunch always does, since it puts exactly what was
+    /// open back; any other launch follows Settings › General › On launch (#433).
+    nonisolated static func resumes(plan: Plan, relaunch: Saved?, choice: LaunchChoice) -> Bool {
+        plan.restoresSession && !startsFresh(plan: plan, relaunch: relaunch, choice: choice)
+    }
+
+    /// Whether this launch is a fresh start, the saved windows waiting for a Zigzag Mini link included. An update's
+    /// relaunch is one only when the fresh start it interrupted was still unused.
+    nonisolated static func startsFresh(plan: Plan, relaunch: Saved?, choice: LaunchChoice) -> Bool {
+        guard choice == .fresh, plan.restoresSession || plan.sessionWaiting else { return false }
+        return relaunch.map { $0.startsFresh == true } ?? true
     }
 
     /// A note older than this isn't from the restart that's launching now (an update that never came back up).
@@ -54,7 +69,8 @@ enum UpdateRelaunch {
         AppDelegate.quitConfirmed = true
         let manager = WindowManager.shared
         let browsers = !manager.sessionWaiting && manager.controllers.contains { !$0.tabManager.isPrivate }
-        write(Saved(at: Date(), browserWindowsOpen: browsers, minis: MiniWindowController.all.compactMap(\.savedForRelaunch)))
+        write(Saved(at: Date(), browserWindowsOpen: browsers, minis: MiniWindowController.all.compactMap(\.savedForRelaunch),
+                    startsFresh: manager.freshStartUnused))
         manager.saveNow(synchronously: true)
     }
 

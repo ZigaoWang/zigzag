@@ -551,7 +551,7 @@ enum DarkPages {
         return color
     }
 
-    /// For what turns a page's own background on or off for a while (Peek): back to how dark pages want it.
+    /// For what turns a page's own background on or off for a while (a page shown before it paints): back to how dark pages want it.
     static func restoreGround(of webView: WKWebView) { applyLook(to: webView) }
 
     /// The setting, a site's choice or the Mac's appearance changed: every open page follows at once, without

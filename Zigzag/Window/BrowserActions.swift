@@ -31,7 +31,6 @@ extension BrowserWindowController: NSMenuItemValidation {
         if commandBar.isVisible { commandBar.dismiss(); return }
         // On the desk, the card you're on.
         if desk.isVisible { desk.closeFocused(); return }
-        if dismissFloatingContent() { return }
         // Rows picked in the sidebar, with the keys still there: all of them, as one step.
         if sidebar.list.marksHaveFocus { closeMarked(sidebar.list.marked); return }
         guard let tab = selectedTab else {
@@ -128,9 +127,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
+    /// File › Capture… (⇧⌘2): Capture's mode over the page, or out of it again.
     @objc func takePageScreenshot(_ sender: Any?) {
-        guard let tab = selectedTab else { return }
-        PageScreenshot.take(tab, in: self)
+        capture.toggle()
     }
 
     @objc private func exported(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
@@ -421,16 +420,14 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// again (#316).
     @objc func resetTileLayout(_ sender: Any?) {
         guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, shape.isParted else { return }
+        let before = shape
         shape.evenOut()
-        tabManager.setTileShape(shape, for: tab)
-        root.setTiles(shape, animated: true)
-        root.paneCards.forEach { $0.header.resetsLayout = false }
-        onStateChange?()
+        applyTileShape(shape, undoTo: before)
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
-    /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
-    @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
+    @objc func showReaderOptions(_ sender: Any?) { toggleReaderOptions() }
+    @objc func translatePage(_ sender: Any?) { translatePage() }
 
     /// Floats the playing video. When WebKit can't tell which video that is, says how to do it from the page.
     @objc func togglePictureInPicture(_ sender: Any?) {
@@ -462,11 +459,9 @@ extension BrowserWindowController: NSMenuItemValidation {
     // MARK: History
 
     @objc func goBack(_ sender: Any?) {
-        if let peek = peekController, peek.isVisible { peek.goBack(); return }
         selectedTab?.goBack()
     }
     @objc func goForward(_ sender: Any?) {
-        if let peek = peekController, peek.isVisible { peek.goForward(); return }
         selectedTab?.goForward()
     }
 
@@ -539,10 +534,11 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// picker, and both land in `SavePath.save` as one ⌘Z.
     @discardableResult
     func save(_ tab: Tab, request: SavePath.Request, at index: Int? = nil, then done: (() -> Void)? = nil) -> Bool {
-        guard !tabManager.isPrivate, let page = SavePath.Page(tab: tab) else { return false }
+        guard !tabManager.isPrivate else { return false }
+        // A saved page's quick save is its unsave, as the star and ⌘D have always toggled, whatever it shows now.
+        if request != .picker, tab.bookmarkID != nil { return toggleSavedState(of: tab) }
+        guard let page = SavePath.Page(tab: tab) else { return false }
         guard request == .picker else {
-            // A saved page's quick save is its unsave, as the star and ⌘D have always toggled.
-            if tab.bookmarkID != nil { return toggleSavedState(of: tab) }
             // A tab in a group saves as the group, as it has since #325: one folder, one undo.
             if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
                 bookmarkWithUndo(tab, at: index, in: tab.spaceID)
@@ -715,9 +711,9 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func addToFavorites(_ sender: Any?) {
         // Favorites are shared by every window: a private one adds none, pinned or not.
-        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate else { return }
+        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate, tabManager.canPin(tab, keepingGroup: false) else { return }
         favoriteWithUndo(tab)
-        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "star.fill", in: self)
+        Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "heart.fill", in: self)
     }
 
     /// File › Install as App…: the site as an app of its own, with its own Dock icon (#165).
@@ -896,7 +892,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
         Tutorial.complete("space")
-        renameSpace(nil)
+        // At the button or menu row it came from; from the menu bar or command bar, beside the space's name.
+        openSpaceEditor(tabManager.currentSpaceID, anchor: sender as? NSView)
         if let madeProfile { SpaceEditorPanel.current?.follow(madeProfile: madeProfile) }
         // Esc while naming it: never mind. Back where you were, without the space, and the guide still asks for one.
         SpaceEditorPanel.current?.onCancel = { [weak self] in
@@ -933,9 +930,9 @@ extension BrowserWindowController: NSMenuItemValidation {
             // Zigzag Mini names it Open in Zigzag while it's in front; here it's itself again.
             item.title = Self.openFileTitle
             return true
-        case #selector(goBack(_:)): return (peekController?.isVisible == true) || (tab?.canGoBackOrReturn ?? false)
-        case #selector(goForward(_:)): return (peekController?.isVisible == true) || (tab?.canGoForward ?? false)
-        case #selector(takePageScreenshot(_:)): return PageScreenshot.canTake(tab)
+        case #selector(goBack(_:)): return tab?.canGoBackOrReturn ?? false
+        case #selector(goForward(_:)): return tab?.canGoForward ?? false
+        case #selector(takePageScreenshot(_:)): return capture.isActive || capture.canBegin
         case #selector(reloadPage(_:)), #selector(reloadPageFromOrigin(_:)), #selector(copyPageURL(_:)), #selector(copyPageURLAsMarkdown(_:)),
              #selector(printPage(_:)), #selector(exportAsPDF(_:)), #selector(showFindBar(_:)), #selector(zoomIn(_:)), #selector(zoomOut(_:)),
              #selector(actualSize(_:)), #selector(showWebInspector(_:)), #selector(showJavaScriptConsole(_:)), #selector(inspectElement(_:)),
@@ -978,9 +975,10 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(toggleBookmark(_:)):
             // Same names as the sidebar menus.
-            let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
+            let pinsPair = tab.map(tabManager.pinsSplit) ?? false
             item.title = tab?.isFavorite == true ? String(localized: "Move to Tabs", comment: "Menu bar item: moves the favorite back to the tabs.")
                 : tab?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil ? String(localized: "Unpin Group", comment: "Menu bar item: unpins the whole pinned group the tab is in.")
+                : tab?.bookmarkID.flatMap(Library.shared.pinnedSplit(containing:)) != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
                 : tab?.bookmarkID != nil ? String(localized: "Unpin Tab", comment: "Menu bar item: unpins the tab.")
                 : tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
@@ -991,7 +989,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)):
-            return tab?.url != nil && tab?.isFavorite != true && !tabManager.isPrivate
+            return tab?.url != nil && tab.map { tabManager.canPin($0, keepingGroup: false) } == true && tab?.isFavorite != true && !tabManager.isPrivate
         case #selector(toggleDevelopmentSite(_:)):
             item.title = DeveloperTool.siteTitle(listed: DevelopmentSites.covers(tab?.url))
             return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)
@@ -1018,11 +1016,11 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(collapseAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: true)
         case #selector(expandAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: false)
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
+        case #selector(showReaderOptions(_:)): return isReaderOnHere
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
             return tab?.url != nil
         case #selector(translatePage(_:)):
-            let tab = peek.isVisible ? peek.tab : tab
             item.title = tab?.isTranslated == true ? String(localized: "Show Original", comment: "Menu bar item: shows the translated page as it was.")
                                                   : String(localized: "Translate Page", comment: "Menu bar item: translates the page.")
             return tab?.url != nil
@@ -1062,6 +1060,17 @@ enum ZoomLevels {
 
     /// A zoom as people read it: "125%".
     static func percent(_ zoom: CGFloat) -> String { "\(Int((zoom * 100).rounded()))%" }
+
+    /// A typed zoom as a value: "130%", "130" or " 130 % ". Nil when it isn't a number above zero; the caller
+    /// keeps it within its own levels.
+    static func typed(_ text: String) -> CGFloat? {
+        let plain = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "%", with: "")
+            .replacingOccurrences(of: "％", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        guard let percent = Double(plain), percent.isFinite, percent > 0 else { return nil }
+        return CGFloat(percent / 100)
+    }
 
     /// Zoom for sites without their own: Settings › Appearance › Page zoom (100% by default). Actual Size resets to it,
     /// as in Chrome and Safari.

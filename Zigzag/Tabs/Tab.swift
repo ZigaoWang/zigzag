@@ -31,7 +31,8 @@ enum OpenDisposition {
     case currentTab
     case foregroundTab
     case backgroundTab
-    case peek
+    /// Zigzag Mini over the window (⇧-click, Open Link in Zigzag Mini).
+    case mini
     case newWindow
     case privateWindow
 }
@@ -157,18 +158,24 @@ final class Tab: NSObject {
     let createdAt: Date
     /// True for a tab opened by a search from the command bar, until the user leaves the results page.
     var isSearchTab = false
-    /// True while the page lives in the peek card rather than the tab list. A PDF in peek is WebKit's; it gets
+    /// True while the page lives outside a tab list (Zigzag Mini, an installed app). A PDF there is WebKit's; it gets
     /// Zigzag's viewer once it's a tab.
     /// A site installed as an app (`WebAppWindowController`): a link you click to another site goes to the browser.
     var keepsSite = false
-    var isPeek = false {
-        didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
+    var isOutsideTabList = false {
+        didSet { if oldValue, !isOutsideTabList, let webView { checkForPDF(webView) } }
     }
     /// The last ⇧ or ⌥ link click the page kept, for its own navigation right after (#322).
     var followedClick: (url: URL, activation: LinkActivation, at: Date)?
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore? { didSet { if privateStore !== oldValue { refreshChosenIcon() } } }
     var isPrivate: Bool { privateStore != nil }
+
+    /// What makes a fresh start count as used (#433): a page in an everyday browser window, not a private window,
+    /// Zigzag Mini, or one of Zigzag's own pages such as Settings.
+    static func countsAsBrowsingForSession(isPrivate: Bool, isInBrowserWindow: Bool, url: URL?) -> Bool {
+        !isPrivate && isInBrowserWindow && !HistoryPage.isInternal(url)
+    }
 
     /// Moves it to another space. On another profile, its page moves with it.
     func setSpace(_ id: UUID) {
@@ -258,7 +265,7 @@ final class Tab: NSObject {
     /// Opened from a link, with nothing earlier in this tab: Back closes it and goes back to the page that opened
     /// it, as Safari and Chrome do.
     var returnsToOpener: Bool {
-        guard !canGoBack, !isPeek, bookmarkID == nil, let opener, !opener.isClosed else { return false }
+        guard !canGoBack, !isOutsideTabList, bookmarkID == nil, let opener, !opener.isClosed else { return false }
         // In another window the opener is no longer beside it (shared tabs still count, #162).
         return opener.spaceID == spaceID && (opener.host === host || (store != nil && opener.store === store))
     }
@@ -547,6 +554,8 @@ final class Tab: NSObject {
         if #available(macOS 15.4, *), extensionConfiguration == nil,
            configuration.webExtensionController === profile.extensions.controller {
             profile.extensions.bridge.userScripts.attach(configuration.userContentController, isPrivate: privateStore != nil)
+            // After the private store above: a private page gets OldTwitter's challenge call only when it may run there.
+            profile.extensions.attachOldTwitterSolver(to: configuration, isPrivate: privateStore != nil)
         }
         // A page's own scripts may ask Zigzag to make a loopback call, when Settings and the site's switch both say
         // yes. An extension's own page has its bridge instead, and a private tab keeps WebKit's own networking.
@@ -704,7 +713,7 @@ final class Tab: NSObject {
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
             let freed = chosen ? nil : self.memoryInUse(by: webView)
-            self.tearDown(webView)
+            self.tearDown(webView, keepingSettings: self.url.map(SettingsPage.isSettings) ?? false)
             self.freedMemory = freed
             self.sleepCause = chosen ? .chosen : reason == EnergyWatch.sleepReason ? .energy : .memory
             self.changed.send(.webView)
@@ -764,7 +773,7 @@ final class Tab: NSObject {
         // Sound stops the moment it closes, whatever may still hold the page for a moment.
         webView?.pauseAllMediaPlayback(completionHandler: nil)
         if let webView { tearDown(webView) }
-        // Its holder leaves whatever was showing it (the page card, Peek, a card it stayed in during a video's full
+        // Its holder leaves whatever was showing it (the page card, Zigzag Mini, a card it stayed in during a video's full
         // screen), as its page does.
         pageHolder?.removeFromSuperview()
         if !keepingSnapshot {
@@ -774,12 +783,14 @@ final class Tab: NSObject {
         }
     }
 
-    private func tearDown(_ webView: BrowserWebView) {
+    /// `keepingSettings`: the page may come back as it was (a sleep), so the Settings view stays for it: building one
+    /// again costs the whole first-open time (#357).
+    private func tearDown(_ webView: BrowserWebView, keepingSettings: Bool = false) {
         Autofill.shared.forget(webView)
         // Tabs that shared the rule keep their images.
         PageImages.set(false, in: webView)
         setPDFViewer(nil)
-        if settingsView != nil {
+        if settingsView != nil, !keepingSettings {
             settingsView = nil
             changed.send(.settings)
         }
@@ -876,7 +887,7 @@ final class Tab: NSObject {
 
     /// Where a page may navigate a tab on its own: only the web. App links go to ExternalLinks (which asks); local
     /// files, javascript:, extension and Zigzag pages are refused, except a local page linking to a file beside it.
-    /// data: too: WebKit blocks top-level data: navigation and loading it ourselves (⌘-click, Peek) would bypass that.
+    /// data: too: WebKit blocks top-level data: navigation and loading it ourselves (⌘-click, Zigzag Mini) would bypass that.
     enum PageLinkRoute: Equatable { case load, app, refuse }
 
     static func route(forPageLink url: URL, from page: URL?) -> PageLinkRoute {
@@ -1824,7 +1835,7 @@ extension Tab: WKNavigationDelegate {
             let activation = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: isMainFrame,
                                                  modifiers: flags, buttonNumber: navigationAction.buttonNumber,
                                                  followed: followed)
-            // Site routes (#286) apply to clicks and new-tab links; not peek (⇧), download (⌥) or page-initiated.
+            // Site routes (#286) apply to clicks and new-tab links; not Zigzag Mini (⇧), download (⌥) or page-initiated.
             let opensTab = activation.isNewTab
             if followed == nil, userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
                host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
@@ -1834,8 +1845,8 @@ extension Tab: WKNavigationDelegate {
             case .newTab(let inFront):
                 host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
-            case .peek:
-                host?.tab(self, openURL: url, disposition: .peek)
+            case .mini:
+                host?.tab(self, openURL: url, disposition: .mini)
                 return (.cancel, preferences)
             case .download:
                 return (.download, preferences)
@@ -1877,10 +1888,10 @@ extension Tab: WKNavigationDelegate {
         return (.allow, preferences)
     }
 
-    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Peek, ⌥ download, else the
+    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Zigzag Mini, ⌥ download, else the
     /// page. `followed` is a ⇧ or ⌥ click the page kept and then navigated to itself.
     enum LinkActivation: Equatable {
-        case page, peek, download
+        case page, mini, download
         case newTab(inFront: Bool)
 
         var isNewTab: Bool { if case .newTab = self { true } else { false } }
@@ -1896,7 +1907,7 @@ extension Tab: WKNavigationDelegate {
         if type == .linkActivated {
             // ⌘ wins over ⌥, as in Chrome.
             if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }
-            if modifiers.contains(.shift) { return .peek }
+            if modifiers.contains(.shift) { return .mini }
             if modifiers.contains(.option) { return .download }
             return .page
         }
@@ -1907,8 +1918,8 @@ extension Tab: WKNavigationDelegate {
     static let followedClickWindow: TimeInterval = 2
 
     /// From the page script: a ⇧ or ⌥ click landed on `url` and the page kept it.
-    func modifiedClickFollowed(_ url: URL, peek: Bool, download: Bool) {
-        let activation: LinkActivation = peek ? .peek : download ? .download : .page
+    func modifiedClickFollowed(_ url: URL, mini: Bool, download: Bool) {
+        let activation: LinkActivation = mini ? .mini : download ? .download : .page
         followedClick = activation == .page ? nil : (url, activation, Date())
     }
 
@@ -2187,6 +2198,9 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        // A link preview from the page that's going has nothing left to describe, and a hover from it during the
+        // load must not bring the preview back.
+        hoveredLinkChanged(nil)
         isLeavingPage = true
         // The page is going: a socket it opened to this Mac goes with it.
         localReceivers?.closeAllSockets()
@@ -2235,6 +2249,12 @@ extension Tab: WKNavigationDelegate {
         pdfFailed = []
         checkForPDF(webView, fresh: fresh)
         hasLoadedOnce = true
+        // A page has actually loaded in an everyday browser window: on a fresh start that's browsing, and the
+        // session from before gives way (#433). A Mini, a private window or Settings isn't browsing.
+        if Self.countsAsBrowsingForSession(isPrivate: isPrivate, isInBrowserWindow: host is BrowserWindowController,
+                                            url: webView.url) {
+            WindowManager.shared.pageLoaded()
+        }
         // The page's own icon as soon as it's here, not only once it finishes (some sites never quite do).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.refreshFavicon() }
         // A new page under a tab that isn't showing: its picture is of the old one, and can't be retaken until it
@@ -2450,7 +2470,7 @@ extension Tab: WKNavigationDelegate {
 
 extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        // Zigzag's own Open in New Tab, New Window or Peek always opens; a page's own request needs a click or your say.
+        // Zigzag's own Open in New Tab, New Window or Zigzag Mini always opens; a page's own request needs a click or your say.
         if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
             // Page pop-up: a saved destination for the site opens without asking, else the banner asks and nothing
             // opens yet. Zigzag pages never open this way.
@@ -2600,6 +2620,9 @@ extension Tab: WKUIDelegate {
 
     /// Reported by our hover script: the link under the pointer, or nil.
     func hoveredLinkChanged(_ url: URL?, title: String? = nil) {
+        // The page is going: a hover from it is for a page that won't be here, and must not bring the preview back
+        // after the click cleared it.
+        guard !isLeavingPage else { return }
         hoveredLink = url
         hoveredLinkTitle = url == nil ? nil : title
         host?.tab(self, hoveringLink: url)
@@ -2704,9 +2727,9 @@ extension Tab {
             self.title = pdfName(of: url)
             self.changed.send(.title)
         }
-        // In peek, a form's reply, or one ours couldn't open (on this page, or one that brought the helper down this
+        // Outside a tab list, a form's reply, or one ours couldn't open (on this page, or one that brought the helper down this
         // session, which a reload would only bring down again): WebKit's own viewer shows it.
-        guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url), !SafePDF.broughtDownTheHelper(url),
+        guard !self.isOutsideTabList, self.pageIsGet, !self.pdfFailed.contains(url), !SafePDF.broughtDownTheHelper(url),
               !(self.pdfResponseURL == url && self.pdfResponseTooLarge) else {
             if self.pdfViewer != nil { self.setPDFViewer(nil) }
             return

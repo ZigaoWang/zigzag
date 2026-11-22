@@ -1,7 +1,7 @@
 import AppKit
 import WebKit
 
-/// Our WKWebView. Only adds what the browser frame needs: context menu tweaks and Peek.
+/// Our WKWebView. Only adds what the browser frame needs: context menu tweaks and swipes.
 final class BrowserWebView: WKWebView {
     weak var owner: Tab?
     private lazy var swipe = SwipeNavigator(webView: self)
@@ -40,8 +40,6 @@ final class BrowserWebView: WKWebView {
         super.viewDidMoveToWindow()
         // Its tab went to the back mid-swipe: the swipe can't finish here any more.
         if window == nil { swipe.leftWindow() }
-        // Covered by Peek in the window it left, or under Peek in the one it came to.
-        PeekController.pageMoved(self)
     }
 
     /// Edit › Select All (⌘A) on the History page selects every row, as in Safari, rather than the page's text. The
@@ -200,8 +198,8 @@ final class BrowserWebView: WKWebView {
         }
         addOpenSelection(to: menu)
         addSaveToPins(to: menu)
-        // Only in a browser window's page, which does the translating; not Zigzag Mini's or a web app's.
-        if let owner, WindowManager.shared.controller(for: window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
+        // In a browser window's page or Zigzag Mini's, which a browser window translates; not a web app's.
+        if let owner, WindowManager.shared.controller(for: window) != nil || MiniWindowController.showing(window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
         Self.placeInspectElementLast(in: menu)
         #if DEBUG
@@ -211,7 +209,7 @@ final class BrowserWebView: WKWebView {
     }
 
     /// A link's menu starts as Chrome's does (#419): Open Link in New Tab, in New Window, in Private Window, then
-    /// Peek. WebKit's Open Link (in this tab, even for a target=_blank link) goes below them.
+    /// Zigzag Mini. WebKit's Open Link (in this tab, even for a target=_blank link) goes below them.
     static func arrangeLinkItems(in menu: NSMenu, target: AnyObject?) {
         guard let original = menu.items.first(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) else { return }
         let openLink = menu.items.first { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }
@@ -221,7 +219,7 @@ final class BrowserWebView: WKWebView {
         let choices = [(String(localized: "Open Link in New Tab", comment: "Item in a page's right-click menu."), #selector(openInNewTab(_:))),
                        (String(localized: "Open Link in New Window", comment: "Item in a page's right-click menu."), #selector(openInNewWindow(_:))),
                        (String(localized: "Open Link in Private Window", comment: "Item in a page's right-click menu."), #selector(openInPrivateWindow(_:))),
-                       (String(localized: "Open Link in Peek", comment: "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page."), #selector(openInPeek(_:)))]
+                       (String(localized: "Open Link in Zigzag Mini", comment: "Item in a page's right-click menu: opens the link in Zigzag Mini, the small window for one page, over this one (Arc called it Little Arc)."), #selector(openInMini(_:)))]
         let items = choices.map { title, action in
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = target
@@ -238,7 +236,7 @@ final class BrowserWebView: WKWebView {
     /// Only over a link, and only in a browser window that isn't private, which is where pins live.
     private func addSaveToPins(to menu: NSMenu) {
         // Our own Open Link items (#419) replaced WebKit's, so they're found by action.
-        let openActions: Set<Selector> = [#selector(openInNewTab(_:)), #selector(openInNewWindow(_:)), #selector(openInPrivateWindow(_:)), #selector(openInPeek(_:))]
+        let openActions: Set<Selector> = [#selector(openInNewTab(_:)), #selector(openInNewWindow(_:)), #selector(openInPrivateWindow(_:)), #selector(openInMini(_:))]
         guard let owner, !owner.isPrivate, WindowManager.shared.controller(for: window) != nil,
               let last = menu.items.lastIndex(where: { $0.action.map(openActions.contains) == true || $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }) else { return }
         let item = NSMenuItem(title: String(localized: "Pin Link", comment: "Item in a page's right-click menu over a link: pins the link, without opening it."),
@@ -248,9 +246,9 @@ final class BrowserWebView: WKWebView {
         item.representedObject = menu.items.first { $0.action == #selector(openInNewTab(_:)) }?.representedObject
         item.identifier = NSUserInterfaceItemIdentifier(Self.saveToPinsIdentifier)
         item.image = Tokens.Symbol.image("star")
-        // After the link's own items: Open Link in New Tab, Peek, a New Window, a Private one, and a download.
+        // After the link's own items: Open Link in New Tab, Zigzag Mini, a New Window, a Private one, and a download.
         var at = last
-        let linkItems = ["WKMenuItemIdentifierOpenLinkInNewTab", "WKMenuItemIdentifierOpenLinkInPeek", "WKMenuItemIdentifierOpenLinkInNewWindow",
+        let linkItems = ["WKMenuItemIdentifierOpenLinkInNewTab", "WKMenuItemIdentifierOpenLinkInNewWindow",
                          "WKMenuItemIdentifierDownloadLinkedFile", "WKMenuItemIdentifierDownloadLinkedFileAs"]
         while at + 1 < menu.items.count, linkItems.contains(menu.items[at + 1].identifier?.rawValue ?? "") { at += 1 }
         menu.insertItem(item, at: at + 1)
@@ -383,6 +381,7 @@ final class BrowserWebView: WKWebView {
     static let translateItemIdentifier = "ZigzagTranslatePage"
 
     @objc private func translatePage(_ sender: NSMenuItem) {
+        if let mini = MiniWindowController.showing(window) { mini.translatePage(sender); return }
         guard let owner, let controller = WindowManager.shared.controller(for: window) else { return }
         controller.translatePage(tab: owner)
     }
@@ -402,8 +401,8 @@ final class BrowserWebView: WKWebView {
         menu.addItem(inspect)
     }
 
-    @objc private func openInPeek(_ sender: NSMenuItem) {
-        trigger(sender.representedObject as? NSMenuItem, disposition: .peek)
+    @objc private func openInMini(_ sender: NSMenuItem) {
+        trigger(sender.representedObject as? NSMenuItem, disposition: .mini)
     }
 
     @objc private func openInNewTab(_ sender: NSMenuItem) {

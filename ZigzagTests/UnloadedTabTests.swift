@@ -161,4 +161,15 @@ import Testing
         #expect(sleeper.isLoaded && !sleeper.isAsleep)
         #expect(await until { sleeper.webView?.url == second && sleeper.canGoBack })
     }
+
+    /// Settings keeps its view when it sleeps, so closing the tab in front of it doesn't rebuild it (#357).
+    @Test func aSleepingSettingsTabKeepsItsSettingsView() throws {
+        let url = try #require(URL(string: "zigzag://settings"))
+        let tab = Tab(url: url, title: "Settings", spaceID: UUID())
+        tab.load(url)
+        let view = try #require(tab.settingsView)
+        tab.suspend(because: "test")
+        #expect(tab.settingsView === view)
+        tab.close()
+    }
 }

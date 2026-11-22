@@ -25,8 +25,14 @@
   Test: CommandBarPlacementTests.defaultIsCenteredOnTheWindowAndHighOnThePage
 - Open links from a tab → by default each lands below it, after the ones it already opened, in reading order.
   Test: TabCloseSelectionTests.linksOpenedBehindKeepTheirOrderAndCloseToTheNextOne
-- ⌘-click or middle-click a link → a background tab; ⇧⌘-click → in front; ⇧-click → Peek; in a frame only ⌘ and middle-click.
+- ⌘-click or middle-click a link → a background tab; ⇧⌘-click → in front; ⇧-click → Zigzag Mini; in a frame only ⌘ and middle-click.
   Test: PageLinkTests.aClicksModifierDecidesWhereALinkOpens
+- ⇧-click or Open Link in Zigzag Mini → a Zigzag Mini centered over the window's page, in the page's space and profile.
+  Test: MiniFromPageTests.itOpensOverTheWindowsPage
+- The same from a private window → the Mini is private: its own store, never saved to History or brought back after an update.
+  Test: MiniFromPageTests.aPrivateWindowsMiniIsPrivate
+- ⌘O in a Mini opened from a page → the same live page becomes a tab right after the one it came from.
+  Test: MiniFromPageTests.openInZigzagPutsItRightAfterTheTabItCameFrom
 
 ## Order and sidebar keys
 - ⌥⌘↓ / ⌥⌘↑ or ⇧⌘] / ⇧⌘[ → next or previous row as the sidebar shows it, wrapping, never another space.
@@ -49,6 +55,10 @@
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.
   Test: UnloadedTabTests.aSleepingTabClickedLoadsAgainWhereItWas
+
+## Handoff
+- The key window's tab on an http or https page → offered to your other devices; never a private window, Zigzag's own pages, a file, an error page or this Mac's own address.
+  Test: HandoffTests.onlyAWebPageAnotherDeviceCanOpenIsOffered
 
 ## Sound
 - A tab playing sound or muted → a speaker after its title; clicking it mutes or unmutes that page.

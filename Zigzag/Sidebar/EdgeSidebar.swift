@@ -1127,8 +1127,9 @@ final class EdgeSystemPageNotice: NSView {
     private let detail = Label(String(localized: "Zigzag's own pages work in the browser window.",
                                       comment: "Under the page's name in the edge sidebar's note for one of Zigzag's own pages, which the panel can't show."),
                                font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
-    let returnButton = PrimaryButton(title: String(localized: "Return to Zigzag",
-                                                   comment: "Button in the edge sidebar's note for one of Zigzag's own pages: brings the browser forward on that page."))
+    let returnButton = PillButton(title: String(localized: "Return to Zigzag",
+                                                comment: "Button in the edge sidebar's note for one of Zigzag's own pages: brings the browser forward on that page."),
+                                  style: .prominent)
     var onReturn: (() -> Void)? {
         didSet {
             returnButton.onClick = { [weak self] _ in self?.onReturn?() }

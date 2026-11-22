@@ -169,4 +169,16 @@ struct BrandContrastTests {
             }
         }
     }
+
+    /// The welcome's Back and Skip as pill buttons: their own ink, faded the same readable way when disabled.
+    @Test func aQuietPillInItsOwnColorFadesReadably() {
+        let ink = Brand.ribbon.withAlphaComponent(0.75)
+        let button = PillButton(title: "Back", style: .quiet)
+        button.customInk = ink
+        #expect(button.debugInk == ink)
+        button.isEnabled = false
+        for dark in [false, true] {
+            #expect(resolved(button.debugInk!, dark: dark) == resolved(TextButton.disabledInk(ink), dark: dark))
+        }
+    }
 }

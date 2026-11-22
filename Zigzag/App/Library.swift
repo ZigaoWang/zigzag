@@ -104,59 +104,31 @@ extension Array where Element == BookmarkFolder {
 /// Pinned pages that open side by side, as the split view or tile group (#160, #203) they were pinned from: two
 /// halves, or three or four pages in their places. Its pages stay in the space's own list in its order (the group's
 /// reading order), one right after another, in the same folder; its first page's row (or tile) carries the rest.
+///
+/// It is the split a window keeps on screen (`TabManager.SplitPair`) with the pinned pages' ids in it: one model, one
+/// layout and one reading of what's saved, for two pages or four.
 nonisolated struct PinnedSplit: Codable, Sendable {
-    var left: UUID
-    var right: UUID
-    /// Share of the width (or height, when vertical) the left page gets. In a group of more, the share of the width
-    /// left of the line between the columns.
-    var ratio = 0.5
-    /// Stacked top and bottom instead of side by side.
-    var vertical = false
-    /// A tile group's third and fourth pages.
-    var more: [UUID] = []
-    /// Where each page of a group of more than two sits, in `ids` order; nil for two, whose halves `vertical` says.
-    var regions: [TileRegion]? = nil
-    /// The other line's share: in a group of more, of the height above the line between the rows.
-    var otherRatio = 0.5
-    /// A group's own lines (#316): the line between the columns in the top row and in the bottom, then the line
-    /// between the rows in the left column and in the right; nil for two, or a group saved before its rows had lines
-    /// of their own.
-    var shares: [Double]? = nil
+    /// Its pages, by their pinned ids, and how they're laid out.
+    var layout: TabManager.SplitPair
 
     init(left: UUID, right: UUID) {
-        self.left = left
-        self.right = right
+        layout = TabManager.SplitPair(left: left, right: right)
+    }
+
+    init(layout: TabManager.SplitPair) {
+        self.layout = layout
     }
 
     /// Pages `ids` (in `pair`'s order) laid out as `pair` lays out its own; nil when the two don't match.
     init?(_ ids: [UUID], as pair: TabManager.SplitPair) {
-        guard ids.count == pair.more.count + 2, Set(ids).count == ids.count else { return nil }
-        left = ids[0]
-        right = ids[1]
-        more = Array(ids.dropFirst(2))
-        ratio = pair.ratio
-        vertical = pair.vertical
-        regions = more.isEmpty ? nil : pair.regions
-        otherRatio = pair.otherRatio
-        shares = more.isEmpty ? nil : pair.shares
+        guard let layout = pair.withPages(ids) else { return nil }
+        self.layout = layout
     }
 
+    /// Read as a split on screen is: a two-page record of any age as it always was, a group whose pages or places
+    /// don't add up as the split of its first two.
     init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        left = try c.decode(UUID.self, forKey: .left)
-        right = try c.decode(UUID.self, forKey: .right)
-        ratio = try c.decodeIfPresent(Double.self, forKey: .ratio) ?? 0.5
-        vertical = try c.decodeIfPresent(Bool.self, forKey: .vertical) ?? false
-        otherRatio = (try? c.decodeIfPresent(Double.self, forKey: .otherRatio)) ?? 0.5
-        // A group whose pages or places don't add up opens as the split of its first two.
-        let more = ((try? c.decodeIfPresent([UUID].self, forKey: .more)) ?? nil) ?? []
-        let regions = (try? c.decodeIfPresent([TileRegion].self, forKey: .regions)) ?? nil
-        if !more.isEmpty, let regions, regions.count == more.count + 2, TileShape.isValid(regions),
-           Set([left, right] + more).count == more.count + 2 {
-            self.more = more
-            self.regions = regions
-            shares = ((try? c.decodeIfPresent([Double].self, forKey: .shares)) ?? nil).flatMap { $0.count == 4 ? $0 : nil }
-        }
+        layout = try TabManager.SplitPair(from: decoder)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -176,29 +148,27 @@ nonisolated struct PinnedSplit: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case left, right, ratio, vertical, more, regions, otherRatio, shares }
 
+    var left: UUID { get { layout.left } set { layout.left = newValue } }
+    var right: UUID { get { layout.right } set { layout.right = newValue } }
+    var ratio: Double { get { layout.ratio } set { layout.ratio = newValue } }
+    var vertical: Bool { get { layout.vertical } set { layout.vertical = newValue } }
+    var more: [UUID] { layout.more }
+    var regions: [TileRegion]? { layout.regions }
+    var otherRatio: Double { layout.otherRatio }
+    var shares: [Double]? { layout.shares }
+    /// How its pages share the page area: the same shape the group had on screen.
+    var shape: TileShape { layout.shape }
+
     /// Its pages, in order.
-    var ids: [UUID] { [left, right] + more }
+    var ids: [UUID] { layout.ids }
     /// The pages that ride in the first one's row or tile.
     var riders: ArraySlice<UUID> { ids.dropFirst() }
     /// Three or four pages, not a split of two.
-    var isGroup: Bool { !more.isEmpty }
-    func contains(_ id: UUID) -> Bool { left == id || right == id || more.contains(id) }
+    var isGroup: Bool { layout.isGroup }
+    func contains(_ id: UUID) -> Bool { layout.contains(id) }
 
     /// How it opens: tabs `tabIDs` (one for each of its pages, in its order) side by side as it was laid out.
-    func pair(of tabIDs: [UUID]) -> TabManager.SplitPair? {
-        guard tabIDs.count == ids.count, Set(tabIDs).count == tabIDs.count else { return nil }
-        var pair = TabManager.SplitPair(left: tabIDs[0], right: tabIDs[1])
-        pair.ratio = ratio
-        pair.vertical = vertical
-        pair.otherRatio = otherRatio
-        if isGroup {
-            guard let regions, regions.count == tabIDs.count, TileShape.isValid(regions) else { return nil }
-            pair.more = Array(tabIDs.dropFirst(2))
-            pair.regions = regions
-            pair.shares = shares
-        }
-        return pair
-    }
+    func pair(of tabIDs: [UUID]) -> TabManager.SplitPair? { layout.withPages(tabIDs) }
 }
 
 /// The same pinned split keeps the same pages in the same order. Its size and direction are left out, so resizing it
@@ -238,6 +208,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var brightness: Double? = nil
     /// The second color's own brightness; nil: the same as the first.
     var brightness2: Double? = nil
+    /// A palette color following the Mac: its depth by day and at night, both ends of a gradient alike. Nil: the
+    /// strength in `intensity` instead. Only used without `brightness`.
+    var dayDepth: Double? = nil
+    var nightDepth: Double? = nil
     /// How much of its hue the color has, from 0 (none: white, a gray or black) to 1 (all of it). Nil: all.
     var tint: Double? = nil
     /// The second color's own tint. Nil: all of it.
@@ -246,6 +220,12 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var translucency: Double? = nil
     /// False: frosted glass, milkier and softer. Nil or true: clear glass where the Mac has it (`usesClearGlass`).
     var clearGlass: Bool? = nil
+    /// A palette look's glass: the color tints it as it is, never leaning toward its dot, so the desktop shows through
+    /// clear instead of under a grayed veil; a deep one covers a little more (`Tokens.Frame.clearNightCover`). Nil: as
+    /// any other see-through space.
+    var clearTint: Bool? = nil
+    /// Which texture the grain is: "linen" (`MaterialImages.linen`). Nil: fine film grain.
+    var texture: String? = nil
     /// Whether this Mac has clear glass (Liquid Glass, macOS 26 and later).
     static var hasClearGlass: Bool { if #available(macOS 26.0, *) { true } else { false } }
     /// Clear glass, the default where the Mac has it; frosted when chosen, or before macOS 26.
@@ -265,9 +245,14 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 
     /// No hue of its own: white, a gray, or black.
     var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
-    /// How much of its hue the first color has, 0 for white, grays and black.
-    var tintAmount: Double { isNeutral ? 0 : min(max(tint ?? 1, 0), 1) }
-    var tintAmount2: Double { min(max(tint2 ?? 1, 0), 1) }
+    /// How much of its hue the first color has, 0 for white, grays and black; past 1 for the palette's lively colors.
+    var tintAmount: Double { isNeutral ? 0 : min(max(tint ?? 1, 0), SpaceColor.maxTint) }
+    var tintAmount2: Double { min(max(tint2 ?? 1, 0), SpaceColor.maxTint) }
+    /// Following the Mac between a palette color's own depths.
+    private var followsDepths: (day: Double, night: Double)? {
+        guard brightness == nil, !isNeutral, let dayDepth, let nightDepth else { return nil }
+        return (dayDepth, nightDepth)
+    }
 
     /// How much of the desktop shows through, 0 when solid.
     var seeThrough: Double { min(max(translucency ?? 0, 0), 1) }
@@ -281,6 +266,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// The window frame color for this space, solid.
     var background: NSColor {
         if let brightness { return SpaceColor.paint(hue: baseHue, depth: brightness, tint: tintAmount) }
+        if let (day, night) = followsDepths {
+            return Tokens.Color.dynamic(light: SpaceColor.paint(hue: baseHue, depth: day, tint: tintAmount),
+                                        dark: SpaceColor.paint(hue: baseHue, depth: night, tint: tintAmount))
+        }
         if isNeutral {
             // Following the Mac and see-through: clear white by day, smoked black at night.
             if isSeeThrough { return Tokens.Color.dynamic(light: .white, dark: .black) }
@@ -294,6 +283,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             return isNeutral ? NSColor(white: 0.86 - 0.56 * brightness, alpha: 1)
                 : SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * brightness, tint: tintAmount)
         }
+        if let (day, night) = followsDepths {
+            return Tokens.Color.dynamic(light: SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * day, tint: tintAmount),
+                                        dark: SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * night, tint: tintAmount))
+        }
         if isNeutral { return color.isNeutral ? color.swatch : SpaceColor.graphite.swatch }
         return hue.map(SpaceColor.swatch(hue:)) ?? color.swatch
     }
@@ -303,6 +296,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var background2: NSColor? {
         hue2.map { h in
             if let depth = brightness2 ?? brightness { return SpaceColor.paint(hue: h, depth: depth, tint: tintAmount2) }
+            if let (day, night) = followsDepths {
+                return Tokens.Color.dynamic(light: SpaceColor.paint(hue: h, depth: day, tint: tintAmount2),
+                                            dark: SpaceColor.paint(hue: h, depth: night, tint: tintAmount2))
+            }
             return SpaceColor.background(hue: h, intensity: intensity2 ?? intensity ?? SpaceColor.defaultIntensity)
         }
     }
@@ -313,10 +310,12 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// wash still reads as the space's color instead of gray.
     var frameColor: NSColor {
         guard isSeeThrough else { return background }
+        if clearTint == true { return Self.covering(background, by: coverage, deep: Tokens.Frame.clearNightCover) }
         return Self.covering(Self.richer(background, toward: swatch, by: isNeutral ? 0 : 0.6 * seeThrough), by: coverage)
     }
     var frameColor2: NSColor? {
         guard isSeeThrough else { return background2 }
+        if clearTint == true { return background2.map { Self.covering($0, by: coverage, deep: Tokens.Frame.clearNightCover) } }
         return background2.map { Self.covering($0, by: coverage) }
     }
 
@@ -354,13 +353,14 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         }
     }
 
-    /// `color` at `alpha`, still following light and dark when it does.
-    private static func covering(_ color: NSColor, by alpha: CGFloat) -> NSColor {
+    /// `color` at `alpha`, still following light and dark when it does; in a dark window at least `deep`.
+    private static func covering(_ color: NSColor, by alpha: CGFloat, deep: CGFloat = 0) -> NSColor {
         guard alpha < 1 else { return color }
         return NSColor(name: nil) { appearance in
             var resolved = color
             appearance.performAsCurrentDrawingAppearance { resolved = color.usingColorSpace(.sRGB) ?? color }
-            return resolved.withAlphaComponent(alpha)
+            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return resolved.withAlphaComponent(dark ? max(alpha, deep) : alpha)
         }
     }
 
@@ -384,11 +384,35 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             space.tint2 = nil
             space.brightness = brightness.map { SpaceColor.depth(ofWhite: 1 - $0) }
         }
+        if clearTint == nil, isSeeThrough { space.upgradeEarlierPalette() }
         return space
     }
 
+    /// A palette look saved by the 0.9.4 betas before the palette's clear glass takes the clear glass, as picked or as
+    /// a new space had it. Grain of its own stays.
+    private mutating func upgradeEarlierPalette() {
+        let ownGrain = grain
+        for color in SpaceColor.palette {
+            guard let earlier = color.earlierLook else { continue }
+            func matches(_ look: SpaceLook) -> Bool {
+                var look = look
+                look.grain = ownGrain ?? 0
+                return look.matches(self)
+            }
+            let picked = matches(SpaceLook.palette(color, earlier, following: false, clear: false))
+            guard picked || matches(SpaceLook.palette(color, earlier, following: true, clear: false)) else { continue }
+            guard let look = picked ? color.look : color.defaultLook else { return }
+            look.apply(to: &self)
+            if let ownGrain, ownGrain > 0 {
+                grain = ownGrain
+                texture = nil
+            }
+            return
+        }
+    }
+
     /// The space with the colors a new one gets: `color` alone, light by day and dark at night with the Mac, with no
-    /// gradient, see-through or grain. Its name, icon, pages and the rest stay.
+    /// gradient, see-through or grain; a palette color, its look. Its name, icon, pages and the rest stay.
     func withDefaultColors(_ color: SpaceColor) -> SpaceInfo {
         var space = self
         space.color = color
@@ -400,12 +424,18 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         space.glass = nil
         space.brightness = nil
         space.brightness2 = nil
+        space.dayDepth = nil
+        space.nightDepth = nil
         space.tint = nil
         space.tint2 = nil
         space.translucency = nil
         space.clearGlass = nil
+        space.clearTint = nil
         space.grain = nil
+        space.texture = nil
         space.appearance = nil
+        // The palette's colors come on clear glass, following the Mac; the older ones are one solid color.
+        color.defaultLook?.apply(to: &space)
         return space.upgraded
     }
 
@@ -417,7 +447,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             let two = s.hue2 != nil
             let values: [Any?] = [s.color.rawValue, s.hue, s.intensity, s.brightness, s.tint, s.translucency, s.grain, s.appearance,
                                   s.hue2, two ? s.intensity2 : nil, two ? s.brightness2 : nil, two ? s.tint2 : nil, two ? s.angle : nil,
-                                  s.isSeeThrough ? s.clearGlass : nil]
+                                  s.isSeeThrough ? s.clearGlass : nil, s.dayDepth, s.nightDepth, s.clearTint, s.grain == nil ? nil : s.texture]
             return values.map { $0.map { "\($0)" } ?? "-" }
         }
         return look(self) == look(withDefaultColors(color))
@@ -430,9 +460,25 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         guard brightness != nil else {
             // White and black stay themselves day and night, so the window's mode stays with them, never black text on black.
             if appearance == nil, hue == nil, !isSeeThrough { if color == .ink { return "dark" }; if color == .snow { return "light" } }
+            // A palette color deep by day too (red), or light at night too (citron), keeps its mode; the rest follow the Mac.
+            if appearance == nil, followsDepths != nil {
+                func mode(_ name: NSAppearance.Name) -> String? {
+                    var shown: String?
+                    NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+                        shown = Self.readable(on: [background] + (background2.map { [$0] } ?? []))
+                    }
+                    return shown
+                }
+                let day = mode(.aqua), night = mode(.darkAqua)
+                return day == night ? day : nil
+            }
             return appearance
         }
-        let colors = [background] + (background2.map { [$0] } ?? [])
+        return Self.readable(on: [background] + (background2.map { [$0] } ?? []))
+    }
+
+    /// "light" or "dark": whichever text reads better on all of `colors`, as they resolve now.
+    private static func readable(on colors: [NSColor]) -> String {
         func luminance(_ color: NSColor) -> Double {
             guard let c = color.usingColorSpace(.sRGB) else { return 0.5 }
             func linear(_ v: CGFloat) -> Double { let v = Double(v); return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
@@ -443,6 +489,91 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         let black = lums.map { ($0 + 0.05) / 0.05 }.min() ?? 1
         let white = lums.map { 1.05 / ($0 + 0.05) }.min() ?? 1
         return black >= white ? "light" : "dark"
+    }
+}
+
+/// Written so an older Zigzag can still read it: `color` and `defaultColor` hold a color it knows, the nearest one,
+/// and a palette color goes under keys of its own, which this one reads first.
+extension SpaceInfo {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, color, bookmarks, folders, pinnedSplits, hue, intensity, appearance, grain, hue2, intensity2, angle,
+             glass, brightness, brightness2, dayDepth, nightDepth, tint, tint2, translucency, clearGlass, clearTint, texture, icon, importedFrom, defaultColor,
+             routedSites, backgroundImage, paletteColor, paletteDefaultColor
+    }
+
+    /// A stored color's name; one this version doesn't know reads as nil.
+    private static func color(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> SpaceColor? {
+        ((try? c.decodeIfPresent(String.self, forKey: key)) ?? nil).flatMap(SpaceColor.named)
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        // A beta that wrote a palette color into `color` reads as it was, and is written the compatible way next time;
+        // the betas' palette names read as the colors that took their place.
+        color = Self.color(c, .paletteColor) ?? Self.color(c, .color) ?? .graphite
+        defaultColor = Self.color(c, .paletteDefaultColor) ?? Self.color(c, .defaultColor)
+        bookmarks = try c.decodeIfPresent([Bookmark].self, forKey: .bookmarks) ?? []
+        folders = try c.decodeIfPresent([BookmarkFolder].self, forKey: .folders)
+        pinnedSplits = try c.decodeIfPresent([PinnedSplit].self, forKey: .pinnedSplits)
+        hue = try c.decodeIfPresent(Double.self, forKey: .hue)
+        intensity = try c.decodeIfPresent(Double.self, forKey: .intensity)
+        appearance = try c.decodeIfPresent(String.self, forKey: .appearance)
+        grain = try c.decodeIfPresent(Double.self, forKey: .grain)
+        hue2 = try c.decodeIfPresent(Double.self, forKey: .hue2)
+        intensity2 = try c.decodeIfPresent(Double.self, forKey: .intensity2)
+        angle = try c.decodeIfPresent(Double.self, forKey: .angle)
+        glass = try c.decodeIfPresent(Bool.self, forKey: .glass)
+        brightness = try c.decodeIfPresent(Double.self, forKey: .brightness)
+        brightness2 = try c.decodeIfPresent(Double.self, forKey: .brightness2)
+        dayDepth = try c.decodeIfPresent(Double.self, forKey: .dayDepth)
+        nightDepth = try c.decodeIfPresent(Double.self, forKey: .nightDepth)
+        tint = try c.decodeIfPresent(Double.self, forKey: .tint)
+        tint2 = try c.decodeIfPresent(Double.self, forKey: .tint2)
+        translucency = try c.decodeIfPresent(Double.self, forKey: .translucency)
+        clearGlass = try c.decodeIfPresent(Bool.self, forKey: .clearGlass)
+        clearTint = try c.decodeIfPresent(Bool.self, forKey: .clearTint)
+        texture = try c.decodeIfPresent(String.self, forKey: .texture)
+        icon = try c.decodeIfPresent(String.self, forKey: .icon)
+        importedFrom = try c.decodeIfPresent(String.self, forKey: .importedFrom)
+        routedSites = try c.decodeIfPresent([String].self, forKey: .routedSites)
+        backgroundImage = try c.decodeIfPresent(String.self, forKey: .backgroundImage)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(color.nearestLegacy, forKey: .color)
+        if color != color.nearestLegacy { try c.encode(color, forKey: .paletteColor) }
+        try c.encodeIfPresent(defaultColor?.nearestLegacy, forKey: .defaultColor)
+        if let defaultColor, defaultColor != defaultColor.nearestLegacy { try c.encode(defaultColor, forKey: .paletteDefaultColor) }
+        try c.encode(bookmarks, forKey: .bookmarks)
+        try c.encodeIfPresent(folders, forKey: .folders)
+        try c.encodeIfPresent(pinnedSplits, forKey: .pinnedSplits)
+        try c.encodeIfPresent(hue, forKey: .hue)
+        try c.encodeIfPresent(intensity, forKey: .intensity)
+        try c.encodeIfPresent(appearance, forKey: .appearance)
+        try c.encodeIfPresent(grain, forKey: .grain)
+        try c.encodeIfPresent(hue2, forKey: .hue2)
+        try c.encodeIfPresent(intensity2, forKey: .intensity2)
+        try c.encodeIfPresent(angle, forKey: .angle)
+        try c.encodeIfPresent(glass, forKey: .glass)
+        try c.encodeIfPresent(brightness, forKey: .brightness)
+        try c.encodeIfPresent(brightness2, forKey: .brightness2)
+        try c.encodeIfPresent(dayDepth, forKey: .dayDepth)
+        try c.encodeIfPresent(nightDepth, forKey: .nightDepth)
+        try c.encodeIfPresent(tint, forKey: .tint)
+        try c.encodeIfPresent(tint2, forKey: .tint2)
+        try c.encodeIfPresent(translucency, forKey: .translucency)
+        try c.encodeIfPresent(clearGlass, forKey: .clearGlass)
+        try c.encodeIfPresent(clearTint, forKey: .clearTint)
+        try c.encodeIfPresent(texture, forKey: .texture)
+        try c.encodeIfPresent(icon, forKey: .icon)
+        try c.encodeIfPresent(importedFrom, forKey: .importedFrom)
+        try c.encodeIfPresent(routedSites, forKey: .routedSites)
+        try c.encodeIfPresent(backgroundImage, forKey: .backgroundImage)
     }
 }
 
@@ -644,7 +775,8 @@ final class Library {
             if stored.siteRoutes == nil { saveNow() }
         } else {
             wasRead = false
-            spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: .sky, defaultColor: .sky)]
+            let first = SpaceColor.newSpaceOrder[0]
+            spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: first, defaultColor: first).withDefaultColors(first)]
             searchEngine = .google
             importedFromArc = false
             saveNow()
@@ -700,7 +832,7 @@ final class Library {
     func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID, ownProfile: Bool = false) -> SpaceInfo {
         let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
         var space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
-                              color: pick)
+                              color: pick).withDefaultColors(pick)
         space.defaultColor = pick
         spaces.append(space)
         directory.place(newSpace: space, on: profile, ownProfile: ownProfile, usedColors: profiles.map { self.color(of: $0) })
@@ -745,7 +877,8 @@ final class Library {
         var made: [SpaceColor] = []
         for space in spaces {
             if let kept = space.defaultColor { made.append(kept) }
-            else if space.color == .graphite, space.brightness != nil { made.append(SpaceColor.next(unused: made)) }
+            // Spaces not kept were made before the new palette, so they got the colors of then.
+            else if space.color == .graphite, space.brightness != nil { made.append(SpaceColor.legacyNext(unused: made)) }
             else { made.append(space.color) }
         }
         return made
@@ -791,6 +924,9 @@ final class Library {
         spaces[i].color = color
         spaces[i].hue = nil
         spaces[i].intensity = nil
+        spaces[i].dayDepth = nil
+        spaces[i].nightDepth = nil
+        spaces[i].clearTint = nil
         spaces[i].tint = nil
         commit()
     }
@@ -806,13 +942,17 @@ final class Library {
         spaces[i].intensity2 = look.intensity2
         spaces[i].brightness = look.brightness
         spaces[i].brightness2 = look.brightness2
+        spaces[i].dayDepth = look.dayDepth
+        spaces[i].nightDepth = look.nightDepth
         spaces[i].angle = look.angle
         spaces[i].tint = look.tint
         spaces[i].tint2 = look.tint2
         spaces[i].translucency = look.translucency
         spaces[i].clearGlass = look.clearGlass
+        spaces[i].clearTint = look.clearTint
         spaces[i].glass = nil
         spaces[i].grain = look.grain
+        spaces[i].texture = look.texture
         spaces[i].appearance = look.appearance
         commit()
     }
@@ -838,6 +978,9 @@ final class Library {
         keepDefaultColor(i)
         spaces[i].hue = hue
         spaces[i].tint = nil
+        spaces[i].dayDepth = nil
+        spaces[i].nightDepth = nil
+        spaces[i].clearTint = nil
         if let intensity { spaces[i].intensity = intensity }
         commit()
     }
@@ -1588,6 +1731,40 @@ final class Library {
            let i = spaces[s].folders?[f].bookmarkIDs.firstIndex(of: pinnedID) {
             spaces[s].folders?[f].bookmarkIDs[i] = page.id
         }
+        tidyFolders(s)
+        commit()
+    }
+
+    /// A page into the pinned split `targetID` is in, where `drop` puts it (`SplitPair.adding`), after the split's
+    /// pages and in its folder: a new page, or one pinned on its own in that space.
+    func joinPinnedSplit(_ page: Bookmark, onto targetID: UUID, _ drop: TileDrop.Kind) {
+        guard let s = spaces.firstIndex(where: { $0.pinnedSplits?.contains { $0.contains(targetID) } == true }),
+              let i = spaces[s].pinnedSplits?.firstIndex(where: { $0.contains(targetID) }),
+              let grown = spaces[s].pinnedSplits?[i].layout.adding(page.id, drop) else { return }
+        spaces[s].bookmarks.removeAll { $0.id == page.id }
+        for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == page.id } }
+        let after = spaces[s].bookmarks.lastIndex { grown.contains($0.id) }.map { $0 + 1 } ?? spaces[s].bookmarks.count
+        spaces[s].bookmarks.insert(page, at: after)
+        if let f = spaces[s].folders?.firstIndex(where: { $0.bookmarkIDs.contains(targetID) }) { spaces[s].folders?[f].bookmarkIDs.append(page.id) }
+        spaces[s].pinnedSplits?[i] = PinnedSplit(layout: grown)
+        tidyFolders(s)
+        commit()
+    }
+
+    /// One page out of its pinned or favorite group of three or four: it stays where it's kept, on its own after the
+    /// group, and the rest close up around its place as a group of tabs does; out of a split of two, the split ends.
+    func removeFromPinnedSplit(_ id: UUID) {
+        func shrunk(_ split: PinnedSplit) -> PinnedSplit? { split.layout.removing(id).map(PinnedSplit.init(layout:)) }
+        if let i = favoriteSplits.firstIndex(where: { $0.contains(id) }) {
+            if let rest = shrunk(favoriteSplits[i]) { favoriteSplits[i] = rest } else { favoriteSplits.remove(at: i) }
+            tidyFavorites()
+            commit()
+            return
+        }
+        guard let s = spaces.firstIndex(where: { $0.pinnedSplits?.contains { $0.contains(id) } == true }),
+              let i = spaces[s].pinnedSplits?.firstIndex(where: { $0.contains(id) }), let split = spaces[s].pinnedSplits?[i] else { return }
+        if let rest = shrunk(split) { spaces[s].pinnedSplits?[i] = rest } else { spaces[s].pinnedSplits?.remove(at: i) }
+        if spaces[s].pinnedSplits?.isEmpty == true { spaces[s].pinnedSplits = nil }
         tidyFolders(s)
         commit()
     }

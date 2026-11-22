@@ -86,7 +86,7 @@ protocol FindBarHost: AnyObject {
     var findBarHeaderHeight: CGFloat { get }
     /// View the bar is added to.
     var findBarOverlay: NSView { get }
-    /// Something over the page (command bar, peek) gets Esc first.
+    /// Something over the page (the command bar) gets Esc first.
     var findBarIsCovered: Bool { get }
     var findableWebView: WKWebView? { get }
     /// Zigzag's PDF viewer, which searches the PDF itself.
@@ -96,7 +96,7 @@ protocol FindBarHost: AnyObject {
 extension BrowserWindowController: FindBarHost {
     var findBarHeaderHeight: CGFloat { root.card.showsHeader ? PaneHeaderView.height : 0 }
     var findBarOverlay: NSView { root.overlay }
-    var findBarIsCovered: Bool { commandBar.isVisible || peek.isVisible }
+    var findBarIsCovered: Bool { commandBar.isVisible }
     var findablePDF: PDFViewerView? { selectedTab?.pdfViewer }
 }
 
@@ -225,7 +225,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.keyCode == 53, self.isVisible, event.window === self.window?.window,
                   event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
-                  // Something else in front (the address bar, peek) takes its own Esc first.
+                  // Something else in front (the address bar) takes its own Esc first.
                   self.window?.findBarIsCovered != true else { return event }
             self.hide()
             return nil
@@ -879,6 +879,8 @@ final class ToastView: FloatingPanelView {
     /// Puts an offer away before it goes on its own ("This page is in French"), as the other offers at the top of
     /// the page are put away.
     let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Not Now", comment: "Tooltip of the close button on a toast that offers something, like translating the page."))
+    /// More choices for an offer, in a menu: the translate offer's Always and Never.
+    let optionsButton = IconButton(symbol: "ellipsis", size: .compact, toolTip: String(localized: "More", comment: "Tooltip of the … button in the site panel."))
     /// Something under way ("Writing report…"): the ribbon turns where the icon goes.
     let spinner = Spinner()
 
@@ -890,8 +892,10 @@ final class ToastView: FloatingPanelView {
         addSubview(spinner)
         addSubview(label)
         addSubview(actionButton)
+        addSubview(optionsButton)
         addSubview(closeButton)
         actionButton.isHidden = true
+        optionsButton.isHidden = true
         closeButton.isHidden = true
         onLayout = { [weak self] in self?.layoutContent() }
     }
@@ -906,8 +910,12 @@ final class ToastView: FloatingPanelView {
 
     /// The right end: padding, or the action and the close button, the last one inset as evenly as it sits.
     private var trailingWidth: CGFloat {
-        guard !actionButton.isHidden || !closeButton.isHidden else { return Tokens.Space.x4 }
+        // With an icon, the words end as far from the edge as the symbol's ink starts.
+        guard !actionButton.isHidden || !closeButton.isHidden else {
+            return icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + (Tokens.Metric.favicon - Tokens.Symbol.row) / 2
+        }
         var width = actionButton.isHidden ? 0 : Tokens.Space.x3 + actionButton.fittingWidth
+        if !optionsButton.isHidden { width += Tokens.Space.x1 + optionsButton.frame.width }
         if !closeButton.isHidden { width += (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1) + closeButton.frame.width }
         return width + (Self.height - (closeButton.isHidden ? Tokens.Metric.toastButtonHeight : closeButton.frame.height)) / 2
     }
@@ -943,6 +951,11 @@ final class ToastView: FloatingPanelView {
             let side = closeButton.frame.width
             closeButton.frame.origin = NSPoint(x: bounds.width - (Self.height - side) / 2 - side, y: (bounds.height - side) / 2)
             right = closeButton.frame.minX - Tokens.Space.x1
+        }
+        if !optionsButton.isHidden {
+            let side = optionsButton.frame.width
+            optionsButton.frame.origin = NSPoint(x: right - side, y: (bounds.height - side) / 2)
+            right = optionsButton.frame.minX - Tokens.Space.x1
         }
         if !actionButton.isHidden {
             // Inset evenly from the toast's edge, top, bottom and right alike, so the pill runs with the capsule. The
@@ -987,9 +1000,12 @@ enum Toast {
     }
 
     /// Takes down the toast showing in this window, if any.
-    static func hide(in controller: BrowserWindowController) {
-        let state = state(for: controller.root.overlay)
-        guard let toast = state.toast, toast.superview === controller.root.overlay else { return }
+    static func hide(in controller: BrowserWindowController) { hide(over: controller.root.overlay) }
+
+    /// Takes down the toast showing over `host`, if any.
+    static func hide(over host: NSView) {
+        let state = state(for: host)
+        guard let toast = state.toast, toast.superview === host else { return }
         state.hideWork?.cancel()
         toast.dismiss()
         state.toast = nil
@@ -1012,10 +1028,11 @@ enum Toast {
     /// `closes` adds a close button, for offers. `owner`: for `hide(for:in:)`. `onClose`: runs when closed by its
     /// button.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     actionMenu: (() -> NSMenu?)? = nil,
-                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, onClose: (() -> Void)? = nil,
-                     in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, actionMenu: actionMenu, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller), onClose: onClose)
+                     actionMenu: (() -> NSMenu?)? = nil, options: (() -> [MenuPanel.Entry])? = nil,
+                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, announces: Bool = true,
+                     onClose: (() -> Void)? = nil, in controller: BrowserWindowController) {
+        show(text, symbol: symbol, action: action, actionMenu: actionMenu, options: options, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller),
+             announces: announces, onClose: onClose)
         state(for: controller.root.overlay).owner = owner
     }
 
@@ -1025,8 +1042,10 @@ enum Toast {
         // Under the bar of an AI app using the page, if there is one.
         var page = controller.root.cardFrame
         let reserved = AgentControl.shared.reservedHeight(in: controller)
-        page.origin.y += reserved
-        page.size.height -= reserved
+        // Under a split's pane strips, clear of their buttons, as the find bar is.
+        let strip = controller.root.card.showsHeader && !controller.root.card.liftsHeader ? PaneHeaderView.height : 0
+        page.origin.y += reserved + strip
+        page.size.height -= reserved + strip
         // Below any page question or top update note, never over them.
         return PageQuestions.area(page, below: PageQuestions.occupied(in: controller.root.overlay))
     }
@@ -1075,9 +1094,9 @@ enum Toast {
 
     /// Shows a toast at the top center of `area` in any flipped view (also used by Passwords).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     actionMenu: (() -> NSMenu?)? = nil,
+                     actionMenu: (() -> NSMenu?)? = nil, options: (() -> [MenuPanel.Entry])? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
-                     onClose: (() -> Void)? = nil) {
+                     announces: Bool = true, onClose: (() -> Void)? = nil) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1091,7 +1110,8 @@ enum Toast {
             isNew = true
         }
         toast.label.stringValue = text
-        Announcement.post(text, priority: action == nil ? .medium : .high)
+        // A progress update to a toast already up isn't read out again.
+        if announces { Announcement.post(text, priority: action == nil ? .medium : .high) }
         // Busy: an empty picture keeps the icon's place for the spinner.
         toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }
         busy ? toast.spinner.startAnimation(nil) : toast.spinner.stopAnimation(nil)
@@ -1122,6 +1142,11 @@ enum Toast {
                 toast?.dismiss()
             }
         }
+        toast.optionsButton.isHidden = options == nil
+        toast.optionsButton.onClick = { [weak toast] _ in
+            guard let toast, let options else { return }
+            MenuPanel.show(options(), from: toast.optionsButton, placement: .below)
+        }
         // A toast with something to do (Undo, Pin This Page) can be put away at once, as a notification can.
         toast.closeButton.isHidden = !(closes || action != nil || actionMenu != nil)
         toast.closeButton.onClick = { [weak toast] _ in
@@ -1150,7 +1175,8 @@ enum Toast {
         @MainActor func hideWhenClear(_ toast: ToastView?) {
             // Shown again since (a repeat toast): that showing decides when it goes.
             guard let toast, toast.superview != nil, state.hideWork == nil else { return }
-            if action != nil || actionMenu != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
+            let menuOpen = MenuPanel.current?.anchor?.isDescendant(of: toast) == true
+            if action != nil || actionMenu != nil, menuOpen || toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak toast] in hideWhenClear(toast) }
                 return
             }

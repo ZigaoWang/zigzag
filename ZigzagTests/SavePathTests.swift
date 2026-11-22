@@ -504,4 +504,98 @@ import Testing
             #expect(library.folderID(containing: saved.id) == nil)
         }
     }
+
+
+    /// Zigzag's own views have an address but nothing to pin: the star isn't offered, and the save path refuses them
+    /// as ⌘D and the menus already did (#442).
+    @Test func zigzagsOwnViewsCannotBePinned() throws {
+        #expect(!SavePath.Page.isPinnable(try #require(URL(string: "zigzag://settings"))))
+        #expect(!SavePath.Page.isPinnable(try #require(URL(string: "zigzag://history"))))
+        #expect(!SavePath.Page.isPinnable(try #require(URL(string: "about:blank"))))
+        #expect(SavePath.Page.isPinnable(try #require(URL(string: "https://example.com/a"))))
+        #expect(SavePath.Page.isPinnable(try #require(URL(string: "file:///tmp/a.pdf"))))
+        let space = library.spaces[0].id
+        let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+        #expect(SavePath.Page(tab: settings) == nil)
+        // The star is offered by the same rule the save path uses, so a Zigzag view hides it in the app too.
+        #expect(!AddressView.canSave(for: settings))
+        #expect(!AddressView.canSave(for: nil))
+        let address = AddressView()
+        address.setSaved(false, canSave: AddressView.canSave(for: settings))
+        #expect(address.saveButton.isHidden)
+        let page = Tab(url: try #require(URL(string: "https://example.com/")), title: "Example", spaceID: space)
+        #expect(AddressView.canSave(for: page))
+        address.setSaved(false, canSave: AddressView.canSave(for: page))
+        #expect(!address.saveButton.isHidden)
+        address.setSaved(true, canSave: SavePath.Page(tab: settings) != nil)
+        #expect(address.saveButton.isHidden)
+    }
+
+    /// A pinned tab gone to a Zigzag view or about:blank still unpins with ⌘D and keeps its filled star; a new pin of
+    /// one is still refused (#472).
+    @Test func aPinnedTabShowingAZigzagViewStillUnpins() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let blank = Tab(url: try #require(URL(string: "about:blank")), title: "Blank", spaceID: space)
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            manager.adopt([blank, settings], in: space)
+            manager.select(blank)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            #expect(!controller.save(settings, request: .quick))
+            #expect(settings.bookmarkID == nil)
+            #expect(!AddressView.canSave(for: blank))
+
+            let pinned = SavePath.Page(url: try #require(URL(string: "https://example.com/pinned")), title: "Pinned", tab: blank)
+            let saved = try #require(SavePath.save(pinned, to: SavePath.quickPlace(in: space), in: manager))
+            #expect(blank.bookmarkID == saved.id)
+            #expect(AddressView.canSave(for: blank))
+            let address = AddressView()
+            address.setSaved(true, canSave: AddressView.canSave(for: blank))
+            #expect(!address.saveButton.isHidden)
+            #expect(address.saveButton.symbol == "star.fill")
+
+            #expect(controller.save(blank, request: .quick))
+            #expect(blank.bookmarkID == nil)
+            #expect(library.bookmark(saved.id) == nil)
+        }
+    }
+
+    /// Dragged into Pinned, onto a folder or a pinned page, into the favorites, or from the command bar, a Zigzag view
+    /// stays a tab (#472). A page split beside one doesn't take it along either.
+    @Test func zigzagsOwnViewsCannotBeDraggedIntoPinned() throws {
+        try scratch { space, _, folder in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            let page = Tab(url: try #require(URL(string: "https://example.com/drag")), title: "Example", spaceID: space)
+            manager.adopt([settings, page], in: space)
+            manager.select(settings)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let pinned = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/pinned")!, title: "Pinned", to: space))
+            let before = Library.shared.bookmarks(in: space).count
+            #expect(!manager.canPin(settings))
+            #expect(!SidebarListView.pinnable([.tab(settings.id)], in: manager))
+            #expect(!SidebarListView.pinnable([.tab(page.id), .tab(settings.id)], in: manager))
+            #expect(SidebarListView.pinnable([.tab(page.id), .bookmark(pinned.id), .folder(folder.id)], in: manager))
+            controller.listBookmark(settings, at: 0, in: space)
+            controller.listPinSplit(settings, onto: pinned.id, tabOnRight: true)
+            controller.favoriteWithUndo(settings)
+            controller.fileMarked([.tab(settings.id)], in: folder.id)
+            #expect(settings.bookmarkID == nil && !settings.isFavorite)
+            #expect(Library.shared.bookmarks(in: space).count == before)
+            let actions = CommandRanker.contextActions(CommandRanker.context(for: manager)).map(\.id)
+            #expect(!actions.contains("pin") && !actions.contains("pin-to-folder") && !actions.contains("favorite"))
+            // Split beside Settings, the page would bring it into Pinned with it.
+            manager.select(page)
+            #expect(CommandRanker.contextActions(CommandRanker.context(for: manager)).map(\.id).contains("pin"))
+            try #require(manager.canSplit(page, with: settings))
+            manager.makeSplit(page, with: settings)
+            #expect(!manager.canPin(page))
+            controller.bookmarkWithUndo(page, at: nil, in: space)
+            #expect(page.bookmarkID == nil && settings.bookmarkID == nil)
+        }
+    }
 }

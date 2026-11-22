@@ -23,7 +23,7 @@ final class ImportView: NSView {
     }
     /// The welcome window follows along, retitling its brand panel at each step.
     var onStageChange: ((Stage) -> Void)?
-    private let showPasswords = TextButton(title: String(localized: "Show Passwords", comment: "Button in the Import window after passwords came over."), font: Tokens.Font.body(.medium))
+    private let showPasswords = PillButton(title: String(localized: "Show Passwords", comment: "Button in the Import window after passwords came over."), style: .plain)
 
     private let hero = ImportHero()
     private let banner = BrandBanner()
@@ -54,9 +54,9 @@ final class ImportView: NSView {
     private var profilesToken: SignalToken?
     /// The profile it all goes into.
     private var target: Profile { Profiles.shared.profile(intoProfile) }
-    private let chooseFile = TextButton(title: String(localized: "Choose File…", comment: "Button in the Import window: choose a passwords export or Safari export file."), font: Tokens.Font.body(.medium))
-    private let primary = PrimaryButton(title: String(localized: "Import", comment: "Main button in the Import window."))
-    private let secondary = TextButton(title: String(localized: "Not Now", comment: "Button in the Import window: close it without importing."), font: Tokens.Font.body(.medium))
+    private let chooseFile = PillButton(title: String(localized: "Choose File…", comment: "Button in the Import window: choose a passwords export or Safari export file."), style: .quiet)
+    private let primary = PillButton(title: String(localized: "Import", comment: "Main button in the Import window."), style: .prominent)
+    private let secondary = PillButton(title: String(localized: "Not Now", comment: "Button in the Import window: close it without importing."), style: .quiet)
     /// What Sign-ins means, in a line, while it's offered.
     private let signInsNote = NSTextField(wrappingLabelWithString: String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
                                                                               comment: "Note under the choices in the Import window, explaining Sign-ins."))
@@ -149,7 +149,6 @@ final class ImportView: NSView {
             choiceButtons.append((choice, box))
         }
         chooseFile.onClick = { [weak self] _ in self?.pickFile() }
-        showPasswords.showsFillAtRest = true
         showPasswords.isHidden = true
         showPasswords.onClick = { _ in PasswordsWindowController.show() }
         addSubview(showPasswords)
@@ -668,11 +667,11 @@ final class ImportView: NSView {
             secondary.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - sw, y: by, width: sw, height: buttonHeight)
         }
         if !showPasswords.isHidden {
-            let w = showPasswords.fittingWidth + Tokens.Space.x2
+            let w = showPasswords.fittingWidth
             showPasswords.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - w, y: by, width: w, height: buttonHeight)
         }
         if !chooseFile.isHidden {
-            chooseFile.frame = NSRect(x: x - Tokens.Space.x2, y: by, width: chooseFile.fittingWidth, height: buttonHeight)
+            chooseFile.frame = NSRect(x: x - chooseFile.textInset, y: by, width: chooseFile.fittingWidth, height: buttonHeight)
         }
     }
 
@@ -696,7 +695,7 @@ private final class SourceRow: InteractiveView, ImportListItem {
     var onToggle: (() -> Void)?
     var onFix: ((ImportProblem.Fix, String) -> Void)?
     /// Off while an import runs: the fixes that import again wait for it.
-    var fixesEnabled = true { didSet { fixViews.forEach { ($0 as? TextButton)?.isEnabled = fixesEnabled || !importsAgain($0) } } }
+    var fixesEnabled = true { didSet { fixViews.forEach { ($0 as? PillButton)?.isEnabled = fixesEnabled || !importsAgain($0) } } }
     private var importButtons: [ObjectIdentifier] = []
     private func importsAgain(_ view: NSView) -> Bool { importButtons.contains(ObjectIdentifier(view)) }
     /// A chosen export: once its passwords are in, offer to move it to the Trash, since it holds them unprotected.
@@ -766,7 +765,7 @@ private final class SourceRow: InteractiveView, ImportListItem {
 
     private var textX: CGFloat { Tokens.Space.x3 + Tokens.Space.x8 + Tokens.Space.x3 }
 
-    private func fixWidth(_ view: NSView) -> CGFloat { view is FilledField ? 180 : ((view as? TextButton)?.fittingWidth ?? 80) }
+    private func fixWidth(_ view: NSView) -> CGFloat { view is FilledField ? 180 : ((view as? PillButton)?.fittingWidth ?? 80) }
 
     /// The fix buttons, wrapped onto as many lines as the row's width needs.
     private func fixLines(for width: CGFloat) -> [[NSView]] {
@@ -811,8 +810,7 @@ private final class SourceRow: InteractiveView, ImportListItem {
             if let exportFile, summary.passwords + summary.updatedPasswords > 0, FileManager.default.fileExists(atPath: exportFile.path) {
                 detail.stringValue += "\n" + String(localized: "The file still holds your passwords unprotected. It’s safer to move it to the Trash.",
                                                      comment: "Import window, after passwords came over from an exported file.")
-                let button = TextButton(title: String(localized: "Move to Trash", comment: "Button in the Import window: move the exported passwords file to the Trash."), font: Tokens.Font.body(.medium))
-                button.showsFillAtRest = true
+                let button = PillButton(title: String(localized: "Move to Trash", comment: "Button in the Import window: move the exported passwords file to the Trash."), style: .plain)
                 button.onClick = { [weak self, weak button] _ in
                     NSWorkspace.shared.recycle([exportFile]) { _, error in
                         DispatchQueue.main.async {
@@ -834,7 +832,10 @@ private final class SourceRow: InteractiveView, ImportListItem {
                 fixViews.append(button)
             }
         }
-        superview?.needsLayout = true
+        // The window lays out the rows' heights, not the list they sit in: a count that wraps grows the row.
+        var host = superview
+        while let view = host, !(view is ImportView) { host = view.superview }
+        (host ?? superview)?.needsLayout = true
         needsLayout = true
     }
 
@@ -854,15 +855,14 @@ private final class SourceRow: InteractiveView, ImportListItem {
         case .primaryPassword: title = String(localized: "Unlock", comment: "Button in the Import window after typing Firefox's primary password.")
         case .none: return
         }
-        guard !fixViews.contains(where: { ($0 as? TextButton)?.title == title }) else { return }
+        guard !fixViews.contains(where: { ($0 as? PillButton)?.title == title }) else { return }
         if fix == .primaryPassword {
             let field = FilledField(placeholder: String(localized: "Primary password", comment: "Placeholder of the field for Firefox's primary password, in the Import window."), secure: true)
             addSubview(field)
             fixViews.append(field)
             passwordField = field
         }
-        let button = TextButton(title: title, font: Tokens.Font.body(.medium))
-        button.showsFillAtRest = true
+        let button = PillButton(title: title, style: .plain)
         if fix == .retry || fix == .primaryPassword {
             importButtons.append(ObjectIdentifier(button))
             button.isEnabled = fixesEnabled

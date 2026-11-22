@@ -285,77 +285,16 @@ struct PageHolderTests {
         #expect(page.frame == holder.bounds)
     }
 
-    @Test func aPageInPeekHasOnlyItsOwnScrollBars() throws {
+    @Test func aPageInZigzagMiniHasOnlyItsOwnScrollBars() throws {
         let manager = TabManager(spaceID: Library.shared.spaces[0].id)
         defer { manager.invalidate() }
         let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
         defer { controller.window?.close() }
-        let page = try #require(controller.peek.show(url: nil, configuration: nil, opener: nil))
-        defer { controller.peek.close() }
-        let holder = try #require(controller.peek.tab?.pageHolder)
+        let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: nil, in: controller)
+        defer { mini.window?.close() }
+        let page = try #require(mini.tab.webView)
+        let holder = try #require(mini.tab.pageHolder)
         #expect(!ancestors(of: page).contains { $0 is NSScrollView })
         #expect(page.frame == holder.bounds)
-    }
-}
-
-/// Peek's slim scroll bar: only with the Mac's classic scroll bars, only on a page that doesn't style its own.
-@MainActor
-struct PeekScrollbarsTests {
-    private final class Loading: NSObject, WKNavigationDelegate {
-        var done: CheckedContinuation<Void, Never>?
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
-    }
-
-    private func page(_ head: String = "", body: String = "") async -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 400), configuration: configuration)
-        let loading = Loading()
-        webView.navigationDelegate = loading
-        let html = "<!doctype html><html><head>\(head)</head><body\(body)><div style='height:3000px'>Long</div></body></html>"
-        await withCheckedContinuation { done in
-            loading.done = done
-            webView.loadHTMLString(html, baseURL: URL(string: "https://peek-scrollbars.test/"))
-        }
-        return webView
-    }
-
-    private func hasBar(_ webView: WKWebView) async throws -> Bool {
-        try await webView.evaluateJavaScript("!!document.getElementById('\(PeekScrollbars.styleID)')") as? Bool == true
-    }
-
-    @Test func onlyClassicScrollBarsGetTheSlimBar() {
-        #expect(PeekScrollbars.wanted(for: .legacy))
-        #expect(!PeekScrollbars.wanted(for: .overlay))
-    }
-
-    @Test func aPlainPageGetsItAndLosesIt() async throws {
-        let webView = await page()
-        #expect(await PeekScrollbars.run(in: webView, want: true, dark: false) == "added")
-        #expect(try await hasBar(webView))
-        #expect(await PeekScrollbars.run(in: webView, want: true, dark: true) == "updated")
-        #expect(await PeekScrollbars.run(in: webView, want: false, dark: false) == "removed")
-        #expect(try await !hasBar(webView))
-    }
-
-    @Test func aPageWithItsOwnScrollBarsKeepsThem() async throws {
-        let sheets = [
-            "<style>::-webkit-scrollbar{width:8px}</style>",
-            "<style>@media screen{body::-webkit-scrollbar-thumb{background:red}}</style>",
-            "<style>html{scrollbar-width:thin}</style>",
-            "<style>.list{scrollbar-color:red blue}</style>",
-        ]
-        for sheet in sheets {
-            let webView = await page(sheet)
-            #expect(await PeekScrollbars.run(in: webView, want: true, dark: false) == "own", "\(sheet)")
-            #expect(try await !hasBar(webView))
-        }
-        let inline = await page(body: " style='scrollbar-color: red blue'")
-        #expect(await PeekScrollbars.run(in: inline, want: true, dark: false) == "own")
-    }
-
-    @Test func theBarFollowsThePagesLightOrDark() {
-        #expect(PeekScrollbars.css(dark: false).contains("rgba(0,0,0,.35)"))
-        #expect(PeekScrollbars.css(dark: true).contains("rgba(255,255,255,.35)"))
     }
 }

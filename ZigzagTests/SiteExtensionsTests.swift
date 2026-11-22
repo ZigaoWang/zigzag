@@ -55,9 +55,11 @@ struct SiteExtensionsTests {
                 // Full width, the rows' wash past the column on each side, one under the other.
                 #expect(shown(s).allSatisfy { $0.frame.minX == 0 && $0.frame.width == column + PanelLinkRow.outset * 2 })
                 #expect(Set(shown(s).map(\.frame.minY)).count == count)
-                #expect(shown(s).first?.frame.minY == SiteExtensionsLayout.headerHeight)
-                #expect(s.height(for: column) == SiteExtensionsLayout.headerHeight + CGFloat(count) * SiteExtensionRow.height
-                        + CGFloat(count - 1) * PanelLinkRow.gap + Tokens.Space.x2 + PanelLinkRow.height)
+                // A section label's gap under the header's caps, then Manage as the list's next row.
+                #expect(shown(s).first?.frame.minY == s.bodyTop)
+                #expect(s.bodyTop > 0 && s.bodyTop < SiteExtensionsLayout.headerHeight)
+                #expect(s.height(for: column) == s.bodyTop + CGFloat(count) * SiteExtensionRow.height
+                        + CGFloat(count) * PanelLinkRow.gap + PanelLinkRow.height)
             }
         }
     }
@@ -85,8 +87,9 @@ struct SiteExtensionsTests {
                 #expect(Set(grid.map(\.frame.minY)).count == rows)
                 if columns > 1 { #expect(grid[1].frame.minX - grid[0].frame.maxX >= SiteExtensionsLayout.minGap - 0.5) }
                 if rows > 1 { #expect(grid[columns].frame.minY - grid[0].frame.maxY >= SiteExtensionsLayout.minGap) }
-                #expect(s.height(for: columnWidth) == SiteExtensionsLayout.headerHeight
-                        + SiteExtensionsLayout.bodyHeight(count: count, width: columnWidth) + Tokens.Space.x2 + PanelLinkRow.height)
+                #expect(grid[0].frame.minY == s.bodyTop)
+                #expect(s.height(for: columnWidth) == s.bodyTop
+                        + SiteExtensionsLayout.bodyHeight(count: count, width: columnWidth) + PanelLinkRow.gap + PanelLinkRow.height)
             }
         }
     }

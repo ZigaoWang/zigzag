@@ -16,7 +16,7 @@ final class DeskHeaderView: InteractiveView {
     }
     private static let dotSize = Tokens.Space.x2
     /// "Close 3 Duplicates", when the space has the same page open more than once.
-    let duplicatesButton = TextButton(title: "", font: Tokens.Font.body())
+    let duplicatesButton = PillButton(style: .quiet)
     var duplicates = 0 {
         didSet {
             duplicatesButton.title = String(localized: "Close \(duplicates) Duplicates", comment: "In the tab overview (all spaces' tabs as cards), a button beside a space's name: closes the tabs that show a page already open.")
@@ -171,6 +171,7 @@ final class DeskFrameView: NSView {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 wash.colors = [color.cgColor, (end ?? color).cgColor]
             }
+            grain.backgroundColor = MaterialImages.texture(space.texture).cgColor
             grain.opacity = Float(min(max(isPrivate ? 0 : space.grain ?? 0, 0), 1) * 0.18)
         }
     }
@@ -274,16 +275,18 @@ final class DeskController {
     /// Counts opens and closes, so one that's been taken over doesn't finish what the next one started.
     private var transition = 0
     /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
-    private let searchBox = ColorView()
-    private let searchIcon = NSImageView()
-    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
+    private let searchBox = FilledField.search(String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
+    private var searchField: NSTextField { searchBox.field }
     private let searchDelegate = DeskSearchDelegate()
-    private let noMatches = Label(String(localized: "No tabs match", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search."), font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let noMatches = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
     private static let searchHeight = Tokens.Metric.controlHeight
     private static let actionBarHeight = Tokens.Page.controlHeight + Tokens.Space.x2 + 2
     private static let searchArea = Tokens.Space.x6 + Tokens.Space.x8 + Tokens.Space.x2
     private var frameToken: NSObjectProtocol?
+    private var boundsToken: NSObjectProtocol?
+    /// A hairline under the search band, only while cards are scrolled under it.
+    private let scrollEdge = ColorView(color: Tokens.Color.separator)
 
     /// Cards shrink with more tabs down to this, where a title still reads, and grow with fewer up to the largest.
     private let minCardWidth = Tokens.Metric.deskCardWidth
@@ -305,6 +308,12 @@ final class DeskController {
         scrollView.documentView = canvas
         scrollView.useSlimScroller()
         backdrop.addSubview(scrollView)
+        scrollEdge.isHidden = true
+        backdrop.addSubview(scrollEdge)
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        boundsToken = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scrollView.contentView, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshScrollEdge() }
+        }
         // The window resized, went full screen or the sidebar moved: the cards take the page area's new shape.
         scrollView.contentView.postsFrameChangedNotifications = true
         frameToken = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView.contentView, queue: .main) { [weak self] _ in
@@ -322,16 +331,9 @@ final class DeskController {
         closeButton.onClick = { [weak self] _ in self?.closeSelected() }
         doneButton.onClick = { [weak self] _ in self?.hide(openingTab: nil) }
 
-        searchBox.wantsLayer = true
-        searchBox.layer?.cornerRadius = Self.searchHeight / 2
-        searchBox.layer?.cornerCurve = .continuous
-        searchIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.Symbol.inline)
-        searchIcon.imageScaling = .scaleNone
-        searchIcon.contentTintColor = Tokens.Color.textTertiary
         // The sidebar's soft field on the frame, like the address: the desk's search sits on the space's color.
-        searchBox.layer?.borderWidth = 0
-        searchBox.addSubview(searchIcon)
-        searchBox.addSubview(searchField)
+        searchBox.isPill = true
+        searchBox.isOnFrame = true
         backdrop.addSubview(searchBox)
         noMatches.isHidden = true
         canvas.addSubview(noMatches)
@@ -363,6 +365,7 @@ final class DeskController {
 
     isolated deinit {
         if let frameToken { NotificationCenter.default.removeObserver(frameToken) }
+        if let boundsToken { NotificationCenter.default.removeObserver(boundsToken) }
     }
 
     private var manager: TabManager? { controller?.tabManager }
@@ -386,8 +389,6 @@ final class DeskController {
         Tutorial.overviewOpened()
         selection = []
         controller.previews.hide()
-        // A peek would sit under the cards and come back after: it's put away first.
-        controller.peek.close()
         // The page's link preview would float over the cards.
         controller.linkStatus.show(nil, in: controller.root.cardFrame)
         controller.commandBar.dismiss(restoringFocus: false)
@@ -906,13 +907,15 @@ final class DeskController {
         let top = backdrop.isFlipped ? Tokens.Space.x6 : b.height - Tokens.Space.x6 - h
         searchBox.frame = NSRect(x: round((b.width - width) / 2), y: top, width: width, height: h)
         searchBox.autoresizingMask = [.minXMargin, .maxXMargin, backdrop.isFlipped ? .maxYMargin : .minYMargin]
-        searchBox.color = Tokens.Chrome.field
-        let icon = Tokens.Symbol.inline
-        searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
-        let textHeight = ceil(searchField.intrinsicContentSize.height)
-        let x = searchIcon.frame.maxX + Tokens.Space.x2
-        searchField.frame = NSRect(x: x, y: searchField.centeredY(in: h), width: width - x - Tokens.Space.x3, height: textHeight)
         scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
+        let line = Tokens.Metric.hairline
+        scrollEdge.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea - line : b.height - Self.searchArea, width: b.width, height: line)
+        scrollEdge.autoresizingMask = [.width, backdrop.isFlipped ? .maxYMargin : .minYMargin]
+        refreshScrollEdge()
+    }
+
+    private func refreshScrollEdge() {
+        scrollEdge.isHidden = scrollView.contentView.bounds.minY <= 0
     }
 
     /// The page whose card a page shows on: the first of its split or tile group among the space's tabs (a pinned
@@ -1084,9 +1087,10 @@ final class DeskController {
         }
         noMatches.isHidden = query.isEmpty || !layout.cards.isEmpty
         if !noMatches.isHidden {
-            // In the middle of what you can see, not at the top of the canvas.
+            noMatches.stringValue = String(localized: "No tabs match “\(query)”.", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search; what was typed.")
+            // Where the first card would be, in what you can see.
             let w = noMatches.textWidth + 4, visible = scrollView.documentVisibleRect
-            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: round(visible.midY - noMatches.lineHeight / 2),
+            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: Tokens.EmptyState.noMatchY(in: visible, lineHeight: noMatches.lineHeight),
                                      width: w, height: noMatches.lineHeight)
         }
         for (id, card) in cards {

@@ -44,8 +44,14 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     /// Asks AppKit to open the list for the focused field. Only an app in front can.
     static func askSystem(_ field: NSView) -> Bool {
         debugLog("syspasswords ask active=\(NSApp.isActive) key=\(field.window?.isKeyWindow ?? false) responder=\(field.window?.firstResponder.map { String(describing: type(of: $0)) } ?? "none")")
-        guard NSApp.isActive, let responder = field.window?.firstResponder, responder.responds(to: passwordsCommand) else { return false }
-        return NSApp.sendAction(passwordsCommand, to: responder, from: nil)
+        let responds = field.window?.firstResponder?.responds(to: passwordsCommand) ?? false
+        guard NSApp.isActive, let responder = field.window?.firstResponder, responder.responds(to: passwordsCommand) else {
+            PasswordsLog.write("ask-system", ["active": .flag(NSApp.isActive), "responds": .flag(responds), "sent": .flag(false)])
+            return false
+        }
+        let sent = NSApp.sendAction(passwordsCommand, to: responder, from: nil)
+        PasswordsLog.write("ask-system", ["active": .flag(true), "responds": .flag(true), "sent": .flag(sent)])
+        return sent
     }
 
     /// Holds the fields over the page's field. Clicks go through to the page underneath.
@@ -75,6 +81,9 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     private var shownInVisibleWindow = false
     /// The system's list took the front (Zigzag stopped being the active app), so coming back means it closed.
     private(set) var opened = false
+    /// System uptime at `present`, for the log's timings.
+    private var presentedAt: TimeInterval = 0
+    private var elapsed: PasswordsLog.Fact { .seconds(ProcessInfo.processInfo.systemUptime - presentedAt) }
     private let timeout: TimeInterval
     private let openCheck: TimeInterval?
     private let settle: TimeInterval
@@ -136,7 +145,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
             MainActor.assumeIsolated {
                 // Read once the storage is done editing, never inside its edit.
                 guard let self, self.isPresented else { return }
-                self.after(0) { $0.fieldsChanged() }
+                self.after(0) { $0.fieldsChanged(in: $0.passwordView) }
             }
         }
     }
@@ -149,6 +158,9 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     func present(over rect: NSRect, in overlay: NSView, restoringFocusTo responder: NSResponder?,
                  ask: @escaping @MainActor (NSView) -> Bool = SystemPasswordPicker.askSystem, completion: @escaping (Outcome) -> Void) {
         if isPresented { finish(.cancelled(.replaced)) }
+        presentedAt = ProcessInfo.processInfo.systemUptime
+        PasswordsLog.write("present", ["session": .number(session), "active": .flag(NSApp.isActive), "key": .flag(overlay.window?.isKeyWindow ?? false),
+                                       "responder": .type(overlay.window?.firstResponder), "reshowGuard": .flag(reshowGuard != nil)])
         endReshowGuard()
         // Whatever AppKit still has open from before is closed first, so every request starts clean (#378).
         dismissSystem()
@@ -163,7 +175,10 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         passwordView.font = usernameField.font
         overlay.addSubview(anchor)
         debugLog("syspasswords present")
-        guard let window = overlay.window, window.makeFirstResponder(passwordView) else { finish(.cancelled(.unavailable)); return }
+        let focused = overlay.window?.makeFirstResponder(passwordView) ?? false
+        PasswordsLog.write("focus", ["window": .flag(overlay.window != nil), "took": .flag(focused), "responder": .type(overlay.window?.firstResponder),
+                                     "anchor": .size(anchor.frame.size), "overlay": .size(overlay.bounds.size)])
+        guard let window = overlay.window, focused else { finish(.cancelled(.unavailable)); return }
         shownInVisibleWindow = window.isVisible
         let center = NotificationCenter.default
         observers = [
@@ -172,11 +187,33 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
                 MainActor.assumeIsolated { self?.finish(.cancelled(.dismissed)) }
             },
             center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.opened = true }
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier?.hasPrefix("com.apple.") ?? false
+                    PasswordsLog.write("app-resigned", ["after": self.elapsed, "frontIsApple": .flag(front)])
+                    self.opened = true
+                }
             },
             // Back in front: the list closed. A login picked in it has arrived by now or just after.
             center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.after(0.5) { $0.giveUpIfEmpty(.dismissed) } }
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    PasswordsLog.write("app-active", ["after": self.elapsed, "key": .flag(self.anchor.window?.isKeyWindow ?? false),
+                                                      "responder": .type(self.anchor.window?.firstResponder)])
+                    self.after(0.5) { $0.giveUpIfEmpty(.dismissed) }
+                }
+            },
+            center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    PasswordsLog.write("window-key", ["after": self.elapsed, "responder": .type(self.anchor.window?.firstResponder)])
+                }
+            },
+            center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    PasswordsLog.write("window-resigned-key", ["after": self.elapsed, "keyWindow": .type(NSApp.keyWindow)])
+                }
             },
         ]
         // A click in the window anywhere but the fields: you've moved on, so the fields go (a fill already on its
@@ -188,6 +225,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
                 let point = self.anchor.convert(event.locationInWindow, from: nil)
                 guard !self.anchor.bounds.contains(point) else { return }
                 // Closed before the page takes the click, so AppKit never moves it to the page's field.
+                PasswordsLog.write("click-away", ["after": self.elapsed])
                 self.dismissSystem()
                 self.after(0.3) { $0.giveUpIfEmpty(.dismissed) }
             }
@@ -199,13 +237,24 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     }
 
     private func askNow(_ ask: @MainActor (NSView) -> Bool) {
+        PasswordsLog.write("settled", ["after": elapsed, "active": .flag(NSApp.isActive), "key": .flag(anchor.window?.isKeyWindow ?? false),
+                                       "visible": .flag(anchor.window?.isVisible ?? false), "focused": .flag(anchor.window?.firstResponder === passwordView),
+                                       "responder": .type(anchor.window?.firstResponder)])
         // The focus moved on while AutoFill caught up, or the window closed or went away: you've moved on.
         guard let overlay = anchor.superview, let window = anchor.window, !shownInVisibleWindow || window.isVisible,
               window.firstResponder === passwordView else { finish(.cancelled(.dismissed)); return }
         // The list points at the field; a field off its page would put it in a corner of the screen.
         guard Self.anchorIsValid(anchor.frame, in: overlay.bounds) else { finish(.cancelled(.unavailable)); return }
         Self.pairForAutoFill(passwordView)
-        guard ask(passwordView) else { finish(.cancelled(.unavailable)); return }
+        let asked = ask(passwordView)
+        PasswordsLog.write("asked", ["sent": .flag(asked), "active": .flag(NSApp.isActive), "key": .flag(window.isKeyWindow),
+                                     "responder": .type(window.firstResponder)])
+        // The panel may take the focus a moment later.
+        after(0.3) { [weak window] in
+            PasswordsLog.write("after-ask", ["after": $0.elapsed, "active": .flag(NSApp.isActive), "key": .flag(window?.isKeyWindow ?? false),
+                                             "responder": .type(window?.firstResponder)])
+        }
+        guard asked else { finish(.cancelled(.unavailable)); return }
         if let openCheck { after(openCheck) { if !$0.opened { $0.giveUpIfEmpty(.unavailable) } } }
     }
 
@@ -219,16 +268,23 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     static func dismissSystemAutoFill() {
         let shared = NSSelectorFromString("sharedInstance")
         guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
-              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject else { return }
-        for selector in dismissSelectors where controller.responds(to: selector) { controller.perform(selector) }
+              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject else {
+            PasswordsLog.writeIfStarted("dismiss", ["controller": .flag(false)])
+            return
+        }
+        let answered = dismissSelectors.filter { controller.responds(to: $0) }
+        for selector in answered { controller.perform(selector) }
+        PasswordsLog.writeIfStarted("dismiss", ["controller": .flag(true), "sent": .selectors(answered)])
     }
 
     /// The part of AppKit's AutoFill that pairs a password field with its username field, where AppKit has it.
     static var autoFillDetection: NSObject? {
         let shared = NSSelectorFromString("sharedInstance"), create = NSSelectorFromString("_createTargetDetectionControllerIfNecessary")
         guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
-              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.responds(to: create),
-              let ivar = class_getInstanceVariable(type, "_targetDetectionController") else { return nil }
+              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.isKind(of: type), controller.responds(to: create),
+              let ivar = class_getInstanceVariable(type, "_targetDetectionController"),
+              // Read only while it holds an object, as it does on the macOS versions this was written for.
+              ivar_getTypeEncoding(ivar).map({ String(cString: $0).hasPrefix("@") }) == true else { return nil }
         controller.perform(create)
         return object_getIvar(controller, ivar) as? NSObject
     }
@@ -236,9 +292,25 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     /// AppKit pairs the fields only when a text field takes the focus, never a text view, and fills by the last pair (#378).
     static func pairForAutoFill(_ view: NSView) {
         let mode = NSSelectorFromString("autoFillModeForResponder:")
-        guard let detection = autoFillDetection, detection.responds(to: mode) else { return }
+        let detection = autoFillDetection
+        guard let detection, detection.responds(to: mode) else { logPairing(detection: detection, mode: mode, result: nil); return }
         typealias Mode = @convention(c) (NSObject, Selector, NSView) -> UInt
-        _ = unsafeBitCast(detection.method(for: mode), to: Mode.self)(detection, mode, view)
+        let result = unsafeBitCast(detection.method(for: mode), to: Mode.self)(detection, mode, view)
+        logPairing(detection: detection, mode: mode, result: result)
+    }
+
+    /// What of AppKit's pairing calls this Mac has, looked up without calling any of them.
+    private static func logPairing(detection: NSObject?, mode: Selector, result: UInt?) {
+        let type: AnyClass? = NSClassFromString("NSAutoFillHeuristicController")
+        let ivar = type.flatMap { class_getInstanceVariable($0, "_targetDetectionController") }
+        let encoding = ivar.flatMap { ivar_getTypeEncoding($0) }.map { String(String(cString: $0).prefix(1)) } ?? "none"
+        let create = NSSelectorFromString("_createTargetDetectionControllerIfNecessary")
+        var found: [Selector] = []
+        if type?.instancesRespond(to: create) == true { found.append(create) }
+        if detection?.responds(to: mode) == true { found.append(mode) }
+        PasswordsLog.write("pair", ["class": .flag(type != nil), "shared": .flag((type as? NSObject.Type)?.responds(to: NSSelectorFromString("sharedInstance")) ?? false),
+                                    "ivar": .flag(ivar != nil), "ivarObject": .flag(encoding == "@"), "detection": .type(detection),
+                                    "found": .selectors(found), "mode": .number(result.map { Int(truncatingIfNeeded: $0) } ?? -1)])
     }
 
     /// The suggestion under a field, then the Passwords panel. AppKit closes the panel itself only for a field that
@@ -265,12 +337,15 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
 
     // MARK: Filling
 
-    func controlTextDidChange(_ notification: Notification) { fieldsChanged() }
+    func controlTextDidChange(_ notification: Notification) { fieldsChanged(in: usernameField) }
 
-    private func fieldsChanged() {
+    private func fieldsChanged(in field: NSView?) {
         guard isPresented else { return }
+        let typing = Self.isTyping(NSApp.currentEvent)
+        PasswordsLog.write("changed", ["field": .type(field), "after": elapsed, "username": .text(usernameField.stringValue),
+                                       "password": .text(passwordView.string), "typing": .flag(typing)])
         // Keys pressed here aren't a login from the list (the fields can't be seen): hand the focus back.
-        if Self.isTyping(NSApp.currentEvent) { finish(.cancelled(.typed)); return }
+        if typing { finish(.cancelled(.typed)); return }
         // AutoFill fills the two fields one after the other: read them once both have had their turn.
         changes += 1
         settling = true
@@ -286,11 +361,12 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     }
 
     /// For tests: what AutoFill's filling of the fields looks like from here.
-    func fieldsDidChange() { fieldsChanged() }
+    func fieldsDidChange() { fieldsChanged(in: nil) }
 
     private func collect() {
         settling = false
         let username = SecretString(usernameField.stringValue), password = SecretString(passwordView.string)
+        PasswordsLog.write("collect", ["after": elapsed, "username": .flag(!username.isEmpty), "password": .flag(!password.isEmpty)])
         guard !username.isEmpty || !password.isEmpty else { return }
         finish(.filled(username: username, password: password))
     }
@@ -353,8 +429,13 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         anchor.removeFromSuperview()
         if let window { guardReshow(in: window) }
         switch outcome {
-        case .filled: debugLog("syspasswords filled")
-        case .cancelled(let reason): debugLog("syspasswords cancelled \(reason)")
+        case .filled(let username, let password):
+            debugLog("syspasswords filled")
+            PasswordsLog.write("finish", ["outcome": .reason(nil), "after": elapsed, "username": .flag(!username.isEmpty), "password": .flag(!password.isEmpty),
+                                          "opened": .flag(opened), "focusBack": .flag(focused)])
+        case .cancelled(let reason):
+            debugLog("syspasswords cancelled \(reason)")
+            PasswordsLog.write("finish", ["outcome": .reason(reason), "after": elapsed, "opened": .flag(opened), "focusBack": .flag(focused)])
         }
         completion(outcome)
     }
@@ -365,11 +446,15 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         endReshowGuard()
         let dismiss = dismissSystem
         reshowGuard = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { _ in
-            DispatchQueue.main.async { MainActor.assumeIsolated { dismiss() } }
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                PasswordsLog.write("reshow-guard")
+                dismiss()
+            } }
         }
         let session = session
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.reshowGuardTime) { [weak self] in
             guard let self, self.session == session, !self.isPresented else { return }
+            PasswordsLog.write("reshow-guard-ended")
             self.endReshowGuard()
         }
     }
@@ -461,6 +546,7 @@ final class SystemPanelWatch {
         guard let onEnd else { return }
         stop()
         debugLog("syspasswords closed by \(trigger)")
+        PasswordsLog.writeIfStarted("watch-ended", ["by": .trigger(trigger)])
         onEnd(trigger)
     }
 
@@ -629,4 +715,119 @@ final class SecretTextView: NSTextView {
     override func accessibilityString(for range: NSRange) -> String? { nil }
     override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? { nil }
     override func accessibilitySubrole() -> NSAccessibility.Subrole? { .secureTextField }
+}
+
+/// The Mac's Passwords list, step by step, in every build, for finding out why it misbehaves on a Mac nobody here
+/// has (#378). Only what happened and yes-or-no facts: never a username, password, page or anything typed.
+enum PasswordsLog {
+    /// One fact in a line. None of these can carry a field's text.
+    nonisolated enum Fact {
+        case flag(Bool)
+        /// Written as set or empty, never the text.
+        case text(String)
+        /// The object's class name.
+        case type(Any?)
+        case selectors([Selector])
+        case number(Int)
+        case seconds(TimeInterval)
+        case size(NSSize)
+        /// nil for a fill.
+        case reason(SystemPasswordPicker.Reason?)
+        case trigger(SystemPanelWatch.Trigger)
+
+        var rendered: String {
+            switch self {
+            case .flag(let on): on ? "yes" : "no"
+            case .text(let text): text.isEmpty ? "empty" : "set"
+            case .type(let object): object.map { String(describing: Swift.type(of: $0)) } ?? "none"
+            case .selectors(let selectors): selectors.isEmpty ? "none" : selectors.map(NSStringFromSelector).joined(separator: ",")
+            case .number(let n): String(n)
+            case .seconds(let seconds): String(format: "%.2fs", seconds)
+            case .size(let size): "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+            case .reason(let reason): reason.map { String(describing: $0) } ?? "filled"
+            case .trigger(let trigger): String(describing: trigger)
+            }
+        }
+    }
+
+    /// The file's folder; none while tests run.
+    nonisolated static let folder: URL? = {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return nil }
+        let name = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true ? "Library/Logs/Zigzag Dev" : "Library/Logs/Zigzag"
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(name, isDirectory: true)
+    }()
+    nonisolated static let fileName = "passwords.log"
+    nonisolated static let oldFileName = "passwords.old.log"
+    /// Past this size the file is set aside as the old one and starts over.
+    nonisolated static let limit = 200_000
+
+    nonisolated private static let queue = DispatchQueue(label: "app.zigzag.passwords-log", qos: .utility)
+    nonisolated(unsafe) private static var collapser = Collapser()
+    /// Set by the first line, so nothing is written until the list is used.
+    @MainActor private(set) static var started = false
+
+    /// "event key=value …".
+    nonisolated static func line(_ event: StaticString, _ facts: KeyValuePairs<StaticString, Fact>) -> String {
+        ([String(describing: event)] + facts.map { "\($0.key)=\($0.value.rendered)" }).joined(separator: " ")
+    }
+
+    @MainActor static func write(_ event: StaticString, _ facts: KeyValuePairs<StaticString, Fact> = [:]) {
+        guard let folder else { return }
+        var lines = [ExtensionLog.entry(line(event, facts))]
+        if !started {
+            started = true
+            let info = Bundle.main.infoDictionary
+            lines.insert("launch \(ProcessInfo.processInfo.operatingSystemVersionString) Zigzag \(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))", at: 0)
+        }
+        let now = Date(), taken = lines
+        queue.async {
+            let stamp = now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: true))
+            let out = taken.flatMap { collapser.take($0) }.map { "\(stamp) \($0)" }
+            guard !out.isEmpty else { return }
+            append(out, to: folder, limit: limit)
+        }
+    }
+
+    /// Only once the list has been used this launch.
+    @MainActor static func writeIfStarted(_ event: StaticString, _ facts: KeyValuePairs<StaticString, Fact> = [:]) {
+        if started { write(event, facts) }
+    }
+
+    /// The same line again and again is written once, then how many more times it came.
+    nonisolated struct Collapser {
+        private var last: String?
+        private var repeats = 0
+
+        mutating func take(_ line: String) -> [String] {
+            if line == last { repeats += 1; return [] }
+            defer { last = line; repeats = 0 }
+            return repeats > 0 ? ["  same \(repeats) more time\(repeats == 1 ? "" : "s")", line] : [line]
+        }
+    }
+
+    /// Adds `lines` to the file in `folder`, first setting it aside once it would pass `limit`.
+    nonisolated static func append(_ lines: [String], to folder: URL, limit: Int) {
+        let manager = FileManager.default
+        try? manager.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent(fileName), old = folder.appendingPathComponent(oldFileName)
+        let text = Data(lines.map { $0 + "\n" }.joined().utf8)
+        let size = (try? manager.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+        if size > 0, size + text.count > limit {
+            try? manager.removeItem(at: old)
+            try? manager.moveItem(at: url, to: old)
+        }
+        if manager.fileExists(atPath: url.path), let handle = try? FileHandle(forWritingTo: url) {
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: text)
+            try? handle.close()
+        } else {
+            try? text.write(to: url)
+        }
+    }
+
+    /// The last lines, for Help › Report a Problem.
+    nonisolated static func recent(_ count: Int) -> [String] {
+        guard let folder, let text = try? String(contentsOf: folder.appendingPathComponent(fileName), encoding: .utf8) else { return [] }
+        return text.split(separator: "\n").suffix(count).map(String.init)
+    }
 }

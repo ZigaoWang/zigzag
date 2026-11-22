@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// The "add Zigzag in 1Password" note shows only when every connection is refused; one succeeding cancels it, and unknown replies prove nothing.
@@ -129,5 +130,40 @@ struct CompanionAppNoticeTests {
 
     @Test func aUseAfterNowDoesNotCount() {
         #expect(!shows(use: 10, at: 9))
+    }
+}
+
+/// Only a sign-in field or 1Password's own menu counts as using 1Password; a search box never does.
+@MainActor
+struct CompanionAppNoticeFieldTests {
+    private final class Loading: NSObject, WKNavigationDelegate {
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    private func counts(_ html: String, focus selector: String) async -> Bool? {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<html><body>\(html)</body></html>", baseURL: URL(string: "https://example.com/"))
+        }
+        withExtendedLifetime(loading) {}
+        _ = try? await webView.evaluateJavaScript("document.querySelector('\(selector)').focus(); true")
+        return try? await webView.evaluateJavaScript(CompanionAppNotice.fieldFocusedScript) as? Bool
+    }
+
+    @Test func aSearchBoxDoesNotCount() async {
+        #expect(await counts("<input type=text name=q placeholder=Search>", focus: "input") == false)
+        #expect(await counts("<textarea></textarea>", focus: "textarea") == false)
+    }
+
+    @Test func aSignInFieldCounts() async {
+        #expect(await counts("<form><input type=password></form>", focus: "input") == true)
+        #expect(await counts("<form><input id=u name=username><input type=password></form>", focus: "#u") == true)
+        #expect(await counts("<input autocomplete=email>", focus: "input") == true)
     }
 }

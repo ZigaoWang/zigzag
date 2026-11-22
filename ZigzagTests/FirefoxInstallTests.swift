@@ -458,6 +458,42 @@ struct FirefoxInstallTests {
         #expect(Self.stagingFolders() == before)
     }
 
+    /// A theme isn't an extension: Zigzag draws its own look, so a theme-only package is refused before the review
+    /// sheet, from either store or a folder, and leaves nothing staged. One that also runs something installs (#454).
+    @Test func aThemeOnlyPackageIsRefusedAndAnExtensionWithAThemeInstalls() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let colors: [String: Any] = ["colors": ["frame": "#000000", "tab_background_text": "#ffffff"]]
+        #expect(ExtensionStore.isThemeOnly(["manifest_version": 3, "name": "Dark", "version": "1.0", "theme": colors]))
+        #expect(ExtensionStore.isThemeOnly(["manifest_version": 2, "name": "Dark", "version": "1.0", "theme_experiment": ["stylesheet": "a.css"]]))
+        #expect(!ExtensionStore.isThemeOnly(["manifest_version": 3, "name": "Both", "version": "1.0", "theme": colors,
+                                             "content_scripts": [["matches": ["<all_urls>"], "js": ["a.js"]]]]))
+        #expect(!ExtensionStore.isThemeOnly(["manifest_version": 3, "name": "Plain", "version": "1.0", "action": [String: Any]()]))
+
+        let theme = try work.xpiFile(try Self.xpi(Self.manifest("theme@example.com", "2.0", ["theme": colors])))
+        let before = Self.stagingFolders()
+        let refused = await ExtensionStore.prepareInstallXPI(at: theme)
+        guard case .failure(let error) = refused, case .theme = error else {
+            Issue.record("expected .theme, got \(refused)")
+            return
+        }
+        #expect(Self.stagingFolders() == before)
+
+        let both = try work.xpiFile(try Self.xpi(Self.manifest("both@example.com", "1.0", ["theme": colors, "background": ["scripts": ["bg.js"]]]),
+                                                 files: ["bg.js": Data("void 0;".utf8)]))
+        guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(at: both) else {
+            Issue.record("an extension with a theme should prepare")
+            return
+        }
+        ExtensionStore.discard(prepared)
+
+        let folder = work.folder.appendingPathComponent("theme-folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: ["manifest_version": 3, "name": "Dark", "version": "1.0", "theme": colors])
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        #expect(ExtensionStore.folderIsThemeOnly(folder))
+    }
+
     /// Firefox versions may carry letters (`1.0.0b1`), which Chrome's grammar refuses. A package isn't damaged over
     /// one: it installs, and the version it declares is the one recorded.
     @Test func aFirefoxVersionWithLettersInstallsAndIsRecorded() async throws {

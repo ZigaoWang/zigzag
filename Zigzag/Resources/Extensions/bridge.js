@@ -114,6 +114,17 @@
       for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       return btoa(binary);
     };
+    // ExtensionFetchRequests.responseLimit, the most a body carries across.
+    const bodyLimit = 32 << 20;
+    // The fewest bytes a body can be, known without reading it: a form's parts before its boundaries.
+    const leastSize = (given) => {
+      if (given instanceof Blob) return given.size;
+      if (given instanceof ArrayBuffer || ArrayBuffer.isView(given)) return given.byteLength;
+      if (given instanceof URLSearchParams) return given.toString().length;
+      let size = 0;
+      for (const [, value] of given) size += value instanceof Blob ? value.size : value.length;
+      return size;
+    };
     globalThis.fetch = async (input, init) => {
       const isRequest = input instanceof Request;
       const option = (name, fallback) => init && init[name] !== undefined ? init[name] : isRequest ? input[name] : fallback;
@@ -123,22 +134,29 @@
       // A text body crosses as text; form data, a Blob or a buffer crosses as base64 bytes, read below from the
       // request itself, so its bytes match the Content-Type that request made (a form's boundary). A loopback call
       // always carries base64 bytes, a Request's own body included. Streams stay with WebKit.
+      // A body over the native side's limit goes to WebKit before it is read or encoded.
       let body = null, asBytes = false;
       const given = init && init.body != null ? init.body : null;
       if (given != null) {
-        if (typeof given === 'string') body = loopback ? encoded(new TextEncoder().encode(given).buffer) : given;
-        else if (given instanceof FormData || given instanceof URLSearchParams || given instanceof Blob
-                 || given instanceof ArrayBuffer || ArrayBuffer.isView(given)) asBytes = true;
-        else return nativeFetch(input, init);
+        if (typeof given === 'string') {
+          if (!loopback) body = given.length > bodyLimit ? null : given;
+          else { const bytes = new TextEncoder().encode(given); body = bytes.byteLength > bodyLimit ? null : encoded(bytes.buffer); }
+          if (body == null) return nativeFetch(input, init);
+        } else if (given instanceof FormData || given instanceof URLSearchParams || given instanceof Blob
+                 || given instanceof ArrayBuffer || ArrayBuffer.isView(given)) {
+          if (leastSize(given) > bodyLimit) return nativeFetch(input, init);
+          asBytes = true;
+        } else return nativeFetch(input, init);
       } else if (isRequest && input.body !== null) {
         if (!loopback) return nativeFetch(input, init);
         asBytes = true;
       }
-      // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
-      // A loopback call is the exception: it is another origin on this Mac, and the helper is a plain server with no
-      // CORS reply of its own to read, so the switch alone decides and the default credentials stand.
+      // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default,
+      // and none with omit, past CORS either way (#478). A loopback call is the exception: it is another origin on this
+      // Mac, and the helper is a plain server with no CORS reply of its own to read, so the switch alone decides and
+      // the default credentials stand.
       const credentials = option('credentials', 'same-origin');
-      if (!['http:', 'https:'].includes(url.protocol) || (!loopback && !['include', 'same-origin'].includes(credentials))
+      if (!['http:', 'https:'].includes(url.protocol) || !['include', 'same-origin', 'omit'].includes(credentials)
           || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
@@ -150,7 +168,11 @@
       const request = new Request(isRequest ? input.clone() : input, init);
       const signal = request.signal;
       signal.throwIfAborted();
-      if (asBytes) body = encoded(await request.clone().arrayBuffer());
+      if (asBytes) {
+        const bytes = await request.clone().arrayBuffer();
+        if (bytes.byteLength > bodyLimit) return nativeFetch(input, init);
+        body = encoded(bytes);
+      }
       const requestID = crypto.randomUUID();
       let abort;
       const aborted = new Promise((resolve, reject) => { abort = () => {

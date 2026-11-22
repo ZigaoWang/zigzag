@@ -108,6 +108,12 @@ final class WebStoreOffer: FloatingPanelView {
                 self.add.isHidden = false
                 self.line.stringValue = String(localized: "Works in Zigzag", comment: "On the bar over a Chrome Web Store page for an extension that works in Zigzag.")
                 self.line.textColor = Tokens.Color.textSecondary
+            case .theme:
+                // The store's page is a theme, not an extension: the bar stops offering Add and says so (#454).
+                self.spinner.stopAnimation(nil)
+                self.add.isHidden = true
+                self.line.stringValue = ExtensionStore.InstallError.theme.reason
+                self.line.textColor = Tokens.Color.caution
             }
             self.needsLayout = true
         }

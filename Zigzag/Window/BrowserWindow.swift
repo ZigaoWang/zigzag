@@ -118,12 +118,14 @@ final class BrowserWindow: NSWindow {
     /// quitting and hiding, the sidebar and the tab overview, and Zigzag's own windows. Everything else a page may use
     /// for its document first, as in Safari and Chrome.
     static let browserActions: Set<String> = [
-        "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:",
+        "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:", "quitFromMenu:",
         "newTab:", "newWindow:", "newPrivateWindow:", "openLocation:", "closeTab:", "closeOtherTabs:", "performClose:",
         "reopenClosedTab:", "selectNextTab:", "selectPreviousTab:", "selectTabByNumber:",
         "nextSpace:", "previousSpace:", "selectSpaceByNumber:", "showSpaceSwitcher:", "newSpace:", "reloadPage:", "reloadPageFromOrigin:", "stopLoading:",
         "performMiniaturize:", "toggleFullScreen:", "toggleBrowserSidebar:", "toggleDeskView:", "showWebInspector:",
         "showDownloads:", "showHistory:", "hideWebApp:", "quitWebApp:",
+        // ⇧⌘C copies the page's link, as in Arc, even where the page has its own (GitHub copies a file's raw text).
+        "copyPageURL:", "copyPageURLAsMarkdown:",
     ]
 
     /// Whether the menu item these keys belong to is one the browser keeps (`browserActions`). Keys no item has are
@@ -388,7 +390,8 @@ final class BrowserWindow: NSWindow {
         // In full screen AppKit shows them in the title bar that slides down with the menu bar, flashing them in
         // the wrong place; they stay hidden there, and the sidebar's buttons move into their space.
         // In full screen they belong to the title bar that slides down with the menu bar, where AppKit puts them,
-        // so you can always leave full screen; the sidebar keeps no space for them.
+        // so you can always leave full screen. The bar and sidebar keep their room, so they sit beside the app's
+        // controls rather than over them.
         guard !styleMask.contains(.fullScreen) else {
             buttons.forEach { if $0.isHidden { $0.isHidden = false } }
             return
@@ -439,6 +442,8 @@ enum FullScreenPhase: Equatable {
 
     /// AppKit is moving the title bar and its buttons: Zigzag leaves them alone.
     var isMoving: Bool { self == .entering || self == .exiting }
+    /// The lights' backing goes as full screen starts to end, before AppKit moves the title bar.
+    var dropsTrafficLightBacking: Bool { self == .exiting }
     /// Transparent as everywhere in Zigzag, full screen included: the buttons come down with the menu bar and sit on
     /// the bar above the page, not on a bar of the system's own.
     var titlebarAppearsTransparent: Bool { true }

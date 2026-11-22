@@ -1,19 +1,34 @@
 import AppKit
+import UniformTypeIdentifiers
 
-/// About Zigzag: a small window as every Mac app has it (icon, name, version and copyright), with the drawn wordmark
-/// for the name, as Settings has it, the release notes and the acknowledgements a click away, and the legal lines at
-/// the foot. Check for Updates sits right under About in the Zigzag menu.
+/// About Zigzag: Your Zigzag Card as the hero, its finishes and Save as Image… and Share… under it, the version with
+/// its build, the release notes and the acknowledgements a click away, and the legal lines at the foot. Check for
+/// Updates sits right under About in the Zigzag menu.
 final class AboutWindowController: NSWindowController, NSWindowDelegate {
-    private static var shared: AboutWindowController?
+    private(set) static var shared: AboutWindowController?
+    private let content: AboutView
+    private var themeToken: SignalToken?
+    private let sharing = SharingWatch()
+
+    private static var frontSpace: SpaceInfo? {
+        (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first)?.tabManager.currentSpace
+    }
 
     static func show() {
         NSApp.activate(ignoringOtherApps: true)
         if let shared {
+            shared.refresh()
             shared.window?.makeKeyAndOrderFront(nil)
             return
         }
-        let view = AboutView(frame: NSRect(x: 0, y: 0, width: Tokens.Welcome.aboutSize.width, height: AboutView.height))
-        let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .fullSizeContentView],
+        let controller = AboutWindowController()
+        shared = controller
+        controller.showWindow(nil)
+    }
+
+    private init() {
+        content = AboutView(face: .current(), palette: .of(Self.frontSpace), finish: CardFinish.chosen)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: content.frame.size), styleMask: [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: true)
         window.title = String(localized: "About Zigzag", comment: "Title of the About window.")
         window.titlebarAppearsTransparent = true
@@ -22,23 +37,96 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
         window.tabbingMode = .disallowed
         window.isMovableByWindowBackground = true
         window.backgroundColor = Tokens.Color.formBackground
-        window.contentView = view
+        window.contentView = content
         window.center()
-        let controller = AboutWindowController(window: window)
-        window.delegate = controller
-        shared = controller
-        controller.showWindow(nil)
+        super.init(window: window)
+        window.delegate = self
+        content.save.onClick = { [weak self] _ in self?.saveImage() }
+        content.share.onClick = { [weak self] _ in self?.shareImage() }
+        content.finishes.onPick = { [weak self] finish in
+            CardFinish.chosen = finish
+            self?.content.stage.finish = finish
+        }
+        themeToken = Brand.themeChanged.observe { [weak self] in self?.refresh() }
     }
 
+    required init?(coder: NSCoder) { fatalError() }
+
     func windowWillClose(_ notification: Notification) { Self.shared = nil }
+
+    /// The space in front and today, again.
+    private func refresh() {
+        // While this window is key, the space in front is the last browser window's.
+        let palette = CardPalette.of(Self.frontSpace)
+        content.stage.palette = palette
+        content.finishes.palette = palette
+        content.stage.face = .current()
+    }
+
+    private var png: Data? {
+        let stage = content.stage
+        return CardArt.png(stage.face, finish: stage.finish, palette: stage.palette, dark: content.effectiveAppearance.isDark)
+    }
+
+    private static var fileName: String { String(localized: "Zigzag Card", comment: "File name of Your Zigzag Card saved as a picture.") + ".png" }
+
+    private func saveImage() {
+        guard let window, let data = png else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.png]
+        panel.nameFieldStringValue = Self.fileName
+        panel.directoryURL = DownloadManager.folder
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            try? data.write(to: url)
+        }
+    }
+
+    private func shareImage() {
+        guard let data = png else { return }
+        let provider = NSItemProvider(item: data as NSData, typeIdentifier: UTType.png.identifier)
+        provider.suggestedName = Self.fileName
+        let picker = NSSharingServicePicker(items: [provider])
+        picker.delegate = sharing
+        picker.show(relativeTo: content.share.bounds, of: content.share, preferredEdge: .minY)
+    }
+
+    #if DEBUG
+    /// `card tilt <x> <y>|off`, `card finish <name>`, `card flip`, `card hover <n>|off`, `card save <path>`,
+    /// `card shot <path>`, `card close`.
+    func debugCard(_ f: [String]) {
+        switch f.first ?? "" {
+        case "tilt":
+            let n = f.dropFirst().compactMap { Double($0) }
+            content.stage.lean(toward: n.count == 2 ? CGPoint(x: n[0], y: n[1]) : nil)
+        case "finish":
+            guard f.count == 2, let finish = CardFinish(rawValue: f[1]) else { break }
+            content.finishes.selected = finish
+            content.finishes.onPick?(finish)
+        case "flip": content.stage.turnOver()
+        case "hover": content.finishes.debugHover(f.count == 2 ? Int(f[1]) : nil)
+        case "save": if f.count == 2 { try? png?.write(to: URL(fileURLWithPath: f[1])) }
+        case "shot":
+            guard f.count == 2, let number = window?.windowNumber else { break }
+            let shot = Process()
+            shot.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            shot.arguments = ["-x", "-o", "-l", "\(number)", f[1]]
+            try? shot.run()
+        case "close": window?.close()
+        default: break
+        }
+    }
+    #endif
 }
 
-/// The icon, the wordmark and the version with its build, then the places to go as one grouped list (release notes,
-/// acknowledgements, the website, the source and who made it), and the copyright and license in a line at the foot.
+/// The card, its finishes at its left under it and Save as Image… and Share… at its right, the version, then the
+/// places to go as one grouped list (release notes, acknowledgements, the website, the source and who made it), and
+/// the copyright and license in a line at the foot.
 private final class AboutView: NSView {
-    static let height = Tokens.Welcome.aboutSize.height
-    private let icon = NSImageView(image: NSApp.applicationIconImage)
-    private let wordmark = WordmarkView()
+    let stage: CardStage
+    let finishes: CardFinishSwatches
+    let save = PillButton(title: String(localized: "Save as Image…", comment: "Button in About Zigzag, under Your Zigzag Card: saves it as a PNG picture, asking where."))
+    let share = PillButton(title: String(localized: "Share…", comment: "Button in About Zigzag, under Your Zigzag Card: opens the Mac's share menu with its picture."))
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     /// Each a name, where it goes in quiet text, and an arrow that says whether it opens here or on the web.
     private let rows: [AboutRow] = [
@@ -57,9 +145,12 @@ private final class AboutView: NSView {
     private let card = ColorView(color: Tokens.Color.surfaceGroup)
     /// The copyright, and the license as a link to its text.
     private let legal = NSTextField(labelWithAttributedString: AboutView.legalText())
+    private var tracking: NSTrackingArea?
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
+    init(face: CardFace, palette: CardPalette, finish: CardFinish) {
+        stage = CardStage(face: face, palette: palette, finish: finish)
+        finishes = CardFinishSwatches(selected: finish, palette: palette)
+        super.init(frame: .zero)
         let info = Bundle.main.infoDictionary
         // As a Mac app's About says it: the version, with the build in brackets for anyone reporting a problem.
         let short = VersionName.display(info?["CFBundleShortVersionString"] as? String ?? "")
@@ -70,12 +161,13 @@ private final class AboutView: NSView {
         // Selectable, so its link can be clicked.
         legal.isSelectable = true
         legal.allowsEditingTextAttributes = true
-        icon.imageScaling = .scaleProportionallyUpOrDown
         card.wantsLayer = true
         card.layer?.cornerRadius = Tokens.Radius.group
         card.layer?.cornerCurve = .continuous
         card.layer?.borderWidth = Tokens.Metric.hairline
-        ([icon, wordmark, version, legal, card] + lines + rows).forEach { addSubview($0) }
+        ([stage, finishes, save, share, version, legal, card] + lines + rows).forEach { addSubview($0) }
+        let width = Tokens.Keepsake.size.width + Tokens.Keepsake.margin * 2
+        setFrameSize(NSSize(width: width, height: place(width: width, apply: false)))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -105,30 +197,73 @@ private final class AboutView: NSView {
 
     override func layout() {
         super.layout()
-        let width = bounds.width
-        let iconSide = Tokens.Welcome.aboutIcon
-        icon.frame = NSRect(x: round((width - iconSide) / 2), y: Tokens.Space.x10, width: iconSide, height: iconSide)
-        let markHeight = Tokens.Welcome.smallWordmarkHeight
-        let markWidth = ceil(markHeight * WordmarkView.aspect)
-        wordmark.frame = NSRect(x: round((width - markWidth) / 2), y: icon.frame.maxY + Tokens.Space.x4, width: markWidth, height: markHeight)
-        version.frame = NSRect(x: 0, y: wordmark.frame.maxY + Tokens.Space.x2, width: width, height: version.lineHeight)
-        // The list, inset as a panel's rows are, a hairline between each two, the lines lined up with the text.
-        let pad = Tokens.Space.x5, inset = Tokens.Space.x1, rowHeight = Tokens.Metric.rowHeight + Tokens.Space.x1
-        let top = version.frame.maxY + Tokens.Space.x6
-        card.frame = NSRect(x: pad, y: top, width: width - pad * 2, height: CGFloat(rows.count) * rowHeight + inset * 2)
-        card.layer?.borderColor = cgColor(Tokens.Color.surfaceGroupEdge)
-        var y = top + inset
-        for (i, row) in rows.enumerated() {
-            row.frame = NSRect(x: pad + inset, y: y, width: width - (pad + inset) * 2, height: rowHeight)
-            y += rowHeight
-            if i < lines.count {
-                let lineX = row.frame.minX + CardRow.inset
-                lines[i].frame = NSRect(x: lineX, y: y - Tokens.Metric.hairline / 2, width: row.frame.maxX - CardRow.inset - lineX,
-                                        height: Tokens.Metric.hairline)
+        _ = place(width: bounds.width, apply: true)
+    }
+
+    /// Lays everything out top down for `width`, and returns the height it takes.
+    private func place(width: CGFloat, apply: Bool) -> CGFloat {
+        let k = Tokens.Keepsake.self
+        let left = k.margin, right = width - k.margin
+        var y = k.top + k.size.height + k.gap
+        let height = Tokens.Page.controlHeight
+        let versionHeight = version.lineHeight
+        let pad = Tokens.Space.x1, rowHeight = Tokens.Metric.rowHeight + Tokens.Space.x1
+        let legalHeight = ceil(legal.sizeThatFits(NSSize(width: width, height: 100)).height)
+        if apply {
+            // The stage runs to the window's sides with the card in its middle, so the shadow and the turn have room.
+            stage.frame = NSRect(x: 0, y: 0, width: width, height: (k.top + k.size.height / 2) * 2)
+            let swatches = finishes.fittingSize
+            finishes.frame = NSRect(x: left, y: y + (height - swatches.height) / 2, width: swatches.width, height: swatches.height)
+            var x = right
+            for button in [share, save] {
+                let w = button.fittingWidth
+                x -= w
+                button.frame = NSRect(x: x, y: y, width: w, height: height)
+                x -= Tokens.Space.x2
             }
         }
-        let legalHeight = ceil(legal.sizeThatFits(NSSize(width: width, height: 100)).height)
-        legal.frame = NSRect(x: 0, y: bounds.height - Tokens.Space.x5 - legalHeight, width: width, height: legalHeight)
+        y += height + k.gap
+        if apply { version.frame = NSRect(x: 0, y: y, width: width, height: versionHeight) }
+        y += versionHeight + Tokens.Space.x4
+        // The list, as wide as the card, a hairline between each two, the lines lined up with the text.
+        let listHeight = CGFloat(rows.count) * rowHeight + pad * 2
+        if apply {
+            card.frame = NSRect(x: left, y: y, width: right - left, height: listHeight)
+            card.layer?.borderColor = cgColor(Tokens.Color.surfaceGroupEdge)
+            var rowY = y + pad
+            for (i, row) in rows.enumerated() {
+                row.frame = NSRect(x: left + pad, y: rowY, width: right - left - pad * 2, height: rowHeight)
+                rowY += rowHeight
+                if i < lines.count {
+                    let lineX = row.frame.minX + CardRow.inset
+                    lines[i].frame = NSRect(x: lineX, y: rowY - Tokens.Metric.hairline / 2, width: row.frame.maxX - CardRow.inset - lineX,
+                                            height: Tokens.Metric.hairline)
+                }
+            }
+        }
+        y += listHeight + Tokens.Space.x5
+        if apply { legal.frame = NSRect(x: 0, y: y, width: width, height: legalHeight) }
+        return y + legalHeight + Tokens.Space.x5
+    }
+
+    // The card turns toward the pointer only while it's over the card or just beside it.
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) { follow(event) }
+    override func mouseEntered(with event: NSEvent) { follow(event) }
+    override func mouseExited(with event: NSEvent) { stage.lean(toward: nil) }
+
+    private func follow(_ event: NSEvent) {
+        let location = stage.convert(event.locationInWindow, from: nil)
+        let near = stage.cardFrame.insetBy(dx: -Tokens.Space.x3, dy: -Tokens.Space.x3).contains(location)
+        stage.lean(toward: near ? stage.leanPoint(for: location) : nil)
     }
 }
 

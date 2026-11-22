@@ -5,6 +5,18 @@ import Testing
 /// ⌘1–⌘9 and the numbers holding ⌘ shows on the sidebar's places: each shown number goes where it says, and only
 /// ⌘ held alone a moment shows them.
 struct NumberHintsTests {
+    /// With the numbers up, their own keys keep them up while the modifier is held; any other key hides them.
+    @MainActor @Test func theNumbersOwnKeysKeepThemShown() {
+        let one: UInt16 = 18, five: UInt16 = 23, t: UInt16 = 17
+        #expect(NumberHints.keepsShown(keyCode: one, flags: .command, tabsShown: true, spacesShown: false))
+        #expect(NumberHints.keepsShown(keyCode: five, flags: .control, tabsShown: false, spacesShown: true))
+        // Another key, another modifier with it, or numbers not up yet: they go.
+        #expect(!NumberHints.keepsShown(keyCode: t, flags: .command, tabsShown: true, spacesShown: false))
+        #expect(!NumberHints.keepsShown(keyCode: one, flags: [.command, .shift], tabsShown: true, spacesShown: false))
+        #expect(!NumberHints.keepsShown(keyCode: one, flags: .command, tabsShown: false, spacesShown: false))
+        #expect(!NumberHints.keepsShown(keyCode: one, flags: .control, tabsShown: true, spacesShown: false))
+    }
+
     @Test func numbersGoToTheirPlaceAndNineToTheLast() {
         #expect(TabNumbers.index(for: 1, count: 0) == nil)
         #expect(TabNumbers.index(for: 1, count: 12) == 0)

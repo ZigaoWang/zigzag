@@ -219,6 +219,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         menu?.removeFromSuperview()
         let menu = AutofillMenu(items: Array(items.prefix(AutofillMenu.maxRows)), origin: origin)
         menu.onPick = { [weak self] item in self?.pick(item) }
+        menu.onHoverSelect = { [weak self, weak menu] in self?.markSelected(menu?.selected != nil) }
         let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
         menu.frame = Self.menuFrame(under: fieldInOverlay, in: overlay.bounds, height: menu.contentHeight)
         overlay.addSubview(menu)
@@ -251,11 +252,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         return MiniWindowController.all.first { $0.tab.webView === webView }?.overlay
     }
 
-    /// The page is the one on screen in its window: the selected tab's, the page peeked at over it (a sign-in a
-    /// site opens in a window of its own comes up there), or Zigzag Mini's only page.
+    /// The page is the one on screen in its window: the selected tab's, or Zigzag Mini's only page.
     static func isInFront(_ webView: WKWebView) -> Bool {
         if let controller = WindowManager.shared.controller(for: webView.window) {
-            if controller.peek.isVisible { return controller.peek.tab?.webView === webView }
             return controller.selectedWebView === webView
         }
         return MiniWindowController.all.contains { $0.tab.webView === webView && $0.window === webView.window }
@@ -268,6 +267,21 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         guard let origin = Origin(webView.url), let frame = lastFrame else { return }
         let item: AutofillMenu.Item = kind == "missing" ? .missing : .importFrom("Chrome")
         show([item], under: NSRect(x: 40, y: 120, width: 320, height: 32), in: webView, frame: frame, origin: origin)
+    }
+
+    /// For the debug bridge: the menu with two made-up logins (never saved) in `overlay`, to look at; `move` steps its
+    /// highlight as the arrow keys do.
+    func debugPreview(in overlay: NSView, move: Int) {
+        if let menu, move != 0 { menu.move(move); return }
+        menu?.removeFromSuperview()
+        guard let origin = Origin(URL(string: "https://example.com")) else { return }
+        let logins = ["sam@example.com", "alex@example.com"].map {
+            Credential(id: UUID(), origin: origin, username: $0, title: "", notes: "", otpAuth: "", created: Date(), modified: Date(), lastUsed: nil)
+        }
+        let menu = AutofillMenu(items: logins.map { .login($0) } + [.systemPasswords], origin: origin)
+        menu.frame = NSRect(x: 40, y: 120, width: 320, height: menu.contentHeight)
+        overlay.addSubview(menu)
+        self.menu = menu
     }
 
     /// The menu's rows, for the debug log.
@@ -598,13 +612,20 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// Fills what the Mac's list gave into the page Passwords… was chosen on, then lets go of it.
     func fillFromSystem(username: SecretString, password: SecretString, into request: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)) {
         let webView = request.webView
-        guard Self.systemFillAllowed(asked: request.origin, now: webView.url, inFront: Self.isInFront(webView)) else { Self.tell(Self.pageMovedOn, about: webView); return }
+        guard Self.systemFillAllowed(asked: request.origin, now: webView.url, inFront: Self.isInFront(webView)) else {
+            PasswordsLog.write("page-fill", ["allowed": .flag(false)])
+            Self.tell(Self.pageMovedOn, about: webView)
+            return
+        }
         Task {
             // Passed as arguments, never pasted into the script's source, held only for the call, and not marked as
             // Zigzag's own fill: signing in with it never offers to save it.
             let arguments: [String: Any] = ["username": username.withUnsafeString { String($0) }, "password": password.withUnsafeString { String($0) },
                                             "expectedOrigin": request.origin.description, "mark": false]
             let filled = try? await webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: request.frame, contentWorld: .defaultClient) as? [String: Any]
+            PasswordsLog.write("page-fill", ["answered": .flag(filled != nil), "moved": .flag(filled?["moved"] as? Bool == true),
+                                             "username": .flag(filled?["username"] as? Bool == true), "password": .flag(filled?["password"] as? Bool == true),
+                                             "usernameEmpty": .flag(filled?["usernameEmpty"] as? Bool == true)])
             guard let filled, filled["moved"] as? Bool != true else { Self.tell(Self.pageMovedOn, about: webView); return }
             guard filled["password"] as? Bool == true || filled["username"] as? Bool == true else { Self.tell(Self.noPasswordField, about: webView); return }
             // Only a password came back, and the username field is still empty: say so, or it looks like a slip.
@@ -1086,11 +1107,20 @@ final class AutofillMenu: FloatingPanelView {
     override func mouseUp(with event: NSEvent) {}
 
     private var rows: [AutofillRow] = []
-    private let footer = TextButton(title: String(localized: "Passwords", comment: "Link at the bottom of the menu that fills a password into a page: opens the Passwords window."), font: Tokens.Font.small(.medium))
+    private let footer = PillButton(title: String(localized: "Passwords", comment: "Link at the bottom of the menu that fills a password into a page: opens the Passwords window."), style: .quiet)
     private let footerLine = ColorView(color: Tokens.Color.separator)
     private let hasFooter: Bool
-    private var selection = -1 { didSet { rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection } } }
+    private var selection = -1 {
+        didSet {
+            rows.enumerated().forEach { $0.element.isSelected = $0.offset == selection }
+            moveHighlight()
+        }
+    }
+    private let highlight = HighlightGlide()
+    private var highlighted: Int?
     var onPick: ((Item) -> Void)?
+    /// The pointer chose a row, or left the one chosen.
+    var onHoverSelect: (() -> Void)?
 
     private let pad = Tokens.Space.x1 + 2
     private let rowHeight = Tokens.Space.x10 + Tokens.Space.x1
@@ -1106,9 +1136,17 @@ final class AutofillMenu: FloatingPanelView {
             }
         }
         radius = Tokens.Radius.panel
-        rows = items.map { item in
+        addSubview(highlight)
+        rows = items.enumerated().map { index, item in
             let row = AutofillRow(item: item, origin: origin)
             row.onClick = { [weak self] _ in self?.onPick?(item) }
+            row.hoverChanged = { [weak self, weak row] on in
+                guard let self, let row else { return }
+                // As in MenuPanel: the pointer and the keys move one choice, which Return fills.
+                if on { self.selection = row.isEnabled ? index : -1 } else if self.selection == index { self.selection = -1 } else { return }
+                self.onHoverSelect?()
+            }
+            row.pressChanged = { [weak self] pressed in self?.highlight.showPressed(pressed) }
             addSubview(row)
             return row
         }
@@ -1138,20 +1176,39 @@ final class AutofillMenu: FloatingPanelView {
     #if DEBUG
     var debugRows: [String] { rows.map(\.debugName) }
     func debugRowFrame(_ index: Int) -> NSRect? { rows.indices.contains(index) ? rows[index].frame : nil }
+    /// The pointer over row `index`, or off it.
+    func debugHover(_ index: Int, _ on: Bool) { if rows.indices.contains(index) { rows[index].isHovered = on } }
+    /// The one highlight: where it is, and whether it's showing.
+    var debugHighlight: (frame: NSRect, shown: Bool, gliding: Bool) {
+        (highlight.frame, highlighted != nil, highlight.layer?.animation(forKey: "glide") != nil)
+    }
+    /// Whether any row paints a fill of its own.
+    var debugRowsFilled: Bool { rows.contains { $0.layer?.backgroundColor != nil } }
     #endif
+
+    /// One highlight on the row the pointer or the arrow keys chose last, gliding between them.
+    private func moveHighlight() {
+        let next = rows.indices.contains(selection) ? selection : nil
+        guard next != highlighted else { return }
+        let old = highlighted
+        highlighted = next
+        highlight.move(to: next.map { rows[$0].frame }, wasShown: old != nil)
+    }
 
     private func layoutRows() {
         for (index, row) in rows.enumerated() {
             row.frame = NSRect(x: pad, y: pad + CGFloat(index) * rowHeight, width: bounds.width - pad * 2, height: rowHeight)
         }
+        if let highlighted, rows.indices.contains(highlighted) { highlight.follow(rows[highlighted].frame) }
         guard hasFooter else { return }
         let y = pad + CGFloat(rows.count) * rowHeight + pad / 2
         footerLine.frame = NSRect(x: pad + Tokens.Space.x2, y: y, width: bounds.width - (pad + Tokens.Space.x2) * 2, height: Tokens.Metric.hairline)
-        footer.frame = NSRect(x: pad, y: y + pad / 2, width: footer.fittingWidth, height: footerHeight)
+        let fh = Tokens.Page.controlHeight
+        footer.frame = NSRect(x: pad, y: y + pad / 2 + (footerHeight - fh) / 2, width: footer.fittingWidth, height: fh)
     }
 }
 
-private final class AutofillRow: InteractiveView {
+final class AutofillRow: InteractiveView {
     let item: AutofillMenu.Item
     private let icon = NSImageView()
     private let name: Label
@@ -1233,8 +1290,6 @@ private final class AutofillRow: InteractiveView {
         detail.frame = NSRect(x: x, y: name.frame.maxY, width: bounds.width - x - Tokens.Space.x2, height: detail.lineHeight)
     }
 
-    override func stateDidChange(animated: Bool) {
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : (isHovered || isSelected) ? Tokens.Color.hoverFill : nil
-        layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
-    }
+    // The menu's one gliding highlight shows hover, the keys' choice and the press; the row draws none of its own.
+    override func stateDidChange(animated: Bool) {}
 }

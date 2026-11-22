@@ -20,11 +20,10 @@ import Testing
         try body(controller, tabs)
     }
 
-    private func row(_ tab: Tab, partners: [Tab]) -> TabRowView {
-        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
+    private func row(_ tab: Tab, partners: [Tab], width: CGFloat = 240) -> TabRowView {
+        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.rowHeight))
         row.configure(tab: tab)
-        row.configure(partners: partners)
-        row.closesPart = true
+        row.configure(parts: partners.map { TabRowView.Part(page: $0) })
         return row
     }
 
@@ -70,30 +69,94 @@ import Testing
             #expect(row.closingPage === right)
             row.focusedHalf = 0
             #expect(row.closingPage === left)
-            // Not a split row's per-part ×: the row's own tab.
-            row.closesPart = false
+            row.debugPoint(atPart: 1)
+            #expect(row.closingPage === right)
+            // A row of one page: its own tab.
+            row.configure(parts: [])
             #expect(row.closingPage === left)
             _ = controller
         }
     }
 
-    /// The × sits inside the part it closes, named for that page, and only on the row you're in or point at.
-    @Test func theCloseButtonSitsInItsPart() throws {
-        try inWindow(["A", "B"]) { controller, tabs in
-            let row = row(tabs[0], partners: [tabs[1]])
-            row.isSelected = true
-            row.focusedHalf = 1
-            row.layoutSubtreeIfNeeded()
-            #expect(!row.closeButton.isHidden)
-            #expect(row.closeButton.frame.minX > row.bounds.midX && row.closeButton.frame.maxX < row.bounds.maxX)
-            #expect(row.closeButton.toolTip == "Close B")
-            row.focusedHalf = 0
-            row.layoutSubtreeIfNeeded()
-            #expect(row.closeButton.frame.maxX < row.bounds.midX)
-            #expect(row.closeButton.toolTip == "Close A")
-            row.isSelected = false
+    /// Each part's × sits inside it, the size, inset and height of a single tab's, and only on the part you point at
+    /// or the page you're in.
+    @Test(arguments: [2, 4]) func theCloseButtonSitsInItsPart(count: Int) throws {
+        try inWindow((0..<count).map { "Page \($0)" } + ["Single"]) { controller, tabs in
+            // Wide enough that every part shows its title, as a tab's row does.
+            let width: CGFloat = count == 2 ? 240 : 480
+            let single = TabRowView(frame: NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.rowHeight))
+            single.configure(tab: tabs[count])
+            single.isSelected = true
+            single.layoutSubtreeIfNeeded()
+            let inset = single.bounds.maxX - single.closeButton.frame.maxX
+            let row = row(tabs[0], partners: Array(tabs[1..<count]), width: width)
+            row.isHovered = true
+            for part in 0..<count {
+                row.debugPoint(atPart: part)
+                row.layoutSubtreeIfNeeded()
+                #expect(!row.closeButton.isHidden)
+                #expect(row.closeButton.toolTip == "Close Tab")
+                #expect(row.closeButton.frame.size == single.closeButton.frame.size)
+                #expect(row.closeButton.frame.minY == single.closeButton.frame.minY)
+                let end = TabRowView.splitParts(count: count, end: row.bounds.width)[part].end
+                #expect(end - row.closeButton.frame.maxX == inset)
+                #expect(row.closingPage === tabs[part])
+            }
+            row.debugPoint(atPart: nil)
+            row.isHovered = false
             row.layoutSubtreeIfNeeded()
             #expect(row.closeButton.isHidden)
+            _ = controller
+        }
+    }
+
+    /// A part's × closes that page alone, the rest of the split closing up, and ⌘Z puts it back in the split.
+    @Test(arguments: [2, 4]) func aPartsCloseButtonClosesOnlyItsPage(count: Int) throws {
+        try inWindow((0..<count).map { "Page \($0)" } + ["Other"]) { controller, tabs in
+            let manager = controller.tabManager
+            let pages = Array(tabs[0..<count])
+            if count == 2 { manager.makeSplit(pages[0], with: pages[1]) } else {
+                manager.makeGroup(pages, shape: TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight], column: 0.5, row: 0.5))
+            }
+            controller.sidebar.list.reload(animated: false)
+            controller.sidebar.list.layoutSubtreeIfNeeded()
+            let row = try #require(controller.sidebar.list.row(for: pages[0]) as? TabRowView)
+            let shown = row.pages
+            #expect(shown.count == count)
+            row.isHovered = true
+            row.debugPoint(atPart: 1)
+            #expect(row.closingPage === shown[1])
+            row.onClose?()
+            #expect(manager.tab(with: shown[1].id) == nil)
+            let rest = shown.filter { $0 !== shown[1] }
+            #expect(rest.allSatisfy { manager.tab(with: $0.id) === $0 })
+            #expect(count == 2 ? manager.split(for: rest[0]) == nil : manager.split(for: rest[0])?.count == count - 1)
+            controller.sidebarUndo.undo()
+            let back = try #require(manager.split(for: rest[0]))
+            #expect(back.count == count)
+            #expect(manager.currentTabs.contains { $0.displayTitle == shown[1].displayTitle })
+        }
+    }
+
+    /// No row of the tab list, one page or several, gives a system tooltip with a title: the hover card names them.
+    @Test func aRowAndItsPartsCarryNoTitleTooltip() throws {
+        try inWindow(["A page", "B page", "C page", "D page"]) { controller, tabs in
+            let titles = tabs.map(\.displayTitle)
+            for partners in [[], [tabs[1]], Array(tabs[1...3])] {
+                let row = row(tabs[0], partners: partners)
+                row.isHovered = true
+                row.debugPoint(atPart: partners.isEmpty ? nil : 1)
+                row.layoutSubtreeIfNeeded()
+                var views: [NSView] = [row]
+                var seen: [NSView] = []
+                while let view = views.popLast() { seen.append(view); views += view.subviews }
+                for view in seen {
+                    #expect(view.toolTip.map { tip in !titles.contains { tip.contains($0) } } ?? true)
+                    #expect((view as? NSTextField)?.allowsExpansionToolTips != true)
+                }
+                // No tooltip rects either: nothing names a page for a point of the row.
+                #expect(!row.responds(to: #selector(NSViewToolTipOwner.view(_:stringForToolTip:point:userData:))))
+            }
             _ = controller
         }
     }

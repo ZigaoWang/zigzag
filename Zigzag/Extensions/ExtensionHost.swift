@@ -311,13 +311,14 @@ final class ExtensionHost: NSObject {
                      injectionTime: .atDocumentStart, forMainFrameOnly: false)
     }
 
-    /// OldTwitter's challenge call, in this web view's extension world, when the extension is on.
-    func attachOldTwitterSolver(to configuration: WKWebViewConfiguration) {
+    /// OldTwitter's challenge call, in this web view's extension world, when the extension is on. A private page gets
+    /// it only when OldTwitter may run there.
+    func attachOldTwitterSolver(to configuration: WKWebViewConfiguration, isPrivate: Bool) {
         guard let id = profile.installs.installedIDs.first(where: {
                   OldTwitterSolver.isOldTwitter(id: $0, manifest: ExtensionStore.manifest(for: $0) ?? [:])
               }),
               profile.installs.state(id)?.enabled == true else { return }
-        oldTwitterSolver.attach(to: configuration, extensionID: id)
+        oldTwitterSolver.attach(to: configuration, extensionID: id, isPrivate: isPrivate)
     }
 
     /// The extension, loaded in this profile, that the page at this address is one of.
@@ -442,7 +443,7 @@ final class ExtensionHost: NSObject {
     }
 
     /// The window to point at `id`'s app in while a connection that began at `since` waits: only when you used the
-    /// extension, or a field in a page, around then (`CompanionAppNotice`). Answers at most once per use.
+    /// extension, or a sign-in field in a page, around then (`CompanionAppNotice`). Answers at most once per use.
     fileprivate func windowForAppNotice(_ id: String, waitingSince since: Date, found: @escaping (BrowserWindowController) -> Void) {
         let now = Date()
         if let mark = ownUses[id], let window = mark.window.value, appNoticeUse[id] != mark.at,
@@ -451,7 +452,7 @@ final class ExtensionHost: NSObject {
             found(window)
             return
         }
-        // A page click or key counts when it left a field focused: a login you're filling, or the extension's menu in it.
+        // A page click or key counts when it left a sign-in field focused, or 1Password's menu in the page (#387).
         guard let page = pageUse, let tab = page.tab.value, let webView = tab.webView, appNoticeUse[id] != page.at,
               CompanionAppNotice.follows(use: page.at, waitingSince: since, now: now) else { return }
         appNoticeUse[id] = page.at
@@ -615,6 +616,10 @@ final class ExtensionHost: NSObject {
             context.hasAccessToPrivateData = profile.installs.allowsPrivate(id)
             try controller.load(context)
             contexts.append(context)
+            // OldTwitter's request signing: pages made before it was installed or started again get its call too.
+            if OldTwitterSolver.isOldTwitter(id: id, manifest: ExtensionStore.manifest(for: id) ?? [:]) {
+                oldTwitterSolver.attach(toOpenPagesOf: id)
+            }
             // Installed since the profile's pages were set up: its pages are marked from their next load.
             if ExtensionStore.kind(of: id) == .firefox { addFirefoxMarker(id) }
             // Its user scripts, in every web view, from their next page.
@@ -818,7 +823,7 @@ final class ExtensionHost: NSObject {
         for site in offSites {
             for pattern in patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
-        // When You Click It: a click gives the tab's site through activeTab, which WebKit drops when the tab leaves it.
+        // On Click: a click gives the tab's site through activeTab, which WebKit drops when the tab leaves it.
         if access == .click {
             context.setPermissionStatus(.grantedExplicitly, for: .activeTab)
         } else if !approvesActiveTab {
@@ -827,7 +832,7 @@ final class ExtensionHost: NSObject {
     }
 
     /// The sites a site access choice grants (nil: never chosen). Chosen, "On All Sites" adds the optional host permissions too.
-    /// "When You Click It" grants none: a click gives only the tab it's on.
+    /// "On Click" grants none: a click gives only the tab it's on.
     static func siteAccessPatterns(_ access: ExtensionInstalls.SiteAccess?, approved: [WKWebExtension.MatchPattern],
                                    optional: Set<WKWebExtension.MatchPattern>, sites: [String]) -> [WKWebExtension.MatchPattern] {
         switch access {
@@ -839,7 +844,7 @@ final class ExtensionHost: NSObject {
     }
 
     /// Whether a click (or the extension's shortcut or menu item) gives it the tab's site, as Chrome's activeTab does.
-    /// Under "When You Click It", Zigzag allows activeTab itself, so one that never asked for it gets only sites it asked for.
+    /// Under "On Click", Zigzag allows activeTab itself, so one that never asked for it gets only sites it asked for.
     func grantsTabOnGesture(_ context: WKWebExtensionContext, url: URL?) -> Bool {
         let id = context.uniqueIdentifier
         guard profile.installs.siteAccess(id) == .click,
@@ -870,7 +875,7 @@ final class ExtensionHost: NSObject {
         defer { bridge.userScripts.refresh() }
         let before = Set(profile.installs.state(context.uniqueIdentifier)?.grantedPermissions ?? [])
         var granted = Set(context.grantedPermissions.keys.map(\.rawValue))
-        // The activeTab "When You Click It" lends isn't an approval.
+        // The activeTab "On Click" lends isn't an approval.
         if profile.installs.siteAccess(context.uniqueIdentifier) == .click, !before.union(approving).contains(WKWebExtension.Permission.activeTab.rawValue) {
             granted.remove(WKWebExtension.Permission.activeTab.rawValue)
         }
@@ -1111,7 +1116,7 @@ final class ExtensionHost: NSObject {
             Toast.show(String(localized: "\(attention.title): in its settings, choose Browser, then Add Browser", comment: "Toast when an extension needs a step in its own app. The placeholder is a title like “Connect 1Password to Zigzag”. Browser and Add Browser are names in 1Password's settings."), symbol: "exclamationmark.triangle",
                        action: open, duration: 6, in: controller)
         }
-        // "When You Click It": the click gives it this tab's site until the tab leaves it or closes (activeTab).
+        // "On Click": the click gives it this tab's site until the tab leaves it or closes (activeTab).
         if profile.installs.siteAccess(item.id) == .click, let tab { item.context.userGesturePerformed(in: tab) }
         // A click always does something: if the extension has no popup at all and opens no page, its options page
         // opens instead. One with a popup is left alone, however long it takes: a locked 1Password is slow, not broken.
@@ -1347,13 +1352,14 @@ final class ExtensionHost: NSObject {
     // Zigzag Mini windows: a window with its one tab, like a sign-in popup. Its tab is a real one, so its changes are told
     // as any tab's are.
     func miniOpened(_ mini: MiniWindowController) {
+        guard tells(mini.tab) else { return }
         controller.didOpenWindow(mini)
         controller.didOpenTab(mini.tab)
         controller.didFocusWindow(mini)
         controller.didActivateTab(mini.tab, previousActiveTab: nil)
     }
-    func miniFocused(_ mini: MiniWindowController) { controller.didFocusWindow(mini) }
-    func miniClosed(_ mini: MiniWindowController) { controller.didCloseWindow(mini) }
+    func miniFocused(_ mini: MiniWindowController) { if tells(mini.tab) { controller.didFocusWindow(mini) } }
+    func miniClosed(_ mini: MiniWindowController) { if tells(mini.tab) { controller.didCloseWindow(mini) } }
     func windowClosed(_ window: BrowserWindowController) {
         guard !window.tabManager.isPrivate || runsInPrivate else { return }
         controller.didCloseWindow(window)
@@ -1395,12 +1401,18 @@ enum CompanionAppNotice {
         return now.timeIntervalSince(use) <= useWindow + patience
     }
 
-    /// Whether the page's focus is in a field, through shadow roots; an extension's menu frame counts too.
+    /// Whether the page's focus is where 1Password fills: a sign-in or password field, or its own menu in the page.
+    /// A search box or any other field doesn't count.
     static let fieldFocusedScript = """
     (() => {
+      \(Autofill.signInCheck)
       let e = document.activeElement;
       while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
-      return !!e && (e.matches('input, textarea, select, iframe') || e.isContentEditable);
+      if (!e) return false;
+      if (e.tagName === 'INPUT' && e.type === 'password') return true;
+      if (signIn(e)) return true;
+      if (e.tagName === 'IFRAME' && (e.getAttribute('src') || '').startsWith('webkit-extension://')) return true;
+      return e.tagName.toLowerCase().startsWith('com-1password');
     })()
     """
 }
@@ -1836,7 +1848,6 @@ extension Tab: WKWebExtensionTab {
     /// The window the tab's in: its own host when that window holds it (most often), else a look through them all.
     /// Asked for every tab each time an extension lists tabs, so the quick answer comes first.
     private var windowController: BrowserWindowController? {
-        if let peekWindow { return peekWindow }
         if let host = host as? BrowserWindowController, host.tabManager.tab(with: id) === self { return host }
         return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
     }
@@ -1848,17 +1859,11 @@ extension Tab: WKWebExtensionTab {
 
     /// The Zigzag Mini it's the page of, while it is.
     private var miniWindow: MiniWindowController? { (host as? MiniWindowController).flatMap { $0.tab === self ? $0 : nil } }
-    /// The window whose Peek shows it, while it does.
-    fileprivate var peekWindow: BrowserWindowController? {
-        guard isPeek, let window = host as? BrowserWindowController, window.peekedTab === self else { return nil }
-        return window
-    }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
-        // Counted among `tabs(for:)`: the tabs in it, the Peek last.
+        // Counted among `tabs(for:)`.
         guard let window = windowController else { return 0 }
-        if window === peekWindow { return window.tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && window.holds($0) }.count }
         return window.tabManager.extensionPlace(of: self, seenBy: Tab.seers(context)) { $0.isSeen(by: context) && window.holds($0) } ?? 0
     }
     /// The profile a context's extensions run with; it decides which tabs it sees.
@@ -1881,13 +1886,11 @@ extension Tab: WKWebExtensionTab {
     }
     func isLoadingComplete(for context: WKWebExtensionContext) -> Bool { !isLoading }
     func isSelected(for context: WKWebExtensionContext) -> Bool {
-        if miniWindow != nil || peekWindow != nil { return true }
+        if miniWindow != nil { return true }
         guard let window = windowController else { return false }
-        // Under a Peek, the peeked page is its window's active tab.
-        if window.tabManager.selectedTab === self { return window.peekedTab.map { !$0.isSeen(by: context) } ?? true }
+        if window.tabManager.selectedTab === self { return true }
         // With none of its tabs in the space in front, the one `activeTab(for:)` gives, so a query finds it too.
-        guard window.tabManager.selectedTab.map({ !$0.isSeen(by: context) }) ?? true,
-              window.peekedTab.map({ !$0.isSeen(by: context) }) ?? true else { return false }
+        guard window.tabManager.selectedTab.map({ !$0.isSeen(by: context) }) ?? true else { return false }
         return (window.activeTab(for: context) as? Tab) === self
     }
     func isPinned(for context: WKWebExtensionContext) -> Bool { bookmarkID != nil }
@@ -1900,7 +1903,7 @@ extension Tab: WKWebExtensionTab {
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         miniWindow?.window?.makeKeyAndOrderFront(nil)
-        if peekWindow == nil { windowController?.tabManager.select(self) }
+        if miniWindow == nil { windowController?.tabManager.select(self) }
         completionHandler(nil)
     }
 
@@ -1919,7 +1922,7 @@ extension Tab: WKWebExtensionTab {
 
     func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         miniWindow?.window?.close()
-        if let peekWindow { peekWindow.peek.close() } else { windowController?.tabManager.close(self) }
+        if miniWindow == nil { windowController?.tabManager.close(self) }
         completionHandler(nil)
     }
 
@@ -1951,16 +1954,13 @@ extension BrowserWindowController: WKWebExtensionWindow {
     /// or last was).
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {
         guard !hides(from: context) else { return [] }
-        let tabs = tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && self.holds($0) }
-        guard let peeked = peekedTab, peeked.isSeen(by: context) else { return tabs }
-        return tabs + [peeked]
+        return tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && self.holds($0) }
     }
 
     /// The tab you're on if it's on the extension's profile; else the one you left selected in a space that is,
     /// since Chrome's extensions expect a window to have an active tab.
     func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
         guard !hides(from: context) else { return nil }
-        if let peeked = peekedTab, peeked.isSeen(by: context) { return peeked }
         if let tab = tabManager.selectedTab, tab.isSeen(by: context) { return tab }
         return Library.shared.spaces.lazy.compactMap { self.tabManager.selectedTab(in: $0.id) }.first { $0.isSeen(by: context) }
     }

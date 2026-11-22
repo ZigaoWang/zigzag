@@ -11,7 +11,13 @@ enum EmptyPage {
     static func ground(for space: SpaceInfo?, isPrivate: Bool) -> NSColor {
         guard !isPrivate, let space else { return Tokens.Color.cardBackground }
         let theme = Brand.Theme.of(space)
-        guard theme.surfaceHue != nil else { return Tokens.Color.cardBackground }
+        guard let hue = theme.surfaceHue else { return Tokens.Color.cardBackground }
+        // A palette color on glass: a fainter tint, so the window reads as one piece of glass.
+        if space.isSeeThrough, SpaceLook.presets.contains(where: { $0.seeThrough > 0 && $0.matches(space) })
+            || SpaceColor.palette.contains(where: { $0.defaultLook?.matches(space) == true }) {
+            return Tokens.Color.dynamic(light: SpaceColor.tone(hue: hue, lightness: Tokens.Frame.glassPageLightness, chroma: Tokens.Frame.glassPageChroma),
+                                        dark: SpaceColor.tone(hue: hue, lightness: Tokens.Frame.glassPageDarkLightness, chroma: Tokens.Frame.glassPageDarkChroma))
+        }
         return theme.wash
     }
 

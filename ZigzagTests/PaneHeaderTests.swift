@@ -100,6 +100,46 @@ import Testing
         header.isOnCard = false
         #expect(header.appearance == nil)
     }
+
+    /// Reload's ring would sit low centered by its box, as its arrowhead stands above it: it goes up by its ink's weight.
+    @Test func reloadIsCenteredByItsInksWeight() {
+        for size in [Tokens.Pane.glyph, Tokens.Sidebar.glyph] {
+            #expect(Tokens.Symbol.inkOffset("arrow.clockwise", size: size).height < -0.3)
+            #expect(abs(Tokens.Symbol.inkOffset("chevron.left", size: size).height) < 0.2)
+        }
+    }
+
+    /// The screen draws xmark half a point below its image's middle: measured as drawn, the button lifts it back.
+    @Test func closeIsCenteredByItsInkAsDrawn() {
+        #expect(abs(Tokens.Symbol.inkOffset("xmark", size: Tokens.Symbol.glyph).height + 0.5) < 0.2)
+        #expect(abs(Tokens.Symbol.inkOffset("chevron.up", size: Tokens.Symbol.glyph).height) < 0.2)
+    }
+
+    /// The row sits as far below the card's top as above the hairline, to the screen's pixel.
+    @Test func theRowIsCenteredAboveTheHairline() {
+        let header = PaneHeaderView(frame: NSRect(x: 0, y: 0, width: 700, height: PaneHeaderView.height))
+        header.layout()
+        let above = header.back.frame.minY
+        let below = header.bounds.height - Tokens.Metric.hairline - header.back.frame.maxY
+        #expect(abs(above - below) <= 0.5)
+        #expect(header.back.frame.midY == header.reload.frame.midY)
+    }
+
+    /// Like the sidebar's address, the strip's marks a page that isn't secure.
+    @Test func anHttpPageIsMarkedNotSecure() {
+        let tab = Tab(url: URL(string: "http://example.com")!, spaceID: UUID())
+        let header = PaneHeaderView()
+        header.show(tab)
+        #expect(header.address.notSecure)
+    }
+
+    /// A page with no site shows by its name, never a cut "file:"; a web page shows its address.
+    @Test func aFileShowsItsNameAndAWebPageItsAddress() {
+        #expect(PaneHeaderView.addressText(URL(fileURLWithPath: "/tmp/Notes.html")) == "Notes.html")
+        #expect(PaneHeaderView.addressText(URL(string: "https://www.example.com/a/b")!) == "example.com/a/b")
+        #expect(PaneHeaderView.addressText(URL(string: "http://127.0.0.1:8765/Alpha.html")!) == "127.0.0.1:8765/Alpha.html")
+        #expect(PaneHeaderView.addressText(HistoryPage.url) == "History")
+    }
 }
 
 /// The page area's ground, which moves the window wherever nothing on it takes the press.

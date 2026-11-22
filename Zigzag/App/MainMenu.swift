@@ -111,7 +111,7 @@ enum MainMenu {
             item(String(localized: "Hide Others", comment: "Zigzag menu item."), #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
             item(String(localized: "Show All", comment: "Zigzag menu item."), #selector(NSApplication.unhideAllApplications(_:)), ""),
             .separator(),
-            item(String(localized: "Quit Zigzag", comment: "Zigzag menu item."), #selector(NSApplication.terminate(_:)), "q"),
+            item(String(localized: "Quit Zigzag", comment: "Zigzag menu item."), #selector(AppDelegate.quitFromMenu(_:)), "q"),
         ]))
 
         main.addItem(submenu(String(localized: "File", comment: "A menu in the menu bar."), [
@@ -143,7 +143,7 @@ enum MainMenu {
             item(String(localized: "Share…", comment: "File menu item."), #selector(C.sharePage(_:)), ""),
             item(String(localized: "Save Page As…", comment: "File menu item."), #selector(C.savePageAs(_:)), "s"),
             item(String(localized: "Export as PDF…", comment: "File menu item."), #selector(C.exportAsPDF(_:)), ""),
-            item(String(localized: "Take Screenshot of Whole Page", comment: "File menu item."), #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
+            item(String(localized: "Capture…", comment: "File menu item, with ⇧⌘2: a mode over the page to take a picture of an area, an element, the whole page or what's on screen."), #selector(C.takePageScreenshot(_:)), "2", [.command, .shift]),
             item(String(localized: "Print…", comment: "File menu item."), #selector(C.printPage(_:)), "p"),
         ]))
 
@@ -182,6 +182,7 @@ enum MainMenu {
             item(String(localized: "Mute Tab", comment: "View menu item."), #selector(C.toggleMute(_:)), "m", [.command, .shift]),
             item(String(localized: "Picture in Picture", comment: "View menu item."), #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
             item(String(localized: "Show Reader", comment: "View menu item."), #selector(C.toggleReader(_:)), "r", [.command, .option]),
+            item(String(localized: "Reader Text and Colors", comment: "View menu item: opens Reader's text size, typeface, column width and color choices."), #selector(C.showReaderOptions(_:)), ""),
             item(String(localized: "Translate Page", comment: "View menu item."), #selector(C.translatePage(_:)), "t", [.command, .option]),
             .separator(),
             submenu(String(localized: "Developer", comment: "Submenu of the View menu."), [
@@ -219,6 +220,8 @@ enum MainMenu {
             item(String(localized: "Show Archive", comment: "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs."), #selector(AppDelegate.showArchive(_:)), ""),
             item(String(localized: "Reopen Closed Tab", comment: "History menu item."), #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
             item(String(localized: "Reopen Closed Window", comment: "History menu item."), #selector(AppDelegate.reopenClosedWindow(_:)), ""),
+            // What a fresh start passed over at launch (#433), as in Safari.
+            item(String(localized: "Reopen Last Session", comment: "History menu item: brings back the windows and tabs a fresh start at launch passed over. Shown when On launch is Start Fresh."), #selector(AppDelegate.reopenLastSession(_:)), ""),
             // Recently closed tabs and windows, and pages by day (#271).
             HistoryMenu.makeRecentlyClosedItem(),
             .separator(),

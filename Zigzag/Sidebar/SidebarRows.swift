@@ -23,6 +23,7 @@ class SidebarRowView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        drawsMenu = true
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         title.font = Tokens.Font.sidebarRow()
@@ -334,6 +335,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         renamingPage = renamingPart == 0 ? tab : pages.indices.contains(renamingPart) ? pages[renamingPart] : nil
         let field = PlainTextField(font: label.font ?? Tokens.Font.body(), placeholder: String(localized: "Name", comment: "Placeholder of the field that renames a tab, in its sidebar row."))
         field.stringValue = label.stringValue
+        // The row's ink, so the name doesn't change color as you edit it.
+        field.textColor = Brand.Theme.for(self).rowInk
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
         label.isHidden = true
@@ -420,12 +423,20 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func refreshUnloaded() { isUnloaded = isBookmark && !Self.showsOpenEdge(pinned: true, loaded: pages.map(\.isLoaded)) }
 
-    /// The other half of a split: shown in the same row, to the right.
-    private(set) var partner: Tab?
-    /// A pinned split's other page, by its pinned name and icon: there whether or not its page is open.
-    private var pinnedPartner: (title: String, icon: NSImage?, unloaded: Bool)?
-    /// Two pages in one row: a split of tabs, or a pinned split.
-    var isSplit: Bool { partner != nil || pinnedPartner != nil }
+    /// One of the row's other pages, after its own: its page while open, and for a pinned page its pinned name and
+    /// icon, there whether or not the page is. Tab rows and pinned rows give the same parts.
+    struct Part {
+        var page: Tab?
+        var name: String? = nil
+        var icon: NSImage? = nil
+    }
+    /// The row's other pages in the group's order: a split's other half, or a tile group's other two or three.
+    private(set) var parts: [Part] = []
+    private var partTokens: [SignalToken] = []
+    /// The second part's page.
+    var partner: Tab? { parts.first?.page }
+    /// Two to four pages in one row: a split or tile group, of tabs or of pinned pages.
+    var isSplit: Bool { !parts.isEmpty }
     /// Which page you're working in, when split (0 = this row's own, 1 = its partner).
     var focusedHalf = 0 { didSet { if oldValue != focusedHalf { refreshTitleColor(); refreshAccessories() } } }
     /// The part whose page is zoomed over the rest of its split or group (`half(at:)`'s numbering), lit; nil for none.
@@ -462,7 +473,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
     /// The partner is on the left of the page, so it's on the left of the row too (a pinned page beside a tab).
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
-    private var partnerToken: SignalToken?
     private let partnerIcon = FaviconView()
     private let partnerTitle: Label = {
         let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
@@ -470,10 +480,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return label
     }()
     private let divider = ColorView(color: Tokens.Color.separator)
-    /// A tile group's third and fourth pages, after the partner (#160): each its own part of the row, as the
-    /// partner's half is, with its icon, its title while there's room for it, and its speaker.
-    private(set) var extraPartners: [Tab] = []
-    private var extraTokens: [SignalToken] = []
+    /// A tile group's third and fourth parts' views (#160): each its own part of the row, as the partner's half is,
+    /// with its icon, its title while there's room for it, and its speaker.
     private typealias ExtraViews = (icon: FaviconView, title: Label, divider: ColorView, audio: IconButton)
     /// Made the first time the row shows a group of more than two.
     private var extraViews: [ExtraViews]?
@@ -498,19 +506,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
     /// Every page the row shows, its own first, in the group's order.
     var pages: [Tab] { ([tab, partner] + extraPages).compactMap { $0 } }
-    /// A pinned group's third and fourth pages (#203), by their pinned names and icons, with their pages while open.
-    private var pinnedExtras: [(title: String, icon: NSImage?, page: Tab?)] = []
     /// The third and fourth parts' pages, in order: nil for a pinned page that isn't open.
-    var extraPages: [Tab?] { pinnedExtras.isEmpty ? extraPartners.map { Optional($0) } : pinnedExtras.map(\.page) }
+    var extraPages: [Tab?] { parts.dropFirst().map(\.page) }
     /// The third and fourth parts' names.
-    private var extraTitles: [String] { pinnedExtras.isEmpty ? extraPartners.map(\.displayTitle) : pinnedExtras.map(\.title) }
+    private var extraTitles: [String] { parts.dropFirst().map(Self.name) }
     /// How many parts the row has after its own and its partner's.
-    private var extraCount: Int { pinnedExtras.isEmpty ? extraPartners.count : pinnedExtras.count }
+    private var extraCount: Int { max(0, parts.count - 1) }
+    /// A part's name: its pinned one, else its page's.
+    private static func name(_ part: Part) -> String { part.name ?? part.page?.displayTitle ?? "" }
     /// How many parts the row is split into: one, two halves, or a tile group's three or four.
     private var segmentCount: Int { isSplit ? 2 + extraCount : 1 }
 
-    /// A row of several tabs whose × closes one page (#404): the part pointed at, else the one you're in.
-    var closesPart = false { didSet { if oldValue != closesPart { refreshAccessories(); needsLayout = true } } }
+    /// A row of several pages, tabs or pinned, whose × closes one page (#404): the part pointed at, else the one you're in.
+    var closesPart: Bool { isSplit && !isAway }
     /// The part under the pointer, in `half(at:)`'s numbering; nil while it's elsewhere.
     private var pointedPart: Int? { didSet { if oldValue != pointedPart { stateDidChange(animated: false); needsLayout = true } } }
     /// Whether the × sits in one part of the row, which it closes: the part under the pointer, or the one you're in.
@@ -546,15 +554,26 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The part the × is on, in `half(at:)`'s numbering.
     var closePart: Int {
         guard closesPart, isSplit else { return 0 }
+        if let voicedPart { return voicedPart }
         if let pointedPart, pointedPart < segmentCount { return pointedPart }
         if isSelected { return min(focusedHalf, segmentCount - 1) }
         return extraCount == 0 && partnerLeads ? 0 : segmentCount - 1
     }
-    /// The page the × closes: one part's with `closesPart`, else the row's own.
+    /// The page the × closes: one part's with `closesPart` (nil for a pinned part that isn't open), else the row's own.
     var closingPage: Tab? {
+        guard closesPart else { return tab }
         let pages = [tab, partner] + extraPages
-        return closesPart && pages.indices.contains(closePart) ? pages[closePart] ?? tab : tab
+        return pages.indices.contains(closePart) ? pages[closePart] : nil
     }
+    /// Whether the part's page has a × of its own: a tab always, a pinned page while it's loaded, as on its own row.
+    private func partCloses(_ page: Tab?) -> Bool {
+        guard let page else { return false }
+        return page.bookmarkID == nil || page.isLoaded
+    }
+    #if DEBUG
+    /// The debug bridge's pointer over one part of the row (`half(at:)`'s numbering).
+    func debugPoint(atPart part: Int?) { pointedPart = part }
+    #endif
     private var moveTracking: NSTrackingArea?
     /// The page under the pointer, when it moves from one part of a split or tile group to another: the edge panel
     /// previews the part being pointed at, not only the row's first page.
@@ -601,6 +620,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         reportedPart = part
         onHoverPart?(part == nil ? nil : page(at: point))
     }
+
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
     /// 0 = would open on the left, 1 = on the right, nil = not a drop target.
@@ -650,41 +670,24 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         addSubview(closeButton)
     }
 
-    func configure(partner: Tab?) {
-        guard partner !== self.partner else { return }
-        self.partner = partner
-        partnerToken = partner?.changed.observe { [weak self] change in
-            // `.webView`: it went to sleep or woke, which its icon shows.
-            if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer { self?.refreshPartner() }
+    /// The row's other pages after its own, in order (none: a row of one page). The only way a row becomes a split
+    /// or tile group's row, in the tab list and among the pinned pages alike.
+    func configure(parts new: [Part]) {
+        let new = Array(new.prefix(3))
+        let samePages = new.count == parts.count && zip(new, parts).allSatisfy { $0.page === $1.page }
+        guard !samePages || zip(new, parts).contains(where: { $0.name != $1.name || $0.icon !== $1.icon }) else { return }
+        parts = new
+        if !samePages {
+            partTokens = new.enumerated().compactMap { i, part in
+                part.page?.changed.observe { [weak self] change in
+                    // `.webView`: it went to sleep or woke, which its icon shows.
+                    guard change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer else { return }
+                    if i == 0 { self?.refreshPartner() } else { self?.refreshExtras() }
+                }
+            }
         }
         [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
         refreshPartner()
-    }
-
-    /// A split's other page or a tile group's other pages, in order: the first is the partner, any more follow it.
-    func configure(partners: [Tab]) {
-        configure(partner: partners.first)
-        let more = Array(partners.dropFirst().prefix(2))
-        guard more.count != extraPartners.count || zip(more, extraPartners).contains(where: { $0 !== $1 }) else { return }
-        extraPartners = more
-        extraTokens = more.map { page in
-            page.changed.observe { [weak self] change in
-                if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer { self?.refreshExtras() }
-            }
-        }
-        refreshExtras()
-    }
-
-    /// A pinned group's third and fourth pages, each by its pinned name and icon, with its page where it's open;
-    /// none for a row of one or two.
-    func configure(pinnedExtras parts: [(title: String, icon: NSImage?, page: Tab?)]) {
-        guard !(parts.isEmpty && pinnedExtras.isEmpty) else { return }
-        pinnedExtras = Array(parts.prefix(2))
-        extraTokens = pinnedExtras.compactMap(\.page).map { page in
-            page.changed.observe { [weak self] change in
-                if change == .favicon || change == .loading || change == .audio || change == .webView || change == .developer { self?.refreshExtras() }
-            }
-        }
         refreshExtras()
     }
 
@@ -694,8 +697,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         for (i, views) in extras.enumerated() {
             let shown = i < extraCount
             let page = pages.indices.contains(i) ? pages[i] : nil
-            let pinned = pinnedExtras.indices.contains(i) ? pinnedExtras[i] : nil
-            views.icon.image = page?.displayIcon ?? pinned?.icon
+            let part = parts.indices.contains(i + 1) ? parts[i + 1] : nil
+            views.icon.image = page?.displayIcon ?? part?.icon
             views.icon.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true)
             views.icon.isUnloaded = showsUnloaded(page)
             views.title.stringValue = titles.indices.contains(i) ? titles[i] : ""
@@ -711,17 +714,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         needsLayout = true
     }
 
-    func configure(pinnedPartner title: String?, icon: NSImage?, unloaded: Bool) {
-        // Not a pinned split, and wasn't: nothing to redo.
-        guard title != nil || pinnedPartner != nil else { return }
-        pinnedPartner = title.map { ($0, icon, unloaded) }
-        [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
-        refreshPartner()
-    }
-
     private func refreshPartner() {
-        partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
-        partnerIcon.image = partner?.displayIcon ?? pinnedPartner?.icon
+        partnerTitle.stringValue = parts.first.map(Self.name) ?? ""
+        partnerIcon.image = partner?.displayIcon ?? parts.first?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
         partnerIcon.isUnloaded = showsUnloaded(partner)
         Self.showSpeaker(partnerAudioButton, muted: partner?.isMuted == true)
@@ -747,18 +742,43 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             return name.map { String(localized: "\($0) playing audio", comment: "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it plays sound.") }
                 ?? String(localized: "playing audio", comment: "Spoken by VoiceOver after a tab row's name: the tab plays sound.")
         }
-        let split = partner != nil
+        let split = isSplit
         let development = showsDeveloperMode ? DeveloperTool.modeName : nil
         // What its ring shows: its page isn't running.
         let unloaded = showsUnloaded(tab) ? String(localized: "not loaded", comment: "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.") : nil
         let waiting = ([tab, partner] + extraPages).compactMap { $0 }.contains { PendingQuestions.hasPending(tabID: $0.id) }
-            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.")
+            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name: a question is waiting for that page.")
             : nil
         let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, waiting, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + zip(extraPages, extraTitles).map { sound($0, $1) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
         setAccessibilitySelected(isSelected)
+        refreshCloseActions()
+    }
+
+    /// The part VoiceOver's close action is for, while it runs.
+    private var voicedPart: Int?
+
+    /// VoiceOver closes each page of a split with its own action, as its part's × does.
+    private func refreshCloseActions() {
+        guard closesPart else { setAccessibilityCustomActions(nil); return }
+        let pages = [tab, partner] + extraPages
+        let names = partTitles.map(\.stringValue)
+        let actions = pages.indices.compactMap { i -> NSAccessibilityCustomAction? in
+            guard partCloses(pages[i]), names.indices.contains(i) else { return nil }
+            let name = pages[i]?.bookmarkID != nil
+                ? String(localized: "Unload \(names[i])", comment: "VoiceOver action on a split view's row in the sidebar: unloads one pinned page of it. The name is that page's title.")
+                : String(localized: "Close \(names[i])", comment: "VoiceOver action on a split view's row in the sidebar: closes one page of it. The name is that page's title.")
+            return NSAccessibilityCustomAction(name: name) { [weak self] in
+                guard let self else { return false }
+                self.voicedPart = i
+                defer { self.voicedPart = nil }
+                self.onClose?()
+                return true
+            }
+        }
+        setAccessibilityCustomActions(actions)
     }
 
     /// Which page the point is over: 0 for this row's own, 1 for its partner, 2 and 3 for a tile group's others.
@@ -784,37 +804,18 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The title labels of the row's parts, in `half(at:)`'s order: its own, the partner's, a group's others.
     private var partTitles: [Label] { [title, partnerTitle] + (extraViews ?? []).map(\.title) }
 
-    /// Pointing at a part of a row of several pages names that page, as its title may be cut short or not shown.
-    private var showsPartTips = false
-
-    private func refreshPartTips() {
-        guard isSplit || showsPartTips else { return }
-        removeAllToolTips()
-        showsPartTips = isSplit
-        guard isSplit else { return }
-        for (start, end) in partSpans where end > start {
-            addToolTip(NSRect(x: start, y: 0, width: end - start, height: bounds.height), owner: self, userData: nil)
-        }
-    }
-
-    @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
-        let index = half(at: point)
-        let name = partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
-        // A part in Developer Mode says so under its name, with its host.
-        let pages = [tab, partner] + extraPages
-        let described = developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
-        // Mark parts with a waiting question so it isn't missed in a background tab.
-        if pages.indices.contains(index), let page = pages[index], PendingQuestions.hasPending(tabID: page.id) {
-            return "\(described)\n\(String(localized: "needs your answer", comment: "Shown in a tab row's tooltip, and spoken by VoiceOver after its name: a question is waiting for that page."))"
-        }
-        return described
-    }
-
     /// The page the point is over.
     func page(at point: NSPoint) -> Tab? {
         let pages = [tab, partner] + extraPages
         let index = half(at: point)
         return pages.indices.contains(index) ? pages[index] ?? tab : tab
+    }
+
+    /// The open page of the part the point is over; nil for a pinned part that isn't open.
+    func partPage(at point: NSPoint) -> Tab? {
+        let pages = [tab, partner] + extraPages
+        let index = half(at: point)
+        return pages.indices.contains(index) ? pages[index] : nil
     }
 
     /// Splits a row of `count` pages into equal whole-point parts up to `end`, meeting at hairlines.
@@ -939,13 +940,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let pointing = closesInPart ? isHovered && pointedPart != nil : isHovered
         // A part too narrow for its icon and the × beside it keeps its icon until you point at it.
         let resting = isSelected && !isBookmark && (!closesInPart || closeFitsBesideIcon(part: closePart))
-        let showClose = (pointing || resting) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil && number == nil
+        // In a split, each part's × is that page's own: none on a pinned part that isn't loaded.
+        let unloaded = closesInPart ? !partCloses(closingPage) : isBookmark && isUnloaded
+        let showClose = (pointing || resting) && !isLifted && !unloaded && renameField == nil && number == nil
         if closesPart, closeButton.isHidden == showClose { needsLayout = true }
         closeButton.isHidden = !showClose
-        let closesPinned = isBookmark && (!closesPart || closingPage?.bookmarkID != nil)
+        let closesPinned = closesInPart ? closingPage?.bookmarkID != nil : isBookmark
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
             : closesPinned ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.")
-            : closesInPart ? String(localized: "Close \(closingPage?.displayTitle ?? "")", comment: "Tooltip of the close button on one page's part of a split view's row in the sidebar. The name is that page's title.")
             : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         refreshDeveloperMode()
@@ -971,8 +973,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         for (i, view) in icons.enumerated() {
             let on = badged.contains(i)
             view.developerBadge = on ? color : nil
-            // A row of several pages names each in its own tooltip; a row of one says it on its icon.
-            view.toolTip = on && !isSplit ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
+            // Each page in it says so on its own icon, with its host.
+            view.toolTip = on ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
         }
     }
 
@@ -1007,7 +1009,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func layoutRenameField() {
         guard let field = renameField else { return }
         let height = ceil(field.intrinsicContentSize.height)
-        let y = (bounds.height - height) / 2
+        // On the title's line, so the name doesn't move as editing starts.
+        let y = title.frame.midY - height / 2
         guard isSplit else {
             let x = title.frame.minX
             field.frame = NSRect(x: x, y: y, width: max(0, bounds.width - x - Self.inset), height: height)
@@ -1050,7 +1053,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         refreshAccessories()
         refreshAccessibilityLabel()
     }
-
 
     override func layout() {
         super.layout()
@@ -1128,10 +1130,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             end = nestedButton.frame.minX - Self.buttonGap
         }
         layoutDropHalf()
-        defer {
-            refreshPartTips()
-            layoutZoomMark()
-        }
+        defer { layoutZoomMark() }
 
         guard isSplit else {
             partEdges = []
@@ -1384,6 +1383,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         setAccessibilityLabel(tabGroup ? String(localized: "\(name), group, \(count) tabs", comment: "Accessibility label of a group of tabs in the sidebar: its name, then how many tabs it holds.")
                               : String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
         setAccessibilityValue(open ? 1 : 0)
+        title.textColor = Brand.Theme.for(self).rowInk
         needsLayout = true
     }
 
@@ -1419,12 +1419,15 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
         if let field = renameField {
             let height = ceil(field.intrinsicContentSize.height)
-            field.frame = NSRect(x: title.frame.minX, y: (bounds.height - height) / 2, width: max(0, bounds.width - title.frame.minX - Self.inset), height: height)
+            // On the title's line, so the name doesn't move as editing starts.
+            field.frame = NSRect(x: title.frame.minX, y: title.frame.midY - height / 2, width: max(0, bounds.width - title.frame.minX - Self.inset), height: height)
         }
     }
 
     override func stateDidChange(animated: Bool) {
         super.stateDidChange(animated: animated)
+        // The space's ink, as the pinned pages under it.
+        title.textColor = Brand.Theme.for(self).rowInk
         if isDropTarget {
             // The one drop target look, as on the favorites and a split's half.
             setLifted(false)
@@ -1442,6 +1445,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         let field = PlainTextField(font: title.font ?? Tokens.Font.body(), placeholder: isTabGroup ? String(localized: "Group name", comment: "Placeholder of the field that renames a group of tabs, in its sidebar row.")
                                    : String(localized: "Folder name", comment: "Placeholder of the field that renames a folder, in its sidebar row."))
         field.stringValue = title.stringValue
+        // The title's own ink, so the name doesn't change color as you edit it.
+        field.textColor = title.textColor
         field.delegate = self
         field.onCancel = { [weak self] in self?.endRename(commit: false) }
         title.isHidden = true
@@ -1530,7 +1535,9 @@ final class SpaceHeaderView: InteractiveView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        drawsMenu = true
         chevron.imageScaling = .scaleNone
+
         chevron.contentTintColor = Tokens.Color.textTertiary
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.imageAlignment = .alignCenter
@@ -1550,8 +1557,8 @@ final class SpaceHeaderView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        // Large, the name stands flush with the icons' edge, the way a heading does. At 26pt the first letter's own
-        // side bearing sets its ink a point in: pulled back so the ink, not the box, meets the icons' edge.
+        // The name stands flush with the icons' edge, the way a heading does. Its first letter's own side bearing
+        // sets its ink in from the box: pulled back so the ink, not the box, meets the icons' edge, at either size.
         // Low in its slot, near the pinned tabs it names, with the room above it.
         let pad = Tokens.Space.x1
         // Large, low in its slot; at row size, centered in its row like the rows below it.
@@ -1561,7 +1568,7 @@ final class SpaceHeaderView: InteractiveView {
         let font = Self.nameFont
         let baseline = isFlipped ? y + (h + font.ascender + font.descender) / 2 : y + (h - font.ascender - font.descender) / 2
         let xMiddle = isFlipped ? baseline - font.xHeight / 2 : baseline + font.xHeight / 2
-        let bearing = Self.isLarge ? Tokens.Sidebar.spaceNameBearing : 0
+        let bearing = Self.inkBearing(of: name, font: font)
         var x = SidebarRowView.inset - Label.inset - bearing
         if icon != nil {
             // The space's icon leads the name at the name's own scale, as one mark, not a row icon beside a heading.
@@ -1593,6 +1600,12 @@ final class SpaceHeaderView: InteractiveView {
             profileTip = profileName as NSString
             addToolTip(profileLabel.frame, owner: profileTip!, userData: nil)
         }
+    }
+    /// How far in from its box the first letter's ink starts, so the name's ink, not its box, meets the icon column.
+    static func inkBearing(of text: String, font: NSFont) -> CGFloat {
+        guard let first = text.first else { return 0 }
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: String(first), attributes: [.font: font]))
+        return max(0, CTLineGetBoundsWithOptions(line, .useGlyphPathBounds).minX)
     }
     /// What the cut profile name's tooltip says; a tooltip doesn't keep its owner.
     private var profileTip: NSString?
@@ -1702,7 +1715,9 @@ final class SeparatorRowView: NSView {
         // Center the caps on `mid`, Clear's capsule center.
         let capsY = mid - h / 2 - Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarLabel(), lineHeight: h)
         let scale = window?.backingScaleFactor ?? 2
-        label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
+        // Its ink, not its box, on the icon column, as the space's name is.
+        let bearing = SpaceHeaderView.inkBearing(of: label.stringValue, font: label.font ?? Tokens.Font.sidebarLabel())
+        label.frame = NSRect(x: SidebarRowView.inset - Label.inset - bearing, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
         let cw = clearButton.fittingWidth, ch: CGFloat = 20
         clearButton.frame = NSRect(x: bounds.width - cw, y: floor(mid - ch / 2), width: cw, height: ch)
         clearButton.layoutSubtreeIfNeeded()

@@ -176,7 +176,7 @@ struct SettingsSiteAccessTests {
         try withInstalls { installs in
             installs.setSiteAccess(id, .sites, sites: ["news.example"])
             #expect(rows(installs).map(\.debugTitle).last == "news.example")
-            // Sites clicked on with When You Click It aren't a list to edit.
+            // Sites clicked on with On Click aren't a list to edit.
             installs.setSiteAccess(id, .click, sites: ["bank.example"])
             #expect(rows(installs).count == 1)
             installs.addAccessSite(id, "github.com")

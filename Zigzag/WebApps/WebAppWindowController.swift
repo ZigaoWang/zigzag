@@ -73,7 +73,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         self.app = app
         tab = Tab(url: app.url, spaceID: Self.space(for: app))
         // As in Zigzag Mini: no PDF viewer or mini player of a browser window's tabs.
-        tab.isPeek = true
+        tab.isOutsideTabList = true
         tab.keepsSite = true
         let area = NSScreen.main?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
         let size = NSSize(width: min(Tokens.Metric.webAppWindowSize.width, area.width), height: min(Tokens.Metric.webAppWindowSize.height, area.height))
@@ -363,7 +363,7 @@ extension WebAppWindowController: TabHost {
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         switch disposition {
         // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
-        case .currentTab, .peek:
+        case .currentTab, .mini:
             tab.load(url, by: sender)
         case .newWindow, .privateWindow:
             WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: sender)

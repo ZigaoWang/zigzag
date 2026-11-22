@@ -161,8 +161,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     private let resultsScroll = NSScrollView()
     private let resultsList = FlippedView()
     private var resultCells: [IconButton] = []
-    private let noResults = Label(String(localized: "No emoji found", comment: "In the icon choices, when no emoji's name matches what's typed in the field under them."),
-                                  font: Tokens.Font.body(), color: Tokens.Color.textTertiary)
+    private let noResults = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
 
     static let columns = 8
     static let cell: CGFloat = 30
@@ -243,7 +242,8 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         resultsScroll.frame = NSRect(x: 0, y: 0, width: bounds.width, height: Self.gridHeight)
         layoutResults()
         let h = noResults.lineHeight
-        noResults.frame = NSRect(x: 0, y: round((Self.gridHeight - h) / 2), width: bounds.width, height: h)
+        let area = NSRect(x: 0, y: 0, width: bounds.width, height: Self.gridHeight)
+        noResults.frame = NSRect(x: 0, y: Tokens.EmptyState.noMatchY(in: area, lineHeight: h), width: bounds.width, height: h)
         emojiField.frame = NSRect(x: 0, y: Self.gridHeight + Tokens.Space.x3, width: bounds.width, height: Self.fieldHeight)
     }
 
@@ -284,6 +284,8 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         }
         results = EmojiSearch.search(text, in: index)
         showResults()
+        let typed = text.trimmingCharacters(in: .whitespaces)
+        noResults.stringValue = String(localized: "No emoji match “\(typed)”.", comment: "In the icon choices, when no emoji's name matches what's typed in the field under them; what was typed.")
         noResults.isHidden = !results.isEmpty
     }
 
@@ -421,17 +423,17 @@ final class IconPickerPanel: FloatingPanelView {
     var preferredWidth: CGFloat { IconGrid.width + pad * 2 }
 
     /// Pages get Choose Image… and, with an icon set, Use Site Icon (#303); folders get neither.
-    private let chooseImage: TextButton?
-    private let useSite = TextButton(title: SidebarMenus.useSiteIconTitle)
-    /// Footer row height: a quiet button with equal padding on all sides.
-    private var footHeight: CGFloat { chooseImage == nil ? 0 : Tokens.Space.x1 * 2 + Tokens.Space.x7Height - pad }
+    private let chooseImage: PillButton?
+    private let useSite = PillButton(title: SidebarMenus.useSiteIconTitle, style: .quiet)
+    /// Footer row: a gap under the search field, then the buttons, then the panel's own margin below them.
+    private var footHeight: CGFloat { chooseImage == nil ? 0 : Tokens.Space.x2 + Tokens.Space.x7Height }
     var preferredHeight: CGFloat { IconGrid.height + pad * 2 + footHeight }
 
     /// `onChooseImage`: a page's picker, which also accepts image files and can revert to the site icon.
     init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?,
          onChooseImage: (() -> Void)? = nil, onPick: @escaping (String?) -> Void) {
         grid = IconGrid(noneSymbol: noneSymbol, noneImage: noneImage, noneToolTip: noneToolTip, selected: selected)
-        chooseImage = onChooseImage.map { _ in TextButton(title: SidebarMenus.chooseImageTitle) }
+        chooseImage = onChooseImage.map { _ in PillButton(title: SidebarMenus.chooseImageTitle, style: .quiet) }
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
         grid.onPick = { [weak self] icon in
@@ -452,12 +454,12 @@ final class IconPickerPanel: FloatingPanelView {
     private func layoutParts() {
         grid.frame = NSRect(x: pad, y: pad, width: IconGrid.width, height: IconGrid.height)
         guard let chooseImage else { return }
-        // Text aligns with the grid; buttons extend past it by their padding.
-        let y = pad + IconGrid.height + Tokens.Space.x1, h = Tokens.Space.x7Height
+        // The buttons' hover fill keeps to the grid's edges, as the search field does, never out toward the panel's.
+        let y = pad + IconGrid.height + Tokens.Space.x2, h = Tokens.Space.x7Height
         let chooseWidth = min(ceil(chooseImage.fittingWidth), IconGrid.width / 2)
-        chooseImage.frame = NSRect(x: pad - chooseImage.textInset, y: y, width: chooseWidth, height: h)
+        chooseImage.frame = NSRect(x: pad, y: y, width: chooseWidth, height: h)
         let siteWidth = min(ceil(useSite.fittingWidth), IconGrid.width / 2)
-        useSite.frame = NSRect(x: pad + IconGrid.width - siteWidth + useSite.textInset, y: y, width: siteWidth, height: h)
+        useSite.frame = NSRect(x: pad + IconGrid.width - siteWidth, y: y, width: siteWidth, height: h)
     }
 
     required init?(coder: NSCoder) { fatalError() }

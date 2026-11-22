@@ -103,7 +103,7 @@ final class MiniPlayer {
         apply(model.switched(shown: shown, playing: playing?.id))
         // Any other page you leave playing sound stays in the window, out of sight: out of it, WebKit counts it as
         // hidden and won't load or start its next song, so music stopped at the end of each one (#199).
-        for tab in before where !shown.contains(tab.id) && tab.id != model.tab && !tab.isPeek && !tab.isClosed {
+        for tab in before where !shown.contains(tab.id) && tab.id != model.tab && !tab.isOutsideTabList && !tab.isClosed {
             guard let webView = tab.webView, webView.window != nil, Self.isInPageCard(tab.pageHolder),
                   MiniPlayerLayout.keepsInWindow(playingSound: tab.isPlayingAudio, followed: false,
                                                  inFullScreen: webView.fullscreenState != .notInFullscreen) else { continue }
@@ -116,7 +116,7 @@ final class MiniPlayer {
     func soundChanged() {
         guard let controller else { return }
         // Skip tabs another sharing window shows (#162).
-        for tab in controller.tabManager.allTabs where tab.isPlayingAudio && !tab.isPeek && !tab.isClosed && tab.id != model.tab && !isOnScreen(tab)
+        for tab in controller.tabManager.allTabs where tab.isPlayingAudio && !tab.isOutsideTabList && !tab.isClosed && tab.id != model.tab && !isOnScreen(tab)
             && controller.holds(tab) && !controller.tabManager.isShownElsewhere(tab) {
             guard let webView = tab.webView, webView.window == nil, tab.pageHolder?.superview == nil,
                   !parked.contains(where: { $0.webView === webView }) else { continue }
@@ -141,11 +141,11 @@ final class MiniPlayer {
     /// Whether this tab's video would follow you out of it: its page is on screen, and plays a video you were
     /// watching (`MiniPlayerLayout.followed`), not one it's leaving behind for a page on its way in.
     private func follows(_ tab: Tab) -> Bool {
-        guard !tab.isPeek, !tab.isClosed, let webView = tab.webView, webView.window != nil, Self.isInPageCard(tab.pageHolder) else { return false }
+        guard !tab.isOutsideTabList, !tab.isClosed, let webView = tab.webView, webView.window != nil, Self.isInPageCard(tab.pageHolder) else { return false }
         return PageVideos.shared.followed(in: webView, leavingPage: tab.isLeavingPage) != nil
     }
 
-    /// Whether the page is shown in one of the window's page cards (not the mini player's, nor a peek's), however
+    /// Whether the page is shown in one of the window's page cards (not the mini player's), however
     /// deep in it its holder sits.
     private static func isInPageCard(_ holder: PageHolder?) -> Bool {
         var view = holder?.superview

@@ -65,6 +65,30 @@ struct TrafficLightTests {
         for phase in [FullScreenPhase.windowed, .entering, .fullScreen, .exiting] {
             #expect(phase.titlebarAppearsTransparent, "\(phase)")
         }
+
+        #expect(FullScreenPhase.fullScreen.after(.willExit).dropsTrafficLightBacking)
+        for phase in [FullScreenPhase.windowed, .entering, .fullScreen] { #expect(!phase.dropsTrafficLightBacking, "\(phase)") }
+    }
+
+    /// The lights get a backing in full screen only when the page, not the bar or sidebar, is under them (#462).
+    @Test func backingOnlyWhenNothingOfOursIsUnderTheLights() {
+        #expect(BrowserWindowController.needsTrafficLightBacking(fullScreen: true, barShown: false,
+                                                                  sidebarVisible: false, sidebarFloating: false))
+        #expect(!BrowserWindowController.needsTrafficLightBacking(fullScreen: true, barShown: true,
+                                                                   sidebarVisible: false, sidebarFloating: false))
+        #expect(!BrowserWindowController.needsTrafficLightBacking(fullScreen: true, barShown: false,
+                                                                   sidebarVisible: true, sidebarFloating: false))
+        #expect(!BrowserWindowController.needsTrafficLightBacking(fullScreen: true, barShown: false,
+                                                                   sidebarVisible: false, sidebarFloating: true))
+        #expect(!BrowserWindowController.needsTrafficLightBacking(fullScreen: false, barShown: false,
+                                                                   sidebarVisible: false, sidebarFloating: false))
+    }
+
+    /// In full screen the lights are in the title bar, not the sidebar: the sidebar keeps no room for them.
+    @Test func noRoomForTheLightsInTheSidebarInFullScreen() {
+        #expect(BrowserWindowController.trafficLightRoom(fullScreen: true, barKeepsLights: false, width: 60) == 0)
+        #expect(BrowserWindowController.trafficLightRoom(fullScreen: false, barKeepsLights: true, width: 60) == 0)
+        #expect(BrowserWindowController.trafficLightRoom(fullScreen: false, barKeepsLights: false, width: 60) == 60)
     }
 
     /// While AppKit moves the title bar into or out of full screen, Zigzag doesn't move or hide the buttons (#401).

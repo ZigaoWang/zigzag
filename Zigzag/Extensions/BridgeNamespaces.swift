@@ -1002,7 +1002,7 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
 
 /// WebKit leaves SameSite cookies out of extension fetches even with host access. With credentials: 'include', reads
 /// use a blank page at the target origin; writes, and every request with the default credentials, use a temporary
-/// native session that keeps the sender's Chrome extension Origin.
+/// native session that keeps the sender's Chrome extension Origin, as does credentials: 'omit', with no cookies.
 /// Both use the owning profile's cookies. Live host permission authorizes requests, with no vendor allowlist.
 @available(macOS 15.4, *)
 @MainActor
@@ -1072,12 +1072,9 @@ final class BridgeExtensionFetch: BridgeNamespace {
         guard Self.allows(url, context: context) else { return ["fallback": true] }
         // Each hop of a redirect is checked against the extension's access as it is then.
         let authorize: @MainActor @Sendable (URL) -> Bool = { hop in host.context(for: extensionID) === context && Self.allows(hop, context: context) }
-        if options.string("credentials") == "same-origin" {
-            // With default credentials WebKit's own fetch sends every cookie but SameSite ones, so it needs no help without them.
-            guard await sameSiteCookies.has(url, in: host.profile.store) else { return ["fallback": true] }
-            return try await requests.direct(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID, authorize: authorize)
-        }
-        return try await requests.response(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID, authorize: authorize)
+        let store = host.profile.store, sameSiteCookies = sameSiteCookies
+        return try await requests.withHostAccess(options, url: url, extensionID: extensionID, store: store, requestID: requestID,
+                                                 keepsSameSiteCookies: { await sameSiteCookies.has(url, in: store) }, authorize: authorize)
     }
 
     private let sameSiteCookies = SameSiteCookieCheck()
@@ -1098,6 +1095,7 @@ final class BridgeExtensionFetch: BridgeNamespace {
         // or not, rather than their text form.
         let body: Data?
         if let text = options["body"] as? String {
+            guard ExtensionFetchRequests.base64Size(text) <= LocalReceivers.responseLimit else { throw BridgeError("That request is too large.") }
             guard let decoded = Data(base64Encoded: text) else { throw BridgeError("That request's body is not readable.") }
             body = decoded
         } else {
@@ -1193,8 +1191,8 @@ final class ExtensionFetchRequests {
             // Over plain HTTP that session knows nothing of the sites WebKit keeps on HTTPS (HSTS) and would send
             // their cookies in the clear, so outside this Mac those stay with WebKit's own fetch.
             if url.scheme == "http", !Self.isLoopback(url) { return ["fallback": true] }
-            if (Self.body(options)?.count ?? 0) > Self.responseLimit { return ["fallback": true] }
-            let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
+            if Self.bodySize(options) > Self.responseLimit { return ["fallback": true] }
+            let request = try Self.writeRequest(options, body: Self.body(options), url: url, extensionID: extensionID)
             return try await send(request, key: key, store: store, authorize: authorize)
         }
         if openPages < Self.pageLimit {
@@ -1228,24 +1226,48 @@ final class ExtensionFetchRequests {
                                                   in: nil, contentWorld: .page)
     }
 
+    /// A request to a site the extension may reach, by its credentials. Omit: sent here with no cookies, as WebKit's own
+    /// fetch can still hold it to the site's CORS answer, which Chrome never asks for (#478); a read too big to carry
+    /// is safe to send again and goes to WebKit. Default: sent here when WebKit would leave SameSite cookies out.
+    /// Include: always here, with every cookie.
+    func withHostAccess(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore, requestID: UUID = UUID(),
+                        keepsSameSiteCookies: @MainActor () async -> Bool, authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
+        switch options["credentials"] as? String {
+        case "omit":
+            do {
+                return try await direct(options, url: url, extensionID: extensionID, store: store, requestID: requestID, authorize: authorize)
+            } catch let error as BridgeError where error.message == ExtensionWriteTransfer.tooLarge
+                        && ["GET", "HEAD"].contains((options["method"] as? String ?? "GET").uppercased()) {
+                return ["fallback": true]
+            }
+        case "same-origin":
+            guard await keepsSameSiteCookies() else { return ["fallback": true] }
+            return try await direct(options, url: url, extensionID: extensionID, store: store, requestID: requestID, authorize: authorize)
+        default:
+            return try await response(options, url: url, extensionID: extensionID, store: store, requestID: requestID, authorize: authorize)
+        }
+    }
+
     /// A request with default credentials, sent here rather than by WebKit, which leaves SameSite cookies out. All of
     /// it is decided before anything is sent, so nothing is sent twice: what this can't carry goes to WebKit's fetch
     /// from the start. Redirects are followed one hop at a time like WebKit's: a site the extension may reach gets its
-    /// cookies, any other gets none and must allow the extension by CORS.
+    /// cookies, any other gets none and must allow the extension by CORS. With credentials: 'omit', no hop gets cookies.
     func direct(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
                 requestID id: UUID = UUID(), authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
         let key = RequestKey(extensionID: extensionID, id: id)
         if let when = cancelled.removeValue(forKey: key), when.timeIntervalSinceNow > -40 { throw BridgeError("Extension request cancelled.") }
         guard pages[key] == nil, writes[key] == nil else { throw BridgeError("Extension request is already running.") }
         let method = (options["method"] as? String ?? "GET").uppercased()
-        let body = Self.body(options)
+        let fits = Self.bodySize(options) <= Self.responseLimit
+        let body = fits ? Self.body(options) : nil
         let headers = options["headers"] as? [[String]] ?? []
         let streams = headers.contains { $0.count == 2 && $0[0].lowercased() == "accept" && $0[1].lowercased().contains("event-stream") }
         guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method),
-              url.scheme == "https" || Self.isLoopback(url), !streams, (body?.count ?? 0) <= Self.responseLimit,
+              url.scheme == "https" || Self.isLoopback(url), !streams, fits,
               options["body"] == nil || options["body"] is NSNull || body != nil, body == nil || !["GET", "HEAD"].contains(method)
         else { return ["fallback": true] }
-        let request = try Self.writeRequest(options, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        var request = try Self.writeRequest(options, body: body, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        request.sendsCookies = options["credentials"] as? String != "omit"
         return try await send(request, key: key, store: store, followsOtherOrigins: true, authorize: authorize)
     }
 
@@ -1253,11 +1275,12 @@ final class ExtensionFetchRequests {
     private func send(_ request: ExtensionWrite.Request, key: RequestKey, store: WKWebsiteDataStore, followsOtherOrigins: Bool = false,
                       authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
         // Every cookie, scoped to each hop's host off the main thread: one for another path of the site goes too.
-        let every: @MainActor @Sendable (URL) async -> [HTTPCookie] = { _ in await store.httpCookieStore.allCookies() }
+        let sendsCookies = request.sendsCookies
+        let every: @MainActor @Sendable (URL) async -> [HTTPCookie] = { _ in sendsCookies ? await store.httpCookieStore.allCookies() : [] }
         let cookies = followsOtherOrigins ? every : nil
         let task = Task {
             // The profile's proxy, set by an extension through chrome.proxy, carries these as it carries its pages.
-            try await ExtensionWrite.send(request, cookies: await store.httpCookieStore.allCookies(), proxies: store.proxyConfigurations,
+            try await ExtensionWrite.send(request, cookies: sendsCookies ? await store.httpCookieStore.allCookies() : [], proxies: store.proxyConfigurations,
                                           otherOrigins: cookies, authorize: authorize) { set, deleted in
                 for cookie in deleted { await store.httpCookieStore.deleteCookie(cookie) }
                 for cookie in set { await store.httpCookieStore.setCookie(cookie) }
@@ -1286,11 +1309,24 @@ final class ExtensionFetchRequests {
         return options["encoding"] as? String == "base64" ? Data(base64Encoded: text) : Data(text.utf8)
     }
 
-    /// What a write sends, read from the extension's message here so the rest can leave the main thread.
-    private static func writeRequest(_ options: [String: Any], url: URL, extensionID: String,
+    /// A body's size in bytes as bridge.js sent it, read from its length without decoding base64.
+    nonisolated static func bodySize(_ options: [String: Any]) -> Int {
+        guard let text = options["body"] as? String else { return 0 }
+        return options["encoding"] as? String == "base64" ? base64Size(text) : text.utf8.count
+    }
+
+    /// The bytes a base64 text decodes to, padding left out.
+    nonisolated static func base64Size(_ text: String) -> Int {
+        let utf8 = text.utf8
+        let padding = utf8.reversed().prefix(2).prefix { $0 == UInt8(ascii: "=") }.count
+        return max(0, utf8.count / 4 * 3 - padding)
+    }
+
+    /// What a write sends, read from the extension's message here so the rest can leave the main thread. `body` is
+    /// `body(options)`, decoded once by the caller.
+    private static func writeRequest(_ options: [String: Any], body: Data?, url: URL, extensionID: String,
                                      methods: Set<String> = ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"]) throws -> ExtensionWrite.Request {
         let method = (options["method"] as? String ?? "POST").uppercased()
-        let body = Self.body(options)
         guard methods.contains(method), options["body"] == nil || options["body"] is NSNull || body != nil else {
             throw BridgeError("Unsupported extension request.")
         }
@@ -1386,6 +1422,8 @@ nonisolated enum ExtensionWrite {
         let cache: String?
         let redirect: String?
         let origin: String
+        /// False for credentials: 'omit': no cookie goes out, and none an answer sets is kept.
+        var sendsCookies = true
     }
 
     /// Whether a page's script could set this header, by the Fetch standard's forbidden request headers. An
@@ -1445,9 +1483,9 @@ nonisolated enum ExtensionWrite {
         configuration.timeoutIntervalForResource = 600
         configuration.proxyConfigurations = proxies
         let jar = configuration.httpCookieStorage!
-        jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
+        jar.cookieAcceptPolicy = input.sendsCookies ? .onlyFromMainDocumentDomain : .never
         // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.
-        jar.setCookies(scoped(cookies, to: url), for: url, mainDocumentURL: url)
+        if input.sendsCookies { jar.setCookies(scoped(cookies, to: url), for: url, mainDocumentURL: url) }
         try Task.checkCancellation()
         guard await authorize(url) else { throw BridgeError("The extension can no longer access this URL.") }
         let transfer = ExtensionWriteTransfer(limit: ExtensionFetchRequests.responseLimit)
@@ -1475,9 +1513,9 @@ nonisolated enum ExtensionWrite {
                 reached = true
             } else if let otherOrigins {
                 reached = await authorize(hop)
-                if reached { jar.setCookies(scoped(await otherOrigins(hop), to: hop), for: hop, mainDocumentURL: hop) }
+                if reached, input.sendsCookies { jar.setCookies(scoped(await otherOrigins(hop), to: hop), for: hop, mainDocumentURL: hop) }
             }
-            request.httpShouldHandleCookies = reached
+            request.httpShouldHandleCookies = reached && input.sendsCookies
             request.mainDocumentURL = hop
             let before = jar.cookies ?? []
             let (data, raw) = try await transfer.run(request, in: session)
@@ -1549,6 +1587,8 @@ nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionData
 
     init(limit: Int) { self.limit = limit }
 
+    static let tooLarge = "The response is too large for an extension request."
+
     func run(_ request: URLRequest, in session: URLSession) async throws -> (Data, URLResponse) {
         let task = session.dataTask(with: request)
         return try await withTaskCancellationHandler {
@@ -1596,7 +1636,7 @@ nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionData
             defer { done = nil }
             return (done, self.data, self.response, self.tooLarge)
         }
-        if tooLarge { continuation?.resume(throwing: BridgeError("The response is too large for an extension request.")) }
+        if tooLarge { continuation?.resume(throwing: BridgeError(Self.tooLarge)) }
         else if let error { continuation?.resume(throwing: error) }
         else if let response { continuation?.resume(returning: (data, response)) }
         else { continuation?.resume(throwing: BridgeError("Invalid extension response.")) }

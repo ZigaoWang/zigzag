@@ -274,3 +274,36 @@ struct SharedSoundGateTests {
         #expect(!capture.isHearing)
     }
 }
+
+/// Pages play protected video (Netflix, Apple TV+, Disney+): WebKit's FairPlay Streaming answers through EME, as in
+/// Safari. Asked without playing anything.
+@MainActor
+struct ProtectedVideoTests {
+    private final class Loading: NSObject, WKNavigationDelegate {
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    @Test func fairPlayIsOfferedToPages() async throws {
+        let configuration = WebKitSetup.makeConfiguration(for: Profiles.shared.profile(Profile.defaultID))
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<html><body></body></html>", baseURL: URL(string: "https://example.com/"))
+        }
+        withExtendedLifetime(loading) {}
+        let answer = try await webView.callAsyncJavaScript("""
+        try {
+          const access = await navigator.requestMediaKeySystemAccess('com.apple.fps', [{
+            initDataTypes: ['sinf', 'skd'],
+            videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }]
+          }]);
+          return access.keySystem;
+        } catch (e) { return 'error: ' + e.name; }
+        """, contentWorld: .page) as? String
+        #expect(answer == "com.apple.fps")
+    }
+}

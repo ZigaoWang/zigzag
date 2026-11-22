@@ -320,6 +320,9 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     /// The notes scroll between the header and the buttons, so a long list never pushes Done out of reach.
     private let scroll = NSScrollView()
     private let notes = FlippedView()
+    /// Hairlines where the notes run under the header or the buttons, only while there's more that way.
+    private let topEdge = ColorView(color: Tokens.Color.separator)
+    private let bottomEdge = ColorView(color: Tokens.Color.separator)
 
     /// "Version 0.7.7, November 10, 2026": the day in the app's own language.
     private static var versionLine: String {
@@ -348,6 +351,9 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
+        [topEdge, bottomEdge].forEach { $0.isHidden = true; panel.addSubview($0) }
+        scroll.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(notesScrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         let accent = controller.promptAccent
         for section in WhatsNew.sections {
             let heading = Label(WhatsNew.heading(section.title), font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
@@ -607,10 +613,18 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         return y
     }
 
+    @objc private func notesScrolled() {
+        let clip = scroll.contentView.bounds
+        topEdge.isHidden = clip.minY <= 0
+        bottomEdge.isHidden = notes.frame.height - clip.maxY <= 1
+    }
+
     private func layoutPanel() {
         let inner = width - pad * 2
-        icon.frame = NSRect(x: pad, y: pad, width: iconSize, height: iconSize)
-        let textX = pad + iconSize + Tokens.Space.x3
+        // The icon's art fills 824 of its 1024 points: set out by that margin, its edge meets the headings' and bullets'.
+        let margin = round(iconSize * 100 / 1024)
+        icon.frame = NSRect(x: pad - margin, y: pad, width: iconSize, height: iconSize)
+        let textX = icon.frame.maxX - margin + Tokens.Space.x3
         let block = titleLabel.lineHeight + Tokens.Space.x1 + versionLabel.lineHeight
         titleLabel.frame = NSRect(x: textX, y: pad + (iconSize - block) / 2, width: inner - iconSize - Tokens.Space.x3, height: titleLabel.lineHeight)
         versionLabel.frame = NSRect(x: textX, y: titleLabel.frame.maxY + Tokens.Space.x1, width: titleLabel.frame.width, height: versionLabel.lineHeight)
@@ -618,6 +632,10 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         let scrollHeight = panel.bounds.height - headerHeight - footerHeight
         scroll.frame = NSRect(x: 0, y: headerHeight, width: width, height: max(0, scrollHeight))
         notes.frame = NSRect(x: 0, y: 0, width: scroll.contentSize.width, height: max(contentHeight, scroll.contentSize.height))
+        let line = Tokens.Metric.hairline
+        topEdge.frame = NSRect(x: 0, y: scroll.frame.minY, width: width, height: line)
+        bottomEdge.frame = NSRect(x: 0, y: scroll.frame.maxY - line, width: width, height: line)
+        notesScrolled()
         // All Release Notes is words without a fill until the pointer is on it: the row reaches out by its padding, so
         // those words start where the headings and bullets do.
         let reach = Tokens.Space.x3

@@ -21,6 +21,8 @@
   Test: SplitDropTests.aSplitShowsInOneRow
 - Click × on the row → closes only the page of the part it sits in.
   Test: SplitCloseTests.theRowsCloseButtonClosesOnePart
+- A split of two, three or four pages draws the same row in the tab list and among the pinned pages.
+  Test: PinnedGroupTests.bothSectionsDrawTheSameRow
 - Middle-click the row → closes the page of the part under the pointer.
   Test: SplitCloseTests.aMiddleClickClosesThePartUnderThePointer
 - Close Split View in the row's menu → closes every page; one ⌘Z brings them all back.
@@ -33,6 +35,24 @@
   Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
 - Stack Vertically on a split of two → one above the other; the item then reads Side by Side.
   Test: SplitCloseTests.stackVerticallyThenReadsSideBySide
+
+## Pinned splits
+- Pin a split of two, three or four pages → one pinned split with every page in its place; opened or unpinned, it comes back in that shape.
+  Test: PinnedGroupTests.aSplitPinsReopensAndUnpinsWhole
+- Drag a split of four into Pinned and back → the same four pages side by side, each step undoable.
+  Test: PinnedGroupTests.aFourPageSplitDraggedToPinnedAndBack
+- Remove from Split View on one page of a pinned split of three → that page stays pinned on its own; the other two stay a pinned split.
+  Test: PinnedGroupTests.onePageLeavesAPinnedSplitOfThree
+- Close one page of a pinned split → that page unloads; the pin keeps every page.
+  Test: PinnedGroupTests.closingOnePinnedPageKeepsThePin
+- A pinned split's row has the same × in each part as a split of tabs; click it → only that page unloads.
+  Test: PinnedGroupTests.aPinnedPartsCloseButtonUnloadsOnlyIt
+- Drop a tab or a pinned page on either half of a pinned split's row → it joins as a third or fourth page, as on a split of tabs; at four, the row only moves.
+  Test: PinnedGroupTests.aDropGrowsAPinnedSplitAsATabSplit
+- Drag one page of a pinned split out by its strip → into Pinned it stays pinned on its own there, into the tabs it's a tab; the rest stay a pinned split, or one pinned page.
+  Test: PinnedGroupTests.aPagePulledOutOfAPinnedSplitOfThree
+- A pinned split saved by an older Zigzag → reads and is written back as before.
+  Test: PinnedGroupTests.olderPinnedSplitsReadAndWriteAsBefore
 
 ## Resizing
 - Plain drag on a line → the whole line moves; in a grid of four, ⇧-drag on either line moves only the segment between two pages.
@@ -61,6 +81,10 @@
   Test: PaneHeaderTests.fewerButtonsAsItNarrows
 - Zoom on a strip (or ⇧⌘↩) → that pane fills the page; Zoom again puts it back.
   Test: PaneMoveTests.aPaneZoomsAndGoesBack
+- An http page in a pane → its strip's address shows the not-secure mark, as the sidebar's does.
+  Test: PaneHeaderTests.anHttpPageIsMarkedNotSecure
+- A file or a Zigzag page (History, Settings) in a pane → its strip's address shows its name, never a cut "file:".
+  Test: PaneHeaderTests.aFileShowsItsNameAndAWebPageItsAddress
 
 ## Closing and suspending one page
 - Close one page of a split of two (⌘W, or × on its strip or row part) → the one left takes the split row's place as a plain tab.

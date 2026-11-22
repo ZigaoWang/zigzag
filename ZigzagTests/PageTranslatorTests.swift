@@ -415,14 +415,50 @@ struct PageTranslatorTests {
         #expect(runs.all.isEmpty)
     }
 
-    /// A translation's toasts show only while its page is in view: the peeked page while Peek is open, otherwise
-    /// the tab you're on.
+    /// A translation's toasts show only while its page is the tab you're on.
     @Test func toastsFollowThePageInView() {
-        let tab = Run(), other = Run(), peeked = Run()
-        #expect(PageTranslator.isInView(tab, selected: tab, peeked: nil))
-        #expect(!PageTranslator.isInView(tab, selected: other, peeked: nil))
-        #expect(!PageTranslator.isInView(tab, selected: tab, peeked: peeked))
-        #expect(PageTranslator.isInView(peeked, selected: tab, peeked: peeked))
+        let tab = Run(), other = Run()
+        #expect(PageTranslator.isInView(tab, selected: tab))
+        #expect(!PageTranslator.isInView(tab, selected: other))
+    }
+
+    /// A long page goes in small requests, on-screen text first, so each comes back well inside the limit (#465).
+    @Test func aLongPageIsTranslatedInSmallBatchesOnScreenFirst() {
+        let pieces = (0..<100).map { "Paragraphe numéro \($0)." }
+        let batches = PageTranslator.batches(Array(0..<100), pieces: pieces, shown: [40, 41, 42], maxPieces: 24, maxCharacters: 10_000)
+        #expect(batches.first?.prefix(3) == [40, 41, 42])
+        #expect(batches.allSatisfy { $0.count <= 24 })
+        #expect(batches.flatMap { $0 }.sorted() == Array(0..<100))
+        // The rest follows in page order.
+        #expect(Array(batches.flatMap { $0 }.dropFirst(3).prefix(3)) == [0, 1, 2])
+        // Long paragraphs cut a request short by characters; one longer than the cap still goes, alone.
+        let long = [String(repeating: "a", count: 1500), String(repeating: "b", count: 1500), String(repeating: "c", count: 5000), "d"]
+        #expect(PageTranslator.batches([0, 1, 2, 3], pieces: long, maxPieces: 24, maxCharacters: 2400) == [[0], [1], [2], [3]])
+        // Places past the page's text are skipped.
+        #expect(PageTranslator.batches([0, 9], pieces: ["x"]) == [[0]])
+    }
+
+    /// The limit is on going quiet: each batch that comes back starts it again, so a page that keeps coming back
+    /// keeps going (#465).
+    @Test func theTimeLimitRunsFromTheLastBatch() {
+        let start = Date(timeIntervalSinceReferenceDate: 0)
+        #expect(PageTranslator.waitLeft(lastProgress: start, now: start.addingTimeInterval(10), limit: 45) == 35)
+        #expect(PageTranslator.waitLeft(lastProgress: start, now: start.addingTimeInterval(45), limit: 45) == nil)
+        // Two minutes in, with a batch back 5 seconds ago, it waits on.
+        let recent = start.addingTimeInterval(115)
+        #expect(PageTranslator.waitLeft(lastProgress: recent, now: start.addingTimeInterval(120), limit: 45) == 40)
+        #expect(PageTranslator.percent(0) == 0)
+        #expect(PageTranslator.percent(0.426) == 42)
+        #expect(PageTranslator.percent(1) == 99)
+    }
+
+    /// Reading the page marks what's on screen, so it's translated first.
+    @Test func theTextOnScreenIsMarked() async {
+        let (webView, loading) = await page("<html><body style='margin:0'><p>En haut de la page.</p><div style='height:3000px'></div><p>Tout en bas de la page.</p></body></html>")
+        defer { _ = loading }
+        let text = await PageTranslator.text(in: webView)
+        #expect(text.pieces == ["En haut de la page.", "Tout en bas de la page."])
+        #expect(text.shown == [0])
     }
 }
 
@@ -509,5 +545,125 @@ struct PageLanguageChoiceTests {
         #expect(missing.contains(PageTranslator.name(of: french)))
         #expect(missing != PageTranslator.failureMessage(notDownloaded: nil))
         #expect(PageTranslator.failureMessage(notDownloaded: nil) == String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails."))
+    }
+
+    // MARK: Always and Never
+
+    private func withChoices(_ body: (PageTranslator.Choices) throws -> Void) rethrows {
+        let name = "PageTranslatorTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        try body(PageTranslator.Choices(defaults: defaults))
+    }
+
+    @Test func alwaysAndNeverDecideWhatHappensOnTheirOwn() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR")
+            @MainActor func automatic(site: String = "lemonde.fr", translatedHere: Bool = false, neverHere: Set<String> = [],
+                           offers: Bool = true, offered: Bool = false) -> PageTranslator.Automatic {
+                choices.automatic(language: french, site: site, translatedHere: translatedHere, neverHere: neverHere, offers: offers, offered: offered)
+            }
+            // Nothing chosen: offered once per site, and not at all with the offer off.
+            #expect(automatic() == .offer)
+            #expect(automatic(offered: true) == .nothing)
+            #expect(automatic(offers: false) == .nothing)
+            // Always French translates on every site, by language code, even with the offer off.
+            choices.setAlways(true, "fr")
+            #expect(automatic(offers: false) == .translate)
+            #expect(automatic(site: "liberation.fr", offered: true) == .translate)
+            // Never French replaces Always French.
+            choices.setNever(true, "fr")
+            #expect(choices.alwaysLanguages.isEmpty)
+            #expect(automatic() == .nothing)
+            choices.setAlways(true, "fr")
+            #expect(choices.neverLanguages.isEmpty)
+            // Never This Site beats Always, whether kept or only for a private window.
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            #expect(automatic() == .nothing)
+            #expect(automatic(site: "liberation.fr") == .translate)
+            #expect(automatic(site: "liberation.fr", neverHere: ["liberation.fr"]) == .nothing)
+            // A site translated a moment ago keeps translating as you browse it, unless it's a Never site.
+            #expect(automatic(site: "liberation.fr", translatedHere: true, offers: false) == .translate)
+            #expect(automatic(translatedHere: true) == .nothing)
+        }
+    }
+
+    /// A Never chosen while a site was translated this session wins at once: the site, or every site translated from
+    /// that language, no longer translates its next page on its own.
+    @Test func aNeverChoiceStopsASiteTranslatedThisSession() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR"), german = Locale.Language(identifier: "de")
+            let sites: [String: Locale.Language] = ["lemonde.fr": french, "liberation.fr": french, "spiegel.de": german]
+            @MainActor func automatic(_ site: String, _ translated: [String: Locale.Language]) -> PageTranslator.Automatic {
+                choices.automatic(language: translated[site] ?? french, site: site, translatedHere: translated[site] != nil,
+                                  offers: true, offered: true)
+            }
+            #expect(automatic("lemonde.fr", sites) == .translate)
+            // Never This Site, from another tab of the site: only that site stops.
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            let afterSite = PageTranslator.translated(sites, neverSite: "lemonde.fr")
+            #expect(afterSite.keys.sorted() == ["liberation.fr", "spiegel.de"])
+            #expect(automatic("lemonde.fr", afterSite) == .nothing)
+            #expect(automatic("liberation.fr", afterSite) == .translate)
+            // Never French: every site translated from French stops, German ones go on.
+            choices.setNever(true, "fr")
+            let afterLanguage = PageTranslator.translated(afterSite, neverLanguage: "fr")
+            #expect(afterLanguage.keys.sorted() == ["spiegel.de"])
+            #expect(automatic("liberation.fr", afterLanguage) == .nothing)
+            #expect(choices.automatic(language: german, site: "spiegel.de", translatedHere: afterLanguage["spiegel.de"] != nil,
+                                      offers: true, offered: true) == .translate)
+        }
+    }
+
+    /// A Never chosen in one window, or in Settings, holds in a window that still counts the site as translated.
+    @Test func aNeverChoiceBeatsASiteTranslatedInAnotherWindow() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR")
+            @MainActor func automatic(_ site: String = "lemonde.fr") -> PageTranslator.Automatic {
+                choices.automatic(language: french, site: site, translatedHere: true, offers: true, offered: true)
+            }
+            #expect(automatic() == .translate)
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            #expect(automatic() == .nothing)
+            #expect(automatic("liberation.fr") == .translate)
+            choices.setNever(true, "fr")
+            #expect(automatic("liberation.fr") == .nothing)
+        }
+    }
+
+    @Test func aPrivateWindowKeepsNoSites() {
+        withChoices { choices in
+            #expect(!choices.setNeverSite(true, "lemonde.fr", isPrivate: true))
+            #expect(choices.neverSites.isEmpty)
+            #expect(choices.defaults.object(forKey: "TranslateNeverSites") == nil)
+            // What was chosen in a normal window still counts there.
+            #expect(choices.setNeverSite(true, "lemonde.fr", isPrivate: false))
+            #expect(!choices.setNeverSite(false, "lemonde.fr", isPrivate: true))
+            #expect(choices.neverSites == ["lemonde.fr"])
+            #expect(choices.automatic(language: Locale.Language(identifier: "fr"), site: "lemonde.fr", translatedHere: false,
+                                      offers: true, offered: false) == .nothing)
+        }
+    }
+
+    @Test func settingsListsTheChoicesAndRemovesOne() {
+        withChoices { choices in
+            let names = ["fr": "French", "de": "German", "ja": "Japanese", "es": "Spanish"]
+            choices.setAlways(true, "ja")
+            choices.setAlways(true, "fr")
+            choices.setNever(true, "es")
+            choices.setNever(true, "de")
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            let listed = choices.entries { names[$0] ?? $0 }
+            #expect(listed.always == [.always("fr"), .always("ja")])
+            #expect(listed.never == [.neverLanguage("de"), .neverLanguage("es"), .neverSite("lemonde.fr")])
+            choices.remove(.always("fr"))
+            choices.remove(.neverSite("lemonde.fr"))
+            let after = choices.entries { names[$0] ?? $0 }
+            #expect(after.always == [.always("ja")])
+            #expect(after.never == [.neverLanguage("de"), .neverLanguage("es")])
+            #expect(choices.defaults.object(forKey: "TranslateNeverSites") == nil)
+            // Kept in the existing setting, so Always choices made before this still show.
+            #expect(choices.defaults.stringArray(forKey: "TranslateAlways") == ["ja"])
+        }
     }
 }

@@ -242,7 +242,7 @@ final class WindowManager {
             frame = (fullScreen ? key.windowedFrame : window.frame)?.offsetBy(dx: Tokens.Space.x6, dy: -Tokens.Space.x6)
         }
         let controller = makeController(manager: manager, frame: frame, sidebarVisible: keyController?.root.sidebarVisible ?? true,
-                                        sidebarWidth: keyController?.root.sidebarWidth ?? Tokens.Metric.sidebarWidth)
+                                        sidebarWidth: keyController?.root.sidebarWidth)
         let firstLaunch = url == nil && !isPrivate && Self.needsOnboarding
         if firstLaunch {
             // First launch is its own moment: the welcome window, then the browser.
@@ -270,7 +270,7 @@ final class WindowManager {
         return controller
     }
 
-    private func makeController(manager: TabManager, frame: NSRect?, sidebarVisible: Bool, sidebarWidth: CGFloat) -> BrowserWindowController {
+    private func makeController(manager: TabManager, frame: NSRect?, sidebarVisible: Bool, sidebarWidth: CGFloat?) -> BrowserWindowController {
         let controller = BrowserWindowController(tabManager: manager, frame: frame, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth)
         controller.onClose = { [weak self] closed in self?.windowClosed(closed) }
         controller.onStateChange = { [weak self] in self?.scheduleSave() }
@@ -327,6 +327,9 @@ final class WindowManager {
     /// from elsewhere doesn't get to choose that.
     func openExternal(_ url: URL) { open(url, fromAnotherApp: true) }
 
+    /// A page handed off from another device: routed like a link from another app, but always a tab, never Zigzag Mini.
+    func openHandedOff(_ url: URL) { open(url, fromAnotherApp: true, allowsMini: false) }
+
     /// A page Zigzag itself opens (About's links, Send Feedback, release notes): a tab in the front window, as any
     /// link inside Zigzag, never Zigzag Mini, which is for links from other apps.
     func openFromZigzag(_ url: URL) {
@@ -334,10 +337,10 @@ final class WindowManager {
         NSApp.activate()
     }
 
-    private func open(_ url: URL, fromAnotherApp: Bool) {
+    private func open(_ url: URL, fromAnotherApp: Bool, allowsMini: Bool = true) {
         // Settings › Zigzag Mini can send links to a Zigzag Mini of their own instead; files and links before onboarding
         // still open here. Zigzag Mini is never saved, so nothing about the session changes.
-        if fromAnotherApp, opensInMini(url) {
+        if fromAnotherApp, allowsMini, opensInMini(url) {
             MiniWindowController.open(url: url, fromAnotherApp: true)
             return
         }
@@ -372,6 +375,8 @@ final class WindowManager {
     func saveNow(synchronously: Bool = false) {
         saveDebouncer.cancel()
         guard !controllers.isEmpty, !sessionWaiting else { return }
+        // Started fresh and nothing done yet: the session from before is still the one to bring back.
+        if freshStartUnused { return }
         // Private windows are never written down.
         let saved = controllers.filter { !$0.tabManager.isPrivate }
         guard !saved.isEmpty else { return }
@@ -470,10 +475,32 @@ final class WindowManager {
     /// Whatever asks for a browser window next brings them back first.
     var sessionWaiting = false
 
+    /// Launched with Settings › General › On launch set to start fresh: until the new window is used, saving would put
+    /// one blank page in place of the session that's still there to reopen (#433).
+    var startingFresh = false
+
+    /// Whether a page has actually loaded since a fresh start, so the old session should give way. It stays used for
+    /// the rest of the run, even after that page closes. A new window or a second blank tab isn't browsing by itself,
+    /// and mustn't let a save overwrite the session that's still there to reopen (#433).
+    var sessionWasUsed: Bool {
+        get { sessionUsed }
+        set { if newValue { sessionUsed = true } }
+    }
+    private var sessionUsed = false
+
+    /// Called as pages load: a page that finished loading somewhere marks the fresh session used, and it stays used
+    /// for the rest of the run even after its tabs close.
+    func pageLoaded() { sessionWasUsed = true }
+
+    /// Started fresh and nothing done yet: the session on disk is still the one passed over.
+    var freshStartUnused: Bool { startingFresh && !sessionWasUsed }
+
     /// Brings back every window and tab from the last run, crash or not. Returns false if there was nothing.
     @discardableResult
     func restoreSession() -> Bool {
         sessionWaiting = false
+        // The session on disk is the one a fresh start passed over: it comes back only from History.
+        if freshStartUnused { return false }
         finishSaving()
         guard let saved = JSONStore.load(SessionState.self, from: Paths.session), !saved.windows.isEmpty else { return false }
         // With shared tabs (#162), every window's tabs restore into one list, each once, however saved; otherwise per
@@ -488,6 +515,99 @@ final class WindowManager {
         SnapshotStore.prune(keeping: allIDs)
         return !controllers.isEmpty
     }
+
+    /// A fresh start passed the last session over: keep it, so History › Reopen Last Session can bring back what it
+    /// was, however long the fresh window is used first (#433). An empty session never replaces a kept one: a fresh
+    /// start that only opened Settings or a Mini must not erase the session it passed over.
+    func keepSessionForReopening(session: URL = Paths.session, kept: URL = Paths.previousSession,
+                                 tabStates: URL = Paths.tabState, keptTabStates: URL = Paths.previousTabState) {
+        // One copy per run: the session from before this launch, never this run's own saving over it.
+        guard !keptPreviousSession else { return }
+        guard let saved = JSONStore.load(SessionState.self, from: session),
+              saved.windows.contains(where: { !$0.hasNoTabs }) else { return }
+        guard JSONStore.save(saved, to: kept) else { return }
+        Self.keepTabStates(of: saved, from: tabStates, to: keptTabStates)
+        keptPreviousSession = true
+    }
+
+    /// Whether there's a session from before a fresh start to bring back.
+    var canReopenLastSession: Bool { hasSessionToReopen(at: Paths.previousSession) }
+
+    /// Whether the kept session at `kept` still has a window that isn't already open.
+    func hasSessionToReopen(at kept: URL) -> Bool {
+        guard let saved = JSONStore.load(SessionState.self, from: kept) else { return false }
+        return !Self.windowsToReopen(saved, open: openTabIDs, shares: TabStore.windowsShareTabs).isEmpty
+    }
+
+    /// The kept session's windows not open again, so reopening never brings back a tab that's open. A window saved
+    /// without tabs (#162) is back once any of the session's tabs is.
+    static func windowsToReopen(_ saved: SessionState, open: Set<UUID>, shares: Bool) -> [SessionState.WindowState] {
+        guard saved.windows.contains(where: { !$0.hasNoTabs }) else { return [] }
+        let windows = (shares ? saved : saved.givingWindowsTheirOwnTabs()).windows
+        let anyBack = windows.contains { isBack($0, open: open) }
+        return windows.filter { $0.hasNoTabs ? !anyBack : !isBack($0, open: open) }
+    }
+
+    /// History › Reopen Last Session: the windows and tabs a fresh start passed over come back, with the back/forward
+    /// lists kept beside them, and the fresh session stays until the next launch writes over it.
+    func reopenLastSession(kept: URL = Paths.previousSession, keptTabStates: URL = Paths.previousTabState,
+                           tabStates: URL = Paths.tabState) {
+        guard let saved = JSONStore.load(SessionState.self, from: kept) else { return }
+        let shares = TabStore.windowsShareTabs
+        let windows = Self.windowsToReopen(saved, open: openTabIDs, shares: shares)
+        guard !windows.isEmpty else { return }
+        Self.restoreKeptTabStates(of: SessionState(windows: windows), from: keptTabStates, to: tabStates)
+        let store: TabStore? = shares ? sharedStore ?? TabStore() : nil
+        for windowState in windows { restoreWindow(windowState, store: store) }
+    }
+
+    /// The back/forward lists of a session being kept: copied now, before the fresh session's saves can clean up the
+    /// old tabs' files (#433).
+    nonisolated static func keepTabStates(of saved: SessionState, from source: URL, to destination: URL) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: destination)
+        try? fm.createDirectory(at: destination, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        chmod(destination.path, 0o700)
+        for id in tabIDs(of: saved) {
+            let from = source.appendingPathComponent(id.uuidString)
+            guard fm.fileExists(atPath: from.path) else { continue }
+            let to = destination.appendingPathComponent(id.uuidString)
+            guard (try? fm.copyItem(at: from, to: to)) != nil else { continue }
+            Paths.makePrivate(to)
+        }
+    }
+
+    /// Puts a kept session's back/forward lists back where restoring reads them, so reopening brings the history
+    /// with the tabs.
+    nonisolated static func restoreKeptTabStates(of saved: SessionState, from source: URL, to destination: URL) {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: destination, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        for id in tabIDs(of: saved) {
+            let from = source.appendingPathComponent(id.uuidString)
+            guard fm.fileExists(atPath: from.path) else { continue }
+            let to = destination.appendingPathComponent(id.uuidString)
+            // A tab already open has a current list of its own: the kept older one mustn't replace it.
+            guard !fm.fileExists(atPath: to.path) else { continue }
+            guard (try? fm.copyItem(at: from, to: to)) != nil else { continue }
+            Paths.makePrivate(to)
+        }
+    }
+
+    private nonisolated static func tabIDs(of saved: SessionState) -> Set<UUID> {
+        var ids = Set<UUID>()
+        for window in saved.windows {
+            for space in window.spaces { ids.formUnion(space.tabs.map(\.id)) }
+            ids.formUnion(window.bookmarkTabs.map(\.tab.id))
+        }
+        return ids
+    }
+
+    private var keptPreviousSession = false
+
+    #if DEBUG
+    /// Tests that keep more than one session in a run: the one copy per run is a launch rule (#433).
+    func forgetKeptSessionForTesting() { keptPreviousSession = false }
+    #endif
 
     /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.
     private var closedWindows: [(id: UUID, state: SessionState.WindowState, history: [UUID: Data], closedAt: Date)] = []
@@ -525,7 +645,7 @@ final class WindowManager {
         if let front, front.isPrivate { return front.lastClosedTab.map { (.tab, front, $0.id) } }
         let tab = latestClosedTab(from: front)
         let open = openTabIDs
-        let window = closedWindows.last { !isBack($0.state, open: open) }
+        let window = closedWindows.last { !Self.isBack($0.state, open: open) }
         switch Self.lastClosed(tab: tab?.tab.closedAt, tabOfClosedWindow: orphanedClosedTabs.last?.closedAt, window: window?.closedAt) {
         case .tab: return tab.map { (.tab, $0.manager, $0.tab.id) }
         case .tabOfClosedWindow: return (.tabOfClosedWindow, nil, nil)
@@ -561,7 +681,7 @@ final class WindowManager {
 
     var canReopenClosedWindow: Bool {
         let open = openTabIDs
-        return closedWindows.contains { !isBack($0.state, open: open) }
+        return closedWindows.contains { !Self.isBack($0.state, open: open) }
     }
 
     /// Brings back the last closed window, its spaces, tabs, history and place on screen.
@@ -570,7 +690,7 @@ final class WindowManager {
         // so it's passed over for the one closed before it.
         let open = openTabIDs
         while let closed = closedWindows.popLast() {
-            guard !isBack(closed.state, open: open) else { continue }
+            guard !Self.isBack(closed.state, open: open) else { continue }
             restoreWindow(closed.state, history: closed.history, store: sharedStore)
             return
         }
@@ -579,7 +699,7 @@ final class WindowManager {
     /// Reopenable closed windows, newest first, for History › Recently Closed, with tab count and shown tab.
     var recentlyClosedWindows: [(id: UUID, tabCount: Int, shown: SessionState.TabState?)] {
         let open = openTabIDs
-        return closedWindows.reversed().filter { !isBack($0.state, open: open) }.map { closed in
+        return closedWindows.reversed().filter { !Self.isBack($0.state, open: open) }.map { closed in
             let state = closed.state
             let tabs = state.spaces.flatMap(\.tabs) + state.bookmarkTabs.map(\.tab)
             let space = state.spaces.first { $0.spaceID == state.currentSpaceID }
@@ -592,13 +712,13 @@ final class WindowManager {
     func reopenClosedWindow(_ id: UUID) {
         guard let index = closedWindows.firstIndex(where: { $0.id == id }) else { return }
         let closed = closedWindows.remove(at: index)
-        guard !isBack(closed.state, open: openTabIDs) else { return }
+        guard !Self.isBack(closed.state, open: openTabIDs) else { return }
         restoreWindow(closed.state, history: closed.history, store: sharedStore)
     }
 
     private var openTabIDs: Set<UUID> { Set(openTabs.map(\.id)) }
 
-    private func isBack(_ state: SessionState.WindowState, open: Set<UUID>) -> Bool {
+    private static func isBack(_ state: SessionState.WindowState, open: Set<UUID>) -> Bool {
         let ids = state.spaces.flatMap { $0.tabs.map(\.id) } + state.bookmarkTabs.map(\.tab.id)
         return ids.contains(where: open.contains)
     }

@@ -48,3 +48,49 @@ struct PhoneLinkTests {
         #expect(!DeveloperTool.isOffered(.phone, isOn: true, isDevelopment: false, url: URL(string: "https://example.com/"), isPrivate: false))
     }
 }
+
+/// Handoff (#456): which pages are offered to your other devices, and the activity that offers them.
+@MainActor
+struct HandoffTests {
+    private func offered(_ address: String, title: String = "Page", isPrivate: Bool = false, errorPage: Bool = false) -> HandoffPage? {
+        HandoffPage.advertised(url: URL(string: address), title: title, isPrivate: isPrivate, errorPage: errorPage)
+    }
+
+    @Test func onlyAWebPageAnotherDeviceCanOpenIsOffered() {
+        #expect(offered("https://example.com/a?b=1#c") == .page(url: URL(string: "https://example.com/a?b=1#c")!, title: "Page"))
+        #expect(offered("http://example.com/") != nil)
+        #expect(offered("https://example.com/", isPrivate: true) == nil)
+        #expect(offered("https://example.com/", errorPage: true) == nil)
+        for address in ["zigzag://settings/general", "file:///Users/me/report.pdf", "about:blank", "data:text/html,hi",
+                        "blob:https://example.com/1", "http://localhost:3000/", "http://127.0.0.1:8080/", "http://[::1]/",
+                        "http://app.localhost/", "https://user:secret@example.com/"] {
+            #expect(offered(address) == nil, "\(address)")
+        }
+        #expect(HandoffPage.advertised(url: nil, title: "", isPrivate: false, errorPage: false) == nil)
+    }
+
+    @Test func aPageWithoutATitleIsNamedByItsSite() {
+        #expect(offered("https://example.com/x", title: "  ") == .page(url: URL(string: "https://example.com/x")!, title: "example.com"))
+    }
+
+    @Test func theActivityFollowsThePageAndGoesWhenNothingIsOffered() throws {
+        let first = try #require(HandoffPage.update(nil, to: offered("https://example.com/one", title: "One")))
+        #expect(first.activityType == NSUserActivityTypeBrowsingWeb)
+        #expect(first.webpageURL?.absoluteString == "https://example.com/one" && first.title == "One")
+        // A new address or title updates the same activity rather than making another.
+        let moved = HandoffPage.update(first, to: offered("https://example.com/two", title: "Two"))
+        #expect(moved === first && first.webpageURL?.absoluteString == "https://example.com/two" && first.title == "Two")
+        let renamed = HandoffPage.update(first, to: offered("https://example.com/two", title: "Two, loaded"))
+        #expect(renamed === first && first.title == "Two, loaded")
+        #expect(HandoffPage.update(first, to: nil) == nil)
+    }
+
+    /// Handed off while Zigzag was still launching: a tab, as when it's running, even with Zigzag Mini taking links.
+    @Test func aPageHandedOffAtLaunchNeverOpensInMini() throws {
+        let handedOff = try #require(URL(string: "https://example.com/handed"))
+        let link = try #require(URL(string: "https://example.com/link"))
+        #expect(!AppDelegate.pendingOpensInMini(handedOff, handedOff: [handedOff], opensInMini: { _ in true }))
+        #expect(AppDelegate.pendingOpensInMini(link, handedOff: [handedOff], opensInMini: { _ in true }))
+        #expect(!AppDelegate.pendingOpensInMini(link, handedOff: [], opensInMini: { _ in false }))
+    }
+}

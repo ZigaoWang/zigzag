@@ -453,31 +453,71 @@ struct BookmarkFolderTests {
         #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }
 
-    /// Taps a swipe would give over these steps of (progress, speed), and whether letting go at the end navigates.
-    private func arm(_ steps: [(CGFloat, CGFloat)]) -> (taps: Int, armed: Bool) {
+    /// Taps a swipe would give over these steps of progress, and whether letting go at the end navigates at `speed`.
+    private func arm(_ steps: [CGFloat], speed: CGFloat = 0) -> (taps: Int, goes: Bool) {
         var arming = SwipeArming()
-        let taps = steps.filter { arming.step(progress: $0.0, speed: $0.1) }.count
-        return (taps, arming.armed)
+        let taps = steps.filter { arming.step(progress: $0) }.count
+        return (taps, arming.release(progress: steps.last ?? 0, speed: speed))
     }
 
     @Test func swipeTapsOnceAsItArms() {
-        // Mid speed: around a flick's speed, well past its start, the arrow arms once (#377).
-        let mid: [(CGFloat, CGFloat)] = (0..<12).map { (i: Int) -> (CGFloat, CGFloat) in
-            let speed: CGFloat = i % 2 == 0 ? 750 : 650
-            return (0.4 + CGFloat(i) * 0.05, speed)
-        }
-        #expect(arm(mid) == (1, true))
-        // Slow, hovering right at the distance.
-        #expect(arm([(0.9, 100), (1.01, 100), (0.98, 50), (1.02, 80), (0.96, 0), (1.0, 40)]) == (1, true))
-        // A flick that arms and goes on past the distance.
-        #expect(arm([(0.2, 1500), (0.45, 1800), (0.8, 1600), (1.2, 900)]) == (1, true))
+        // Slow, hovering right at the distance: one tap (#377).
+        #expect(arm([0.9, 1.01, 0.98, 1.02, 0.96, 1.0]) == (1, true))
+        // Fast past the distance.
+        #expect(arm([0.2, 0.45, 0.8, 1.2]) == (1, true))
         // Pulled well back, it disarms, and crossing again is a second tap.
-        #expect(arm([(1.05, 100), (0.7, -300), (1.05, 200)]) == (2, true))
-        #expect(arm([(1.05, 100), (0.7, -300)]) == (1, false))
-        // Armed by a flick, then the fingers stop short: letting go there doesn't navigate.
-        #expect(arm([(0.5, 900), (0.55, 400), (0.55, 0)]) == (1, false))
-        // Never armed, never a tap.
-        #expect(arm([(0.2, 300), (0.5, 600), (0.8, 200)]) == (0, false))
+        #expect(arm([1.05, 0.7, 1.05]) == (2, true))
+        #expect(arm([1.05, 0.7]) == (1, false))
+        // Short of the distance and stopped: no tap, and letting go doesn't navigate.
+        #expect(arm([0.2, 0.5, 0.8]) == (0, false))
+        // A flick still moving as the fingers lift goes, short of the distance.
+        #expect(arm([0.2, 0.5], speed: 900) == (0, true))
+        #expect(!arm([0.2, 0.5], speed: -900).goes)
+    }
+
+    /// What the arrow shows (ring, filled) after each scroll of `deltas`, one every 8 ms toward back, then at each of
+    /// `rest` later moments with no new events, and whether letting go at the end navigates, as SwipeNavigator does.
+    private func replay(_ deltas: [CGFloat], rest: [TimeInterval], distance: CGFloat = 200)
+        -> (shown: [(ring: CGFloat, filled: Bool)], goes: Bool) {
+        var arming = SwipeArming(), dx: CGFloat = 0, now: TimeInterval = 1
+        var shown: [(ring: CGFloat, filled: Bool)] = []
+        var samples: [(time: TimeInterval, dx: CGFloat)] = []
+        func show() {
+            _ = arming.step(progress: dx / distance)
+            shown.append((min(dx / distance, 1), arming.armed))
+        }
+        for delta in deltas {
+            now += 0.008
+            dx += delta
+            samples.append((now, dx))
+            show()
+        }
+        let last = now
+        for wait in rest {
+            now = last + wait
+            show()
+        }
+        return (shown, arming.release(progress: dx / distance, speed: SwipeDecision.speed(samples, at: now, direction: -1)))
+    }
+
+    @Test func restingFingersKeepTheArrowAsItIs() {
+        // The tester's swipe: fast to about halfway, a zero-delta scroll or two, then the fingers rest (#377).
+        let fast = replay(Array(repeating: 12, count: 9) + [0, 0], rest: [0.05, 0.1, 0.5, 1.5])
+        let moved = fast.shown[8]
+        #expect(!moved.filled)
+        #expect(fast.shown.dropFirst(8).allSatisfy { $0.ring == moved.ring && $0.filled == moved.filled })
+        // Shown short, and let go after resting: it doesn't navigate.
+        #expect(!fast.goes)
+        // Past the distance, then resting: the full ring and fill stay, and letting go goes.
+        let far = replay(Array(repeating: 25, count: 9) + [0], rest: [0.05, 0.1, 1.5])
+        #expect(far.shown.dropFirst(8).allSatisfy { $0.ring == 1 && $0.filled })
+        #expect(far.goes)
+        // Only moving back takes them away.
+        let back = replay(Array(repeating: 25, count: 9) + [-40, -40, -40], rest: [0.2])
+        #expect(back.shown.last.map { !$0.filled && $0.ring < 1 } == true)
+        #expect(!back.goes)
+        // A flick let go while still moving goes, though it never reached the distance.
+        #expect(replay(Array(repeating: 12, count: 9), rest: []).goes)
     }
 
     @Test func swipeScriptLooksPastShadowRoots() throws {
@@ -611,6 +651,43 @@ struct BookmarkFolderTests {
         #expect(LinkStatusController.describe(link) == "iana.org/domains/reserved/rfc6761?x=1")
         #expect(LinkStatusController.describe(try #require(URL(string: "https://example.com/")))  == "example.com")
         #expect(LinkStatusController.describe(try #require(URL(string: "mailto:a@example.com"))) == "Email a@example.com")
+    }
+
+    /// The pill follows the pointer: it shows a link only while the pointer is on one, and a press, a move off the
+    /// link, or a scroll clears it (#449).
+    @Test func theHoverScriptOnlyShowsALinkUnderThePointer() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript("""
+        var posted = [];
+        var listeners = {};
+        function listen(name, fn) { listeners[name] = fn; }
+        var window = {
+          webkit: { messageHandlers: { zigzagHover: { postMessage: function (m) { posted.push(m); } } } },
+          addEventListener: listen
+        };
+        var document = { addEventListener: listen };
+        var link = { href: 'https://example.com/a', getAttribute: function () { return null; }, textContent: 'A', closest: function () { return this; } };
+        var plain = { closest: function () { return null; } };
+        """)
+        context.evaluateScript(PageScripts.linkHover)
+        #expect(context.exception == nil)
+        let result = context.evaluateScript("""
+        listeners['mouseover']({ target: link });
+        var shows = posted.length === 1 && posted[0].url === 'https://example.com/a';
+        listeners['mousedown']({});
+        var press = posted[posted.length - 1] === '';
+        listeners['mouseover']({ target: link });
+        listeners['mousemove']({ target: plain });
+        var move = posted[posted.length - 1] === '';
+        listeners['mouseover']({ target: link });
+        listeners['mouseout']({ relatedTarget: plain });
+        var out = posted[posted.length - 1] === '';
+        listeners['mouseover']({ target: link });
+        listeners['scroll']({});
+        var scrolled = posted[posted.length - 1] === '';
+        shows && press && move && out && scrolled;
+        """)
+        #expect(result?.toBool() == true)
     }
 
     @Test func aCutOffSecureConnectionIsNotCalledAnImpostor() throws {
@@ -1115,5 +1192,219 @@ struct ControlMenuTests {
         #expect(!button.offersMenu)
         #expect(!button.isAccessibilitySelectorAllowed(#selector(NSView.accessibilityPerformShowMenu)))
         #expect(button.menu(for: rightClick()) == nil)
+    }
+}
+
+/// Your Zigzag Card: when you started, kept once and never moved; the beta line; the saved picture's size.
+@MainActor
+@Suite(.serialized)
+struct ZigzagCardTests {
+    private let day: TimeInterval = 24 * 60 * 60
+    private let now = Date(timeIntervalSince1970: 1_795_000_000)
+
+    private func withDefaults(_ body: (URL) throws -> Void) throws {
+        let name = "ZigzagCardTests-\(UUID().uuidString)"
+        let saved = CardStart.defaults
+        CardStart.defaults = try #require(UserDefaults(suiteName: name))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-card-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer {
+            CardStart.defaults.removePersistentDomain(forName: name)
+            CardStart.defaults = saved
+            try? FileManager.default.removeItem(at: root)
+        }
+        try body(root)
+    }
+
+    @Test func aFreshInstallKeepsThisVersionExactly() {
+        let record = CardStart.choose(now: now, version: "0.9.4", dates: [now - 30], lastRun: nil, backups: [], launches: 0)
+        #expect(record == CardStart.Record(date: now - 30, version: "0.9.4", isExact: true))
+    }
+
+    /// Used before the card existed: the earliest date on disk, and the earliest version on record, said as such.
+    @Test func anEarlierInstallTakesTheEarliestItKnows() {
+        let folder = now - 40 * day, backup = now - 20 * day
+        let record = CardStart.choose(now: now, version: "0.9.4", dates: [backup, folder, now - day], lastRun: "0.9.3",
+                                      backups: ["0.9.0-beta.1", "0.8.7"], launches: 12)
+        #expect(record == CardStart.Record(date: folder, version: "0.8.7", isExact: false))
+        // Nothing on record but this version: this version, still not claimed as the first.
+        let only = CardStart.choose(now: now, version: "0.9.4", dates: [folder], lastRun: nil, backups: [], launches: 0)
+        #expect(only == CardStart.Record(date: folder, version: "0.9.4", isExact: false))
+    }
+
+    /// A date from before Zigzag existed, or from the future, is a copied or odd file, never a start.
+    @Test func impossibleDatesAreIgnored() {
+        let record = CardStart.choose(now: now, version: "0.9.4", dates: [Date(timeIntervalSince1970: 0), now + day], lastRun: nil,
+                                      backups: [], launches: 0)
+        #expect(record.date == now)
+        #expect(record.isExact)
+    }
+
+    /// The data folder's creation date and an update backup's date both count, and the kept start never moves.
+    @Test func theStartIsReadFromDiskOnceAndKept() throws {
+        try withDefaults { root in
+            let made = now - 30 * day
+            try FileManager.default.setAttributes([.creationDate: made], ofItemAtPath: root.path)
+            let backups = root.appendingPathComponent("Backups/2026-11-01T09-00-00Z 0.9.1", isDirectory: true)
+            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+            let first = CardStart.settle(now: now, version: "0.9.4", root: root)
+            #expect(first == CardStart.Record(date: made, version: "0.9.1", isExact: false))
+            #expect(CardStart.defaults.object(forKey: CardStart.dateKey) as? Date == made)
+            // Later, with newer data and another version: still the same start.
+            try FileManager.default.setAttributes([.creationDate: now - 90 * day], ofItemAtPath: root.path)
+            #expect(CardStart.settle(now: now + 10 * day, version: "1.0.0", root: root) == first)
+            #expect(CardStart.stored == first)
+        }
+    }
+
+    @Test func theBackupsDateCountsWhenItsEarliest() throws {
+        try withDefaults { root in
+            try FileManager.default.setAttributes([.creationDate: now - day], ofItemAtPath: root.path)
+            let backups = root.appendingPathComponent("Backups/2026-10-30T09-00-00Z 0.9.0", isDirectory: true)
+            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+            let record = CardStart.settle(now: now, version: "0.9.4", root: root)
+            #expect(record.date == UpdateBackup.date(of: "2026-10-30T09-00-00Z"))
+            #expect(record.version == "0.9.0")
+        }
+    }
+
+    @Test func betaIsEverythingBeforeOnePointOh() {
+        #expect(CardStart.isBeta("0.9.4"))
+        #expect(CardStart.isBeta("0.1.3"))
+        #expect(CardStart.isBeta("0.9.2-beta.1"))
+        #expect(!CardStart.isBeta("1.0"))
+        #expect(!CardStart.isBeta("1.0.0-beta.2"))
+        #expect(!CardStart.isBeta("2.1.0"))
+        #expect(!CardStart.isBeta(""))
+        let face = CardFace(name: "", start: now, version: "1.0.0", isExact: true, day: 1)
+    }
+
+    @Test func versionsCompareAsReleasesDo() {
+        #expect(CardStart.isEarlier("0.9.2-beta.1", than: "0.9.2"))
+        #expect(CardStart.isEarlier("0.9.2", than: "0.10.0"))
+        #expect(CardStart.isEarlier("0.9.2-beta.1", than: "0.9.2-beta.2"))
+        #expect(!CardStart.isEarlier("0.9.2", than: "0.9.2"))
+        #expect(!CardStart.isEarlier("1.0", than: "0.9.9"))
+    }
+
+    @Test func daysCountFromOne() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        #expect(CardFace.day(from: now, to: now, calendar: calendar) == 1)
+        #expect(CardFace.day(from: now - 13 * day, to: now, calendar: calendar) == 14)
+        // A clock set back never reads below Day 1.
+        #expect(CardFace.day(from: now + 3 * day, to: now, calendar: calendar) == 1)
+    }
+
+    /// The finish picked under the card is kept, and an unknown one reads as Space.
+    @Test func theFinishIsKept() throws {
+        let name = "ZigzagCardFinish-\(UUID().uuidString)"
+        let saved = CardFinish.defaults
+        CardFinish.defaults = try #require(UserDefaults(suiteName: name))
+        defer {
+            CardFinish.defaults.removePersistentDomain(forName: name)
+            CardFinish.defaults = saved
+        }
+        #expect(CardFinish.chosen == .space)
+        for finish in CardFinish.allCases {
+            CardFinish.chosen = finish
+            #expect(CardFinish.chosen == finish)
+            #expect(CardFinish.defaults.string(forKey: CardFinish.key) == finish.rawValue)
+        }
+        CardFinish.defaults.set("chrome", forKey: CardFinish.key)
+        #expect(CardFinish.chosen == .space)
+    }
+
+    /// The saved picture is the card at eight times, clear around it for its shadow, solid in the middle and clear at
+    /// the corners, in every finish.
+    @Test func theSavedPictureIsSharpWithClearCorners() throws {
+        let face = CardFace(name: "Ada Lovelace", start: now, version: "0.9.4", isExact: true, day: 14)
+        for finish in CardFinish.allCases {
+            let data = try #require(CardArt.png(face, finish: finish, palette: CardPalette(hue: 0.6, hue2: nil), dark: finish == .graphite))
+            let rep = try #require(NSBitmapImageRep(data: data))
+            let k = Tokens.Keepsake.self
+            #expect(rep.pixelsWide >= 2700, "\(finish)")
+            #expect(rep.pixelsWide == Int((k.size.width + k.exportMargin * 2) * k.exportScale))
+            #expect(rep.pixelsHigh == Int((k.size.height + k.exportMargin * 2) * k.exportScale))
+            #expect(rep.colorAt(x: rep.pixelsWide / 2, y: rep.pixelsHigh / 2)?.alphaComponent == 1, "\(finish)")
+            #expect(rep.colorAt(x: 0, y: 0)?.alphaComponent == 0)
+            #expect(rep.colorAt(x: rep.pixelsWide - 1, y: rep.pixelsHigh - 1)?.alphaComponent == 0)
+            // The card's own corner is round: just inside its top left corner is still clear.
+            let m = Int(k.exportMargin * k.exportScale)
+            #expect(rep.colorAt(x: m + 2, y: m + 2)?.alphaComponent ?? 1 < 0.5, "\(finish)")
+        }
+    }
+
+    /// "Since" reads at AA and the name well above it on every finish, by day and at night, wherever the light is.
+    @Test func theWordsReadOnEveryFinish() throws {
+        let face = CardFace(name: "Ada Lovelace", start: now, version: "0.9.4", isExact: true, day: 14)
+        let rects = CardArt.wordRects()
+        let lights = [CardLight.rest] + [CGPoint(x: -1, y: -1), CGPoint(x: 1, y: 1), CGPoint(x: -1, y: 1), CGPoint(x: 1, y: -1), .zero]
+            .map(CardLight.init(point:))
+        for finish in CardFinish.allCases {
+            for dark in [false, true] {
+                let look = CardLook.of(finish, palette: CardPalette(hue: 0.6, hue2: nil), dark: dark)
+                for light in lights {
+                    let image = try #require(CardArt.image(face, look: look, light: light, parts: [.surface, .light], scale: 1))
+                    let rep = NSBitmapImageRep(cgImage: image)
+                    var worst = (ink: Double.infinity, quiet: Double.infinity)
+                    for (rect, quiet) in [(rects.name, false), (rects.since, true)] {
+                        // The ground as an eye reads it behind a letter: averaged over a few points, past the grain.
+                        let cell = 6
+                        for x in stride(from: Int(rect.minX), to: Int(min(rect.maxX, rect.minX + 200)) - cell, by: cell) {
+                            for y in stride(from: Int(rect.minY), to: Int(rect.maxY) - cell, by: cell) {
+                                var sum = (r: 0.0, g: 0.0, b: 0.0)
+                                for i in 0..<cell { for j in 0..<cell {
+                                    guard let c = rep.colorAt(x: x + i, y: y + j)?.usingColorSpace(.sRGB) else { continue }
+                                    sum = (sum.r + c.redComponent, sum.g + c.greenComponent, sum.b + c.blueComponent)
+                                } }
+                                let n = Double(cell * cell)
+                                let ground = NSColor(srgbRed: sum.r / n, green: sum.g / n, blue: sum.b / n, alpha: 1)
+                                let color = (quiet ? look.quiet : look.ink).usingColorSpace(.sRGB)!
+                                let contrast = Brand.contrast(color, ground)
+                                if quiet { worst.quiet = min(worst.quiet, contrast) } else { worst.ink = min(worst.ink, contrast) }
+                            }
+                        }
+                    }
+                    #expect(worst.ink >= 5.5, "\(finish) dark: \(dark) \(light.point) ink \(worst.ink)")
+                    #expect(worst.quiet >= 4.5, "\(finish) dark: \(dark) \(light.point) quiet \(worst.quiet)")
+                }
+            }
+        }
+    }
+
+    /// The quiet lines read at AA on both ends of the face, in every curated hue, by day and at night.
+    @Test func theWordsReadOnEveryColor() throws {
+        for color in SpaceColor.allCases {
+            let palette = CardPalette(hue: color.hue, hue2: nil)
+            for name in [NSAppearance.Name.aqua, .darkAqua] {
+                try #require(NSAppearance(named: name)).performAsCurrentDrawingAppearance {
+                    for ground in [palette.top, palette.bottom] {
+                        let g = ground.usingColorSpace(.sRGB)!
+                        #expect(Brand.contrast(palette.quiet.usingColorSpace(.sRGB)!, g) >= 4.5, "\(color) \(name.rawValue)")
+                        #expect(Brand.contrast(palette.ink.usingColorSpace(.sRGB)!, g) >= 7, "\(color) \(name.rawValue)")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func theChosenFinishHasTheAccentRingAsReadersColorsDo() throws {
+        let swatches = CardFinishSwatches(selected: .graphite, palette: CardPalette(hue: Brand.navyHue, hue2: nil))
+        swatches.frame = NSRect(origin: .zero, size: swatches.fittingSize)
+        swatches.layoutSubtreeIfNeeded()
+        let tiles = swatches.subviews
+        #expect(tiles.count == CardFinish.allCases.count)
+        for (tile, finish) in zip(tiles, CardFinish.allCases) {
+            tile.layout()
+            let ring = try #require(tile.layer?.sublayers?.first)
+            var accent: CGColor?
+            tile.effectiveAppearance.performAsCurrentDrawingAppearance { accent = Tokens.Color.accent.cgColor }
+            if finish == .graphite {
+                #expect(ring.borderColor == accent)
+            } else {
+                #expect(ring.borderColor != accent)
+            }
+        }
     }
 }

@@ -150,8 +150,8 @@ final class NumberHintView: NSView {
 }
 
 /// Holding ⌘ a moment shows, on each favorite and row, the number that goes to it with ⌘, as Safari does with its
-/// tabs; holding ⌃ shows, on each space key, the number that goes to it with ⌃. Letting go, any key, a click, a scroll
-/// or the window going to the back hides them at once.
+/// tabs; holding ⌃ shows, on each space key, the number that goes to it with ⌃. Their own number keys keep them up;
+/// letting go, any other key, a click, a scroll or the window going to the back hides them at once.
 final class NumberHints {
     /// The tabs' numbers with ⌘, the spaces' with ⌃: each waits on its own hold, and only one is ever held alone.
     private enum Kind: CaseIterable {
@@ -204,9 +204,28 @@ final class NumberHints {
                     hide(kind)
                 }
             }
+        } else if keepsShown(for: event) {
+            // The places under the numbers can change with it (another space's rows): they follow.
+            DispatchQueue.main.async { [weak self] in self?.placesChanged() }
         } else {
             interrupt(holding: event.modifierFlags)
         }
+    }
+
+    /// The number row's keys, 1 to 9, wherever the layout puts its characters.
+    nonisolated static let numberKeys: Set<UInt16> = [18, 19, 20, 21, 23, 22, 26, 28, 25]
+
+    /// ⌘1–⌘9 with the tabs' numbers up, or ⌃1–⌃9 with the spaces': the key the numbers are for, so they stay while
+    /// the modifier is still held, as you go on to the next.
+    private func keepsShown(for event: NSEvent) -> Bool {
+        guard event.type == .keyDown else { return false }
+        return Self.keepsShown(keyCode: event.keyCode, flags: event.modifierFlags, tabsShown: isShown, spacesShown: areSpacesShown)
+    }
+
+    static func keepsShown(keyCode: UInt16, flags: NSEvent.ModifierFlags, tabsShown: Bool, spacesShown: Bool) -> Bool {
+        guard numberKeys.contains(keyCode) else { return false }
+        let held = flags.intersection(ModifierHold.modifiers)
+        return (tabsShown && held == .command) || (spacesShown && held == .control)
     }
 
     private func interrupt(holding flags: NSEvent.ModifierFlags = NSEvent.modifierFlags) {

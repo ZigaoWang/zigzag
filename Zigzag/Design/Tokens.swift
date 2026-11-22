@@ -47,7 +47,7 @@ enum Tokens {
         static let small: CGFloat = 4
         /// Grouped cards on a window's background: Settings and Passwords groups, the site panel's sections.
         static let group: CGFloat = 10
-        /// Floating surfaces: command bar, peek, previews, menus.
+        /// Floating surfaces: command bar, previews, menus.
         static let panel: CGFloat = 14
         /// Large floating surfaces that hold rounded things of their own: the tab switcher, Reader's options, the tour.
         static let large: CGFloat = 16
@@ -117,7 +117,8 @@ enum Tokens {
         static let switcherThumbWidth: CGFloat = 224
         /// The narrowest a Control+Tab card gets before the cards go into rows: its title still reads.
         static let switcherThumbMinWidth: CGFloat = 184
-        static let peekInsetRatio: CGFloat = 0.08
+        /// How far a zoomed pane's card sits in from the page area's edges.
+        static let zoomInsetRatio: CGFloat = 0.08
         static let findBarWidth: CGFloat = 320
         static let popupDefaultSize = NSSize(width: 520, height: 640)
         /// Zigzag Mini, for one page opened from another app: big enough to read, small enough to stay out of the way.
@@ -155,10 +156,15 @@ enum Tokens {
         static let floatingButton: CGFloat = Space.x8 + Space.x1
         /// A tab preview's caption under the picture.
         static let previewCaptionHeight: CGFloat = Space.x12
-        /// Peek's top strip: a split view pane's, so the page under it gets the room.
-        static let peekHeaderHeight: CGFloat = Pane.height
-        /// Peek's rim around its page, at the sides and below: enough to hold the page, not a frame around it.
-        static let peekInset: CGFloat = 2
+        /// Capture's toolbar (⇧⌘2): a capsule of control-height buttons, `Space.x1 + 2` in from its edge.
+        static let captureToolbarHeight: CGFloat = controlHeight + (Space.x1 + 2) * 2
+        /// The round grips on a captured area's corners and sides.
+        static let captureHandle: CGFloat = Space.x2 + 1
+        /// A drag shorter than this either way is a click, not an area.
+        static let captureMinSide: CGFloat = Space.x2
+        /// The card that shows a capture, and the tallest its picture gets.
+        static let capturePreviewWidth: CGFloat = 240
+        static let capturePreviewMaxImage: CGFloat = 160
     }
 
     // MARK: - Pages
@@ -277,8 +283,6 @@ enum Tokens {
         static var spaceNameText: CGFloat { scaled(26) }
         static var spaceNameHeight: CGFloat { scaledEven(36) }
         /// Tracking for the space's name, in points: display type sits tighter.
-        /// The name's first letter's side bearing at that size, so its ink lands on the icon column.
-        static let spaceNameBearing: CGFloat = 1
         /// A space key in the bottom bar: a small rounded key with its number, 4pt between keys.
         static let spaceKey: CGFloat = 18
         /// Between the favorites and the list.
@@ -359,7 +363,7 @@ enum Tokens {
         static let height: CGFloat = 30
         static let button: CGFloat = 24
         static let glyph: CGFloat = 13
-        /// The page's icon in a strip (Peek's): a favicon at the sidebar's Medium size, whatever size the sidebar is.
+        /// The page's icon in a strip: a favicon at the sidebar's Medium size, whatever size the sidebar is.
         static let favicon: CGFloat = 16
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
@@ -451,6 +455,13 @@ enum Tokens {
         static let actionGap: CGFloat = Space.x6
         /// The widest the text runs.
         static let textWidth: CGFloat = 360
+        /// A search that finds nothing: its one line this far below the top of where the results go.
+        static let noMatchTop: CGFloat = 96
+
+        /// The top of the no-match line in `area` (flipped): `noMatchTop` down, or the middle of a shorter area.
+        static func noMatchY(in area: NSRect, lineHeight: CGFloat) -> CGFloat {
+            round(min(area.minY + noMatchTop, area.midY - lineHeight / 2))
+        }
     }
 
     // MARK: - Dialogs
@@ -477,8 +488,6 @@ enum Tokens {
     enum Welcome {
         /// The wordmark on the hello screen.
         static let wordmarkHeight: CGFloat = 72
-        /// The wordmark heading a window of the app's own (About, Import).
-        static let smallWordmarkHeight: CGFloat = 22
         /// The glass card a step's choice sits on.
         static let cardWidth: CGFloat = 560
         /// A step's big title, in display weight: the one place type is this large.
@@ -487,9 +496,6 @@ enum Tokens {
         static let countSize: CGFloat = 60
         /// A brand moment's card (onboarding's import card).
         static let cardRadius: CGFloat = 22
-        /// The About window: its width and height, the app icon and the wordmark under it.
-        static let aboutSize = NSSize(width: 320, height: 476)
-        static let aboutIcon: CGFloat = 96
         /// About › Acknowledgments: wide enough for a license's lines as written.
         static let acknowledgementsSize = NSSize(width: 640, height: 600)
         /// The progress dots.
@@ -498,6 +504,45 @@ enum Tokens {
         static let buttonHeight: CGFloat = Space.x10
         static let buttonWidth: CGFloat = 168
         static let groupGap: CGFloat = Space.x6 + Space.x1
+    }
+
+    /// Your Zigzag Card, the hero of About Zigzag: a bank card's proportions.
+    enum Keepsake {
+        static let size = NSSize(width: 420, height: 264)
+        /// A bank card's corner for its width.
+        static let radius: CGFloat = 16
+        /// From the card's edges to what's on it.
+        static let pad: CGFloat = Space.x6 + Space.x1
+        static let wordmarkHeight: CGFloat = 18
+        /// The wordmark alone in the middle of the back.
+        static let backWordmarkHeight: CGFloat = 30
+        static let nameSize: CGFloat = 26
+        /// The ribbon Zs pressed into the surface: their height, the grid they sit on, and how deep they're pressed.
+        static let motifHeight: CGFloat = 9
+        static let motifStep = NSSize(width: 40, height: 32)
+        static let motifDepth: CGFloat = 0.6
+        /// How deep the wordmark is stamped.
+        static let stampDepth: CGFloat = 0.35
+        /// The most it turns toward the pointer, in degrees, and how far the eye is from it.
+        static let tilt: CGFloat = 8
+        static let perspective: CGFloat = 1100
+        /// Turning after the pointer, slow enough to feel its weight; settling back on a soft spring; turning over.
+        static let follow: TimeInterval = Material.follow * 0.5
+        static let settle: TimeInterval = Material.follow
+        static let settleBounce: CGFloat = 0.12
+        static let turn: TimeInterval = Motion.large * 2
+        /// The saved picture's pixels per point, and the clear room around the card for its shadow, in points.
+        static let exportScale: CGFloat = 8
+        static let exportMargin: CGFloat = Space.x10
+        /// Two shadows: a wide soft one it floats on, and a close one where it nearly touches.
+        static let ambientRadius: CGFloat = 24
+        static let ambientDrop: CGFloat = 14
+        static let contactRadius: CGFloat = 3
+        static let contactDrop: CGFloat = 1.5
+        /// Room around it in About: at the sides, above it (under the traffic lights), and under it.
+        static let margin: CGFloat = Space.x10
+        static let top: CGFloat = Space.x12
+        static let gap: CGFloat = Space.x6
     }
 
     // MARK: - Type (SF Pro: six roles, one scale for the whole app)
@@ -589,16 +634,24 @@ enum Tokens {
         /// moves it back so every icon in a row looks evenly spaced.
         @MainActor static func inkOffset(_ name: String, size: CGFloat = pointSize) -> CGSize {
             let box = inkBox(name, size: size)
-            return CGSize(width: box.midX, height: box.midY)
+            guard weightCentered.contains(name) else { return CGSize(width: box.midX, height: box.midY) }
+            return CGSize(width: box.midX, height: inkWeightY["\(name) \(size)"] ?? box.midY)
         }
+
+        /// Centered vertically by ink weight, not box: reload's arrowhead would leave its ring low.
+        static let weightCentered: Set<String> = ["arrow.clockwise"]
 
         /// The size of a symbol's ink, for lining it up by what you see rather than by its image's padding.
         @MainActor static func inkSize(_ name: String, size: CGFloat = pointSize) -> CGSize { inkBox(name, size: size).size }
 
         /// A symbol's ink, in points from the middle of its image (x right, y up).
         @MainActor private static func inkBox(_ name: String, size: CGFloat) -> CGRect {
-            inkBox(of: Self.image(name, size: size), key: "\(name) \(size)")
+            let drawn = measuredAsDrawn.contains(name)
+            return inkBox(of: Self.image(name, size: size), key: "\(name) \(size)", scale: drawn ? 2 : 4, asDrawn: drawn)
         }
+
+        /// Measured as a 2x screen draws them, not scaled up: the screen draws xmark half a point lower than its image.
+        static let measuredAsDrawn: Set<String> = ["xmark"]
 
         /// How far an image's ink sits from its middle (x right, y up), for a symbol drawn some other way (a heavier
         /// weight, a glyph of its own); `key` names it for the cache, `scale` is pixels per point.
@@ -610,26 +663,33 @@ enum Tokens {
         /// The size of an image's ink; `key` names it for the cache.
         @MainActor static func inkSize(of image: NSImage, key: String, scale: CGFloat = 4) -> CGSize { inkBox(of: image, key: key, scale: scale).size }
 
-        @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4) -> CGRect {
-            let key = scale == 4 ? key : "\(key) @\(scale)x"
+        @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4, asDrawn: Bool = false) -> CGRect {
+            let key = scale == 4 ? key : "\(key) @\(scale)x\(asDrawn ? " drawn" : "")"
             if let known = inkBoxes[key] { return known }
             let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
             var box = CGRect.zero
             if w > 0, h > 0, let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,
                                                          samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                                          colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+                // As drawn: the bitmap at the image's size in points, so the symbol snaps to pixels as on screen.
+                if asDrawn { rep.size = image.size }
                 NSGraphicsContext.saveGraphicsState()
                 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-                image.draw(in: NSRect(x: 0, y: 0, width: w, height: h))
+                image.draw(in: asDrawn ? NSRect(origin: .zero, size: image.size) : NSRect(x: 0, y: 0, width: w, height: h))
                 NSGraphicsContext.restoreGraphicsState()
                 var minX = w, maxX = -1, minY = h, maxY = -1
+                var weight = 0.0, weightedY = 0.0
                 if let data = rep.bitmapData {
                     for y in 0..<h {
-                        for x in 0..<w where data[y * rep.bytesPerRow + x * 4 + 3] > 50 {
+                        for x in 0..<w {
+                            let alpha = data[y * rep.bytesPerRow + x * 4 + 3]
+                            weight += Double(alpha); weightedY += Double(alpha) * (Double(y) + 0.5)
+                            guard alpha > 50 else { continue }
                             minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
                         }
                     }
                 }
+                if weight > 0 { inkWeightY[key] = (CGFloat(h) / 2 - CGFloat(weightedY / weight)) / scale }
                 if maxX >= minX {
                     // Bitmap rows run top down.
                     box = CGRect(x: (CGFloat(minX) - CGFloat(w) / 2) / scale, y: (CGFloat(h) / 2 - CGFloat(maxY + 1)) / scale,
@@ -640,6 +700,8 @@ enum Tokens {
             return box
         }
         @MainActor private static var inkBoxes: [String: CGRect] = [:]
+        /// Each measured image's ink weight center from its middle (y up), by the same key.
+        @MainActor private static var inkWeightY: [String: CGFloat] = [:]
 
         /// Offsets (as `inkOffset`) for symbols that take turns in one place (a speaker playing and muted): each is
         /// drawn with its alignment rect's origin, its baseline's start, where the others' is, so what they share (the
@@ -909,7 +971,7 @@ enum Tokens {
             CATransaction.commit()
         }
 
-        /// Fades a backdrop (sheet scrim, peek dimming) in or out from its current opacity, eased; crossfade with
+        /// Fades a backdrop (sheet scrim, a zoomed pane's dimming) in or out from its current opacity, eased; crossfade with
         /// Reduce Motion. `evenFromKeyboard` false: appears instantly from a key, like the command bar.
         static func fadeBackdrop(_ view: NSView, entering: Bool, evenFromKeyboard: Bool = true, completion: (@MainActor () -> Void)? = nil) {
             if let layer = view.layer, layer.animation(forKey: "opacity") != nil, let shown = layer.presentation()?.opacity {
@@ -1289,6 +1351,8 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.64), highDark: hex(0xFFFFFF, alpha: 0.72))
         /// Disabled quiet button text: the faintest text at full opacity, still 3:1.
         static let textDisabled = textTertiary
+        /// A round swatch's ring under the pointer: faint beside the chosen one's, with nothing moving.
+        static let swatchHoverRing = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0xFFFFFF, alpha: 0.28))
 
         static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66),
             highLight: hex(0x000000, alpha: 0.80), highDark: hex(0xFFFFFF, alpha: 0.84))
@@ -1418,8 +1482,12 @@ enum Tokens {
         static let unfocusedPaneAlpha: CGFloat = 0.45
         /// Selected text in our own fields (the command bar, its inline completion), in the accent at this opacity.
         static let textSelectionAlpha: CGFloat = 0.26
-        /// A firmer dim than `scrim`, under Peek: a page above the page should read as a layer.
-        static let peekScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
+        /// A firmer dim than `scrim`, under a zoomed pane: a page above the page should read as a layer.
+        static let zoomScrim = dynamic(light: hex(0x000000, alpha: 0.2), dark: hex(0x000000, alpha: 0.42))
+        /// Capture's dim over the page around what's picked: firm enough that the clear part reads at once.
+        static let captureScrim = dynamic(light: hex(0x000000, alpha: 0.3), dark: hex(0x000000, alpha: 0.5))
+        /// The edge of a picked area: a light line that reads on the dim and on the page it frames.
+        static let captureEdge = hex(0xFFFFFF, alpha: 0.9)
         /// A keycap's fill and edge (`KeyCap`): a touch of the field fill with a hairline, like a key seen from above.
         static let keyCapFill = dynamic(light: hex(0x000000, alpha: 0.04), dark: hex(0xFFFFFF, alpha: 0.07),
             highLight: hex(0x000000, alpha: 0.07), highDark: hex(0xFFFFFF, alpha: 0.11))
@@ -1438,7 +1506,7 @@ enum Tokens {
         /// Status: done and fine.
         static let success = NSColor.systemGreen
 
-        /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in Peek):
+        /// Text on a color Zigzag doesn't choose (a site's brand on its search chip, a page's own top color in a strip):
         /// near-white on dark colors, near-black on light ones.
         static func ink(on color: NSColor) -> NSColor {
             guard let c = color.usingColorSpace(.sRGB) else { return textPrimary }
@@ -1498,6 +1566,23 @@ enum Tokens {
         static let chroma = 0.045
         static let darkLightness = 0.27
         static let darkChroma = 0.04
+        /// The space editor's palette: a touch richer than the colors before it, by day and at night.
+        static let paletteLightness = 0.915
+        static let paletteChroma = 0.078
+        static let paletteDarkLightness = 0.27
+        static let paletteDarkChroma = 0.05
+        /// How strong a new space's palette color is to a Zigzag from before the palette's own day and night depths
+        /// (`SpaceColor.background(hue:intensity:)`).
+        static let followingIntensity = 0.8
+        static let softFollowingIntensity = 0.5
+        /// The least a palette look's clear glass covers in a dark window (`SpaceInfo.clearTint`): its deep tint keeps
+        /// light text readable over a light desktop.
+        static let clearNightCover: CGFloat = 0.68
+        /// A blank page in a palette space on glass: fainter than `wash`, near white by day and near the page's dark at night.
+        static let glassPageLightness = 0.982
+        static let glassPageChroma = 0.012
+        static let glassPageDarkLightness = 0.228
+        static let glassPageDarkChroma = 0.018
         /// A floating panel: near white with a breath of the space by day, a deep gray of it at night.
         static let panelLightness = 0.975
         static let panelChroma = 0.02
@@ -1513,6 +1598,16 @@ enum Tokens {
         static let washChroma = 0.016
         static let washDarkLightness = 0.235
         static let washDarkChroma = 0.016
+        /// Reader's Auto paper: barely the space's hue, read as paper rather than color, lighter than a panel by day.
+        static let readerLightness = 0.985
+        static let readerChroma = 0.0035
+        static let readerDarkLightness = 0.235
+        static let readerDarkChroma = 0.005
+        /// Reader's Space paper: the space's own color, held out of the middle tones and as calm as a frame.
+        static let readerSpaceLightness = 0.86
+        static let readerSpaceChroma = 0.05
+        static let readerSpaceDarkLightness = 0.3
+        static let readerSpaceDarkChroma = 0.045
     }
 
     /// What sits on the frame (the sidebar's rows, its address and favorites): washes of white, so whatever the

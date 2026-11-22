@@ -321,7 +321,9 @@ private final class StepPage: NSView {
             dot.alphaValue = i == index ? 1 : i < index ? 0.55 : 0.28
             dx += w + 6
         }
-        skip.frame = NSRect(x: bounds.width - 28 - skip.fittingWidth, y: 12, width: skip.fittingWidth, height: Tokens.Space.x8)
+        // Skip's text on the dots' center line.
+        let skipY = dotY + Tokens.Welcome.dot / 2 - Tokens.Space.x8 / 2
+        skip.frame = NSRect(x: bounds.width - 28 - skip.fittingWidth, y: skipY, width: skip.fittingWidth, height: Tokens.Space.x8)
         let th = ceil(title.sizeThatFits(NSSize(width: width, height: 200)).height)
         let bh0 = ceil(body.sizeThatFits(NSSize(width: width - 80, height: 200)).height)
         let footY = bounds.height - 40 - Tokens.Space.x10
@@ -330,6 +332,12 @@ private final class StepPage: NSView {
         // The title sits at the same height on every step, so going from one to the next only changes what's under
         // it; a step with a tall card starts a little higher to make room, never under the progress.
         var y = max(76, min(Self.titleTop, round(footY - 28 - want)))
+        if content.isQuestion {
+            // A question's few lines and its answers sit in the middle, between the progress and the bottom row.
+            let shown = head + Self.cardPad + content.preferredHeight(for: width - Self.cardPad * 2)
+            let top = dotY + Tokens.Welcome.dot
+            y = max(76, round(top + (footY - top - shown) / 2))
+        }
         title.frame = NSRect(x: x, y: y, width: width, height: th)
         y = title.frame.maxY + 10
         let bh = ceil(body.sizeThatFits(NSSize(width: width - 80, height: 200)).height)
@@ -344,7 +352,8 @@ private final class StepPage: NSView {
         content.frame = NSRect(x: Self.cardPad, y: Self.cardPad, width: inner, height: ch - Self.cardPad * 2)
         let nw = max(next.fittingWidth + 24, 150)
         next.frame = NSRect(x: x + width - nw, y: fy, width: nw, height: h)
-        back.frame = NSRect(x: x - Tokens.Space.x2, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
+        // Back's text starts on the card's edge.
+        back.frame = NSRect(x: x - back.textInset, y: fy + (h - Tokens.Space.x8) / 2, width: back.fittingWidth, height: Tokens.Space.x8)
     }
 }
 
@@ -441,8 +450,8 @@ private enum Onboard {
     }
 
     /// The second answer to a question: an outline on the blue.
-    static func outline(_ title: String) -> PrimaryButton {
-        let button = PrimaryButton(title: title)
+    static func outline(_ title: String) -> PillButton {
+        let button = PillButton(title: title, style: .prominent)
         button.customFill = Brand.ribbon.withAlphaComponent(0.12)
         button.customInk = Brand.ribbon
         return button
@@ -451,16 +460,15 @@ private enum Onboard {
     static let answerHeight: CGFloat = 44
 
     /// The picked answer is outlined and lit; the other stays quiet. Neither looks like Continue, which is solid.
-    static func mark(chosen: PrimaryButton, other: PrimaryButton) {
+    static func mark(chosen: PillButton, other: PillButton) {
         // The answer you're on is plainly picked: solid, in the ribbon's pale with deep ink. The other is just its
         // outline, so there's no doubt which Continue goes with.
+        chosen.customEdge = nil
         chosen.customFill = Brand.ribbon
         chosen.customInk = Brand.navy
-        chosen.layer?.borderWidth = 0
+        other.customEdge = Brand.ribbon.withAlphaComponent(0.45)
         other.customFill = .clear
         other.customInk = Brand.ribbon.withAlphaComponent(0.85)
-        other.layer?.borderWidth = 1
-        other.layer?.borderColor = Brand.ribbon.withAlphaComponent(0.45).cgColor
     }
 
     /// A question's answers, side by side in the middle, the same width.
@@ -474,31 +482,27 @@ private enum Onboard {
     }
 
     /// Back and Skip, quiet on the blue.
-    static func quietLight(_ title: String) -> TextButton {
-        let button = TextButton(title: title, font: Tokens.Font.body(.medium))
-        button.textColor = Brand.ribbon.withAlphaComponent(0.75)
+    static func quietLight(_ title: String) -> PillButton {
+        let button = PillButton(title: title, style: .quiet)
+        button.customInk = Brand.ribbon.withAlphaComponent(0.75)
         return button
     }
 
     /// The main action on a step: the brand's blue.
-    static func primary(_ title: String) -> PrimaryButton {
-        let button = PrimaryButton(title: title)
-        button.fixedTheme = Brand.Theme.brand
-        return button
+    static func primary(_ title: String) -> PillButton {
+        PillButton(title: title, style: .prominent)
     }
 
     /// The welcome's one button: light on the blue.
-    static func light(_ title: String) -> PrimaryButton {
-        let button = PrimaryButton(title: title)
+    static func light(_ title: String) -> PillButton {
+        let button = PillButton(title: title, style: .prominent)
         button.customFill = Brand.ribbon
         button.customInk = Brand.navy
         return button
     }
 
-    static func quiet(_ title: String) -> TextButton {
-        let button = TextButton(title: title, font: Tokens.Font.body(.medium))
-        button.textColor = Tokens.Color.textSecondary
-        return button
+    static func quiet(_ title: String) -> PillButton {
+        PillButton(title: title, style: .quiet)
     }
 }
 
@@ -645,7 +649,8 @@ private final class OptionRow: InteractiveView {
         name = Label(title, font: Tokens.Font.body(), color: Onboard.ink)
         detail = Label(text, font: Tokens.Font.small(), color: Onboard.dim(0.62))
         super.init(frame: .zero)
-        layer?.cornerRadius = Tokens.Radius.control
+        // The same corners as the list of browsers above it.
+        layer?.cornerRadius = Tokens.Radius.tile
         layer?.cornerCurve = .continuous
         box.wantsLayer = true
         box.layer?.cornerRadius = Tokens.Radius.control
@@ -731,6 +736,9 @@ private final class BrowserRow: InteractiveView {
         self.source = source
         name = Label(source.name, font: Tokens.Font.body(.semibold), color: Onboard.ink)
         super.init(frame: .zero)
+        // The hover fill rounds as the list's box does, on every row, not just where the box clips the first.
+        layer?.cornerRadius = Tokens.Radius.tile
+        layer?.cornerCurve = .continuous
         box.wantsLayer = true
         box.layer?.cornerRadius = Tokens.Radius.control
         box.layer?.borderWidth = Tokens.Metric.fieldRing
@@ -1620,7 +1628,9 @@ private final class PickTile: InteractiveView {
             detail.frame = NSRect(x: x, y: name.frame.maxY + 1, width: bounds.width - x - 12, height: detail.lineHeight)
         } else {
             let s: CGFloat = 40
-            icon.frame = NSRect(x: (bounds.width - s) / 2, y: bounds.height / 2 - s + 4, width: s, height: s)
+            // The icon and name centered as one block, so a picked tile's wash has even room above and below.
+            let top = round((bounds.height - s - 8 - name.lineHeight) / 2)
+            icon.frame = NSRect(x: (bounds.width - s) / 2, y: top, width: s, height: s)
             // Picked: a small check on the icon's bottom-right corner, like a selected photo.
             check.frame = NSRect(x: icon.frame.maxX - 13, y: icon.frame.maxY - 13, width: 18, height: 18)
             name.frame = NSRect(x: 4, y: icon.frame.maxY + 8, width: bounds.width - 8, height: name.lineHeight)

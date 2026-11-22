@@ -122,7 +122,6 @@ enum WebKitSetup {
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
-            profile.extensions.attachOldTwitterSolver(to: configuration)
             let patterns = profile.installs.externallyConnectablePatterns()
             // Once: a new tab's setup is made and then configured again, which put it in twice.
             if !patterns.isEmpty {
@@ -197,7 +196,7 @@ enum PageScripts {
     """, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient)
 
     /// ⌘-click on a web link is stopped before the page (#317); ⇧ and ⌥ reach the page and are reported, so the
-    /// page's navigation right after becomes Peek or a download (#322).
+    /// page's navigation right after becomes Zigzag Mini or a download (#322).
     static let modifiedLinkClicks = WKUserScript(source: """
     (() => {
       if (!/^https?:$/.test(location.protocol)) return;
@@ -266,7 +265,23 @@ enum PageScripts {
         const a = e.target && e.target.closest ? e.target.closest('a[href], area[href]') : null;
         send(a);
       }, true);
-      document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) send(null); }, true);
+      // The pointer is the only thing that decides: every move shows the link under it, or nothing. A move that
+      // lands anywhere but a link clears the preview, so it can't stay over a page that isn't a link.
+      document.addEventListener('mousemove', (e) => {
+        const a = e.target && e.target.closest ? e.target.closest('a[href], area[href]') : null;
+        send(a);
+      }, true);
+      document.addEventListener('mouseout', (e) => {
+        const to = e.relatedTarget;
+        const a = to && to.closest ? to.closest('a[href], area[href]') : null;
+        if (!a) send(null);
+      }, true);
+      // A click can start a navigation before the page reports a mouseout, and moving away during the load then
+      // leaves the pill showing the old address. Hide it as soon as the button goes down, and on the click itself.
+      document.addEventListener('mousedown', () => send(null), true);
+      document.addEventListener('click', () => send(null), true);
+      // The page can move under a still pointer, taking the link away without a mouse event.
+      window.addEventListener('scroll', () => send(null), true);
       window.addEventListener('blur', () => send(null));
       window.addEventListener('pagehide', () => send(null));
     })();
@@ -300,7 +315,7 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
         case "zigzagLinkClick":
             guard let body = message.body as? [String: Any], let text = body["url"] as? String,
                   let url = URL(string: text) else { return }
-            tab.modifiedClickFollowed(url, peek: body["shift"] as? Bool == true, download: body["alt"] as? Bool == true)
+            tab.modifiedClickFollowed(url, mini: body["shift"] as? Bool == true, download: body["alt"] as? Bool == true)
         case "zigzagIcons":
             guard message.frameInfo.isMainFrame, webView.owner === tab else { return }
             tab.pageIconsChanged()

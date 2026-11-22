@@ -95,10 +95,10 @@ final class CommandRowView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The chosen row in the neutral highlight, as a menu's; hover moves the choice, so it has no fill of its own.
-        // The chosen row on a soft wash of the space's accent, its title in the space's ink; the rest stay plain.
+        // The chosen row takes the shared selection wash, as Settings' sections do.
         let theme = Brand.Theme.for(self)
-        let fill: NSColor? = isSelected ? theme.accent.withAlphaComponent(isPressed ? 0.26 : 0.18) : nil
+        let alpha = isPressed ? Tokens.Color.selectionPressedAlpha : Tokens.Color.selectionAlpha
+        let fill: NSColor? = isSelected ? theme.accent.withAlphaComponent(alpha) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         styleTitle(ink: isSelected ? theme.rowInk : Tokens.Color.textPrimary)
         needsLayout = true
@@ -669,7 +669,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             fieldX = chipRule.frame.maxX + Tokens.Space.x2 + 2
         }
         chipRule.isHidden = !isScoped
-        var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : Tokens.Space.x4)
+        // Unanchored, the Tab key's cap ends where the rows' Return caps do.
+        var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : inset + CardRow.inset)
         if !hint.isHidden {
             let kw = hintKey.width, kh = Tokens.Metric.keyCapHeight
             hintKey.frame = NSRect(x: fieldRight - kw, y: round((fieldHeight - kh) / 2), width: kw, height: kh)
@@ -1318,6 +1319,7 @@ extension CommandBarController {
                 controller.splitWithUndo(tab, with: other)
             }
         case "close-others": controller.closeOtherTabs(nil)
+        case "capture": controller.capture.begin()
         case "close-below": controller.closeTabsBelow(nil)
         case "reopen": controller.reopenClosedTab(nil)
         case "new-space": controller.newSpace(nil)
@@ -1402,7 +1404,7 @@ final class ScrimView: ColorView {
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
 
     /// Fades in from its current opacity, reversing a fade-out instead of flashing. `evenFromKeyboard`: fade even from
-    /// a key (a peek), unlike the command bar. `animated` false: shown at once.
+    /// a key (a sheet), unlike the command bar. `animated` false: shown at once.
     func show(evenFromKeyboard: Bool = false, animated: Bool = true) {
         isLeaving = false
         let shown = layer?.presentation()?.opacity
@@ -1411,7 +1413,7 @@ final class ScrimView: ColorView {
         Tokens.Motion.fadeBackdrop(self, entering: true, evenFromKeyboard: evenFromKeyboard)
     }
 
-    /// `evenFromKeyboard`: it fades with something that leaves even from a key (a peek), rather than going at once
+    /// `evenFromKeyboard`: it fades with something that leaves even from a key (a sheet), rather than going at once
     /// with the command bar.
     func hide(evenFromKeyboard: Bool = false) {
         isLeaving = true

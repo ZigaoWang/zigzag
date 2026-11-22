@@ -3,7 +3,7 @@ import ImageIO
 import UniformTypeIdentifiers
 import WebKit
 
-/// A picture of the whole page, top to bottom, copied for pasting with Save… one click away.
+/// A picture of the whole page, top to bottom: Capture's Full Page (`PageCapture`).
 ///
 /// Pages load as you scroll (images, whole sections), so a picture taken straight away is full of blanks. First the
 /// page is scrolled through once, behind a still of what you were looking at so nothing jumps, then it waits for
@@ -27,32 +27,13 @@ enum PageScreenshot {
         return scheme == "http" || scheme == "https" || scheme == "file"
     }
 
-    static func take(_ tab: Tab, in controller: BrowserWindowController) {
-        guard !isTaking, canTake(tab), let webView = tab.webView else { return }
-        isTaking = true
-        Toast.show(String(localized: "Taking a screenshot of the whole page…", comment: "Toast while Zigzag takes a screenshot of the whole page."), symbol: "camera.viewfinder", duration: 30, in: controller)
-        Task { @MainActor [controller] in
-            defer { isTaking = false }
-            let (data, onScreenOnly) = await capture(webView)
-            guard let data else {
-                Toast.show(String(localized: "Couldn’t take a screenshot of this page", comment: "Toast when a screenshot of the whole page fails."), symbol: "exclamationmark.triangle", in: controller)
-                return
-            }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setData(data, forType: .png)
-            let name = fileName(for: tab)
-            let note = onScreenOnly ? String(localized: "Copied what’s on screen: this page scrolls inside itself", comment: "Toast after taking a screenshot of the whole page. Only the visible part could be taken.") : String(localized: "Screenshot copied", comment: "Toast after taking a screenshot of the whole page.")
-            Toast.show(note, symbol: "camera.viewfinder", action: (String(localized: "Save", comment: "Button in the toast after taking a screenshot: saves it as a file."), { [weak controller] in
-                guard let controller else { return }
-                save(data, name: name, in: controller)
-            }), duration: 8, in: controller)
-        }
-    }
-
     // MARK: Steps
 
-    /// The picture as PNG data, and whether it could only be what's on screen.
-    private static func capture(_ webView: WKWebView) async -> (Data?, Bool) {
+    /// The picture as PNG data, and whether it could only be what's on screen. One at a time.
+    static func capture(_ webView: WKWebView) async -> (Data?, Bool) {
+        guard !isTaking else { return (nil, false) }
+        isTaking = true
+        defer { isTaking = false }
         let cover = await coverPage(webView)
         // However it ends, the still comes off.
         defer { cover?.removeFromSuperview() }
@@ -74,7 +55,7 @@ enum PageScreenshot {
 
     /// A still of the page over it while it scrolls underneath, so the page doesn't race past your eyes. It sits
     /// inside the web view, so switching tabs meanwhile takes it away with its page, not over the next one.
-    private static func coverPage(_ webView: WKWebView) async -> NSView? {
+    static func coverPage(_ webView: WKWebView) async -> NSView? {
         guard webView.window != nil, let image = try? await webView.takeSnapshot(configuration: nil) else { return nil }
         let still = NSImageView(frame: webView.bounds)
         still.image = image
@@ -129,7 +110,7 @@ enum PageScreenshot {
     }
 
     /// The one-page PDF drawn into a PNG, at the screen's sharpness within the ceilings.
-    nonisolated private static func render(_ pdf: Data, backing: CGFloat) -> Data? {
+    nonisolated static func render(_ pdf: Data, backing: CGFloat) -> Data? {
         guard let provider = CGDataProvider(data: pdf as CFData), let document = CGPDFDocument(provider), let page = document.page(at: 1) else { return nil }
         let box = page.getBoxRect(.mediaBox)
         let size = box.size
@@ -151,7 +132,7 @@ enum PageScreenshot {
     }
 
     /// The picture as a PNG, marked with its sharpness (pixels per point).
-    nonisolated private static func png(_ image: CGImage, scale: CGFloat) -> Data? {
+    nonisolated static func png(_ image: CGImage, scale: CGFloat) -> Data? {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
         // Marked with its sharpness, so it opens at the page's size rather than twice it.
@@ -475,30 +456,6 @@ enum PageScreenshot {
     window.__zigzagShot = null;
     if (el && el.isConnected) el.scrollTo({ top: y, behavior: 'instant' });
     """
-
-    private static func fileName(for tab: Tab) -> String {
-        let title = tab.displayTitle.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
-        let date = Date().formatted(.dateTime.year().month(.twoDigits).day(.twoDigits))
-        return "\(title.isEmpty ? "Page" : title) \(date).png"
-    }
-
-    private static func save(_ data: Data, name: String, in controller: BrowserWindowController) {
-        guard let window = controller.window else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = name
-        panel.beginSheetModal(for: window) { response in
-            guard response == .OK, let url = panel.url else { return }
-            MainActor.assumeIsolated {
-                do {
-                    try data.write(to: url)
-                    Toast.show(String(localized: "Screenshot saved", comment: "Toast after saving a screenshot of the whole page."), symbol: "checkmark.circle", in: controller)
-                } catch {
-                    Toast.show(SaveFailure.message(String(localized: "Couldn’t save the screenshot", comment: "Toast when saving a screenshot fails; a reason may follow as its own sentence."), error), symbol: "exclamationmark.triangle", duration: 4, in: controller)
-                }
-            }
-        }
-    }
 }
 
 /// Every frame on a page says hello as it starts, so a picture can later reach into the one that scrolls, even

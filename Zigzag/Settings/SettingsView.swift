@@ -405,7 +405,7 @@ enum SettingsVersionRow {
         let toggle = Toggle(isOn: Updater.getsBetas)
         toggle.onChange = { on in Updater.getsBetas = on }
         let row = FormRow(title: String(localized: "Beta updates", comment: "A setting in Settings › General."),
-                          detail: String(localized: "Try new versions first, on your own tabs and data.", comment: "Explanation under “Beta updates” in Settings › General."),
+                          detail: String(localized: "A beta can break.", comment: "Explanation under “Beta updates” in Settings › General."),
                           control: toggle)
         row.keywords = String(localized: "beta channel prerelease", comment: "Words that find the Beta updates setting with Find a setting in Settings. Not shown.")
         return row
@@ -457,7 +457,7 @@ enum ExtensionSiteAccessRows {
     static func title(_ access: ExtensionInstalls.SiteAccess) -> String {
         switch access {
         case .all: String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")
-        case .click: String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")
+        case .click: String(localized: "On Click", comment: "Site Access choice: the extension works on a site only after its button is clicked.")
         case .sites: String(localized: "On Specific Sites", comment: "Site Access choice in Settings › Extensions: the extension works only on the sites listed under it.")
         }
     }
@@ -526,7 +526,6 @@ enum ExtensionPrivateRow {
         toggle.setAccessibilityLabel(String(localized: "Allow \(name) in private windows", comment: "VoiceOver name of the switch that lets an extension run in private windows, in Settings › Extensions. The placeholder is the extension's name."))
         toggle.onChange = { on in installs.setAllowsPrivate(id, on) }
         let row = FormRow(title: String(localized: "Allow in private windows", comment: "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first."),
-                          detail: String(localized: "It can see and change your pages in private windows.", comment: "Under “Allow in private windows” in Settings › Extensions."),
                           control: toggle)
         row.isIndented = true
         let words = String(localized: "incognito private browsing", comment: "Words that find an extension's Allow in private windows setting with Find a setting in Settings. Not shown.")
@@ -1068,8 +1067,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Reset All beside the Sites heading, there only when something was chosen for a site.
     private var sitesReset: PillButton?
     private var alwaysReset: PillButton?
+    private var neverReset: PillButton?
     private let translationGroup = FormGroup()
     private let alwaysGroup = FormGroup()
+    private let neverGroup = FormGroup()
     private let extensionsGroup = FormGroup()
     /// Extensions that come inside apps on this Mac (#194), each with Install. Looked for when the page opens.
     private let appExtensionsGroup = FormGroup()
@@ -1120,7 +1121,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let pureBlackToggle = Toggle()
     private lazy var pureBlackRow: FormRow = {
         let row = FormRow(title: String(localized: "Pure black backgrounds", comment: "A setting in Settings › Appearance, under Dark pages and shown while it's on: darkened websites are black instead of dark gray."),
-                          detail: String(localized: "Darkened websites are black instead of dark gray.", comment: "Explanation under “Pure black backgrounds” in Settings › Appearance."),
+                          detail: String(localized: "Black, not dark gray.", comment: "Explanation under “Pure black backgrounds” in Settings › Appearance."),
                           control: pureBlackToggle)
         row.keywords = String(localized: "black pure true black oled amoled dark mode", comment: "Words that find the Pure black backgrounds setting with Find a setting in Settings. Not shown.")
         return row
@@ -1135,6 +1136,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let miniToggle = Toggle()
     private let energyToggle = Toggle()
     private let languagePicker = DropdownButton()
+    private let launchChoice = DropdownButton()
     private let defaultButton = PillButton(title: String(localized: "Set as Default", comment: "Button in Settings › General that makes Zigzag the default browser."))
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
@@ -1335,10 +1337,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         versionGroup.add(SettingsVersionRow.betas())
         if let restore = SettingsVersionRow.restore() { versionGroup.add(restore) }
         let defaultRow = FormRow(title: String(localized: "Default browser", comment: "A setting in Settings › General."),
-                                 detail: String(localized: "Links from other apps open here.", comment: "Explanation under “Default browser” in Settings › General."),
                                  control: defaultControl)
         defaultRow.keywords = String(localized: "default app links open launch", comment: "Words that find the Default browser setting with Find a setting in Settings. Not shown.")
         generalGroup.add(defaultRow)
+        launchChoice.options = LaunchChoice.allCases.map { choice in
+            switch choice {
+            case .resume: DropdownButton.Option(title: String(localized: "Pick Up Where You Left Off", comment: "A choice for “On launch” in Settings › General: the last session's windows come back."))
+            case .fresh: DropdownButton.Option(title: String(localized: "Start Fresh", comment: "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session."))
+            }
+        }
+        launchChoice.selectedIndex = LaunchChoice.allCases.firstIndex(of: LaunchChoice.choice) ?? 0
+        launchChoice.onSelect = { index in LaunchChoice.choice = LaunchChoice.allCases[index] }
+        let launchRow = FormRow(title: String(localized: "On launch", comment: "A setting in Settings › General: what a launch does with the last session."),
+                                detail: String(localized: "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session.", comment: "Explanation under “On launch” in Settings › General."),
+                                control: launchChoice)
+        launchRow.keywords = String(localized: "startup launch on start restore session reopen windows fresh blank resume", comment: "Words that find the On launch setting with Find a setting in Settings. Not shown.")
+        generalGroup.add(launchRow)
         // Only once Zigzag speaks more than one language: macOS lists an app under Language & Region only then.
         if Self.hasLanguages {
             // Each language named in itself, so anyone finds theirs whatever Zigzag is in now.
@@ -1346,8 +1360,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             languagePicker.selectedIndex = AppLanguage.choices.firstIndex { $0.code == AppLanguage.chosen } ?? 0
             languagePicker.onSelect = { [weak self] index in self?.chooseLanguage(AppLanguage.choices[index].code) }
             generalGroup.add(FormRow(title: String(localized: "Language", comment: "A setting in Settings › General."),
-                                     detail: String(localized: "Zigzag follows your Mac’s language unless you pick one here.",
-                                                    comment: "Explanation under “Language” in Settings › General."),
                                      control: languagePicker))
         }
         downloadPlace.onSelect = { index in DownloadPlace.pick(index) }
@@ -1391,10 +1403,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: importButton))
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
-                              detail: String(localized: "So ⌘Q never closes everything by accident.", comment: "Explanation under “Ask before quitting” in Settings › General."),
                               control: quitToggle)
-        // There's no startup setting: your tabs always come back. Quitting is the nearest, and where people look.
-        quitRow.keywords = String(localized: "startup launch on start restore reopen session close quit", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.")
+        quitRow.keywords = String(localized: "quit quitting close command q ask confirm", comment: "Words that find the Ask before quitting setting with Find a setting in Settings. Not shown.")
         generalGroup.add(quitRow)
         reloadWebApps()
         webAppsToken = WebAppStore.shared.changed.observe { [weak self] in
@@ -1536,7 +1546,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         ]
         sidebarSide.onSelect = { index in BrowserRootView.sidebarOnRight = Self.sidebarSides[index] }
         let sideRow = FormRow(title: String(localized: "Sidebar position", comment: "A setting in Settings › Appearance: which edge of the window the sidebar runs along, Left or Right."),
-                              detail: String(localized: "The edge of the window the sidebar runs along. The page sits beside it.", comment: "Explanation under “Sidebar position” in Settings › Appearance."),
                               control: sidebarSide)
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sideRow.keywords = String(localized: "sidebar right left side position move", comment: "Words that find the Sidebar position setting with Find a setting in Settings. Not shown.") + " 侧边栏"
@@ -1567,6 +1576,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sidebarSizeStepper.lessTip = String(localized: "Smaller Sidebar", comment: "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.")
         sidebarSizeStepper.moreTip = String(localized: "Larger Sidebar", comment: "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.")
         sidebarSizeStepper.resetTip = String(localized: "Usual Size", comment: "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.")
+        sidebarSizeStepper.typingTip = nil
         sidebarSizeStepper.percentName = String(localized: "Sidebar size %@, Usual Size", comment: "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.")
         sidebarSizeStepper.onChange = { value in Tokens.Sidebar.customScale = value }
         let sizeControls = NSStackView(views: [sidebarSize, sidebarSizeStepper])
@@ -1641,7 +1651,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshPureBlack()
         motionToggle.onChange = { on in Tokens.Motion.reducesMotionHere = on }
         appearanceGroup.add(FormRow(title: String(localized: "Reduce motion", comment: "A setting in Settings › Appearance."),
-                                    detail: String(localized: "Things appear in place instead of sliding or growing. Fades stay.", comment: "Explanation under “Reduce motion” in Settings › Appearance."),
                                     control: motionToggle))
 
         // Tabs
@@ -1680,7 +1689,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(controlTabRow)
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
         let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
-                              detail: String(localized: "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
+                              detail: String(localized: "Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
                               control: nestToggle)
         nestRow.keywords = String(localized: "nested tree child command click", comment: "Words that find the Open ⌘-clicked links under their tab setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(nestRow)
@@ -1704,13 +1713,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         tabsGroup.add(energyRow)
         pipToggle.onChange = { on in PictureInPicture.followsTabs = on }
         let videoRow = FormRow(title: String(localized: "Show a mini player when you switch tabs", comment: "A setting in Settings › Tabs."),
-                               detail: String(localized: "A video you’re watching follows you in a small player over the page. Its right-click menu can turn this off too.", comment: "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs."),
+                               detail: String(localized: "The mini player’s right-click menu can turn this off too.", comment: "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs."),
                                control: pipToggle)
         videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Show a mini player setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(videoRow)
         leavePipToggle.onChange = { on in AutoPictureInPicture.isOn = on }
         let leaveRow = FormRow(title: String(localized: "Show a mini player when you leave Zigzag", comment: "A setting in Settings › Tabs, below “Show a mini player when you switch tabs”: a playing video moves into Zigzag's small player, over other apps, when you switch to another app or desktop."),
-                               detail: String(localized: "A video you’re watching keeps playing in a small player over other apps and desktops, and goes back in its page when you come back to it.", comment: "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs."),
+                               detail: String(localized: "The video floats over other apps and desktops, and goes back in its page when you return.", comment: "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs."),
                                control: leavePipToggle)
         leaveRow.keywords = String(localized: "mini player picture in picture pip floating video other app desktop space leave switch away background automatic", comment: "Words that find the Show a mini player when you leave Zigzag setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(leaveRow)
@@ -1723,7 +1732,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         fullScreenFill.onSelect = { index in PageFullScreen.fill = PageFullScreen.Fill.allCases[index] }
         let fullScreenRow = FormRow(title: String(localized: "Full screen videos fill", comment: "A setting in Settings › Tabs: whether a video put in full screen covers the whole screen or only the page's area in the window. Followed by The Whole Screen or The Page."),
-                                    detail: String(localized: "With The Page, a video in full screen stays inside its tab, or its part of a split. Choose for a single site in its site controls.",
+                                    detail: String(localized: "Choose for a single site in its site controls.",
                                                    comment: "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address."),
                                     control: fullScreenFill)
         fullScreenRow.keywords = String(localized: "full screen fullscreen window tab pane video youtube in window", comment: "Words that find the Full screen videos fill setting with Find a setting in Settings. Not shown.")
@@ -1772,7 +1781,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         customSearch.field.target = self
         customSearch.field.action = #selector(customSearchChanged)
         searchGroup.add(FormRow(title: String(localized: "Search engine", comment: "A setting in Settings › Search."),
-                                detail: String(localized: "Used when what you type isn’t an address.", comment: "Explanation under “Search engine” in Settings › Search."),
                                 control: engine))
         searchGroup.add(customSearchRow)
         refreshCustomSearch()
@@ -2535,6 +2543,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             guard response == .OK, let url = panel.url, let self else { return }
             // A Firefox package is installed from its file; a folder as before.
             if url.pathExtension.lowercased() == "xpi" { installPickedXPI(url, in: profile); return }
+            if ExtensionStore.folderIsThemeOnly(url) { noticeCouldNotAdd(ExtensionStore.InstallError.theme.message); return }
             confirmUnpacked(url, from: nil) { [weak self] in
                 if await ExtensionStore.loadUnpacked(url, in: profile) == nil, let host = self {
                     ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t load this extension", comment: "Title of the notice when an unpacked extension can't load."),
@@ -2902,7 +2911,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 browser.installExtension(id, into: profile, also: { [weak self] stage in
                     switch stage {
                     case .added: if ICloudPasswords.isOn(in: profile) { ICloudPasswords.use(in: profile) }
-                    case .failed, .cancelled: break
+                    case .failed, .cancelled, .theme: break
                     case .downloading, .reviewing, .adding: return
                     }
                     self?.reloadPasswords()
@@ -2931,22 +2940,54 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         translationGroup.add(FormRow(title: String(localized: "Offer to translate", comment: "A setting in Settings › Translation."),
                                      detail: String(localized: "When a page is in another language, Zigzag asks once per site.", comment: "Explanation under “Offer to translate” in Settings › Translation."),
                                      control: translateOffer))
-        let always = PageTranslator.alwaysLanguages.map { PageTranslator.name(of: Locale.Language(identifier: $0)) }.sorted()
+        neverGroup.removeAllRows()
+        let choices = PageTranslator.Choices()
+        let name = { (code: String) in PageTranslator.name(of: Locale.Language(identifier: code)) }
+        let (always, never) = choices.entries(name: name)
         // Laid out like Sites in Privacy: a heading, Reset All beside it only when there's something to reset.
-        let reset = PillButton(title: String(localized: "Reset All", comment: "Button beside Always Translate in Settings › Translation."))
-        reset.onClick = { [weak self] _ in
-            PageTranslator.alwaysLanguages = []
-            self?.reloadTranslation()
-            self?.layoutDocument()
+        func resetAll(_ entries: [PageTranslator.Choices.Entry]) -> PillButton? {
+            guard !entries.isEmpty else { return nil }
+            let reset = PillButton(title: String(localized: "Reset All", comment: "Button beside Always Translate in Settings › Translation."))
+            reset.onClick = { [weak self] _ in
+                entries.forEach(choices.remove)
+                self?.reloadTranslation()
+                self?.layoutDocument()
+            }
+            return reset
         }
-        alwaysReset = always.isEmpty ? nil : reset
-        alwaysGroup.add(always.isEmpty
-            ? FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
-                      detail: String(localized: "To always translate a language, choose it in a page’s site controls.", comment: "Under Always Translate in Settings › Translation."),
-                      control: NSView())
-            : FormRow(title: Words.list(always),
-                      detail: String(localized: "Pages in these languages are translated as soon as they open.", comment: "Under the list of languages in Settings › Translation."),
-                      control: NSView()))
+        alwaysReset = resetAll(always)
+        neverReset = resetAll(never)
+        func row(_ entry: PageTranslator.Choices.Entry) -> FormRow {
+            let title: String, icon: NSImage
+            switch entry {
+            case .always(let code), .neverLanguage(let code):
+                title = name(code)
+                icon = SettingsIcon.symbol("translate")
+            case .neverSite(let site):
+                title = site
+                icon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            }
+            let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Developer: takes the site or the page size off its list."))
+            remove.setAccessibilityLabel(String(localized: "Remove \(title)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
+            remove.onClick = { [weak self] _ in
+                choices.remove(entry)
+                self?.reloadTranslation()
+                self?.layoutDocument()
+            }
+            return FormRow(title: title, icon: icon, control: remove)
+        }
+        if always.isEmpty {
+            alwaysGroup.add(FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
+                                    detail: String(localized: "To always translate a language, choose it from the translate button in the address bar.", comment: "Under Always Translate in Settings › Translation, when there's no language. The translate button is in the address bar on pages in another language."),
+                                    control: NSView()))
+        }
+        always.map(row).forEach(alwaysGroup.add)
+        if never.isEmpty {
+            neverGroup.add(FormRow(title: String(localized: "None yet", comment: "Under Always Translate in Settings › Translation, when there's no language."),
+                                   detail: String(localized: "Languages and sites you never translate show up here.", comment: "Under Never Translate in Settings › Translation, when there's no language or site."),
+                                   control: NSView()))
+        }
+        never.map(row).forEach(neverGroup.add)
     }
 
     // MARK: Shortcuts
@@ -3218,6 +3259,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         String(localized: "Apps on This Mac", comment: "A heading in Settings › Privacy, over the master switch that lets websites reach programs on this Mac.")
     }
     private static var alwaysTranslateHeading: String { String(localized: "Always Translate", comment: "A heading in Settings › Translation.") }
+    private static var neverTranslateHeading: String { String(localized: "Never Translate", comment: "A heading in Settings › Translation, over the languages and sites never offered or translated on their own.") }
     private static var fillingHeading: String { String(localized: "AutoFill", comment: "A heading in Settings › Passwords: when Zigzag offers to save and fill passwords and forms.") }
     /// With more than one profile, over the one row every profile shares: what it fills, named plainly, so it doesn't
     /// read as a second heading for what the one over saving and filling passwords already says.
@@ -3262,7 +3304,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.formsHeading, cardGroup)] : [])
         case .privacy: [(nil, blockingGroup), (Self.localReceiversHeading, localReceiversGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])
         case .websiteData: SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .websiteData ? websiteDataGroups : []
-        case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup)]
+        case .translation: [(nil, translationGroup), (Self.alwaysTranslateHeading, alwaysGroup), (Self.neverTranslateHeading, neverGroup)]
         case .extensions: [(installedHeading, extensionsGroup), (Self.appExtensionsHeading, appExtensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         case .automation: [(nil, aiGroup), (Self.connectHeading, connectGroup), (Self.scriptsHeading, scriptsGroup)]
@@ -3397,9 +3439,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 let words = settingSearch.stringValue.trimmingCharacters(in: .whitespaces)
                 let none = made(words) {
                     Label(String(localized: "No settings match “\(words)”.", comment: "In Settings when Find a setting finds nothing; what was typed."),
-                          font: Tokens.Font.row(), color: Tokens.Color.textSecondary)
+                          font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
                 }
-                none.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: y, width: contentWidth - Tokens.Page.groupPad, height: none.lineHeight)
+                none.alignment = .center
+                none.frame = NSRect(x: pad, y: y + Tokens.EmptyState.noMatchTop, width: contentWidth, height: none.lineHeight)
                 place(none)
                 y = none.frame.maxY + Tokens.Space.x6
             }
@@ -3435,6 +3478,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .translation:
             section(nil, translationGroup)
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
+            section(Self.neverTranslateHeading, neverGroup, accessory: neverReset)
         case .developer:
             section(nil, developerToolsGroup)
             // Sites rows are one line, while Page Sizes rows carry a second: lower this group so the first Remove
@@ -3618,6 +3662,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let content = FormRow(title: rule.name.isEmpty ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.") : rule.name,
                                   detail: rule.summarySentence, control: controls)
             content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            content.revealsOnHover(remove)
             let row = DraggableRow(content)
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
@@ -3754,6 +3799,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let content = FormRow(title: types.isEmpty ? String(localized: "Untitled File Type", comment: "A per-extension destination with no extensions yet.") : types,
                                   detail: rule.destinationSentence, control: controls)
             content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            content.revealsOnHover(remove)
             downloadTypesGroup.add(content)
         }
     }
@@ -4230,7 +4276,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let historyButtons = NSStackView(views: [showHistory, history])
         historyButtons.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: String(localized: "History", comment: "A setting in Settings › Privacy."),
-                                 detail: String(localized: "The pages you’ve visited, used for suggestions in the command bar.", comment: "Explanation under “History” in Settings › Privacy."),
                                  control: historyButtons))
 
         // What's cleared is the profile's shown here.
@@ -4266,7 +4311,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let data = NSStackView(views: [cache, cookies])
         data.spacing = Tokens.Space.x2
         privacyGroup.add(FormRow(title: String(localized: "Website data", comment: "A setting in Settings › Privacy."),
-                                 detail: String(localized: "The cache makes pages load faster. Cookies keep you signed in.", comment: "Explanation under “Website data” in Settings › Privacy."),
                                  control: data))
 
         // Sites whose cookies clearing leaves alone (#334), each with ×, then whether the rest go at quit.

@@ -23,6 +23,10 @@ final class OldTwitterSolver: NSObject {
     (() => {
       const host = location.hostname;
       if (host !== "x.com" && host !== "twitter.com") return;
+      // A page keeps one run of this bridge, whether it came from the user script or from a page that was open when
+      // OldTwitter started again: a second run would add a second set of listeners and observers.
+      if (window.__zigzagOldTwitterBridge) return;
+      window.__zigzagOldTwitterBridge = true;
       const handlers = window.webkit && window.webkit.messageHandlers;
       const handler = handlers && handlers.\(handlerName);
       if (!handler) return;
@@ -35,23 +39,205 @@ final class OldTwitterSolver: NSObject {
         if (event.source !== window || !data || !data.__zigzagSolverReply || typeof data.token !== "string") return;
         try { handler.postMessage({ op: "reply", token: data.token, message: data.message }).catch(() => {}); } catch (e) {}
       });
-      // OldTwitter's own pages write Chrome's address for their icons and fonts. WebKit serves them at its own, so
-      // the text it reads is fixed before it's used. Only extension pages and stylesheets are touched.
+      // OldTwitter's layout names its own files with Chrome's address. WebKit serves the same files at its own
+      // address, which the page's security policy lets through, so the addresses are fixed as the layout is made:
+      // its icon font, the loading picture, its images and the tab's icon.
       const api = globalThis.chrome || globalThis.browser;
-      const nativeFetch = window.fetch;
-      try {
-        // Writable, so OldTwitter's own `fetch = ...` that signs requests still takes, whichever script runs first.
-        Object.defineProperty(window, "fetch", { configurable: true, writable: true, value: async (input, options) => {
-          const response = await nativeFetch.call(window, input, options);
-          const url = typeof input === "string" ? input : (input && input.url) || "";
-          if (!/^webkit-extension:/i.test(url) || !/[.](html|css)([?#]|$)/i.test(url)) return response;
-          const id = api && api.runtime && api.runtime.id ? api.runtime.id : "";
-          const text = (await response.text())
-            .replaceAll("chrome-extension://", "webkit-extension://")
-            .replaceAll("__MSG_@@extension_id__", id);
-          return new Response(text, { status: response.status, statusText: response.statusText, headers: response.headers });
-        } });
-      } catch (e) {}
+      const id = api && api.runtime && api.runtime.id;
+      if (!id) return;
+      const from = "chrome-extension://" + id;
+      const to = "webkit-extension://" + id;
+      const fixed = (text) => (text.includes(from) ? text.split(from).join(to) : text);
+      // A quoted tweet is a link to itself, and its video sits inside it. WebKit's play button on that video never
+      // reaches the page: it follows the quote's link in the UI instead, so play opened the quote in a new tab and a
+      // click could not be taken back. The link is kept aside, so the video is not inside a link at all, and a click
+      // on the quote's text opens it as the link did.
+      const unlinkQuote = (element) => {
+        if (!element || element.tagName !== "A" || !element.classList || !element.classList.contains("tweet-body-quote")) return;
+        // A ⌘, ⌃ or middle press puts the address back for the browser to follow; a right press for its menu.
+        if (element.hasAttribute("data-zigzag-modified") || element.hasAttribute("data-zigzag-menu")) return;
+        const href = element.getAttribute("href");
+        if (!href) return;
+        element.setAttribute("data-zigzag-href", href);
+        element.removeAttribute("href");
+        element.style.cursor = "pointer";
+      };
+      // WebKit's own play button on a quoted video does nothing here: the click never reaches the page and no play
+      // starts. A play button of our own over the video answers a real click, which can start it. The mark on the
+      // video outlives the run that made its layer, so a later run never stacks a second one.
+      const addPlay = (video) => {
+        if (!video || video.tagName !== "VIDEO" || !video.closest("a.tweet-body-quote")) return;
+        if (video.hasAttribute("data-zigzag-play-video")) return;
+        const holder = video.parentElement;
+        if (!holder) return;
+        video.setAttribute("data-zigzag-play-video", "");
+        if (getComputedStyle(holder).position === "static") holder.style.position = "relative";
+        // Metadata only, so a timeline of quoted videos does not download them. The seek asks for just enough for
+        // the first frame, which otherwise shows black.
+        try {
+          video.preload = "metadata";
+          if (!video.currentTime) video.currentTime = 0.1;
+        } catch (e) {}
+        // An invisible layer over the picture, so a click there plays or pauses it. It takes the video's own box,
+        // never the strip around it, and the video's controls at the top and in the bar stay outside it. No button of
+        // Zigzag's is drawn: WebKit's own shows.
+        const layer = document.createElement("div");
+        layer.setAttribute("data-zigzag-play", "");
+        layer.style.cssText = "position:absolute;z-index:3;background:transparent;cursor:pointer;";
+        const place = () => {
+          const box = video.getBoundingClientRect(), holderBox = holder.getBoundingClientRect();
+          if (!box.width || !box.height) return;
+          layer.style.left = (box.left - holderBox.left) + "px";
+          layer.style.top = (box.top - holderBox.top + box.height * 0.28) + "px";
+          layer.style.width = box.width + "px";
+          layer.style.height = (box.height * 0.5) + "px";
+        };
+        layer.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (video.paused) video.play().catch(() => {});
+          else video.pause();
+        });
+        holder.appendChild(layer);
+        // A click on the video belongs to WebKit's controls. The quote's own handler sits on the link around the
+        // video and takes the same click as a request for the quote, which opens it. The controls have already had
+        // the click when it reaches their holder, so it stops there. A ⌘ or ⌃ press is the browser's.
+        if (!holder.hasAttribute("data-zigzag-quote-click")) {
+          holder.setAttribute("data-zigzag-quote-click", "");
+          holder.addEventListener("click", (event) => {
+            if (event.metaKey || event.ctrlKey) return;
+            const target = event.target;
+            if (!target || !target.closest || !target.closest("video")) return;
+            event.preventDefault();
+            event.stopPropagation();
+          }, false);
+        }
+        place();
+        new ResizeObserver(place).observe(holder);
+        new ResizeObserver(place).observe(video);
+        addEventListener("resize", place);
+      };
+      const fix = (element) => {
+        if (!element || element.nodeType !== 1) return;
+        unlinkQuote(element);
+        addPlay(element);
+        if (element.tagName === "STYLE") {
+          const text = element.textContent;
+          if (text && text.includes(from)) element.textContent = fixed(text);
+          return;
+        }
+        for (const name of ["src", "href", "srcset", "poster", "data"]) {
+          const value = element.getAttribute(name);
+          if (value && value.includes(from)) element.setAttribute(name, fixed(value));
+        }
+        const style = element.getAttribute("style");
+        if (style && style.includes(from)) element.setAttribute("style", fixed(style));
+      };
+      const fixTree = (node) => {
+        fix(node);
+        if (node.querySelectorAll) node.querySelectorAll("a,style,img,link,source,video,use,[style]").forEach(fix);
+      };
+      fixTree(document.documentElement);
+      document.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+        if (target.closest("[data-zigzag-play]")) return;
+        const quote = target.closest("a.tweet-body-quote");
+        // A click on the video is the video's own controls'. The controls stop the click before it leaves them,
+        // so the quote's own handler never sees it, but the link under the video still would. The default is
+        // stopped here, before the controls, and a ⌘ or ⌃ press is left to the browser.
+        if (target.closest("video")) {
+          if (quote && !event.metaKey && !event.ctrlKey) event.preventDefault();
+          return;
+        }
+        // ⌘ takes the quoted tweet itself, in a new tab: the click reaches the link, and the extension's own
+        // handlers let a modified click through.
+        if (quote && (event.metaKey || quote.hasAttribute("data-zigzag-modified"))) return;
+        // A link in the quoted text (a URL, a mention, the quoted account) is its own.
+        if (target.closest("a[href]")) return;
+        // A quoted tweet opens in the extension's own modal, which is its own handler's doing. Without the href,
+        // nothing follows it in a tab.
+        if (quote) event.preventDefault();
+      }, true);
+      // The address is put back for the right-click menu alone, so Open in New Tab still has a link, and taken off
+      // again once the menu has it, so a click on the quote or its video never follows it. The right press is marked
+      // like a ⌘ or middle one, so the observer below leaves its link in place until the menu is built.
+      document.addEventListener("mousedown", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const quote = target ? target.closest("a.tweet-body-quote") : null;
+        if (!quote) return;
+        const href = quote.getAttribute("data-zigzag-href");
+        if (!href) return;
+        if (event.button === 2) {
+          quote.setAttribute("href", href);
+          quote.setAttribute("data-zigzag-menu", "");
+          setTimeout(() => {
+            quote.removeAttribute("data-zigzag-menu");
+            // A ⌘ or middle press in the meantime keeps its own link for its own moment.
+            if (quote.hasAttribute("data-zigzag-modified")) return;
+            if (quote.getAttribute("data-zigzag-href")) quote.removeAttribute("href");
+          }, 3000);
+          return;
+        }
+        // Any other press ends a right press's mark before the browser acts on it.
+        quote.removeAttribute("data-zigzag-menu");
+        // The page's own world has already put it back for a ⌘, ⌃ or middle press, and marked it.
+        if (quote.hasAttribute("data-zigzag-modified")) {
+          quote.setAttribute("href", href);
+          return;
+        }
+        const newTab = event.button === 1 || (event.button === 0 && event.metaKey);
+        if (newTab) quote.setAttribute("href", href);
+        else if (event.button === 0) quote.removeAttribute("href");
+      }, true);
+      new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === "attributes") fix(mutation.target);
+          else if (mutation.type === "characterData") { if (mutation.target.parentElement) fix(mutation.target.parentElement); }
+          else mutation.addedNodes.forEach((node) => { if (node.nodeType === 1) fixTree(node); });
+        }
+      }).observe(document.documentElement || document, {
+        childList: true, subtree: true, attributes: true, attributeFilter: ["src", "href", "srcset", "poster", "style", "data"], characterData: true,
+      });
+    })();
+    """
+
+    /// The page's own world sees the keys held on a click; the extension's own world does not always. A ⌘ or middle
+    /// press puts the quoted tweet's link back and marks it, so every handler can tell that click is the browser's.
+    static let modified = """
+    (() => {
+      // It is added to every site's page world; it acts only on x.com and twitter.com.
+      const host = location.hostname;
+      if (host !== "x.com" && host !== "twitter.com") return;
+      if (window.__zigzagOldTwitterModified) return;
+      window.__zigzagOldTwitterModified = true;
+      document.addEventListener("mousedown", (event) => {
+        if (!event.isTrusted || !(event.metaKey || event.button === 1)) return;
+        const quote = event.target.closest && event.target.closest("a.tweet-body-quote");
+        const href = quote && quote.getAttribute("data-zigzag-href");
+        if (!href) return;
+        quote.setAttribute("href", href);
+        quote.setAttribute("data-zigzag-modified", "");
+        setTimeout(() => {
+          quote.removeAttribute("data-zigzag-modified");
+          quote.removeAttribute("href");
+        }, 2000);
+      }, true);
+      // ⌘ on a tweet's own body is that tweet's link: it opens in a new tab, not in the extension's viewer.
+      document.addEventListener("click", (event) => {
+        if (!event.isTrusted || !event.metaKey) return;
+        const target = event.target;
+        if (!target.closest) return;
+        if (target.closest("a[href], button, video, [data-zigzag-play], .tweet-button")) return;
+        const tweet = target.closest(".tweet");
+        if (!tweet || target.closest("a.tweet-body-quote")) return;
+        const link = tweet.querySelector(".tweet-time");
+        const href = link && link.getAttribute("href");
+        if (!href) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.open(href, "_blank", "noopener");
+      }, true);
     })();
     """
 
@@ -99,18 +285,85 @@ final class OldTwitterSolver: NSObject {
     private var sandboxes: [String: Sandbox] = [:]
     private var next = 0
     private var sweeper: Task<Void, Never>?
+    /// The pages' controllers that may carry the call, so one made before OldTwitter was installed or started again
+    /// gets it too, without a new window.
+    private let controllers = NSHashTable<WKUserContentController>.weakObjects()
+    /// Those of them in private windows: they keep the call only while OldTwitter may run there.
+    private let privateControllers = NSHashTable<WKUserContentController>.weakObjects()
+    /// Those that have its handler: WebKit takes a name in a world once.
+    private let handlers = NSHashTable<WKUserContentController>.weakObjects()
 
     init(host: ExtensionHost) { self.host = host }
 
-    /// Puts the one call into this web view's extension world, for x.com and twitter.com.
-    func attach(to configuration: WKWebViewConfiguration, extensionID: String) {
-        // A tab's setup is configured once when it is made and again with its page: only the first adds this.
-        guard !configuration.userContentController.userScripts.contains(where: { $0.source == Self.bridge }) else { return }
+    /// Whether OldTwitter may run in a private window, from what the person allowed. WebKit holds the same answer on
+    /// its context, but a page can be made before the extension has loaded, so the stored setting is what's read.
+    private func mayRunInPrivate(_ extensionID: String) -> Bool {
+        host.profile.installs.allowsPrivate(extensionID)
+    }
+
+    /// Puts the one call into this web view's extension world, for x.com and twitter.com. A private page gets it only
+    /// when OldTwitter may run there, as WebKit's own content scripts do.
+    func attach(to configuration: WKWebViewConfiguration, extensionID: String, isPrivate: Bool = false) {
+        guard PrivateAccess.sees(isPrivate: isPrivate, allowed: mayRunInPrivate(extensionID)) else { return }
         self.extensionID = extensionID
+        let controller = configuration.userContentController
+        controllers.add(controller)
+        if isPrivate { privateControllers.add(controller) }
+        addCall(to: controller)
+    }
+
+    /// A page made before OldTwitter was installed, updated or started again gets the call as well, from its next load
+    /// and in the page it shows now. Without it the extension's script asks for a function no page has.
+    func attach(toOpenPagesOf extensionID: String) {
+        self.extensionID = extensionID
+        let privateAllowed = mayRunInPrivate(extensionID)
+        for controller in controllers.allObjects {
+            // Turned off for private windows since this page was made: its next load doesn't get the bridge.
+            guard privateAllowed || !privateControllers.contains(controller) else {
+                removeCall(from: controller)
+                continue
+            }
+            addCall(to: controller)
+        }
+        for window in WindowManager.shared.controllers where window.tabManager.profile === host.profile {
+            for tab in window.tabManager.allTabs where tab.extensionHost === host && window.holds(tab) {
+                guard let webView = tab.webView else { continue }
+                guard PrivateAccess.sees(isPrivate: tab.isPrivate, allowed: privateAllowed) else { continue }
+                let controller = webView.configuration.userContentController
+                controllers.add(controller)
+                if tab.isPrivate { privateControllers.add(controller) }
+                addCall(to: controller)
+                guard let page = webView.url?.host(), page == "x.com" || page == "twitter.com" else { continue }
+                let world = BridgeUserScripts.contentScriptWorld(extensionID)
+                webView.callAsyncJavaScript(Self.bridge, arguments: [:], in: nil, in: world) { _ in }
+                webView.callAsyncJavaScript(Self.modified, arguments: [:], in: nil, in: .page) { _ in }
+            }
+        }
+    }
+
+    /// Takes the call back out of a page that may no longer have it, from its next load.
+    private func removeCall(from controller: WKUserContentController) {
+        OwnScripts.remove(from: controller) { $0.source == Self.bridge || $0.source == Self.modified }
+        guard handlers.contains(controller), let extensionID else { return }
+        controller.removeScriptMessageHandler(forName: Self.handlerName,
+                                              contentWorld: BridgeUserScripts.contentScriptWorld(extensionID))
+        handlers.remove(controller)
+    }
+
+    private func addCall(to controller: WKUserContentController) {
+        guard let extensionID else { return }
         let world = BridgeUserScripts.contentScriptWorld(extensionID)
-        configuration.userContentController.addScriptMessageHandler(self, contentWorld: world, name: Self.handlerName)
-        configuration.userContentController.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentStart,
-                                                                       forMainFrameOnly: false, in: world))
+        if !handlers.contains(controller) {
+            controller.addScriptMessageHandler(self, contentWorld: world, name: Self.handlerName)
+            handlers.add(controller)
+        }
+        guard !controller.userScripts.contains(where: { $0.source == Self.bridge }) else { return }
+        controller.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentStart,
+                                             forMainFrameOnly: false, in: world))
+        if !controller.userScripts.contains(where: { $0.source == Self.modified }) {
+            controller.addUserScript(WKUserScript(source: Self.modified, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: false, in: .page))
+        }
     }
 
     /// A fresh content world for the tab and frame this page is in, started with the codes its page worked out.

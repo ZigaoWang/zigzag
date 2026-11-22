@@ -46,7 +46,7 @@ struct SidebarDeleteKeyTests {
         func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {}
         func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool { false }
         func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) {}
-        func listJoinSplit(_ tab: Tab, onto other: Tab, onRight: Bool) {}
+        func listJoinSplit(_ page: TabManager.RowPage, onto target: TabManager.RowPage, onRight: Bool) {}
         func listZoomPane(_ tab: Tab) {}
         func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool) {}
         func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool) {}

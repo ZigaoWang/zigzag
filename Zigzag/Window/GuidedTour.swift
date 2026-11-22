@@ -1,7 +1,7 @@
 import AppKit
 
 /// Getting started, in the window itself: one step at a time, the place to act lit up, and a small pill beside
-/// it with the keys and three words. It follows along as you do the step (the address bar, a peek), then shows
+/// it with the keys and three words. It follows along as you do the step (the address bar, a Zigzag Mini), then shows
 /// you what changed for a moment before moving on, so nothing happens unnoticed.
 final class GuidedTour: NSView {
     private static weak var current: GuidedTour?
@@ -14,19 +14,19 @@ final class GuidedTour: NSView {
     private let title = Label("", font: .systemFont(ofSize: 22, weight: .semibold), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
-    private let skip = TextButton(title: String(localized: "Skip", comment: "Button in the getting-started guide, a card in the window: skips the step."), font: Tokens.Font.small(.medium))
+    private let skip = PillButton(title: String(localized: "Skip", comment: "Button in the getting-started guide, a card in the window: skips the step."), style: .quiet)
     /// Ends the guide for good; Help › Getting Started brings it back.
     private let close = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "End Getting Started", comment: "Tooltip of the close button of the getting-started guide, a card in the window."))
-    private let finish = PrimaryButton(title: String(localized: "Start Browsing", comment: "Button that ends the getting-started guide, a card in the window, after its last step."))
+    private let finish = PillButton(title: String(localized: "Start Browsing", comment: "Button that ends the getting-started guide, a card in the window, after its last step."), style: .prominent)
     // The last card: a note from the person who made Zigzag.
     private let wordmark = WordmarkView()
     private let letter = NSTextField(wrappingLabelWithString: "")
     private let signature = Label(String(localized: "Zigao, who makes Zigzag", comment: "Signature under the thank-you note at the end of the getting-started guide, a card in the window. Zigao is the maker's name."), font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
     /// The step shown being done, in the window itself, on your own tabs and buttons.
     private lazy var demo = TourDemo(in: layer!)
-    /// Where Peek's link is on the page, looked up now and then as you scroll.
-    private var peekLink: CGPoint?
-    private var peekLinkAsked = Date.distantPast
+    /// Where the ⇧-click step's link is on the page, looked up now and then as you scroll.
+    private var shiftClickLink: CGPoint?
+    private var shiftClickLinkAsked = Date.distantPast
     private var tokens: [SignalToken] = []
     private var watch: Timer?
     private var ending = false
@@ -80,7 +80,6 @@ final class GuidedTour: NSView {
         _ = demo
         applyColors()
         check.image = Tokens.Symbol.image("checkmark.circle.fill", size: Tokens.TypeSize.display)
-        skip.textColor = NSColor.white.withAlphaComponent(0.6)
         // Dark, whatever the page: a white card on a white page disappears.
         card.surfaceTint = NSColor(white: 0.1, alpha: 1)
         card.tintStrength = 0.94
@@ -167,7 +166,7 @@ final class GuidedTour: NSView {
     private func pace() {
         if !ending, canBeSeen {
             if watch == nil {
-                // Follows what you're doing: the address bar opening, a peek opening and closing.
+                // Follows what you're doing: the address bar opening, a Zigzag Mini opening and closing.
                 let timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
                     MainActor.assumeIsolated { self?.tick() }
                 }
@@ -202,18 +201,18 @@ final class GuidedTour: NSView {
     private func tick() {
         guard let controller, !ending else { return }
         // Other panels (site controls, downloads) come first: the guide steps aside.
-        let bar = controller.commandBar.isVisible, peek = controller.peek.isVisible
+        let bar = controller.commandBar.isVisible, mini = controller.hasMiniFromPage
         let editing = SpaceEditorPanel.current != nil
         let spaceStep = editingNewSpace || confirming?.id == "space"
         // The tab overview is the overview step's own screen: the guide stays, to say what to do there.
         let overviewStep = controller.desk.isVisible && (Tutorial.current?.id == "overview" || confirming?.id == "overview")
-        let relevant = (bar && Tutorial.current?.id == "newTab") || (peek && Tutorial.current?.id == "peek") || (editing && spaceStep) || overviewStep
-        let aside = !relevant && (controller.hasFloatingPanel || peek)
-        // During the Peek step the card sits above the peek, so "Close it" is right there; otherwise it stays beneath
-        // everything that floats.
+        let relevant = (bar && Tutorial.current?.id == "newTab") || (mini && Tutorial.current?.id == "peek") || (editing && spaceStep) || overviewStep
+        let aside = !relevant && (controller.hasFloatingPanel || mini)
+        // During the ⇧-click step the card stays on top, beside the Zigzag Mini, so "Close it" is right there;
+        // otherwise it stays beneath everything that floats.
         if let overlay = superview {
             // Over the tab overview too, while it's the step: "every tab, at a glance" is said over it.
-            let onTop = (peek && Tutorial.current?.id == "peek") || overviewStep
+            let onTop = (mini && Tutorial.current?.id == "peek") || overviewStep
             if onTop, overlay.subviews.last !== self { overlay.addSubview(self) }
             if !onTop, overlay.subviews.first !== self { overlay.addSubview(self, positioned: .below, relativeTo: nil) }
         }
@@ -289,9 +288,9 @@ final class GuidedTour: NSView {
             return Display(keys: [], title: String(localized: "Type “youtube”", comment: "A hint in the middle of a step in the getting-started guide, a card in the window. Keep youtube as it is: it's what to type."),
                            note: String(localized: "Just the word", comment: "Under the hint to type youtube, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "bar")
         }
-        if task.id == "peek", controller.peek.isVisible {
-            return Display(keys: ["Esc"], title: String(localized: "Close it", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while a Peek is open. The Esc key is shown beside it."),
-                           note: String(localized: "Or click outside it", comment: "Under the hint to close a Peek, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "peek")
+        if task.id == "peek", controller.hasMiniFromPage {
+            return Display(keys: ["Esc"], title: String(localized: "Close it", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while a link is open in Zigzag Mini, the small window over the page. The Esc key is shown beside it."),
+                           note: String(localized: "Or press ⌘O to keep it as a tab", comment: "Under the hint to close Zigzag Mini, the small window a shift-clicked link opened in, in the getting-started guide, a card in the window."), count: "", isDone: false, isFinal: false, target: "mini")
         }
         if task.id == "peek" { return Display(keys: task.keys, title: task.title, note: task.note, count: count, isDone: false, isFinal: false, target: "article") }
         // In the overview: what it's for is in front of you, so the hint is how to get back to a page.
@@ -331,8 +330,8 @@ final class GuidedTour: NSView {
         case "newTab": return controller.sidebar.address
         case "bar": return controller.commandBar.panelView
         case "pin", "done.newTab", "done.pin": return row ?? controller.sidebar.list
-        case "peek": return controller.peek.panelView
-        case "done.peek", "article": return controller.root.card
+        // Zigzag Mini is a window of its own, over the page.
+        case "mini", "done.peek", "article": return controller.root.card
         case "split": return splitCandidate.flatMap { controller.sidebar.list.row(for: $0) }
         case "done.split", "overview", "done.overview": return controller.root.card
         case "space": return controller.sidebar.newSpaceAnchor
@@ -386,7 +385,7 @@ final class GuidedTour: NSView {
     private var shownCount = ""
     private var swapping = false
 
-    /// Peek needs a page full of links: an article, opened for you, rather than asking you to find one.
+    /// The ⇧-click step needs a page full of links: an article, opened for you, rather than asking you to find one.
     private func openArticle() {
         guard let controller, controller.tabManager.selectedTab?.url?.host()?.hasSuffix("wikipedia.org") != true,
               let url = URL(string: "https://en.wikipedia.org/wiki/Web_browser") else { return }
@@ -397,7 +396,7 @@ final class GuidedTour: NSView {
     /// Wikipedia sends it on to "Split screen (computing)", so any of its Split screen pages counts.
     private static let splitPartnerURL = URL(string: "https://en.wikipedia.org/wiki/Split_screen_(computer_graphics)")!
 
-    /// The guide's own pages: Peek's article and the one opened to go beside it.
+    /// The guide's own pages: the ⇧-click step's article and the one opened to go beside it.
     private static func isGuidePage(_ url: URL?) -> Bool {
         guard let url, url.host()?.hasSuffix("wikipedia.org") == true else { return false }
         return url.path.hasPrefix("/wiki/Split_screen") || url.path.hasPrefix("/wiki/Web_browser")
@@ -536,7 +535,7 @@ final class GuidedTour: NSView {
         // Nothing is dimmed: the window stays as it is, and a soft ring marks only small things to click.
         let cut = CGMutablePath()
         let page = controller?.root.cardFrame ?? bounds
-        let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "peek", "addmenu"].contains(d.target)
+        let ringed = hole != .zero && !d.isDone && !d.isFinal && hole.width < page.width * 0.6 && !["bar", "editor", "mini", "addmenu"].contains(d.target)
         // Something as small as a space's dot gets a round ring; anything bigger, a rounded rectangle.
         let radius = max(hole.width, hole.height) < Tokens.Tour.ringRoundBelow ? min(hole.width, hole.height) / 2 : Tokens.Radius.tile
         let ringPath: CGPath = ringed ? CGPath(roundedRect: hole, cornerWidth: radius, cornerHeight: radius, transform: nil) : CGMutablePath()
@@ -597,8 +596,8 @@ final class GuidedTour: NSView {
         } else if d.target == "bar" || d.target == "editor" {
             // Right under the bar or the editor: next to what you're looking at.
             frame = NSRect(x: d.target == "bar" ? hole.midX - size.width / 2 : hole.minX, y: hole.maxY + Tokens.Space.x3, width: size.width, height: size.height)
-        } else if d.target == "peek", let sidebar = controller?.root.sidebarContainer.frame, sidebar.width > size.width * 0.8 {
-            // The peek fills the page, so the pill waits in the sidebar, clear of it.
+        } else if d.target == "mini", let sidebar = controller?.root.sidebarContainer.frame, sidebar.width > size.width * 0.8 {
+            // Zigzag Mini sits over the middle of the page, so the pill waits in the sidebar, clear of it.
             frame = NSRect(x: sidebar.midX - size.width / 2, y: bounds.midY - size.height / 2, width: size.width, height: size.height)
         } else if hole.width > page.width * 0.6 {
             // The page itself: the pill sits inside it, bottom right, clear of links.
@@ -684,17 +683,17 @@ final class GuidedTour: NSView {
             let band = NSRect(x: list.minX, y: list.minY + min(list.height, 240) / 2 - 20, width: list.width, height: 40)
             return list.width > 0 ? .swipe(across: band, toRight: d.target == "switch") : nil
         case "article":
-            findPeekLink()
-            return peekLink.map { .click(at: $0, holding: "⇧") }
+            findShiftClickLink()
+            return shiftClickLink.map { .click(at: $0, holding: "⇧") }
         default:
             return nil
         }
     }
 
-    /// Finds a link in the article you can see, for Peek's step to click on, now and then as you scroll.
-    private func findPeekLink() {
-        guard Date().timeIntervalSince(peekLinkAsked) > 1, let webView = controller?.selectedWebView else { return }
-        peekLinkAsked = Date()
+    /// Finds a link in the article you can see, for the ⇧-click step to click on, now and then as you scroll.
+    private func findShiftClickLink() {
+        guard Date().timeIntervalSince(shiftClickLinkAsked) > 1, let webView = controller?.selectedWebView else { return }
+        shiftClickLinkAsked = Date()
         let script = """
         (() => {
           const links = document.querySelectorAll('#mw-content-text p a[href^="/wiki/"], main p a[href], article p a[href], p a[href]');
@@ -708,13 +707,13 @@ final class GuidedTour: NSView {
         webView.runOwnScript(script) { [weak self, weak webView] answer in
             let result = try? answer.get()
             MainActor.assumeIsolated {
-                guard let self, let webView, let point = result as? [Double], point.count == 2 else { self?.peekLink = nil; return }
+                guard let self, let webView, let point = result as? [Double], point.count == 2 else { self?.shiftClickLink = nil; return }
                 let zoom = webView.pageZoom * webView.magnification
                 let inPage = NSPoint(x: point[0] * zoom, y: point[1] * zoom)
                 let flipped = webView.isFlipped ? inPage : NSPoint(x: inPage.x, y: webView.bounds.height - inPage.y)
                 let spot = webView.convert(flipped, to: self)
-                guard spot != self.peekLink else { return }
-                self.peekLink = spot
+                guard spot != self.shiftClickLink else { return }
+                self.shiftClickLink = spot
                 self.needsLayout = true
             }
         }
@@ -761,7 +760,8 @@ final class GuidedTour: NSView {
         let cs = IconButton.Size.compact.side
         close.frame = NSRect(x: width - Tokens.Space.x3 - cs, y: top + (height - cs) / 2, width: cs, height: cs)
         let end = close.isHidden ? width - Tokens.Space.x2 : close.frame.minX - Tokens.Space.x1
-        skip.frame = NSRect(x: end - sw, y: top + (height - Tokens.Space.x8) / 2, width: sw, height: Tokens.Space.x8)
+        let sh = Tokens.Page.controlHeight
+        skip.frame = NSRect(x: end - sw, y: top + (height - sh) / 2, width: sw, height: sh)
         let cw = step.textWidth + 2
         step.frame = NSRect(x: skip.frame.minX - Tokens.Space.x1 - cw, y: top + (height - step.lineHeight) / 2, width: cw, height: step.lineHeight)
         // The words take what's left, ending in "…" when the card is as narrow as the page.

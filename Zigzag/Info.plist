@@ -130,6 +130,10 @@
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>NSUserActivityTypeBrowsingWeb</string>
+	</array>
 	<key>OSAScriptingDefinition</key>
 	<string>Zigzag.sdef</string>
 	<key>SUAutomaticallyUpdate</key>

@@ -148,8 +148,11 @@ class InteractiveView: NSView {
             guard oldValue != isPressed else { return }
             stateDidChange(animated: false)
             if pressScales { showPress(isPressed) } else if pressSinks { showSink(isPressed) }
+            pressChanged?(isPressed)
         }
     }
+    /// A press staying down or lifting, for a control that repeats while held.
+    var pressChanged: ((Bool) -> Void)?
     /// Buttons and rows give under the finger: `Tokens.Motion.pressScale` while held, easing back on release.
     var pressScales = false
     /// Things that read as objects sink a point instead and settle back with weight (`showSink`).
@@ -258,6 +261,11 @@ class InteractiveView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         guard isEnabled else { return }
+        // Control-click is a right-click.
+        if drawsMenu, event.modifierFlags.contains(.control), let onRightClick {
+            if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
+            return
+        }
         if event.clickCount == 2, let onDoubleClick {
             onDoubleClick()
             return
@@ -314,8 +322,18 @@ class InteractiveView: NSView {
         guard let event = NSEvent.mouseEvent(with: .rightMouseDown, location: convert(middle, to: nil), modifierFlags: [],
                                              timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
                                              context: nil, eventNumber: 0, clickCount: 1, pressure: 0) else { return false }
-        onRightClick(event)?.popUp(positioning: nil, at: middle, in: self)
+        guard let menu = onRightClick(event) else { return true }
+        if drawsMenu { showDrawnMenu(menu, at: event.locationInWindow) } else { menu.popUp(positioning: nil, at: middle, in: self) }
         return true
+    }
+
+    /// The right-click menu as Zigzag's own (`MenuPanel`) rather than the system's: the sidebar's rows and buttons.
+    var drawsMenu = false
+
+    private func showDrawnMenu(_ menu: NSMenu, at windowPoint: NSPoint) {
+        let entries = MenuPanel.entries(from: menu)
+        guard !entries.isEmpty else { return }
+        MenuPanel.show(entries, from: self, placement: .at(windowPoint))
     }
 
     override func accessibilityPerformShowMenu() -> Bool { showContextMenu() }
@@ -530,7 +548,14 @@ class InteractiveView: NSView {
     /// A control's menu always comes from `onRightClick`, so a right-click, Control-Return and VoiceOver's Show Menu
     /// all find the same one. Final, so no control can give a menu that only the mouse reaches.
     override final func menu(for event: NSEvent) -> NSMenu? {
-        onRightClick?(event)
+        guard drawsMenu else { return onRightClick?(event) }
+        // Drawn menus open from `rightMouseDown` and `mouseDown`, never from AppKit's menu tracking.
+        return nil
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard drawsMenu, let onRightClick else { return super.rightMouseDown(with: event) }
+        if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -634,6 +659,11 @@ final class IconButton: InteractiveView {
 
     override var intrinsicContentSize: NSSize { frame.size }
 
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        needsLayout = true
+    }
+
     override func layout() {
         super.layout()
         if image != nil {
@@ -642,7 +672,11 @@ final class IconButton: InteractiveView {
         } else if glyph == nil {
             // The symbol's ink, not its image, in the middle.
             let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
-            imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
+            // The image at its own size on the screen's pixels: centered by the image view, it snaps to whole points.
+            let size = imageView.image?.size ?? bounds.size
+            let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+            let x = bounds.midX - size.width / 2 - ink.width, y = bounds.midY - size.height / 2 + (isFlipped ? ink.height : -ink.height)
+            imageView.frame = NSRect(x: round(x * scale) / scale, y: round(y * scale) / scale, width: size.width, height: size.height)
         } else {
             // The glyph's own ink goes in the middle (a play triangle leans right in its image).
             let ink = glyphInk
@@ -876,6 +910,14 @@ extension NSTextField {
         let y = (height - lineHeight) / 2 + ((superview?.isFlipped ?? true) ? -below : below)
         return (y * scale).rounded() / scale
     }
+
+    /// The caps' top and bottom (the baseline) inside one line box, top down: for spacing by the ink, not the box.
+    var capsSpan: (top: CGFloat, bottom: CGFloat) {
+        let font = font ?? Tokens.Font.body()
+        let lineHeight = ceil(intrinsicContentSize.height)
+        let middle = lineHeight / 2 + Label.capsBelowMiddle(of: font, lineHeight: lineHeight)
+        return (middle - font.capHeight / 2, middle + font.capHeight / 2)
+    }
 }
 
 /// A view that paints a single flat color from a dynamic NSColor, following appearance changes.
@@ -961,60 +1003,6 @@ extension NSScrollView {
         verticalScroller = SlimScroller()
         hasVerticalScroller = true
         autohidesScrollers = true
-    }
-}
-
-/// The primary action on a screen: the dark filled pill (`ButtonLook.primary`), one per screen. Kept for the forms
-/// that still build on it; new code uses `PillButton(style: .prominent)`, which looks the same.
-final class PrimaryButton: InteractiveView {
-    private let label: Label
-    /// Kept for callers from when the primary took its window's accent; the primary is dark whatever the theme.
-    var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
-    /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
-    var isDestructive = false { didSet { stateDidChange(animated: false) } }
-    /// Set both to draw the button in other colors, like a light button on the brand's blue.
-    var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
-    var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
-    /// Moves the title off center, to leave room for something beside it (a keycap).
-    var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
-
-    init(title: String) {
-        written = title
-        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.onPrimary)
-        super.init(frame: .zero)
-        pressScales = true
-        layer?.cornerCurve = .continuous
-        addSubview(label)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(title)
-        stateDidChange(animated: false)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private var written = ""
-    var title: String {
-        get { written }
-        set { written = newValue; label.stringValue = newValue; setAccessibilityLabel(newValue); needsLayout = true }
-    }
-
-    var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x8 }
-
-    override var intrinsicContentSize: NSSize { NSSize(width: ceil(max(fittingWidth, 72)), height: Tokens.Page.controlHeight) }
-
-    override func layout() {
-        super.layout()
-        layer?.cornerRadius = bounds.height / 2
-        let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x4 + labelOffset, y: label.centeredY(in: bounds.height), width: bounds.width - Tokens.Space.x8, height: h)
-        label.alignment = .center
-    }
-
-    override func stateDidChange(animated: Bool) {
-        // The space's own accent unless told otherwise, as `PillButton(.prominent)`.
-        let theme = Brand.Theme.for(self)
-        let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
-        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : customFill.map(Brand.ink(on:)) ?? theme.onAccent))
     }
 }
 
@@ -1201,9 +1189,12 @@ final class FilledField: NSView {
     /// Invalid content: the border turns the warning color, so a blocked form shows which field holds it up.
     var isInvalid = false { didSet { guard isInvalid != oldValue else { return }; updateColors() } }
 
+    /// On the window's colored frame rather than a panel: the sidebar address's soft fill (`Chrome.field`).
+    var isOnFrame = false { didSet { updateColors() } }
+
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = (isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
+            layer?.backgroundColor = (isOnFrame ? Tokens.Chrome.field : isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
             let ring = (tint ?? Brand.Theme.for(self).accent).withAlphaComponent(Tokens.Color.focusAlpha)
             layer?.borderColor = (isInvalid ? Tokens.Color.destructive
                                              : isEditing ? ring : isOutlined ? Tokens.Color.controlEdge : .clear).cgColor
@@ -1678,12 +1669,63 @@ final class DropdownButton: InteractiveView {
     }
 }
 
+/// A floating list's one highlight (`Color.highlight`, `Radius.row`): it glides from row to row under the pointer
+/// rather than each row lighting on its own. From the keyboard, arriving from nothing or with Reduce Motion it's
+/// simply there; leaving every row, it fades. Put it behind the rows.
+final class HighlightGlide: ColorView {
+    init() {
+        super.init(color: Tokens.Color.highlight)
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        alphaValue = 0
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    /// Moves to `target`, or fades for nil. `wasShown`: it was on a row before this change.
+    func move(to target: NSRect?, wasShown: Bool) {
+        guard let target else {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Tokens.Motion.quick
+                context.timingFunction = Tokens.Motion.easeOut
+                animator().alphaValue = 0
+            }
+            return
+        }
+        if !wasShown || alphaValue == 0 || Tokens.Motion.isFromKey || Tokens.Motion.reduceMotion {
+            layer?.removeAllAnimations()
+            Tokens.Motion.withoutAnimation { frame = target }
+            alphaValue = 1
+        } else {
+            alphaValue = 1
+            Tokens.Motion.glide(self, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
+        }
+    }
+
+    /// Keeps it on its row through a relayout, without a glide.
+    func follow(_ target: NSRect) { Tokens.Motion.withoutAnimation { frame = target } }
+
+    /// Pressed, it darkens a step.
+    func showPressed(_ pressed: Bool) { color = pressed ? Tokens.Color.pressedFill : Tokens.Color.highlight }
+}
+
+/// What an AppKit menu item carries, as its represented object, for its row in a drawn menu: its symbol, and
+/// whether it's destructive.
+protocol MenuItemStyle: AnyObject {
+    var symbol: String? { get }
+    var isDestructive: Bool { get }
+}
+
 /// Zigzag's own menu, drawn rather than the system's, for choosing from a list (a dropdown's options) or acting on
 /// something (a button's few actions): a solid panel with a hairline edge and the panel shadow, 15pt items, a soft gray
 /// row under the pointer or the arrow keys, a check at the trailing end of the chosen one. It arrives in a quick fade
 /// from a touch smaller and leaves the same way; opened or closed from the keyboard it's simply there.
-/// Keys: Up and Down move, Return or Space chooses, Esc closes, and typing a name jumps to it. Right-click menus stay
-/// the system's, except the sidebar's own, which match its +.
+/// Keys: Up and Down move, Return or Space chooses, Esc closes, and typing a name jumps to it. An item with a submenu
+/// opens it beside itself on hover, Right or Return; Left or Esc closes just that. Right-click menus stay the
+/// system's, except the sidebar's, which match its +.
 final class MenuPanel: FloatingPanelView {
     override var replacesExtensionPopup: Bool { true }
     enum Entry {
@@ -1691,6 +1733,8 @@ final class MenuPanel: FloatingPanelView {
         /// A quiet heading over the items after it ("Save Downloads To").
         case header(String)
         case separator
+        /// Words that explain, wrapped to the menu's width (a help button's few lines).
+        case note(NSAttributedString)
     }
 
     struct Item {
@@ -1702,13 +1746,40 @@ final class MenuPanel: FloatingPanelView {
         var isEnabled = true
         /// Its keyboard shortcut as the menu bar has it now ("⌘T"), quiet at the trailing end; empty for none.
         var shortcut: String
+        /// Items opened beside this one, as a submenu; an item with them has no action of its own.
+        var submenu: [Entry]?
         var action: () -> Void
 
         init(title: String, image: NSImage? = nil, symbol: String? = nil, isChecked: Bool = false, isDestructive: Bool = false,
-             isEnabled: Bool = true, shortcut: String = "", action: @escaping () -> Void) {
+             isEnabled: Bool = true, shortcut: String = "", submenu: [Entry]? = nil, action: @escaping () -> Void) {
             self.title = title; self.image = image; self.symbol = symbol; self.isChecked = isChecked
-            self.isDestructive = isDestructive; self.isEnabled = isEnabled; self.shortcut = shortcut; self.action = action
+            self.isDestructive = isDestructive; self.isEnabled = isEnabled; self.shortcut = shortcut; self.submenu = submenu
+            self.action = action
         }
+    }
+
+    /// An AppKit menu's items as drawn entries: titles, pictures, checks, dimmed items, shortcuts, headers and
+    /// submenus, each item doing what choosing it in the AppKit menu does.
+    static func entries(from menu: NSMenu) -> [Entry] {
+        var entries: [Entry] = []
+        for item in menu.items where !item.isHidden {
+            if item.isSeparatorItem {
+                if let last = entries.last, case .separator = last { continue }
+                if !entries.isEmpty { entries.append(.separator) }
+                continue
+            }
+            if item.isSectionHeader { entries.append(.header(item.title)); continue }
+            let style = item.representedObject as? MenuItemStyle
+            let submenu = item.submenu.map(entries(from:))
+            entries.append(.item(Item(title: item.title, image: style?.symbol == nil ? item.image : nil, symbol: style?.symbol,
+                                      isChecked: item.state == .on, isDestructive: style?.isDestructive ?? false, isEnabled: item.isEnabled,
+                                      shortcut: Shortcuts.caps(item).joined(), submenu: submenu) { [item] in
+                guard let action = item.action else { return }
+                NSApp.sendAction(action, to: item.target, from: item)
+            }))
+        }
+        if let last = entries.last, case .separator = last { entries.removeLast() }
+        return entries
     }
 
     /// Where it opens: with item `index` right over the control, its text `textInset` from the control's edge, as a
@@ -1724,10 +1795,13 @@ final class MenuPanel: FloatingPanelView {
 
     private let entries: [Entry]
     private var rows: [Row] = []
+    private var notes: [NSTextField] = []
+    /// The width notes wrap to, set once the menu's width is known.
+    private var noteWidth: CGFloat = 0
     private let scroll = NSScrollView()
     private let list = FlippedView()
     /// One soft gray pill that glides from row to row under the pointer, rather than each row lighting on its own.
-    private let pill = ColorView(color: Tokens.Color.highlight)
+    private let pill = HighlightGlide()
     private var highlighted: Int? {
         didSet {
             rows.enumerated().forEach { $0.element.isHighlighted = $0.offset == highlighted }
@@ -1747,6 +1821,14 @@ final class MenuPanel: FloatingPanelView {
     private var onClose: (() -> Void)?
     private var typed = ""
     private var typedAt: TimeInterval = 0
+    /// The menu this one is a submenu of, and the submenu open beside this one with the item it belongs to.
+    private weak var parentMenu: MenuPanel?
+    private var child: MenuPanel?
+    private var childIndex: Int?
+    /// Opens or closes a submenu a moment after the pointer settles, so passing over items on the way to it keeps it.
+    private var submenuTimer: Timer?
+    private static let submenuDelay: TimeInterval = 0.2
+    private var root: MenuPanel { parentMenu?.root ?? self }
 
     private static let pad = Tokens.Space.x1
     private static let rowHeight = Tokens.Page.controlHeight
@@ -1767,10 +1849,6 @@ final class MenuPanel: FloatingPanelView {
         scroll.useSlimScroller()
         scroll.documentView = list
         addSubview(scroll)
-        pill.wantsLayer = true
-        pill.layer?.cornerRadius = Tokens.Radius.row
-        pill.layer?.cornerCurve = .continuous
-        pill.alphaValue = 0
         list.addSubview(pill)
         let hasImages = entries.contains { if case .item(let item) = $0 { return item.image != nil || item.symbol != nil }; return false }
         for entry in entries {
@@ -1781,7 +1859,14 @@ final class MenuPanel: FloatingPanelView {
                 row.onClick = { [weak self] _ in self?.choose(index) }
                 row.hoverChanged = { [weak self] hovered in
                     guard let self else { return }
-                    if hovered { self.highlighted = self.rows[index].item.isEnabled ? index : nil } else if self.highlighted == index { self.highlighted = nil }
+                    if hovered {
+                        self.highlighted = self.rows[index].item.isEnabled ? index : nil
+                        self.parentMenu?.keepChild()
+                        self.scheduleSubmenu()
+                    } else if self.highlighted == index, self.childIndex != index {
+                        self.highlighted = nil
+                        self.scheduleSubmenu()
+                    }
                 }
                 rows.append(row)
                 list.addSubview(row)
@@ -1790,23 +1875,37 @@ final class MenuPanel: FloatingPanelView {
                 list.addSubview(Label.section(text))
             case .separator:
                 list.addSubview(ColorView(color: Tokens.Color.separator))
+            case .note(let text):
+                let note = NSTextField.dialogText("")
+                note.attributedStringValue = text
+                notes.append(note)
+                list.addSubview(note)
             }
         }
         setAccessibilityElement(true)
-        setAccessibilityRole(.menu)
+        // Only words to read: a popover, not a menu to choose from.
+        setAccessibilityRole(rows.isEmpty && !notes.isEmpty ? .popover : .menu)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private var contentHeight: CGFloat {
-        Self.pad * 2 + entries.map { entry -> CGFloat in
+        var noteIndex = 0
+        return Self.pad * 2 + entries.map { entry -> CGFloat in
             switch entry {
-            case .item: Self.rowHeight
-            case .header: Self.headerHeight
-            case .separator: Self.separatorHeight
+            case .item: return Self.rowHeight
+            case .header: return Self.headerHeight
+            case .separator: return Self.separatorHeight
+            case .note:
+                defer { noteIndex += 1 }
+                return noteHeight(notes[noteIndex])
             }
         }.reduce(0, +)
     }
+
+    private static let noteInset = Tokens.Space.x2
+
+    private func noteHeight(_ note: NSTextField) -> CGFloat { note.wrappedHeight(noteWidth) + Self.noteInset * 2 }
 
     /// The top of item `index` in the list.
     private func top(ofItem index: Int) -> CGFloat {
@@ -1819,6 +1918,7 @@ final class MenuPanel: FloatingPanelView {
                 y += Self.rowHeight
             case .header: y += Self.headerHeight
             case .separator: y += Self.separatorHeight
+            case .note: break
             }
         }
         return y
@@ -1848,6 +1948,7 @@ final class MenuPanel: FloatingPanelView {
         menu.onClose = closed
 
         let width = ceil(max(menu.fittingWidth, minWidth + Self.pad * 2))
+        menu.noteWidth = width - (Self.pad + Self.rowInset) * 2
         let a = anchor.convert(anchor.bounds, to: nil)
         let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
         let full = menu.contentHeight
@@ -1898,10 +1999,11 @@ final class MenuPanel: FloatingPanelView {
                 maxY = area.maxY
             }
         case .at(let point):
-            // Under the pointer, as a right-click's menu opens; above it where there's no room below.
+            // Under the pointer, as a right-click's menu opens. Short of room below, it slides up only as far as it
+            // must, as macOS's does, so its first items stay by the pointer (never flipped whole above it).
             x = point.x
-            maxY = fits(point.y) ? point.y : fits(point.y + height) ? point.y + height : area.maxY
-            growsY = maxY == point.y ? 0 : 1
+            maxY = min(max(point.y, area.minY + height), area.maxY)
+            growsY = min(max((maxY - point.y) / max(height, 1), 0), 1)
         }
         x = min(max(x, area.minX), max(area.minX, area.maxX - width))
         let rect = NSRect(x: x, y: maxY - height, width: width, height: height)
@@ -1931,7 +2033,11 @@ final class MenuPanel: FloatingPanelView {
         list.frame = NSRect(x: 0, y: 0, width: width, height: contentHeight)
         var y = Self.pad, index = 0
         for view in list.subviews where view !== pill {
-            if let row = view as? Row {
+            if let note = view as? NSTextField, notes.contains(where: { $0 === note }) {
+                let h = noteHeight(note)
+                note.frame = NSRect(x: Self.pad + Self.rowInset, y: y + Self.noteInset, width: width - (Self.pad + Self.rowInset) * 2, height: h - Self.noteInset * 2)
+                y += h
+            } else if let row = view as? Row {
                 row.frame = NSRect(x: Self.pad, y: y, width: width - Self.pad * 2, height: Self.rowHeight)
                 y += Self.rowHeight
                 index += 1
@@ -1945,33 +2051,18 @@ final class MenuPanel: FloatingPanelView {
                 y += Self.separatorHeight
             }
         }
-        if let highlighted, rows.indices.contains(highlighted) { Tokens.Motion.withoutAnimation { pill.frame = rows[highlighted].frame } }
+        if let highlighted, rows.indices.contains(highlighted) { pill.follow(rows[highlighted].frame) }
     }
 
     /// The highlight glides from where it was to the row now under the pointer. From the keyboard, or arriving from
     /// nothing, it's simply there; leaving every row, it fades.
     private func movePill(from old: Int?) {
-        guard let highlighted, rows.indices.contains(highlighted) else {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = Tokens.Motion.quick
-                context.timingFunction = Tokens.Motion.easeOut
-                pill.animator().alphaValue = 0
-            }
-            return
-        }
-        let target = rows[highlighted].frame
-        if old == nil || pill.alphaValue == 0 || Tokens.Motion.isFromKey || Tokens.Motion.reduceMotion {
-            pill.layer?.removeAllAnimations()
-            Tokens.Motion.withoutAnimation { pill.frame = target }
-            pill.alphaValue = 1
-        } else {
-            pill.alphaValue = 1
-            Tokens.Motion.glide(pill, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
-        }
+        let target = highlighted.flatMap { rows.indices.contains($0) ? rows[$0].frame : nil }
+        pill.move(to: target, wasShown: old != nil)
     }
 
     /// Pressed, the highlight darkens a step.
-    fileprivate func showPressed(_ pressed: Bool) { pill.color = pressed ? Tokens.Color.pressedFill : Tokens.Color.highlight }
+    fileprivate func showPressed(_ pressed: Bool) { pill.showPressed(pressed) }
 
     // MARK: Closing
 
@@ -1992,6 +2083,9 @@ final class MenuPanel: FloatingPanelView {
     }
 
     func close(animated: Bool = true) {
+        // A submenu closes with the menu it opened from.
+        if parentMenu != nil { root.close(animated: animated); return }
+        closeChild(animated: false)
         guard Self.current === self || monitor != nil else { return }
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
@@ -2019,9 +2113,99 @@ final class MenuPanel: FloatingPanelView {
 
     private func choose(_ index: Int) {
         guard rows.indices.contains(index), rows[index].item.isEnabled else { return }
+        if rows[index].item.submenu != nil {
+            openChild(index, fromKey: Tokens.Motion.isFromKey)
+            return
+        }
         let action = rows[index].item.action
         close()
         action()
+    }
+
+    // MARK: Submenus
+
+    /// After the pointer settles: the submenu of the item under it opens, another one closes. A pointer already in
+    /// the open submenu keeps it.
+    private func scheduleSubmenu() {
+        submenuTimer?.invalidate()
+        let wanted = highlighted.flatMap { rows[$0].item.submenu == nil ? nil : $0 }
+        guard wanted != childIndex else { return }
+        let timer = Timer(timeInterval: Self.submenuDelay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.settleSubmenu() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        submenuTimer = timer
+    }
+
+    private func settleSubmenu() {
+        submenuTimer = nil
+        if let child, let window, child.contains(windowPoint: window.mouseLocationOutsideOfEventStream) { return }
+        let wanted = highlighted.flatMap { rows[$0].item.submenu == nil ? nil : $0 }
+        guard wanted != childIndex else { return }
+        closeChild(animated: true)
+        if let wanted { openChild(wanted, fromKey: false) }
+    }
+
+    /// The pointer reached the submenu: its item stays lit here, and nothing pending closes it.
+    private func keepChild() {
+        submenuTimer?.invalidate()
+        submenuTimer = nil
+        if let childIndex, highlighted != childIndex { highlighted = childIndex }
+    }
+
+    private func contains(windowPoint: NSPoint) -> Bool {
+        bounds.contains(convert(windowPoint, from: nil)) || child?.contains(windowPoint: windowPoint) == true
+    }
+
+    /// The submenu of item `index`, beside it: its first item level with this one, on the right, or on the left
+    /// where there's no room. From the keys, its first item is lit.
+    private func openChild(_ index: Int, fromKey: Bool) {
+        guard rows.indices.contains(index), let entries = rows[index].item.submenu, !entries.isEmpty else { return }
+        if childIndex == index {
+            if fromKey { child?.move(1) }
+            return
+        }
+        closeChild(animated: false)
+        guard window != nil, let host = superview else { return }
+        let menu = MenuPanel(entries: entries)
+        menu.appearance = appearance
+        menu.anchor = anchor
+        menu.parentMenu = self
+        let width = ceil(menu.fittingWidth)
+        let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
+        let height = min(menu.contentHeight, area.height)
+        let me = convert(bounds, to: nil)
+        let row = rows[index].convert(rows[index].bounds, to: nil)
+        let gap = Tokens.Space.x1
+        var x = me.maxX + gap
+        var growsX: CGFloat = 0
+        if x + width > area.maxX, me.minX - gap - width >= area.minX {
+            x = me.minX - gap - width
+            growsX = 1
+        }
+        // Room on neither side: over the menu, inside the window.
+        x = min(max(x, area.minX), max(area.minX, area.maxX - width))
+        let maxY = min(max(row.maxY + Self.pad, area.minY + height), area.maxY)
+        menu.frame = host.convert(NSRect(x: x, y: maxY - height, width: width, height: height), from: nil)
+        menu.growsFrom = CGPoint(x: growsX, y: 0)
+        host.addSubview(menu)
+        menu.layoutSubtreeIfNeeded()
+        child = menu
+        childIndex = index
+        highlighted = index
+        menu.arrive()
+        NSAccessibility.post(element: menu, notification: .created)
+        if fromKey { menu.move(1) }
+    }
+
+    private func closeChild(animated: Bool) {
+        submenuTimer?.invalidate()
+        submenuTimer = nil
+        guard let child else { return }
+        child.closeChild(animated: false)
+        self.child = nil
+        childIndex = nil
+        if animated { child.leave() } else { child.removeFromSuperview() }
     }
 
     // MARK: Pointer and keys
@@ -2041,7 +2225,7 @@ final class MenuPanel: FloatingPanelView {
 
     private func handle(_ event: NSEvent) -> NSEvent? {
         let inSameWindow = event.window === window
-        let inside = inSameWindow && bounds.contains(convert(event.locationInWindow, from: nil))
+        let inside = inSameWindow && contains(windowPoint: event.locationInWindow)
         switch event.type {
         case .keyDown:
             return handleKey(event) ? nil : event
@@ -2051,9 +2235,11 @@ final class MenuPanel: FloatingPanelView {
             return event
         default:
             if inside { return event }
-            // A click elsewhere closes the menu and goes no further in this window, as with any menu.
+            // A click elsewhere closes the menu and goes no further in this window, as with any menu; a right-click
+            // goes on to open the menu of what it's on.
             close()
-            return inSameWindow ? nil : event
+            let opensMenu = event.type == .rightMouseDown || (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
+            return inSameWindow && !opensMenu ? nil : event
         }
     }
 
@@ -2061,6 +2247,31 @@ final class MenuPanel: FloatingPanelView {
     var highlightedIndex: Int? { highlighted }
     /// Its items' titles, in order.
     var itemTitles: [String] { rows.map(\.item.title) }
+    /// The submenu open beside it, if any.
+    var openSubmenu: MenuPanel? { child }
+
+    #if DEBUG
+    /// A key typed in the menu, as `handleKey` takes it from the keyboard.
+    func debugKey(_ code: UInt16) {
+        let chars = code == 36 ? "\r" : code == 53 ? "\u{1b}" : String(UnicodeScalar([123: NSLeftArrowFunctionKey, 124: NSRightArrowFunctionKey,
+                                                                                      125: NSDownArrowFunctionKey, 126: NSUpArrowFunctionKey][Int(code)] ?? 0)!)
+        guard let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window?.windowNumber ?? 0, context: nil, characters: chars,
+                                           charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { return }
+        _ = handleKey(event)
+    }
+
+    /// Opens the submenu of the item with this title, as hovering it does.
+    func debugOpenSubmenu(_ title: String) {
+        if let index = rows.firstIndex(where: { $0.item.title == title }) { highlighted = index; openChild(index, fromKey: false) }
+    }
+
+    /// Its items, the lit one and its open submenu's, for scripts.
+    var debugState: [String: Any] {
+        ["items": itemTitles, "highlighted": highlighted.map { rows[$0].item.title } ?? "", "frame": NSStringFromRect(convert(bounds, to: nil)),
+         "submenu": child?.debugState ?? [:]]
+    }
+    #endif
 
     /// True when the key was the menu's.
     func handleKey(_ event: NSEvent) -> Bool {
@@ -2070,7 +2281,19 @@ final class MenuPanel: FloatingPanelView {
             close(animated: false)
             return false
         }
+        // An open submenu takes the keys until Left or Esc closes it.
+        if let child, child.highlighted != nil || child.child != nil { return child.handleKey(event) }
+        let opensSubmenu = highlighted.map { rows[$0].item.submenu != nil } ?? false
         switch event.keyCode {
+        case 53 where parentMenu != nil, 123 where parentMenu != nil:     // Esc, Left in a submenu
+            parentMenu?.closeChild(animated: true)
+            return true
+        case 124:                                                         // Right
+            if let highlighted, rows[highlighted].item.submenu != nil { openChild(highlighted, fromKey: true) }
+            return true
+        case 36 where opensSubmenu, 76 where opensSubmenu:                // Return on a submenu's item
+            if let highlighted { openChild(highlighted, fromKey: true) }
+            return true
         case 53: close(); return true                                     // Esc
         case 125: move(1); return true                                    // Down
         case 126: move(-1); return true                                   // Up
@@ -2154,12 +2377,15 @@ final class MenuPanel: FloatingPanelView {
                 icon.imageScaling = .scaleNone
                 icon.contentTintColor = Tokens.Color.icon
             }
-            check.image = Tokens.Symbol.image("checkmark", size: Tokens.Symbol.inline)
+            // A submenu's chevron takes the check's place, quiet like the shortcuts.
+            check.image = Tokens.Symbol.image(item.submenu == nil ? "checkmark" : "chevron.right", size: Tokens.Symbol.inline)
             check.imageScaling = .scaleNone
-            check.isHidden = !item.isChecked
+            // Its trailing edge on the shortcuts' trailing edge.
+            if item.submenu != nil { check.imageAlignment = .alignRight }
+            check.isHidden = !item.isChecked && item.submenu == nil
             [icon, label, keys, check].forEach { addSubview($0) }
             isEnabled = item.isEnabled
-            setAccessibilityRole(.menuItem)
+            setAccessibilityRole(item.submenu == nil ? .menuItem : .menuButton)
             setAccessibilityLabel(item.title)
             if !item.shortcut.isEmpty { setAccessibilityHelp(item.shortcut) }
             setAccessibilityValue(item.isChecked ? String(localized: "selected", comment: "What VoiceOver says after a checked item in one of Zigzag's menus.") : nil)
@@ -2192,7 +2418,7 @@ final class MenuPanel: FloatingPanelView {
         override func stateDidChange(animated: Bool) {
             // The highlight is the menu's one gliding pill (`MenuPanel.pill`); the chosen item has its check, in the
             // window's accent.
-            check.contentTintColor = Brand.Theme.for(self).accent
+            check.contentTintColor = item.submenu == nil ? Brand.Theme.for(self).accent : Tokens.Color.textTertiary
             sequence(first: superview, next: { $0?.superview }).lazy.compactMap { $0 as? MenuPanel }.first?.showPressed(isPressed)
             alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
             setAccessibilitySelected(isHighlighted)

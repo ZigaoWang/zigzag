@@ -31,11 +31,11 @@
   Test: ExtensionSecurityTests.aFolderThatNowAsksForMoreWaitsForThePerson
 
 ## Site Access
-- Site Access in Settings › Extensions → On All Sites, When You Click It or On Specific Sites.
+- Site Access in Settings › Extensions → On All Sites, On Click or On Specific Sites.
   Test: SettingsSiteAccessTests.theMenuSetsSiteAccess
 - On Specific Sites → a list you add sites to and remove them from; choosing it again later starts an empty list.
   Test: SettingsSiteAccessTests.specificSitesAreAddedAndRemoved
-- When You Click It → a click gives that tab the site until it leaves the site or closes; other tabs on the site don't get it.
+- On Click → a click gives that tab the site until it leaves the site or closes; other tabs on the site don't get it.
   Test: SiteAccessContentScriptTests.contentScriptsFollowSiteAccess
 - Extensions off for a site in Site Controls → their scripts stay out there at once, no restart, and the extension keeps running elsewhere.
   Test: SiteAccessContentScriptTests.anOffSiteNeedsNoRestart

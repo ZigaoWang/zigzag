@@ -82,6 +82,20 @@ struct SidebarMenuTests {
         #expect(abs(frame.maxY - point.y) < 0.5)
     }
 
+    /// Short of room below, the menu slides up only as far as it must, as macOS's does, never flipped whole above.
+    @Test func rightClickNearTheBottomSlidesUpJustEnough() throws {
+        let (window, anchor) = host()
+        let area = try #require(window.contentView).bounds
+        let point = NSPoint(x: 120, y: area.minY + 40)
+        let menu = try #require(MenuPanel.show(entries { _ in }, from: anchor, placement: .at(point)))
+        defer { menu.close(animated: false) }
+        let frame = menu.convert(menu.bounds, to: nil)
+        // Its bottom rests on the window's margin, so its top is no higher than it needs to be.
+        #expect(frame.minY >= area.minY)
+        #expect(frame.minY - area.minY <= 12)
+        #expect(frame.maxY > point.y)
+    }
+
     @Test func aShortcutWidensTheMenuToFitIt() throws {
         let (_, anchor) = host()
         let plain = try #require(MenuPanel.show([.item(MenuPanel.Item(title: "New Tab") {})], from: anchor))
@@ -146,6 +160,154 @@ struct SidebarMenuTests {
         #expect(items.count == 3)
         #expect(items.allSatisfy { $0.accessibilityRole() == .menuItem })
         #expect(items.first?.accessibilityLabel() == "New Tab")
+    }
+
+    // MARK: Submenus
+
+    /// "Copy Link", then "Move To" with "Work" and "Home" inside.
+    private func nested(_ chosen: @escaping (String) -> Void) -> [MenuPanel.Entry] {
+        let spaces: [MenuPanel.Entry] = ["Work", "Home"].map { title in .item(MenuPanel.Item(title: title, symbol: "square") { chosen(title) }) }
+        return [.item(MenuPanel.Item(title: "Copy Link", symbol: "link") { chosen("Copy Link") }),
+                .item(MenuPanel.Item(title: "Move To", symbol: "arrow.right.square", submenu: spaces) { chosen("Move To") })]
+    }
+
+    @Test func rightOpensASubmenuLeftClosesOnlyIt() throws {
+        let (window, anchor) = host()
+        var picked: String?
+        let menu = try #require(MenuPanel.show(nested { picked = $0 }, from: anchor, placement: .at(NSPoint(x: 100, y: 400))))
+        defer { menu.close(animated: false) }
+        #expect(menu.handleKey(key(125, in: window)))
+        #expect(menu.handleKey(key(125, in: window)))
+        #expect(menu.highlightedIndex == 1)
+        // Right on Move To: its submenu, first item lit, beside it on the right.
+        #expect(menu.handleKey(key(124, in: window)))
+        let sub = try #require(menu.openSubmenu)
+        #expect(sub.itemTitles == ["Work", "Home"])
+        #expect(sub.highlightedIndex == 0)
+        #expect(sub.convert(sub.bounds, to: nil).minX >= menu.convert(menu.bounds, to: nil).maxX)
+        // The keys go to it now.
+        #expect(menu.handleKey(key(125, in: window)))
+        #expect(sub.highlightedIndex == 1)
+        // Left closes the submenu alone; Move To stays lit.
+        #expect(menu.handleKey(key(123, in: window)))
+        #expect(menu.openSubmenu == nil)
+        #expect(MenuPanel.current === menu)
+        #expect(menu.highlightedIndex == 1)
+        #expect(picked == nil)
+    }
+
+    @Test func returnOpensASubmenuAndChoosingInsideClosesEveryMenu() throws {
+        let (window, anchor) = host()
+        var picked: String?
+        let menu = try #require(MenuPanel.show(nested { picked = $0 }, from: anchor, placement: .at(NSPoint(x: 100, y: 400))))
+        #expect(menu.handleKey(key(125, in: window)))
+        #expect(menu.handleKey(key(119, in: window)))
+        // Return on an item with a submenu opens it rather than running anything.
+        #expect(menu.handleKey(key(36, "\r", in: window)))
+        let sub = try #require(menu.openSubmenu)
+        #expect(picked == nil)
+        // Esc in the submenu closes only it.
+        #expect(menu.handleKey(key(53, in: window)))
+        #expect(menu.openSubmenu == nil)
+        #expect(MenuPanel.current === menu)
+        #expect(menu.handleKey(key(124, in: window)))
+        #expect(menu.openSubmenu !== sub)
+        #expect(menu.handleKey(key(125, in: window)))
+        #expect(menu.handleKey(key(36, "\r", in: window)))
+        #expect(picked == "Home")
+        #expect(MenuPanel.current == nil)
+        #expect(menu.superview == nil || menu.openSubmenu == nil)
+    }
+
+    @Test func aSubmenuOpensInwardAtTheWindowsRightEdge() throws {
+        let (window, anchor) = host()
+        let menu = try #require(MenuPanel.show(nested { _ in }, from: anchor, placement: .at(NSPoint(x: 700, y: 400))))
+        defer { menu.close(animated: false) }
+        #expect(menu.handleKey(key(125, in: window)))
+        #expect(menu.handleKey(key(119, in: window)))
+        #expect(menu.handleKey(key(124, in: window)))
+        let sub = try #require(menu.openSubmenu)
+        let frame = sub.convert(sub.bounds, to: nil)
+        #expect(frame.maxX <= menu.convert(menu.bounds, to: nil).minX)
+        #expect(frame.maxX <= 800)
+    }
+
+    @Test func aSubmenuItemShowsAChevronNotACheck() throws {
+        let (_, anchor) = host()
+        let menu = try #require(MenuPanel.show(nested { _ in }, from: anchor))
+        defer { menu.close(animated: false) }
+        let items = (menu.accessibilityChildren() ?? []).compactMap { $0 as? NSView }
+        #expect(items.map { $0.accessibilityRole() } == [.menuItem, .menuButton])
+    }
+
+    // MARK: AppKit menus drawn
+
+    @Test func anAppKitMenuKeepsItsItemsWhenDrawn() throws {
+        var ran: [String] = []
+        let menu = SidebarMenus.menu([
+            [SidebarMenus.Item("Reload Page", symbol: "arrow.clockwise") { ran.append("reload") }],
+            [SidebarMenus.Item("Delete Space", symbol: "trash", destructive: true, enabled: false) { ran.append("delete") }],
+            [SidebarMenus.Submenu("Move To", symbol: "arrow.right.square", [SidebarMenus.Item("Work") { ran.append("work") }])],
+        ])
+        let large = SidebarMenus.Item("Large Space Names", symbol: "textformat.size") {}
+        large.state = .on
+        menu.addItem(large)
+        let keyed = SidebarMenus.withShortcut(SidebarMenus.Item("Close Tab", symbol: "xmark") {}, of: #selector(BrowserWindowController.closeTab(_:)))
+        menu.addItem(keyed)
+        menu.insertItem(.sectionHeader(title: "Profile"), at: 0)
+
+        let entries = MenuPanel.entries(from: menu)
+        var titles: [String] = []
+        var items: [MenuPanel.Item] = []
+        for entry in entries {
+            switch entry {
+            case .item(let item): titles.append(item.title); items.append(item)
+            case .header(let text): titles.append("# " + text)
+            case .separator: titles.append("-")
+            case .note: titles.append("note")
+            }
+        }
+        #expect(titles == ["# Profile", "Reload Page", "-", "Delete Space", "-", "Move To", "Large Space Names", "Close Tab"])
+        #expect(items.allSatisfy { $0.symbol != nil })
+        let delete = try #require(items.first { $0.title == "Delete Space" })
+        #expect(delete.isDestructive && !delete.isEnabled)
+        #expect(items.first { $0.title == "Large Space Names" }?.isChecked == true)
+        #expect(items.first { $0.title == "Close Tab" }?.shortcut == Shortcuts.keys(for: #selector(BrowserWindowController.closeTab(_:))))
+        let move = try #require(items.first { $0.title == "Move To" })
+        guard case .item(let work)? = move.submenu?.first else { Issue.record("no submenu"); return }
+        items.first { $0.title == "Reload Page" }?.action()
+        work.action()
+        #expect(ran == ["reload", "work"])
+    }
+
+    /// A help button's lines open in the drawn menu's panel, not a system popover: wrapped to its width, read as a
+    /// popover, closed by Esc or the button again.
+    @Test func aNoteOpensInTheDrawnPanel() throws {
+        let (window, anchor) = host()
+        let text = NSAttributedString(string: String(repeating: "Matches pages on the exact hostname you enter. ", count: 4))
+        let menu = try #require(MenuPanel.show([.note(text)], from: anchor, minWidth: 300))
+        #expect(MenuPanel.current === menu)
+        #expect(menu.accessibilityRole() == .popover)
+        #expect(menu.itemTitles.isEmpty)
+        #expect(menu.frame.width >= 300)
+        // Several lines, all inside it.
+        #expect(menu.frame.height > Tokens.Page.controlHeight * 2)
+        #expect(menu.handleKey(key(53, "\u{1b}", in: window)))
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func theMatchTypeHelpTogglesItsPanel() throws {
+        let (window, anchor) = host()
+        let help = SiteRouteSheet.matchHelpButton()
+        help.frame = anchor.frame
+        anchor.superview?.addSubview(help)
+        #expect(help.accessibilityPerformPress())
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === help)
+        #expect(menu.accessibilityRole() == .popover)
+        #expect(help.accessibilityPerformPress())
+        #expect(MenuPanel.current == nil)
+        _ = window
     }
 }
 
@@ -469,6 +631,81 @@ struct SidebarRowMenuTests {
             controller.unpinMarked([second.id])
             controller.favoriteMarked([.bookmark(second.id)])
             #expect(Library.shared.snapshot == before)
+        }
+    }
+
+    /// Every item of a drawn menu, submenus' too, with whether it has a picture.
+    private func drawn(_ menu: NSMenu) -> [(title: String, pictured: Bool)] {
+        func walk(_ entries: [MenuPanel.Entry]) -> [(title: String, pictured: Bool)] {
+            entries.flatMap { entry -> [(title: String, pictured: Bool)] in
+                guard case .item(let item) = entry else { return [] }
+                return [(item.title, item.symbol != nil || item.image != nil)] + walk(item.submenu ?? [])
+            }
+        }
+        return walk(MenuPanel.entries(from: menu))
+    }
+
+    private func item(_ title: String, in menu: NSMenu) -> MenuPanel.Item? {
+        MenuPanel.entries(from: menu).compactMap { entry -> MenuPanel.Item? in
+            if case .item(let item) = entry, item.title == title { item } else { nil }
+        }.first
+    }
+
+    /// The sidebar's right-click menus are Zigzag's own: the AppKit menu's items in order, each with its symbol.
+    @Test func everySidebarMenuItemHasAPicture() throws {
+        try inWindow(["A", "B", "C"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.bookmarkTab(tabs[2], in: space)
+            let pin = try #require(tabs[2].bookmarkID.flatMap { Library.shared.bookmark($0) })
+            let folder = try #require(Library.shared.addFolder(named: "Shelf", with: [pin.id], in: space))
+            let favorite = Library.shared.addFavorite(url: URL(string: "https://example.com/menu/favorite")!, title: "Favorite", in: manager.profile.id)
+            let menus: [NSMenu] = [
+                SidebarMenus.tabMenu(for: tabs[1], controller: controller),
+                SidebarMenus.tabMenu(for: tabs[0], controller: controller),
+                SidebarMenus.bookmarkMenu(for: pin, controller: controller),
+                SidebarMenus.folderMenu(for: folder, controller: controller),
+                SidebarMenus.favoriteMenu(for: favorite, controller: controller),
+                SidebarMenus.spaceMenu(for: space, controller: controller),
+                SidebarMenus.markedMenu(for: [.tab(tabs[0].id), .tab(tabs[1].id)], controller: controller),
+            ]
+            for menu in menus {
+                let items = drawn(menu)
+                #expect(!items.isEmpty)
+                for item in items { #expect(item.pictured, "\(item.title)") }
+                let top = MenuPanel.entries(from: menu).compactMap { entry -> String? in if case .item(let item) = entry { item.title } else { nil } }
+                #expect(top == menu.items.filter { !$0.isSeparatorItem && !$0.isSectionHeader }.map(\.title))
+            }
+            #expect(item("Delete Space", in: SidebarMenus.spaceMenu(for: space, controller: controller))?.isDestructive == true)
+        }
+    }
+
+    /// The tab you're on shows the menu bar's keys in its drawn menu, as they are now.
+    @Test func theDrawnMenuShowsTheMenuBarsKeys() throws {
+        try inWindow(["A", "B"]) { controller, tabs, _ in
+            let close = item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[0], controller: controller))
+            #expect(close?.shortcut == Shortcuts.keys(for: #selector(BrowserWindowController.closeTab(_:))))
+            #expect(close?.shortcut.isEmpty == false)
+            #expect(item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[1], controller: controller))?.shortcut == "")
+        }
+    }
+
+    /// A right-click on a tab's row opens the drawn menu and gives AppKit none.
+    @Test func aRightClickOnARowOpensTheDrawnMenu() throws {
+        try inWindow(["A", "B"]) { controller, tabs, _ in
+            controller.sidebar.list.reload(animated: false)
+            controller.window?.contentView?.layoutSubtreeIfNeeded()
+            let row = try #require(controller.sidebar.list.tabRow(tabs[1].id) as? InteractiveView)
+            #expect(row.drawsMenu)
+            let point = row.convert(NSPoint(x: 20, y: row.bounds.midY), to: nil)
+            let click = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: point, modifierFlags: [], timestamp: 0,
+                                                        windowNumber: controller.window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            #expect(row.menu(for: click) == nil)
+            row.rightMouseDown(with: click)
+            let menu = try #require(MenuPanel.current)
+            defer { menu.close(animated: false) }
+            #expect(menu.anchor === row)
+            #expect(menu.itemTitles.first == "Reload Page")
+            #expect(menu.itemTitles.last == "Close Other Tabs")
         }
     }
 }

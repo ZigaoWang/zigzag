@@ -28,8 +28,18 @@ final class AddressView: InteractiveView {
         IconButton(symbol: symbol, size: buttonSide, symbolSize: Tokens.Sidebar.addressGlyph, toolTip: toolTip)
     }
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
-    /// Shown on articles: opens Reader.
+    /// Shown on articles: turns Reader on and off.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
+    /// Shown on pages in another language, pressed while translated: opens the translate menu.
+    let translateButton = AddressView.button("translate", toolTip: String(localized: "Translate", comment: "Action in the site panel: translates the page."))
+
+    func setTranslation(available: Bool, translated: Bool) {
+        wantsTranslate = available || translated
+        translateButton.isSelected = translated
+        translateButton.toolTip = translated ? String(localized: "Translated", comment: "Tooltip of the address bar's translate button on a translated page.")
+            : String(localized: "Translate", comment: "Action in the site panel: translates the page.")
+        reflow(animated: true)
+    }
 
     func setCapture(camera: Bool, microphone: Bool) {
         wantsCapture = camera || microphone
@@ -52,6 +62,13 @@ final class AddressView: InteractiveView {
     /// Whether the page can be pinned at all (a new tab has no address).
     private(set) var canSave = false
 
+    /// Whether the star is offered for a tab: a page with something to pin, in a window that keeps pins (#442).
+    /// The same rule the save path uses, so the star, ⌘D and the menus can't disagree. A pinned tab can always unpin.
+    static func canSave(for tab: Tab?) -> Bool {
+        guard let tab, !tab.isPrivate else { return false }
+        return tab.bookmarkID != nil || SavePath.Page(tab: tab) != nil
+    }
+
     /// The star's state for the page in the field. A page that isn't pinned, or is a private window's, keeps the star.
     func setSaved(_ saved: Bool, canSave: Bool) {
         guard isSaved != saved || self.canSave != canSave else { return }
@@ -60,6 +77,8 @@ final class AddressView: InteractiveView {
         saveButton.symbol = saved ? "star.fill" : "star"
         saveButton.tint = saved ? Brand.Theme.for(saveButton).accent : Tokens.Color.icon
         saveButton.isEnabled = canSave
+        // Nothing to pin, nothing to offer: the star goes rather than sitting greyed out (#442).
+        saveButton.isHidden = !canSave
         saveButton.toolTip = saved
             ? String(localized: "Pinned", comment: "Tooltip of the address bar's star button for a page that's pinned: it says the page is pinned.")
             : String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where.")
@@ -394,6 +413,8 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        translateButton.isHidden = true
+        addSubview(translateButton)
         saveButton.tint = Tokens.Color.icon
         saveButton.isHidden = true
         addSubview(saveButton)
@@ -418,16 +439,17 @@ final class AddressView: InteractiveView {
 
     func setReader(available: Bool, active: Bool) {
         wantsReader = available || active
+        // A toggle: pressed while Reader is on. How it reads is chosen from the page's own Aa button.
         readerButton.isSelected = active
-        readerButton.toolTip = Shortcuts.tooltip(active ? String(localized: "Hide Reader", comment: "Tooltip of the address bar's Reader button while Reader is on.")
-                                                         : String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."),
-                                                  for: #selector(BrowserWindowController.toggleReader(_:)))
+        let title = active ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.")
+            : String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button.")
+        readerButton.toolTip = Shortcuts.tooltip(title, for: #selector(BrowserWindowController.toggleReader(_:)))
         reflow(animated: true)
     }
 
     /// The site's name as the address shows it: without "www.", with a port that isn't the usual one, so
     /// "accounts.google.com:81" never reads as Google's own.
-    private static func site(_ host: String, port: Int?, scheme: String?) -> String {
+    static func site(_ host: String, port: Int?, scheme: String?) -> String {
         let name = host.withoutWWW
         let usual = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
         guard let port, port != usual else { return name }
@@ -485,12 +507,25 @@ final class AddressView: InteractiveView {
         }
     }
 
+    /// Whether the star is in the top bar's pill instead, with the address above the page (#437).
+    var starInPill = false {
+        didSet {
+            guard starInPill != oldValue else { return }
+            // However the pill left the star, the field draws it from scratch when it comes back, by its own rule (#443).
+            drawn.remove(ObjectIdentifier(saveButton))
+            if starInPill { saveButton.removeFromSuperview() } else { saveButton.isHidden = !canSave; addSubview(saveButton) }
+            reflow(animated: true)
+        }
+    }
+
     /// The buttons always at the field's end, after the pins.
-    private var endButtons: [IconButton] { [saveButton, siteControlsButton] }
+    private var endButtons: [IconButton] {
+        (starInPill ? [siteControlsButton] : [saveButton, siteControlsButton]).filter { !$0.isHidden }
+    }
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
+        let count = (wantsTranslate ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -518,6 +553,7 @@ final class AddressView: InteractiveView {
     }
 
     private var wantsReader = false
+    private var wantsTranslate = false
     private var wantsCapture = false
     /// The buttons drawn in the field, those leaving aside.
     private var drawn = Set<ObjectIdentifier>()
@@ -540,7 +576,7 @@ final class AddressView: InteractiveView {
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
         var others: [IconButton] = []
-        for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
+        for (button, wanted) in [(translateButton, wantsTranslate), (readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         // Without the site, buttons get the whole width, including a gap after the last.
@@ -626,7 +662,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [translateButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.
@@ -680,6 +716,7 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button))
+        drawsMenu = true
         // Pressed as the toolbar's buttons are: around its middle, so the icon never moves off its line.
         pressScales = true
         layer?.cornerRadius = Tokens.Radius.control
@@ -806,6 +843,10 @@ final class SidebarView: NSView {
     let sidebarButton = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false), toolTip: String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows."))
     let address = AddressView()
     let favorites = FavoritesView()
+    /// Holds the grid; past its cap the grid scrolls inside it, so the list and footer keep their room.
+    let favoritesScroll = NSScrollView()
+    /// Tiles running on below the grid's cap fade out there, as tabs do at the list's foot.
+    private let favoritesFade = CAGradientLayer()
     let list = SidebarListView()
     private let scrollView = NSScrollView()
     /// Tabs running on below the bottom of the list fade out there, rather than being sliced off by the footer.
@@ -937,7 +978,24 @@ final class SidebarView: NSView {
         trafficLightsPicture.isHidden = true
         addSubview(trafficLightsPicture)
         addSubview(address)
-        addSubview(favorites)
+        favoritesScroll.drawsBackground = false
+        favoritesScroll.hasHorizontalScroller = false
+        favoritesScroll.hasVerticalScroller = true
+        favoritesScroll.scrollerStyle = .overlay
+        favoritesScroll.autohidesScrollers = true
+        favoritesScroll.horizontalScrollElasticity = .none
+        favoritesScroll.verticalScrollElasticity = .none
+        favoritesScroll.automaticallyAdjustsContentInsets = false
+        // Room above and right of the grid for a favorite's × on its corner; the tiles stay where they were.
+        let out = FavoriteTile.badgeOverhang
+        favoritesScroll.contentInsets = NSEdgeInsets(top: out, left: 0, bottom: 0, right: 0)
+        favoritesScroll.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: out)
+        favoritesScroll.contentView.postsBoundsChangedNotifications = true
+        favoritesScroll.documentView = favorites
+        favoritesScroll.wantsLayer = true
+        favoritesScroll.layer?.mask = favoritesFade
+        addSubview(favoritesScroll)
+        NotificationCenter.default.addObserver(self, selector: #selector(favoritesScrolled), name: NSView.boundsDidChangeNotification, object: favoritesScroll.contentView)
         favorites.onHeightChange = { [weak self] in self?.needsLayout = true }
         // Settings › Appearance › Sidebar size: the address and favorites take their new heights, the list moves.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
@@ -1109,8 +1167,9 @@ final class SidebarView: NSView {
     /// Where the traffic lights start, from the sidebar's left edge.
     static let trafficLightsX = Tokens.Sidebar.lightsX
 
-    /// The y position (from the top) where the traffic lights should be centered.
-    var trafficLightCenterY: CGFloat { Tokens.Sidebar.lightsCenter + topRowDrop }
+    /// The y position (from the top) where the traffic lights should be centered: midway down to the address when the
+    /// sidebar holds it, so the row has as much room above as below; on the bar's line when the bar holds it.
+    var trafficLightCenterY: CGFloat { (holdsAddress ? Tokens.Sidebar.addressTop / 2 : Tokens.Sidebar.lightsCenter) + topRowDrop }
     /// How far the top row sits below its usual line: framed, the bar above the page starts the frame's inset down,
     /// and the lights and the sidebar's toggle stay on its middle line with its buttons (set by the window).
     var topRowDrop: CGFloat = 0 { didSet { if topRowDrop != oldValue { needsLayout = true } } }
@@ -1136,12 +1195,18 @@ final class SidebarView: NSView {
         // Its buttons sit as far from the bottom edge as from the side.
         let buttonInset = (bottomHeight - Tokens.Sidebar.button) / 2
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
-        let favoritesHeight = favorites.preferredHeight(for: width - pad * 2)
-        favorites.isHidden = favoritesHeight == 0
-        favorites.frame = NSRect(x: pad, y: topEdge, width: width - pad * 2, height: favoritesHeight)
-        let listTop = favoritesHeight > 0 ? favorites.frame.maxY + Tokens.Sidebar.sectionGap
-            : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         let frames = bottomFrames()
+        let gridHeight = favorites.preferredHeight(for: width - pad * 2)
+        let favoritesHeight = min(gridHeight, Self.favoritesCap(room: frames.listBottom - topEdge))
+        favorites.isHidden = gridHeight == 0
+        favoritesScroll.isHidden = gridHeight == 0
+        let out = FavoriteTile.badgeOverhang
+        favoritesScroll.frame = NSRect(x: pad, y: topEdge - out, width: width - pad * 2 + out, height: favoritesHeight + out)
+        favoritesScroll.verticalScrollElasticity = gridHeight > favoritesHeight ? .allowed : .none
+        favorites.frame = NSRect(x: 0, y: 0, width: width - pad * 2, height: gridHeight)
+        updateFavoritesFade()
+        let listTop = favoritesHeight > 0 ? favoritesScroll.frame.maxY + Tokens.Sidebar.sectionGap
+            : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         for (card, frame) in zip(nowPlayingCards, frames.nowPlaying) { card.frame = frame }
         updateCard.frame = frames.update
         let listBottom = frames.listBottom
@@ -1159,8 +1224,26 @@ final class SidebarView: NSView {
         Self.fade(bottomFade, for: scrollView, list: list)
     }
 
+    /// The most of `room` (from the grid's top to the list's foot) the favorites take: whole rows in half of it, at
+    /// least one. Past that the grid scrolls.
+    static func favoritesCap(room: CGFloat) -> CGFloat {
+        let gap = Tokens.Sidebar.favoriteGap, stride = FavoritesView.tileHeight + gap
+        let rows = max(1, Int((room / 2 + gap) / stride))
+        return CGFloat(rows) * stride - gap
+    }
+
+    private func updateFavoritesFade() {
+        // The room above the grid shows only a ×; scrolled, tiles passing under it are hidden there.
+        let top = favoritesScroll.contentInsets.top
+        Self.fade(favoritesFade, for: favoritesScroll, list: favorites, top: top, clearsTop: favoritesScroll.contentView.bounds.minY > -top + 0.5)
+    }
+
+    @objc private func favoritesScrolled() {
+        updateFavoritesFade()
+    }
+
     /// Fade tabs at the bottom of a list only; the top has the pinned space name and its hairline.
-    private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
+    private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView, top: CGFloat = 0, clearsTop: Bool = false) {
         let bounds = scrollView.bounds
         let clip = scrollView.contentView.bounds
         let moreBelow = list.frame.height - clip.maxY > 1
@@ -1170,8 +1253,9 @@ final class SidebarView: NSView {
         CATransaction.setDisableActions(true)
         mask.frame = bounds
         // Drawn top to bottom in the list's own terms; the gradient's y runs the other way in an unflipped layer.
-        mask.colors = [solid, solid, moreBelow ? clear : solid]
-        mask.locations = [0, NSNumber(value: Double(1 - fade)), 1]
+        let band = bounds.height > 0 ? Double(top / bounds.height) : 0
+        mask.colors = [clearsTop ? clear : solid, clearsTop ? clear : solid, solid, solid, moreBelow ? clear : solid]
+        mask.locations = [0, NSNumber(value: band), NSNumber(value: band), NSNumber(value: Double(1 - fade)), 1]
         let flipped = scrollView.layer?.isGeometryFlipped == true || scrollView.isFlipped
         mask.startPoint = CGPoint(x: 0.5, y: flipped ? 0 : 1)
         mask.endPoint = CGPoint(x: 0.5, y: flipped ? 1 : 0)
@@ -1219,7 +1303,7 @@ final class SidebarView: NSView {
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: tab?.url != nil && tab?.isPrivate != true)
+        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

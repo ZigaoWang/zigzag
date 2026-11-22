@@ -182,8 +182,16 @@ final class PaneHeaderView: NSView {
         let loading = tab?.isLoading ?? false
         reload.symbol = loading ? "xmark" : "arrow.clockwise"
         reload.toolTip = loading ? String(localized: "Stop", comment: "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.") : String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page.")
-        address.text = tab?.url.map(CommandRanker.displayURL) ?? ""
+        address.text = tab?.url.map(Self.addressText) ?? ""
+        address.notSecure = tab?.isNotSecure ?? false
         needsLayout = true
+    }
+
+    /// A web page's address; a file or Zigzag page by its sidebar name, never a cut "file:".
+    static func addressText(_ url: URL) -> String {
+        let name = AddressView.name(of: url)
+        guard let host = url.host(), !url.isFileURL, name == AddressView.site(host, port: url.port, scheme: url.scheme) else { return name }
+        return CommandRanker.displayURL(url)
     }
 
     /// What the strip shows at a width, most first: its buttons give way one step at a time so the address keeps
@@ -275,7 +283,9 @@ final class PaneHeaderView: NSView {
         // they keep the card's radius in from its edges, so the first and last clear its rounded corners and sit as far
         // in from one edge as from the other: every pane's strip in a window alike.
         let edge = overCard ? Tokens.Radius.card : 0
-        let y = isInBar ? round((bounds.height - b) / 2) : floor((bounds.height - Tokens.Metric.hairline - b) / 2)
+        // Rounded to pixels, not down, so the row is as far from the top as from the hairline.
+        let scale = window?.backingScaleFactor ?? 2
+        let y = isInBar ? round((bounds.height - b) / 2) : round((bounds.height - Tokens.Metric.hairline - b) / 2 * scale) / scale
         let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth,
                            splitButtons: arrangesSplit, resetLayout: resetsLayout)
         currentFit = fit
@@ -363,6 +373,34 @@ final class PaneAddressView: InteractiveView {
     /// (`TopBarView.pill`), so its field has none.
     var hasSiteControls = true { didSet { if hasSiteControls != oldValue { needsLayout = true } } }
 
+    /// A control at the field's end, in the place Site Controls take: the top bar puts the pin star inside its pill
+    /// this way (#437), rather than beside the extensions.
+    var pin: NSView? {
+        didSet {
+            guard pin !== oldValue else { return }
+            oldValue?.removeFromSuperview()
+            if let pin {
+                addSubview(pin)
+                // In the pill's rounded end, as Site Controls is, with the field's rim pressing it too (#443).
+                (pin as? IconButton)?.radius = Tokens.Radius.control - Self.buttonInset
+                (pin as? IconButton)?.pressOutset = NSEdgeInsets(top: Self.buttonInset, left: 1,
+                                                                 bottom: Self.buttonInset, right: Self.buttonInset)
+            }
+            needsLayout = true
+        }
+    }
+
+    /// Whether the pin shows at the field's end (#437). The field gave the star up, so the pill decides for itself
+    /// rather than reading the star's leftover hidden flag; the top bar sets this from whether the page can be
+    /// pinned, so a new tab or a private window has no star (#444).
+    var showsPin = true {
+        didSet {
+            guard showsPin != oldValue else { return }
+            pin?.isHidden = !showsPin
+            needsLayout = true
+        }
+    }
+
     /// Not secure (http, or a certificate allowed from the warning page): shows the not-secure mark before the address,
     /// as in the sidebar.
     var notSecure = false {
@@ -394,7 +432,7 @@ final class PaneAddressView: InteractiveView {
     /// As wide as the whole address and the padding, with the few points a middle-truncating field keeps in hand
     /// before it cuts (centered, so they never show).
     var fittingWidth: CGFloat {
-        return fullTextWidth + Self.padding * 2 + Self.slack + (hasSiteControls ? Self.buttonRoom : 0) + (notSecure ? Self.markRoom : 0)
+        return fullTextWidth + Self.padding * 2 + Self.slack + (hasSiteControls || (showsPin && pin != nil) ? Self.buttonRoom : 0) + (notSecure ? Self.markRoom : 0)
     }
     private static let slack: CGFloat = Tokens.Space.x2
     /// The whole address's width, measured as the field draws it, whatever it shows now.
@@ -439,9 +477,15 @@ final class PaneAddressView: InteractiveView {
         siteControls.isHidden = !button
         let side = Self.buttonSide
         siteControls.frame = NSRect(x: bounds.width - Self.buttonInset - side, y: (bounds.height - side) / 2, width: side, height: side)
+        let pinShown = showsPin && pin != nil
+        pin?.isHidden = !pinShown
+        if pinShown, let pin {
+            pin.frame = siteControls.frame
+        }
+        let trailing = button || pinShown
         let markRoom = notSecure ? Self.markRoom : 0
         label.frame = NSRect(x: Self.padding + markRoom - Label.inset, y: label.centeredY(in: bounds.height),
-                             width: max(0, bounds.width - Self.padding * 2 - markRoom - (button ? Self.buttonRoom : 0) + Label.inset * 2), height: h)
+                             width: max(0, bounds.width - Self.padding * 2 - markRoom - (trailing ? Self.buttonRoom : 0) + Label.inset * 2), height: h)
         // An address too long for the strip shows its host alone, cut so its domain stays whole (#189): cut in the
         // middle, "gemini.goo…/app" would hide whose site it is.
         let fits = label.frame.width - Label.inset * 2 >= fullTextWidth - 0.5

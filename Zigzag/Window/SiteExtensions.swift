@@ -5,7 +5,7 @@ import AppKit
 enum SiteExtensionAccess: Equatable {
     /// It reads this site, or never needs to: a popup of its own works anywhere.
     case runs
-    /// It wants this site and gets it from a click on its button ("When You Click It").
+    /// It wants this site and gets it from a click on its button ("On Click").
     case onClick
     /// It wants this site and hasn't been given it.
     case blocked
@@ -24,7 +24,7 @@ enum SiteExtensionAccess: Equatable {
     var note: String? {
         switch self {
         case .runs: nil
-        case .onClick: String(localized: "Runs on this site when you click it", comment: "Tooltip line under an extension's name in Site Controls: its site access is When You Click It, and it hasn't been clicked on this site yet.")
+        case .onClick: String(localized: "Runs on this site when you click it", comment: "Tooltip line under an extension's name in Site Controls: its site access is On Click, and it hasn't been clicked on this site yet.")
         case .blocked: String(localized: "Can’t read this site", comment: "Tooltip line under an extension's name in Site Controls: the extension wants this site but its site access doesn't include it.")
         case .offHere: String(localized: "Extensions are off on this site", comment: "Tooltip line under an extension's name in Site Controls: the Extensions switch is off for this site.")
         }
@@ -332,15 +332,31 @@ final class SiteExtensionsSection: NSView {
         guard count > 0 else { return isWhole ? PanelLinkRow.height * 2 + PanelLinkRow.gap : PanelLinkRow.height }
         let h = SiteExtensionsLayout.headerHeight
         guard isOpen else { return h }
-        return h + SiteExtensionsLayout.bodyHeight(count: count, width: width) + Tokens.Space.x2 + PanelLinkRow.height
+        return bodyTop + SiteExtensionsLayout.bodyHeight(count: count, width: width) + PanelLinkRow.gap + PanelLinkRow.height
     }
 
-    /// The room under the last row's words, which the panel's bottom margin takes back.
-    var bottomSlack: CGFloat { isOpen || items.isEmpty ? manageRow.bottomSlack : 0 }
-    /// Folded, the room under the header's words inside it.
-    var foldedSlack: CGFloat {
-        let probe = Label.section("E"), h = SiteExtensionsLayout.headerHeight
-        return h - probe.centeredY(in: h) - probe.lineHeight
+    /// The header's name in its slot: where its caps start and where they end.
+    private var headingCaps: (top: CGFloat, bottom: CGFloat) {
+        let probe = Label.section("E"), y = probe.centeredY(in: SiteExtensionsLayout.headerHeight)
+        return (y + probe.capsSpan.top, y + probe.capsSpan.bottom)
+    }
+
+    /// Where the extensions start: their first ink a section label's gap under the header's caps, as under This Site.
+    var bodyTop: CGFloat {
+        let slack = SiteExtensionsLayout.listed(count: items.count)
+            ? (SiteExtensionRow.height - Tokens.Metric.favicon) / 2
+            : (SiteExtensionsLayout.tileSide - SiteExtensionsLayout.iconSide) / 2
+        return (headingCaps.bottom + Tokens.Space.x3 - slack).rounded()
+    }
+
+    /// The room above its first ink and below its last, which the panel spaces by.
+    var topSlack: CGFloat { items.isEmpty ? getRow.topSlack : headingCaps.top }
+    var bottomSlack: CGFloat {
+        if isOpen || items.isEmpty { return manageRow.bottomSlack }
+        // Folded: the strip's icons, or the header's name when none fit.
+        let strip = SiteExtensionsLayout.strip(count: items.count, room: stripRoom)
+        let h = SiteExtensionsLayout.headerHeight
+        return strip.icons + strip.more > 0 ? min((h - Tokens.Space.x4) / 2, h - headingCaps.bottom) : h - headingCaps.bottom
     }
 
     /// The text column: the section reaches `PanelLinkRow.outset` past it on each side, for its washes.
@@ -363,19 +379,21 @@ final class SiteExtensionsSection: NSView {
         header.frame = NSRect(x: o, y: 0, width: width, height: h)
         // Trailing, on the text column's end: the strip folded; whose they are, open.
         let room = max(0, width - header.textWidth - Tokens.Space.x2)
+        // The strip's icons end on the column, their buttons' padding past it.
+        let end = o + width + (side - Tokens.Space.x4) / 2
         profileLabel.frame = NSRect(x: o + width - room + Label.inset, y: profileLabel.centeredY(in: h), width: room, height: profileLabel.lineHeight)
         let strip = SiteExtensionsLayout.strip(count: count, room: stripRoom)
         let slots = strip.icons + (strip.more > 0 ? 1 : 0)
-        var sx = o + width - CGFloat(slots) * side - CGFloat(max(0, slots - 1)) * SiteExtensionsLayout.stripGap
+        var sx = end - CGFloat(slots) * side - CGFloat(max(0, slots - 1)) * SiteExtensionsLayout.stripGap
         for (i, tile) in stripTiles.enumerated() {
             let shown = i < strip.icons
-            tile.frame = NSRect(x: shown ? sx : o + width - side, y: (h - side) / 2, width: side, height: side)
+            tile.frame = NSRect(x: shown ? sx : end - side, y: (h - side) / 2, width: side, height: side)
             if shown { sx += side + SiteExtensionsLayout.stripGap }
         }
-        stripMore.frame = NSRect(x: o + width - side, y: (h - side) / 2, width: side, height: side)
+        stripMore.frame = NSRect(x: end - side, y: (h - side) / 2, width: side, height: side)
 
-        // Open: the extensions, then Manage.
-        let top = h
+        // Open: the extensions, then Manage, the next row of their list.
+        let top = bodyTop
         if SiteExtensionsLayout.listed(count: count) {
             for (i, button) in buttons.enumerated() {
                 button.frame = NSRect(x: 0, y: top + CGFloat(i) * (SiteExtensionRow.height + PanelLinkRow.gap), width: bounds.width, height: SiteExtensionRow.height)
@@ -385,7 +403,7 @@ final class SiteExtensionsSection: NSView {
                 button.frame = SiteExtensionsLayout.tileFrame(i, width: width).offsetBy(dx: 0, dy: top)
             }
         }
-        row(manageRow, top + SiteExtensionsLayout.bodyHeight(count: count, width: width) + Tokens.Space.x2)
+        row(manageRow, top + SiteExtensionsLayout.bodyHeight(count: count, width: width) + PanelLinkRow.gap)
         for entry in pins {
             if let row = entry.button as? SiteExtensionRow {
                 entry.mark.frame = row.pinFrame.offsetBy(dx: row.frame.minX, dy: row.frame.minY)

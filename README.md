@@ -54,7 +54,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
     <td width="50%"><img src="docs/all-tabs.jpg" alt="Every tab across three spaces shown as cards"><br><b>Every tab at once.</b> ⇧⌘\ shows every space. Type to filter.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="A Wikipedia article on typography peeked over the page"><br><b>Peek.</b> Shift-click a link to glance at it without losing your place.</td>
+    <td width="50%"><img src="site/assets/win-peek.webp" alt="A Wikipedia article on typography over the page it was opened from"><br><b>Zigzag Mini.</b> Shift-click a link to glance at it without losing your place.</td>
     <td width="50%"><img src="site/assets/clips/reader.jpg" alt="An essay from The Public Domain Review in Reader"><br><b>Reader.</b> Long reads, without the clutter.</td>
   </tr>
 </table>
@@ -74,12 +74,12 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Split view** | Up to four tabs: drag a tab onto the page's edges for a half, or its corners for a quarter. Drag a page by its strip to move it, and pin a split to keep it. |
 | **Windows** | Drag a tab to another window and it moves as it is, without loading again. Turn on Settings › Tabs › Windows share a space's tabs and every window on a space lists the same tabs, as in Arc. The sidebar sits on the left or the right. |
 | **Web apps** | Install as App makes a site an app of its own, in your Applications folder, the Dock and ⌘Tab, with a toolbar in the site's color. |
-| **Peek** | Shift-click a link to read it over the page you're on. |
 | **Mini player** | Leave a tab while its video plays and the video follows you in a small player. Resize it from any edge and put it anywhere, even outside the window over other apps. Turn it off from its menu if you'd rather not have it. Switch to another app and the video floats over it in Picture in Picture. |
+| **Streaming** | Protected music and video play as in Safari, through WebKit's FairPlay Streaming: Spotify's web player works, and so do other services that support Safari. |
 | **Now Playing** | Every tab playing sound in the background gets a card at the foot of the sidebar, up to three, to pause or mute it. |
 | **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
 | **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Point at it to see which it would close. A split view stays or goes whole. Undo brings them back. |
-| **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps open in it, like Little Arc (turn that off in Settings › Zigzag Mini), and Open in Zigzag Mini moves a tab into one. |
+| **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Shift-click a link, or choose Open Link in Zigzag Mini, and it opens in one over your window; ⌘O puts it in a tab next to the one you clicked in, and Esc closes it. Links from other apps open in it, like Little Arc (turn that off in Settings › Zigzag Mini), and Open in Zigzag Mini moves a tab into one. |
 | **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
 | **Dark pages** | Light sites drawn dark by Dark Reader's engine, with its fixes for thousands of sites, so photos stay true. Sites with a dark look of their own keep it. Pure black if you like it darker. On everywhere or per site. |
 | **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, compiled into WebKit content rule lists, plus uBlock Origin's filter lists, which update on their own. |
@@ -94,7 +94,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
 | **Languages** | English and Simplified Chinese. |
-| **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
+| **And** | Reader, PDF viewer, Handoff to your iPhone, iPad or other Mac, Capture of an area, a part of the page or the whole page (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
 
 ## What's missing
 
@@ -130,7 +130,7 @@ with macOS updates rather than from me.
 | **Updates** | Sparkle 2, with EdDSA-signed updates from zigzagbrowser.com, on a stable or a beta feed. Releases are signed with Developer ID and notarized. |
 
 The source is organized by feature: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`,
-`CommandBar`, `Desk` (every tab at once), `Peek`, `WebApps`, `Developer`, `MCP` (AI apps), `Settings`, `Window` and
+`CommandBar`, `Desk` (every tab at once), `WebApps`, `Developer`, `MCP` (AI apps), `Settings`, `Window` and
 `Design` (Zigzag's own drawn controls and design tokens). Over 2,000 tests cover importing, passwords, extensions,
 address handling, history, AI apps and the security fixes.
 
@@ -158,6 +158,9 @@ connections Zigzag makes on its own, apart from the pages you open:
 Translation runs on your Mac, with Apple's on-device Translation. Fraudulent website warnings are WebKit's own,
 the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
 Help › Report a Problem writes a report you can read first, and nothing is sent unless you send it.
+The Mac's Passwords list keeps a small log of its steps in `~/Library/Logs/Zigzag/passwords.log`, never a login or
+a site, and it stays on your Mac. Your Zigzag Card is made on your Mac from your account's name and the day Zigzag
+first ran, and its picture holds only what the card shows.
 
 ## Install
 

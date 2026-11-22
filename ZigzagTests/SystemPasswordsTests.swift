@@ -909,4 +909,47 @@ struct SystemPasswordsTests {
         #expect(!Autofill.justClicked(-.infinity, now: 100))
         #expect(!Autofill.justClicked(101, now: 100))
     }
+
+    // MARK: The log
+
+    private func logFolder() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("PasswordsLogTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    @Test func theLogNeverHoldsWhatWasFilled() throws {
+        let folder = logFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let field = NSTextField()
+        field.stringValue = "sam@example.com"
+        let line = PasswordsLog.line("changed", ["field": .type(field), "username": .text("sam@example.com"), "password": .text("hunter2-secret"),
+                                                 "empty": .text(""), "typing": .flag(false)])
+        #expect(line == "changed field=NSTextField username=set password=set empty=empty typing=no")
+        PasswordsLog.append([line], to: folder, limit: PasswordsLog.limit)
+        let written = try String(contentsOf: folder.appendingPathComponent(PasswordsLog.fileName), encoding: .utf8)
+        #expect(!written.contains("hunter2") && !written.contains("sam@") && !written.contains("example"))
+        #expect(written.contains("password=set"))
+    }
+
+    @Test func theLogStaysSmall() throws {
+        let folder = logFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let limit = 2_000
+        for n in 0..<500 { PasswordsLog.append(["present session=\(n) active=yes key=yes"], to: folder, limit: limit) }
+        let size = { (name: String) in (try? FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent(name).path)[.size] as? Int) ?? 0 }
+        #expect(size(PasswordsLog.fileName) <= limit && size(PasswordsLog.fileName) > 0)
+        #expect(size(PasswordsLog.oldFileName) <= limit)
+        let latest = try String(contentsOf: folder.appendingPathComponent(PasswordsLog.fileName), encoding: .utf8)
+        #expect(latest.hasSuffix("present session=499 active=yes key=yes\n"))
+        // One file set aside at most.
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 2)
+    }
+
+    @Test func theLogSaysARepeatOnce() {
+        var collapser = PasswordsLog.Collapser()
+        #expect(collapser.take("dismiss controller=yes") == ["dismiss controller=yes"])
+        #expect(collapser.take("dismiss controller=yes") == [])
+        #expect(collapser.take("dismiss controller=yes") == [])
+        #expect(collapser.take("present session=1") == ["  same 2 more times", "present session=1"])
+        #expect(collapser.take("present session=2") == ["present session=2"])
+    }
 }

@@ -79,8 +79,8 @@ struct DarkPagesTests {
         }
     }
 
-    /// A choice is kept as made, the same as the setting or not: the dropdown has Automatic to follow it, and On
-    /// chosen while the setting is Always stays On when the setting changes (#134).
+    /// A choice is kept as made, the same as the setting or not: the dropdown has Follow Setting to follow it, and Always
+    /// chosen while the setting is Always stays Always when the setting changes (#134).
     @Test func aChoiceIsKeptAsMade() {
         withDefaults {
             let url = URL(string: "https://example.com/")
@@ -338,7 +338,7 @@ struct DarkPagesTests {
         withDefaults {
             DarkPages.mode = .always
             let tab = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
-            tab.isPeek = true
+            tab.isOutsideTabList = true
             let webView = tab.ensureWebView()
             defer { tab.close() }
             #expect(DarkPages.choice(for: tab.url) == nil)

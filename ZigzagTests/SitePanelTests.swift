@@ -54,4 +54,16 @@ struct SitePanelTests {
         #expect(rows(1, 40) == [1])
         #expect(rows(0, 200) == [])
     }
+
+    /// The panel's margins count from a row's ink: a dropdown's box, or the caps and baseline of its words.
+    @Test func rowSlackCountsFromTheInk() {
+        let dropdown = PanelRow.choice("Open in", options: ["Any Space"], selected: 0) { _ in }
+        #expect(dropdown.topSlack == (PanelRow.height - Tokens.Page.controlHeight) / 2)
+        #expect(dropdown.bottomSlack == (PanelRow.height - Tokens.Page.controlHeight) / 2)
+        let toggle = PanelRow.toggle("Ad blocking", on: true, status: { _ in "On for this site" }) { _ in }
+        #expect(toggle.bottomSlack > 0 && toggle.bottomSlack <= (PanelRow.height - Tokens.Metric.toggleSize.height) / 2)
+        let link = PanelLinkRow("Permissions", goes: true) {}
+        #expect(link.topSlack > 0 && link.bottomSlack > 0)
+        #expect(link.topSlack + link.bottomSlack < PanelLinkRow.height - Tokens.TypeSize.body / 2)
+    }
 }

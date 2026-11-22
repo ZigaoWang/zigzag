@@ -1,7 +1,7 @@
 # Spaces
 
 ## Making and switching
-- New Space (⌥⌘N, or + in the sidebar) → a space at once, in the next unused color (Sky, Sage, Sand first), with its editor open to name it.
+- New Space (⌥⌘N, or + in the sidebar) → a space at once, in the next unused palette color on glass (Slate, Fern, Coral first), with its editor open to name it.
   Test: SpaceDefaultColorsTests.defaultIsTheColorTheSpaceWasMadeWith
 - ⌃1–⌃9 → that space; a number with no space does nothing.
   Test: NumberHintsTests.spaceNumbersGoToTheirOwnSpaceAndNinthIsTheNinth
@@ -23,6 +23,8 @@
   Test: SidebarSlideTests.onlyClearGlassMakesTheWindowSeeThrough
 - Clear on battery or in Low Power Mode → shows frosted instead, and the editor says why under Glass until you plug in or turn it off.
   Test: SidebarSlideTests.theEditorSaysWhenClearShowsAsFrosted
+- Pick a preset with a finish (Stone's linen, Smoke's or Coral's grain) → the finish comes with it; a plain preset takes it off.
+  Test: SpacePaletteTests.aPresetBringsItsFinishAndAPlainOneTakesItOff
 
 ## Icons in the bottom bar
 - Give a space an icon, a symbol or an emoji → its key shows it, with no dot under it.
@@ -47,8 +49,8 @@
   Test: SiteRoutesTests.whatThePageDoesOnItsOwnIsNot
 - A link to a sign-in page → stays in the tab that sent you; typed, it still goes to its space.
   Test: SiteRoutesTests.aSignInALinkSendsYouToStaysPut
-- Private windows, Zigzag Mini, Peek and site apps → never sent anywhere; Open in Zigzag from Mini is.
-  Test: SiteRoutesTests.miniPeekAndAppsKeepTheirPages
+- Private windows, Zigzag Mini and site apps → never sent anywhere; Open in Zigzag from Mini is.
+  Test: SiteRoutesTests.miniAndAppsKeepTheirPages
 
 ## Profiles
 - New Profile in the space editor → a profile named after the space, holding only that space.

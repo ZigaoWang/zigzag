@@ -63,10 +63,8 @@ enum FeatureFlags {
 
     private static let key = "WebKitFeatureFlags"
 
-    /// Flags Zigzag sets differently from WebKit on every page, Developer Mode or not; Settings shows them as the
-    /// default. PreferPageRenderingUpdatesNear60FPS: off, as in Chrome; on, pages draw at 60 fps on 120 Hz displays, so
-    /// animations and scrolling stutter next to native scrolling.
-    static let ownDefaults: [String: Bool] = ["PreferPageRenderingUpdatesNear60FPSEnabled": false]
+    /// Flags Zigzag sets differently from WebKit on every page; none now (#394).
+    static let ownDefaults: [String: Bool] = [:]
 
     /// The flags you can change, the ones WebKit keeps to itself left out; nil when there's no list to show.
     static var flags: [Flag]? {

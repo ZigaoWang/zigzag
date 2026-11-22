@@ -159,7 +159,6 @@ final class UpdateCard: InteractiveView {
         let lines = titleFont.capHeight + Self.lineGap + detailFont.capHeight
         let block = lines + (ready ? 0 : Self.barGap + UpdateBar.height)
         let top = (bounds.height - block) / 2
-        let margin = top
         // Icon centered beside the two lines.
         let size = Tokens.Sidebar.favicon
         icon.frame = NSRect(x: SidebarRowView.inset, y: pixel(top + lines / 2 - size / 2), width: size, height: size)
@@ -170,9 +169,10 @@ final class UpdateCard: InteractiveView {
         let restart = NSRect(x: hide.minX - Self.buttonGap - pill, y: y, width: pill, height: b)
         hideButton.frame = hide
         restartButton.frame = restart
-        // Text column ends at Restart (its padding is the gap), or while downloading, inset from the right like the top inset.
+        // Text column ends at Restart (its padding is the gap), or while downloading as far from the right as the icon's art from the left.
         let x = icon.frame.maxX + SidebarRowView.titleOffset
-        let end = ready ? restart.minX : bounds.width - margin + Label.inset
+        let art = SidebarRowView.inset + round(size * 100 / 1024 * 2) / 2
+        let end = ready ? restart.minX : bounds.width - art + Label.inset
         let width = max(0, end - x)
         title.frame = NSRect(x: x, y: lineY(title, capsMiddle: top + titleFont.capHeight / 2), width: width, height: title.lineHeight)
         let detailY = top + lines - detailFont.capHeight / 2

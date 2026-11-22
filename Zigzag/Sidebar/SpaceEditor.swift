@@ -11,6 +11,9 @@ final class ColorWheel: NSView {
         var amount: Double
     }
 
+    /// Its height in the space editor, and the least it shrinks to in a short window.
+    static let fullHeight: CGFloat = 200, minimumHeight: CGFloat = 140
+
     /// One or two: the color, or where a gradient starts and ends.
     private(set) var spots: [Spot] = [Spot(hue: 0.6, amount: 1)]
     /// How deep each knob's color is, for its fill.
@@ -85,7 +88,7 @@ final class ColorWheel: NSView {
     /// Room for a whole knob, and a little more, around the dots, so one at the rim never leaves the wheel's frame.
     private var radius: CGFloat { min(bounds.width, bounds.height) / 2 - 14 }
 
-    private func point(_ spot: Spot) -> CGPoint {
+    func point(_ spot: Spot) -> CGPoint {
         let a = spot.hue * 2 * .pi - .pi / 2
         let r = radius * CGFloat(spot.amount)
         return CGPoint(x: center.x + cos(a) * r, y: center.y + sin(a) * r)
@@ -205,34 +208,55 @@ final class ColorWheel: NSView {
     /// Within a knob's reach, clicking takes hold of it without moving it.
     private func knob(at p: CGPoint) -> Int? {
         let distances = spots.indices.map { (index: $0, distance: hypot(point(spots[$0]).x - p.x, point(spots[$0]).y - p.y)) }
-        // Over both, the selected one wins, since it's drawn on top.
+        // Over both, the nearer one wins; the selected one only when they sit on the same spot.
         let hits = distances.filter { $0.distance <= 14 }
-        return hits.first { $0.index == selected }?.index ?? hits.min { $0.distance < $1.distance }?.index
+        guard let nearest = hits.min(by: { $0.distance < $1.distance }) else { return nil }
+        return hits.first { $0.index == selected && $0.distance - nearest.distance < 1 }?.index ?? nearest.index
     }
 
-    override func mouseDown(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
-        let index = knob(at: p) ?? selected
+    /// A press on the wheel: the knob it holds, how far off that knob's center, and whether it has moved it yet.
+    struct Grab: Equatable {
+        let index: Int
+        let grip: CGPoint
+        var moved: Bool
+    }
+
+    /// On a knob it takes hold of it; anywhere else the selected knob comes there.
+    func press(at p: CGPoint) -> Grab {
+        let held = knob(at: p)
+        let index = held ?? selected
         // Grabbed off-center, a knob keeps that offset rather than jumping under the pointer.
-        let grip = knob(at: p).map { CGPoint(x: point(spots[$0]).x - p.x, y: point(spots[$0]).y - p.y) } ?? .zero
+        let grip = held.map { CGPoint(x: point(spots[$0]).x - p.x, y: point(spots[$0]).y - p.y) } ?? .zero
         if index != selected {
             selected = index
             onSelect?(index)
         }
         pressed = index
-        var moved = knob(at: p) == nil
-        if moved { move(index, to: p, final: false) } else { placeKnobs(animated: false) }
+        let grab = Grab(index: index, grip: grip, moved: held == nil)
+        if grab.moved { move(index, to: p, final: false) } else { placeKnobs(animated: false) }
+        return grab
+    }
+
+    func drag(_ grab: inout Grab, to p: CGPoint) {
+        grab.moved = true
+        move(grab.index, to: CGPoint(x: p.x + grab.grip.x, y: p.y + grab.grip.y), final: false)
+    }
+
+    func release(_ grab: Grab, at p: CGPoint) {
+        pressed = nil
+        if grab.moved { move(grab.index, to: CGPoint(x: p.x + grab.grip.x, y: p.y + grab.grip.y), final: true) } else { placeKnobs(animated: false) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        var grab = press(at: convert(event.locationInWindow, from: nil))
         window?.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: .infinity, mode: .eventTracking) { event, stop in
             guard let event else { return }
             let q = self.convert(event.locationInWindow, from: nil)
-            let target = CGPoint(x: q.x + grip.x, y: q.y + grip.y)
             if event.type == .leftMouseUp {
                 stop.pointee = true
-                self.pressed = nil
-                if moved { self.move(index, to: target, final: true) } else { self.placeKnobs(animated: false) }
+                self.release(grab, at: q)
             } else {
-                moved = true
-                self.move(index, to: target, final: false)
+                self.drag(&grab, to: q)
             }
         }
     }
@@ -249,6 +273,10 @@ final class ColorWheel: NSView {
         placeKnobs(animated: false)
         onChange?(index, spot, final)
     }
+
+    #if DEBUG
+    func debugKnobs() -> [CGPoint] { spots.map(point) }
+    #endif
 
     /// VoiceOver: more or less color, or the next hue around.
 
@@ -358,6 +386,15 @@ struct SpaceLook {
     var angle: Double = 90
     var seeThrough: Double = 0
     var grain: Double = 0
+    /// The grain's texture (`SpaceInfo.texture`): nil for fine film grain.
+    var texture: String? = nil
+    /// A palette look, on the palette's clear glass (`SpaceInfo.clearTint`).
+    var clearTint = false
+    /// Set: the hues follow the Mac, light by day and deep at night, this strong (`SpaceInfo.intensity`); `depth` unused.
+    var following: Double? = nil
+    /// With `following`, a palette color's own depths by day and at night (`SpaceInfo.dayDepth`, `nightDepth`).
+    var day: Double? = nil
+    var night: Double? = nil
 
     /// How it looks as a space.
     var space: SpaceInfo {
@@ -367,14 +404,18 @@ struct SpaceLook {
     }
 
     /// A curated color, as a preset: light by day and deep at night with the Mac, with any see-through and grain.
+    /// A palette color gives its glass following the Mac, the look a new space gets.
     static func curated(_ color: SpaceColor, name: String? = nil, seeThrough: Double = 0, grain: Double = 0) -> SpaceLook {
-        SpaceLook(name: name ?? color.name, curated: color, depth: 0, seeThrough: seeThrough, grain: grain)
+        if let look = color.defaultLook { return look }
+        return SpaceLook(name: name ?? color.name, curated: color, depth: 0, seeThrough: seeThrough, grain: grain)
     }
 
     /// A preset is the whole look: its see-through and grain come with it, and one without them is solid and smooth.
     func apply(to space: inout SpaceInfo) {
         space.glass = nil
         space.grain = grain > 0 ? grain : nil
+        space.texture = grain > 0 ? texture : nil
+        space.clearTint = clearTint && seeThrough > 0 ? true : nil
         if let curated {
             space.color = curated
             space.hue = nil
@@ -385,7 +426,26 @@ struct SpaceLook {
             space.tint2 = nil
             space.intensity2 = nil
             space.brightness2 = nil
+            space.dayDepth = nil
+            space.nightDepth = nil
             space.translucency = seeThrough > 0 ? seeThrough : nil
+            space.appearance = nil
+            return
+        }
+        if let following {
+            space.hue = hue
+            space.tint = abs(tint - 1) < 0.005 ? nil : tint
+            space.intensity = following
+            space.brightness = nil
+            space.dayDepth = day
+            space.nightDepth = night
+            space.hue2 = hue2
+            space.tint2 = hue2 == nil || abs(tint - 1) < 0.005 ? nil : tint
+            space.intensity2 = hue2 == nil ? nil : following
+            space.brightness2 = nil
+            space.angle = hue2 == nil ? nil : angle
+            space.translucency = seeThrough > 0 ? seeThrough : nil
+            if seeThrough > 0 { space.clearGlass = nil }
             space.appearance = nil
             return
         }
@@ -395,24 +455,37 @@ struct SpaceLook {
             space.tint = 0
         } else {
             space.hue = hue
-            space.tint = tint > 0.995 ? nil : tint
+            space.tint = abs(tint - 1) < 0.005 ? nil : tint
         }
         space.intensity = nil
         space.brightness = depth
+        space.dayDepth = nil
+        space.nightDepth = nil
         space.hue2 = hue2
-        // The second color as quiet as the first.
-        space.tint2 = hue2 == nil || tint > 0.995 ? nil : tint
+        // The second color as quiet (or as rich) as the first.
+        space.tint2 = hue2 == nil || abs(tint - 1) < 0.005 ? nil : tint
         space.intensity2 = nil
         space.brightness2 = hue2 == nil ? nil : depth2
         if hue2 != nil { space.angle = angle }
         space.translucency = seeThrough > 0 ? seeThrough : nil
+        // A glass look is clear glass.
+        if seeThrough > 0 { space.clearGlass = nil }
     }
 
     func matches(_ space: SpaceInfo) -> Bool {
-        guard abs((space.grain ?? 0) - grain) < 0.01 else { return false }
+        guard abs((space.grain ?? 0) - grain) < 0.01, (grain > 0 ? texture : nil) == ((space.grain ?? 0) > 0.01 ? space.texture : nil),
+              (space.clearTint == true) == (clearTint && seeThrough > 0) else { return false }
         if let curated {
             return space.hue == nil && space.color == curated && space.brightness == nil && space.hue2 == nil
                 && abs(space.seeThrough - seeThrough) < 0.01 && (curated.isNeutral || space.tintAmount > 0.99)
+        }
+        if let following {
+            guard space.brightness == nil, space.brightness2 == nil, let h = space.hue, abs(h - hue) < 0.002, abs(space.tintAmount - tint) < 0.01,
+                  abs((space.intensity ?? -1) - following) < 0.005, abs(space.seeThrough - seeThrough) < 0.01,
+                  space.dayDepth == day, space.nightDepth == night else { return false }
+            guard let hue2 else { return space.hue2 == nil }
+            guard let h2 = space.hue2, abs(h2 - hue2) < 0.002 else { return false }
+            return true
         }
         // A space saved as the old white or black (no Shade of its own) is the White or Black here.
         if space.brightness == nil, space.hue == nil, space.hue2 == nil, hue2 == nil, tint < 0.005, seeThrough == 0, !space.isSeeThrough,
@@ -427,23 +500,42 @@ struct SpaceLook {
         }
         guard let hue2 else { return space.hue2 == nil }
         guard let h2 = space.hue2, abs(h2 - hue2) < 0.002, abs((space.brightness2 ?? b) - depth2) < 0.005,
-              abs(space.tintAmount2 - min(tint, 1)) < 0.01 else { return false }
+              abs(space.tintAmount2 - tint) < 0.01 else { return false }
         return true
     }
 
-    /// Preset looks in light and deep pairs. Each is reachable from Custom too.
-    static let presets: [SpaceLook] = [
-        SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0),
-        SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1),
-        SpaceLook(name: String(localized: "Paper", comment: "Tooltip and accessibility label of a preset look in the space editor."), hue: 0.11, tint: 0.55, depth: 0.1, grain: 0.5),
-        fade(String(localized: "Espresso", comment: "Tooltip and accessibility label of a preset look in the space editor."), 0.07, 0.8, 0.07, 0.93, tint: 0.45),
-        fade(String(localized: "Sky", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale blue."), 0.6, 0.04, 0.6, 0.34, tint: 0.6),
-        fade(String(localized: "Slate", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray."), 0.62, 0.76, 0.62, 0.9, tint: 0.35),
-    ]
+    static let white = SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0)
+    static let black = SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1)
+    /// The palette's glass with solid white after its neutrals. Each is reachable from Custom too, black included.
+    static let presets: [SpaceLook] = {
+        let looks = SpaceColor.palette.compactMap(\.look)
+        let neutrals = SpaceColor.neutrals.count
+        return Array(looks.prefix(neutrals)) + [white] + looks.dropFirst(neutrals)
+    }()
+}
 
-    /// A top-to-bottom gradient from a color to a shade of it.
-    private static func fade(_ name: String, _ hue: Double, _ depth: Double, _ hue2: Double, _ depth2: Double, tint: Double) -> SpaceLook {
-        SpaceLook(name: name, hue: hue, tint: tint, depth: depth, hue2: hue2, depth2: depth2, angle: 90)
+extension SpaceColor {
+    /// A palette color's look, on clear glass, at its own depth day and night: the preset. Nil for the older colors.
+    var look: SpaceLook? { paletteLook.map { SpaceLook.palette(self, $0, following: false) } }
+
+    /// What a new space of a palette color gets: the same hues on the same glass, following the Mac between its own
+    /// day and night depths, so a fresh window is light on a light Mac and deep on a dark one. Nil for the older colors.
+    /// `following` is what a Zigzag from before the day and night depths shows instead.
+    var defaultLook: SpaceLook? { paletteLook.map { SpaceLook.palette(self, $0, following: true) } }
+}
+
+extension SpaceLook {
+    /// A palette color's look: picked in the editor at its own depth, or following the Mac as a new space has it. Its
+    /// clear glass and finish come with it; `clear` false for the betas' looks from before it.
+    static func palette(_ color: SpaceColor, _ p: SpaceColor.PaletteLook, following: Bool, clear: Bool = true) -> SpaceLook {
+        var look = following
+            ? SpaceLook(name: color.name, hue: p.hue, tint: p.tint, depth: 0, hue2: p.hue2, angle: 90, seeThrough: p.seeThrough,
+                        following: p.tint < 1 ? Tokens.Frame.softFollowingIntensity : Tokens.Frame.followingIntensity, day: p.day, night: p.night)
+            : SpaceLook(name: color.name, hue: p.hue, tint: p.tint, depth: p.depth, hue2: p.hue2, depth2: p.depth2 ?? p.depth, angle: 90, seeThrough: p.seeThrough)
+        look.grain = p.grain
+        look.texture = p.texture
+        look.clearTint = clear
+        return look
     }
 }
 
@@ -459,14 +551,37 @@ enum Checker {
     }
 }
 
-/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard,
-/// a grainy one with its grain. Without a look it's Custom, painted with the hues around the wheel.
+/// A round swatch's ring and dot, as the space editor's presets and Reader's colors draw them: a 2pt ring at the
+/// edge, the dot 2pt inside it with a hairline so white reads on a light panel and black on a dark one. Chosen, the
+/// dot draws in from the ring so a gap shows; under the pointer a faint ring, and nothing moves. Call it in the
+/// view's drawing appearance.
+enum SwatchRing {
+    static let side: CGFloat = 24
+
+    static func draw(ring: CALayer, fill: CALayer, in bounds: CGRect, selected: Bool, hovered: Bool, chosen: NSColor) {
+        ring.frame = bounds
+        ring.cornerRadius = bounds.width / 2
+        ring.borderWidth = 2
+        ring.borderColor = (selected ? chosen : hovered ? Tokens.Color.swatchHoverRing : .clear).cgColor
+        let inset: CGFloat = selected ? 3.5 : 2
+        fill.frame = bounds.insetBy(dx: inset, dy: inset)
+        fill.cornerRadius = fill.frame.width / 2
+        fill.borderWidth = Tokens.Metric.hairline
+        fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
+    }
+}
+
+/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one is a piece of its glass:
+/// the color over a faint checkerboard, lit along its top. A grainy one shows its grain. Without a look it's Custom,
+/// painted with the hues around the wheel.
 final class LookSwatch: InteractiveView {
     let look: SpaceLook?
     private let fill = CAGradientLayer()
     private let checker = CALayer()
     private let grain = CALayer()
     private let ring = CALayer()
+    /// The glass's light along its top edge.
+    private let shine = CAGradientLayer()
 
     init(look: SpaceLook?, name: String? = nil) {
         self.look = look
@@ -476,12 +591,19 @@ final class LookSwatch: InteractiveView {
         layer?.addSublayer(fill)
         fill.masksToBounds = true
         checker.masksToBounds = true
-        checker.isHidden = (look?.seeThrough ?? 0) == 0
+        let glass = (look?.seeThrough ?? 0) > 0
+        checker.isHidden = !glass
         checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
+        checker.opacity = 0.45
+        shine.isHidden = !glass
+        shine.colors = [NSColor.white.withAlphaComponent(0.55).cgColor, NSColor.white.withAlphaComponent(0).cgColor]
+        shine.startPoint = CGPoint(x: 0.5, y: 0)
+        shine.endPoint = CGPoint(x: 0.5, y: 0.55)
         grain.isHidden = (look?.grain ?? 0) == 0
-        grain.backgroundColor = MaterialImages.grain.cgColor
-        grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.5))
+        grain.backgroundColor = MaterialImages.texture(look?.texture).cgColor
+        grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.3))
         fill.addSublayer(grain)
+        fill.addSublayer(shine)
         if look == nil {
             fill.type = .conic
             fill.startPoint = CGPoint(x: 0.5, y: 0.5)
@@ -508,19 +630,10 @@ final class LookSwatch: InteractiveView {
     override func stateDidChange(animated: Bool) {
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                ring.frame = bounds
-                ring.cornerRadius = bounds.width / 2
-                ring.borderWidth = 2
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : .clear).cgColor
-                // Chosen, the swatch sits inside a fine ring; under the pointer it swells to meet the edge.
-                let inset: CGFloat = isSelected ? 3.5 : (isHovered ? 0 : 2)
-                fill.frame = bounds.insetBy(dx: inset, dy: inset)
-                fill.cornerRadius = fill.frame.width / 2
+                SwatchRing.draw(ring: ring, fill: fill, in: bounds, selected: isSelected, hovered: isHovered,
+                                chosen: Tokens.Color.textPrimary.withAlphaComponent(0.85))
                 checker.frame = fill.frame
                 checker.cornerRadius = fill.cornerRadius
-                fill.borderWidth = Tokens.Metric.hairline
-                // A firmer edge than a panel's, so black still reads on a dark panel and white on a light one.
-                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
                 guard let look else {
                     fill.colors = stride(from: 0.0, through: 1, by: 1.0 / 12).map { SpaceColor.paint(hue: $0, depth: 0.3).cgColor }
                     return
@@ -529,13 +642,16 @@ final class LookSwatch: InteractiveView {
                 // Each color at its own strength (the space's dot), so the row reads as distinct colors even in dark
                 // mode, where every frame color is deep; white, grays and black as they are.
                 // A designed look (a gradient, smoke) shows its real frame colors.
-                let start = space.isNeutral || look.curated == nil ? space.frameColor : space.swatch
-                // See-through shows the checkerboard through the color, as the window shows the desktop.
-                let alpha = 1 - 0.45 * look.seeThrough
-                fill.colors = [start, space.frameColor2 ?? start].map { $0.withAlphaComponent(alpha).cgColor }
+                let glass = look.seeThrough > 0
+                // Glass shows its color as the window does, a gradient top to bottom; the checkerboard shows through.
+                let start = glass ? space.background : space.isNeutral || look.curated == nil ? space.frameColor : space.swatch
+                let end = glass ? space.background2 ?? start : space.frameColor2 ?? start
+                let alpha = glass ? 0.8 : 1
+                fill.colors = [start, end].map { $0.withAlphaComponent(alpha).cgColor }
                 grain.frame = fill.bounds
-                fill.startPoint = CGPoint(x: 0.2, y: 0.1)
-                fill.endPoint = CGPoint(x: 0.8, y: 0.9)
+                shine.frame = fill.bounds
+                fill.startPoint = glass ? CGPoint(x: 0.5, y: 0) : CGPoint(x: 0.2, y: 0.1)
+                fill.endPoint = glass ? CGPoint(x: 0.5, y: 1) : CGPoint(x: 0.8, y: 0.9)
             }
         }
         setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
@@ -960,8 +1076,8 @@ final class ColorChip: InteractiveView {
                 ring.frame = bounds
                 ring.cornerRadius = bounds.width / 2
                 ring.borderWidth = 2
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : .clear).cgColor
-                let inset: CGFloat = isSelected ? 4 : (isHovered ? 0.5 : 1.5)
+                ring.borderColor = (isSelected ? Tokens.Color.textPrimary : isHovered ? Tokens.Color.swatchHoverRing : .clear).cgColor
+                let inset: CGFloat = isSelected ? 4 : 1.5
                 fill.frame = bounds.insetBy(dx: inset, dy: inset)
                 fill.cornerRadius = fill.frame.width / 2
                 fill.backgroundColor = color.cgColor
@@ -1076,8 +1192,8 @@ final class BackgroundSwatch: InteractiveView {
     override func stateDidChange(animated: Bool) {
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                let inset: CGFloat = isHovered ? 0 : 2
-                let circle = bounds.insetBy(dx: inset, dy: inset)
+                // The slot stays its size under the pointer; its outline and glyph darken.
+                let circle = bounds.insetBy(dx: 2, dy: 2)
                 outline.frame = bounds
                 outline.path = CGPath(ellipseIn: circle.insetBy(dx: 0.6, dy: 0.6), transform: nil)
                 outline.strokeColor = (isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary).cgColor
@@ -1211,7 +1327,7 @@ final class SpaceLookEditor: NSView {
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
     /// The picture the space's empty page shows; the panel picks and removes it.
     let backgroundSwatch = BackgroundSwatch()
-    /// Ringed when the colors match no other swatch; click toggles the wheel and Shade.
+    /// Ringed when the colors match no other swatch; click shows the wheel and Shade.
     private let customSwatch = LookSwatch(look: nil, name: String(localized: "Custom", comment: "Tooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own."))
     private var showsCustom = false
     /// In the row's order, for the arrow keys.
@@ -1270,7 +1386,10 @@ final class SpaceLookEditor: NSView {
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
         let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, glassNote, grainLabel, grainSlider, effects]
-        showsEffects = space.hue2 != nil || space.isSeeThrough || (space.grain ?? 0) > 0.01
+        // A palette look's own glass and gradient aren't effects chosen.
+        let ownGlass = (SpaceLook.presets.contains { $0.seeThrough > 0 && $0.matches(space) }
+            || SpaceColor.palette.contains { $0.defaultLook?.matches(space) == true }) && space.clearGlass != false
+        showsEffects = !ownGlass && (space.hue2 != nil || space.isSeeThrough) || (space.grain ?? 0) > 0.01
         (tiles + views + chips).forEach { addSubview($0) }
 
         wheel.onChange = { [weak self] index, spot, final in
@@ -1285,6 +1404,8 @@ final class SpaceLookEditor: NSView {
             }
             self.draft.intensity = nil
             self.draft.intensity2 = nil
+            self.draft.dayDepth = nil
+            self.draft.nightDepth = nil
             self.colorChosen = true
             self.changed(final: final, animated: false)
         }
@@ -1308,12 +1429,19 @@ final class SpaceLookEditor: NSView {
                 guard let self, let look = swatch?.look else { return }
                 look.apply(to: &self.draft)
                 self.selected = 0
-                self.colorChosen = true
+                if look.curated != nil {
+                    // A palette color follows the Mac, as the default colors do.
+                    self.original = self.draft
+                    self.draft.brightness = Self.startingDepth(self.draft, dark: self.isDark)
+                    self.colorChosen = false
+                } else {
+                    self.colorChosen = true
+                }
                 self.changed(final: true, animated: true)
             }
         }
         defaultSwatch.onClick = { [weak self] _ in self?.useDefaultColors() }
-        customSwatch.onClick = { [weak self] _ in self?.toggleCustom() }
+        customSwatch.onClick = { [weak self] _ in self?.showCustom() }
         effects.onClick = { [weak self] _ in
             guard let self else { return }
             self.showsEffects.toggle()
@@ -1381,6 +1509,7 @@ final class SpaceLookEditor: NSView {
         if space.hue == nil, space.brightness == nil, space.color == .snow { return 0 }
         if space.hue == nil, space.brightness == nil, space.color == .ink { return 1 }
         if space.isNeutral { return dark ? 0.9 : 0.06 }
+        if let day = space.dayDepth, let night = space.nightDepth { return dark ? night : day }
         let strength = space.intensity ?? SpaceColor.defaultIntensity
         return dark ? 0.86 : 0.06 + 0.2 * strength
     }
@@ -1436,6 +1565,8 @@ final class SpaceLookEditor: NSView {
             draft.brightness = first + delta
             draft.brightness2 = second + delta
         }
+        draft.dayDepth = nil
+        draft.nightDepth = nil
         colorChosen = true
         changed(final: final, animated: false)
     }
@@ -1459,6 +1590,8 @@ final class SpaceLookEditor: NSView {
             selected = 0
         }
         draft.intensity = nil
+        draft.dayDepth = nil
+        draft.nightDepth = nil
         colorChosen = true
         changed(final: true, animated: true)
     }
@@ -1468,17 +1601,45 @@ final class SpaceLookEditor: NSView {
         let fresh = draft.withDefaultColors(defaultColor)
         original = fresh
         draft = fresh
-        draft.brightness = Self.startingDepth(fresh, dark: isDark)
+        if fresh.brightness == nil { draft.brightness = Self.startingDepth(fresh, dark: isDark) }
         colorChosen = false
         selected = 0
         changed(final: true, animated: true)
     }
+
+    #if DEBUG
+    func debugKnobs() -> [CGPoint] {
+        let custom = customSwatch.convert(NSPoint(x: customSwatch.bounds.midX, y: customSwatch.bounds.midY), to: nil)
+        return [custom] + (wheel.isHidden ? [] : wheel.debugKnobs().map { wheel.convert($0, to: nil) })
+    }
+    func debugToggleEffects() {
+        showsEffects.toggle()
+        sync(animated: true)
+        onResize?()
+    }
+    func debugToggleSecondColor() { toggleSecondColor() }
+    func debugClickCustom() { customSwatch.onClick?(NSEvent()) }
+    /// Presses a knob's center and drags it to that spot, as the mouse would.
+    func debugDrag(_ index: Int, to spot: ColorWheel.Spot) {
+        guard index < wheel.spots.count else { return }
+        var grab = wheel.press(at: wheel.point(wheel.spots[index]))
+        let target = wheel.point(spot)
+        wheel.drag(&grab, to: target)
+        wheel.release(grab, at: target)
+    }
+    #endif
 
     /// Custom: the wheel and Shade, shown or folded away.
     func toggleCustom() {
         showsCustom.toggle()
         sync(animated: true)
         onResize?()
+    }
+
+    /// The Custom swatch: always shows the wheel and Shade, never folds them.
+    func showCustom() {
+        guard !showsCustom else { return }
+        toggleCustom()
     }
 
     private func changed(final: Bool, animated: Bool) {
@@ -1492,10 +1653,10 @@ final class SpaceLookEditor: NSView {
     private func sync(animated: Bool) {
         let space = draft
         if space.hue2 == nil { selected = 0 }
-        var spots = [ColorWheel.Spot(hue: space.baseHue, amount: space.tintAmount)]
+        var spots = [ColorWheel.Spot(hue: space.baseHue, amount: min(space.tintAmount, 1))]
         var depths = [depth(0)]
         if let hue2 = space.hue2 {
-            spots.append(ColorWheel.Spot(hue: hue2, amount: space.tintAmount2))
+            spots.append(ColorWheel.Spot(hue: hue2, amount: min(space.tintAmount2, 1)))
             depths.append(depth(1))
         }
         wheel.show(spots, depths: depths, selected: selected, animated: animated)
@@ -1563,17 +1724,26 @@ final class SpaceLookEditor: NSView {
 
     // MARK: Layout
 
-    private let swatchSize: CGFloat = 24
+    private let swatchSize = SwatchRing.side
     private let chipSize: CGFloat = 26
     private let sliderHeight: CGFloat = 30
     /// The Colors row: as tall as the dial, a little more than a slider.
     private let dialSize: CGFloat = 40
     private let disclosureHeight: CGFloat = 28
     /// How tall the wheel is.
-    var wheelHeight: CGFloat = 200 { didSet { needsLayout = true } }
+    var wheelHeight: CGFloat = ColorWheel.fullHeight { didSet { needsLayout = true } }
+    var showsWheel: Bool { showsCustom }
+
+    /// Swatches in each row of the grid: Default, the presets, picture and Custom come out to whole rows of seven.
+    static let columns = 7
+    /// How many swatches the grid has.
+    static var tileCount: Int { 1 + SpaceLook.presets.count + 2 }
+    private var swatchRows: Int { (tiles.count + Self.columns - 1) / Self.columns }
+    /// The swatch grid's height.
+    private var swatchesHeight: CGFloat { CGFloat(swatchRows) * swatchSize + CGFloat(swatchRows - 1) * Tokens.Space.x2 }
 
     var preferredHeight: CGFloat {
-        var h = swatchSize + Tokens.Space.x1 + disclosureHeight
+        var h = swatchesHeight + Tokens.Space.x1 + disclosureHeight
         if showsCustom { h += customHeight }
         if showsEffects { h += Tokens.Space.x2 + dialSize + Tokens.Space.x3 + (sliderHeight + Tokens.Space.x3) * 2 - Tokens.Space.x3 }
         if showsGlass { h += sliderHeight + Tokens.Space.x3 }
@@ -1604,11 +1774,13 @@ final class SpaceLookEditor: NSView {
         let width = bounds.width
         var y: CGFloat = 0
         let tiles = self.tiles
-        let gap = (width - CGFloat(tiles.count) * swatchSize) / CGFloat(tiles.count - 1)
+        let columns = CGFloat(Self.columns)
+        let gap = (width - columns * swatchSize) / (columns - 1)
         for (i, tile) in tiles.enumerated() {
-            tile.frame = NSRect(x: round(CGFloat(i) * (swatchSize + gap)), y: y, width: swatchSize, height: swatchSize)
+            let column = CGFloat(i % Self.columns), row = CGFloat(i / Self.columns)
+            tile.frame = NSRect(x: round(column * (swatchSize + gap)), y: y + row * (swatchSize + Tokens.Space.x2), width: swatchSize, height: swatchSize)
         }
-        y += swatchSize
+        y += swatchesHeight
         // Laid out while folded too, so they fade in place.
         wheel.frame = NSRect(x: 0, y: y + Tokens.Space.x3, width: width, height: wheelHeight)
         row(shadeLabel, shadeSlider, y: wheel.frame.maxY + Tokens.Space.x3, height: sliderHeight)
@@ -1774,19 +1946,19 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     /// The panel grows or shrinks between the colors and the icons, keeping the edge nearest what opened it.
     private func resizeToFit() {
-        guard superview != nil, abs(frame.height - contentHeight) > 0.5 else { return }
+        guard let superview else { return }
+        if controller != nil { fitWheel(in: superview.bounds.height) }
+        guard abs(frame.height - contentHeight) > 0.5 else { return }
         var target = frame
         let delta = contentHeight - frame.height
         target.size.height = contentHeight
-        if superview?.isFlipped == true, anchoredBelow == false { target.origin.y -= delta }
-        if let host = superview {
-            // The edge panel's side is only as tall as the screen: the icons' grid never pushes the editor past it.
-            target.size.height = min(target.size.height, max(0, host.bounds.height - Tokens.Space.x2 * 2))
-            target.origin.y = min(max(Tokens.Space.x2, target.origin.y),
-                                  max(Tokens.Space.x2, host.bounds.height - target.height - Tokens.Space.x2))
-        } else {
-            target.origin.y = max(Tokens.Space.x2, target.origin.y)
-        }
+        if superview.isFlipped, anchoredBelow == false { target.origin.y -= delta }
+        // The edge panel's side is only as tall as the screen: the icons' grid never pushes the editor past it.
+        target.size.height = min(target.size.height, max(0, superview.bounds.height - Tokens.Space.x2 * 2))
+        target.origin.y = min(max(Tokens.Space.x2, target.origin.y),
+                              max(Tokens.Space.x2, superview.bounds.height - target.height - Tokens.Space.x2))
+        if controller != nil { target.origin.y = Self.clampedTop(target.origin.y, height: contentHeight, in: superview.bounds.height) }
+        target.origin.y = max(Tokens.Space.x2, target.origin.y)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.reduceMotion ? 0 : Tokens.Motion.standard
             context.timingFunction = Tokens.Motion.drawer
@@ -1798,6 +1970,31 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     /// True when it hangs down from what opened it; false when it rises from the dots at the bottom.
     private var anchoredBelow = false
+
+    /// Room left above and below the panel in the window.
+    static let topMargin = Tokens.Space.x2, bottomMargin = Tokens.Space.x4
+
+    /// Whether it rises from what opened it (in the window's lower half) rather than hanging from it.
+    static func rises(from anchor: NSRect, in height: CGFloat) -> Bool { anchor.midY > height / 2 }
+
+    /// Its top, moved so the whole panel stays in the window; the top wins when it can't fit at all.
+    static func clampedTop(_ top: CGFloat, height: CGFloat, in windowHeight: CGFloat) -> CGFloat {
+        max(topMargin, min(top, windowHeight - height - bottomMargin))
+    }
+
+    /// The wheel's height, smaller in a short window so everything fits.
+    static func wheelHeight(overflow: CGFloat) -> CGFloat {
+        min(ColorWheel.fullHeight, max(ColorWheel.minimumHeight, ColorWheel.fullHeight - max(0, overflow)))
+    }
+
+    private func fitWheel(in windowHeight: CGFloat) {
+        let full = contentHeight + (editor.showsWheel ? ColorWheel.fullHeight - editor.wheelHeight : 0)
+        let height = Self.wheelHeight(overflow: full - (windowHeight - Self.topMargin - Self.bottomMargin))
+        if editor.wheelHeight != height {
+            editor.wheelHeight = height
+            layoutContent()
+        }
+    }
 
     private func layoutContent() {
         let width = bounds.width - pad * 2
@@ -1824,32 +2021,28 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let overlay = controller.root.overlay
         // Beside the sidebar, over the page: right of it, or left of it on the right.
         let beside = controller.root.besideSidebar(width: Self.width)
+        let x = min(max(Tokens.Space.x2, beside), overlay.bounds.width - Self.width - Tokens.Space.x2)
+        // What opened it, or the space's name when nothing on screen did (the menu bar, the command bar).
+        var source = anchor?.window != nil ? anchor : nil
+        if source == nil, let header = controller.sidebar.list.headerView, header.window != nil { source = header }
+        let place = source.map { $0.convert($0.bounds, to: overlay) }
+        // Low in the window (a space dot, the +) it rises from there; higher up it hangs from it.
+        let rises = place.map { Self.rises(from: $0, in: overlay.bounds.height) } ?? false
+        anchoredBelow = !rises
+        fitWheel(in: overlay.bounds.height)
         let height = contentHeight
-        let x: CGFloat
         var top: CGFloat
-        if let anchor, anchor.window != nil, anchor is SpaceDotView {
-            // From a space dot: beside the sidebar, its bottom level with the dots, so it covers neither the dots
-            // nor the tabs and the sidebar shows the new look in full.
-            let dot = anchor.convert(anchor.bounds, to: overlay)
-            top = dot.maxY - height
-            x = min(max(Tokens.Space.x2, beside), overlay.bounds.width - Self.width - Tokens.Space.x2)
+        if let place {
+            top = rises ? place.maxY - height : place.minY - Tokens.Space.x2
         } else {
-            // From the space's name: beside the sidebar, level with that header.
             top = controller.root.cardFrame.minY + Tokens.Space.x2
-            if let header = controller.sidebar.list.headerView, header.window != nil {
-                top = header.convert(header.bounds, to: overlay).minY - Tokens.Space.x2
-            }
-            x = beside
-            // Hanging from the header, it grows downward when the icons take the colors' place.
-            anchoredBelow = true
         }
-        top = max(Tokens.Space.x2, min(top, overlay.bounds.height - height - Tokens.Space.x4))
+        top = Self.clampedTop(top, height: height, in: overlay.bounds.height)
         frame = NSRect(x: x, y: top, width: Self.width, height: height)
         overlay.addSubview(self)
-        // From a dot it rises out of the bottom; from the space's name it hangs from the top.
         // Out of the sidebar's side of it: the left, or the right beside a sidebar on the right.
         let right = controller.root.sidebarOnRight
-        growsFrom = anchor is SpaceDotView ? CGPoint(x: right ? 0.9 : 0.1, y: 1) : CGPoint(x: right ? 1 : 0, y: 0.1)
+        growsFrom = rises ? CGPoint(x: right ? 0.9 : 0.1, y: 1) : CGPoint(x: right ? 1 : 0, y: 0.1)
         present(arrival: .pop)
         focusName()
         controller.root.holdReveal = true
@@ -2041,6 +2234,23 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
     func debugRemoveBackground() { clearBackground() }
     func debugToggleCustom() { editor.toggleCustom() }
+    func debugClickCustom() { editor.debugClickCustom() }
+    func debugToggleEffects() { editor.debugToggleEffects() }
+    func debugToggleSecondColor() { editor.debugToggleSecondColor() }
+    func debugDrag(_ index: Int, to spot: ColorWheel.Spot) { editor.debugDrag(index, to: spot) }
+    /// For the debug bridge: what a press on the name, the Custom swatch and each knob lands on, and where the panel is
+    /// (window points, top left).
+    func debugProbe() -> String {
+        guard let window, let frame = window.contentView?.superview else { return "no window" }
+        let height = window.frame.height
+        let name = nameField.convert(NSPoint(x: nameField.bounds.midX, y: nameField.bounds.midY), to: nil)
+        let knobs = ([name] + editor.debugKnobs()).map { p -> String in
+            let hit = frame.hitTest(frame.convert(p, from: nil))
+            return "(\(Int(p.x)),\(Int(height - p.y)))=\(hit.map { "\(type(of: $0))" } ?? "nil")"
+        }
+        let f = convert(bounds, to: nil)
+        return "panel x=\(Int(f.minX)) top=\(Int(height - f.maxY)) bottom=\(Int(height - f.minY)) window=\(Int(height)) " + knobs.joined(separator: " ")
+    }
     #endif
 
     /// A profile created with the space (Settings › Spaces › Give new spaces their own profile, #291); takes the space name

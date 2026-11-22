@@ -256,6 +256,18 @@ struct SidebarSideTests {
         #expect(SettingsView.sidebarSides[menu.selectedIndex] == BrowserRootView.sidebarOnRight)
         #expect(!all(row).contains { $0 is Toggle })
     }
+
+    /// The space's name and the Tabs label have their first letter's ink, not their box, on the icon column.
+    @Test func theSpaceNamesInkMeetsTheIconColumn() throws {
+        let font = SpaceHeaderView.nameFont
+        #expect(SpaceHeaderView.inkBearing(of: "", font: font) == 0)
+        let bearing = SpaceHeaderView.inkBearing(of: "Personal", font: font)
+        #expect(bearing > 0 && bearing < 4)
+        let header = SpaceHeaderView(frame: NSRect(x: 0, y: 0, width: width - Tokens.Sidebar.edge * 2, height: SpaceHeaderView.rowHeight))
+        header.name = "Personal"
+        header.layoutSubtreeIfNeeded()
+        #expect(abs(header.label.frame.minX + Label.inset + bearing - SidebarRowView.inset) < 0.01)
+    }
 }
 
 /// The space name stays at the top while scrolling, as in Arc.

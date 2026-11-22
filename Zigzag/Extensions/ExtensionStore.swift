@@ -531,6 +531,8 @@ enum ExtensionStore {
         case notListed
         /// WebKit couldn't read it as an extension.
         case unsupported
+        /// A browser theme and nothing else: Zigzag draws its own look and doesn't apply one (#454).
+        case theme
         /// What to tell the person, in plain words.
         var message: String {
             switch self {
@@ -539,6 +541,7 @@ enum ExtensionStore {
             case .unpack: String(localized: "This extension’s package is damaged, so it wasn’t installed.", comment: "Shown when an extension couldn't be installed because its package is damaged.")
             case .notListed: String(localized: "This extension isn’t in the Chrome Web Store any more.", comment: "Shown when an extension couldn't be installed because the Chrome Web Store no longer has it. Chrome Web Store is Google's name.")
             case .unsupported: String(localized: "This extension doesn’t work in Zigzag yet.", comment: "Shown when an extension couldn't be installed because WebKit can't run it.")
+            case .theme: String(localized: "This is a browser theme, and Zigzag doesn’t use browser themes. To change how Zigzag looks, choose Edit Space… on a space and pick its colors.", comment: "Shown instead of installing a theme from the Chrome Web Store or Firefox Add-ons. Edit Space… is the item in a space's right-click menu.")
             }
         }
         /// The same, short enough for one line beside the extension's name.
@@ -549,8 +552,24 @@ enum ExtensionStore {
             case .unpack: String(localized: "Its package is damaged.", comment: "One line beside an extension's name when its update's package is damaged.")
             case .notListed: String(localized: "Not in the Chrome Web Store any more.", comment: "One line beside an extension's name when the Chrome Web Store no longer has it. Chrome Web Store is Google's name.")
             case .unsupported: String(localized: "Doesn’t work in Zigzag yet.", comment: "One line beside an extension's name when WebKit can't run it.")
+            case .theme: String(localized: "A browser theme. Zigzag doesn’t use them.", comment: "One line beside a name, in place of installing it, when it's a browser theme rather than an extension.")
             }
         }
+    }
+
+    /// Keys that make a package do something beyond a theme: scripts, a page or popup of its own, or a hook into the
+    /// browser. A manifest with a theme and any of these is an extension that also has a theme, and installs.
+    nonisolated static let extensionKeys: Set<String> = [
+        "background", "content_scripts", "action", "browser_action", "page_action", "options_page", "options_ui",
+        "chrome_url_overrides", "devtools_page", "side_panel", "sidebar_action", "omnibox", "commands",
+        "declarative_net_request", "user_scripts", "chrome_settings_overrides", "experiment_apis",
+    ]
+
+    /// A browser theme and nothing more: Chrome's `theme` or Firefox's `theme` / `theme_experiment`, without
+    /// anything an extension runs (#454). The importers skip these too (`ChromiumExtensions`, `OrionImporter`).
+    nonisolated static func isThemeOnly(_ manifest: [String: Any]) -> Bool {
+        guard manifest["theme"] != nil || manifest["theme_experiment"] != nil else { return false }
+        return extensionKeys.isDisjoint(with: manifest.keys)
     }
 
     /// A verified package, downloaded and unpacked but not installed yet: what the install sheet shows.
@@ -580,6 +599,10 @@ enum ExtensionStore {
             try? FileManager.default.removeItem(at: package.folder)
             return .failure(.unpack)
         }
+        guard !isThemeOnly(manifest) else {
+            try? FileManager.default.removeItem(at: package.folder)
+            return .failure(.theme)
+        }
         // A sound package WebKit still can't read (an app, a manifest it doesn't know) won't run here.
         guard let ext = try? await WKWebExtension(resourceBaseURL: package.folder) else {
             try? FileManager.default.removeItem(at: package.folder)
@@ -605,6 +628,7 @@ enum ExtensionStore {
     @available(macOS 15.4, *)
     static func prepareInstallXPI(data: Data, storeID: String? = nil) async -> Result<PreparedInstall, InstallError> {
         guard let package = try? XPIPackage(data) else { return .failure(.unpack) }
+        guard !isThemeOnly(package.manifest) else { return .failure(.theme) }
         let geckoID = package.firefoxID ?? storeID.flatMap { isAddonsGUID($0) ? $0 : nil }
         let id = xpiID(forGeckoID: geckoID, data: data)
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("\(xpiStagingPrefix)\(UUID().uuidString)")
@@ -745,6 +769,11 @@ enum ExtensionStore {
     static func reviewUnpacked(_ url: URL) async -> (extension: WKWebExtension, report: ExtensionReport)? {
         guard let manifest = manifest(in: url), let ext = try? await WKWebExtension(resourceBaseURL: url) else { return nil }
         return (ext, ExtensionReport(extension: ext, manifest: manifest, id: unpackedID(for: url)))
+    }
+
+    /// A folder holding a browser theme and nothing more (#454), refused before its review sheet.
+    static func folderIsThemeOnly(_ url: URL) -> Bool {
+        manifest(in: url).map(isThemeOnly) ?? false
     }
 
     /// Loads an unpacked extension (Install from Folder, or bundled in an app) in place, never modified. Settings reviews
@@ -1442,10 +1471,24 @@ function createSolverFrame() {
 }
 createSolverFrame();
 """#, pattern: true),
-        // Each transaction id comes from the sandbox through the bridge, not an iframe message.
+        // Each transaction id comes from the sandbox through the bridge, not an iframe message. A page's first request
+        // can come before the challenge has started: it waits for it, as the iframe's queue did, rather than failing.
         Patch(file: "scripts/twchallenge.js",
               find: #"function solveChallenge\(path, method\) \{[\s\S]*?\n\}\n\nfunction recoverSolver"#,
-              replace: "function solveChallenge(path, method) {\n    return window.__zigzagOldTwitterCall({ op: \"solve\", path, method });\n}\n\nfunction recoverSolver", pattern: true),
+              replace: #"""
+async function solveChallenge(path, method) {
+    if (!solverReady && !solverErrored) {
+        await initChallenge();
+        let start = Date.now();
+        while (!solverReady && !solverErrored && Date.now() - start < 15000) {
+            await new Promise((r) => setTimeout(r, 50));
+        }
+    }
+    return window.__zigzagOldTwitterCall({ op: "solve", path, method });
+}
+
+function recoverSolver
+"""#, pattern: true),
         // The codes its page worked out go to the sandbox too; ready means it can sign requests. A failed init stops
         // signing, as in Chrome, but a timeout or a restart doesn't: the next solve starts a new sandbox over.
         Patch(file: "scripts/twchallenge.js",
@@ -1482,6 +1525,61 @@ async function sendInit() {
         // A fresh init starts over, as a new iframe did.
         Patch(file: "sandbox.html", find: "if (data.action === 'init') {\n                try {",
               replace: "if (data.action === 'init') {\n                initError = false;\n                try {"),
+        // A quoted video's picture is Zigzag's own layer's click to toggle. OldTwitter's second toggle on the media
+        // would act on clicks in the control pills' empty parts, where nothing should happen.
+        Patch(file: "scripts/helpers.js",
+              find: """
+        if (tweetMediaQuote)
+            tweetMediaQuote.addEventListener("click", (e) => {
+                if (e && e.target && e.target.tagName === "VIDEO") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    if (e.target.paused) {
+                        e.target.play();
+                    } else {
+                        e.target.pause();
+                    }
+                }
+            });
+""", replace: """
+        if (tweetMediaQuote)
+            tweetMediaQuote.addEventListener("click", (e) => {
+                // The picture's click is handled outside the extension; a quoted video does not toggle here.
+            });
+"""),
+        // A quoted tweet answers a modified click as a link: ⌘-click opens it in a new tab.
+        Patch(file: "scripts/helpers.js",
+              find: """
+                tweetBodyQuote.addEventListener("click", async (e) => {
+                    e.preventDefault();
+                    document.getElementById("loading-box").hidden = false;
+""", replace: """
+                tweetBodyQuote.addEventListener("click", async (e) => {
+                    if (e.metaKey || e.ctrlKey || e.target.closest("a[data-zigzag-modified]")) return;
+                    e.preventDefault();
+                    document.getElementById("loading-box").hidden = false;
+"""),
+        Patch(file: "scripts/helpers.js",
+              find: """
+                tweetBodyQuote.addEventListener("click", (e) => {
+                    e.preventDefault();
+""", replace: """
+                tweetBodyQuote.addEventListener("click", (e) => {
+                    if (e.metaKey || e.ctrlKey || e.target.closest("a[data-zigzag-modified]")) return;
+                    e.preventDefault();
+"""),
+        // The iframe "modal" takes every link click on a page, a quoted tweet included. A modified click is the
+        // browser's: ⌘-click opens the quoted tweet in a new tab.
+        Patch(file: "scripts/iframeNavigation.js",
+              find: """
+function useIframeNavigation(e) {
+    if (e.defaultPrevented) return;
+""", replace: """
+function useIframeNavigation(e) {
+    if (e.defaultPrevented) return;
+    if (e.metaKey || e.ctrlKey || (e.target.closest && e.target.closest("a[data-zigzag-modified]"))) return;
+"""),
         // The sandbox has no body of its own here: the page it sets up the challenge in is the real one, so it makes
         // the two pieces the script reads when they aren't there.
         Patch(file: "sandbox.html", find: """

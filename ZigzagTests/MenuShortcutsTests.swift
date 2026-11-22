@@ -65,6 +65,77 @@ import Testing
     }
 
     /// ⌘T opens the command bar for a new tab; ⌘T again closes it.
+    @Test func onlyTheCommandQKeyCountsAsTheQuitToAskAbout() {
+        let quit = MainMenu.build().items.first?.submenu?.items.first { $0.keyEquivalent == "q" }
+        #expect(quit?.action == #selector(AppDelegate.quitFromMenu(_:)))
+        func key(_ characters: String, _ flags: NSEvent.ModifierFlags) -> NSEvent? {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                             characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: 12)
+        }
+        #expect(AppDelegate.isQuitKey(key("q", .command)))
+        // Return on the highlighted item, a click, or no event at all is choosing it in the menu.
+        #expect(!AppDelegate.isQuitKey(key("\r", [])))
+        #expect(!AppDelegate.isQuitKey(key("q", [.command, .option])))
+        #expect(!AppDelegate.isQuitKey(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                          context: nil, eventNumber: 0, clickCount: 1, pressure: 0)))
+        #expect(!AppDelegate.isQuitKey(nil))
+    }
+
+    @Test func aQuitShortcutSetInSettingsIsTheOneThatAsks() {
+        func key(_ characters: String, _ flags: NSEvent.ModifierFlags) -> NSEvent? {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                             characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: 0)
+        }
+        let custom = Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags([.command, .option]).rawValue)
+        #expect(AppDelegate.isQuitKey(key("q", [.command, .option]), combo: custom))
+        #expect(!AppDelegate.isQuitKey(key("q", .command), combo: custom))
+        // Recorded with ⇧, or shipped as an uppercase key: either way ⇧ is part of it.
+        let shifted = Shortcuts.Combo(key: "x", modifiers: NSEvent.ModifierFlags([.command, .shift]).rawValue)
+        #expect(AppDelegate.isQuitKey(key("X", [.command, .shift]), combo: shifted))
+        #expect(AppDelegate.isQuitKey(key("X", [.command, .shift]), combo: Shortcuts.Combo(key: "X", modifiers: NSEvent.ModifierFlags.command.rawValue)))
+        #expect(!AppDelegate.isQuitKey(key("x", .command), combo: shifted))
+        // Taken away in Settings: no key asks.
+        #expect(!AppDelegate.isQuitKey(key("q", .command), combo: .none))
+    }
+
+    /// A Quit shortcut changed or taken away before Quit had an action of its own stays as you set it.
+    @Test func aQuitShortcutSetBeforeKeepsAfterTheRename() {
+        let option = Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags([.command, .option]).rawValue)
+        #expect(Shortcuts.renamed(["terminate:#0": option]) == ["quitFromMenu:#0": option])
+        #expect(Shortcuts.renamed(["terminate:#0": .none, "newTab:#0": option]) == ["quitFromMenu:#0": .none, "newTab:#0": option])
+        // One already saved under the new id is the newer choice.
+        #expect(Shortcuts.renamed(["terminate:#0": option, "quitFromMenu:#0": .none]) == ["quitFromMenu:#0": .none])
+        #expect(Shortcuts.renamed([:]).isEmpty)
+    }
+
+    /// On a Russian layout ⌘Q types ⌘Й; it's still the Quit key, where Q sits, as the menu takes it.
+    @Test func theQuitKeyOnALayoutWithoutLatinLetters() {
+        func key(_ characters: String, _ flags: NSEvent.ModifierFlags, code: UInt16) -> NSEvent? {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                             characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
+        }
+        let quit = Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags.command.rawValue)
+        #expect(AppDelegate.isQuitKey(key("й", .command, code: 12), combo: quit))
+        #expect(!AppDelegate.isQuitKey(key("ц", .command, code: 13), combo: quit))
+        #expect(!AppDelegate.isQuitKey(key("й", [.command, .option], code: 12), combo: quit))
+        // A custom shortcut goes by its own key's place.
+        let custom = Shortcuts.Combo(key: "x", modifiers: NSEvent.ModifierFlags([.command, .option]).rawValue)
+        #expect(AppDelegate.isQuitKey(key("ч", [.command, .option], code: 7), combo: custom))
+        #expect(!AppDelegate.isQuitKey(key("й", .command, code: 12), combo: custom))
+        // A Latin layout with Q elsewhere (AZERTY's A key) goes by the letter, as the menu does.
+        #expect(!AppDelegate.isQuitKey(key("a", .command, code: 12), combo: quit))
+        #expect(AppDelegate.isQuitKey(key("q", .command, code: 0), combo: quit))
+    }
+
+    @Test func onlyTheQuitKeyAsksButDownloadsAlwaysDo() {
+        // The menu and the Dock quit at once; the key asks while the setting is on.
+        #expect(AppDelegate.asks(fromKey: true, setting: true, downloading: 0))
+        #expect(!AppDelegate.asks(fromKey: false, setting: true, downloading: 0))
+        #expect(!AppDelegate.asks(fromKey: true, setting: false, downloading: 0))
+        #expect(AppDelegate.asks(fromKey: false, setting: false, downloading: 2))
+        #expect(AppDelegate.asks(fromKey: false, setting: true, downloading: 1))
+    }
+
     @Test func commandTOpensTheNewTabBarAndAgainClosesIt() async throws {
         #expect(keys(#selector(BrowserWindowController.newTab(_:))) == ["⌘t"])
         try await inWindow([nil]) { controller, _ in
@@ -177,6 +248,31 @@ import Testing
     }
 
     /// ⌘F shows the find bar with its field focused; ⌘F again there hides it. Away from its field, ⌘F goes back to it.
+    /// ⇧⌘2 brings Capture over the page and again takes it away; Esc leaves it too, and so does going to another tab
+    /// (#457).
+    @Test func shiftCommandTwoOpensCaptureAndEscLeaves() async throws {
+        #expect(keys(#selector(BrowserWindowController.takePageScreenshot(_:))) == ["⇧⌘2"])
+        try await pages(["one", "two"]) { urls in
+            try await inWindow(urls) { controller, tabs in
+                #expect(await settled(tabs[0], at: urls[0]))
+                controller.root.layoutSubtreeIfNeeded()
+                controller.takePageScreenshot(nil)
+                #expect(controller.capture.isActive)
+                controller.takePageScreenshot(nil)
+                #expect(!controller.capture.isActive)
+                controller.takePageScreenshot(nil)
+                let esc = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: controller.window?.windowNumber ?? 0,
+                                                        context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+                #expect(controller.capture.handle(esc))
+                #expect(!controller.capture.isActive)
+                controller.takePageScreenshot(nil)
+                #expect(controller.capture.isActive)
+                controller.tabManager.select(tabs[1])
+                #expect(await until(2) { !controller.capture.isActive })
+            }
+        }
+    }
+
     @Test func commandFShowsTheFindBarAndAgainHidesIt() async throws {
         #expect(keys(#selector(BrowserWindowController.showFindBar(_:))) == ["⌘f"])
         try await inWindow([nil]) { controller, _ in

@@ -57,7 +57,7 @@ struct LinkMenuTests {
 
     private func titles(_ menu: NSMenu) -> [String] { menu.items.map { $0.isSeparatorItem ? "-" : $0.title } }
 
-    private let opens = ["Open Link in New Tab", "Open Link in New Window", "Open Link in Private Window", "Open Link in Peek", "Open Link"]
+    private let opens = ["Open Link in New Tab", "Open Link in New Window", "Open Link in Private Window", "Open Link in Zigzag Mini", "Open Link"]
 
     @Test func newTabComesFirst() {
         let link = menu([("Open Link", "WKMenuItemIdentifierOpenLink"), ("Open Link in New Window", "WKMenuItemIdentifierOpenLinkInNewWindow"),
