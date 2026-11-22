@@ -2238,6 +2238,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
+        DarkPages.pageCommitted(in: webView)
         // Page committed: no fallback needed.
         pendingHTTPFallback = nil
         // The rule-opened page arrived, so its links and downloads are normal again.
