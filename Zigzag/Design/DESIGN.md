@@ -340,12 +340,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   speaker right after that title. Where a part is narrower than its icon, the gaps and a few letters
   (`TabRowView.segmentMinWidth`, 56 at Medium), every part shows its icon alone in its middle, hairlines still between.
   In the split you're on, the page you're in has its title in the row's ink and the others in `quietInk`; with icons
-  alone, the page you're in has the hover wash under its part. The close button comes as a tab's does, over the last
-  title's faded end, so nothing moves under the pointer; its room is kept, at rest too, where it would cover too much (icons
-  alone, a speaker in the last part, or the last part's whole title), decided by the row's width, never its state. A pinned page split beside a tab carries the pair in its own row, so each page
-  shows once and one row is lit. A pinned split of two, three or four is the same row (`TabRowView`) in Pinned. Its ×
-  closes the whole split in the tab list and unloads a pinned one; a middle-click closes the one page under it.
-  Pointing at a part names its page, and a double-click renames that page (over its
+  alone, the page you're in has the hover wash under its part. Each part has its own ×, closing that page alone (a
+  pinned one's unloads it, as on its own row): pointing at a part lights it with the hover wash and puts its × at the
+  part's end, the size and inset of a tab's, over its title's faded end, so nothing moves under the pointer; on the
+  split of tabs you're on, the page you're in shows it at rest. A part with only its icon and no room beside it shows a
+  favorite's small × in its corner. Close Split View in the menu closes them all. A pinned page split beside a tab carries the pair in its own row, so each page
+  shows once and one row is lit. A pinned split of two, three or four is the same row (`TabRowView`) in Pinned. A
+  double-click renames the part's page (over its
   title, or the row for the moment when the part shows no title).
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size

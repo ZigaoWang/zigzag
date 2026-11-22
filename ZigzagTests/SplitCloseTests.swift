@@ -20,8 +20,8 @@ import Testing
         try body(controller, tabs)
     }
 
-    private func row(_ tab: Tab, partners: [Tab]) -> TabRowView {
-        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
+    private func row(_ tab: Tab, partners: [Tab], width: CGFloat = 240) -> TabRowView {
+        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.rowHeight))
         row.configure(tab: tab)
         row.configure(parts: partners.map { TabRowView.Part(page: $0) })
         return row
@@ -59,59 +59,82 @@ import Testing
         }
     }
 
-    /// The × of a split's row sits where a single tab's does, at the row's end, and says it closes the split.
-    @Test func theCloseButtonSitsWhereASingleTabsDoes() throws {
-        try inWindow(["A", "B", "C"]) { controller, tabs in
-            let single = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
-            single.configure(tab: tabs[2])
+    /// The row's × is on the part pointed at, else on the page you're in.
+    @Test func theRowsCloseButtonClosesOnePart() throws {
+        try inWindow(["A", "B"]) { controller, tabs in
+            let left = tabs[0], right = tabs[1]
+            let row = row(left, partners: [right])
+            row.isSelected = true
+            row.focusedHalf = 1
+            #expect(row.closingPage === right)
+            row.focusedHalf = 0
+            #expect(row.closingPage === left)
+            row.debugPoint(atPart: 1)
+            #expect(row.closingPage === right)
+            // A row of one page: its own tab.
+            row.configure(parts: [])
+            #expect(row.closingPage === left)
+            _ = controller
+        }
+    }
+
+    /// Each part's × sits inside it, the size, inset and height of a single tab's, and only on the part you point at
+    /// or the page you're in.
+    @Test(arguments: [2, 4]) func theCloseButtonSitsInItsPart(count: Int) throws {
+        try inWindow((0..<count).map { "Page \($0)" } + ["Single"]) { controller, tabs in
+            // Wide enough that every part shows its title, as a tab's row does.
+            let width: CGFloat = count == 2 ? 240 : 480
+            let single = TabRowView(frame: NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.rowHeight))
+            single.configure(tab: tabs[count])
             single.isSelected = true
             single.layoutSubtreeIfNeeded()
-            for focused in [0, 1] {
-                let row = row(tabs[0], partners: [tabs[1]])
-                row.isSelected = true
-                row.focusedHalf = focused
+            let inset = single.bounds.maxX - single.closeButton.frame.maxX
+            let row = row(tabs[0], partners: Array(tabs[1..<count]), width: width)
+            row.isHovered = true
+            for part in 0..<count {
+                row.debugPoint(atPart: part)
                 row.layoutSubtreeIfNeeded()
                 #expect(!row.closeButton.isHidden)
-                #expect(row.closeButton.frame == single.closeButton.frame)
-                #expect(row.closeButton.toolTip == "Close Split View")
+                #expect(row.closeButton.toolTip == "Close Tab")
+                #expect(row.closeButton.frame.size == single.closeButton.frame.size)
+                #expect(row.closeButton.frame.minY == single.closeButton.frame.minY)
+                let end = TabRowView.splitParts(count: count, end: row.bounds.width)[part].end
+                #expect(end - row.closeButton.frame.maxX == inset)
+                #expect(row.closingPage === tabs[part])
             }
-            let row = row(tabs[0], partners: [tabs[1]])
+            row.debugPoint(atPart: nil)
+            row.isHovered = false
             row.layoutSubtreeIfNeeded()
             #expect(row.closeButton.isHidden)
             _ = controller
         }
     }
 
-    /// A pinned page split with a tab: its × closes the split, so it says so; two pinned pages' says it unloads them.
-    @Test func aPinnedPageWithATabSaysItClosesTheSplit() throws {
-        try inWindow(["A", "B", "C"]) { _, tabs in
-            tabs[0].bookmarkID = UUID()
-            @MainActor func tip(_ partner: Tab) -> String? {
-                let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
-                row.isBookmark = true
-                row.configure(tab: tabs[0])
-                row.configure(parts: [TabRowView.Part(page: partner)])
-                return row.closeButton.toolTip
-            }
-            #expect(tip(tabs[1]) == "Close Split View")
-            tabs[2].bookmarkID = UUID()
-            #expect(tip(tabs[2]) == "Unload Pages")
-        }
-    }
-
-    /// The row's × closes every page of the split, and one ⌘Z brings them back side by side.
-    @Test func theRowsCloseButtonClosesTheSplit() throws {
-        try inWindow(["A", "B", "C"]) { controller, tabs in
+    /// A part's × closes that page alone, the rest of the split closing up, and ⌘Z puts it back in the split.
+    @Test(arguments: [2, 4]) func aPartsCloseButtonClosesOnlyItsPage(count: Int) throws {
+        try inWindow((0..<count).map { "Page \($0)" } + ["Other"]) { controller, tabs in
             let manager = controller.tabManager
-            manager.makeSplit(tabs[0], with: tabs[1])
+            let pages = Array(tabs[0..<count])
+            if count == 2 { manager.makeSplit(pages[0], with: pages[1]) } else {
+                manager.makeGroup(pages, shape: TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight], column: 0.5, row: 0.5))
+            }
             controller.sidebar.list.reload(animated: false)
             controller.sidebar.list.layoutSubtreeIfNeeded()
-            let row = try #require(controller.sidebar.list.row(for: tabs[0]) as? TabRowView)
+            let row = try #require(controller.sidebar.list.row(for: pages[0]) as? TabRowView)
+            let shown = row.pages
+            #expect(shown.count == count)
+            row.isHovered = true
+            row.debugPoint(atPart: 1)
+            #expect(row.closingPage === shown[1])
             row.onClose?()
-            #expect(manager.currentTabs.map(\.displayTitle) == ["C"])
+            #expect(manager.tab(with: shown[1].id) == nil)
+            let rest = shown.filter { $0 !== shown[1] }
+            #expect(rest.allSatisfy { manager.tab(with: $0.id) === $0 })
+            #expect(count == 2 ? manager.split(for: rest[0]) == nil : manager.split(for: rest[0])?.count == count - 1)
             controller.sidebarUndo.undo()
-            #expect(manager.currentTabs.map(\.displayTitle) == ["A", "B", "C"])
-            #expect(manager.currentTabs.first { $0.displayTitle == "A" }.flatMap(manager.split(for:))?.count == 2)
+            let back = try #require(manager.split(for: rest[0]))
+            #expect(back.count == count)
+            #expect(manager.currentTabs.contains { $0.displayTitle == shown[1].displayTitle })
         }
     }
 

@@ -610,6 +610,43 @@ import Testing
         }
     }
 
+    /// A pinned split's row has a tab split's × in each part: pointed at, it says Unload Page and unloads that page
+    /// alone, the pin keeping every page; an unloaded part has none.
+    @Test(arguments: [2, 4]) func aPinnedPartsCloseButtonUnloadsOnlyIt(count: Int) throws {
+        try inWindow((0..<count).map(String.init)) { controller, tabs, space in
+            let manager = controller.tabManager
+            let list = controller.sidebar.list
+            manager.makeGroup(tabs, shape: count == 2 ? Self.shapes[0] : Self.shapes[4])
+            manager.bookmarkTab(tabs[0], in: space)
+            tabs.forEach { _ = $0.ensureWebView() }
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == count)
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let row = try #require(list.row(forBookmark: marks[0]) as? TabRowView)
+            #expect(row.isSplit)
+            row.isHovered = true
+            row.debugPoint(atPart: 1)
+            row.layoutSubtreeIfNeeded()
+            #expect(!row.closeButton.isHidden)
+            #expect(row.closeButton.toolTip == "Unload Page")
+            let page = try #require(row.closingPage)
+            row.onClose?()
+            #expect(manager.bookmarkTab(for: try #require(page.bookmarkID)) == nil)
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            #expect(tabs.filter { $0 !== page }.allSatisfy { manager.bookmarkTab(for: $0.bookmarkID!) === $0 })
+            // Unloaded now: that part has no ×, as a pinned page that isn't loaded has none on its own row.
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let after = try #require(list.row(forBookmark: marks[0]) as? TabRowView)
+            after.isHovered = true
+            let unloaded = try #require(marks.firstIndex(of: page.bookmarkID!))
+            after.debugPoint(atPart: unloaded)
+            after.layoutSubtreeIfNeeded()
+            #expect(after.closeButton.isHidden)
+        }
+    }
+
     /// A tab of three or four side by side says it pins the split view, as one of two does, in its menu and the
     /// menu bar; a pinned one's says it unpins the split view.
     @Test func theItemsNameTheSplitForEveryCount() throws {
@@ -641,8 +678,11 @@ import Testing
             list.layoutSubtreeIfNeeded()
             let tabRow = try #require(list.row(for: tabs[0]) as? TabRowView)
             let hairline = Tokens.Metric.hairline
+            // Loaded, so a pinned part has its × as a tab's part does.
+            tabs.forEach { _ = $0.ensureWebView() }
             func shape(_ row: TabRowView) -> [NSRect] {
                 row.isHovered = true
+                row.debugPoint(atPart: 0)
                 row.layoutSubtreeIfNeeded()
                 var parts: [NSRect] = []
                 for view in row.subviews where !view.isHidden && (view is FaviconView || view.frame.width == hairline) { parts.append(view.frame) }

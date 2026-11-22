@@ -6712,7 +6712,7 @@
       }
     },
     "Close %@" : {
-      "comment" : "Tooltip of the close button on one page's part of a split view's row in the sidebar. The name is that page's title.",
+      "comment" : "VoiceOver action on a split view's row in the sidebar: closes one page of it. The name is that page's title.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -22161,6 +22161,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消分组"
+          }
+        }
+      }
+    },
+    "Unload %@" : {
+      "comment" : "VoiceOver action on a split view's row in the sidebar: unloads one pinned page of it. The name is that page's title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卸载“%@”"
           }
         }
       }
