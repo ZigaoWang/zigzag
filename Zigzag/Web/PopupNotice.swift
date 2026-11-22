@@ -83,7 +83,8 @@ enum PopupNotice {
     /// A real event on its way in (`ZigzagApplication.sendEvent`): a click or key that lands in a page is noted for it.
     /// AI apps' keys don't count.
     static func noteInput(_ event: NSEvent) {
-        guard countsAsInput(event.type, keyCode: event.type == .keyDown ? event.keyCode : nil), !MCPKeyDelivery.isAgentEvent(event),
+        guard countsAsInput(event.type, keyCode: event.type == .keyDown ? event.keyCode : nil, modifiers: event.modifierFlags),
+              !MCPKeyDelivery.isAgentEvent(event),
               let window = event.window else { return }
         var view: NSView?
         if event.type == .keyDown {
@@ -95,11 +96,12 @@ enum PopupNotice {
         if let webView = view as? WKWebView { noteInput(in: webView) }
     }
 
-    /// A click or a key, but not Esc, which puts a question away (pop-ups' own included), as in Chrome.
-    nonisolated static func countsAsInput(_ type: NSEvent.EventType, keyCode: UInt16?) -> Bool {
+    /// A click or a key, as in Chrome: not Esc, which puts a question away (pop-ups' own included), nor a key with ⌘ or
+    /// ⌃ held, a browser shortcut.
+    nonisolated static func countsAsInput(_ type: NSEvent.EventType, keyCode: UInt16?, modifiers: NSEvent.ModifierFlags = []) -> Bool {
         switch type {
         case .leftMouseDown, .leftMouseUp: true
-        case .keyDown: keyCode != 53
+        case .keyDown: keyCode != 53 && modifiers.isDisjoint(with: [.command, .control])
         default: false
         }
     }

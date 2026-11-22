@@ -468,6 +468,17 @@ import WebKit
         #expect(!PopupNotice.countsAsInput(.scrollWheel, keyCode: nil))
     }
 
+    /// A key with ⌘ or ⌃ held is a browser shortcut and doesn't count; plain typing, ⇧, ⌥ and Return do.
+    @Test func shortcutsAreNeverCountedAsInput() {
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 37, modifiers: .command))
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 17, modifiers: [.command, .shift]))
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 48, modifiers: .control))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 0, modifiers: .shift))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 0, modifiers: .option))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 36, modifiers: []))
+        #expect(PopupNotice.countsAsInput(.leftMouseDown, keyCode: nil, modifiers: .command))
+    }
+
     /// A click on one page doesn't count for the next page's pop-up in the same web view.
     @MainActor @Test func aNewPageDoesntCountInputOnThePageBefore() {
         let webView = WKWebView()
