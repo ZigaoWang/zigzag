@@ -608,7 +608,7 @@ final class Tab: NSObject {
         }
         // What you chose for this tab with the developer tools comes with a new web view, before its first page is
         // asked for: it's asked for as the browser chosen, and starts with the look chosen.
-        if !developer.isUnchanged { applyDeveloperState() }
+        if !developer.isUnchanged { applyDeveloperState() } else { applyUserAgent() }
 
         if Self.isExtensionPage(url), let url {
             // Extension pages always load fresh: their saved history state can come back as a blank page, and one
@@ -1193,6 +1193,8 @@ final class Tab: NSObject {
     }
     func reload() {
         guard let webView else { ensureWebView(); return }
+        // A reload isn't asked for again (`asksAgain`), so a user agent chosen since goes on first.
+        applyUserAgent()
         if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
     }
     func reloadFromOrigin() { webView?.reloadFromOrigin() }
@@ -1743,9 +1745,8 @@ extension Tab: WKNavigationDelegate {
         // The page is asked for as the browser it's to be told it's in (the developer tools' User Agent): a request
         // made as another is made again, so no page off the list is asked for as one you chose for your own site.
         if decidesMainFrame {
-            // addons.mozilla.org shows Add to Firefox only to Firefox.
-            let storeAgent = Self.addonsPage(url) != nil ? DeveloperState.UserAgent.firefox.string : nil
-            let wanted = storeAgent ?? developerInEffect(at: url).userAgent.string
+            // addons.mozilla.org shows Add to Firefox only to Firefox; then a site's kept choice (#392).
+            let wanted = userAgent(at: url)
             let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
                                        type: navigationAction.navigationType)
             if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }
@@ -2473,6 +2474,14 @@ extension Tab: WKNavigationDelegate {
 
 extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        let made = newWebView(for: webView, configuration: configuration, navigationAction: navigationAction, windowFeatures: windowFeatures)
+        // The new window's first request goes as the site's chosen browser, not asked for twice (#392).
+        SiteUserAgents.prepare(made, for: navigationAction.request.url)
+        return made
+    }
+
+    private func newWebView(for webView: WKWebView, configuration: WKWebViewConfiguration, navigationAction: WKNavigationAction,
+                            windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Zigzag Mini always opens; a page's own request needs a click or your say.
         if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
             // Page pop-up: a saved destination for the site opens without asking, else the banner asks and nothing

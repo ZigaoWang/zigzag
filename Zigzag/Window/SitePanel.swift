@@ -948,6 +948,7 @@ final class SitePanel: FloatingPanelView {
         context.localApps = context.isWeb && !isPrivate && origin != nil && LocalReceivers.isEnabled
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         context.manySpaces = Library.shared.spaces.count > 1 && SiteRoutes.site(of: url) != nil
+        context.userAgent = Tab.addonsPage(url) == nil
         return context
     }
 
@@ -1041,6 +1042,8 @@ final class SitePanel: FloatingPanelView {
                 }
                 keepCookiesRow = row
                 rows.append(row)
+            case .userAgent:
+                rows.append(userAgentRow())
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
                 rows.append(.toggle(Self.fullScreenTitle,
@@ -1087,6 +1090,22 @@ final class SitePanel: FloatingPanelView {
         if siteLabel.superview == nil { addSubview(siteLabel) }
         buildPermissions()
         buildBoostRows()
+    }
+
+    /// The browser the site is told it's in (#392): Default, a preset, or one typed in Custom…; choosing reloads.
+    private func userAgentRow() -> PanelRow {
+        let tab = tab, url = url
+        let now = SiteUserAgents.choice(for: url)
+        let choices = SiteUserAgents.offered(with: now)
+        let custom = DropdownButton.Action(title: SiteUserAgents.customAction, symbol: nil) { [weak self] in
+            guard let self, let host = (self.controller?.window ?? self.pageHost?.window)?.contentView else { return }
+            self.close()
+            SiteUserAgents.showCustomSheet(for: url, in: host, tab: tab)
+        }
+        return PanelRow.choice(SiteUserAgents.title, options: choices.map { $0?.title ?? SiteUserAgents.defaultTitle },
+                               selected: choices.firstIndex(of: now) ?? 0, actions: [custom]) { index in
+            SiteUserAgents.choose(choices[index], for: url, in: tab)
+        }
     }
 
     /// Permissions page: a row per permission asked this session or with a saved answer, with Ask, Allow and Block.
@@ -1767,9 +1786,11 @@ final class PanelRow: NSView {
 
     /// A name and a dropdown of choices: a permission's Ask, Allow or Block. With `status`, what the choice means
     /// right now sits under the name, read again once a choice has been made (Dark page's "On, following Settings").
-    static func choice(_ title: String, options: [String], selected: Int, status: ((Int) -> String?)? = nil, chose: @escaping (Int) -> Void) -> PanelRow {
+    static func choice(_ title: String, options: [String], selected: Int, actions: [DropdownButton.Action] = [], status: ((Int) -> String?)? = nil,
+                       chose: @escaping (Int) -> Void) -> PanelRow {
         let dropdown = DropdownButton()
         dropdown.options = options.map { DropdownButton.Option(title: $0) }
+        dropdown.actions = actions
         dropdown.selectedIndex = selected
         dropdown.setAccessibilityLabel(title)
         let row = PanelRow(title, control: dropdown, value: status.map { $0(selected) ?? "" })
@@ -2323,7 +2344,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, localApps, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2356,6 +2377,8 @@ enum SitePanelRows {
         var styled = false
         /// The master setting for reaching apps on this Mac is on, so this site can be switched on for it.
         var localApps = false
+        /// A user agent can be chosen: not on addons.mozilla.org, which is always asked for as Firefox.
+        var userAgent = true
     }
 
     static func rows(_ c: Context) -> [Row] {
@@ -2367,6 +2390,7 @@ enum SitePanelRows {
             rows.append(.darkPage)
             rows.append(.keepAwake)
             if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
+            if c.isWeb, c.userAgent { rows.append(.userAgent) }
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }

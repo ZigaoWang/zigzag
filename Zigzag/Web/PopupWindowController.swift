@@ -126,6 +126,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         showWindow(nil)
         if let heldRequest {
             self.heldRequest = nil
+            webView.customUserAgent = SiteUserAgents.agent(for: heldRequest.url)
             webView.load(heldRequest)
         }
         if #available(macOS 15.4, *), !isPrivate { ExtensionCenter.popupOpened(self) }
@@ -191,6 +192,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                                pageSize: Tokens.Metric.popupDefaultSize, origin: nil, parent: parent)
         controller.openedByRule = sender == .rule
         Self.open.insert(controller)
+        controller.webView.customUserAgent = SiteUserAgents.agent(for: url)
         controller.webView.load(URLRequest(url: url))
         controller.showWindow(nil)
         if #available(macOS 15.4, *), !controller.isPrivate { ExtensionCenter.popupOpened(controller) }
@@ -638,6 +640,16 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // Set WebRTC for the destination before its page is made, as in a tab.
         if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url, !ExternalLinks.isExternal(url) {
             WebRTCProtection.apply(to: webView, for: url, here: webRTCChoices)
+            // The site's user agent, as in a tab (#392): a request made as another browser is made again.
+            let wanted = SiteUserAgents.agent(for: url)
+            let again = Tab.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
+                                      type: navigationAction.navigationType)
+            if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }
+            if again {
+                let request = navigationAction.request
+                DispatchQueue.main.async { [weak webView] in webView?.load(request) }
+                return .cancel
+            }
         }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
