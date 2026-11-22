@@ -458,6 +458,16 @@ import WebKit
         #expect(!PopupNotice.countsAsClicked(sinceInput: PopupNotice.sinceInput(in: other, now: 100.4), windowIsKey: true, fromMainFrame: true))
     }
 
+    /// Esc, which puts the pop-up question away, never counts as input for the page's next pop-up.
+    @Test func escIsNeverCountedAsInput() {
+        #expect(PopupNotice.countsAsInput(.leftMouseDown, keyCode: nil))
+        #expect(PopupNotice.countsAsInput(.leftMouseUp, keyCode: nil))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 0))
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 53))
+        #expect(!PopupNotice.countsAsInput(.mouseMoved, keyCode: nil))
+        #expect(!PopupNotice.countsAsInput(.scrollWheel, keyCode: nil))
+    }
+
     /// A click on one page doesn't count for the next page's pop-up in the same web view.
     @MainActor @Test func aNewPageDoesntCountInputOnThePageBefore() {
         let webView = WKWebView()
