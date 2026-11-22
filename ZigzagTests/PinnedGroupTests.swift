@@ -676,6 +676,64 @@ import Testing
         }
     }
 
+    /// Unloading the top-left page of a pinned split of four on screen, by its part's × or a middle-click there: the
+    /// other three stay side by side, you stay on one of them, and the pin opens all four again.
+    @Test(arguments: [false, true], [0, 3]) func unloadingOnePinnedPageKeepsTheRestOnScreen(middleClick: Bool, selected: Int) throws {
+        try inWindow((0..<4).map(String.init)) { controller, tabs, space in
+            let manager = controller.tabManager
+            let list = controller.sidebar.list
+            manager.makeGroup(tabs, shape: Self.shapes[4])
+            manager.bookmarkTab(tabs[0], in: space)
+            tabs.forEach { _ = $0.ensureWebView() }
+            manager.select(tabs[selected])
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == 4)
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let row = try #require(list.row(forBookmark: marks[0]) as? TabRowView)
+            if middleClick {
+                let page = try #require(row.partPage(at: NSPoint(x: 2, y: row.bounds.midY)))
+                #expect(page === tabs[0])
+                controller.listClose(page)
+            } else {
+                row.isHovered = true
+                row.debugPoint(atPart: 0)
+                row.layoutSubtreeIfNeeded()
+                #expect(row.closingPage === tabs[0])
+                row.onClose?()
+            }
+            expectRestOnScreen(manager, tabs: tabs, marks: marks)
+        }
+    }
+
+    /// The same for a favorite split of four: the other three stay side by side and the favorite opens all four again.
+    @Test(arguments: [0, 3]) func unloadingOneFavoritePageKeepsTheRestOnScreen(selected: Int) throws {
+        try inWindow((0..<4).map(String.init)) { controller, tabs, _ in
+            let manager = controller.tabManager
+            manager.makeGroup(tabs, shape: Self.shapes[4])
+            manager.favoriteTab(tabs[0])
+            tabs.forEach { _ = $0.ensureWebView() }
+            manager.select(tabs[selected])
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == 4)
+            #expect(Library.shared.isFavorite(marks[0]))
+            controller.listClose(tabs[0])
+            expectRestOnScreen(manager, tabs: tabs, marks: marks)
+        }
+    }
+
+    private func expectRestOnScreen(_ manager: TabManager, tabs: [Tab], marks: [UUID]) {
+        #expect(manager.bookmarkTab(for: marks[0]) == nil)
+        #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+        guard let shown = manager.selectedTab else { Issue.record("nothing selected"); return }
+        #expect(tabs[1...].contains { $0 === shown })
+        #expect(manager.split(for: shown).map { Set($0.ids) } == Set(tabs[1...].map(\.id)))
+        guard let open = Library.shared.bookmark(marks[0]) else { Issue.record("no bookmark"); return }
+        manager.openBookmark(open)
+        #expect(manager.split(for: manager.selectedTab!).map { Set($0.ids) } == Set(marks.compactMap { manager.bookmarkTab(for: $0)?.id }))
+        #expect(manager.split(for: manager.selectedTab!)?.count == 4)
+    }
+
     /// A tab of three or four side by side says it pins the split view, as one of two does, in its menu and the
     /// menu bar; a pinned one's says it unpins the split view.
     @Test func theItemsNameTheSplitForEveryCount() throws {
