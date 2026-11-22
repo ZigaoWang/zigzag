@@ -402,6 +402,12 @@ final class EdgeSidebar {
         }
     }
 
+    /// Unfolds the side from the card's edge after its content changed (a page becoming the note, or the note a page):
+    /// the same move a page swap makes, without a second state to keep alive.
+    func foldInSide() {
+        host?.foldInSide()
+    }
+
     /// The note has gone: the panel narrows to the card, unless a page or the space editor is taking the area.
     func noticeDetached(resize: Bool = true) {
         guard isNoticeShowing else { return }
@@ -1015,6 +1021,30 @@ final class EdgeSidebarHost: NSView {
         placeCard()
     }
 
+    /// Unfolds what the side shows from the card's edge, as a page swap does. The page swaps run their own mask on the
+    /// holder; this is for a page and the note taking each other's place.
+    func foldInSide() {
+        guard !Tokens.Motion.reduceMotion else { return }
+        let view: NSView = noticeShowing ? pageCard : pageArea
+        let size = view.bounds.size
+        guard size.width > 0, size.height > 0 else { return }
+        let mask = CALayer()
+        mask.backgroundColor = NSColor.black.cgColor
+        mask.anchorPoint = CGPoint(x: onRight ? 1 : 0, y: 0.5)
+        mask.position = CGPoint(x: onRight ? size.width : 0, y: size.height / 2)
+        mask.bounds = CGRect(origin: .zero, size: size)
+        view.layer?.mask = mask
+        let fold = CABasicAnimation(keyPath: "bounds.size.width")
+        fold.fromValue = 0
+        fold.toValue = size.width
+        fold.duration = 0.16
+        fold.timingFunction = Tokens.Motion.easeOut
+        mask.add(fold, forKey: "fold")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak view] in
+            MainActor.assumeIsolated { view?.layer?.mask = nil }
+        }
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         pageCard.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
@@ -1107,9 +1137,8 @@ final class EdgeSystemPageNotice: NSView {
 
     init() {
         super.init(frame: .zero)
-        icon.image = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 28, weight: .regular))
-        icon.contentTintColor = Tokens.Color.textSecondary
+        icon.image = NSImage(named: NSImage.applicationIconName)
+        icon.imageScaling = .scaleProportionallyUpOrDown
         title.alignment = .center
         detail.alignment = .center
         addSubview(icon)

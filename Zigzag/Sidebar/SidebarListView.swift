@@ -1700,23 +1700,31 @@ final class SidebarListView: NSView {
     private func observeHover(_ row: TabRowView) {
         row.hoverChanged = { [weak self, weak row] hovering in
             guard let self, let row, self.drag == nil else { return }
+            let page = row.pageUnderPointer ?? row.tab
             // A row the panel can't take still lights under the pointer, and the panel explains it in its own page
             // area: the note, not a window preview and not a page.
-            if hovering, self.refusesSystemPages, !EdgeLensPolicy.takesPage(url: row.tab?.url) {
+            if hovering, self.refusesSystemPages, !EdgeLensPolicy.takesPage(url: page?.url) {
                 let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
-                self.onHoverTab?(row.tab, screenFrame)
+                self.onHoverTab?(page, screenFrame)
                 return
             }
             if hovering {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
-                self.delegate?.listHover(row.tab, row: row, bookmark: bookmark)
+                self.delegate?.listHover(page, row: row, bookmark: bookmark)
                 let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
-                self.onHoverTab?(row.tab, screenFrame)
+                self.onHoverTab?(page, screenFrame)
             } else {
                 self.delegate?.listHover(nil, row: nil, bookmark: nil)
                 self.onHoverTab?(nil, nil)
             }
+        }
+        // A split's or a tile group's parts are pages of their own: moving across the row previews each as it comes
+        // under the pointer.
+        row.onHoverPart = { [weak self, weak row] page in
+            guard let self, let row, self.drag == nil, let page else { return }
+            let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
+            self.onHoverTab?(page, screenFrame)
         }
     }
 

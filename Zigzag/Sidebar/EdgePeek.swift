@@ -165,11 +165,13 @@ final class EdgePeek {
             MainActor.assumeIsolated {
                 guard let self, let controller, let locked = self.lockedTab, !locked.isClosed,
                       self.tab !== locked, EdgeSidebar.shared.isShowing else { return }
+                let fromNotice = self.noticeTab != nil
                 if self.noticeTab != nil {
                     self.noticeTab = nil
                     EdgeSidebar.shared.noticeDetached(resize: false)
                 }
                 self.attach(locked, from: controller, swapping: true)
+                if fromNotice { EdgeSidebar.shared.foldInSide() }
             }
         }
         leaveWork = work
@@ -193,7 +195,9 @@ final class EdgePeek {
     func show(tab: Tab, from controller: BrowserWindowController, replacing: Bool = false) {
         guard EdgeLensPolicy.takesPage(url: tab.url) else { return }
         hoverWork?.cancel()
-        // A note on show gives the area up at once: this is a page coming in, and the panel is already the width for it.
+        // A note gives the area up at once: this is a page coming in, and the panel is already the width for it. The
+        // page then unfolds from the card's side, as another page would.
+        let fromNotice = noticeTab != nil
         if noticeTab != nil {
             noticeTab = nil
             EdgeSidebar.shared.noticeDetached(resize: false)
@@ -201,10 +205,11 @@ final class EdgePeek {
         if isVisible {
             guard self.tab !== tab else { return }
             attach(tab, from: controller, swapping: true)
-            return
+        } else {
+            guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
+            attach(tab, from: controller, swapping: false)
         }
-        guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
-        attach(tab, from: controller, swapping: false)
+        if fromNotice { EdgeSidebar.shared.foldInSide() }
     }
 
     /// One of Zigzag's own pages under the pointer: the panel can't lend its page, so the page area says where it
@@ -215,12 +220,16 @@ final class EdgePeek {
         hoverWork = nil
         leaveWork?.cancel()
         if noticeTab === tab { return }
-        // A page on show goes back to its tab first; the panel keeps its width for the note.
+        // A page goes back to its tab first, and the panel keeps its width for the note. The note then unfolds from
+        // the card's side, as another page would; a note already there just changes its words.
+        let replacing = self.tab != nil
+        let fromNotice = noticeTab != nil
         if self.tab != nil { detach(.sidebarClick, resize: false) }
         noticeTab = tab
         self.controller = controller
         installObservers()
         EdgeSidebar.shared.noticeAttached(tab: tab) { [weak self] in self?.returnToBrowser() }
+        if replacing || fromNotice { EdgeSidebar.shared.foldInSide() }
     }
 
     /// The note's button: the page is the window's, so the window comes forward on it and the panel puts itself away.

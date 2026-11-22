@@ -556,6 +556,16 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return closesPart && pages.indices.contains(closePart) ? pages[closePart] ?? tab : tab
     }
     private var moveTracking: NSTrackingArea?
+    /// The page under the pointer, when it moves from one part of a split or tile group to another: the edge panel
+    /// previews the part being pointed at, not only the row's first page.
+    var onHoverPart: ((Tab?) -> Void)?
+    private var reportedPart: Int?
+    /// The page under the pointer now, in a multi-page row; the row's own page when there is only one.
+    var pageUnderPointer: Tab? {
+        guard let window else { return tab }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        return bounds.contains(point) ? page(at: point) : tab
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -581,9 +591,15 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     private func trackPointer(_ event: NSEvent) {
-        guard closesPart, isSplit else { pointedPart = nil; return }
         let point = convert(event.locationInWindow, from: nil)
-        pointedPart = bounds.contains(point) ? half(at: point) : nil
+        let inside = bounds.contains(point)
+        let part = isSplit && inside ? half(at: point) : nil
+        pointedPart = closesPart && isSplit ? part : nil
+        // A split's or a tile group's parts are pages of their own: the preview follows the pointer from one to the
+        // next, as a click already does.
+        guard part != reportedPart else { return }
+        reportedPart = part
+        onHoverPart?(part == nil ? nil : page(at: point))
     }
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
