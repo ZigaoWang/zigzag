@@ -768,7 +768,7 @@ final class PageCardView: NSView {
         let owner = (webView as? BrowserWebView)?.owner
         let viewer: NSView? = owner?.pdfViewer ?? owner?.settingsView
         guard viewer !== document else { return }
-        if let document, document.superview === clip || document.superview === surface {
+        if let document, document.superview != nil {
             // Typing was in the viewer going away: it goes back to the page rather than nowhere.
             if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: document) {
                 window.makeFirstResponder(webView)
@@ -777,19 +777,35 @@ final class PageCardView: NSView {
         }
         document = viewer
         guard let viewer, let webView, let holder else { return }
-        // The page's whole room, whatever the page's own size is: a page at a size of its own has a holder
-        // smaller than that. Laid out again with the card.
-        let room = NSRect(x: 0, y: 0, width: clip.bounds.width, height: max(0, clip.bounds.height - contentTop))
         needsLayout = true
         viewer.autoresizingMask = [.width, .height]
-        if glides(viewer) {
-            viewer.frame = room.offsetBy(dx: 0, dy: contentTop)
-            surface.addSubview(viewer, positioned: .above, relativeTo: clip)
+        if let pdf = viewer as? PDFViewerView {
+            // A PDF is the page, not something laid over the card: it goes in the holder, so it travels with the page
+            // when another surface borrows it (the edge panel) instead of leaving WebKit's own viewer showing there.
+            // A viewer from an earlier page in the holder goes: the current one is the page.
+            for other in holder.subviews.compactMap({ $0 as? PDFViewerView }) where other !== pdf {
+                other.removeFromSuperview()
+            }
+            pdf.frame = holder.bounds
+            holder.addSubview(pdf)
+            // Borrowed, the page is a narrow column: the PDF fits it rather than keeping the window's zoom and its
+            // scroll controls.
+            if holder.superview !== clip { pdf.pdfView.fitWidth() }
         } else {
-            viewer.frame = room
-            clip.addSubview(viewer, positioned: .above, relativeTo: holder)
+            // The page's whole room, whatever the page's own size is: a page at a size of its own has a holder
+            // smaller than that. Laid out again with the card.
+            let room = NSRect(x: 0, y: 0, width: clip.bounds.width, height: max(0, clip.bounds.height - contentTop))
+            if glides(viewer) {
+                viewer.frame = room.offsetBy(dx: 0, dy: contentTop)
+                surface.addSubview(viewer, positioned: .above, relativeTo: clip)
+            } else {
+                viewer.frame = room
+                clip.addSubview(viewer, positioned: .above, relativeTo: holder)
+            }
         }
-        if let window, window.firstResponder === webView { window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer) }
+        if holder.superview === clip, let window, window.firstResponder === webView {
+            window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer)
+        }
     }
 
     func hidePlaceholder() {

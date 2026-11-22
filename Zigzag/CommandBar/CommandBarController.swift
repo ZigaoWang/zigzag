@@ -446,10 +446,16 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         return host.commandBarFitsAnchor || paneStrip != nil
     }
 
-    /// The address the bar opens over, in the overlay's coordinates.
+    /// The address the bar opens over, in the overlay's coordinates. The overlay may be in another window than the
+    /// address (the panel's address, with the bar over the screen), so the frame goes through screen coordinates.
     private func anchorFrame(in host: CommandBarHost) -> NSRect {
         guard let view = host.commandBarAnchor(asked: anchor.flatMap { $0.window != nil ? $0 : nil }) else { return .zero }
-        return view.convert(view.bounds, to: host.commandBarOverlay)
+        let overlay = host.commandBarOverlay
+        guard let window = view.window, let overlayWindow = overlay.window else {
+            return view.convert(view.bounds, to: overlay)
+        }
+        let onScreen = window.convertToScreen(view.convert(view.bounds, to: nil))
+        return overlay.convert(overlayWindow.convertFromScreen(onScreen), from: nil)
     }
 
     private func panelFrame() -> NSRect {
@@ -1211,7 +1217,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private func activate(_ result: CommandResult, modifiers: NSEvent.ModifierFlags) {
         guard let host, result.isActionable else { return }
-        let editing = mode == .editCurrent && host.commandBarTab != nil
+        // The page the bar edits, taken before the bar goes: dismissing it clears the host's panel flag, and with it
+        // the panel's page, so reading it after would edit the window's tab behind instead (the top or a random one).
+        let editingTab = mode == .editCurrent ? host.commandBarTab : nil
+        let editing = editingTab != nil
         // An extension's keyword: the extension decides what happens, told where to open it.
         if case .omnibox(_, let content, _) = result.kind {
             let input = omniboxInput
@@ -1223,9 +1232,11 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             if let controller, let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
             return
         }
+        // Said before the bar hides: the edge panel must know the bar was in place when a result is chosen, or the
+        // tab it makes is treated as a selection away from the panel's page.
+        host.commandBarChoseResult()
         dismiss(restoringFocus: false)
         unsent = nil
-        host.commandBarChoseResult()
         if host.commandBarOpen(result.kind, modifiers: modifiers, editing: editing) { return }
         guard let controller else { return }
         let manager = controller.tabManager
@@ -1240,8 +1251,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                                               httpFallback: httpFallback) { return }
             // Typed or chosen here: yours, so an app's link you typed opens without asking (the site's Block still holds).
             if inCurrent {
-                manager.selectedTab?.load(url, by: .you, httpFallback: httpFallback)
-                manager.selectedTab?.isSearchTab = search
+                // The page the bar is editing: in a panel that is the one shown there, not the window's tab behind.
+                editingTab?.load(url, by: .you, httpFallback: httpFallback)
+                editingTab?.isSearchTab = search
             } else {
                 let tab = manager.newTab(url: url, select: !inBackground, by: .you, httpFallback: httpFallback)
                 tab.isSearchTab = search

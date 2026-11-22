@@ -1779,7 +1779,14 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let delta = contentHeight - frame.height
         target.size.height = contentHeight
         if superview?.isFlipped == true, anchoredBelow == false { target.origin.y -= delta }
-        target.origin.y = max(Tokens.Space.x2, target.origin.y)
+        if let host = superview {
+            // The edge panel's side is only as tall as the screen: the icons' grid never pushes the editor past it.
+            target.size.height = min(target.size.height, max(0, host.bounds.height - Tokens.Space.x2 * 2))
+            target.origin.y = min(max(Tokens.Space.x2, target.origin.y),
+                                  max(Tokens.Space.x2, host.bounds.height - target.height - Tokens.Space.x2))
+        } else {
+            target.origin.y = max(Tokens.Space.x2, target.origin.y)
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.reduceMotion ? 0 : Tokens.Motion.standard
             context.timingFunction = Tokens.Motion.drawer
@@ -1844,18 +1851,31 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let right = controller.root.sidebarOnRight
         growsFrom = anchor is SpaceDotView ? CGPoint(x: right ? 0.9 : 0.1, y: 1) : CGPoint(x: right ? 1 : 0, y: 0.1)
         present(arrival: .pop)
-        controller.window?.makeFirstResponder(nameField)
-        // The cursor at the end, not the whole name selected: you came to change the color as often as the name. A
-        // name Zigzag made up ("Space 2") is selected instead, so typing replaces it.
-        if let editor = nameField.currentEditor() {
-            let name = nameField.stringValue
-            let placeholder = name.range(of: #"^Space \d+$"#, options: .regularExpression) != nil
-                || (1...99).contains { name == String(localized: "Space \($0)", comment: "A new space's made-up name, like “Space 2”.") }
-            editor.selectedRange = placeholder ? NSRange(location: 0, length: nameField.stringValue.utf16.count)
-                                               : NSRange(location: nameField.stringValue.utf16.count, length: 0)
-        }
+        focusName()
         controller.root.holdReveal = true
         startMonitoring()
+    }
+
+    /// In the screen-edge panel: beside the sidebar card, in the panel's own window, so the window behind stays where
+    /// it is and the new space's colors show in the panel.
+    func show(inEdgeHost host: EdgeSidebarHost, frame: NSRect) {
+        self.frame = frame
+        host.setEditor(self)
+        present(arrival: .instant)
+        focusName()
+        startMonitoring()
+    }
+
+    /// The cursor at the end, not the whole name selected: you came to change the color as often as the name. A name
+    /// Zigzag made up ("Space 2") is selected instead, so typing replaces it.
+    private func focusName(selectAll: Bool = true) {
+        window?.makeFirstResponder(nameField)
+        guard let editor = nameField.currentEditor() else { return }
+        let name = nameField.stringValue
+        let placeholder = selectAll && (name.range(of: #"^Space \d+$"#, options: .regularExpression) != nil
+            || (1...99).contains { name == String(localized: "Space \($0)", comment: "A new space's made-up name, like “Space 2”.") })
+        editor.selectedRange = placeholder ? NSRange(location: 0, length: name.utf16.count)
+                                           : NSRange(location: name.utf16.count, length: 0)
     }
 
     /// In Settings: dropping from the Edit button that opened it, its right edge on the button's, inside that window.
@@ -1873,8 +1893,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         anchoredBelow = fits
         host.addSubview(self)
         present(arrival: .instant)
-        window?.makeFirstResponder(nameField)
-        if let editor = nameField.currentEditor() { editor.selectedRange = NSRange(location: nameField.stringValue.count, length: 0) }
+        focusName(selectAll: false)
         startMonitoring()
     }
 
@@ -1911,8 +1930,9 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         needsLayout = true
     }
 
-    /// Where a question is asked from here: over the whole window, the editor under it.
-    private var sheetHost: NSView? { (controller?.window ?? window)?.contentView }
+    /// Where a question is asked from here: over the whole window the editor is in, the editor under it. In the edge
+    /// panel that is the panel's window, not the browser window behind it.
+    private var sheetHost: NSView? { (window ?? controller?.window)?.contentView }
 
     private func chooseProfile(at index: Int) {
         let library = Library.shared
@@ -1971,7 +1991,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     /// Any picture, copied into Zigzag's folder at screen size.
     private func pickBackground() {
-        guard let host = controller?.window ?? window else { return }
+        guard let host = window ?? controller?.window else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.canChooseDirectories = false
@@ -2052,10 +2072,17 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         monitor = nil
         if !cancelled { commitName() }
         if edited, !cancelled { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo(String(localized: "Edit Space", comment: "Undo action name, shown in Edit › Undo."), before: before) }
+        // In the panel the editor closes as the panel's own card: no window's page takes the keyboard back.
+        let edgeHosted = window === EdgeSidebar.shared.panelWindow
         if let controller {
-            controller.root.holdReveal = false
-            dismiss()
-            if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+            if edgeHosted {
+                dismiss(instantly: true)
+                EdgeSidebar.shared.makeKey()
+            } else {
+                controller.root.holdReveal = false
+                dismiss()
+                if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+            }
         } else {
             window?.makeFirstResponder(nil)
             dismiss(instantly: true)
@@ -2104,7 +2131,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     static weak var current: SpaceEditorPanel?
 
-    static func toggle(spaceID: UUID, anchor: NSView? = nil, in controller: BrowserWindowController) {
+    static func toggle(spaceID: UUID, anchor: NSView? = nil, in controller: BrowserWindowController,
+                       edge: EdgeSidebar? = nil) {
         if let current {
             let same = current.spaceID == spaceID
             current.close()
@@ -2113,6 +2141,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         controller.closeFloatingPanels()
         let panel = SpaceEditorPanel(spaceID: spaceID, controller: controller)
         current = panel
-        panel.show(from: anchor)
+        if let edge {
+            edge.present(spaceEditor: panel)
+        } else {
+            panel.show(from: anchor)
+        }
     }
 }

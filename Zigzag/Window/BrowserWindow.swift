@@ -439,11 +439,9 @@ enum FullScreenPhase: Equatable {
 
     /// AppKit is moving the title bar and its buttons: Zigzag leaves them alone.
     var isMoving: Bool { self == .entering || self == .exiting }
-    /// Transparent as everywhere in Zigzag, except in full screen, where the buttons come down with the menu bar and
-    /// would float over the page.
-    var titlebarAppearsTransparent: Bool { self == .windowed || self == .exiting }
-    /// The system's bar behind the buttons in full screen.
-    var showsFullScreenBar: Bool { self == .fullScreen }
+    /// Transparent as everywhere in Zigzag, full screen included: the buttons come down with the menu bar and sit on
+    /// the bar above the page, not on a bar of the system's own.
+    var titlebarAppearsTransparent: Bool { true }
 }
 
 /// Keeps traffic lights where Zigzag places them. AppKit resets them on every title bar layout (title, key window,

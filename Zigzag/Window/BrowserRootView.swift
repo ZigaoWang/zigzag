@@ -600,6 +600,9 @@ final class BrowserRootView: SpaceFrameView {
     var sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?
+    /// Called with the visibility the sidebar is about to have, before it moves: the address goes to the bar or back
+    /// with it, so the bar leaves and returns with the sidebar (#469).
+    var onSidebarVisibilityWillChange: ((Bool) -> Void)?
     /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation) and its curve, so what rides
     /// along moves in step.
     var onSlide: ((TimeInterval, CAMediaTimingFunction) -> Void)?
@@ -768,6 +771,14 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
     static let addressPlaceChanged = Notification.Name("AddressPlaceChanged")
+
+    /// Where the address lives: above the page when the setting says so, and whenever the sidebar is away, which has
+    /// nowhere to keep it (#469).
+    enum AddressPlacement {
+        static func inBar(addressAbovePage: Bool, sidebarVisible: Bool) -> Bool {
+            addressAbovePage || !sidebarVisible
+        }
+    }
 
     /// The sidebar along the window's right edge instead of its left (#166), as Arc's Sidebar on the Right. Off unless
     /// turned on in Settings › Appearance or the View menu.
@@ -1442,6 +1453,7 @@ final class BrowserRootView: SpaceFrameView {
 
     func setSidebarVisible(_ visible: Bool, animated: Bool) {
         guard visible != sidebarVisible else { return }
+        onSidebarVisibilityWillChange?(visible)
         let oldSidebar = sidebarContainer.frame
         let oldBar = topBar.frame, oldControls = topBar.controlPositions
         topBarSlides += 1
@@ -1953,7 +1965,8 @@ struct SidebarEdgeReveal: Equatable {
     /// menu from it, a button pressed). Off toward the page it goes back at once; out past the edge it waits as long
     /// as a quick move has to come back (`comeBack`), since the move that brought it out may still be running on out
     /// there when the slide ends, and the hand on its way back.
-    mutating func follow(at point: NSPoint, time: TimeInterval, in zone: SidebarEdgeZone, held: Bool) -> Bool {
+    mutating func follow(at point: NSPoint, time: TimeInterval, in zone: SidebarEdgeZone, held: Bool,
+                         leaveDelay: TimeInterval = Tokens.Motion.edgeHideDelay) -> Bool {
         guard case let .out(settles, leftAt) = phase else { return false }
         if time < settles || held || zone.keeps(at: point) {
             phase = .out(settles: settles, leftAt: nil)
@@ -1963,7 +1976,7 @@ struct SidebarEdgeReveal: Equatable {
             phase = .out(settles: settles, leftAt: time)
             return false
         }
-        return time - leftAt > (zone.isPast(point) ? Self.comeBack : Tokens.Motion.edgeHideDelay)
+        return time - leftAt > (zone.isPast(point) ? Self.comeBack : leaveDelay)
     }
 }
 

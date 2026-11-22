@@ -161,6 +161,12 @@ final class SidebarListView: NSView {
     var spaceOverride: UUID?
     /// The tab the peek popout is showing: a temporary highlight, separate from the browser's selection.
     var peekTabID: UUID?
+    /// The row the surface showing this list has locked, rather than the window's tab: the edge panel's page. Nil:
+    /// the window's selection, as in the window's own sidebar.
+    private(set) var selectionOverride: UUID?
+    /// The edge panel's list takes web pages only: Zigzag's own pages (Settings, History, the archive) have no page to
+    /// lend it, so their rows grey out, take no preview and take no pick. The window's own sidebar leaves this false.
+    var refusesSystemPages = false
     /// The row a pick came from, on screen: the peek grows from it and shrinks back into it.
     private(set) var lastPickedRowFrame: NSRect?
 
@@ -168,6 +174,20 @@ final class SidebarListView: NSView {
         guard peekTabID != id else { return }
         peekTabID = id
         reload(animated: false)
+    }
+
+    /// Outlines `id` as this list's selection, or goes back to the window's with nil. A click in the panel picks its
+    /// page there; the window behind keeps the tab it was on.
+    func setSelectionOverride(_ id: UUID?) {
+        guard selectionOverride != id else { return }
+        selectionOverride = id
+        reload(animated: false)
+    }
+
+    /// The window's selection, or the panel's locked row while it is in the space this list shows.
+    private func selectedTab(in spaceID: UUID, of manager: TabManager) -> Tab? {
+        if let id = selectionOverride, let tab = manager.tab(with: id), tab.spaceID == spaceID { return tab }
+        return manager.selectedTab(in: spaceID)
     }
     /// In a private window, the header says "Private" instead of the space name.
     var privateLabel = false
@@ -280,7 +300,8 @@ final class SidebarListView: NSView {
         folderPageCounts = [:]
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
         let riders = Set(Library.shared.pinnedSplits(in: spaceID).flatMap(\.riders))
-        let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
+        let currentTab = selectedTab(in: spaceID, of: manager)
+        let current = currentTab?.bookmarkID.map(Self.rowID)
         // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
         // open without opening every folder on the way to it. The page you're on is always open.
         let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil }
@@ -301,7 +322,7 @@ final class SidebarListView: NSView {
         let levels = TabTree.levels(manager.treeNodes(in: spaceID))
         tabLevels = levels
         let byID = Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let selected = manager.selectedTab(in: spaceID)
+        let selected = selectedTab(in: spaceID, of: manager)
         // Tab groups (#209) show like folders: the row at the first tab, tabs indented below. Collapsed, only the current tab
         // stays visible.
         var shownGroup: UUID?
@@ -1126,7 +1147,7 @@ final class SidebarListView: NSView {
 
     private func configure(_ view: NSView, for item: SidebarItem) {
         guard let manager else { return }
-        let selected = manager.selectedTab(in: shownSpaceID ?? manager.currentSpaceID)
+        let selected = selectedTab(in: shownSpaceID ?? manager.currentSpaceID, of: manager)
         switch item {
         case .header:
             let spaceID = shownSpaceID ?? manager.currentSpaceID
@@ -1154,6 +1175,7 @@ final class SidebarListView: NSView {
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
+            row.isUnusable = refusesSystemPages && !EdgeLensPolicy.takesPage(url: tab.url)
             row.configure(tab: tab)
             // Both halves of a split show as open, and every page of a tile group.
             let partners = manager.partners(of: tab)
@@ -1187,6 +1209,7 @@ final class SidebarListView: NSView {
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
             let tab = manager.bookmarkTab(for: id)
+            row.isUnusable = refusesSystemPages && !EdgeLensPolicy.takesPage(url: tab?.url ?? bookmark.url)
             row.bookmarkIcon = bookmark.displayIcon
             if row.bookmarkIcon == nil { FaviconStore.shared.prefetch(for: bookmark.url) }
             // Moved on from its pinned page: the row shows where it is now, and its button goes back.
@@ -1677,6 +1700,8 @@ final class SidebarListView: NSView {
     private func observeHover(_ row: TabRowView) {
         row.hoverChanged = { [weak self, weak row] hovering in
             guard let self, let row, self.drag == nil else { return }
+            // A row the panel can't take still lights under the pointer, but brings no page and no preview.
+            if hovering, self.refusesSystemPages, !EdgeLensPolicy.takesPage(url: row.tab?.url) { return }
             if hovering {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
@@ -1931,6 +1956,7 @@ final class SidebarListView: NSView {
 
     /// A page picked with a click: the edge sidebar's own hook, or the window's delegate.
     private func pick(_ tab: Tab) {
+        guard !refusesSystemPages || EdgeLensPolicy.takesPage(url: tab.url) else { return }
         if let onPickTab { onPickTab(tab) } else { delegate?.listSelect(tab) }
     }
 

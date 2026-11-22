@@ -399,6 +399,9 @@ struct EdgeSidebarLayoutTests {
         #expect(EdgeSidebarLayout.canShow(appIsActive: false))
         // Zigzag itself: its own sidebar already comes out at its edge.
         #expect(!EdgeSidebarLayout.canShow(appIsActive: true))
+        // The browser window is already on this desktop and not minimized: its own sidebar is there, so no panel.
+        #expect(!EdgeSidebarLayout.canShow(appIsActive: false, browserHere: true))
+        #expect(EdgeSidebarLayout.canShow(appIsActive: false, browserHere: false))
     }
 
     @Test func thePanelAndItsBarTakeKeysWithoutTakingTheWindow() {

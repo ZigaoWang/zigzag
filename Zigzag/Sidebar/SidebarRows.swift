@@ -118,11 +118,22 @@ class SidebarRowView: InteractiveView {
         }
     }
 
+    /// A page the surface showing this list can't take (the edge panel and Zigzag's own pages): its title and icon
+    /// stay greyed, whatever the pointer does. The row still takes hover, so its wash says where the pointer is.
+    var isUnusable = false {
+        didSet {
+            guard oldValue != isUnusable else { return }
+            applyFreshness()
+        }
+    }
+
     /// The views that fade: icon and title, or every part's on a split row.
     var fadingViews: [NSView] { [icon, title] }
 
     func applyFreshness(animated: Bool = false) {
-        let visible = isAboutToClear ? 0.18 : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
+        let visible = isAboutToClear ? 0.18
+            : isUnusable ? 0.45
+            : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
         for view in fadingViews { (animated ? view.animator() : view).alphaValue = visible }
     }
 }

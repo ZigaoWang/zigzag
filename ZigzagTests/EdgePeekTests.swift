@@ -15,6 +15,17 @@ struct EdgePeekTests {
         #expect(!EdgePeekFocusPolicy.keepsOpen(newKey: .other, menuOpen: false))
     }
 
+    @Test func aPreviewWaitsForThePointerToRest() {
+        // Crossing a row: nothing.
+        #expect(!EdgePeekHoverPolicy.rests(now: EdgePeekHoverPolicy.dwell - 0.01, since: 0, moved: false))
+        // Rested on it: the page comes.
+        #expect(EdgePeekHoverPolicy.rests(now: EdgePeekHoverPolicy.dwell, since: 0, moved: false))
+        #expect(EdgePeekHoverPolicy.rests(now: 0.9, since: 0.5, moved: false))
+        // Moving within the row starts the wait again, however long it has been there.
+        #expect(!EdgePeekHoverPolicy.rests(now: 5, since: 0, moved: true))
+        #expect(!EdgePeekHoverPolicy.rests(now: EdgePeekHoverPolicy.dwell + 0.3, since: 0.5, moved: true))
+    }
+
     @Test func anOwnedSheetOrMenuKeepsItOpen() {
         #expect(EdgePeekFocusPolicy.keepsOpen(newKey: .owned, menuOpen: false))
         #expect(EdgePeekFocusPolicy.keepsOpen(newKey: .none, menuOpen: true))
@@ -35,10 +46,22 @@ struct EdgePeekTests {
                                                  cardStillShowsPage: false))
     }
 
-    @Test func anotherRowSwitchesTheLensToThatPage() {
+    @Test func anotherRowSwitchesThePageAndTheSameRowLocksIt() {
         #expect(EdgeLensPolicy.pickAction(isVisible: false, sameTab: false) == .open)
-        #expect(EdgeLensPolicy.pickAction(isVisible: true, sameTab: true) == .close)
+        #expect(EdgeLensPolicy.pickAction(isVisible: true, sameTab: true) == .lock)
         #expect(EdgeLensPolicy.pickAction(isVisible: true, sameTab: false) == .replace)
+        #expect(!EdgeLensPolicy.restoresAfterHover(locked: false))
+        #expect(EdgeLensPolicy.restoresAfterHover(locked: true))
+    }
+
+    /// The panel lends the tab's own page, so Zigzag's own pages (Settings, History, the archive) have nothing to
+    /// lend: their rows grey out and take no pick. A web page, local or not, is taken.
+    @Test func thePanelTakesWebPagesAndNotZigzagsOwn() {
+        #expect(EdgeLensPolicy.takesPage(url: URL(string: "https://example.com/page")))
+        #expect(EdgeLensPolicy.takesPage(url: URL(string: "http://localhost:8080")))
+        #expect(!EdgeLensPolicy.takesPage(url: URL(string: "zigzag://settings")))
+        #expect(!EdgeLensPolicy.takesPage(url: URL(string: "zigzag://history")))
+        #expect(!EdgeLensPolicy.takesPage(url: URL(string: "zigzag://archive")))
     }
 
     @Test func aSpaceSwitchKeepsTheSidebarOut() {

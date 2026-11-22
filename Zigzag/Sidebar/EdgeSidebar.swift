@@ -33,10 +33,74 @@ enum EdgeSidebarLayout {
         screens.firstIndex { $0.contains(point) }
     }
 
-    /// Whether the panel may come out: whenever Zigzag is not the app in front. A window behind another app is not
-    /// on screen, so whether its own sidebar is docked or floating there changes nothing the person can see.
-    static func canShow(appIsActive: Bool) -> Bool {
-        !appIsActive
+    /// The page's share of the screen when it is open in the panel: a portrait third, the visible frame's height.
+    static let pageShare: CGFloat = 1.0 / 3.0
+
+    static func pageWidth(in visible: NSRect) -> CGFloat { floor(visible.width * pageShare) }
+
+    /// The panel's width: the sidebar and its gutter, and the side area's width and its gutters when one is open.
+    static func width(sidebar: CGFloat, side: CGFloat, inset: CGFloat, in visible: NSRect) -> CGFloat {
+        sidebar + inset + (side > 0 ? side + inset * 2 : 0)
+    }
+
+    /// The panel's width with the page's third, or with neither: the sidebar and its gutter.
+    static func width(sidebar: CGFloat, page: Bool, inset: CGFloat, in visible: NSRect) -> CGFloat {
+        width(sidebar: sidebar, side: page ? pageWidth(in: visible) : 0, inset: inset, in: visible)
+    }
+
+    /// The sidebar card inside the panel: the sidebar's own width when a side is open, and the panel's whole inner
+    /// width when it is not.
+    static func cardFrame(in bounds: NSRect, sidebar: CGFloat, inset: CGFloat, sideShowing: Bool, onRight: Bool) -> NSRect {
+        let width = sideShowing ? sidebar : max(0, bounds.width - inset)
+        return NSRect(x: onRight ? bounds.width - inset - width : inset, y: inset,
+                      width: width, height: max(0, bounds.height - inset * 2))
+    }
+
+    static func cardFrame(in bounds: NSRect, sidebar: CGFloat, inset: CGFloat, page: Bool, onRight: Bool) -> NSRect {
+        cardFrame(in: bounds, sidebar: sidebar, inset: inset, sideShowing: page, onRight: onRight)
+    }
+
+    /// The page's or the space editor's place inside the panel: the side area on the inner side of the sidebar card,
+    /// the same inset away from the card and the panel's inner edge, and the card's height.
+    static func sideFrame(in bounds: NSRect, sidebar: CGFloat, inset: CGFloat, sideShowing: Bool, onRight: Bool) -> NSRect {
+        guard sideShowing else { return .zero }
+        let card = cardFrame(in: bounds, sidebar: sidebar, inset: inset, sideShowing: true, onRight: onRight)
+        let x = onRight ? inset : card.maxX + inset
+        let width = onRight ? card.minX - 2 * inset : bounds.width - card.maxX - 2 * inset
+        return NSRect(x: x, y: inset, width: max(0, width), height: max(0, bounds.height - inset * 2))
+    }
+
+    static func pageFrame(in bounds: NSRect, sidebar: CGFloat, inset: CGFloat, page: Bool, onRight: Bool) -> NSRect {
+        sideFrame(in: bounds, sidebar: sidebar, inset: inset, sideShowing: page, onRight: onRight)
+    }
+
+    /// Where the page's holder sits in the page area while the panel widens: at the size it will have once the panel
+    /// has, pinned to the card's side. The area clips it until it is wide enough, so the live page is laid out once
+    /// and revealed, not resized through every frame of the widening.
+    static func pageHolderFrame(in area: NSRect, target: NSSize, onRight: Bool) -> NSRect {
+        NSRect(x: onRight ? area.width - target.width : 0, y: 0, width: target.width, height: target.height)
+    }
+
+    /// The holder's autoresizing mask for that pin: the margin away from the card takes the widening.
+    static func pageHolderMask(onRight: Bool) -> NSView.AutoresizingMask {
+        onRight ? [.minXMargin] : [.maxXMargin]
+    }
+
+    /// Where the page area sits while the panel widens: already at its final width, against the card's side. The panel
+    /// window grows over it, uncovering it, instead of resizing it every frame (which would step the live page's edge
+    /// and reflow it through the animation).
+    static func pageRevealFrame(in bounds: NSRect, sidebar: CGFloat, inset: CGFloat, width pageWidth: CGFloat,
+                                onRight: Bool) -> NSRect {
+        let card = cardFrame(in: bounds, sidebar: sidebar, inset: inset, sideShowing: true, onRight: onRight)
+        let x = onRight ? card.minX - inset - pageWidth : card.maxX + inset
+        return NSRect(x: x, y: inset, width: pageWidth, height: max(0, bounds.height - inset * 2))
+    }
+
+    /// Whether the panel may come out: whenever Zigzag is not the app in front, and the browser window it mirrors is
+    /// not already on this desktop. There its own sidebar is on screen, so the panel would only be a second copy of it.
+    /// A minimized, hidden or covered window is not here: the panel is the quick way back to it.
+    static func canShow(appIsActive: Bool, browserHere: Bool = false) -> Bool {
+        !appIsActive && !browserHere
     }
 
     /// The panel stays while the page is attached beside it: the popout taking the keyboard is the panel working,
@@ -97,6 +161,14 @@ final class EdgeSidebar {
     private var isBrowserInFront: Bool {
         NSApp.isActive && NSApp.keyWindow !== panel && NSApp.keyWindow !== commandBarPopup
     }
+
+    /// The window the panel mirrors is on the desktop the pointer is on, and not minimized: its own sidebar is right
+    /// there, so the panel would only be a second copy of it. Hidden (⌘H) is away, like minimized: the panel stays the
+    /// quick way back.
+    private var browserIsHere: Bool {
+        guard let window = target?.window, window.isVisible, !window.isMiniaturized else { return false }
+        return window.isOnActiveSpace
+    }
     /// The last browser window that was in front: its sidebar is the one that comes out.
     private weak var target: BrowserWindowController?
     private var panel: EdgeSidebarPanel?
@@ -108,8 +180,9 @@ final class EdgeSidebar {
     private var reveal = SidebarEdgeReveal()
     /// Whether the panel is out now (or on its way back in).
     private(set) var isShowing = false
-    /// The Peek's page is attached beside it: the pointer being over the page is not the pointer leaving.
-    private var holdsForPeek = false
+    /// Attributes of the panel's own that put the pointer somewhere else for a moment (the command bar, a page
+    /// arriving, a sheet): not the pointer leaving. The panel stays until this passes.
+    private var heldUntil: TimeInterval = 0
     /// The visible frame of the screen the panel is on, while it's out.
     private var shownScreen: NSRect?
     /// The side the panel last came out on, so it slides back the same way after its window has gone.
@@ -150,7 +223,7 @@ final class EdgeSidebar {
                 DispatchQueue.main.async {
                     guard let self, self.isBrowserInFront else { return }
                     // The popout taking key is the panel working, not the browser coming forward.
-                    guard !EdgeSidebarLayout.keepsPanelOnActivation(holdsForPeek: self.holdsForPeek) else { return }
+                    guard !EdgeSidebarLayout.keepsPanelOnActivation(holdsForPeek: self.isPageShowing || self.isNoticeShowing) else { return }
                     self.hide(animated: false)
                 }
             }
@@ -182,6 +255,8 @@ final class EdgeSidebar {
                 guard let self, event.keyCode == 53, self.panel?.isKeyWindow == true,
                       !self.isCommandBarOpen else { return false }
                 if self.panel?.firstResponder is NSTextView { return false }
+                // With the page open, the first Esc closes it and leaves the sidebar; the next puts the panel away.
+                if self.isPageShowing { EdgePeek.shared.dismiss(.escape); return true }
                 self.hide()
                 return true
             }
@@ -200,9 +275,227 @@ final class EdgeSidebar {
     /// A tab, favorite or other action picked in the panel: it goes at once, and its window comes forward.
     func picked() { hide(animated: false) }
 
-    /// The Peek keeps the panel out while its page is attached, whatever the pointer does.
-    func holdForPeek(_ hold: Bool) { holdsForPeek = hold }
+    /// The live page beside the sidebar, inside the same panel: hovering a row brings it, and the panel widens.
+    private(set) var pageTab: Tab?
+    var isPageShowing: Bool { pageTab != nil }
+    var pageArea: NSView? { host?.pageArea }
+    /// The page area's size once the panel has widened: the tab's page is laid out at this from the first frame, so
+    /// the panel's widening reveals it rather than resizing it through the animation.
+    var pageTargetSize: NSSize? {
+        guard let target, let visible = shownScreen else { return nil }
+        let width = EdgeSidebarLayout.width(sidebar: target.edgeSidebarWidth,
+                                            side: EdgeSidebarLayout.pageWidth(in: visible),
+                                            inset: Tokens.Metric.cardInset, in: visible)
+        let bounds = NSRect(origin: .zero, size: NSSize(width: width, height: visible.height))
+        return EdgeSidebarLayout.sideFrame(in: bounds, sidebar: target.edgeSidebarWidth, inset: Tokens.Metric.cardInset,
+                                           sideShowing: true, onRight: target.edgeSidebarOnRight).size
+    }
+    /// The side the card is on: the page is pinned to it, so it doesn't slide as the panel widens.
+    var pagePinsOnRight: Bool { host?.onRight ?? target?.edgeSidebarOnRight ?? false }
+    /// The space editor, when one was opened from the panel rather than in the window behind it.
+    private weak var spaceEditor: SpaceEditorPanel?
+    var isSpaceEditorOpen: Bool { spaceEditor != nil }
 
+    /// Something the panel itself is showing has the pointer, or the keyboard, for now: a page, the note for Zigzag's
+    /// own pages, the command bar, a sheet, the editor. The pointer leaving the edge strip for a moment is not the
+    /// pointer leaving the panel.
+    var isHoldingOpen: Bool {
+        isPageShowing || isNoticeShowing || isCommandBarOpen || isSpaceEditorOpen
+            || ProcessInfo.processInfo.systemUptime < heldUntil
+            || NSApp.modalWindow != nil
+    }
+
+    /// The page area is showing the note for one of Zigzag's own pages (Settings, History, the archive), which the
+    /// panel can't lend: the panel is as wide as for a page, and the note offers the way back to the window.
+    private(set) var isNoticeShowing = false
+
+    /// Keeps the panel out for a moment whatever the pointer does: a surface it opened moved the pointer elsewhere
+    /// (the command bar in the middle of the screen), and the panel is still the thing being used.
+    func holdOpen(for seconds: TimeInterval = 0.5) {
+        heldUntil = max(heldUntil, ProcessInfo.processInfo.systemUptime + seconds)
+    }
+
+    /// The page's holder is in the panel's page area: widen the one panel so both collapse together. Another preview
+    /// replacing the first changes the page only: the panel is already the right shape, and nothing slides again.
+    func pageAttached(_ tab: Tab) {
+        let already = pageTab != nil
+        pageTab = tab
+        if let target { host?.sidebarWidth = target.edgeSidebarWidth }
+        if let host, let visible = shownScreen {
+            let pageWidth = EdgeSidebarLayout.pageWidth(in: visible)
+            // The first page: the area is already the width it will keep, so the panel's widening uncovers it
+            // instead of resizing it (and the live page) every frame.
+            if !already { host.pageRevealWidth = pageWidth }
+            host.sideWidth = max(host.sideWidth, pageWidth)
+        }
+        host?.pageShowing = true
+        guard !already else { return }
+        resizeForSide()
+        holdOpen(for: 0.6)
+        let generation = sideGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.sideGeneration == generation else { return }
+                self.host?.pageRevealWidth = nil
+            }
+        }
+    }
+
+    /// The page has gone back to its tab: fold it into the card and narrow the panel, unless the panel is going away
+    /// itself. While the window narrows, the page is still there at its full place, so its edge covers the page (a
+    /// fold); the page area is let go once the narrow has finished. The card keeps the sidebar's width until then, so
+    /// it never jumps wide and then shrinks.
+    func pageDetached(resize: Bool = true) {
+        let pageWidth = shownScreen.map { EdgeSidebarLayout.pageWidth(in: $0) }
+        pageTab = nil
+        guard resize else {
+            host?.pageRevealWidth = nil
+            host?.pageShowing = false
+            return
+        }
+        // The area keeps its full width under the narrowing window: the window's edge folds the page into the card
+        // instead of the page vanishing in one frame.
+        if let pageWidth, let host {
+            host.pageRevealWidth = pageWidth
+            host.pageShowing = true
+        }
+        if isSpaceEditorOpen {
+            host?.sideWidth = max(pageWidth ?? 0, SpaceEditorPanel.width + Tokens.Space.x2)
+            resizeForSide()
+        } else {
+            resizeForSide(closing: true)
+        }
+        let generation = sideGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.sideGeneration == generation else { return }
+                self.host?.pageRevealWidth = nil
+                self.host?.pageShowing = false
+            }
+        }
+    }
+
+    /// A row of Zigzag's own pages has been previewed: no page can be lent, so the page area shows a note saying where
+    /// the page works and a button back to it. The panel widens exactly as for a page, so the row's behaviour is the
+    /// same shape; only the page's contents are the note's.
+    func noticeAttached(tab: Tab, onReturn: @escaping () -> Void) {
+        let already = isNoticeShowing || isPageShowing
+        isNoticeShowing = true
+        if let target { host?.sidebarWidth = target.edgeSidebarWidth }
+        if let host, let visible = shownScreen {
+            let pageWidth = EdgeSidebarLayout.pageWidth(in: visible)
+            if !already { host.pageRevealWidth = pageWidth }
+            host.sideWidth = max(host.sideWidth, pageWidth)
+        }
+        host?.noticeShowing = true
+        host?.notice.show(tab: tab)
+        host?.notice.onReturn = onReturn
+        guard !already else { return }
+        resizeForSide()
+        holdOpen(for: 0.6)
+        let generation = sideGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.sideGeneration == generation else { return }
+                self.host?.pageRevealWidth = nil
+            }
+        }
+    }
+
+    /// The note has gone: the panel narrows to the card, unless a page or the space editor is taking the area.
+    func noticeDetached(resize: Bool = true) {
+        guard isNoticeShowing else { return }
+        isNoticeShowing = false
+        host?.noticeShowing = false
+        host?.notice.onReturn = nil
+        guard resize, !isPageShowing, !isSpaceEditorOpen else { return }
+        resizeForSide(closing: true)
+    }
+
+    // MARK: The space editor
+
+    /// A space editor opened from the panel: the panel widens to hold it beside the card, and the editor takes the
+    /// keyboard there. The window behind stays where it is.
+    func present(spaceEditor editor: SpaceEditorPanel) {
+        guard isShowing, let visible = shownScreen, let target, let host else { return }
+        spaceEditor = editor
+        host.sidebarWidth = target.edgeSidebarWidth
+        host.sideWidth = max(EdgeSidebarLayout.pageWidth(in: visible), SpaceEditorPanel.width + Tokens.Space.x2)
+        host.editorShowing = true
+        resizeForSide()
+        let panelWidth = EdgeSidebarLayout.width(sidebar: target.edgeSidebarWidth, side: host.sideWidth,
+                                                 inset: Tokens.Metric.cardInset, in: visible)
+        let bounds = NSRect(origin: .zero, size: NSSize(width: panelWidth, height: visible.height))
+        let side = EdgeSidebarLayout.sideFrame(in: bounds, sidebar: target.edgeSidebarWidth,
+                                               inset: Tokens.Metric.cardInset, sideShowing: true,
+                                               onRight: target.edgeSidebarOnRight)
+        let width = min(SpaceEditorPanel.width, max(0, side.width - Tokens.Space.x2 * 2))
+        let height = min(editor.contentHeight, max(0, side.height - Tokens.Space.x2 * 2))
+        editor.onClose = { [weak self] in self?.spaceEditorDidClose() }
+        editor.show(inEdgeHost: host, frame: NSRect(x: side.midX - width / 2, y: side.minY + Tokens.Space.x2,
+                                                    width: width, height: height))
+        panel?.makeKey()
+        holdOpen(for: 1)
+    }
+
+    /// The editor has gone: the page's third comes back if one is showing, else the panel narrows to the card.
+    private func spaceEditorDidClose() {
+        spaceEditor = nil
+        guard isShowing, let host else { return }
+        host.setEditor(nil)
+        host.editorShowing = false
+        if isPageShowing {
+            if let visible = shownScreen { host.sideWidth = EdgeSidebarLayout.pageWidth(in: visible) }
+            resizeForSide()
+        } else {
+            resizeForSide(closing: true)
+        }
+        makeKey()
+    }
+
+    /// The panel's width follows its side area: the page's third or the editor, or neither.
+    private var sideGeneration = 0
+    private func resizeForSide(animated: Bool = true, closing: Bool = false) {
+        guard isShowing, let visible = shownScreen, let panel, let target, let host else { return }
+        sideGeneration += 1
+        let generation = sideGeneration
+        host.sidebarWidth = target.edgeSidebarWidth
+        if !closing {
+            let page = isPageShowing ? EdgeSidebarLayout.pageWidth(in: visible) : 0
+            let editor = isSpaceEditorOpen ? SpaceEditorPanel.width + Tokens.Space.x2 : 0
+            host.sideWidth = max(page, editor)
+        }
+        let width = EdgeSidebarLayout.width(sidebar: target.edgeSidebarWidth, side: closing ? 0 : host.sideWidth,
+                                            inset: Tokens.Metric.cardInset, in: visible)
+        let frame = EdgeSidebarLayout.frame(in: visible, width: width, onRight: target.edgeSidebarOnRight)
+        if panel.frame == frame {
+            if closing { host.sideWidth = 0 }
+            return
+        }
+        let reduced = !animated || Tokens.Motion.reduceMotion
+        guard !reduced else {
+            panel.setFrame(frame, display: true)
+            if closing { host.sideWidth = 0 }
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = Tokens.Motion.easeOut
+            panel.animator().setFrame(frame, display: true)
+        }
+        // The shrink has to finish with the card still the sidebar's width, so the card keeps its place and only the
+        // panel narrows; the side area lets go once it's home.
+        guard closing else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.sideGeneration == generation else { return }
+                self.host?.sideWidth = 0
+            }
+        }
+    }
+
+    /// The sidebar's address, clicked while the page is open: the command bar over the screen, as ⌘T is, and its
+    /// page opens in the panel.
     /// Whether the pointer is still in the strip that keeps the panel out.
     var pointerInEdgeZone: Bool {
         guard isShowing, let visible = shownScreen, let zone = zone(in: visible) else { return false }
@@ -238,8 +531,31 @@ final class EdgeSidebar {
     /// Where Site Controls and other floating pieces sit over the panel's card.
     var panelOverlay: PassthroughView? { host?.overlay }
 
+    /// The panel's address field: the command bar opens over it when the address is clicked, as it does over the
+    /// sidebar's in the window, rather than in the middle of the screen like New Tab.
+    var addressView: NSView? {
+        guard isShowing, let target else { return nil }
+        let (sidebar, _) = target.edgeSidebarForDisplay()
+        let address = sidebar.address
+        guard !address.isHidden, address.window != nil else { return nil }
+        return address
+    }
+
     /// The panel is along the screen's right edge; the page attaches on the other side of it.
     var panelOnRight: Bool { sideIsRight }
+
+    /// The card's look follows the space on show, as the window's own does: its color, gradient, grain, and light or
+    /// dark, so a switch in the panel is seen there at once and not only after reopening it.
+    func setCardLook(tint: NSColor, gradient: (end: NSColor, angle: Double)?, grain: Double) {
+        guard let container = host?.container else { return }
+        container.tint = tint
+        container.gradient = gradient
+        container.grain = grain
+    }
+
+    func setCardAppearance(_ name: NSAppearance.Name?) {
+        panel?.appearance = name.flatMap(NSAppearance.init(named:))
+    }
 
     /// The sidebar card's frame on screen: the page sits beside its inner edge.
     var sidebarCardScreenFrame: NSRect? {
@@ -273,7 +589,7 @@ final class EdgeSidebar {
         // The window whose sidebar comes out: the last one in front, or, after that one closed, the one Zigzag would
         // have brought forward.
         if target == nil { target = WindowManager.shared.keyController }
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront) else { return }
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront, browserHere: browserIsHere) else { return }
         let point = NSEvent.mouseLocation
         guard let (zone, local, _) = zone(at: point), zone.opens(at: local) else { return }
         met(at: event.timestamp)
@@ -291,7 +607,10 @@ final class EdgeSidebar {
     private func zone(in visible: NSRect) -> SidebarEdgeZone? {
         guard let target else { return nil }
         // The panel is the card and the gutter it stands off the screen's edge by: the card's inner edge is the panel's.
-        return EdgeSidebarLayout.zone(in: visible, width: target.edgeSidebarWidth + Tokens.Metric.cardInset, onRight: target.edgeSidebarOnRight)
+        // With the page open the panel is wider, and the pointer over the page is over the panel, not leaving it.
+        let width = EdgeSidebarLayout.width(sidebar: target.edgeSidebarWidth, page: isPageShowing || isNoticeShowing,
+                                            inset: Tokens.Metric.cardInset, in: visible)
+        return EdgeSidebarLayout.zone(in: visible, width: width, onRight: target.edgeSidebarOnRight)
     }
 
     private func met(at time: TimeInterval) {
@@ -341,27 +660,55 @@ final class EdgeSidebar {
 
     private func follow() {
         guard isShowing, let visible = shownScreen, let zone = zone(in: visible) else { return }
-        // The page is attached beside the panel, or the preview card is out: the pointer is over them, not the panel,
-        // and the panel stays.
-        guard !holdsForPeek, !EdgePeekPreview.shared.isVisible else { return }
         // Zigzag came forward, or the window's sidebar came out: the panel has nothing left to show.
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront) else {
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront, browserHere: browserIsHere) else {
             hide()
             return
         }
+        let now = ProcessInfo.processInfo.systemUptime
         let point = EdgeSidebarLayout.point(NSEvent.mouseLocation, in: visible)
         // A pressed button holds it out, as a drag from the panel does. So does a menu opened from it, whose tracking
         // (system menus) or open panel (MenuPanel) runs while the pointer is over it.
+        // So does a surface of the panel's own that moved the pointer elsewhere for a moment: the command bar in the
+        // middle of the screen, a save or permission sheet, the space editor. And the panel's own actual frame counts
+        // as being over it, whatever the edge strip's arithmetic says while the page widens or narrows it.
+        let overPanel = panel.map {
+            $0.isVisible && $0.frame.insetBy(dx: -Tokens.Space.x2, dy: -Tokens.Space.x2).contains(NSEvent.mouseLocation)
+        } ?? false
+        let ownedKey = NSApp.keyWindow.map { $0 !== panel && $0 !== commandBarPopup && $0 !== target.window } ?? false
         let held = NSEvent.pressedMouseButtons != 0
             || RunLoop.current.currentMode == .eventTracking
             || MenuPanel.current != nil
             || isCommandBarOpen
-        if reveal.follow(at: point, time: ProcessInfo.processInfo.systemUptime, in: zone, held: held) {
+            || isSpaceEditorOpen
+            || isNoticeShowing
+            || now < heldUntil
+            || overPanel
+            || ownedKey
+            || NSApp.modalWindow != nil
+            || panel?.attachedSheet != nil
+        // The panel is a surface of its own, not a strip: a glance away across the screen gets a beat longer than the
+        // window's own edge, and a page being read gets longer still.
+        let leaveDelay: TimeInterval = (isPageShowing || isNoticeShowing || isSpaceEditorOpen) ? 0.3 : 0.15
+        if reveal.follow(at: point, time: now, in: zone, held: held, leaveDelay: leaveDelay) {
+            debugLog("edge follow hides point=\(point) mouse=\(NSEvent.mouseLocation) held=\(held) overPanel=\(overPanel) keeps=\(zone.keeps(at: point)) past=\(zone.isPast(point)) visible=\(visible) panel=\(panel.map { NSStringFromRect($0.frame) } ?? "-")")
             hide()
         }
     }
 
     // MARK: The panel
+
+    /// A sideways scroll over the panel's sidebar changes space there, as it does in the window's own. The panel is
+    /// a window of its own, so the window's event interceptor never sees these.
+    private func intercept(_ event: NSEvent) -> Bool {
+        guard event.type == .scrollWheel, isShowing, let target, let host else { return false }
+        let (sidebar, _) = target.edgeSidebarForDisplay()
+        let point = host.convert(event.locationInWindow, from: nil)
+        // Only where the sidebar card is what's under the pointer: a menu over it keeps its own scrolls.
+        guard host.cardFrame.contains(point),
+              host.hitTest(point)?.isDescendant(of: sidebar) == true else { return false }
+        return sidebar.handleSwipe(event)
+    }
 
     // MARK: The command bar
 
@@ -374,27 +721,42 @@ final class EdgeSidebar {
 
     /// New Tab from the panel — ⌘T or its row: the browser's own bar, over the screen, not in the window behind it.
     func newTabInPlace() {
+        openCommandBarInPlace(.newTab)
+    }
+
+    /// The address clicked in the panel: the same bar, editing the page the panel shows. The panel is the browser
+    /// while it is out, so neither the window behind it nor the pointer's place in it changes what is typed into.
+    func editAddressInPlace() {
+        openCommandBarInPlace(.editCurrent)
+    }
+
+    private func openCommandBarInPlace(_ mode: CommandBarController.Mode) {
         guard isShowing, !isCommandBarOpen, let target, let visible = shownScreen else { return }
+        // The bar sits in the middle of the screen, away from the panel: the panel is still the surface being used.
+        holdOpen(for: 1)
         let popup = commandBarPopup ?? makeCommandBarPopup()
         popup.setFrame(visible, display: true)
         popup.overlay.frame = NSRect(origin: .zero, size: visible.size)
         isCommandBarOpen = true
         popup.orderFrontRegardless()
-        target.showEdgeCommandBar()
+        target.showEdgeCommandBar(mode: mode)
     }
 
     /// The bar's field is in the popup, and the popup takes the keyboard for it.
     func focusCommandBar(_ field: NSTextField) {
         guard isCommandBarOpen, let popup = commandBarPopup else { return }
+        holdOpen(for: 1)
         popup.makeKeyAndOrderFront(nil)
         popup.makeFirstResponder(field)
     }
 
-    /// The bar has finished leaving: the popup goes, and the panel (still out) takes the keyboard back.
+    /// The bar has finished leaving: the popup goes, and the panel (still out) takes the keyboard back. The pointer
+    /// is still where the bar was, away from the panel, so the panel gets a moment before proximity counts again.
     func commandBarDidHide() {
         guard isCommandBarOpen else { return }
         isCommandBarOpen = false
         commandBarPopup?.orderOut(nil)
+        holdOpen(for: 1)
         if EdgePeek.shared.isVisible { EdgePeek.shared.makeKey() } else if isShowing { panel?.makeKey() }
     }
 
@@ -415,13 +777,14 @@ final class EdgeSidebar {
     }
 
     private func show(on visible: NSRect) {
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront) else { return }
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront, browserHere: browserIsHere) else { return }
         let (sidebar, container) = target.edgeSidebarForDisplay()
         target.prepareEdgeSidebar()
         let onRight = target.edgeSidebarOnRight
         lastPanelWasOnRight = onRight
         // The card keeps the window's sidebar's width; the panel is that and the gutter it stands off the edge by.
-        let width = target.edgeSidebarWidth + Tokens.Metric.cardInset
+        let width = EdgeSidebarLayout.width(sidebar: target.edgeSidebarWidth, page: false,
+                                            inset: Tokens.Metric.cardInset, in: visible)
         let panel = panel ?? makePanel()
         guard let host else { return }
         sidebar.isOnRight = onRight
@@ -432,6 +795,12 @@ final class EdgeSidebar {
         container.grain = look.grain
         container.windowGlass = look.glass
         host.onRight = onRight
+        host.sidebarWidth = target.edgeSidebarWidth
+        host.sideWidth = 0
+        host.pageShowing = false
+        host.noticeShowing = false
+        host.editorShowing = false
+        isNoticeShowing = false
         host.set(container)
 
         generation += 1
@@ -462,15 +831,24 @@ final class EdgeSidebar {
 
     /// Puts the panel away. Without the slide for a pick, so its window can come forward at once.
     func hide(animated: Bool = true, force: Bool = false) {
-        // The preview is the closed lens: it goes whenever the panel goes.
-        EdgePeekPreview.shared.hide()
+        debugLog("edge hide page=\(isPageShowing) pointer=\(NSEvent.mouseLocation) panel=\(panel.map { NSStringFromRect($0.frame) } ?? "-") shown=\(shownScreen.map(NSStringFromRect) ?? "-") browserHere=\(browserIsHere) key=\(NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "-") callers=\(Thread.callStackSymbols.dropFirst().prefix(4).joined(separator: " <- "))")
+        // The editor is the panel's too: closing it commits its name, and it doesn't try to resize a panel on its way
+        // out.
+        if let editor = spaceEditor {
+            spaceEditor = nil
+            editor.onClose = nil
+            editor.close()
+            host?.setEditor(nil)
+            host?.editorShowing = false
+        }
+        // The page is the panel's: it goes back to its tab before the panel goes, and neither outlives the other.
+        EdgePeek.shared.detachForHide()
         // The lens and the sidebar are one session: the lens collapses first, and only then does the sidebar follow.
         // A stop or a closed window is the exception: there is nothing left to follow.
         guard force || !EdgeLensPolicy.blocksSidebarHide(lensOpen: EdgePeek.shared.isVisible) else { return }
         // The panel's popout is its page: it goes with the panel, however the panel goes.
         target?.edgePopoutDidDismiss()
         stopDeciding(dismiss: true)
-        holdsForPeek = false
         // The bar and the downloads list open over the screen go with the panel.
         if isCommandBarOpen, let target { target.commandBar.dismiss(restoringFocus: false) }
         if let host, DownloadsPanel.isOpen(in: host.window) { DownloadsPanel.closeCurrent() }
@@ -513,6 +891,7 @@ final class EdgeSidebar {
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
+        panel.eventInterceptor = { [weak self] event in self?.intercept(event) ?? false }
         let host = EdgeSidebarHost()
         panel.contentView = host
         host.overlay.frame = host.bounds
@@ -529,6 +908,13 @@ final class EdgeSidebar {
 final class EdgeSidebarPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    /// Before the views: sideways scrolls over the sidebar change space, as in the window behind.
+    var eventInterceptor: ((NSEvent) -> Bool)?
+
+    override func sendEvent(_ event: NSEvent) {
+        if eventInterceptor?(event) == true { return }
+        super.sendEvent(event)
+    }
 
     /// ⌘T in either panel — the sidebar's or the lens's — opens the panel's own command bar, as a new tab there.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -547,12 +933,46 @@ final class EdgeSidebarHost: NSView {
     private(set) weak var container: SidebarContainer?
     /// Where the site panel and other floating pieces sit, above the card.
     let overlay = PassthroughView()
+    /// The live page beside the sidebar: the same panel, so both slide and collapse as one.
+    let pageArea = EdgePageArea()
+    /// The page's card behind it: the page area clips its page, so its own bounds are drawn here, with the card's
+    /// shadow. A PDF's backdrop can be the same dark as the panel, and without this the page has no visible edge.
+    private let pageCard = NSView()
+    /// The card's page area for one of Zigzag's own pages, which the panel can't lend: where the page works, and the
+    /// button back to the window.
+    let notice = EdgeSystemPageNotice()
     let inset = Tokens.Metric.cardInset
+    /// The sidebar's own width while a side is open; the card keeps it then.
+    var sidebarWidth: CGFloat = 0
+    /// The side area's width: the page's third or the space editor, 0 while neither is open. Kept until the panel has
+    /// finished narrowing, so the card never jumps wide and then shrinks.
+    var sideWidth: CGFloat = 0 { didSet { if sideWidth != oldValue { placeCard() } } }
+    /// While the page's third is being revealed: its width, with the area already there and the panel widening over
+    /// it. Nil once the panel has widened, when the ordinary side frame takes over (at the same place).
+    var pageRevealWidth: CGFloat? { didSet { if pageRevealWidth != oldValue { placeCard() } } }
+    var pageShowing = false { didSet { updateSideVisibility() } }
+    var noticeShowing = false { didSet { updateSideVisibility() } }
+    var editorShowing = false { didSet { updateSideVisibility() } }
+    private weak var editor: NSView?
+
+    /// The page area, the note and the editor share one side: the note is only there when no page is, and the editor
+    /// takes the side from both.
+    private func updateSideVisibility() {
+        pageArea.isHidden = !pageShowing || editorShowing || noticeShowing
+        notice.isHidden = !noticeShowing || editorShowing
+        editor?.isHidden = !editorShowing
+        placeCard()
+    }
     /// The panel is along the screen's right edge: its gutter is on the right.
     var onRight = false { didSet { placeCard() } }
+    private var sideIsShowing: Bool { sideWidth > 0 }
     var cardFrame: NSRect {
-        NSRect(x: onRight ? 0 : inset, y: inset, width: max(0, bounds.width - inset), height: max(0, bounds.height - inset * 2))
+        EdgeSidebarLayout.cardFrame(in: bounds, sidebar: sidebarWidth, inset: inset, sideShowing: sideIsShowing, onRight: onRight)
     }
+    var sideFrame: NSRect {
+        EdgeSidebarLayout.sideFrame(in: bounds, sidebar: sidebarWidth, inset: inset, sideShowing: sideIsShowing, onRight: onRight)
+    }
+    var pageFrame: NSRect { sideFrame }
 
     override var isFlipped: Bool { true }
 
@@ -561,12 +981,66 @@ final class EdgeSidebarHost: NSView {
         self.container = container
         container.autoresizingMask = []
         addSubview(container)
-        addSubview(overlay, positioned: .above, relativeTo: container)
+        if pageArea.superview == nil {
+            pageCard.wantsLayer = true
+            pageCard.layer?.cornerRadius = Tokens.Radius.large
+            pageCard.layer?.cornerCurve = .continuous
+            pageCard.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+            pageCard.layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
+            pageCard.layer?.shadowOpacity = 1
+            pageCard.layer?.shadowRadius = Tokens.Shadow.sheetRadius
+            pageCard.layer?.shadowOffset = Tokens.Shadow.panelOffset(flipped: isFlipped)
+            pageCard.addSubview(notice)
+            addSubview(pageCard)
+            addSubview(pageArea)
+        }
+        // Above the card, whatever was added before: showing the panel again re-adds the card, and Site Controls and
+        // the rest of the overlay must still draw over it.
+        addSubview(overlay, positioned: .above, relativeTo: nil)
         placeCard()
+    }
+
+    /// The space editor, above the page: the panel's side is the editor's while it is open.
+    func setEditor(_ view: NSView?) {
+        editor?.removeFromSuperview()
+        editor = view
+        guard let view else { placeCard(); return }
+        addSubview(view, positioned: .above, relativeTo: pageArea)
+        view.isHidden = !editorShowing
+        placeCard()
+    }
+
+    override func layout() {
+        super.layout()
+        placeCard()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        pageCard.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+        pageCard.layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
     }
 
     func placeCard() {
         container?.frame = cardFrame
+        pageArea.frame = pageRevealWidth.map {
+            EdgeSidebarLayout.pageRevealFrame(in: bounds, sidebar: sidebarWidth, inset: inset, width: $0, onRight: onRight)
+        } ?? pageFrame
+        pageCard.frame = pageArea.frame
+        // The card stands behind the page, or behind the note when the panel can't lend the page.
+        pageCard.isHidden = !(pageShowing || noticeShowing) || editorShowing
+        notice.frame = pageCard.bounds
+        pageCard.layer?.shadowPath = CGPath(roundedRect: pageCard.bounds,
+                                            cornerWidth: Tokens.Radius.large, cornerHeight: Tokens.Radius.large,
+                                            transform: nil)
+        if let editor, editorShowing {
+            let side = sideFrame
+            let size = editor.frame.size
+            editor.frame = NSRect(x: side.midX - size.width / 2,
+                                  y: side.minY + Tokens.Space.x2,
+                                  width: min(size.width, max(0, side.width - Tokens.Space.x2 * 2)),
+                                  height: min(size.height, max(0, side.height - Tokens.Space.x2 * 2)))
+        }
         overlay.frame = bounds
     }
 
@@ -578,11 +1052,101 @@ final class EdgeSidebarHost: NSView {
     override func cancelOperation(_ sender: Any?) { EdgeSidebar.shared.hide() }
 
     /// A click outside the card, in the panel's gutter, puts it away; clicks on the card belong to the sidebar in it
-    /// (its own blank space does the same).
+    /// (its own blank space does the same). The page and the editor are the panel's too, and take their own clicks;
+    /// while either is out, a click in the gutter between them is not a dismissal.
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if container?.frame.contains(point) != true { EdgeSidebar.shared.hide(); return }
+        if container?.frame.contains(point) != true, !sideFrame.contains(point) {
+            if pageShowing || noticeShowing || editorShowing { return }
+            EdgeSidebar.shared.hide()
+            return
+        }
         super.mouseDown(with: event)
+    }
+}
+
+/// One page's worth of the panel: clipped to the card's corners, with the page's own holder filling it.
+final class EdgePageArea: NSView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.large
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        // The page's own backdrop (a PDF's especially) can match the panel behind it: a hairline says where the
+        // card is, whatever the page happens to draw.
+        layer?.borderWidth = Tokens.Metric.hairline
+        layer?.borderColor = cgColor(Tokens.Color.cardEdge)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        layer?.borderColor = cgColor(Tokens.Color.cardEdge)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+/// The page area for one of Zigzag's own pages (Settings, History, the archive): the panel lends the tab its page, and
+/// these pages are the window's own, so the card says where the page works and offers the way back. The row that
+/// brought it stays greyed in the list; this button is the only action here.
+final class EdgeSystemPageNotice: NSView {
+    private let icon = NSImageView()
+    private let title = Label("", font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
+    private let detail = Label(String(localized: "Zigzag's own pages work in the browser window.",
+                                      comment: "Under the page's name in the edge sidebar's note for one of Zigzag's own pages, which the panel can't show."),
+                               font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+    let returnButton = PrimaryButton(title: String(localized: "Return to Zigzag",
+                                                   comment: "Button in the edge sidebar's note for one of Zigzag's own pages: brings the browser forward on that page."))
+    var onReturn: (() -> Void)? {
+        didSet {
+            returnButton.onClick = { [weak self] _ in self?.onReturn?() }
+        }
+    }
+
+    init() {
+        super.init(frame: .zero)
+        icon.image = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 28, weight: .regular))
+        icon.contentTintColor = Tokens.Color.textSecondary
+        title.alignment = .center
+        detail.alignment = .center
+        addSubview(icon)
+        addSubview(title)
+        addSubview(detail)
+        addSubview(returnButton)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func show(tab: Tab) {
+        title.stringValue = tab.title.isEmpty
+            ? String(localized: "This page opens in Zigzag", comment: "The edge sidebar's note for one of Zigzag's own pages when the page's name is not known yet.")
+            : tab.title
+        title.toolTip = tab.title
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let width = min(320, max(0, bounds.width - Tokens.Space.x6 * 2))
+        let iconSide: CGFloat = 34
+        let gap = Tokens.Space.x2
+        let button = returnButton.intrinsicContentSize
+        let buttonWidth = max(button.width, 132)
+        let titleHeight = title.lineHeight
+        let detailHeight = detail.lineHeight
+        let total = iconSide + gap * 2 + titleHeight + gap + detailHeight + gap * 2 + button.height
+        // From the bottom up: the button, the explanation, the page's name, the symbol.
+        var y = max(Tokens.Space.x6, (bounds.height - total) / 2)
+        returnButton.frame = NSRect(x: bounds.midX - buttonWidth / 2, y: y, width: buttonWidth, height: button.height)
+        y = returnButton.frame.maxY + gap * 2
+        detail.frame = NSRect(x: bounds.midX - width / 2, y: y, width: width, height: detailHeight)
+        y = detail.frame.maxY + gap
+        title.frame = NSRect(x: bounds.midX - width / 2, y: y, width: width, height: titleHeight)
+        y = title.frame.maxY + gap * 2
+        icon.frame = NSRect(x: bounds.midX - iconSide / 2, y: y, width: iconSide, height: iconSide)
     }
 }
 
@@ -619,7 +1183,8 @@ final class EdgeSidebarHost: NSView {
 /// The browser's command bar over the screen while the edge sidebar is in use: it takes the keyboard without bringing
 /// Zigzag forward, so the bar can be typed in over another app.
 final class EdgeCommandBarPopup: NSPanel {
-    let overlay = NSView()
+    /// Flipped, as the window's command-bar overlay is: the bar's frames count down from the screen's top.
+    let overlay = PassthroughView()
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }

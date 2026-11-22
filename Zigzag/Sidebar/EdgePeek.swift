@@ -35,6 +35,23 @@ enum EdgePeekSwap {
     }
 }
 
+/// How long the pointer rests on a row before its page is previewed. A pointer crossing rows previews nothing; a
+/// pointer that stops on one does. Movement inside the row starts the wait again.
+enum EdgePeekHoverPolicy {
+    /// The rest before a preview: long enough that a pointer crossing rows previews nothing, short enough that
+    /// stopping on one still feels immediate. Movement inside the row starts the wait again.
+    static let dwell: TimeInterval = 0.2
+    /// How often the pointer is looked at while it rests.
+    static let check: TimeInterval = 0.05
+    /// Movement, in points, that means the pointer is still travelling rather than resting.
+    static let movement: CGFloat = 2
+
+    /// The pointer has rested: it hasn't moved since `since`, and the dwell has passed.
+    static func rests(now: TimeInterval, since: TimeInterval, moved: Bool) -> Bool {
+        !moved && now - since >= dwell
+    }
+}
+
 /// What the lens does when the browser's context changes under it: a space switch ends it, and a page opened from
 /// it stays in it.
 enum EdgePeekRouting {
@@ -49,265 +66,363 @@ enum EdgePeekRouting {
     }
 }
 
-/// The edge lens (#365): the sidebar's preview, opened. The tab's own page fills the preview card beside the sidebar,
-/// its caption carries the page's controls, and the sidebar and the lens live and close as one session.
+/// The edge page, inside the sidebar's own panel (#365 prototype): the panel widens by a third of the screen, and the
+/// tab's own page fills it. Hovering a row runs the page through the panel; a click keeps the one it is on; the page
+/// and the sidebar slide, and collapse, as one object.
 ///
 /// The page is the tab's own `pageHolder`, moved out of its pane and put straight back on close, so its state carries:
 /// the same page, not a second load. Nothing in the close path waits on WebKit.
 final class EdgePeek {
     static let shared = EdgePeek()
 
-    private var panel: EdgeSidebarPanel?
-    private var card: TabPreviewView?
-    private var overlay: PassthroughView?
-    private weak var controller: BrowserWindowController?
     private(set) var tab: Tab?
-    private(set) var isVisible = false
+    /// The tab picked from the rows: the page the panel goes back to when the pointer leaves them. A preview passes
+    /// over the rows without changing it.
+    private(set) var lockedTab: Tab?
+    /// One of Zigzag's own pages under the pointer: no page can be lent to the panel, so the page area says where it
+    /// works and offers the window. Setting it does not change `tab`: the note has no page of its own.
+    private(set) var noticeTab: Tab?
+    var isVisible: Bool { tab != nil || noticeTab != nil }
+    private weak var controller: BrowserWindowController?
     /// Where the page came from, so closing puts it back there.
     private weak var origin: NSView?
     private var originFrame: NSRect = .zero
     private var token: Any?
     private var managerObserver: Any?
-    private var escMonitor: Any?
-    private var keyObserver: NSObjectProtocol?
-    private var closeObserver: NSObjectProtocol?
     private var outsideMonitor: Any?
-    private var outsideLocal: Any?
-    private var spaceObserver: NSObjectProtocol?
-    private var appObserver: NSObjectProtocol?
-    private var activationObserver: NSObjectProtocol?
-    private var keyLostObserver: NSObjectProtocol?
-    private var screenObserver: NSObjectProtocol?
-    private var settingsObserver: NSObjectProtocol?
-    private var siteHost: EdgeSitePanelHost?
-    /// The preview frame the lens grew from; the collapse goes back to it.
-    private var sourceFrame: NSRect?
-    private var isCollapsing = false
-    private var collapseDeadline: DispatchWorkItem?
+    private var keyObserver: NSObjectProtocol?
+    /// The row the pointer is resting on: one page is brought after a short rest, not one per row passed over.
+    private var hoverWork: DispatchWorkItem?
+    /// The pointer has left the rows: after a moment, the panel goes back to the tab picked there. The short wait
+    /// keeps a pass down the rows from swapping back and forth.
+    private var leaveWork: DispatchWorkItem?
+    /// A page swap folding in from the card's side: the new page over the old, which goes back when the fold ends.
+    private struct Fold {
+        let newHolder: PageHolder
+        let old: Tab
+        let oldHolder: PageHolder
+        let origin: NSView?
+        let originFrame: NSRect
+        let controller: BrowserWindowController
+    }
+    private var fold: Fold?
+    private var foldWork: DispatchWorkItem?
 
     private init() {}
 
-    // MARK: Opening
+    // MARK: Hovering and opening
 
-    /// The preview or a row was clicked: the lens opens from the preview's frame, or closes first if it is already
-    /// out. One action never opens a second lens. A page opened from the lens replaces its page instead.
-    func show(tab: Tab, from controller: BrowserWindowController, replacing: Bool = false) {
-        if isVisible {
-            switch EdgeLensPolicy.openAction(isVisible: true, replacing: replacing) {
-            case .replace:
-                swap(to: tab, from: controller)
-            case .close:
-                dismiss(self.tab === tab ? .sameTab : .sidebarClick)
-            case .open:
-                break
+    /// The pointer is on a row: after it rests there, that tab's page fills the panel's page area. Crossing rows
+    /// previews nothing; a pointer that stops on one does, and moving within it starts the wait again.
+    func hover(tab: Tab, from controller: BrowserWindowController) {
+        guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
+        // A new row is a new preview: the trip back to the picked tab doesn't happen.
+        leaveWork?.cancel()
+        hoverWork?.cancel()
+        // A row of Zigzag's own pages previews the note instead of a page, but only after the same rest.
+        guard self.tab !== tab, self.noticeTab !== tab else { return }
+        scheduleHoverCheck(tab: tab, from: controller, pointer: NSEvent.mouseLocation,
+                           stillSince: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// Checks the pointer while a row is hovered: still for the dwell, its page comes; moved, the dwell starts over.
+    private func scheduleHoverCheck(tab: Tab, from controller: BrowserWindowController,
+                                    pointer: NSPoint, stillSince: TimeInterval) {
+        let work = DispatchWorkItem { [weak self, weak tab, weak controller] in
+            MainActor.assumeIsolated {
+                guard let self, let tab, let controller, EdgeSidebar.shared.isShowing else { return }
+                let now = ProcessInfo.processInfo.systemUptime
+                let point = NSEvent.mouseLocation
+                let moved = abs(point.x - pointer.x) > EdgePeekHoverPolicy.movement
+                    || abs(point.y - pointer.y) > EdgePeekHoverPolicy.movement
+                if self.fold != nil {
+                    // A fold is very short: this page comes when it has finished, so two folds never overlap.
+                    self.scheduleHoverCheck(tab: tab, from: controller, pointer: point, stillSince: stillSince)
+                } else if EdgePeekHoverPolicy.rests(now: now, since: stillSince, moved: moved) {
+                    if EdgeLensPolicy.takesPage(url: tab.url) {
+                        self.show(tab: tab, from: controller)
+                    } else {
+                        self.showNotice(tab: tab, from: controller)
+                    }
+                } else {
+                    self.scheduleHoverCheck(tab: tab, from: controller, pointer: point,
+                                            stillSince: moved ? now : stillSince)
+                }
             }
+        }
+        hoverWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + EdgePeekHoverPolicy.check, execute: work)
+    }
+
+    /// The pointer has left the rows for the rest of the panel (the page, the spaces, a menu): once a tab has been
+    /// picked, the page goes back to it. Before a pick there is no selected tab, so the preview stays.
+    func rowsLeft(from controller: BrowserWindowController) {
+        hoverWork?.cancel()
+        hoverWork = nil
+        leaveWork?.cancel()
+        guard isVisible, lockedTab != nil else { return }
+        let work = DispatchWorkItem { [weak self, weak controller] in
+            MainActor.assumeIsolated {
+                guard let self, let controller, let locked = self.lockedTab, !locked.isClosed,
+                      self.tab !== locked, EdgeSidebar.shared.isShowing else { return }
+                if self.noticeTab != nil {
+                    self.noticeTab = nil
+                    EdgeSidebar.shared.noticeDetached(resize: false)
+                }
+                self.attach(locked, from: controller, swapping: true)
+            }
+        }
+        leaveWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+    }
+
+    /// A click on a row picks that tab: its page stays from then on unless another row is previewed, and the keyboard
+    /// goes into it. The same row clicked again only takes the keyboard.
+    func lock(tab: Tab, from controller: BrowserWindowController) {
+        hoverWork?.cancel()
+        hoverWork = nil
+        leaveWork?.cancel()
+        show(tab: tab, from: controller)
+        guard self.tab === tab else { return }
+        lockedTab = tab
+        controller.setEdgeSelection(tab.id)
+        makeKey()
+    }
+
+    /// A page opened from the panel replaces the one it shows; a click on the row already showing locks it.
+    func show(tab: Tab, from controller: BrowserWindowController, replacing: Bool = false) {
+        guard EdgeLensPolicy.takesPage(url: tab.url) else { return }
+        hoverWork?.cancel()
+        // A note on show gives the area up at once: this is a page coming in, and the panel is already the width for it.
+        if noticeTab != nil {
+            noticeTab = nil
+            EdgeSidebar.shared.noticeDetached(resize: false)
+        }
+        if isVisible {
+            guard self.tab !== tab else { return }
+            attach(tab, from: controller, swapping: true)
             return
         }
-        guard !isCollapsing else { return }
-        // The lens and the sidebar are one session: a lens with no panel would float over another app with nothing
-        // to put its page back into.
-        guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else {
-            EdgePeekPreview.shared.hide()
-            return
-        }
-        EdgePeekPreview.shared.hide()
-        makePanel()
-        guard let panel, let card, let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else { return }
+        guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
+        attach(tab, from: controller, swapping: false)
+    }
+
+    /// One of Zigzag's own pages under the pointer: the panel can't lend its page, so the page area says where it
+    /// works and offers the window. The row itself stays inert; this note is the only action.
+    func showNotice(tab: Tab, from controller: BrowserWindowController) {
+        guard !EdgeLensPolicy.takesPage(url: tab.url), EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
+        hoverWork?.cancel()
+        hoverWork = nil
+        leaveWork?.cancel()
+        if noticeTab === tab { return }
+        // A page on show goes back to its tab first; the panel keeps its width for the note.
+        if self.tab != nil { detach(.sidebarClick, resize: false) }
+        noticeTab = tab
         self.controller = controller
-        self.tab = tab
+        installObservers()
+        EdgeSidebar.shared.noticeAttached(tab: tab) { [weak self] in self?.returnToBrowser() }
+    }
+
+    /// The note's button: the page is the window's, so the window comes forward on it and the panel puts itself away.
+    private func returnToBrowser() {
+        guard let noticeTab, !noticeTab.isClosed, let controller else { return }
+        controller.tabManager.select(noticeTab)
+        controller.bringForwardForEdge()
+    }
+
+    private func attach(_ tab: Tab, from controller: BrowserWindowController, swapping: Bool) {
+        guard let area = EdgeSidebar.shared.pageArea else { return }
         _ = tab.ensureWebView()
-        guard let holder = tab.pageHolder else {
-            self.controller = nil
-            self.tab = nil
-            return
+        guard let holder = tab.pageHolder else { return }
+        // A fold already running finishes at once, so its page goes back before this one starts.
+        finishFold()
+        let old = swapping ? self.tab : nil
+        let oldHolder = old?.pageHolder
+        let oldOrigin = origin
+        let oldOriginFrame = originFrame
+        if !swapping { self.controller = controller }
+        origin = holder.superview
+        originFrame = holder.frame
+        holder.removeFromSuperview()
+        // The page lays out once at the size it will have when the panel has widened, pinned to the card's side: the
+        // widening reveals it from behind the card instead of resizing it every frame. A live page (the tab the window
+        // already shows) would otherwise reflow through the whole animation; a page not yet loaded opens quietly.
+        let pageSize = EdgeSidebar.shared.pageTargetSize ?? area.bounds.size
+        holder.frame = EdgeSidebarLayout.pageHolderFrame(in: area.bounds, target: pageSize,
+                                                         onRight: EdgeSidebar.shared.pagePinsOnRight)
+        holder.autoresizingMask = EdgeSidebarLayout.pageHolderMask(onRight: EdgeSidebar.shared.pagePinsOnRight)
+        // The page's place is rounded; the holder is too, so a PDF's own backdrop (which is a layer of its own) can't
+        // square off the corners the way a web page's view is clipped by the area.
+        holder.wantsLayer = true
+        holder.layer?.cornerRadius = Tokens.Radius.large
+        holder.layer?.cornerCurve = .continuous
+        holder.layer?.masksToBounds = true
+        // The page it leaves stays under it until the fold finishes: the new page unfolds over it from the card's
+        // side, so the old one is not put back first (which would leave nothing to uncover).
+        if let oldHolder, oldHolder !== holder {
+            oldHolder.layer?.mask = nil
+            oldHolder.frame = NSRect(origin: .zero, size: pageSize)
+            if oldHolder.superview !== area { area.addSubview(oldHolder) }
         }
+        area.addSubview(holder)
+        if let old, let oldHolder, oldHolder !== holder {
+            startFold(newHolder: holder, old: old, oldHolder: oldHolder, origin: oldOrigin, originFrame: oldOriginFrame,
+                      size: pageSize, controller: controller)
+        }
+        adoptPDFViewer(of: tab, fitting: true)
+        self.tab = tab
         controller.setEdgePeek(tab.id)
         controller.prepareEdgeSidebar()
-        // The page moves, not a copy: the same holder the pane has, so form state, scroll and media carry.
-        origin = holder.superview
-        originFrame = holder.frame
-        holder.removeFromSuperview()
-
-        card.showsLensControls = true
-        card.show(tab: tab, bookmark: nil)
-        card.showLive(holder: holder)
-        card.layoutSubtreeIfNeeded()
-
-        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(sidebarFrame) } ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        sourceFrame = EdgePeekPreview.shared.currentFrame
-            ?? controller.edgeSidebarForDisplay().sidebar.list.lastPickedRowFrame
-        let frame = EdgeLensLayout.frame(beside: sidebarFrame, in: visible,
-                                         onRight: EdgeSidebar.shared.panelOnRight,
-                                         rowMidY: sourceFrame?.midY ?? sidebarFrame.midY)
-        panel.setFrame(sourceFrame ?? frame, display: false)
-        panel.ignoresMouseEvents = false
-        isVisible = true
-        isCollapsing = false
-        EdgeSidebar.shared.holdForPeek(true)
-        panel.orderFrontRegardless()
-        panel.makeKey()
-        if let source = sourceFrame, source != frame {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.28
-                context.timingFunction = Tokens.Motion.easeOut
-                panel.animator().setFrame(frame, display: true)
-            }
-        } else {
-            panel.setFrame(frame, display: true)
-        }
-        card.layoutSubtreeIfNeeded()
-        if let webView = tab.webView { panel.makeFirstResponder(webView) }
-
-        token = tab.changed.observe { [weak self] _ in self?.refreshLens() }
-        managerObserver = controller.tabManager.changed.observe { [weak self] change in
-            MainActor.assumeIsolated { self?.managerChanged(change) }
-        }
-        installLensObservers(for: controller)
-        refreshLens()
+        EdgeSidebar.shared.pageAttached(tab)
+        token = tab.changed.observe { [weak self] _ in self?.refresh() }
+        if !swapping { installObservers() }
+        // A preview never takes the keyboard: the pointer is only passing over the row. A click locks it and does.
+        refresh()
     }
 
-    /// A page opened from the lens takes the card over: the new page's holder moves into the same card. The page it
-    /// leaves goes back to its card only if that card still shows it; a page the browser has already replaced (a link
-    /// opened from the lens) is not painted back over the new one. The panel, its frame and the sidebar stay.
-    private func swap(to tab: Tab, from controller: BrowserWindowController) {
-        guard controller === self.controller, EdgePeekSwap.canTake(tab, from: self.tab, isClosed: tab.isClosed) else { return }
-        _ = tab.ensureWebView()
-        guard let holder = tab.pageHolder, let card, let panel else { return }
-        card.endLive()
-        if let old = self.tab, let oldHolder = old.pageHolder, let origin,
-           old.webView != nil, controller.root.card.webView === old.webView {
-            oldHolder.removeFromSuperview()
-            oldHolder.frame = originFrame
-            origin.addSubview(oldHolder)
+    /// Folds the new page in over the old, from the card's side. The old page stays under it until the fold ends,
+    /// then goes back to its tab. A layer mask reveals the new page; the page itself is laid out once and never
+    /// resized, so the live tab folds without reflowing.
+    private func startFold(newHolder: PageHolder, old: Tab, oldHolder: PageHolder, origin: NSView?, originFrame: NSRect,
+                           size: NSSize, controller: BrowserWindowController) {
+        let fold = Fold(newHolder: newHolder, old: old, oldHolder: oldHolder, origin: origin, originFrame: originFrame,
+                        controller: controller)
+        self.fold = fold
+        guard !Tokens.Motion.reduceMotion else {
+            finishFold()
+            return
+        }
+        let mask = CALayer()
+        mask.backgroundColor = NSColor.black.cgColor
+        // Anchored at the card: the page unfolds from the sidebar's side, on either edge.
+        let onRight = EdgeSidebar.shared.pagePinsOnRight
+        mask.anchorPoint = CGPoint(x: onRight ? 1 : 0, y: 0.5)
+        mask.position = CGPoint(x: onRight ? size.width : 0, y: size.height / 2)
+        mask.bounds = CGRect(origin: .zero, size: size)
+        newHolder.layer?.mask = mask
+        let reveal = CABasicAnimation(keyPath: "bounds.size.width")
+        reveal.fromValue = 0
+        reveal.toValue = size.width
+        reveal.duration = 0.16
+        reveal.timingFunction = Tokens.Motion.easeOut
+        mask.add(reveal, forKey: "fold")
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.finishFold() } }
+        foldWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.17, execute: work)
+    }
+
+    /// The fold has finished (or another page is taking over): the new page is fully revealed and the old one goes
+    /// back to its tab, if that card still shows it.
+    private func finishFold() {
+        foldWork?.cancel()
+        foldWork = nil
+        guard let fold else { return }
+        self.fold = nil
+        fold.newHolder.layer?.mask = nil
+        fold.oldHolder.removeFromSuperview()
+        fold.oldHolder.layer?.cornerRadius = 0
+        fold.oldHolder.layer?.masksToBounds = false
+        if let origin = fold.origin, fold.old.webView != nil,
+           fold.controller.root.card.webView === fold.old.webView {
+            fold.oldHolder.frame = fold.originFrame
+            origin.addSubview(fold.oldHolder)
             origin.needsLayout = true
         }
-        origin = holder.superview
-        originFrame = holder.frame
-        holder.removeFromSuperview()
-        self.tab = tab
-        card.showsLensControls = true
-        card.show(tab: tab, bookmark: nil)
-        card.showLive(holder: holder)
-        card.layoutSubtreeIfNeeded()
-        controller.setEdgePeek(tab.id)
-        token = tab.changed.observe { [weak self] _ in self?.refreshLens() }
-        if let webView = tab.webView { panel.makeFirstResponder(webView) }
-        refreshLens()
     }
 
-    private func makePanel() {
-        guard panel == nil else { return }
-        let panel = EdgeSidebarPanel(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
-                                     styleMask: [.borderless, .nonactivatingPanel],
-                                     backing: .buffered, defer: false)
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.hidesOnDeactivate = false
-        panel.isMovable = false
-        panel.isReleasedWhenClosed = false
-        panel.animationBehavior = .none
-        let card = TabPreviewView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        // A window of its own over another app: the material shows what is behind it, not its own window.
-        card.showsDesktop = true
-        card.radius = Tokens.Radius.large
-        let overlay = PassthroughView(frame: card.bounds)
-        overlay.autoresizingMask = [.width, .height]
-        card.addSubview(overlay)
-        panel.contentView = card
-        self.panel = panel
-        self.card = card
-        self.overlay = overlay
-        configureCaption()
-    }
-
-    // MARK: Caption
-
-    private func configureCaption() {
-        guard let card else { return }
-        card.onLensBack = { [weak self] in self?.tab?.webView?.goBack() }
-        card.onLensForward = { [weak self] in self?.tab?.webView?.goForward() }
-        card.onLensReload = { [weak self] in
-            guard let tab = self?.tab else { return }
-            if tab.isLoading { tab.webView?.stopLoading() } else { tab.webView?.reload() }
+    /// A PDF's viewer covers the page, so it goes in the holder rather than the card. The holder is what the panel
+    /// borrows: putting the viewer in it is what brings Zigzag's PDF into the popout instead of WebKit's own viewer.
+    /// `fitting`: the page has just arrived in a narrow column, so the PDF fits its width rather than keeping the
+    /// window's zoom and its scroll controls.
+    private func adoptPDFViewer(of tab: Tab, fitting: Bool) {
+        guard let holder = tab.pageHolder, let pdf = tab.pdfViewer else { return }
+        // A viewer left over from an earlier page in this holder must not stay under or over this one: two white
+        // documents in one holder read as a PDF with no page card around it.
+        for other in holder.subviews.compactMap({ $0 as? PDFViewerView }) where other !== pdf {
+            other.removeFromSuperview()
         }
-        card.onLensAddress = { [weak self] text in self?.navigate(to: text) }
-        card.onLensSiteControls = { [weak self] button in self?.showSiteControls(from: button) }
-        card.onLensClose = { [weak self] in self?.dismiss(.escape) }
+        let moved = pdf.superview !== holder
+        if moved {
+            pdf.removeFromSuperview()
+            pdf.frame = holder.bounds
+            pdf.autoresizingMask = [.width, .height]
+            holder.addSubview(pdf)
+        }
+        if moved || fitting { pdf.pdfView.fitWidth() }
     }
 
-    private func refreshLens() {
+    /// The panel's own address and buttons follow the page in it.
+    private func refresh() {
         guard let tab else { return }
         if tab.isClosed {
             dismiss(.sameTab)
             return
         }
+        // A PDF that arrived after the page did (the viewer is made once the document opens) travels with it too.
+        adoptPDFViewer(of: tab, fitting: false)
         controller?.updateEdgeSidebarForPeek(tab)
-        card?.updateLens(address: tab.url?.absoluteString ?? "",
-                         canGoBack: tab.webView?.canGoBack ?? false,
-                         canGoForward: tab.webView?.canGoForward ?? false,
-                         isLoading: tab.isLoading)
     }
 
-    private func navigate(to text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
-        guard let url = URL(string: candidate),
-              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
-        tab?.load(url)
-    }
-
-    /// Site Controls from the lens's caption: the page's own panel, over the lens, in the lens's window.
-    private func showSiteControls(from button: IconButton) {
-        guard let tab, let overlay, let panel else { return }
-        if SitePanel.isOpen(in: panel) {
-            SitePanel.closeCurrent()
-            return
-        }
-        let host = EdgeSitePanelHost(tab: tab, overlay: overlay, window: panel)
-        siteHost = host
-        SitePanel.toggle(in: host, from: button)
-    }
-
-    /// The sidebar's address, clicked while the lens is out, types in the lens instead of bringing the browser.
-    func focusAddress() {
-        guard isVisible else { return }
-        panel?.makeKey()
-        card?.focusLensAddress()
-    }
-
-    /// The command bar or another of our popups has finished: the page takes the keyboard back.
     func makeKey() {
         guard isVisible else { return }
-        panel?.makeKey()
-        if let webView = tab?.webView { panel?.makeFirstResponder(webView) }
+        EdgeSidebar.shared.makeKey()
+        if let pdf = tab?.pdfViewer {
+            EdgeSidebar.shared.panelWindow?.makeFirstResponder(pdf.pdfView)
+        } else if let webView = tab?.webView {
+            EdgeSidebar.shared.panelWindow?.makeFirstResponder(webView)
+        }
     }
 
     // MARK: Dismissing
 
-    /// Ends the lens for `reason`, as the policy says. State goes first: the page is back in its tab before the card
-    /// moves, the observers are gone, and no path here asks WebKit anything. The card then collapses to the preview;
-    /// a deadline forces the panel out if the animation is interrupted. The sidebar follows only after that.
+    /// Ends the page for `reason`. Its holder goes back first, then the panel narrows, or goes with it when the
+    /// reason takes the whole object.
     func dismiss(_ reason: EdgeLensReason = .escape) {
-        guard isVisible, !isCollapsing else { return }
+        guard isVisible else { return }
+        let hidePanel = EdgeLensPolicy.hidesSidebar(after: reason,
+                                                    pointerInEdgeZone: EdgeSidebar.shared.pointerInEdgeZone,
+                                                    panelCanShow: EdgeSidebar.shared.canStayOut)
+        detach(reason, resize: !hidePanel)
+        if hidePanel {
+            EdgeSidebar.shared.hide(animated: true)
+        } else if EdgeLensPolicy.keepsKey(after: reason), !EdgeSidebar.shared.isCommandBarOpen {
+            EdgeSidebar.shared.makeKey()
+        }
+    }
+
+    /// The panel is going away: the page goes back to its tab, and the panel leaves at whatever width it has.
+    func detachForHide() {
+        guard isVisible else { return }
+        detach(.windowClose, resize: false)
+    }
+
+    private func detach(_ reason: EdgeLensReason, resize: Bool) {
+        debugLog("edge peek detach reason=\(reason) panel=\(EdgeSidebar.shared.isShowing) pointer=\(NSEvent.mouseLocation)")
+        // A page still folding goes back to its tab first, so no holder is left in the panel.
+        finishFold()
+        hoverWork?.cancel()
+        hoverWork = nil
+        leaveWork?.cancel()
+        leaveWork = nil
+        // The note has no page to put back: its card goes, and the panel narrows unless it is leaving anyway.
+        if noticeTab != nil {
+            noticeTab = nil
+            EdgeSidebar.shared.noticeDetached(resize: resize)
+            releaseObservers()
+            self.controller = nil
+            return
+        }
         let controller = self.controller
         let tab = self.tab
         let origin = self.origin
         let originFrame = self.originFrame
-        let panel = self.panel
-        let card = self.card
-        let hideSidebar = EdgeLensPolicy.hidesSidebar(after: reason,
-                                                      pointerInEdgeZone: EdgeSidebar.shared.pointerInEdgeZone,
-                                                      panelCanShow: EdgeSidebar.shared.canStayOut)
-        isCollapsing = true
-        EdgeSidebar.shared.holdForPeek(false)
-        controller?.setEdgePeek(nil)
-        if let tab, let holder = tab.pageHolder {
+        // The page goes back to its tab. Folding into the card, it stays where it is until the panel has narrowed over
+        // it, then goes; hiding it first made the narrow a jump with nothing moving.
+        let restore = {
+            guard let tab, let holder = tab.pageHolder else { return }
             holder.removeFromSuperview()
+            holder.layer?.cornerRadius = 0
+            holder.layer?.masksToBounds = false
             // A selection change puts the page back only if its card still shows it (the split's other pane); a page
             // the card has replaced stays out, so it never paints over the page that owns the place now.
             let cardStillShowsPage = controller?.root.card.webView === tab.webView
@@ -319,183 +434,55 @@ final class EdgePeek {
                 origin.needsLayout = true
             }
         }
-        releaseLensObservers()
-        if let panel, SitePanel.isOpen(in: panel) { SitePanel.closeCurrent() }
-        siteHost = nil
+        let folding = resize && EdgeSidebar.shared.isShowing
+        if folding {
+            EdgeSidebar.shared.pageDetached(resize: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                MainActor.assumeIsolated { restore() }
+            }
+        } else {
+            restore()
+            EdgeSidebar.shared.pageDetached(resize: false)
+        }
+        releaseObservers()
         self.tab = nil
+        self.lockedTab = nil
         self.controller = nil
         self.origin = nil
-        // The collapse is the preview's picture, not the live page.
-        card?.endLive()
-        card?.showsLensControls = false
-        panel?.makeFirstResponder(nil)
-        panel?.ignoresMouseEvents = true
-        guard let panel else {
-            finishCollapse(hideSidebar: hideSidebar, reason: reason)
-            return
-        }
-        let source = EdgePeekPreview.shared.currentFrame ?? sourceFrame ?? panel.frame
-        sourceFrame = nil
-        let duration = 0.22
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = duration
-            context.timingFunction = Tokens.Motion.easeOut
-            panel.animator().setFrame(source, display: true)
-        }
-        let deadline = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, self.isCollapsing else { return }
-                self.finishCollapse(hideSidebar: hideSidebar, reason: reason)
-            }
-        }
-        collapseDeadline = deadline
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05, execute: deadline)
-    }
-
-    private func finishCollapse(hideSidebar: Bool, reason: EdgeLensReason) {
-        collapseDeadline?.cancel()
-        collapseDeadline = nil
-        isCollapsing = false
-        isVisible = false
-        card?.endLive()
-        card?.showsLensControls = false
-        panel?.orderOut(nil)
-        panel?.ignoresMouseEvents = false
-        if hideSidebar {
-            EdgeSidebar.shared.hide(animated: true)
-        } else if EdgeLensPolicy.keepsKey(after: reason), !EdgeSidebar.shared.isCommandBarOpen {
-            // A lens action leaves the keyboard in the sidebar. A context change leaves it where the user put it.
-            EdgeSidebar.shared.makeKey()
-        }
+        // The panel may stay (Esc, a blank click): its rows and address go back to the browser's selected tab.
+        controller?.setEdgeSelection(nil)
+        controller?.setEdgePeek(nil)
+        controller?.prepareEdgeSidebar()
     }
 
     // MARK: Context
 
-    private func installLensObservers(for controller: BrowserWindowController) {
-        if let window = controller.window {
-            // The browser coming forward, or going away, ends the lens: it is not the browser's window.
+    private func installObservers() {
+        guard controller != nil, outsideMonitor == nil else { return }
+        if let window = controller?.window {
+            // The browser coming forward ends the page: it is not the browser's window.
             keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
                                                                  object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.dismiss(.browserFront) }
             }
-            closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification,
-                                                                  object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.dismiss(.windowClose) }
-            }
         }
-        keyLostObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification,
-                                                                  object: panel, queue: .main) { [weak self] _ in
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.focusChanged() } }
+        managerObserver = controller?.tabManager.changed.observe { [weak self] change in
+            MainActor.assumeIsolated { self?.managerChanged(change) }
         }
-        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.panel?.isKeyWindow == true else { return event }
-            if event.keyCode == 53 {
-                // Our own pieces take their Esc first: the address's edit, the site panel, an open menu.
-                if self.isEditingAddress || SitePanel.isOpen(in: self.panel) || MenuPanel.current != nil {
-                    return event
-                }
-                self.dismiss(.escape)
-                return nil
-            }
-            let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
-            if mods == .command, let characters = event.charactersIgnoringModifiers?.lowercased() {
-                switch characters {
-                case "l":
-                    self.focusAddress()
-                    return nil
-                case "r":
-                    guard let tab = self.tab else { return nil }
-                    if tab.isLoading { tab.webView?.stopLoading() } else { tab.webView?.reload() }
-                    return nil
-                default:
-                    break
-                }
-            }
-            return event
-        }
-        // A click outside, in this app or another, ends the lens. A click on the sidebar is a sidebar action: the
-        // lens goes and the sidebar stays, in that one click.
+        // A click outside, in this app or another, puts the whole panel away, page and all.
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.isVisible, !self.isCollapsing, MenuPanel.current == nil else { return }
-                let point = NSEvent.mouseLocation
-                guard self.panel?.frame.contains(point) != true,
-                      EdgeSidebar.shared.panelWindow?.frame.contains(point) != true else { return }
-                self.dismiss(.outsideClick)
-            }
-        }
-        outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self, self.isVisible, !self.isCollapsing else { return event }
-            if MenuPanel.current != nil || RunLoop.current.currentMode == .eventTracking { return event }
-            if event.window is EdgeCommandBarPopup || event.window is NSSavePanel || event.window?.sheetParent != nil {
-                return event
-            }
-            if event.window === self.panel { return event }
-            if event.window === EdgeSidebar.shared.panelWindow {
-                // A row, New Tab or blank click is a sidebar action; the sidebar's own controls (back, reload, the
-                // address) act on the lens and leave it open.
-                if EdgeSidebar.shared.clickClosesLens(at: event.locationInWindow) {
-                    self.dismiss(.sidebarClick)
-                }
-                return event
-            }
-            if event.window === self.controller?.window {
-                self.dismiss(.browserFront)
-                return event
-            }
-            self.dismiss(.outsideClick)
-            return event
-        }
-        // Moving to another app or desktop is moving away. Becoming active is only leaving when the key is not ours.
-        activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
-                                                                     object: nil, queue: .main) { [weak self] _ in
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self, self.isVisible, !self.isCollapsing else { return }
-                    let key = NSApp.keyWindow
-                    if key === self.panel || key === EdgeSidebar.shared.panelWindow || key is EdgeCommandBarPopup
-                        || key is NSSavePanel || key?.sheetParent != nil { return }
-                    self.dismiss(key === self.controller?.window ? .browserFront : .altTab)
-                }
-            }
-        }
-        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.dismiss(.spaceChange) }
-        }
-        appObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] note in
-            // The pid, not the application: the note is not sendable, and the main actor only needs to know whose it was.
-            let pid = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
-            MainActor.assumeIsolated {
-                guard let self, pid != NSRunningApplication.current.processIdentifier else { return }
-                self.dismiss(.altTab)
-            }
-        }
-        screenObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.dismiss(.spaceChange) }
-        }
-        settingsObserver = NotificationCenter.default.addObserver(forName: EdgeSidebar.changed, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, !EdgeSidebar.isOn else { return }
-                self.dismiss(.featureOff)
+                guard let self, self.isVisible, MenuPanel.current == nil else { return }
+                guard EdgeSidebar.shared.panelWindow?.frame.contains(NSEvent.mouseLocation) != true else { return }
+                EdgeSidebar.shared.hide()
             }
         }
     }
 
-    private var isEditingAddress: Bool {
-        guard let field = card?.lensAddress, let editor = field.currentEditor() else { return false }
-        return panel?.firstResponder === editor
-    }
-
-    /// A space change or the page's tab changing under the lens: both end it rather than leave a page with no row to
-    /// come from or go back to.
+    /// A space change or the page's tab changing under it: both end it rather than leave a page with no row to come
+    /// from or go back to.
     private func managerChanged(_ change: TabManager.Change) {
-        guard isVisible, !isCollapsing else { return }
+        guard isVisible else { return }
         switch change {
         case .space:
             if EdgePeekRouting.closesOnSpaceChange(peekVisible: isVisible) { dismiss(.spaceChange) }
@@ -507,69 +494,28 @@ final class EdgePeek {
                 return
             }
             if let lensTab = tab, let selected = controller?.tabManager.selectedTab, selected !== lensTab {
-                // A page opened from the lens is a replacement, not a selection away from it: the show that follows
-                // swaps the page in. Anything else is leaving the lens, and the page must not be put back over the
-                // card that now owns its place.
-                if EdgePeekRouting.selectionKeepsLens(lensTab: lensTab, selected: selected) {
-                    // The replacement is shown right after this notification. If it never comes (Switch to Tab, an
-                    // extension selecting a child tab), the lens has no page there: close it on the next turn, so the
-                    // swap has its moment first.
-                    DispatchQueue.main.async { [weak self] in
-                        MainActor.assumeIsolated {
-                            guard let self, self.isVisible, !self.isCollapsing, self.tab === lensTab,
-                                  self.controller?.tabManager.selectedTab === selected else { return }
-                            self.dismiss(.selection)
-                        }
+                // A page chosen in the panel's command bar is locked into it right after this notification, and a page
+                // opened from the page replaces it. Both swap the panel's page here. Anything else is leaving it, but
+                // give that turn its moment first: deciding now would dismiss the panel before the new page arrives.
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, self.isVisible, let lensTab = self.tab,
+                              let selected = self.controller?.tabManager.selectedTab, selected !== lensTab else { return }
+                        self.dismiss(.selection)
                     }
-                    return
                 }
-                dismiss(.selection)
             }
         case .content:
             break
         }
     }
 
-    /// The lens is no longer the key window: keep it only for the sidebar or our own menus and sheets.
-    private func focusChanged() {
-        guard isVisible, !isCollapsing else { return }
-        let key = NSApp.keyWindow
-        if key === panel { return }
-        let newKey: EdgePeekFocusPolicy.NewKey
-        if key == nil {
-            newKey = .none
-        } else if key === EdgeSidebar.shared.panelWindow {
-            newKey = .sidebar
-        } else if key is EdgeCommandBarPopup || key is NSSavePanel || key?.sheetParent != nil {
-            newKey = .owned
-        } else {
-            newKey = .other
-        }
-        guard !EdgePeekFocusPolicy.keepsOpen(newKey: newKey, menuOpen: MenuPanel.current != nil) else { return }
-        dismiss(key === controller?.window ? .browserFront : .altTab)
-    }
-
-    private func releaseLensObservers() {
+    private func releaseObservers() {
         token = nil
         managerObserver = nil
-        if let escMonitor { NSEvent.removeMonitor(escMonitor) }
-        escMonitor = nil
         if let outsideMonitor { NSEvent.removeMonitor(outsideMonitor) }
         outsideMonitor = nil
-        if let outsideLocal { NSEvent.removeMonitor(outsideLocal) }
-        outsideLocal = nil
-        for observer in [keyObserver, closeObserver, keyLostObserver, activationObserver, screenObserver, settingsObserver] {
-            if let observer { NotificationCenter.default.removeObserver(observer) }
-        }
+        if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
         keyObserver = nil
-        closeObserver = nil
-        keyLostObserver = nil
-        activationObserver = nil
-        screenObserver = nil
-        settingsObserver = nil
-        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
-        spaceObserver = nil
-        if let appObserver { NSWorkspace.shared.notificationCenter.removeObserver(appObserver) }
-        appObserver = nil
     }
 }

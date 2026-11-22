@@ -88,8 +88,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
+        if !sidebarVisible {
+            // The bar comes for the address once the window is up: a window restored with the sidebar away has it.
+            DispatchQueue.main.async { [weak self] in self?.placeAddress() }
+        }
         // A width saved before the toolbar's buttons grew can be narrower than they now need.
         root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
+        root.onSidebarVisibilityWillChange = { [weak self] visible in
+            guard let self else { return }
+            self.moveAddress(above: BrowserRootView.AddressPlacement.inBar(
+                addressAbovePage: BrowserRootView.addressAbovePage, sidebarVisible: visible))
+        }
         root.onLayoutChange = { [weak self] in
             guard let self else { return }
             self.layoutTrafficLights()
@@ -144,12 +153,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.delegate = self
         sidebar.onEditSpace = { [weak self] id in self?.openSpaceEditor(id, anchor: self?.sidebar.dot(for: id)) }
 
-        sidebar.onSwipeSpace = { [weak self] offset in
-            guard let self else { return false }
-            let before = self.tabManager.currentSpaceID
-            self.tabManager.switchSpace(by: offset)
-            return before != self.tabManager.currentSpaceID
-        }
+        sidebar.onSwipeSpace = { [weak self] offset in self?.switchSpace(by: offset) ?? false }
         sidebar.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         // Right-click Back or Forward: the pages that way, to jump several at once.
@@ -396,10 +400,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .selection:
             if tabManager.selectedTab != nil { commandBar.pageArrived() }
             showSelectedTab()
-            // A tab chosen in the panel's command bar opens in the lens, over the panel; the window stays behind.
+            // A tab chosen in the panel's command bar opens in the panel and is locked there; the window stays behind.
             if edgeBarChoosing, let tab = tabManager.selectedTab {
                 edgeBarChoosing = false
-                EdgePeek.shared.show(tab: tab, from: self, replacing: true)
+                EdgePeek.shared.lock(tab: tab, from: self)
             }
             // An AI app's bar goes with the tab it's using.
             AgentControl.shared.refresh(self)
@@ -428,6 +432,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.currentSpaceID = tabManager.currentSpaceID
         bothSidebars { $0.reloadSpaces(current: tabManager.currentSpaceID) }
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: old, snapshot: snapshot)
+        // The panel's sidebar is a second live sidebar, not a copy taken when it opened: its list and its color move
+        // to the new space as the window's do, whether the switch came from a dot, a swipe or the keyboard.
+        if let edgeSidebar {
+            edgeSidebar.currentSpaceID = tabManager.currentSpaceID
+            if EdgeSidebar.shared.isShowing {
+                edgeSidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: old, snapshot: nil)
+                EdgeSidebar.shared.holdOpen(for: 0.7)
+            } else {
+                edgeSidebar.list.reload(animated: false)
+            }
+        }
         // The slide goes to Core Animation first, so it carries on from the fingers at once: the new color (and with
         // it light or dark, which restyles everything) follows a moment later, and the page after that (tens of
         // milliseconds of WebKit work). From here they run on their own, so a swipe never catches on that work.
@@ -583,16 +598,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return menu
     }
 
-    /// Opens the space panel beside the sidebar (or closes it, if it's already showing that space).
+    /// Opens the space panel beside the sidebar (or closes it, if it's already showing that space). From the edge
+    /// panel it opens there, beside the card, and the window behind stays where it is.
     func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
-        if !root.sidebarVisible && !root.isSidebarFloatingVisible { root.reveal(true) }
         previews.hide()
+        if EdgeSidebar.shared.isShowing {
+            SpaceEditorPanel.toggle(spaceID: spaceID, anchor: nil, in: self, edge: EdgeSidebar.shared)
+            return
+        }
+        if !root.sidebarVisible && !root.isSidebarFloatingVisible { root.reveal(true) }
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
 
     /// While anything is being dragged in the space editor: the window shows that version of the space, unsaved.
     func previewSpace(_ draft: SpaceInfo) {
-        sidebar.previewDotColor(draft.swatch, for: draft.id)
+        bothSidebars { $0.previewDotColor(draft.swatch, for: draft.id) }
         guard draft.id == tabManager.currentSpaceID, !tabManager.isPrivate else { return }
         render(draft, animated: false)
     }
@@ -603,7 +623,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
     /// from them is put away first. At once: a setting you change, not a layout you watch.
     @objc func placeAddress() {
-        let above = BrowserRootView.addressAbovePage
+        moveAddress(above: BrowserRootView.AddressPlacement.inBar(addressAbovePage: BrowserRootView.addressAbovePage,
+                                                                  sidebarVisible: root.sidebarVisible))
+    }
+
+    /// The address above the page (`above`) or back in the sidebar. Used for the setting, and for the sidebar going
+    /// or coming: with it away the bar is the address's only home, so the bar is there with it (#469).
+    func moveAddress(above: Bool) {
         guard sidebar.holdsAddress == above else { return }
         if window?.isVisible == true { closeFloatingPanels() }
         bothSidebars { $0.holdsAddress = !above }
@@ -651,8 +677,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Whether the window shows a look partway to another space, mid-swipe.
     private var showsSwipeLook = false
 
+    /// A swipe in either sidebar: the panel's own and the window's take the same path, so the spaces move exactly as
+    /// they do in the browser.
+    private func switchSpace(by offset: Int) -> Bool {
+        let before = tabManager.currentSpaceID
+        tabManager.switchSpace(by: offset)
+        return before != tabManager.currentSpaceID
+    }
+
     /// Mid-swipe: the window's look `share` of the way to `id`'s, as far as the fingers have pulled that space in. Nil
-    /// or none of the way: the current space's own again, as when a swipe is called off.
+    /// or none of the way: the current space's own again, as when a swipe is called off. The panel's card follows the
+    /// same colors when it is the one being swiped.
     private func swipeLook(toward id: UUID?, share: CGFloat) {
         guard !tabManager.isPrivate else { return }
         let space = tabManager.currentSpace
@@ -662,10 +697,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         showsSwipeLook = true
         let (color, end) = root.paint(space, toward: next, share: share)
-        root.sidebarContainer.tint = color
-        root.sidebarContainer.gradient = end.map { ($0, share < 0.5 ? space.gradientAngle : next.gradientAngle) }
+        let gradient = end.map { ($0, share < 0.5 ? space.gradientAngle : next.gradientAngle) }
         let t = Double(min(share, 1))
-        root.sidebarContainer.grain = (space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t
+        let grain = (space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t
+        root.sidebarContainer.tint = color
+        root.sidebarContainer.gradient = gradient
+        root.sidebarContainer.grain = grain
+        EdgeSidebar.shared.setCardLook(tint: color, gradient: gradient, grain: grain)
         root.showEmptyPage(of: space, toward: next, share: share)
     }
 
@@ -678,10 +716,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Draws the window for a space: its mode, color, gradient, how see-through it is, and grain.
     private func render(_ space: SpaceInfo, animated: Bool, crossFadesMode: Bool = true) {
         let (color, end) = root.paint(space, isPrivate: tabManager.isPrivate, animated: animated, crossFadesMode: crossFadesMode)
+        let gradient = end.map { ($0, space.gradientAngle) }
+        let grain = tabManager.isPrivate ? 0 : space.grain ?? 0
         root.sidebarContainer.tint = color
-        root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
-        root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0
+        root.sidebarContainer.gradient = gradient
+        root.sidebarContainer.grain = grain
         root.sidebarContainer.windowGlass = root.windowGlass
+        // The panel's card is the same space's: a switch made there must not wait for it to be closed and reopened.
+        EdgeSidebar.shared.setCardLook(tint: color, gradient: gradient, grain: grain)
+        let mode = tabManager.isPrivate ? "dark" : space.readableAppearance
+        EdgeSidebar.shared.setCardAppearance(mode == "light" ? .aqua : mode == "dark" ? .darkAqua : nil)
         root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
     }
 
@@ -2296,24 +2340,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
-    /// Bar behind the traffic lights when they drop down with the menu bar in full screen. AppKit draws nothing there
-    /// when the page runs under the title bar, so with the sidebar hidden the buttons floated over the page. Uses the
-    /// title bar material, like Safari's toolbar.
-    private var fullScreenBar: NSVisualEffectView?
-
-    private func showFullScreenBar(_ on: Bool) {
-        fullScreenBar?.removeFromSuperview()
-        fullScreenBar = nil
-        guard on, let titlebar = browserWindow.standardWindowButton(.closeButton)?.superview else { return }
-        let bar = NSVisualEffectView(frame: titlebar.bounds)
-        bar.material = .titlebar
-        bar.blendingMode = .behindWindow
-        bar.state = .followsWindowActiveState
-        bar.autoresizingMask = [.width, .height]
-        titlebar.addSubview(bar, positioned: .below, relativeTo: nil)
-        fullScreenBar = bar
-    }
-
     /// The window's place before it went full screen: what's saved, so leaving full screen after a relaunch gives
     /// back the window you had, not one the size of the screen.
     private(set) var windowedFrame: NSRect?
@@ -2354,7 +2380,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
             browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
         }
-        if (fullScreenBar != nil) != phase.showsFullScreenBar { showFullScreenBar(phase.showsFullScreenBar) }
         guard !phase.isMoving else { return }
         layoutTrafficLights()
         root.needsLayout = true
@@ -3436,13 +3461,12 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func sidebarOpenCommandBar() {
-        // The popout is the browser while it is out: its own address takes the typing, and the sidebar stays.
-        if EdgePeek.shared.isVisible {
-            EdgePeek.shared.focusAddress()
+        // The popout is the browser while it is out: its own address opens for editing over the screen, and the panel
+        // and its page stay. What is typed goes into the page shown there, not into the window behind it.
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.editAddressInPlace()
             return
         }
-        // From the edge sidebar: Zigzag comes forward to be typed in, and the panel makes way for the bar.
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         commandBar.show(mode: .editCurrent)
     }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
@@ -3519,8 +3543,9 @@ extension BrowserWindowController: CommandBarHost {
     /// A split pane's address when asked for; else the address above the page, or the sidebar's while the sidebar
     /// shows docked.
     func commandBarAnchor(asked: NSView?) -> NSView? {
-        // The panel's bar opens over the screen's middle, not over a field in the window behind it.
-        if edgeCommandBarInPlace { return nil }
+        // In the panel, editing the address opens over the panel's own address, as in the window's sidebar; New Tab
+        // still centers, since an anchor only counts while editing.
+        if edgeCommandBarInPlace { return EdgeSidebar.shared.addressView }
         if let asked { return asked }
         // In split view under the bar, the bar's address steps aside: the address of the pane you're in, as ⌘L edits
         // that pane's page.
@@ -3533,13 +3558,19 @@ extension BrowserWindowController: CommandBarHost {
     var commandBarTabs: TabManager? { tabManager }
     var commandBarIsMovable: Bool { !edgeCommandBarInPlace }
     var commandBarProfile: Profile { tabManager.profile }
-    var commandBarTab: Tab? { tabManager.selectedTab }
+    /// The page ⌘L edits: in the panel, the page showing there (a preview or a locked one), not the window's tab
+    /// behind it.
+    var commandBarTab: Tab? {
+        edgeCommandBarInPlace ? (EdgePeek.shared.tab ?? tabManager.selectedTab) : tabManager.selectedTab
+    }
     var commandBarSpace: SpaceInfo? { tabManager.currentSpace }
     var commandBarIsPrivate: Bool { tabManager.isPrivate }
 
     /// One floating thing at a time. Over the tab overview, the overview steps aside: whatever you open or search for
     /// shows in the window, not behind the overview.
     func commandBarWillShow() {
+        // A choice from an older bar never reaches a tab made by this one.
+        edgeBarChoosing = false
         if desk.isVisible { desk.hide(openingTab: nil) }
         SitePanel.closeCurrent()
         DownloadsPanel.closeCurrent()
@@ -3565,16 +3596,22 @@ extension BrowserWindowController: CommandBarHost {
         else { window?.makeFirstResponder(field) }
     }
 
-    /// A result chosen in the panel: the tab it makes or selects opens in the lens, over the panel, not behind it.
+    /// A result chosen in the panel: the tab it makes or selects opens and locks in the panel, not behind it. The bar
+    /// hides before that tab exists, so the flag outlives `commandBarDidHide`; an action that makes no tab lets it go
+    /// a moment later.
     func commandBarChoseResult() {
         guard edgeCommandBarInPlace else { return }
         edgeBarChoosing = true
+        EdgeSidebar.shared.holdOpen(for: 1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.edgeBarChoosing = false
+        }
     }
 
     func commandBarDidHide() {
         guard edgeCommandBarInPlace else { return }
         edgeCommandBarInPlace = false
-        edgeBarChoosing = false
+        // `edgeBarChoosing` stays set: the bar hides before its chosen result makes or selects its tab.
         EdgeSidebar.shared.commandBarDidHide()
     }
 }
@@ -3589,12 +3626,21 @@ extension BrowserWindowController {
         edgeSidebarForDisplay().sidebar.list.setPeek(id)
     }
 
+    /// The row the panel has selected: clicking a tab there outlines it in the panel, while the window behind keeps
+    /// the tab it was on. Nil puts the panel's rows back on the window's selection.
+    func setEdgeSelection(_ id: UUID?) {
+        edgeSidebar?.list.setSelectionOverride(id)
+    }
+
     func edgeSidebarForDisplay() -> (sidebar: SidebarView, container: SidebarContainer) {
         if let edgeSidebar, let edgeContainer { return (edgeSidebar, edgeContainer) }
         let mirror = SidebarView(frame: .zero)
         mirror.delegate = self
         // A click picks a tab; a drag would leave the panel, so its rows stay put.
         mirror.list.allowsDragging = false
+        // Zigzag's own pages (Settings, History, the archive) have no page to lend the panel: their rows grey out and
+        // do nothing, rather than open a blank card.
+        mirror.list.refusesSystemPages = true
         mirror.list.onPickTab = { [weak self] tab in self?.pickFromEdgeSidebar(tab) }
         // A pinned page opens in the popout too, whether it is open in a window already or made here.
         mirror.list.onOpenBookmark = { [weak self] bookmark in self?.openBookmarkFromEdgeSidebar(bookmark) }
@@ -3612,14 +3658,12 @@ extension BrowserWindowController {
         mirror.sidebarButton.isHidden = true
         // Over another app, the app is inactive and the panel never key: its hover states still answer the pointer.
         mirror.hoversWhileInactive = true
-        // Hovering a row shows its still page beside it, in the panel's own window: the browser window's overlay is
-        // behind another app while the panel is out.
-        mirror.list.onHoverTab = { [weak self] tab, rect in
-            guard let self, let tab, let rect, !EdgePeek.shared.isVisible else {
-                EdgePeekPreview.shared.pointerLeftRow()
-                return
-            }
-            EdgePeekPreview.shared.hover(tab: tab, at: rect)
+        // Hovering a row brings its page into the panel's page area: the whole tab, inside the sidebar, swapped as
+        // the pointer moves down the rows. A click locks the one it is on; leaving the rows comes back to it.
+        mirror.list.onHoverTab = { [weak self] tab, _ in
+            guard let self else { return }
+            if let tab { EdgePeek.shared.hover(tab: tab, from: self) }
+            else { EdgePeek.shared.rowsLeft(from: self) }
         }
         wireEdgeSidebar(mirror)
         let container = SidebarContainer(sidebar: mirror)
@@ -3639,12 +3683,13 @@ extension BrowserWindowController {
         return (container.tint, container.gradient, container.grain, container.windowGlass)
     }
 
-    /// Opens the browser's own new-tab bar in the panel, over the screen: the same bar and results, its overlay and
-    /// keyboard in the edge popup while it is open (`CommandBarHost` in this file).
-    func showEdgeCommandBar() {
+    /// Opens the browser's own bar in the panel, over the screen: the same bar and results, its overlay and keyboard
+    /// in the edge popup while it is open (`CommandBarHost` in this file). New Tab, or the panel's address editing the
+    /// page it shows.
+    func showEdgeCommandBar(mode: CommandBarController.Mode = .newTab) {
         guard !commandBar.isVisible else { return }
         edgeCommandBarInPlace = true
-        commandBar.show(mode: .newTab)
+        commandBar.show(mode: mode)
     }
 
     /// Brings the mirror up to the window's sidebar as it is now, before the panel shows it.
@@ -3679,6 +3724,9 @@ extension BrowserWindowController {
     private func wireEdgeSidebar(_ mirror: SidebarView) {
         mirror.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         mirror.updateCard.onHide = { Updater.shared.dismissCard() }
+        // The same swipe as in the window's own sidebar: the panel is the browser while it is out.
+        mirror.onSwipeSpace = { [weak self] offset in self?.switchSpace(by: offset) ?? false }
+        mirror.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
 
         mirror.backButton.onClick = { [weak self] _ in
             guard let self else { return }
@@ -3756,10 +3804,8 @@ extension BrowserWindowController {
 
         mirror.onEditSpace = { [weak self] id in
             guard let self else { return }
-            // The editor is 300 wide and belongs to the window: Zigzag comes forward with its sidebar, as from any
-            // other menu. Shown from the panel it would be clipped to the sidebar's width.
-            bringForwardForEdge()
-            openSpaceEditor(id)
+            // In the panel it opens over the panel's own page area, not in the window behind it.
+            openSpaceEditor(id, anchor: self.edgeSidebar?.list.headerView)
         }
     }
 
@@ -3768,29 +3814,30 @@ extension BrowserWindowController {
         pickFromEdgeSidebar(tab)
     }
 
-    /// A tab picked in the edge sidebar opens the lens beside it; a favorite or a page the lens can't take brings the
-    /// window forward on it. A click while the lens is open: the same row closes it, another row brings that page into
-    /// it rather than closing the lens and opening nothing.
+    /// A tab picked in the edge sidebar locks that page into the panel: it stays when the pointer leaves the rows,
+    /// and the keyboard goes into it. Hovering another row previews it; leaving the rows comes back to the locked
+    /// page. A favorite or a page the panel can't take brings the window forward on it.
     private func pickFromEdgeSidebar(_ tab: Tab) {
+        // The panel lends the tab its page; Zigzag's own pages have no page to lend. Their rows are greyed, and this
+        // is the last gate for a pick that arrives another way (a pin, the command bar).
+        guard EdgeLensPolicy.takesPage(url: tab.url) else { return }
         switch EdgeLensPolicy.pickAction(isVisible: EdgePeek.shared.isVisible,
                                          sameTab: EdgePeek.shared.tab === tab) {
-        case .close:
-            EdgePeek.shared.dismiss(.sameTab)
-            return
-        case .replace:
-            EdgePeek.shared.show(tab: tab, from: self, replacing: true)
+        case .lock, .replace:
+            // The row under the pointer is already showing its page (or another preview is): the click locks it.
+            EdgePeek.shared.lock(tab: tab, from: self)
             return
         case .open:
             break
         }
-        // Any page can be borrowed, pinned or private or Zigzag's own, as the person asked. One that has no web view
-        // yet (a just-opened tab, a picked pinned page never looked at) is made here first, beside the panel.
+        // Any web page can be borrowed, pinned or private, as the person asked. One that has no web view yet (a
+        // just-opened tab, a picked pinned page never looked at) is made here first, beside the panel.
         guard tab.url != nil, EdgeSidebar.shared.sidebarCardScreenFrame != nil else {
             bringForwardForEdge()
             return
         }
         if MiniWindowController.needsPage(tab) { tab.reload() }
-        EdgePeek.shared.show(tab: tab, from: self)
+        EdgePeek.shared.lock(tab: tab, from: self)
     }
 
     /// The page the edge panel is showing: the lens's, or the one the panel's rows are on.
@@ -3798,6 +3845,7 @@ extension BrowserWindowController {
 
     /// A pinned page picked in the edge panel: its live tab, opened in the popout like a tab row.
     private func openBookmarkFromEdgeSidebar(_ bookmark: Bookmark) {
+        guard EdgeLensPolicy.takesPage(url: bookmark.url) else { return }
         tabManager.openBookmark(bookmark)
         guard let tab = tabManager.bookmarkTab(for: bookmark.id) ?? tabManager.selectedTab else { return }
         pickFromEdgeSidebar(tab)

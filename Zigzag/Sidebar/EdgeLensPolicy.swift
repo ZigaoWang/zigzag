@@ -29,11 +29,11 @@ enum EdgeLensOpenAction: Equatable {
     case close
 }
 
-/// What a row picked in the sidebar does while the lens is out.
+/// What a row picked in the sidebar does while the page is out.
 enum EdgeLensPick: Equatable {
     case open
     case replace
-    case close
+    case lock
 }
 
 /// The edge lens's rules (#365): the sidebar and the lens are one session, and every dismissal says what it closes.
@@ -57,11 +57,20 @@ enum EdgeLensPolicy {
         return replacing ? .replace : .close
     }
 
-    /// A row picked while the lens is out: the same row closes it, another row brings that page into it.
+    /// A row picked while the page is out: the same row locks it, another row brings that page into the panel.
     static func pickAction(isVisible: Bool, sameTab: Bool) -> EdgeLensPick {
         guard isVisible else { return .open }
-        return sameTab ? .close : .replace
+        return sameTab ? .lock : .replace
     }
+
+    /// Leaving the rows goes back to the tab picked there. Before anything is picked, the preview stays where the
+    /// pointer left it: there is no selected tab to go back to.
+    static func restoresAfterHover(locked: Bool) -> Bool { locked }
+
+    /// Whether the panel takes this page. It lends the tab's own page, so a page Zigzag serves itself (Settings,
+    /// History, the archive) is not one it can show there: its row stays, greyed, and takes no pick. Hover still
+    /// lights its place, enough to see where the pointer is and move off it.
+    static func takesPage(url: URL?) -> Bool { !HistoryPage.isInternal(url) }
 
     /// Whether the sidebar takes the keyboard back after the lens collapses. A lens action leaves it working in the
     /// sidebar; a context change leaves the keyboard where the user put it.
