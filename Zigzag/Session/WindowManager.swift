@@ -610,9 +610,50 @@ final class WindowManager {
     #endif
 
     /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.
-    private var closedWindows: [(id: UUID, state: SessionState.WindowState, history: [UUID: Data], closedAt: Date)] = []
+    private var closedWindows: [(id: UUID, state: SessionState.WindowState, history: [UUID: Data], closedAt: Date)] = [] {
+        didSet { Self.recentlyClosedChanged.send() }
+    }
     /// Tabs closed in everyday windows that have closed since, oldest first.
-    private var orphanedClosedTabs: [TabManager.ClosedTab] = []
+    private var orphanedClosedTabs: [TabManager.ClosedTab] = [] {
+        didSet { Self.recentlyClosedChanged.send() }
+    }
+
+    /// Fires when everyday windows' closed tabs or the closed windows change; never for a private window.
+    static let recentlyClosedChanged = Signal<Void>()
+
+    /// What can be brought back, for `chrome.sessions`, never a private window's: tabs closed in open windows (one
+    /// list per shared store), tabs of windows since closed, and closed windows not already back.
+    var recentlyClosed: (tabs: [TabManager.ClosedTab], windows: [(id: UUID, state: SessionState.WindowState, closedAt: Date)]) {
+        var stores = Set<ObjectIdentifier>()
+        var tabs = orphanedClosedTabs
+        for manager in controllers.map(\.tabManager) where !manager.isPrivate && !manager.isInvalidated
+            && stores.insert(ObjectIdentifier(manager.store)).inserted {
+            tabs += manager.closedTabRecords
+        }
+        let open = openTabIDs
+        return (tabs, closedWindows.filter { !Self.isBack($0.state, open: open) }.map { ($0.id, $0.state, $0.closedAt) })
+    }
+
+    /// Reopens one closed tab as History › Recently Closed does, in its window brought to the front. One of a window
+    /// since closed goes into the front everyday window, as ⇧⌘T puts it. False when it's no longer there.
+    @discardableResult
+    func reopenClosedTab(_ id: UUID) -> Bool {
+        let key = keyController
+        let everyday = controllers.filter { !$0.tabManager.isPrivate && !$0.tabManager.isInvalidated }
+        let ordered = everyday.filter { $0 === key } + everyday.filter { $0 !== key }
+        if let controller = ordered.first(where: { $0.tabManager.closedTabRecords.contains { $0.id == id } }) {
+            controller.window?.makeKeyAndOrderFront(nil)
+            return controller.tabManager.reopenClosedTab(id) != nil
+        }
+        guard orphanedClosedTabs.contains(where: { $0.id == id }) else { return false }
+        if !controllers.contains(where: { !$0.tabManager.isPrivate }) { reopen() }
+        let front = keyController?.tabManager
+        let into = front.flatMap { $0.isPrivate ? nil : $0 } ?? controllers.first { !$0.tabManager.isPrivate }?.tabManager
+        guard let into, let index = orphanedClosedTabs.lastIndex(where: { $0.id == id }) else { return false }
+        let record = orphanedClosedTabs.remove(at: index)
+        controllers.first { $0.tabManager === into }?.window?.makeKeyAndOrderFront(nil)
+        return into.reopenFromClosedWindow(record) != nil
+    }
 
     /// What ⇧⌘T brings back: a tab, into the window it closed in, a tab of a window since closed, or a window.
     enum LastClosed: Equatable { case tab, tabOfClosedWindow, window }

@@ -67,6 +67,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - The address bar's translate button is in the accent color while a page is being translated.
 - A pop-up from a window kept on top opens over it, kept on top too, instead of behind it. From Zigzag Mini over a full-screen app, it opens over that app.
 - A pop-up a page opens right after you click or press a key in it opens at once instead of asking where to go, in Zigzag Mini too. A page you went to doesn't count a click on the page before it.
+- Extensions that manage sessions or tabs see the tabs and windows you closed. With the sessions permission, an extension gets the ones History › Recently Closed brings back, newest first, and can reopen one the same way; private windows' never show. ([#486](https://github.com/ZigaoWang/zigzag/issues/486))
 
 ## [0.9.3] - 2026-11-21
 

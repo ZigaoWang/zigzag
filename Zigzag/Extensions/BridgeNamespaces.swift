@@ -97,6 +97,138 @@ final class BridgeTopSites: BridgeNamespace {
     }
 }
 
+// MARK: - sessions
+
+/// `chrome.sessions`, over the tabs and windows History › Recently Closed and ⇧⌘T bring back, newest first. Only the
+/// extension's own profile's, and never a private window's. Zigzag doesn't sync, so there are no other devices.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeSessions: BridgeNamespace {
+    static let name = "sessions"
+    static let permission = "sessions"
+    /// Chrome's MAX_SESSION_RESULTS: the default and the most getRecentlyClosed returns.
+    static let maxResults = 25
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
+    private var watching: SignalToken?
+    private let announce = Coalescer()
+    /// The session ids last told about, so another profile's closing never reaches this one's extensions.
+    private var lastSeen: [String] = []
+
+    /// One closed tab or window, as `getRecentlyClosed` lists it.
+    enum Entry {
+        case tab(TabManager.ClosedTab)
+        case window(id: UUID, state: SessionState.WindowState, closedAt: Date)
+
+        var closedAt: Date {
+            switch self {
+            case .tab(let tab): return tab.closedAt
+            case .window(_, _, let closedAt): return closedAt
+            }
+        }
+
+        var sessionID: String {
+            switch self {
+            case .tab(let tab): return "t:\(tab.id)"
+            case .window(let id, _, _): return "w:\(id)"
+            }
+        }
+    }
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "getRecentlyClosed":
+            let wanted = args.object(0).number("maxResults").map { Int(saturating: $0) }
+            return Self.recentlyClosed(closed(), maxResults: wanted).map(Self.session)
+        case "getDevices":
+            return [Any]()
+        case "restore":
+            let all = Self.newestFirst(closed())
+            let wanted = args.string(0)
+            guard let entry = wanted.map({ id in all.first { $0.sessionID == id } }) ?? all.first else {
+                throw BridgeError(wanted.map { "Invalid session id: \"\($0)\"." } ?? "There are no sessions to restore.")
+            }
+            let session = Self.session(entry)
+            switch entry {
+            case .tab(let tab):
+                guard WindowManager.shared.reopenClosedTab(tab.id) else { throw BridgeError("Couldn't restore the tab") }
+            case .window(let id, _, _):
+                WindowManager.shared.reopenClosedWindow(id)
+            }
+            return session
+        default:
+            throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+
+    func startEvents() {
+        guard watching == nil else { return }
+        lastSeen = Self.newestFirst(closed()).map(\.sessionID)
+        watching = WindowManager.recentlyClosedChanged.observe { [weak self] in
+            self?.announce.schedule { [weak self] in self?.announceChanges() }
+        }
+    }
+
+    private func announceChanges() {
+        let now = Self.newestFirst(closed()).map(\.sessionID)
+        guard now != lastSeen else { return }
+        lastSeen = now
+        host.bridge.emit("sessions.onChanged", [])
+    }
+
+    /// This profile's closed tabs and windows, from every everyday window.
+    private func closed() -> [Entry] {
+        let found = WindowManager.shared.recentlyClosed
+        return Self.mine(tabs: found.tabs, windows: found.windows, profile: host.profile.id, profileOf: Library.shared.profileID(ofSpace:))
+    }
+
+    /// The tabs with a page and the windows on `profile`, each tab once.
+    static func mine(tabs: [TabManager.ClosedTab], windows: [(id: UUID, state: SessionState.WindowState, closedAt: Date)],
+                     profile: UUID, profileOf: (UUID) -> UUID) -> [Entry] {
+        var seen = Set<UUID>()
+        let kept = tabs.filter { $0.url != nil && profileOf($0.spaceID) == profile && seen.insert($0.id).inserted }.map(Entry.tab)
+        return kept + windows.filter { profileOf($0.state.currentSpaceID) == profile }.map { Entry.window(id: $0.id, state: $0.state, closedAt: $0.closedAt) }
+    }
+
+    /// Newest first; a tie goes to the one listed later, as it closed after.
+    static func newestFirst(_ all: [Entry]) -> [Entry] {
+        all.enumerated().sorted { a, b in
+            a.element.closedAt != b.element.closedAt ? a.element.closedAt > b.element.closedAt : a.offset > b.offset
+        }.map(\.element)
+    }
+
+    /// What getRecentlyClosed returns: newest first, at most `maxResults` (Chrome's default and cap, 25).
+    static func recentlyClosed(_ all: [Entry], maxResults wanted: Int?) -> [Entry] {
+        Array(newestFirst(all).prefix(max(0, min(wanted ?? maxResults, maxResults))))
+    }
+
+    /// Chrome's `Session`: when it closed, in seconds, and the tab or window.
+    static func session(_ entry: Entry) -> [String: Any] {
+        let seconds = Int(entry.closedAt.timeIntervalSince1970)
+        switch entry {
+        case .tab(let closed):
+            return ["lastModified": seconds,
+                    "tab": tab(sessionID: entry.sessionID, url: closed.url, title: closed.customTitle ?? closed.title, index: closed.index)]
+        case .window(_, let state, _):
+            let pages = state.spaces.flatMap(\.tabs) + state.bookmarkTabs.map(\.tab)
+            let tabs = pages.filter { $0.url != nil }.enumerated().map { index, page in
+                tab(sessionID: "\(entry.sessionID)/\(page.id)", url: page.url, title: page.customTitle ?? page.title, index: index)
+            }
+            return ["lastModified": seconds,
+                    "window": ["sessionId": entry.sessionID, "tabs": tabs, "focused": false, "incognito": false, "alwaysOnTop": false,
+                               "type": "normal", "state": state.isFullScreen == true ? "fullscreen" : "normal"] as [String: Any]]
+        }
+    }
+
+    /// A closed tab as Chrome's `Tab`. It's in no open window, so windowId is WINDOW_ID_NONE.
+    private static func tab(sessionID: String, url: URL?, title: String, index: Int) -> [String: Any] {
+        ["sessionId": sessionID, "url": url?.absoluteString ?? "", "title": title, "index": index, "windowId": -1,
+         "active": false, "highlighted": false, "selected": false, "pinned": false, "incognito": false,
+         "discarded": false, "autoDiscardable": true, "groupId": -1]
+    }
+}
+
 // MARK: - notifications
 
 /// `chrome.notifications`, shown by macOS under Zigzag, titled with the extension's name. A click opens nothing on

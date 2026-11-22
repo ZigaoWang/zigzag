@@ -709,19 +709,12 @@
       "group": "privacy"
     },
     "sessions": {
-      "status": "unsupported",
-      "reason": "notImplemented",
-      "group": "sessions",
+      "status": "bridged",
+      "implementation": "swift:sessions",
       "members": {
-        "getRecentlyClosed": {
-          "status": "emulated",
-          "implementation": "js:getRecentlyClosed",
-          "group": "sessions"
-        },
         "getDevices": {
           "status": "emulated",
-          "implementation": "js:getDevices",
-          "group": "sessions"
+          "implementation": "swift:sessions"
         }
       }
     },
@@ -972,9 +965,7 @@
       "group": "readingList"
     },
     "sessions": {
-      "status": "unsupported",
-      "reason": "notImplemented",
-      "group": "sessions"
+      "status": "supported"
     },
     "sidePanel": {
       "status": "supported"

@@ -531,6 +531,14 @@
 
   install('topSites', { get: method('topSites', 'get') });
 
+  install('sessions', {
+    getRecentlyClosed: method('sessions', 'getRecentlyClosed'),
+    getDevices: method('sessions', 'getDevices'),
+    restore: method('sessions', 'restore'),
+    onChanged: event('sessions.onChanged'),
+    MAX_SESSION_RESULTS: 25,
+  });
+
   install('bookmarks', {
     getTree: method('bookmarks', 'getTree'),
     getSubTree: method('bookmarks', 'getSubTree'),

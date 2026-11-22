@@ -12,7 +12,9 @@ final class TabStore {
     var tabsBySpace: [UUID: [Tab]] = [:]
     var bookmarkTabs: [UUID: Tab] = [:]
     var splits: [TabManager.SplitPair] = []
-    var closedTabs: [TabManager.ClosedTab] = []
+    var closedTabs: [TabManager.ClosedTab] = [] {
+        didSet { if !isPrivate { WindowManager.recentlyClosedChanged.send() } }
+    }
     /// Reopened closed tabs: old id to new id.
     var reopenedAs: [UUID: UUID] = [:]
     /// How many closed tabs ⇧⌘T and ⌘Z can reopen: 50 more than the largest batch closed. Never shrinks, so ⌘Z after a

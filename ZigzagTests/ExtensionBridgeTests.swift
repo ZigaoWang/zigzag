@@ -1601,3 +1601,84 @@ struct ContentScriptCopiesTests {
         #expect(grown < 40_000_000, "grew \(grown / 1_000_000) MB")
     }
 }
+
+/// chrome.sessions lists what History › Recently Closed brings back (#486).
+@MainActor
+struct ExtensionSessionsTests {
+    private let mine = UUID(), other = UUID()
+    private let home = UUID(), away = UUID()
+
+    private func closed(_ title: String, at seconds: TimeInterval, space: UUID? = nil, url: String? = "https://example.com/") -> TabManager.ClosedTab {
+        TabManager.ClosedTab(url: url.flatMap(URL.init(string:)), title: title, spaceID: space ?? home, index: 3, interactionState: nil,
+                             closedAt: Date(timeIntervalSince1970: seconds))
+    }
+
+    private func window(space: UUID, pages: [String]) -> SessionState.WindowState {
+        let tabs = pages.map { SessionState.TabState(id: UUID(), url: URL(string: "https://\($0).example/"), title: $0,
+                                                     lastActivated: Date(), createdAt: Date()) }
+        return SessionState.WindowState(frame: [0, 0, 800, 600], sidebarVisible: true, sidebarWidth: 240, currentSpaceID: space,
+                                        spaces: [SessionState.SpaceTabs(spaceID: space, tabs: tabs, selectedTabID: tabs.first?.id)], bookmarkTabs: [])
+    }
+
+    private func profileOf(_ space: UUID) -> UUID { space == home ? mine : other }
+
+    @Test func newestFirstOnlyThisProfilesAndOnlyPages() {
+        let a = closed("A", at: 100), b = closed("B", at: 300), elsewhere = closed("Elsewhere", at: 400, space: away)
+        let blank = closed("Blank", at: 500, url: nil)
+        let windowID = UUID()
+        let entries = BridgeSessions.mine(tabs: [a, b, elsewhere, blank, a],
+                                          windows: [(windowID, window(space: home, pages: ["one", "two"]), Date(timeIntervalSince1970: 200)),
+                                                    (UUID(), window(space: away, pages: ["three"]), Date(timeIntervalSince1970: 600))],
+                                          profile: mine, profileOf: profileOf)
+        let sessions = BridgeSessions.recentlyClosed(entries, maxResults: nil).map(BridgeSessions.session)
+        #expect(sessions.map { $0["lastModified"] as? Int } == [300, 200, 100])
+        let tab = sessions[0]["tab"] as? [String: Any]
+        #expect(tab?["sessionId"] as? String == "t:\(b.id)")
+        #expect(tab?["title"] as? String == "B")
+        #expect(tab?["url"] as? String == "https://example.com/")
+        #expect(tab?["index"] as? Int == 3)
+        #expect(tab?["incognito"] as? Bool == false)
+        let shown = sessions[1]["window"] as? [String: Any]
+        #expect(shown?["sessionId"] as? String == "w:\(windowID)")
+        #expect((shown?["tabs"] as? [[String: Any]])?.map { $0["title"] as? String } == ["one", "two"])
+        #expect((shown?["tabs"] as? [[String: Any]])?.map { $0["index"] as? Int } == [0, 1])
+        #expect(JSONSerialization.isValidJSONObject(sessions))
+    }
+
+    @Test func maxResultsDefaultsToAndStopsAt25() {
+        let entries = (0..<40).map { BridgeSessions.Entry.tab(closed("\($0)", at: TimeInterval($0))) }
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: nil).count == 25)
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: 100).count == 25)
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: -1).isEmpty)
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: 3).map { BridgeSessions.session($0)["lastModified"] as? Int } == [39, 38, 37])
+    }
+
+    @Test func aTieGoesToTheOneClosedLater() {
+        let first = closed("First", at: 100), second = closed("Second", at: 100)
+        #expect(BridgeSessions.newestFirst([.tab(first), .tab(second)]).map(\.sessionID) == ["t:\(second.id)", "t:\(first.id)"])
+    }
+
+    @Test func needsTheSessionsPermission() {
+        #expect(BridgeSessions.permission == "sessions")
+        #expect(ExtensionBridge.handlerNames.contains("sessions"))
+        #expect(ExtensionBridgeScript.permissions.contains("sessions"))
+        let now = Date()
+        let granted = [WKWebExtension.Permission(rawValue: "sessions"): now.addingTimeInterval(60)]
+        #expect(ExtensionBridge.allows("sessions", declared: (["sessions"], []), granted: granted, now: now))
+        #expect(!ExtensionBridge.allows("sessions", declared: ([], []), granted: granted, now: now))
+        #expect(!ExtensionBridge.allows("sessions", declared: (["sessions"], []), granted: [:], now: now))
+    }
+
+    @Test func aPrivateWindowsClosingTellsNoOne() {
+        var heard = 0
+        let token = WindowManager.recentlyClosedChanged.observe { heard += 1 }
+        defer { token.cancel() }
+        let secret = TabStore(isPrivate: true)
+        secret.closedTabs.append(closed("Private", at: 100))
+        #expect(heard == 0)
+        let everyday = TabStore()
+        everyday.closedTabs.append(closed("Everyday", at: 100))
+        #expect(heard == 1)
+    }
+}
+
