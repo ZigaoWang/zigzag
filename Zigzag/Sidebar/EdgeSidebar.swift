@@ -417,9 +417,10 @@ final class EdgeSidebar {
     }
 
     /// Unfolds the side from the card's edge after its content changed (a page becoming the note, or the note a page):
-    /// the same move a page swap makes, without a second state to keep alive.
-    func foldInSide() {
-        host?.foldInSide()
+    /// the same move a page swap makes, without a second state to keep alive. A space switch passes the side its
+    /// list slid in from.
+    func foldInSide(fromRight: Bool? = nil) {
+        host?.foldInSide(fromRight: fromRight)
     }
 
     /// The note has gone: the panel narrows to the card, unless a page or the space editor is taking the area.
@@ -1120,16 +1121,18 @@ final class EdgeSidebarHost: NSView {
     }
 
     /// Unfolds what the side shows from the card's edge, as a page swap does. The page swaps run their own mask on the
-    /// holder; this is for a page and the note taking each other's place.
-    func foldInSide() {
+    /// holder; this is for a page and the note taking each other's place. `fromRight`: the side a space switch's list
+    /// slid in from; nil keeps to the card's edge.
+    func foldInSide(fromRight: Bool? = nil) {
         guard !Tokens.Motion.reduceMotion else { return }
         let view: NSView = noticeShowing ? pageCard : pageArea
         let size = view.bounds.size
         guard size.width > 0, size.height > 0 else { return }
+        let right = fromRight ?? onRight
         let mask = CALayer()
         mask.backgroundColor = NSColor.black.cgColor
-        mask.anchorPoint = CGPoint(x: onRight ? 1 : 0, y: 0.5)
-        mask.position = CGPoint(x: onRight ? size.width : 0, y: size.height / 2)
+        mask.anchorPoint = CGPoint(x: right ? 1 : 0, y: 0.5)
+        mask.position = CGPoint(x: right ? size.width : 0, y: size.height / 2)
         mask.bounds = CGRect(origin: .zero, size: size)
         view.layer?.mask = mask
         let fold = CABasicAnimation(keyPath: "bounds.size.width")

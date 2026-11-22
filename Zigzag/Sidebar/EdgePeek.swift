@@ -58,6 +58,12 @@ enum EdgePeekRouting {
     enum NewPage { case peek, browser }
 
     static func keepsLensOnSpaceChange(peekVisible: Bool) -> Bool { peekVisible }
+    /// Which way the spaces moved: +1 to the next space, -1 to the one before, 0 when either is unknown. The list
+    /// slides the new space in from the right on +1 and the left on -1; the page's fold follows it.
+    static func spaceSlide(from old: UUID?, to new: UUID, order: [UUID]) -> Int {
+        guard let old, let before = order.firstIndex(of: old), let after = order.firstIndex(of: new) else { return 0 }
+        return after == before ? 0 : (after > before ? 1 : -1)
+    }
     static func newPage(peekVisible: Bool) -> NewPage { peekVisible ? .peek : .browser }
     /// A page opened from the lens replaces it; selecting any other tab is leaving the lens.
     static func selectionKeepsLens(lensTab: Tab?, selected: Tab?) -> Bool {
@@ -91,6 +97,11 @@ final class EdgePeek {
     private var managerObserver: Any?
     private var outsideMonitor: Any?
     private var keyObserver: NSObjectProtocol?
+    /// The space the panel was in when it last showed a page: a switch's direction is this and the spaces' order.
+    private var lastSpaceID: UUID?
+    /// A space switch waiting for the selection pass that follows it, with the space left and the way it went.
+    /// Taking the page in that pass means the card never draws it at window size on its way to the panel.
+    private var spaceHandoff: (from: UUID?, direction: Int)?
     /// The row the pointer is resting on: one page is brought after a short rest, not one per row passed over.
     private var hoverWork: DispatchWorkItem?
     /// The pointer has left the rows: after a moment, the panel goes back to the tab picked there. The short wait
@@ -197,7 +208,10 @@ final class EdgePeek {
     }
 
     /// A page opened from the panel replaces the one it shows; a click on the row already showing locks it.
-    func show(tab: Tab, from controller: BrowserWindowController, replacing: Bool = false) {
+    /// `foldFromRight`: a space switch unfolds the page from the side its space list slides in on; nil follows the
+    /// card's side, as a hover swap does.
+    func show(tab: Tab, from controller: BrowserWindowController, replacing: Bool = false,
+              foldFromRight: Bool? = nil) {
         guard EdgeLensPolicy.takesPage(url: tab.url) else { return }
         hoverWork?.cancel()
         // A note gives the area up at once: this is a page coming in, and the panel is already the width for it. The
@@ -210,17 +224,17 @@ final class EdgePeek {
         if isVisible {
             guard self.tab !== tab else { return }
             closeSitePanel()
-            attach(tab, from: controller, swapping: true)
+            attach(tab, from: controller, swapping: true, foldFromRight: foldFromRight)
         } else {
             guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
-            attach(tab, from: controller, swapping: false)
+            attach(tab, from: controller, swapping: false, foldFromRight: foldFromRight)
         }
-        if fromNotice { EdgeSidebar.shared.foldInSide() }
+        if fromNotice { EdgeSidebar.shared.foldInSide(fromRight: foldFromRight) }
     }
 
     /// One of Zigzag's own pages under the pointer: the panel can't lend its page, so the page area says where it
     /// works and offers the window. The row itself stays inert; this note is the only action.
-    func showNotice(tab: Tab, from controller: BrowserWindowController) {
+    func showNotice(tab: Tab, from controller: BrowserWindowController, foldFromRight: Bool? = nil) {
         guard !EdgeLensPolicy.takesPage(url: tab.url), EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
         hoverWork?.cancel()
         hoverWork = nil
@@ -237,7 +251,7 @@ final class EdgePeek {
         controller.updateEdgeSidebarForNotice(tab)
         installObservers()
         EdgeSidebar.shared.noticeAttached(tab: tab) { [weak self] in self?.returnToBrowser() }
-        if replacing || fromNotice { EdgeSidebar.shared.foldInSide() }
+        if replacing || fromNotice { EdgeSidebar.shared.foldInSide(fromRight: foldFromRight) }
     }
 
     /// The note's button: the page is the window's, so the window comes forward on it and the panel puts itself away.
@@ -247,7 +261,8 @@ final class EdgePeek {
         controller.bringForwardForEdge()
     }
 
-    private func attach(_ tab: Tab, from controller: BrowserWindowController, swapping: Bool) {
+    private func attach(_ tab: Tab, from controller: BrowserWindowController, swapping: Bool,
+                        foldFromRight: Bool? = nil) {
         guard let area = EdgeSidebar.shared.pageArea else { return }
         _ = tab.ensureWebView()
         guard let holder = tab.pageHolder else { return }
@@ -284,7 +299,8 @@ final class EdgePeek {
         area.addSubview(holder)
         if let old, let oldHolder, oldHolder !== holder {
             startFold(newHolder: holder, old: old, oldHolder: oldHolder, origin: oldOrigin, originFrame: oldOriginFrame,
-                      size: pageSize, controller: controller)
+                      size: pageSize, fromRight: foldFromRight ?? EdgeSidebar.shared.pagePinsOnRight,
+                      controller: controller)
         }
         adoptPDFViewer(of: tab, fitting: true)
         self.tab = tab
@@ -301,7 +317,7 @@ final class EdgePeek {
     /// then goes back to its tab. A layer mask reveals the new page; the page itself is laid out once and never
     /// resized, so the live tab folds without reflowing.
     private func startFold(newHolder: PageHolder, old: Tab, oldHolder: PageHolder, origin: NSView?, originFrame: NSRect,
-                           size: NSSize, controller: BrowserWindowController) {
+                           size: NSSize, fromRight: Bool, controller: BrowserWindowController) {
         let fold = Fold(newHolder: newHolder, old: old, oldHolder: oldHolder, origin: origin, originFrame: originFrame,
                         controller: controller)
         self.fold = fold
@@ -311,10 +327,9 @@ final class EdgePeek {
         }
         let mask = CALayer()
         mask.backgroundColor = NSColor.black.cgColor
-        // Anchored at the card: the page unfolds from the sidebar's side, on either edge.
-        let onRight = EdgeSidebar.shared.pagePinsOnRight
-        mask.anchorPoint = CGPoint(x: onRight ? 1 : 0, y: 0.5)
-        mask.position = CGPoint(x: onRight ? size.width : 0, y: size.height / 2)
+        // A hover swap unfolds from the card's side; a space switch unfolds from the side its list slides in on.
+        mask.anchorPoint = CGPoint(x: fromRight ? 1 : 0, y: 0.5)
+        mask.position = CGPoint(x: fromRight ? size.width : 0, y: size.height / 2)
         mask.bounds = CGRect(origin: .zero, size: size)
         newHolder.layer?.mask = mask
         let reveal = CABasicAnimation(keyPath: "bounds.size.width")
@@ -490,6 +505,8 @@ final class EdgePeek {
 
     private func installObservers() {
         guard controller != nil, outsideMonitor == nil else { return }
+        lastSpaceID = controller?.tabManager.currentSpaceID
+        spaceHandoff = nil
         if let window = controller?.window {
             // The browser coming forward ends the page: it is not the browser's window.
             keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
@@ -520,14 +537,16 @@ final class EdgePeek {
                 dismiss(.spaceChange)
                 return
             }
-            // The window shows the new space's selected tab as the switch finishes (`.selection` follows `.space`).
-            // Borrow its page only after that: taking the holder before its card has it leaves a grey page in both.
-            DispatchQueue.main.async { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self, self.isVisible else { return }
-                    self.transitionToSpace()
-                }
-            }
+            // The window puts the new space's selected tab in its card during the selection pass that follows this
+            // notification. Take the page in that same pass: a turn later the card has drawn it at window size, and
+            // moving it into the panel then reads as the page resizing into place. The fold follows the list's slide.
+            let from = lastSpaceID ?? controller?.tabManager.currentSpaceID
+            let to = controller?.tabManager.currentSpaceID ?? from
+            let direction = to.map {
+                EdgePeekRouting.spaceSlide(from: from, to: $0, order: Library.shared.spaces.map(\.id))
+            } ?? 0
+            spaceHandoff = (from, direction)
+            lastSpaceID = to
         case .structure:
             if tab?.isClosed == true { dismiss(.sameTab) }
         case .selection:
@@ -552,30 +571,50 @@ final class EdgePeek {
         }
     }
 
-    /// The new space's selected tab takes the page's place with the same fold a hover swap uses. A page picked from
-    /// the rows stays picked, now in the new space; a note has no page to keep.
-    private func transitionToSpace() {
-        guard let controller, let selected = controller.tabManager.selectedTab else {
+    /// The window has just put the selected tab on its card: a pending space switch takes the page now, before the
+    /// frame draws. The controller calls this from `showSelectedTab`, so the handoff doesn't depend on the order
+    /// `TabManager.changed`'s observers happen to run in.
+    func spaceSelectionShown(_ selected: Tab?) {
+        guard isVisible, let handoff = spaceHandoff else { return }
+        spaceHandoff = nil
+        // The page picked in the panel is the space's selection, though the window behind kept the tab it was on
+        // while the panel was out. Remember it before the space goes, so coming back finds it.
+        if let locked = lockedTab, let controller {
+            controller.tabManager.rememberPicked(locked, in: handoff.from ?? locked.spaceID)
+        }
+        guard let selected else {
             dismiss(.spaceChange)
             return
         }
+        transitionToSpace(from: handoff.from, direction: handoff.direction, selected: selected)
+    }
+
+    /// The new space's selected tab takes the page's place with the same fold a hover swap uses, turned the way the
+    /// list slid. A page picked in the space being left stays that space's selection; a note has no page to keep.
+    private func transitionToSpace(from space: UUID?, direction: Int, selected: Tab? = nil) {
+        guard let controller, let shown = selected ?? controller.tabManager.selectedTab else {
+            dismiss(.spaceChange)
+            return
+        }
+        let foldFromRight: Bool? = direction == 0 ? nil : direction > 0
         let keepsPick = lockedTab != nil
-        if EdgeLensPolicy.takesPage(url: selected.url) {
-            show(tab: selected, from: controller)
-            guard tab === selected else { return }
+        if EdgeLensPolicy.takesPage(url: shown.url) {
+            show(tab: shown, from: controller, foldFromRight: foldFromRight)
+            guard tab === shown else { return }
             if keepsPick {
-                lockedTab = selected
-                controller.setEdgeSelection(selected.id)
+                lockedTab = shown
+                controller.setEdgeSelection(shown.id)
             }
         } else {
-            showNotice(tab: selected, from: controller)
-            guard noticeTab === selected else { return }
+            showNotice(tab: shown, from: controller, foldFromRight: foldFromRight)
+            guard noticeTab === shown else { return }
             lockedTab = nil
             controller.setEdgeSelection(nil)
         }
     }
 
     private func releaseObservers() {
+        spaceHandoff = nil
         token = nil
         managerObserver = nil
         if let outsideMonitor { NSEvent.removeMonitor(outsideMonitor) }

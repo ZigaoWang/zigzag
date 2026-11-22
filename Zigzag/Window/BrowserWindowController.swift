@@ -778,6 +778,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         showPages()
+        // A space switch's page is on its card now: the edge panel takes it here, before the frame draws, rather
+        // than a turn later when it would have shown at window size first.
+        EdgePeek.shared.spaceSelectionShown(tab)
         // Shown in a pane some other way (split beside the page you're on): the mini player lets it go.
         miniPlayer.tabsChanged()
         // Back on the tab whose video went to the mini player: return it to the page.

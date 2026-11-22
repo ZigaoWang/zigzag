@@ -73,6 +73,17 @@ struct EdgePeekTests {
         #expect(!EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: false))
     }
 
+    @Test func aSpaceSwitchFoldsThePageTheWayTheSpacesSlide() {
+        let one = UUID(), two = UUID(), three = UUID()
+        let order = [one, two, three]
+        #expect(EdgePeekRouting.spaceSlide(from: one, to: two, order: order) == 1)
+        #expect(EdgePeekRouting.spaceSlide(from: two, to: one, order: order) == -1)
+        #expect(EdgePeekRouting.spaceSlide(from: one, to: three, order: order) == 1)
+        #expect(EdgePeekRouting.spaceSlide(from: one, to: one, order: order) == 0)
+        #expect(EdgePeekRouting.spaceSlide(from: nil, to: two, order: order) == 0)
+        #expect(EdgePeekRouting.spaceSlide(from: one, to: UUID(), order: order) == 0)
+    }
+
     @Test func aNewPageFromTheLensStaysInTheLens() {
         #expect(EdgePeekRouting.newPage(peekVisible: true) == .peek)
         #expect(EdgePeekRouting.newPage(peekVisible: false) == .browser)
