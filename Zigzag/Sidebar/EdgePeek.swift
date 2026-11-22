@@ -516,10 +516,17 @@ final class EdgePeek {
         guard isVisible else { return }
         switch change {
         case .space:
-            if EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: isVisible) {
-                transitionToSpace()
-            } else {
+            guard EdgePeekRouting.keepsLensOnSpaceChange(peekVisible: isVisible) else {
                 dismiss(.spaceChange)
+                return
+            }
+            // The window shows the new space's selected tab as the switch finishes (`.selection` follows `.space`).
+            // Borrow its page only after that: taking the holder before its card has it leaves a grey page in both.
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.isVisible else { return }
+                    self.transitionToSpace()
+                }
             }
         case .structure:
             if tab?.isClosed == true { dismiss(.sameTab) }
