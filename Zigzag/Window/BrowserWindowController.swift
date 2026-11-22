@@ -679,6 +679,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.sidebarContainer.gradient = end.map { ($0, share < 0.5 ? space.gradientAngle : next.gradientAngle) }
         let t = Double(min(share, 1))
         root.sidebarContainer.grain = (space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t
+        root.sidebarContainer.texture = t < 0.5 ? space.texture : next.texture
         root.showEmptyPage(of: space, toward: next, share: share)
     }
 
@@ -694,6 +695,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.sidebarContainer.tint = color
         root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
         root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0
+        root.sidebarContainer.texture = space.texture
         root.sidebarContainer.windowGlass = root.windowGlass
         root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
     }

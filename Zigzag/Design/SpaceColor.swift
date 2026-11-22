@@ -48,7 +48,8 @@ enum SpaceColor: String, Codable, CaseIterable {
 
     /// A palette color on clear glass. `hue` and `hue2` are wheel hues, `depth` and `tint` as `paint` takes them (tint
     /// past 1 for the lively ones, richer than a custom color goes), `seeThrough` the space's translucency. A new space
-    /// follows the Mac between `day` and `night` depths; picked in the editor it keeps `depth`.
+    /// follows the Mac between `day` and `night` depths; picked in the editor it keeps `depth`. `grain` and `texture`
+    /// are its finish, as `SpaceInfo` keeps them; most have none.
     struct PaletteLook {
         let hue: Double
         let depth: Double
@@ -58,10 +59,37 @@ enum SpaceColor: String, Codable, CaseIterable {
         let seeThrough: Double
         let day: Double
         let night: Double
+        var grain: Double = 0
+        var texture: String? = nil
     }
 
-    /// The palette's looks: nil for the colors from before.
+    /// The palette's looks: nil for the colors from before. Light tints of clear glass by day, all but Smoke and Navy.
     var paletteLook: PaletteLook? {
+        switch self {
+        case .slate: PaletteLook(hue: 0.5689, depth: 0.09, tint: 0.29, seeThrough: 0.7, day: 0.09, night: 0.94)
+        case .stone: PaletteLook(hue: 0.126, depth: 0.07, tint: 0.28, seeThrough: 0.7, day: 0.07, night: 0.94, grain: 0.5, texture: "linen")
+        case .smoke: PaletteLook(hue: 0.58, depth: 0.95, tint: 0.2, seeThrough: 0.7, day: 0.95, night: 0.95, grain: 0.5)
+        case .azure: PaletteLook(hue: 0.5499, depth: 0.16, tint: 1.4, seeThrough: 0.7, day: 0.16, night: 0.94)
+        case .navy: PaletteLook(hue: 0.6066, depth: 0.93, tint: 1, hue2: 0.7088, depth2: 0.95, seeThrough: 0.7, day: 0.18, night: 0.94)
+        case .seafoam: PaletteLook(hue: 0.483, depth: 0.1, tint: 1.1, seeThrough: 0.7, day: 0.1, night: 0.94)
+        case .pine: PaletteLook(hue: 0.4551, depth: 0.2, tint: 1.3, seeThrough: 0.7, day: 0.2, night: 0.94)
+        case .fern: PaletteLook(hue: 0.3105, depth: 0.16, tint: 1.4, seeThrough: 0.7, day: 0.16, night: 0.94)
+        case .citron: PaletteLook(hue: 0.1447, depth: 0.1, tint: 1.5, seeThrough: 0.7, day: 0.1, night: 0.1)
+        case .coral: PaletteLook(hue: 0.0634, depth: 0.14, tint: 1.4, hue2: 0.03, depth2: 0.17, seeThrough: 0.7, day: 0.14, night: 0.14, grain: 0.35)
+        case .red: PaletteLook(hue: 0.9808, depth: 0.18, tint: 1.5, seeThrough: 0.7, day: 0.18, night: 0.94)
+        case .iris: PaletteLook(hue: 0.7425, depth: 0.14, tint: 1.35, hue2: 0.7627, depth2: 0.17, seeThrough: 0.7, day: 0.14, night: 0.94)
+        case .pink: PaletteLook(hue: 0.9005, depth: 0.14, tint: 1.35, seeThrough: 0.7, day: 0.14, night: 0.94)
+        case .mist: PaletteLook(hue: 0.6, depth: 0.05, tint: 1, seeThrough: 0.76, day: 0.05, night: 0.95)
+        case .dew: PaletteLook(hue: 0.42, depth: 0.05, tint: 1, seeThrough: 0.76, day: 0.05, night: 0.95)
+        case .shell: PaletteLook(hue: 0.075, depth: 0.05, tint: 1, seeThrough: 0.76, day: 0.05, night: 0.96)
+        case .orchid: PaletteLook(hue: 0.8, depth: 0.05, tint: 1, seeThrough: 0.76, day: 0.05, night: 0.95)
+        default: nil
+        }
+    }
+
+    /// The look the 0.9.4 betas gave each palette color, before its clear glass: a space saved in one takes the new
+    /// one (`SpaceInfo.upgraded`).
+    var earlierLook: PaletteLook? {
         switch self {
         case .slate: PaletteLook(hue: 0.5689, depth: 0.16, tint: 0.28, seeThrough: 0.55, day: 0.16, night: 0.93)
         case .stone: PaletteLook(hue: 0.126, depth: 0.16, tint: 0.1, seeThrough: 0.55, day: 0.16, night: 0.93)

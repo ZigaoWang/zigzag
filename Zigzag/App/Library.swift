@@ -220,6 +220,12 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var translucency: Double? = nil
     /// False: frosted glass, milkier and softer. Nil or true: clear glass where the Mac has it (`usesClearGlass`).
     var clearGlass: Bool? = nil
+    /// A palette look's glass: the color tints it as it is, never leaning toward its dot, so the desktop shows through
+    /// clear instead of under a grayed veil; a deep one covers a little more (`Tokens.Frame.clearNightCover`). Nil: as
+    /// any other see-through space.
+    var clearTint: Bool? = nil
+    /// Which texture the grain is: "linen" (`MaterialImages.linen`). Nil: fine film grain.
+    var texture: String? = nil
     /// Whether this Mac has clear glass (Liquid Glass, macOS 26 and later).
     static var hasClearGlass: Bool { if #available(macOS 26.0, *) { true } else { false } }
     /// Clear glass, the default where the Mac has it; frosted when chosen, or before macOS 26.
@@ -304,10 +310,12 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// wash still reads as the space's color instead of gray.
     var frameColor: NSColor {
         guard isSeeThrough else { return background }
+        if clearTint == true { return Self.covering(background, by: coverage, deep: Tokens.Frame.clearNightCover) }
         return Self.covering(Self.richer(background, toward: swatch, by: isNeutral ? 0 : 0.6 * seeThrough), by: coverage)
     }
     var frameColor2: NSColor? {
         guard isSeeThrough else { return background2 }
+        if clearTint == true { return background2.map { Self.covering($0, by: coverage, deep: Tokens.Frame.clearNightCover) } }
         return background2.map { Self.covering($0, by: coverage) }
     }
 
@@ -345,13 +353,14 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         }
     }
 
-    /// `color` at `alpha`, still following light and dark when it does.
-    private static func covering(_ color: NSColor, by alpha: CGFloat) -> NSColor {
+    /// `color` at `alpha`, still following light and dark when it does; in a dark window at least `deep`.
+    private static func covering(_ color: NSColor, by alpha: CGFloat, deep: CGFloat = 0) -> NSColor {
         guard alpha < 1 else { return color }
         return NSColor(name: nil) { appearance in
             var resolved = color
             appearance.performAsCurrentDrawingAppearance { resolved = color.usingColorSpace(.sRGB) ?? color }
-            return resolved.withAlphaComponent(alpha)
+            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return resolved.withAlphaComponent(dark ? max(alpha, deep) : alpha)
         }
     }
 
@@ -375,7 +384,31 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             space.tint2 = nil
             space.brightness = brightness.map { SpaceColor.depth(ofWhite: 1 - $0) }
         }
+        if clearTint == nil, isSeeThrough { space.upgradeEarlierPalette() }
         return space
+    }
+
+    /// A palette look saved by the 0.9.4 betas before the palette's clear glass takes the clear glass, as picked or as
+    /// a new space had it. Grain of its own stays.
+    private mutating func upgradeEarlierPalette() {
+        let ownGrain = grain
+        for color in SpaceColor.palette {
+            guard let earlier = color.earlierLook else { continue }
+            func matches(_ look: SpaceLook) -> Bool {
+                var look = look
+                look.grain = ownGrain ?? 0
+                return look.matches(self)
+            }
+            let picked = matches(SpaceLook.palette(color, earlier, following: false, clear: false))
+            guard picked || matches(SpaceLook.palette(color, earlier, following: true, clear: false)) else { continue }
+            guard let look = picked ? color.look : color.defaultLook else { return }
+            look.apply(to: &self)
+            if let ownGrain, ownGrain > 0 {
+                grain = ownGrain
+                texture = nil
+            }
+            return
+        }
     }
 
     /// The space with the colors a new one gets: `color` alone, light by day and dark at night with the Mac, with no
@@ -397,7 +430,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         space.tint2 = nil
         space.translucency = nil
         space.clearGlass = nil
+        space.clearTint = nil
         space.grain = nil
+        space.texture = nil
         space.appearance = nil
         // The palette's colors come on clear glass, following the Mac; the older ones are one solid color.
         color.defaultLook?.apply(to: &space)
@@ -412,7 +447,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             let two = s.hue2 != nil
             let values: [Any?] = [s.color.rawValue, s.hue, s.intensity, s.brightness, s.tint, s.translucency, s.grain, s.appearance,
                                   s.hue2, two ? s.intensity2 : nil, two ? s.brightness2 : nil, two ? s.tint2 : nil, two ? s.angle : nil,
-                                  s.isSeeThrough ? s.clearGlass : nil, s.dayDepth, s.nightDepth]
+                                  s.isSeeThrough ? s.clearGlass : nil, s.dayDepth, s.nightDepth, s.clearTint, s.grain == nil ? nil : s.texture]
             return values.map { $0.map { "\($0)" } ?? "-" }
         }
         return look(self) == look(withDefaultColors(color))
@@ -462,7 +497,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 extension SpaceInfo {
     private enum CodingKeys: String, CodingKey {
         case id, name, color, bookmarks, folders, pinnedSplits, hue, intensity, appearance, grain, hue2, intensity2, angle,
-             glass, brightness, brightness2, dayDepth, nightDepth, tint, tint2, translucency, clearGlass, icon, importedFrom, defaultColor,
+             glass, brightness, brightness2, dayDepth, nightDepth, tint, tint2, translucency, clearGlass, clearTint, texture, icon, importedFrom, defaultColor,
              routedSites, backgroundImage, paletteColor, paletteDefaultColor
     }
 
@@ -498,6 +533,8 @@ extension SpaceInfo {
         tint2 = try c.decodeIfPresent(Double.self, forKey: .tint2)
         translucency = try c.decodeIfPresent(Double.self, forKey: .translucency)
         clearGlass = try c.decodeIfPresent(Bool.self, forKey: .clearGlass)
+        clearTint = try c.decodeIfPresent(Bool.self, forKey: .clearTint)
+        texture = try c.decodeIfPresent(String.self, forKey: .texture)
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         importedFrom = try c.decodeIfPresent(String.self, forKey: .importedFrom)
         routedSites = try c.decodeIfPresent([String].self, forKey: .routedSites)
@@ -531,6 +568,8 @@ extension SpaceInfo {
         try c.encodeIfPresent(tint2, forKey: .tint2)
         try c.encodeIfPresent(translucency, forKey: .translucency)
         try c.encodeIfPresent(clearGlass, forKey: .clearGlass)
+        try c.encodeIfPresent(clearTint, forKey: .clearTint)
+        try c.encodeIfPresent(texture, forKey: .texture)
         try c.encodeIfPresent(icon, forKey: .icon)
         try c.encodeIfPresent(importedFrom, forKey: .importedFrom)
         try c.encodeIfPresent(routedSites, forKey: .routedSites)
@@ -887,6 +926,7 @@ final class Library {
         spaces[i].intensity = nil
         spaces[i].dayDepth = nil
         spaces[i].nightDepth = nil
+        spaces[i].clearTint = nil
         spaces[i].tint = nil
         commit()
     }
@@ -909,8 +949,10 @@ final class Library {
         spaces[i].tint2 = look.tint2
         spaces[i].translucency = look.translucency
         spaces[i].clearGlass = look.clearGlass
+        spaces[i].clearTint = look.clearTint
         spaces[i].glass = nil
         spaces[i].grain = look.grain
+        spaces[i].texture = look.texture
         spaces[i].appearance = look.appearance
         commit()
     }
@@ -938,6 +980,7 @@ final class Library {
         spaces[i].tint = nil
         spaces[i].dayDepth = nil
         spaces[i].nightDepth = nil
+        spaces[i].clearTint = nil
         if let intensity { spaces[i].intensity = intensity }
         commit()
     }

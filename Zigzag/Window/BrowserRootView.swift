@@ -11,6 +11,8 @@ final class SidebarContainer: NSView {
     /// and the grain, so sliding it out never strips them.
     var gradient: (end: NSColor, angle: Double)? { didSet { refresh() } }
     var grain: Double = 0 { didSet { refresh() } }
+    /// The grain's texture (`SpaceInfo.texture`).
+    var texture: String? { didSet { if texture != oldValue { grainLayer.backgroundColor = MaterialImages.texture(texture).cgColor } } }
     /// The window's own glass, while its space is see-through: floating, the sidebar is the same glass over the page,
     /// so it's the same color slid out as docked. Nil: a solid space, the page blurred under its color.
     var windowGlass: WindowGlass? { didSet { if windowGlass != oldValue { refresh() } } }

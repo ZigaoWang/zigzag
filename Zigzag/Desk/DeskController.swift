@@ -171,6 +171,7 @@ final class DeskFrameView: NSView {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 wash.colors = [color.cgColor, (end ?? color).cgColor]
             }
+            grain.backgroundColor = MaterialImages.texture(space.texture).cgColor
             grain.opacity = Float(min(max(isPrivate ? 0 : space.grain ?? 0, 0), 1) * 0.18)
         }
     }

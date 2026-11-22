@@ -386,6 +386,10 @@ struct SpaceLook {
     var angle: Double = 90
     var seeThrough: Double = 0
     var grain: Double = 0
+    /// The grain's texture (`SpaceInfo.texture`): nil for fine film grain.
+    var texture: String? = nil
+    /// A palette look, on the palette's clear glass (`SpaceInfo.clearTint`).
+    var clearTint = false
     /// Set: the hues follow the Mac, light by day and deep at night, this strong (`SpaceInfo.intensity`); `depth` unused.
     var following: Double? = nil
     /// With `following`, a palette color's own depths by day and at night (`SpaceInfo.dayDepth`, `nightDepth`).
@@ -410,6 +414,8 @@ struct SpaceLook {
     func apply(to space: inout SpaceInfo) {
         space.glass = nil
         space.grain = grain > 0 ? grain : nil
+        space.texture = grain > 0 ? texture : nil
+        space.clearTint = clearTint && seeThrough > 0 ? true : nil
         if let curated {
             space.color = curated
             space.hue = nil
@@ -467,7 +473,8 @@ struct SpaceLook {
     }
 
     func matches(_ space: SpaceInfo) -> Bool {
-        guard abs((space.grain ?? 0) - grain) < 0.01 else { return false }
+        guard abs((space.grain ?? 0) - grain) < 0.01, (grain > 0 ? texture : nil) == ((space.grain ?? 0) > 0.01 ? space.texture : nil),
+              (space.clearTint == true) == (clearTint && seeThrough > 0) else { return false }
         if let curated {
             return space.hue == nil && space.color == curated && space.brightness == nil && space.hue2 == nil
                 && abs(space.seeThrough - seeThrough) < 0.01 && (curated.isNeutral || space.tintAmount > 0.99)
@@ -509,20 +516,26 @@ struct SpaceLook {
 
 extension SpaceColor {
     /// A palette color's look, on clear glass, at its own depth day and night: the preset. Nil for the older colors.
-    var look: SpaceLook? {
-        paletteLook.map { p in
-            SpaceLook(name: name, hue: p.hue, tint: p.tint, depth: p.depth, hue2: p.hue2, depth2: p.depth2 ?? p.depth, angle: 90, seeThrough: p.seeThrough)
-        }
-    }
+    var look: SpaceLook? { paletteLook.map { SpaceLook.palette(self, $0, following: false) } }
 
     /// What a new space of a palette color gets: the same hues on the same glass, following the Mac between its own
     /// day and night depths, so a fresh window is light on a light Mac and deep on a dark one. Nil for the older colors.
     /// `following` is what a Zigzag from before the day and night depths shows instead.
-    var defaultLook: SpaceLook? {
-        paletteLook.map { p in
-            SpaceLook(name: name, hue: p.hue, tint: p.tint, depth: 0, hue2: p.hue2, angle: 90, seeThrough: p.seeThrough,
-                      following: p.tint < 1 ? Tokens.Frame.softFollowingIntensity : Tokens.Frame.followingIntensity, day: p.day, night: p.night)
-        }
+    var defaultLook: SpaceLook? { paletteLook.map { SpaceLook.palette(self, $0, following: true) } }
+}
+
+extension SpaceLook {
+    /// A palette color's look: picked in the editor at its own depth, or following the Mac as a new space has it. Its
+    /// clear glass and finish come with it; `clear` false for the betas' looks from before it.
+    static func palette(_ color: SpaceColor, _ p: SpaceColor.PaletteLook, following: Bool, clear: Bool = true) -> SpaceLook {
+        var look = following
+            ? SpaceLook(name: color.name, hue: p.hue, tint: p.tint, depth: 0, hue2: p.hue2, angle: 90, seeThrough: p.seeThrough,
+                        following: p.tint < 1 ? Tokens.Frame.softFollowingIntensity : Tokens.Frame.followingIntensity, day: p.day, night: p.night)
+            : SpaceLook(name: color.name, hue: p.hue, tint: p.tint, depth: p.depth, hue2: p.hue2, depth2: p.depth2 ?? p.depth, angle: 90, seeThrough: p.seeThrough)
+        look.grain = p.grain
+        look.texture = p.texture
+        look.clearTint = clear
+        return look
     }
 }
 
@@ -587,8 +600,8 @@ final class LookSwatch: InteractiveView {
         shine.startPoint = CGPoint(x: 0.5, y: 0)
         shine.endPoint = CGPoint(x: 0.5, y: 0.55)
         grain.isHidden = (look?.grain ?? 0) == 0
-        grain.backgroundColor = MaterialImages.grain.cgColor
-        grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.5))
+        grain.backgroundColor = MaterialImages.texture(look?.texture).cgColor
+        grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.3))
         fill.addSublayer(grain)
         fill.addSublayer(shine)
         if look == nil {

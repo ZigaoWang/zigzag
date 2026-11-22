@@ -162,7 +162,7 @@ struct SpacePaletteTests {
         #expect(abs(space.seeThrough - first.paletteLook!.seeThrough) < 0.001)
         // It follows the Mac: a clear, barely cool glass by day, deep slate at night.
         #expect(space.brightness == nil && space.readableAppearance == nil && space.appearance == nil)
-        #expect(space.dayDepth == 0.16 && space.nightDepth == 0.93 && space.hue2 == nil)
+        #expect(space.dayDepth == 0.09 && space.nightDepth == 0.94 && space.hue2 == nil)
         let day = resolved(space.background, dark: false), night = resolved(space.background, dark: true)
         #expect(Brand.relativeLuminance(day) > 0.6 && Brand.relativeLuminance(night) < 0.06)
         #expect(day.saturationComponent > 0.02 && day.saturationComponent < 0.12)
@@ -178,9 +178,9 @@ struct SpacePaletteTests {
     /// coral or yellow reads as brown); the rest follow the Mac.
     @Test func aNewSpaceTakesItsColorsModeWhereItHasOne() {
         func fresh(_ color: SpaceColor) -> SpaceInfo { SpaceInfo(name: "S", color: color, defaultColor: color).withDefaultColors(color) }
-        #expect(fresh(.red).readableAppearance == "dark" && fresh(.smoke).readableAppearance == "dark")
+        #expect(fresh(.smoke).readableAppearance == "dark")
         #expect(fresh(.citron).readableAppearance == "light" && fresh(.coral).readableAppearance == "light")
-        #expect(fresh(.fern).readableAppearance == nil)
+        #expect(fresh(.fern).readableAppearance == nil && fresh(.red).readableAppearance == nil)
         // Richer than a custom color goes, and saved that way.
         #expect(fresh(.red).tintAmount > 1.3)
     }
@@ -227,11 +227,11 @@ struct SpacePaletteTests {
     @Test func thePaletteIsDistinctGlass() {
         let looks = SpaceColor.palette.compactMap(\.look)
         #expect(looks.count == 17)
-        #expect(looks.allSatisfy { (0.35...0.55).contains($0.seeThrough) })
-        // Deep ones and light ones, and at most three gradients, each a small drift of one hue.
+        #expect(looks.allSatisfy { (0.6...0.8).contains($0.seeThrough) && $0.clearTint })
+        // Light tints of glass, but for two deep ones, and at most three gradients, each a small drift of one hue.
         let spaces = looks.map(\.space)
-        #expect(spaces.filter { $0.readableAppearance == "dark" }.count >= 3)
-        #expect(spaces.filter { $0.readableAppearance == "light" }.count >= 6)
+        #expect(spaces.filter { $0.readableAppearance == "dark" }.map(\.name) == [SpaceColor.smoke.name, SpaceColor.navy.name])
+        #expect(spaces.filter { $0.readableAppearance == "light" }.count == looks.count - 2)
         let gradients = looks.filter { $0.hue2 != nil }
         #expect(gradients.count <= 3)
         func okHue(_ h: Double) -> Double { SpaceColor.okHue(h) * 180 / .pi }
@@ -302,6 +302,80 @@ struct SpacePaletteTests {
                 #expect(Brand.contrast(laid(text, over: tab), tab) >= 4.5, "\(look.name) tab \(dark)")
             }
         }
+    }
+}
+
+extension SpacePaletteTests {
+    /// The palette's glass tints the desktop with the color as it is, light by day: clear, never a grayed veil. Deep
+    /// at night it covers a little more, so light text holds over a light desktop.
+    @Test func thePalettesGlassIsClear() {
+        func resolved(_ color: NSColor, dark: Bool) -> NSColor {
+            var out = color
+            NSAppearance(named: dark ? .darkAqua : .aqua)!.performAsCurrentDrawingAppearance { out = color.usingColorSpace(.sRGB) ?? color }
+            return out
+        }
+        for look in SpaceLook.presets where look.seeThrough > 0 {
+            let space = look.space
+            #expect(space.clearTint == true, "\(look.name)")
+            let dark = space.readableAppearance == "dark"
+            let frame = resolved(space.frameColor, dark: dark), color = resolved(space.background, dark: dark)
+            // Its own color, not leaning toward its dot.
+            #expect(abs(frame.redComponent - color.redComponent) < 0.002 && abs(frame.blueComponent - color.blueComponent) < 0.002, "\(look.name)")
+            if dark {
+                #expect(abs(frame.alphaComponent - Tokens.Frame.clearNightCover) < 0.001, "\(look.name)")
+            } else {
+                #expect(frame.alphaComponent <= 0.5 && Brand.relativeLuminance(color) > 0.5, "\(look.name)")
+            }
+        }
+        // A custom color on glass is as it was.
+        var custom = SpaceInfo(name: "C", color: .sky)
+        custom.hue = 0.6
+        custom.brightness = 0.2
+        custom.translucency = 0.7
+        #expect(custom.clearTint == nil)
+        let frame = resolved(custom.frameColor, dark: false)
+        #expect(abs(frame.alphaComponent - (1 - 0.75 * 0.7)) < 0.001)
+        #expect(Brand.relativeLuminance(frame.withAlphaComponent(1)) < Brand.relativeLuminance(resolved(custom.background, dark: false)))
+    }
+
+    /// A preset with a finish brings it, and a plain one takes it off.
+    @Test func aPresetBringsItsFinishAndAPlainOneTakesItOff() {
+        let stone = SpaceLook.presets.first { $0.name == SpaceColor.stone.name }!
+        let slate = SpaceLook.presets.first { $0.name == SpaceColor.slate.name }!
+        var space = SpaceInfo(name: "S", color: .sky)
+        stone.apply(to: &space)
+        #expect(space.grain == 0.5 && space.texture == "linen" && stone.matches(space))
+        slate.apply(to: &space)
+        #expect(space.grain == nil && space.texture == nil && slate.matches(space) && !stone.matches(space))
+        let finished = SpaceLook.presets.filter { $0.grain > 0 }.map(\.name)
+        #expect(finished == [SpaceColor.stone, .smoke, .coral].map(\.name))
+        // A new space of the color has it too, and Use Default Colors gives it back.
+        let fresh = SpaceInfo(name: "S", color: .smoke, defaultColor: .smoke).withDefaultColors(.smoke)
+        #expect(fresh.grain == 0.5 && fresh.texture == nil && fresh.hasDefaultColors(.smoke))
+    }
+
+    /// A space saved in one of the betas' palette looks, picked or new, takes the clear glass; grain of its own stays.
+    @Test func theBetasLooksTakeTheClearGlass() throws {
+        for color in SpaceColor.palette {
+            let earlier = color.earlierLook!
+            var picked = SpaceInfo(name: "P", color: .sky)
+            SpaceLook.palette(color, earlier, following: false, clear: false).apply(to: &picked)
+            #expect(color.look!.matches(picked.upgraded), "\(color)")
+            var made = SpaceInfo(name: "N", color: color, defaultColor: color)
+            SpaceLook.palette(color, earlier, following: true, clear: false).apply(to: &made)
+            #expect(made.upgraded.hasDefaultColors(color), "\(color)")
+        }
+        var grainy = SpaceInfo(name: "G", color: .sky)
+        SpaceLook.palette(.slate, SpaceColor.slate.earlierLook!, following: false, clear: false).apply(to: &grainy)
+        grainy.grain = 0.3
+        let up = grainy.upgraded
+        #expect(up.clearTint == true && up.grain == 0.3 && up.seeThrough == SpaceColor.slate.paletteLook!.seeThrough)
+        // A custom color on glass is left alone.
+        var custom = SpaceInfo(name: "C", color: .sky)
+        custom.hue = 0.57
+        custom.brightness = 0.16
+        custom.translucency = 0.55
+        #expect(custom.upgraded == custom)
     }
 }
 
@@ -468,7 +542,10 @@ struct SpaceEditorPlacementTests {
         #expect(back == space)
         #expect(back.color == .coral)
         #expect(back.defaultColor == .pine)
-        #expect(back.dayDepth == 0.28 && back.nightDepth == 0.28 && back.tint == 1.25)
+        #expect(back.dayDepth == 0.14 && back.nightDepth == 0.14 && back.tint == 1.4)
+        #expect(back.clearTint == true && back.grain == 0.35)
+        let stone = try JSONDecoder().decode(SpaceInfo.self, from: encoded(SpaceInfo(name: "S", color: .stone).withDefaultColors(.stone)))
+        #expect(stone.texture == "linen" && stone.grain == 0.5)
     }
 
     @Test func anOlderColorIsWrittenAsBefore() throws {

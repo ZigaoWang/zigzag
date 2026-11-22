@@ -34,7 +34,7 @@ class SpaceFrameView: ColorView {
         // sits under it and would be hidden); a single color washes as a gradient of itself.
         setColor(clear ? .clear : color, animated: animated, duration: Tokens.Motion.large)
         setGradient(from: color, to: clear ? end ?? color : end, angle: space.gradientAngle, animated: animated)
-        setGrain(isPrivate ? 0 : space.grain ?? 0, animated: animated)
+        setGrain(isPrivate ? 0 : space.grain ?? 0, texture: space.texture, animated: animated)
         return (color, end)
     }
 
@@ -64,7 +64,7 @@ class SpaceFrameView: ColorView {
         setColor(a.clear ? .clear : color, animated: false)
         setGradient(from: color, to: a.clear ? end ?? color : end, angle: share < 0.5 ? space.gradientAngle : next.gradientAngle, animated: false)
         let t = Double(min(max(share, 0), 1))
-        setGrain((space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t, animated: false)
+        setGrain((space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t, texture: t < 0.5 ? space.texture : next.texture, animated: false)
         return (color, end)
     }
 
@@ -254,9 +254,19 @@ class SpaceFrameView: ColorView {
         return grain
     }()
 
+    /// The grain's texture now (`SpaceInfo.texture`).
+    private var grainTexture: String?
+
     /// 0 is smooth; 1 is as much as reads as texture without becoming noise.
-    func setGrain(_ amount: Double, animated: Bool) {
+    func setGrain(_ amount: Double, texture: String? = nil, animated: Bool) {
         let target = Float(min(max(amount, 0), 1) * 0.18)
+        if texture != grainTexture {
+            grainTexture = texture
+            Tokens.Motion.withoutAnimation {
+                grainLayer.backgroundColor = MaterialImages.texture(texture).cgColor
+                glassGrain.backgroundColor = MaterialImages.texture(texture).cgColor
+            }
+        }
         guard grainLayer.opacity != target || glassGrain.opacity != target else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)

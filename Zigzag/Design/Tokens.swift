@@ -1575,6 +1575,9 @@ enum Tokens {
         /// (`SpaceColor.background(hue:intensity:)`).
         static let followingIntensity = 0.8
         static let softFollowingIntensity = 0.5
+        /// The least a palette look's clear glass covers in a dark window (`SpaceInfo.clearTint`): its deep tint keeps
+        /// light text readable over a light desktop.
+        static let clearNightCover: CGFloat = 0.68
         /// A blank page in a palette space on glass: fainter than `wash`, near white by day and near the page's dark at night.
         static let glassPageLightness = 0.982
         static let glassPageChroma = 0.012
