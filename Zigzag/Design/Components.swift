@@ -534,6 +534,17 @@ final class DialogHeader: NSView {
     let subtitle = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     /// Room kept at the trailing end for a close button in the panel's corner.
     var trailingRoom: CGFloat = 0 { didSet { needsLayout = true } }
+    /// A sentence under the title wraps to as many lines as it needs; a site or version stays on one line.
+    var wrapsSubtitle = false {
+        didSet {
+            subtitle.usesSingleLineMode = !wrapsSubtitle
+            subtitle.maximumNumberOfLines = wrapsSubtitle ? 0 : 1
+            subtitle.lineBreakMode = wrapsSubtitle ? .byWordWrapping : .byTruncatingMiddle
+            subtitle.cell?.wraps = wrapsSubtitle
+            subtitle.cell?.truncatesLastVisibleLine = !wrapsSubtitle
+            needsLayout = true
+        }
+    }
 
     init(title text: String, subtitle detail: String = "") {
         title = NSTextField(wrappingLabelWithString: text)
@@ -582,8 +593,13 @@ final class DialogHeader: NSView {
         ceil(title.sizeThatFits(NSSize(width: max(0, width - textX - trailingRoom) + Label.inset * 2, height: 400)).height)
     }
 
+    private func subtitleHeight(_ width: CGFloat) -> CGFloat {
+        guard wrapsSubtitle else { return subtitle.lineHeight }
+        return ceil(subtitle.sizeThatFits(NSSize(width: max(0, width - textX - trailingRoom) + Label.inset * 2, height: 400)).height)
+    }
+
     private func textHeight(_ width: CGFloat) -> CGFloat {
-        titleHeight(width) + (subtitle.stringValue.isEmpty ? 0 : 2 + subtitle.lineHeight)
+        titleHeight(width) + (subtitle.stringValue.isEmpty ? 0 : 2 + subtitleHeight(width))
     }
 
     func height(for width: CGFloat) -> CGFloat { max(hasPicture ? Tokens.Dialog.iconSide : 0, textHeight(width)) }
@@ -600,7 +616,7 @@ final class DialogHeader: NSView {
         // their first letters line up where the text starts.
         title.frame = NSRect(x: textX - Label.inset, y: round((total - text) / 2), width: width + Label.inset * 2, height: titleHeight(bounds.width))
         subtitle.isHidden = subtitle.stringValue.isEmpty
-        subtitle.frame = NSRect(x: textX - Label.inset, y: title.frame.maxY + 2, width: width + Label.inset * 2, height: subtitle.lineHeight)
+        subtitle.frame = NSRect(x: textX - Label.inset, y: title.frame.maxY + 2, width: width + Label.inset * 2, height: subtitleHeight(bounds.width))
     }
 }
 

@@ -741,6 +741,14 @@ struct ExtensionPermissionRequestTests {
         #expect(ExtensionReport(requesting: ["history"], patterns: ["https://example.com/*"], id: id).abilities.count == 2)
     }
 
+    @Test func theSheetsSubtitleWrapsInsteadOfTruncating() {
+        let header = DialogHeader(title: "Site Request Probe wants more access", subtitle: "Allow it only if it needs this for what you just asked it to do.")
+        let oneLine = header.height(for: 280)
+        header.wrapsSubtitle = true
+        #expect(header.height(for: 280) > oneLine)
+        #expect(header.subtitle.lineBreakMode == .byWordWrapping)
+    }
+
     @Test func allowedSitesAreGrantedUnderAnySiteAccess() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
