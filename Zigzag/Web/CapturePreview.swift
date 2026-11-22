@@ -177,7 +177,15 @@ final class CapturePreview: FloatingPanelView {
     private func beginDrag(_ event: NSEvent) -> Bool {
         let promise = CaptureFilePromise(data: data, name: name)
         let item = NSDraggingItem(pasteboardWriter: promise)
-        item.setDraggingFrame(thumbnail.bounds, contents: image)
+        if thumbnail.showsTop, let rep = thumbnail.bitmapImageRepForCachingDisplay(in: thumbnail.bounds) {
+            // The top it shows, as it looks on the card.
+            thumbnail.cacheDisplay(in: thumbnail.bounds, to: rep)
+            let shown = NSImage(size: thumbnail.bounds.size)
+            shown.addRepresentation(rep)
+            item.setDraggingFrame(thumbnail.bounds, contents: shown)
+        } else {
+            item.setDraggingFrame(thumbnail.picture, contents: image)
+        }
         holds = true
         thumbnail.beginDraggingSession(with: [item], event: event, source: thumbnail)
         return true
@@ -205,7 +213,8 @@ final class SharingWatch: NSObject, NSSharingServicePickerDelegate {
     func sharingServicePicker(_ picker: NSSharingServicePicker, didChoose service: NSSharingService?) { done?() }
 }
 
-/// The capture on the card: its top when it's tall, in a softly rounded frame, picked up to drag out.
+/// The capture on the card, never stretched, in a softly rounded frame, picked up to drag out: all of it, or a full
+/// page's top fading out below.
 final class CaptureThumbnail: InteractiveView, NSDraggingSource {
     private let image: NSImage
     /// When a drag ends: whether somewhere took it.
@@ -231,14 +240,53 @@ final class CaptureThumbnail: InteractiveView, NSDraggingSource {
 
     private func refreshEdge() { layer?.borderColor = cgColor(Tokens.Color.cardEdge) }
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        // A page's top draws its own edge, so it fades with the picture.
+        layer?.borderWidth = showsTop ? 0 : Tokens.Metric.hairline
+        needsDisplay = true
+    }
+
+    /// Showing only a full page's top.
+    var showsTop: Bool { CaptureGeometry.thumbnailShowsTop(for: image.size, in: bounds.size) }
+
+    /// How far up a page's top fades out.
+    private static let fade = Tokens.Space.x8
+
     override func stateDidChange(animated: Bool) {}
+
+    /// Where the picture is drawn in the frame.
+    var picture: NSRect { CaptureGeometry.thumbnailPicture(for: image.size, in: bounds.size) }
 
     override func draw(_ dirtyRect: NSRect) {
         guard image.size.width > 0, image.size.height > 0, bounds.width > 0 else { return }
-        // As wide as the frame; a picture taller than it shows from its top.
-        let shown = min(image.size.height, image.size.width * bounds.height / bounds.width)
-        let source = NSRect(x: 0, y: image.size.height - shown, width: image.size.width, height: shown)
-        image.draw(in: bounds, from: source, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high.rawValue])
+        let rect = picture
+        // A strip thinner than the frame sits on a quiet backdrop.
+        if rect.width < bounds.width - 0.5 || rect.height < bounds.height - 0.5 {
+            Tokens.Color.fieldFill.setFill()
+            bounds.fill()
+        }
+        let hints: [NSImageRep.HintKey: Any] = [.interpolation: NSImageInterpolation.high.rawValue]
+        guard showsTop, let context = NSGraphicsContext.current?.cgContext else {
+            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: hints)
+            return
+        }
+        let hairline = Tokens.Metric.hairline
+        context.saveGState()
+        NSBezierPath(roundedRect: bounds, xRadius: Tokens.Radius.small, yRadius: Tokens.Radius.small).addClip()
+        // Drawn as one group, so the fade clears only the picture and its edge.
+        context.beginTransparencyLayer(auxiliaryInfo: nil)
+        image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: hints)
+        let edge = NSBezierPath(roundedRect: bounds.insetBy(dx: hairline / 2, dy: hairline / 2), xRadius: Tokens.Radius.small, yRadius: Tokens.Radius.small)
+        edge.lineWidth = hairline
+        Tokens.Color.cardEdge.setStroke()
+        edge.stroke()
+        // The page goes on: its foot fades into the card.
+        context.setBlendMode(.destinationOut)
+        let band = NSRect(x: 0, y: bounds.height - Self.fade, width: bounds.width, height: Self.fade)
+        NSGradient(colorsAndLocations: (.clear, 0), (NSColor(white: 0, alpha: 0.4), 0.5), (.black, 1))?.draw(in: band, angle: 90)
+        context.endTransparencyLayer()
+        context.restoreGState()
     }
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }
