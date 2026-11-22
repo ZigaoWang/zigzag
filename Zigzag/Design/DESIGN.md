@@ -52,13 +52,18 @@ night (`SpaceColor`, `Tokens.Frame`).
   (warm peach, not beige) and Orchid (lilac). Then cool: Azure, Navy, Seafoam, Pine, Fern. Warm: Citron, Coral, Red.
   Last, one violet and one pink: Iris, Pink. At most two blues among the colors, no brown or beige. Gradients are
   only a drift of one hue a little deeper toward the bottom, 20° of OKLCH hue at most: Iris, Coral, Navy. Lively
-  colors go past a custom color's tint (`SpaceColor.maxTint`) so they read as color on glass, not chalk. See-through
-  is 0.5 for most, 0.55 for the soft and light neutral ones, 0.45 for the deep ones, 0.4 for the washes so they stay
-  near white over a busy desktop, and 0.35 for Red, as clear as keeps text at 4.5:1 over a desktop that works against
-  it. Smoke, Navy, Pine and Red keep the window dark with light text. A new space takes the next of
+  colors go past a custom color's tint (`SpaceColor.maxTint`) so they read as color on glass, not chalk. All but
+  Smoke and Navy are light tints by day, the desktop plainly visible through them. Their glass is the palette's clear
+  glass (`SpaceInfo.clearTint`): the color tints it as it is, where a custom color on glass leans toward its dot and
+  grays a light color into haze, and it covers 0.475 (see-through 0.7) by day, 0.43 for the washes (0.76), and at
+  least 0.68 in a dark window (`Tokens.Frame.clearNightCover`), as little as keeps text at 4.5:1 over a desktop that
+  works against it. Smoke and Navy keep the window dark with light text. A few carry a finish, kept as the space's
+  grain (`PaletteLook.grain`, `texture`): Stone a fine linen (`MaterialImages.linen`), Smoke and Coral a light film
+  grain; picking a plain preset takes it off. A space saved in a beta's earlier look of these
+  (`SpaceColor.earlierLook`) takes the clear glass when it loads, keeping grain of its own. A new space takes the next of
   `SpaceColor.newSpaceOrder` no other space has, Slate first, in its following version (`SpaceColor.defaultLook`): the
   same glass, following the Mac between the color's own day and night depths (`SpaceInfo.dayDepth`, `nightDepth`), so
-  a fresh window is light on a light Mac and deep on a dark one; Smoke and Red stay dark, and Citron and Coral stay
+  a fresh window is light on a light Mac and deep on a dark one; Smoke stays dark, and Citron and Coral stay
   light, since a deep yellow or coral reads as brown. The washes are never given to a new space; their night depths
   are a deep glass of the same tint, Shell nearly black so it never reads as brown. Use Default Colors gives that back;
   the presets in the row keep their own depth, a choice made on purpose. The 0.9.4 betas' palette names read as the
@@ -70,7 +75,7 @@ night (`SpaceColor`, `Tokens.Frame`).
   still take their colors from these.
 - **Custom**: any hue and depth from the wheel, mixed in OKLCH (`SpaceColor.paint`); a deep one turns the window dark.
 - **Effects**, all optional: a second color for a gradient and its direction, see-through (the frosted desktop under
-  a thinner coat of the color), and grain.
+  a thinner coat of the color), and grain, fine or linen as a preset gave it.
 - **Ink**: on the frame, row titles and quiet words take the space's own ink (`Theme.rowInk`, `quietInk`), a deep or
   pale tone of its hue, checked against every curated color under the hover and card washes: titles at least 11.7:1
   by day and 7.5:1 at night, quiet words 5.2:1 and 4.8:1. Each space's inks are checked against its own frame (both
