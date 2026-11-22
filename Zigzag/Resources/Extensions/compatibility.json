@@ -78,7 +78,7 @@
       "catalog": "extension.limit.cookiePartitions",
       "order": 141
     },
-    "permissions": {
+    "hostAccessRequests": {
       "catalog": "extension.limit.hostAccessRequests",
       "order": 150
     },
@@ -344,17 +344,17 @@
     "permissions": {
       "status": "patched",
       "implementation": "js:permissions",
-      "group": "permissions",
+      "group": "hostAccessRequests",
       "members": {
         "addHostAccessRequest": {
           "status": "unsupported",
           "reason": "notImplemented",
-          "group": "permissions"
+          "group": "hostAccessRequests"
         },
         "removeHostAccessRequest": {
           "status": "unsupported",
           "reason": "notImplemented",
-          "group": "permissions"
+          "group": "hostAccessRequests"
         }
       }
     },

@@ -215,7 +215,7 @@ nonisolated enum CompatibilityText {
                           comment: "A Chrome extension feature Zigzag cannot provide: reading a cookie's partition key.")
         case "extension.limit.hostAccessRequests":
             return String(localized: "extension.limit.hostAccessRequests", defaultValue: "Site access requests",
-                          comment: "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.")
+                          comment: "A Chrome extension feature Zigzag cannot provide: permissions.addHostAccessRequest, a request for a site's access shown on the extension's button.")
         case "extension.limit.storage":
             return String(localized: "extension.limit.storage", defaultValue: "Stored extension settings",
                           comment: "A Chrome extension feature Zigzag emulates: managed extension storage.")

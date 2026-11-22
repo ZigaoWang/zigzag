@@ -710,3 +710,82 @@ extension ExtensionSecurityTests {
         #expect(await ExtensionStore.reviewUnpacked(empty) == nil)
     }
 }
+
+/// permissions.request for sites (#489): what site access covers is granted, the rest asked about in the more-access
+/// sheet; what you allow is kept until permissions.remove or another site access choice.
+@MainActor
+struct ExtensionPermissionRequestTests {
+    private let id = "permission-request-test"
+
+    @Test func sitesOutsideAccessAreAskedAbout() throws {
+        let pattern = { (s: String) in try WKWebExtension.MatchPattern(string: s) }
+        let all = try pattern("*://*/*"), github = try pattern("*://*.github.com/*")
+        let ublacklist = try pattern("https://ublacklist.github.io/*"), example = try pattern("https://example.com/*")
+        let bank = try pattern("*://bank.example/*"), inBank = try pattern("https://bank.example/*")
+        // Declared as optional (*://*/*): any site is asked about, except one where extensions are off.
+        #expect(ExtensionHost.patternsToAsk([ublacklist, example, inBank], declared: [all], denied: [bank]) == [ublacklist, example])
+        // A site it never declared is never asked about.
+        #expect(ExtensionHost.patternsToAsk([example], declared: [github], denied: []).isEmpty)
+        // Every site is asked about with an off site: that site stays denied.
+        #expect(ExtensionHost.patternsToAsk([all], declared: [all], denied: [bank]) == [all])
+    }
+
+    @Test func theSheetNamesTheSites() {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        #expect(ExtensionReport(requesting: [], patterns: ["https://ublacklist.github.io/*"], id: id).abilities.map(\.text)
+                == ["Read and change what you see on ublacklist.github.io"])
+        #expect(ExtensionReport(requesting: [], patterns: ["*://*/*"], id: id).abilities.map(\.text)
+                == ["Read and change what you see on every website"])
+        #expect(ExtensionReport(requesting: [], patterns: ["http://localhost/*"], id: id).abilities.map(\.text)
+                == ["Read and change what you see on localhost"])
+        #expect(ExtensionReport(requesting: ["history"], patterns: ["https://example.com/*"], id: id).abilities.count == 2)
+    }
+
+    @Test func allowedSitesAreGrantedUnderAnySiteAccess() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0","optional_host_permissions":["*://*/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        let context = WKWebExtensionContext(for: ext)
+        let requested = [try WKWebExtension.MatchPattern(string: "https://ublacklist.github.io/*")]
+        let site = try #require(URL(string: "https://ublacklist.github.io/rulesets/"))
+        for access: ExtensionInstalls.SiteAccess? in [nil, .click, .sites] {
+            ExtensionHost.applySiteAccess(access, approved: [], sites: ["example.com"], requested: requested, offSites: [], approvesActiveTab: false, to: context)
+            #expect(context.permissionStatus(for: site) == .grantedExplicitly, "\(String(describing: access))")
+        }
+        // A site where extensions are off stays off.
+        ExtensionHost.applySiteAccess(nil, approved: [], sites: [], requested: requested, offSites: ["ublacklist.github.io"], approvesActiveTab: false, to: context)
+        #expect(context.permissionStatus(for: site) == .deniedExplicitly)
+    }
+
+    @Test func removingForgetsOnlyWhatWasAskedFor() {
+        let recorded = ExtensionInstalls.State(grantedPermissions: ["history", "storage", "activeTab"], grantedMatchPatterns: ["*://*.google.com/*"],
+                                               requestedMatchPatterns: ["https://ublacklist.github.io/*"])
+        let removed = ExtensionHost.removedGrants(permissions: ["history", "activeTab"], patterns: ["https://ublacklist.github.io/*", "*://*.google.com/*"],
+                                                  recorded: recorded, granted: (["storage"], []))
+        #expect(removed.permissions == ["history"])
+        #expect(removed.patterns == ["https://ublacklist.github.io/*"])
+        // Granted again by Zigzag's own change by the time it's looked at: nothing is forgotten.
+        let regranted = ExtensionHost.removedGrants(permissions: [], patterns: ["https://ublacklist.github.io/*"], recorded: recorded,
+                                                    granted: ([], ["https://ublacklist.github.io/*"]))
+        #expect(regranted.patterns.isEmpty)
+    }
+
+    @Test func anotherSiteAccessChoiceStartsOver() {
+        let library = Library.shared
+        let info = library.addProfile(name: "Permission request test")
+        let installs = Profiles.shared.profile(info.id).installs
+        defer {
+            installs.remove(id)
+            library.removeProfile(info.id)
+            library.finishedRemovingProfile(info.id)
+        }
+        installs.save(ExtensionInstalls.State(grantedPermissions: [], grantedMatchPatterns: [], requestedMatchPatterns: ["https://ublacklist.github.io/*"]), for: id)
+        installs.setSiteAccess(id, .all)
+        #expect(installs.state(id)?.requestedMatchPatterns == ["https://ublacklist.github.io/*"])
+        installs.chooseSiteAccess(id, .click)
+        #expect(installs.state(id)?.requestedMatchPatterns == nil)
+    }
+}

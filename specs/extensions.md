@@ -41,6 +41,10 @@
   Test: SiteAccessContentScriptTests.contentScriptsFollowSiteAccess
 - Extensions off for a site in Site Controls → their scripts stay out there at once, no restart, and the extension keeps running elsewhere.
   Test: SiteAccessContentScriptTests.anOffSiteNeedsNoRestart
+- An extension asking for a site its site access doesn't cover (`permissions.request`) right after you used it → the more-access sheet asks; Allow grants it, Don't Allow or no recent use answers false.
+  Test: ExtensionPermissionRequestTests.sitesOutsideAccessAreAskedAbout
+- A site you allowed it → kept under any site access, until the extension removes it or you choose another site access; a site where extensions are off stays off.
+  Test: ExtensionPermissionRequestTests.allowedSitesAreGrantedUnderAnySiteAccess
 
 ## Private windows
 - A new extension → off in private windows until Allow in private windows is on for it in Settings › Extensions.

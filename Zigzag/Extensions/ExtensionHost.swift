@@ -261,6 +261,7 @@ final class ExtensionHost: NSObject {
         forwarding = [changed.observe { ExtensionCenter.noteChanged() }, popupsChanged.observe { ExtensionCenter.popupsChanged.send() }]
         watchGestures()
         watchPopupVisibility()
+        watchRemovedGrants()
     }
 
     // MARK: Loading
@@ -789,6 +790,47 @@ final class ExtensionHost: NSObject {
         changed.send()
     }
 
+    /// `permissions.remove` takes back what was allowed when it asked: forgotten in the record too, so it stays gone.
+    private func watchRemovedGrants() {
+        let names = [WKWebExtensionContext.grantedPermissionsWereRemovedNotification, WKWebExtensionContext.grantedPermissionMatchPatternsWereRemovedNotification]
+        removedGrantObservers = names.map { name in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                nonisolated(unsafe) let note = note
+                MainActor.assumeIsolated {
+                    let context = note.object as? WKWebExtensionContext
+                    let permissions = (note.userInfo?[WKWebExtensionContext.NotificationUserInfoKey.permissions] as? Set<WKWebExtension.Permission>)?.map(\.rawValue) ?? []
+                    let patterns = (note.userInfo?[WKWebExtensionContext.NotificationUserInfoKey.matchPatterns] as? Set<WKWebExtension.MatchPattern>)?.map(\.string) ?? []
+                    // After Zigzag's own changes, which clear site grants and make them again.
+                    DispatchQueue.main.async { [weak self, weak context] in
+                        self?.forgetRemoved(permissions: Set(permissions), patterns: Set(patterns), of: context)
+                    }
+                }
+            }
+        }
+    }
+
+    private func forgetRemoved(permissions: Set<String>, patterns: Set<String>, of context: WKWebExtensionContext?) {
+        guard let context, self.context(for: context.uniqueIdentifier) === context, let state = profile.installs.state(context.uniqueIdentifier) else { return }
+        let forgotten = Self.removedGrants(permissions: permissions, patterns: patterns, recorded: state,
+                                           granted: (Set(context.grantedPermissions.keys.map(\.rawValue)), Set(context.grantedPermissionMatchPatterns.keys.map(\.string))))
+        guard !forgotten.permissions.isEmpty || !forgotten.patterns.isEmpty else { return }
+        profile.installs.update(context.uniqueIdentifier) {
+            $0.grantedPermissions = $0.grantedPermissions?.filter { !forgotten.permissions.contains($0) }
+            $0.grantedMatchPatterns = $0.grantedMatchPatterns?.filter { !forgotten.patterns.contains($0) }
+            let requested = ($0.requestedMatchPatterns ?? []).filter { !forgotten.patterns.contains($0) }
+            $0.requestedMatchPatterns = requested.isEmpty ? nil : requested
+        }
+    }
+
+    /// What a removal takes from the record: permissions you're asked about, and sites allowed when it asked, that
+    /// are still not granted. Zigzag's own changes take nothing else (activeTab, site access).
+    static func removedGrants(permissions: Set<String>, patterns: Set<String>, recorded: ExtensionInstalls.State,
+                              granted: (permissions: Set<String>, patterns: Set<String>)) -> (permissions: Set<String>, patterns: Set<String>) {
+        let asked = permissions.intersection(ExtensionReport.askedPermissions).intersection(recorded.grantedPermissions ?? []).subtracting(granted.permissions)
+        let sites = patterns.intersection(recorded.requestedMatchPatterns ?? []).subtracting(granted.patterns)
+        return (asked, sites)
+    }
+
     typealias SiteGrants = (granted: Set<String>, denied: Set<String>)
 
     static func access(of context: WKWebExtensionContext) -> SiteGrants {
@@ -806,18 +848,20 @@ final class ExtensionHost: NSObject {
         let id = context.uniqueIdentifier
         let state = profile.installs.state(id)
         let approved = (state?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
-        Self.applySiteAccess(state?.siteAccess, approved: approved, sites: profile.installs.accessSites(id),
+        let requested = (state?.requestedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        Self.applySiteAccess(state?.siteAccess, approved: approved, sites: profile.installs.accessSites(id), requested: requested,
                              offSites: ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)),
                              approvesActiveTab: state?.grantedPermissions?.contains(WKWebExtension.Permission.activeTab.rawValue) ?? false,
                              to: context)
     }
 
     static func applySiteAccess(_ access: ExtensionInstalls.SiteAccess?, approved: [WKWebExtension.MatchPattern], sites: [String],
-                                offSites: Set<String>, approvesActiveTab: Bool, to context: WKWebExtensionContext) {
+                                requested: [WKWebExtension.MatchPattern] = [], offSites: Set<String>, approvesActiveTab: Bool,
+                                to context: WKWebExtensionContext) {
         // Forget earlier decisions first (clearing one pattern can clear an overlapping one), then make the current ones.
         for pattern in context.grantedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
         for pattern in context.deniedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
-        for pattern in siteAccessPatterns(access, approved: approved, optional: context.webExtension.optionalPermissionMatchPatterns, sites: sites) {
+        for pattern in siteAccessPatterns(access, approved: approved, optional: context.webExtension.optionalPermissionMatchPatterns, sites: sites) + requested {
             context.setPermissionStatus(.grantedExplicitly, for: pattern)
         }
         for site in offSites {
@@ -1048,6 +1092,7 @@ final class ExtensionHost: NSObject {
     /// When a popup last started closing in each place, on the clock events use.
     private var popupClosedAt: [PopupPlace: TimeInterval] = [:]
     private var popupOcclusionObserver: NSObjectProtocol?
+    private var removedGrantObservers: [NSObjectProtocol] = []
     /// A popup opened or closed.
     let popupsChanged = Signal<Void>()
     /// Watches each open popup closing, to end what it started (endCapturesWhenClosed).
@@ -1617,17 +1662,26 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             finish(quiet, false)
             return
         }
-        let ext = extensionContext.webExtension
-        let content = ExtensionSheet.Content(
+        let content = Self.moreAccessSheet(for: extensionContext, report: ExtensionReport(requesting: Set(asked.map(\.rawValue)), id: extensionContext.uniqueIdentifier))
+        ExtensionSheet.present(content, in: window, onConfirm: { [weak self] in
+            // Sites asked for in the same request are asked about next, still in answer to that click.
+            self?.use.touched(extensionContext.uniqueIdentifier)
+            finish(permissions, true)
+        }, onCancel: { finish(quiet, false) })
+    }
+
+    /// The sheet that asks before an extension gets more than it has (`permissions.request`).
+    static func moreAccessSheet(for context: WKWebExtensionContext, report: ExtensionReport) -> ExtensionSheet.Content {
+        let ext = context.webExtension
+        return ExtensionSheet.Content(
             icon: ext.icon(for: NSSize(width: 40, height: 40)),
             title: ext.displayName.map { String(localized: "\($0) wants more access", comment: "Title of the sheet shown when an extension asks for more access. The name is the extension's.") }
                 ?? String(localized: "This extension wants more access", comment: "Title of the sheet shown when an extension with no name asks for more access."),
             subtitle: String(localized: "Allow it only if it needs this for what you just asked it to do.", comment: "Under the title of the sheet shown when an extension asks for more access."),
             heading: String(localized: "It would also be able to", comment: "Heading over the list of what an extension could also do, in the sheet shown when it asks for more access."),
-            report: ExtensionReport(requesting: Set(asked.map(\.rawValue)), id: extensionContext.uniqueIdentifier),
+            report: report,
             confirm: String(localized: "Allow", comment: "Button in the sheet shown when an extension asks for more access: gives it."),
             cancel: String(localized: "Don’t Allow", comment: "Button in the sheet shown when an extension asks for more access: refuses it."))
-        ExtensionSheet.present(content, in: window, onConfirm: { finish(permissions, true) }, onCancel: { finish(quiet, false) })
     }
 
     /// The permissions asked for that need your say, and those granted without asking.
@@ -1636,9 +1690,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         return (asked, permissions.subtracting(asked))
     }
 
-    /// An extension asking for sites (`permissions.request`, or a page it wants to reach) gets only what your
-    /// site access already gives it: asking for <all_urls> never widens "only sites I list" or "when I click it".
-    /// A site you want to add is added in its site access instead.
+    /// A page it wants to reach gets only what your site access already gives it.
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionToAccess urls: Set<URL>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<URL>, Date?) -> Void) {
@@ -1649,11 +1701,44 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         }, nil)
     }
 
+    /// Sites asked for with `permissions.request`: those your site access covers are granted, the others only if you
+    /// allow them, asked only in answer to something you just did with the extension, as Chrome requires. Allowed is kept.
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
-        completionHandler(Self.patternsWithinAccess(matchPatterns, granted: Array(extensionContext.grantedPermissionMatchPatterns.keys),
-                                                    denied: Array(extensionContext.deniedPermissionMatchPatterns.keys)), nil)
+        let ext = extensionContext.webExtension
+        let granted = Array(extensionContext.grantedPermissionMatchPatterns.keys), denied = Array(extensionContext.deniedPermissionMatchPatterns.keys)
+        let within = Self.patternsWithinAccess(matchPatterns, granted: granted, denied: denied)
+        let asked = Self.patternsToAsk(matchPatterns.subtracting(within), declared: Array(ext.allRequestedMatchPatterns.union(ext.optionalPermissionMatchPatterns)),
+                                       denied: denied)
+        guard !asked.isEmpty else { completionHandler(within, nil); return }
+        let id = extensionContext.uniqueIdentifier
+        guard hasRecentGesture(id), !ExtensionSheet.isShowing,
+              let window = WindowManager.shared.keyController.flatMap({ $0.tabManager.isPrivate ? nil : $0 }) ?? openWindows.first else {
+            ExtensionLog.write("\(ext.displayName ?? "extension") asked for \(asked.map(\.string).sorted()) without a click; not granted")
+            completionHandler(within, nil)
+            return
+        }
+        let report = ExtensionReport(requesting: [], patterns: asked.map(\.string), id: id)
+        ExtensionSheet.present(Self.moreAccessSheet(for: extensionContext, report: report), in: window, onConfirm: { [weak self, weak extensionContext] in
+            completionHandler(within.union(asked), nil)
+            DispatchQueue.main.async {
+                guard let self, let extensionContext, self.context(for: id) === extensionContext else { return }
+                self.profile.installs.update(id) {
+                    $0.requestedMatchPatterns = Array(Set(($0.requestedMatchPatterns ?? []) + asked.map(\.string))).sorted()
+                }
+            }
+        }, onCancel: { completionHandler(within, nil) })
+    }
+
+    /// The requested patterns worth asking about: within what the extension declared, and not inside a site where
+    /// extensions are off.
+    static func patternsToAsk(_ requested: Set<WKWebExtension.MatchPattern>, declared: [WKWebExtension.MatchPattern],
+                              denied: [WKWebExtension.MatchPattern]) -> Set<WKWebExtension.MatchPattern> {
+        requested.filter { pattern in
+            declared.contains { $0.matches(pattern) }
+                && !denied.contains { $0.matches(pattern) }
+        }
     }
 
     /// The requested patterns that a pattern already granted covers in full, and that no denied one touches.

@@ -81,6 +81,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - `chrome-extension://` 地址现在和 Chrome 一样会打开对应扩展的页面：在地址栏里输入、由扩展自己打开，或从扩展自己的页面里点过去都可以，比如 Hotspot Shield 的欢迎页和设置页。没有安装的扩展的地址会马上说明，不再先停在空白标签页上；网站上指向这种地址的链接仍然打不开。([#475](https://github.com/ZigaoWang/zigzag/issues/475))
 - 要设置代理的 Firefox 扩展（.xpi），比如为 Firefox 做的 VPN，现在会在安装确认和“设置 › 扩展”里说明：用 Firefox 的代理 API 设置代理在 Zigzag 里无法使用。Zigzag 没有可以运行这个 API 的地方，所以这类扩展在这里没法让页面走它的服务器。([#475](https://github.com/ZigaoWang/zigzag/issues/475))
 - 扩展发出的请求如果正文是字节、自己没有标明类型，由 Zigzag 代发（为了带上网站的 Cookie 或绕过 CORS）时，不会再被标成表单数据了。它现在和 Chrome 一样带着扩展请求本来的类型，读取类型的服务器不会再把原始字节（比如 protobuf 格式的登录请求）当成表单。([#475](https://github.com/ZigaoWang/zigzag/issues/475))
+- 扩展在你使用时请求访问某个网站（比如 uBlacklist 添加订阅、启用规则集订阅链接时），Zigzag 会像 Chrome 一样先弹出确认。允许后扩展就能访问这个网站，重启后也一样；不允许就告诉它被拒绝。以前不问就直接拒绝，所以它的按钮点了没反应。感谢 [Kronight](https://github.com/Kronight)。([#489](https://github.com/ZigaoWang/zigzag/issues/489))
 
 ## [0.9.3] - 2026-11-21
 

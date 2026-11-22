@@ -8520,7 +8520,7 @@
       }
     },
     "extension.limit.hostAccessRequests" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.",
+      "comment" : "A Chrome extension feature Zigzag cannot provide: permissions.addHostAccessRequest, a request for a site's access shown on the extension's button.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {

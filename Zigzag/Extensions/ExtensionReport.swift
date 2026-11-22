@@ -161,8 +161,14 @@ struct ExtensionReport {
 
     /// What an extension asking for more (`permissions.request`) would gain, for asking you first. Every permission
     /// asked for shows in a line, if only in the last one.
-    init(requesting permissions: Set<String>, id: String) {
-        var lines = Self.abilities(permissions: permissions, patterns: [], id: id)
+    init(requesting permissions: Set<String>, patterns: [String] = [], id: String) {
+        var lines = Self.abilities(permissions: permissions, patterns: patterns, id: id)
+        // A site the install sheet leaves unnamed (localhost) is still named here.
+        if let pattern = patterns.first, !lines.contains(where: { $0.symbol == "globe" }) {
+            let site = String(pattern.components(separatedBy: "://").last?.prefix { $0 != "/" } ?? Substring(pattern))
+            lines.insert(Line(symbol: "globe", text: String(localized: "Read and change what you see on \(site)",
+                                                             comment: "One thing an extension can do, in its install sheet and in Settings. The placeholder is a site, like youtube.com.")), at: 0)
+        }
         var worded: Set<String> = ["nativeMessaging", "history", "tabs", "webNavigation", "bookmarks", "downloads", "notifications",
                                    "declarativeNetRequest", "declarativeNetRequestWithHostAccess", "userScripts", "cookies", "proxy", "management"]
         if permissions.contains("downloads") { worded.insert("downloads.open") }
