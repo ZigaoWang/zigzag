@@ -753,6 +753,19 @@ final class PageCardView: NSView {
         refreshGround()
     }
 
+    /// A borrowed holder comes back after another surface (the edge panel) showed the page. `show` would skip it
+    /// because the card's web view never changed; this puts the holder in the clip again and lets the card place it
+    /// for the size the card has now, including a split's other pane.
+    func reclaim(_ borrowed: PageHolder) {
+        guard let page = borrowed.page, webView === page, borrowed.superview !== clip else { return }
+        borrowed.layer?.cornerRadius = 0
+        borrowed.layer?.masksToBounds = false
+        holder = borrowed
+        clip.addSubview(borrowed, positioned: .below, relativeTo: placeholder)
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
     /// A page's full screen ended: WebKit put it back in its holder. Left here behind the page now shown, that holder
     /// goes, rather than staying under it with its page still on screen to itself.
     func pageLeftFullScreen(_ page: WKWebView) {

@@ -363,11 +363,10 @@ final class EdgePeek {
         fold.oldHolder.removeFromSuperview()
         fold.oldHolder.layer?.cornerRadius = 0
         fold.oldHolder.layer?.masksToBounds = false
-        if let origin = fold.origin, fold.old.webView != nil,
-           fold.controller.root.card.webView === fold.old.webView {
-            fold.oldHolder.frame = fold.originFrame
-            origin.addSubview(fold.oldHolder)
-            origin.needsLayout = true
+        // The old page may have been a split's other pane: give it back to the card that still shows it.
+        if let page = fold.old.webView,
+           let card = fold.controller.root.paneCards.first(where: { $0.webView === page }) {
+            card.reclaim(fold.oldHolder)
         }
     }
 
@@ -468,15 +467,21 @@ final class EdgePeek {
             holder.removeFromSuperview()
             holder.layer?.cornerRadius = 0
             holder.layer?.masksToBounds = false
-            // A selection change puts the page back only if its card still shows it (the split's other pane); a page
-            // the card has replaced stays out, so it never paints over the page that owns the place now.
-            let cardStillShowsPage = controller?.root.card.webView === tab.webView
+            // A selection change puts the page back only if a card still shows it; a page the cards have replaced
+            // stays out, so it never paints over the page that owns the place now. A split's other pane is a card
+            // too: the page goes back where it was borrowed, not only into the window's first card.
+            let cards = controller?.root.paneCards ?? []
+            let page = holder.page
+            let cardStillShowsPage = page.map { page in cards.contains { $0.webView === page } } ?? false
             if EdgePeekRestorePolicy.canRestore(isClosed: tab.isClosed, hasOrigin: origin != nil, reason: reason,
-                                                cardStillShowsPage: cardStillShowsPage),
-               let origin {
-                holder.frame = originFrame
-                origin.addSubview(holder)
-                origin.needsLayout = true
+                                                cardStillShowsPage: cardStillShowsPage) {
+                if let page, let card = cards.first(where: { $0.webView === page }) {
+                    card.reclaim(holder)
+                } else if let origin {
+                    holder.frame = originFrame
+                    origin.addSubview(holder)
+                    origin.needsLayout = true
+                }
             }
         }
         // The window kept this page out of its card while the panel had it, so it goes back once the holder is free,
