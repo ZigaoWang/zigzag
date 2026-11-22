@@ -388,6 +388,9 @@ struct SpaceLook {
     var grain: Double = 0
     /// Set: the hues follow the Mac, light by day and deep at night, this strong (`SpaceInfo.intensity`); `depth` unused.
     var following: Double? = nil
+    /// With `following`, a palette color's own depths by day and at night (`SpaceInfo.dayDepth`, `nightDepth`).
+    var day: Double? = nil
+    var night: Double? = nil
 
     /// How it looks as a space.
     var space: SpaceInfo {
@@ -417,17 +420,21 @@ struct SpaceLook {
             space.tint2 = nil
             space.intensity2 = nil
             space.brightness2 = nil
+            space.dayDepth = nil
+            space.nightDepth = nil
             space.translucency = seeThrough > 0 ? seeThrough : nil
             space.appearance = nil
             return
         }
         if let following {
             space.hue = hue
-            space.tint = nil
+            space.tint = abs(tint - 1) < 0.005 ? nil : tint
             space.intensity = following
             space.brightness = nil
+            space.dayDepth = day
+            space.nightDepth = night
             space.hue2 = hue2
-            space.tint2 = nil
+            space.tint2 = hue2 == nil || abs(tint - 1) < 0.005 ? nil : tint
             space.intensity2 = hue2 == nil ? nil : following
             space.brightness2 = nil
             space.angle = hue2 == nil ? nil : angle
@@ -442,13 +449,15 @@ struct SpaceLook {
             space.tint = 0
         } else {
             space.hue = hue
-            space.tint = tint > 0.995 ? nil : tint
+            space.tint = abs(tint - 1) < 0.005 ? nil : tint
         }
         space.intensity = nil
         space.brightness = depth
+        space.dayDepth = nil
+        space.nightDepth = nil
         space.hue2 = hue2
-        // The second color as quiet as the first.
-        space.tint2 = hue2 == nil || tint > 0.995 ? nil : tint
+        // The second color as quiet (or as rich) as the first.
+        space.tint2 = hue2 == nil || abs(tint - 1) < 0.005 ? nil : tint
         space.intensity2 = nil
         space.brightness2 = hue2 == nil ? nil : depth2
         if hue2 != nil { space.angle = angle }
@@ -464,8 +473,9 @@ struct SpaceLook {
                 && abs(space.seeThrough - seeThrough) < 0.01 && (curated.isNeutral || space.tintAmount > 0.99)
         }
         if let following {
-            guard space.brightness == nil, space.brightness2 == nil, let h = space.hue, abs(h - hue) < 0.002, space.tintAmount > 0.99,
-                  abs((space.intensity ?? -1) - following) < 0.005, abs(space.seeThrough - seeThrough) < 0.01 else { return false }
+            guard space.brightness == nil, space.brightness2 == nil, let h = space.hue, abs(h - hue) < 0.002, abs(space.tintAmount - tint) < 0.01,
+                  abs((space.intensity ?? -1) - following) < 0.005, abs(space.seeThrough - seeThrough) < 0.01,
+                  space.dayDepth == day, space.nightDepth == night else { return false }
             guard let hue2 else { return space.hue2 == nil }
             guard let h2 = space.hue2, abs(h2 - hue2) < 0.002 else { return false }
             return true
@@ -483,30 +493,35 @@ struct SpaceLook {
         }
         guard let hue2 else { return space.hue2 == nil }
         guard let h2 = space.hue2, abs(h2 - hue2) < 0.002, abs((space.brightness2 ?? b) - depth2) < 0.005,
-              abs(space.tintAmount2 - min(tint, 1)) < 0.01 else { return false }
+              abs(space.tintAmount2 - tint) < 0.01 else { return false }
         return true
     }
 
     static let white = SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0)
     static let black = SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1)
-    /// The palette's glass, then solid white. Each is reachable from Custom too, black included.
-    static let presets: [SpaceLook] = SpaceColor.palette.compactMap(\.look) + [white]
+    /// The palette's glass with solid white after its neutrals. Each is reachable from Custom too, black included.
+    static let presets: [SpaceLook] = {
+        let looks = SpaceColor.palette.compactMap(\.look)
+        let neutrals = SpaceColor.neutrals.count
+        return Array(looks.prefix(neutrals)) + [white] + looks.dropFirst(neutrals)
+    }()
 }
 
 extension SpaceColor {
     /// A palette color's look, on clear glass, at its own depth day and night: the preset. Nil for the older colors.
     var look: SpaceLook? {
         paletteLook.map { p in
-            SpaceLook(name: name, hue: p.hue, tint: p.tint, depth: p.depth, hue2: p.hue2, depth2: p.depth2, angle: 90, seeThrough: p.seeThrough)
+            SpaceLook(name: name, hue: p.hue, tint: p.tint, depth: p.depth, hue2: p.hue2, depth2: p.depth2 ?? p.depth, angle: 90, seeThrough: p.seeThrough)
         }
     }
 
-    /// What a new space of a palette color gets: the same hues on the same glass, following the Mac, so a fresh window
-    /// is light on a light Mac. Soft colors stay softer. Nil for the older colors.
+    /// What a new space of a palette color gets: the same hues on the same glass, following the Mac between its own
+    /// day and night depths, so a fresh window is light on a light Mac and deep on a dark one. Nil for the older colors.
+    /// `following` is what a Zigzag from before the day and night depths shows instead.
     var defaultLook: SpaceLook? {
         paletteLook.map { p in
-            SpaceLook(name: name, hue: p.hue, depth: 0, hue2: p.hue2, angle: 90, seeThrough: p.seeThrough,
-                      following: p.tint < 1 ? Tokens.Frame.softFollowingIntensity : Tokens.Frame.followingIntensity)
+            SpaceLook(name: name, hue: p.hue, tint: p.tint, depth: 0, hue2: p.hue2, angle: 90, seeThrough: p.seeThrough,
+                      following: p.tint < 1 ? Tokens.Frame.softFollowingIntensity : Tokens.Frame.followingIntensity, day: p.day, night: p.night)
         }
     }
 }
@@ -1376,6 +1391,8 @@ final class SpaceLookEditor: NSView {
             }
             self.draft.intensity = nil
             self.draft.intensity2 = nil
+            self.draft.dayDepth = nil
+            self.draft.nightDepth = nil
             self.colorChosen = true
             self.changed(final: final, animated: false)
         }
@@ -1479,6 +1496,7 @@ final class SpaceLookEditor: NSView {
         if space.hue == nil, space.brightness == nil, space.color == .snow { return 0 }
         if space.hue == nil, space.brightness == nil, space.color == .ink { return 1 }
         if space.isNeutral { return dark ? 0.9 : 0.06 }
+        if let day = space.dayDepth, let night = space.nightDepth { return dark ? night : day }
         let strength = space.intensity ?? SpaceColor.defaultIntensity
         return dark ? 0.86 : 0.06 + 0.2 * strength
     }
@@ -1534,6 +1552,8 @@ final class SpaceLookEditor: NSView {
             draft.brightness = first + delta
             draft.brightness2 = second + delta
         }
+        draft.dayDepth = nil
+        draft.nightDepth = nil
         colorChosen = true
         changed(final: final, animated: false)
     }
@@ -1557,6 +1577,8 @@ final class SpaceLookEditor: NSView {
             selected = 0
         }
         draft.intensity = nil
+        draft.dayDepth = nil
+        draft.nightDepth = nil
         colorChosen = true
         changed(final: true, animated: true)
     }
@@ -1618,10 +1640,10 @@ final class SpaceLookEditor: NSView {
     private func sync(animated: Bool) {
         let space = draft
         if space.hue2 == nil { selected = 0 }
-        var spots = [ColorWheel.Spot(hue: space.baseHue, amount: space.tintAmount)]
+        var spots = [ColorWheel.Spot(hue: space.baseHue, amount: min(space.tintAmount, 1))]
         var depths = [depth(0)]
         if let hue2 = space.hue2 {
-            spots.append(ColorWheel.Spot(hue: hue2, amount: space.tintAmount2))
+            spots.append(ColorWheel.Spot(hue: hue2, amount: min(space.tintAmount2, 1)))
             depths.append(depth(1))
         }
         wheel.show(spots, depths: depths, selected: selected, animated: animated)

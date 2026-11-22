@@ -45,16 +45,20 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 The soul of the window. A space's color fills the sidebar and the frame around the page completely, by day and at
 night (`SpaceColor`, `Tokens.Frame`).
 
-- **Palette** (`SpaceColor.palette`, `SpaceColor.look`): fourteen looks on clear glass, each a mood rather than a hue
-  step, each a hue at a depth like a custom color, so the window's mode follows the depth day and night. Gradients,
-  two hues top to bottom and never across the wheel: Lagoon (teal to blue), Sunset (coral to violet), Dusk (indigo to
-  rose), Citrus (lime to tangerine). Deep and moody, with a dark window and light text: Midnight, Petrol, Forest,
-  Merlot. Bright: Watermelon, Fuchsia, Volt. Soft: Lilac, Seafoam, Dune. Only Lagoon and Midnight lean blue. Deep and
-  soft looks are see-through to 0.45 and bright ones to 0.4 (`paletteSeeThrough`, `vividSeeThrough`), as clear as
-  keeps text at 4.5:1 over a desktop that works against it. A new space takes the next of `SpaceColor.newSpaceOrder`
-  no other space has, Lagoon first, in its following version (`SpaceColor.defaultLook`): the same hues and glass, light
-  by day and deep at night with the Mac, so a fresh window on a light Mac is light. Use Default Colors gives that back;
-  the presets in the row keep their own depth, a choice made on purpose.
+- **Palette** (`SpaceColor.palette`, `SpaceColor.PaletteLook`): thirteen colors on clear glass, the desktop showing
+  through and the color a tint in it, never paint. Neutral first, in the editor's row with solid white: Slate (a
+  barely cool gray), Stone (barely warm) and Smoke (deep graphite). Then cool: Azure, Navy, Seafoam, Pine, Fern. Warm:
+  Citron, Coral, Red. Last, one violet and one pink: Iris, Pink. At most two blues, no brown or beige. Gradients are
+  only a drift of one hue a little deeper toward the bottom, 20° of OKLCH hue at most: Iris, Coral, Navy. Lively
+  colors go past a custom color's tint (`SpaceColor.maxTint`) so they read as color on glass, not chalk. See-through
+  is 0.5 for most, 0.55 for the soft and light neutral ones, 0.45 for the deep ones and 0.35 for Red, as clear as
+  keeps text at 4.5:1 over a desktop that works against it. Smoke, Navy, Pine and Red keep the window dark with light
+  text. A new space takes the next of `SpaceColor.newSpaceOrder` no other space has, Slate first, in its following
+  version (`SpaceColor.defaultLook`): the same glass, following the Mac between the color's own day and night depths
+  (`SpaceInfo.dayDepth`, `nightDepth`), so a fresh window is light on a light Mac and deep on a dark one; Smoke and
+  Red stay dark, and Citron and Coral stay light, since a deep yellow or coral reads as brown. Use Default Colors
+  gives that back; the presets in the row keep their own depth, a choice made on purpose. The 0.9.4 betas' palette
+  names read as the nearest of these (`SpaceColor.renamed`), Lagoon as Slate.
 - **Older colors**: white, sky, lavender, rose, peach, sand, sage, mint and graphite, at 0.915 and 0.045 by day and
   0.27 and 0.04 at night, solid. Spaces that have them keep them exactly, Use Default Colors included, and profiles
   still take their colors from these.

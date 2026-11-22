@@ -53,8 +53,10 @@ struct EmptyPageTests {
     }
 
     @Test func aGlassSpaceTintsItsPageMoreLightly() {
-        for color in SpaceColor.palette {
+        // The neutral glasses keep the plain card, and a color that keeps its window light at night has no night page.
+        for color in SpaceColor.palette where !SpaceColor.neutrals.contains(color) {
             let glass = SpaceInfo(name: "G", color: color, defaultColor: color).withDefaultColors(color)
+            guard glass.readableAppearance == nil else { continue }
             let ground = EmptyPage.ground(for: glass, isPrivate: false), wash = Brand.Theme.of(glass).wash
             let day = resolved(ground, Self.light), dayWash = resolved(wash, Self.light)
             #expect(day.saturationComponent <= dayWash.saturationComponent, "\(color)")
@@ -76,6 +78,10 @@ struct EmptyPageTests {
         #expect(EmptyPage.ground(for: SpaceInfo(name: "G", color: .graphite, tint: 0), isPrivate: false) == Tokens.Color.cardBackground)
         #expect(EmptyPage.ground(for: SpaceInfo(name: "S", color: .sky), isPrivate: true) == Tokens.Color.cardBackground)
         #expect(EmptyPage.ground(for: nil, isPrivate: false) == Tokens.Color.cardBackground)
+        for color in SpaceColor.neutrals {
+            let glass = SpaceInfo(name: "N", color: color, defaultColor: color).withDefaultColors(color)
+            #expect(EmptyPage.ground(for: glass, isPrivate: false) == Tokens.Color.cardBackground, "\(color)")
+        }
         var space = SpaceInfo(name: "S", color: .rose)
         space.backgroundImage = "x.jpg"
         #expect(EmptyPage.picture(for: space, isPrivate: false) == "x.jpg")

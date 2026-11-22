@@ -18,7 +18,7 @@ struct SpaceDefaultColorsTests {
     @Test func defaultIsTheColorTheSpaceWasMadeWith() {
         let spaces = made(9)
         #expect(Library.defaultColors(of: spaces) == spaces.map(\.color))
-        #expect(Array(spaces.prefix(3).map(\.color)) == [.lagoon, .sunset, .forest])
+        #expect(Array(spaces.prefix(3).map(\.color)) == [.slate, .fern, .coral])
     }
 
     @Test func useDefaultColorsPutsBackANewSpacesLook() {
@@ -82,7 +82,7 @@ struct SpaceDefaultColorsTests {
         SpaceLook.white.apply(to: &spaces[1])
         #expect(spaces[1].color == .graphite)
         let color = Library.defaultColors(of: spaces)[1]
-        #expect(color == .sunset)
+        #expect(color == .fern)
         #expect(spaces[1].withDefaultColors(color) == original)
     }
 
@@ -154,23 +154,47 @@ struct SpacePaletteTests {
         (dark ? [0.09, 0.5] : [0.96, 0.3]).map { NSColor(srgbRed: $0, green: $0, blue: $0, alpha: 1) }
     }
 
-    @Test func aFreshSpaceIsLagoonGlass() {
+    @Test func aFreshSpaceIsSlateGlass() {
         let first = SpaceColor.newSpaceOrder[0]
-        #expect(first == .lagoon)
+        #expect(first == .slate)
         let space = SpaceInfo(name: "Personal", color: first, defaultColor: first).withDefaultColors(first)
         #expect(space.isSeeThrough && space.clearGlass == nil)
-        #expect(abs(space.seeThrough - Tokens.Frame.paletteSeeThrough) < 0.001)
-        // It follows the Mac: light by day, deep at night, teal running into blue.
+        #expect(abs(space.seeThrough - first.paletteLook!.seeThrough) < 0.001)
+        // It follows the Mac: a clear, barely cool glass by day, deep slate at night.
         #expect(space.brightness == nil && space.readableAppearance == nil && space.appearance == nil)
-        #expect(space.hue == 0.5 && space.hue2 == 0.6)
+        #expect(space.dayDepth == 0.16 && space.nightDepth == 0.93 && space.hue2 == nil)
         let day = resolved(space.background, dark: false), night = resolved(space.background, dark: true)
         #expect(Brand.relativeLuminance(day) > 0.6 && Brand.relativeLuminance(night) < 0.06)
-        #expect(day.saturationComponent > 0.08)
+        #expect(day.saturationComponent > 0.02 && day.saturationComponent < 0.12)
+        #expect(day.blueComponent > day.redComponent)
         #expect(space.hasDefaultColors(first))
         #expect(SpaceLook.curated(first).matches(space))
-        // The Lagoon in the row is the deep one, a choice of its own.
+        // The Slate in the row keeps one depth, a choice of its own.
         #expect(!SpaceLook.presets.contains { $0.matches(space) })
-        #expect(first.look!.space.readableAppearance == "dark")
+        #expect(first.look!.space.readableAppearance == "light")
+    }
+
+    /// A palette color that is deep by day too keeps a dark window, one light at night too keeps a light one (a deep
+    /// coral or yellow reads as brown); the rest follow the Mac.
+    @Test func aNewSpaceTakesItsColorsModeWhereItHasOne() {
+        func fresh(_ color: SpaceColor) -> SpaceInfo { SpaceInfo(name: "S", color: color, defaultColor: color).withDefaultColors(color) }
+        #expect(fresh(.red).readableAppearance == "dark" && fresh(.smoke).readableAppearance == "dark")
+        #expect(fresh(.citron).readableAppearance == "light" && fresh(.coral).readableAppearance == "light")
+        #expect(fresh(.fern).readableAppearance == nil)
+        // Richer than a custom color goes, and saved that way.
+        #expect(fresh(.red).tintAmount > 1.3)
+    }
+
+    /// The 0.9.4 betas' palette names read as the colors that took their place.
+    @Test func theBetasPaletteNamesReadAsTheNewColors() throws {
+        for (old, new) in ["lagoon": SpaceColor.slate, "sunset": .coral, "dusk": .navy, "citrus": .citron, "midnight": .navy,
+                           "petrol": .pine, "forest": .pine, "merlot": .red, "watermelon": .coral, "fuchsia": .pink, "volt": .fern,
+                           "lilac": .iris, "seafoam": .seafoam, "dune": .stone] {
+            #expect(SpaceColor.named(old) == new, "\(old)")
+            let json = #"{"name":"A","color":"sky","paletteColor":"\#(old)","paletteDefaultColor":"\#(old)","bookmarks":[]}"#
+            let space = try JSONDecoder().decode(SpaceInfo.self, from: Data(json.utf8))
+            #expect(space.color == new && space.defaultColor == new, "\(old)")
+        }
     }
 
     @Test func existingSpacesKeepTheirColors() throws {
@@ -196,24 +220,27 @@ struct SpacePaletteTests {
 
     @Test func profilesKeepTheOlderColors() {
         #expect(ProfileDirectory.ownColor(for: .sage, used: []) == .sage)
-        #expect(SpaceColor.legacy.contains(ProfileDirectory.ownColor(for: .lagoon, used: [])))
+        #expect(SpaceColor.legacy.contains(ProfileDirectory.ownColor(for: .slate, used: [])))
         #expect(SpaceColor.legacyNext(unused: []) == .sky)
     }
 
     @Test func thePaletteIsDistinctGlass() {
         let looks = SpaceColor.palette.compactMap(\.look)
-        #expect(looks.count == 14)
-        #expect(looks.allSatisfy { $0.seeThrough > 0 })
-        // Deep ones and light ones, and a few two-hue gradients, never across the whole wheel.
+        #expect(looks.count == 13)
+        #expect(looks.allSatisfy { (0.35...0.55).contains($0.seeThrough) })
+        // Deep ones and light ones, and at most three gradients, each a small drift of one hue.
         let spaces = looks.map(\.space)
-        #expect(spaces.filter { $0.readableAppearance == "dark" }.count >= 5)
-        #expect(spaces.filter { $0.readableAppearance == "light" }.count >= 3)
+        #expect(spaces.filter { $0.readableAppearance == "dark" }.count >= 3)
+        #expect(spaces.filter { $0.readableAppearance == "light" }.count >= 6)
         let gradients = looks.filter { $0.hue2 != nil }
-        #expect((3...4).contains(gradients.count))
+        #expect(gradients.count <= 3)
+        func okHue(_ h: Double) -> Double { SpaceColor.okHue(h) * 180 / .pi }
         for look in gradients {
-            let d = abs(look.hue - look.hue2!)
-            #expect(min(d, 1 - d) < 0.25, "\(look.name)")
+            let d = abs(okHue(look.hue) - okHue(look.hue2!)).truncatingRemainder(dividingBy: 360)
+            #expect(min(d, 360 - d) <= 20, "\(look.name)")
         }
+        // Neutrals lead the editor's row, white among them.
+        #expect(SpaceLook.presets.prefix(4).map(\.name) == SpaceColor.neutrals.map(\.name) + [SpaceLook.white.name])
         func lab(_ c: NSColor) -> (l: Double, a: Double, b: Double) {
             OKLab.lab(r: OKLab.decode(c.redComponent), g: OKLab.decode(c.greenComponent), b: OKLab.decode(c.blueComponent))
         }
@@ -232,7 +259,9 @@ struct SpacePaletteTests {
     /// modes: on the solid color, on the glass over a light and a dark desktop, and on the selected tab's card.
     @Test func everyPresetKeepsTextReadable() {
         let looks = SpaceLook.presets.map { ($0, $0.space.readableAppearance == "dark") }
-            + SpaceColor.palette.compactMap(\.defaultLook).flatMap { [($0, false), ($0, true)] }
+            + SpaceColor.palette.compactMap(\.defaultLook).flatMap { look in
+                look.space.readableAppearance.map { [(look, $0 == "dark")] } ?? [(look, false), (look, true)]
+            }
         for (look, dark) in looks {
             let space = look.space
             let text = resolved(Brand.Theme.of(space).rowInk, dark: dark)
@@ -400,11 +429,11 @@ struct SpaceEditorPlacementTests {
     private func encoded(_ space: SpaceInfo) throws -> Data { try JSONEncoder().encode(space) }
 
     @Test func anOlderZigzagReadsAPaletteSpace() throws {
-        let space = SpaceInfo(name: "Work", color: .lagoon, defaultColor: .lagoon).withDefaultColors(.lagoon)
+        let space = SpaceInfo(name: "Work", color: .slate, defaultColor: .slate).withDefaultColors(.slate)
         let old = try JSONDecoder().decode(OldSpace.self, from: encoded(space))
         #expect(old.name == "Work")
-        #expect(old.color.rawValue == SpaceColor.lagoon.nearestLegacy.rawValue)
-        #expect(old.defaultColor?.rawValue == SpaceColor.lagoon.nearestLegacy.rawValue)
+        #expect(old.color.rawValue == SpaceColor.slate.nearestLegacy.rawValue)
+        #expect(old.defaultColor?.rawValue == SpaceColor.slate.nearestLegacy.rawValue)
         // Every palette color has an older one to stand in for it.
         for color in SpaceColor.palette {
             #expect(SpaceColor.legacyAll.contains(color.nearestLegacy))
@@ -414,13 +443,14 @@ struct SpaceEditorPlacementTests {
     }
 
     @Test func aPaletteColorComesBack() throws {
-        var space = SpaceInfo(name: "Work", color: .sunset, defaultColor: .forest).withDefaultColors(.sunset)
+        var space = SpaceInfo(name: "Work", color: .coral, defaultColor: .pine).withDefaultColors(.coral)
         space.icon = "star"
-        space.defaultColor = .forest
+        space.defaultColor = .pine
         let back = try JSONDecoder().decode(SpaceInfo.self, from: encoded(space))
         #expect(back == space)
-        #expect(back.color == .sunset)
-        #expect(back.defaultColor == .forest)
+        #expect(back.color == .coral)
+        #expect(back.defaultColor == .pine)
+        #expect(back.dayDepth == 0.28 && back.nightDepth == 0.28 && back.tint == 1.25)
     }
 
     @Test func anOlderColorIsWrittenAsBefore() throws {
@@ -432,17 +462,18 @@ struct SpaceEditorPlacementTests {
         #expect(try JSONDecoder().decode(SpaceInfo.self, from: encoded(space)) == space)
     }
 
-    /// The beta that wrote "lagoon" into `color` reads as it was, and its next save is one an older Zigzag reads.
+    /// The beta that wrote "lagoon" into `color` reads as Slate, the color that took its place, keeping the look it
+    /// has, and its next save is one an older Zigzag reads.
     @Test func aBetaFileWithAPaletteColorMigrates() throws {
         let id = UUID()
         let beta = #"{"id":"\#(id.uuidString)","name":"Personal","color":"lagoon","defaultColor":"lagoon","bookmarks":[],"hue":0.5,"intensity":0.8,"hue2":0.6,"intensity2":0.8,"angle":90,"translucency":0.45}"#
         let space = try JSONDecoder().decode(SpaceInfo.self, from: Data(beta.utf8))
         #expect(space.id == id)
-        #expect(space.color == .lagoon)
-        #expect(space.defaultColor == .lagoon)
+        #expect(space.color == .slate)
+        #expect(space.defaultColor == .slate)
         #expect(space.hue == 0.5 && space.hue2 == 0.6 && space.translucency == 0.45)
         let old = try JSONDecoder().decode(OldSpace.self, from: encoded(space))
-        #expect(old.color.rawValue == SpaceColor.lagoon.nearestLegacy.rawValue)
+        #expect(old.color.rawValue == SpaceColor.slate.nearestLegacy.rawValue)
         #expect(try JSONDecoder().decode(SpaceInfo.self, from: encoded(space)) == space)
     }
 

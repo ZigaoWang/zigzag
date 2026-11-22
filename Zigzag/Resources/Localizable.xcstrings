@@ -23,68 +23,57 @@
         }
       }
     },
-    "Citrus" : {
-      "comment" : "Name of a curated space color, in the space editor. Lime running into tangerine.",
+    "Citron" : {
+      "comment" : "Name of a curated space color, in the space editor. A pale lemon yellow.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "柑橘"
+            "value" : "柠檬黄"
           }
         }
       }
     },
-    "Dune" : {
-      "comment" : "Name of a curated space color, in the space editor. A soft sandy gold.",
+    "Stone" : {
+      "comment" : "Name of a curated space color, in the space editor. A clear, barely warm gray glass.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "沙丘"
+            "value" : "岩灰"
           }
         }
       }
     },
-    "Dusk" : {
-      "comment" : "Name of a curated space color, in the space editor. Deep indigo running into deep rose.",
+    "Navy" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep navy blue.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暮色"
+            "value" : "藏青"
           }
         }
       }
     },
-    "Forest" : {
-      "comment" : "Name of a curated space color, in the space editor. A deep forest green.",
+    "Fern" : {
+      "comment" : "Name of a curated space color, in the space editor. A fresh leaf green.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "森林"
+            "value" : "蕨绿"
           }
         }
       }
     },
-    "Fuchsia" : {
-      "comment" : "Name of a curated space color, in the space editor. A hot magenta.",
+    "Slate" : {
+      "comment" : "Name of a curated space color, in the space editor. A clear, barely cool gray glass.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "品红"
-          }
-        }
-      }
-    },
-    "Lagoon" : {
-      "comment" : "Name of a curated space color, in the space editor. Deep teal running into deep blue.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "泻湖"
+            "value" : "石板灰"
           }
         }
       }
@@ -100,35 +89,24 @@
         }
       }
     },
-    "Lilac" : {
-      "comment" : "Name of a curated space color, in the space editor. A soft lilac.",
+    "Iris" : {
+      "comment" : "Name of a curated space color, in the space editor. A blue violet.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "丁香紫"
+            "value" : "鸢尾紫"
           }
         }
       }
     },
-    "Merlot" : {
-      "comment" : "Name of a curated space color, in the space editor. A deep red wine.",
+    "Smoke" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep smoked graphite glass.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "梅洛"
-          }
-        }
-      }
-    },
-    "Midnight" : {
-      "comment" : "Name of a curated space color, in the space editor. A deep midnight indigo.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "午夜"
+            "value" : "烟灰"
           }
         }
       }
@@ -188,13 +166,13 @@
         }
       }
     },
-    "Petrol" : {
-      "comment" : "Name of a curated space color, in the space editor. A deep inky teal.",
+    "Pine" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep pine green.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "石油蓝"
+            "value" : "松绿"
           }
         }
       }
@@ -221,13 +199,13 @@
         }
       }
     },
-    "Sunset" : {
-      "comment" : "Name of a curated space color, in the space editor. Coral running into violet.",
+    "Azure" : {
+      "comment" : "Name of a curated space color, in the space editor. A clear sky blue.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日落"
+            "value" : "蔚蓝"
           }
         }
       }
@@ -265,24 +243,13 @@
         }
       }
     },
-    "Volt" : {
-      "comment" : "Name of a curated space color, in the space editor. An electric lime green.",
+    "Coral" : {
+      "comment" : "Name of a curated space color, in the space editor. A warm coral orange.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "电光绿"
-          }
-        }
-      }
-    },
-    "Watermelon" : {
-      "comment" : "Name of a curated space color, in the space editor. A bright pinkish red.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "西瓜红"
+            "value" : "珊瑚"
           }
         }
       }
@@ -16048,7 +16015,7 @@
       }
     },
     "Pink" : {
-      "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
+      "comment" : "Name of a curated space color, in the space editor. A clear pink.\nVoiceOver, in the space editor's color wheel: a color's family.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16763,7 +16730,7 @@
       }
     },
     "Red" : {
-      "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
+      "comment" : "Name of a curated space color, in the space editor. A true red.\nVoiceOver, in the space editor's color wheel: a color's family.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
