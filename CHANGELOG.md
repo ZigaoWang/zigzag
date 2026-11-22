@@ -5,12 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Text that shows up more than once on a page, like a menu repeated in the header and footer, is translated once, and text already translated goes straight in until you quit, so a site's next pages translate sooner. ([#465](https://github.com/ZigaoWang/zigzag/issues/465))
-- Zigzag offers to translate each page in another language, not just the first one on a site, until you close the offer for that site.
-- After a translated page loads again, Translate translates it instead of acting as Show Original.
-- The address bar's translate button is in the accent color while a page is being translated.
-
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, and Your Zigzag Card.
@@ -67,6 +61,12 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - In full screen, dragging an empty part of the sidebar, the bar above the page or the strip over a split page no longer moves the window. In a window it still does. Thanks to [liverHawk](https://github.com/liverHawk). ([#483](https://github.com/ZigaoWang/zigzag/issues/483))
 - Starting Zigzag with an extension that runs a large script on many sites, like uBlacklist, no longer fills gigabytes of memory and swap. WebKit kept a copy of the script for every site it runs on, in every page and extension process, up to 17 GB for uBlacklist's 1 MB script and its 193 Google sites. Zigzag now has WebKit keep one copy of each script, as Safari does. Thanks to [Kronight](https://github.com/Kronight). ([#485](https://github.com/ZigaoWang/zigzag/issues/485))
 - On macOS 26, picking a login in the Mac's Passwords list should fill the username as well as the password. macOS 26 filled only the hidden password field Zigzag lays over the page, never the username field beside it, so Zigzag now uses the same kind of field for both, and waits a moment for a username that arrives after the password. If only the password comes back, the cursor is left in the empty username field, ready to type. Thanks to [frarees](https://github.com/frarees). ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+- Text that shows up more than once on a page, like a menu repeated in the header and footer, is translated once, and text already translated goes straight in until you quit, so a site's next pages translate sooner. Thanks to [orisred](https://github.com/orisred). ([#465](https://github.com/ZigaoWang/zigzag/issues/465))
+- Zigzag offers to translate each page in another language, not just the first one on a site. Closing the offer with its × stops it for that site while the window is open.
+- After a translated page loads again, Translate translates it instead of acting as Show Original.
+- The address bar's translate button is in the accent color while a page is being translated.
+- A pop-up from a window kept on top opens over it, kept on top too, instead of behind it. From Zigzag Mini over a full-screen app, it opens over that app.
+- A pop-up a page opens right after you click or press a key in it opens at once instead of asking where to go, in Zigzag Mini too. A page you went to doesn't count a click on the page before it.
 
 ## [0.9.3] - 2026-11-21
 
