@@ -30,13 +30,16 @@ final class AddressView: InteractiveView {
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
     /// Shown on articles: turns Reader on and off.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
-    /// Shown on pages in another language, pressed while translated: opens the translate menu.
+    /// Shown on pages in another language, in the accent while translating, pressed while translated: opens the
+    /// translate menu.
     let translateButton = AddressView.button("translate", toolTip: String(localized: "Translate", comment: "Action in the site panel: translates the page."))
 
-    func setTranslation(available: Bool, translated: Bool) {
-        wantsTranslate = available || translated
+    func setTranslation(available: Bool, translated: Bool, translating: Bool = false) {
+        wantsTranslate = available || translated || translating
         translateButton.isSelected = translated
-        translateButton.toolTip = translated ? String(localized: "Translated", comment: "Tooltip of the address bar's translate button on a translated page.")
+        translateButton.tint = translating ? Brand.Theme.for(self).accent : Tokens.Color.icon
+        translateButton.toolTip = translating ? String(localized: "Translating Page…", comment: "Tooltip of the address bar's translate button while the page is being translated.")
+            : translated ? String(localized: "Translated", comment: "Tooltip of the address bar's translate button on a translated page.")
             : String(localized: "Translate", comment: "Action in the site panel: translates the page.")
         reflow(animated: true)
     }

@@ -21824,6 +21824,17 @@
         }
       }
     },
+    "Translating Page…" : {
+      "comment" : "Tooltip of the address bar's translate button while the page is being translated.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在翻译网页…"
+          }
+        }
+      }
+    },
     "Translation" : {
       "comment" : "A section of Settings: translating web pages.",
       "localizations" : {

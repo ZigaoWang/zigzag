@@ -5,6 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Text that shows up more than once on a page, like a menu repeated in the header and footer, is translated once, and text already translated goes straight in until you quit, so a site's next pages translate sooner. ([#465](https://github.com/ZigaoWang/zigzag/issues/465))
+- Zigzag offers to translate each page in another language, not just the first one on a site, until you close the offer for that site.
+- After a translated page loads again, Translate translates it instead of acting as Show Original.
+- The address bar's translate button is in the accent color while a page is being translated.
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, and Your Zigzag Card.

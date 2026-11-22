@@ -1678,6 +1678,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .language:
             updateTranslateButton()
             offerTranslation()
+        case .document:
+            updateTranslateButton()
         case .themeColor, .darkPage:
             paintTopBar()
         default:
@@ -1726,7 +1728,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The tab whose "Translating…" is showing.
     private weak var translationToastTab: Tab?
     /// Sites already offered this session, so browsing a site in another language doesn't ask on every page.
-    private var translationOffered: Set<String> = []
+    private var translationDeclined: Set<String> = []
     /// Sites translated this session and their source language; their other pages auto-translate when in that language.
     private var translatedSites: [String: Locale.Language] = [:]
     /// Never Translate This Site chosen in a private window: kept only while the window is open.
@@ -1779,10 +1781,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
               let site = ContentBlocker.site(of: tab.url) else { return }
         switch PageTranslator.Choices().automatic(language: language, site: site, translatedHere: translatedSites[site] != nil,
                                                   neverHere: neverTranslatedHere, offers: PageTranslator.offers,
-                                                  offered: translationOffered.contains(site)) {
+                                                  declined: translationDeclined.contains(site)) {
         case .translate: translatePage(asked: false)
         case .offer:
-            translationOffered.insert(site)
             showTranslationOffer(tab, language: language)
         case .nothing: break
         }
@@ -1797,19 +1798,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self, let tab else { return [] }
             return self.translateChoices(tab, language: language)
         }
+        // Closed with its ×, the site stops asking this session.
+        let declined = { [weak self, site = ContentBlocker.site(of: tab.url)] in
+            if let site { self?.translationDeclined.insert(site) }
+        }
         if let mini = translationMini(tab) {
-            Toast.show(text, symbol: "translate", action: translate, options: options, duration: 6, closes: true, over: mini.overlay, area: mini.overlay.bounds)
+            Toast.show(text, symbol: "translate", action: translate, options: options, duration: 6, closes: true, over: mini.overlay, area: mini.overlay.bounds, onClose: declined)
             return
         }
         translationOfferPage = tab.url
-        Toast.show(text, symbol: "translate", action: translate, options: options, duration: 6, closes: true, owner: tab, in: self)
+        Toast.show(text, symbol: "translate", action: translate, options: options, duration: 6, closes: true, owner: tab, onClose: declined, in: self)
     }
 
     /// The address bar's translate button: on pages in another language, and pressed while translated.
     private func updateTranslateButton() {
         guard let tab = tabManager.selectedTab else { sidebar.address.setTranslation(available: false, translated: false); return }
         let foreign = tab.foreignLanguage != nil && PageTranslator.readsLanguage(of: tab.url, errorPage: tab.showsErrorPage)
-        sidebar.address.setTranslation(available: foreign, translated: tab.isTranslated)
+        let key = ObjectIdentifier(tab)
+        sidebar.address.setTranslation(available: foreign, translated: tab.isTranslated,
+                                       translating: translations.run(for: key) != nil || planningTranslation.contains(key))
     }
 
     /// The translate button's menu: Translate or Show Original, then the Always and Never choices.
@@ -1896,6 +1903,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         planningTranslation.insert(key)
+        updateTranslateButton()
         // Read the page's language again now: what was seen as it loaded can be out of date (a site that changes
         // its page without loading a new one), and translating from the wrong language never finishes.
         // Still loading, there's too little text to tell yet: what was seen of it so far stands.
@@ -1904,7 +1912,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Seen as in your language, or as too little to tell, it's asked for anyway: the whole page is read again
         // to find what it's in (#218).
         Task { @MainActor [weak self] in
-            defer { self?.planningTranslation.remove(key) }
+            defer {
+                self?.planningTranslation.remove(key)
+                self?.updateTranslateButton()
+            }
             let target = PageTranslator.readerLanguage
             let kept = site.flatMap { self?.translatedSites[$0] }
             let seen = await PageTranslator.pageLanguage(of: webView) ?? (webView.isLoading ? tab.foreignLanguage : nil)
@@ -1964,15 +1975,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let run = PageTranslation(tab: tab, webView: webView, name: Words.list(names), site: site, source: groups.first?.source)
         let key = ObjectIdentifier(tab)
         guard translations.begin(run, for: key) else { return }
+        updateTranslateButton()
         (translationMini(tab)?.overlay ?? root.overlay).addSubview(run.host.view)
-        // Another page in the tab: that page isn't translated, and there's nothing to say.
+        // Another page in the tab, or this one loaded again: it isn't translated, and there's nothing to say.
         run.token = tab.changed.observe { [weak self, weak run, weak tab] change in
-            guard change == .url, let self, let run, tab?.webView?.url != run.page else { return }
+            guard let self, let run, change == .document || (change == .url && tab?.webView?.url != run.page) else { return }
             self.endTranslation(run, for: key)
         }
         if translationInView(tab) { showTranslating(run) }
         watchTranslation(run, for: key)
-        run.host.translate(webView, pieces: pieces, shown: shown, groups: groups, into: target, progress: { [weak self, weak run] fraction in
+        run.host.translate(webView, pieces: pieces, shown: shown, groups: groups, into: target,
+                           memory: tab.isPrivate ? TranslationMemory() : .shared, progress: { [weak self, weak run] fraction in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             run.lastProgress = Date()
             run.fraction = fraction
