@@ -25216,7 +25216,7 @@
       }
     },
     "needs your answer" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.",
+      "comment" : "Spoken by VoiceOver after a tab row's name: a question is waiting for that page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

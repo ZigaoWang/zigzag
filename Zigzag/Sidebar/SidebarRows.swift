@@ -716,7 +716,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // What its ring shows: its page isn't running.
         let unloaded = showsUnloaded(tab) ? String(localized: "not loaded", comment: "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.") : nil
         let waiting = ([tab, partner] + extraPages).compactMap { $0 }.contains { PendingQuestions.hasPending(tabID: $0.id) }
-            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.")
+            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name: a question is waiting for that page.")
             : nil
         let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, waiting, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + zip(extraPages, extraTitles).map { sound($0, $1) })
@@ -772,32 +772,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// The title labels of the row's parts, in `half(at:)`'s order: its own, the partner's, a group's others.
     private var partTitles: [Label] { [title, partnerTitle] + (extraViews ?? []).map(\.title) }
-
-    /// Pointing at a part of a row of several pages names that page, as its title may be cut short or not shown.
-    private var showsPartTips = false
-
-    private func refreshPartTips() {
-        guard isSplit || showsPartTips else { return }
-        removeAllToolTips()
-        showsPartTips = isSplit
-        guard isSplit else { return }
-        for (start, end) in partSpans where end > start {
-            addToolTip(NSRect(x: start, y: 0, width: end - start, height: bounds.height), owner: self, userData: nil)
-        }
-    }
-
-    @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
-        let index = half(at: point)
-        let name = partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
-        // A part in Developer Mode says so under its name, with its host.
-        let pages = [tab, partner] + extraPages
-        let described = developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
-        // Mark parts with a waiting question so it isn't missed in a background tab.
-        if pages.indices.contains(index), let page = pages[index], PendingQuestions.hasPending(tabID: page.id) {
-            return "\(described)\n\(String(localized: "needs your answer", comment: "Shown in a tab row's tooltip, and spoken by VoiceOver after its name: a question is waiting for that page."))"
-        }
-        return described
-    }
 
     /// The page the point is over.
     func page(at point: NSPoint) -> Tab? {
@@ -968,8 +942,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         for (i, view) in icons.enumerated() {
             let on = badged.contains(i)
             view.developerBadge = on ? color : nil
-            // A row of several pages names each in its own tooltip; a row of one says it on its icon.
-            view.toolTip = on && !isSplit ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
+            // Each page in it says so on its own icon, with its host.
+            view.toolTip = on ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
         }
     }
 
@@ -1125,10 +1099,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             end = nestedButton.frame.minX - Self.buttonGap
         }
         layoutDropHalf()
-        defer {
-            refreshPartTips()
-            layoutZoomMark()
-        }
+        defer { layoutZoomMark() }
 
         guard isSplit else {
             partEdges = []

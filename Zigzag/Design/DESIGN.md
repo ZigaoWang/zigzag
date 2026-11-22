@@ -347,7 +347,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   favorite's small × in its corner. Close Split View in the menu closes them all. A pinned page split beside a tab carries the pair in its own row, so each page
   shows once and one row is lit. A pinned split of two, three or four is the same row (`TabRowView`) in Pinned. A
   double-click renames the part's page (over its
-  title, or the row for the moment when the part shows no title).
+  title, or the row for the moment when the part shows no title). No row shows the system's tooltip with a title: the
+  hover card names the pages.
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size
   (`Sidebar.spaceIcon`: a favorite's icon, 16, 18, 20), each in a 26pt key (28 at Large, `Sidebar.spaceTarget`).

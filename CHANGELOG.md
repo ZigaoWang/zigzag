@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Open in (⌘O) in Zigzag Mini brings Zigzag forward with the page, in a browser window on the desktop you're on when there is one. It used to leave the window behind other apps or on another desktop.
+- Pointing at a split view's row in the sidebar no longer shows the Mac's gray tooltip with a page's title. Zigzag's own hover card shows its pages instead.
 
 ## [0.9.4] - 2026-11-21
 

@@ -138,6 +138,29 @@ import Testing
         }
     }
 
+    /// No row of the tab list, one page or several, gives a system tooltip with a title: the hover card names them.
+    @Test func aRowAndItsPartsCarryNoTitleTooltip() throws {
+        try inWindow(["A page", "B page", "C page", "D page"]) { controller, tabs in
+            let titles = tabs.map(\.displayTitle)
+            for partners in [[], [tabs[1]], Array(tabs[1...3])] {
+                let row = row(tabs[0], partners: partners)
+                row.isHovered = true
+                row.debugPoint(atPart: partners.isEmpty ? nil : 1)
+                row.layoutSubtreeIfNeeded()
+                var views: [NSView] = [row]
+                var seen: [NSView] = []
+                while let view = views.popLast() { seen.append(view); views += view.subviews }
+                for view in seen {
+                    #expect(view.toolTip.map { tip in !titles.contains { tip.contains($0) } } ?? true)
+                    #expect((view as? NSTextField)?.allowsExpansionToolTips != true)
+                }
+                // No tooltip rects either: nothing names a page for a point of the row.
+                #expect(!row.responds(to: #selector(NSViewToolTipOwner.view(_:stringForToolTip:point:userData:))))
+            }
+            _ = controller
+        }
+    }
+
     /// Close Tab closes the page alone; Close Split View all of it, and one ⌘Z puts it all back where it was.
     @Test func theMenuOffersBoth() throws {
         try inWindow(["A", "C", "B"]) { controller, tabs in
