@@ -436,6 +436,13 @@ import WebKit
         #expect(PopupNotice.heldOutcome(for: "deny", sized: true) == .discard)
     }
 
+    /// The diagnostics line for an unclicked pop-up says where it was and whether you had just used a page.
+    @Test func anUnclickedPopUpNotesWhereAndYourLastInput() {
+        #expect(PopupNotice.unclickedNote(inMini: true, sinceInput: 0.34) == "in Zigzag Mini, a click or key in a page 0.3 s before")
+        #expect(PopupNotice.unclickedNote(inMini: false, sinceInput: 12) == "in a window, no click or key in a page for 5 s")
+        #expect(PopupNotice.unclickedNote(inMini: false, sinceInput: -1) == "in a window, no click or key in a page for 5 s")
+    }
+
     /// A legacy popup `true` becomes "automatic", not the viewer; other subjects' `true` is "allow".
     @Test func aLegacyPopupYesKeepsTheOrdinaryRouting() throws {
         try withDefaults { defaults in

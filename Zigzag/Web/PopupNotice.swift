@@ -75,6 +75,14 @@ enum PopupNotice {
         return [.leftMouseUp, .leftMouseDown, .otherMouseUp, .keyDown].contains(event.type)
     }
 
+    /// The diagnostics line for a pop-up WebKit saw no click for: where it was, and how long since your last click or
+    /// key in a page, if that was in the last 5 seconds.
+    nonisolated static func unclickedNote(inMini: Bool, sinceInput: TimeInterval) -> String {
+        let place = inMini ? "in Zigzag Mini" : "in a window"
+        guard sinceInput >= 0, sinceInput < 5 else { return "\(place), no click or key in a page for 5 s" }
+        return "\(place), a click or key in a page \(String(format: "%.1f", sinceInput)) s before"
+    }
+
     /// One question per site every few seconds, and a put-off question doesn't come straight back, as with the app
     /// question. Also applies after a "this time" answer.
     private static var lastAsked: [String: Date] = [:]

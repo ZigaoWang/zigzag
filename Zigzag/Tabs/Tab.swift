@@ -2539,6 +2539,10 @@ extension Tab: WKUIDelegate {
                                  "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             }
+            // For Report a Problem: whether you had just clicked or typed in a page, which WebKit didn't count.
+            Diagnostics.note("Pop-up without a click", site: url?.host(),
+                             PopupNotice.unclickedNote(inMini: host is MiniWindowController, sinceInput: Date().timeIntervalSince(UndoClock.lastPageInput)),
+                             isPrivate: isPrivate)
             return PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost,
                                    configuration: configuration, features: windowFeatures)
         }
