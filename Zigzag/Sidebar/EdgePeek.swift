@@ -234,6 +234,7 @@ final class EdgePeek {
         if self.tab != nil { detach(.sidebarClick, resize: false) }
         noticeTab = tab
         self.controller = controller
+        controller.updateEdgeSidebarForNotice(tab)
         installObservers()
         EdgeSidebar.shared.noticeAttached(tab: tab) { [weak self] in self?.returnToBrowser() }
         if replacing || fromNotice { EdgeSidebar.shared.foldInSide() }
@@ -426,6 +427,8 @@ final class EdgePeek {
         if noticeTab != nil {
             noticeTab = nil
             EdgeSidebar.shared.noticeDetached(resize: resize)
+            // The note's page is not the window's page: the mirror goes back to what the window is on.
+            controller?.prepareEdgeSidebar()
             releaseObservers()
             self.controller = nil
             return

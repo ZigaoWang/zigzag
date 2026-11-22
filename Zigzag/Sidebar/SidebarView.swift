@@ -85,6 +85,14 @@ final class AddressView: InteractiveView {
         reflow(animated: true)
     }
 
+    /// Whether Site Controls is offered for the page in the field. Zigzag's own pages have no site to control, so the
+    /// button goes rather than opening an empty panel.
+    func setSiteControls(showing: Bool) {
+        guard siteControlsButton.isHidden == showing else { return }
+        siteControlsButton.isHidden = !showing
+        reflow(animated: true)
+    }
+
     /// The dot on Site Controls while an extension can't work until you do something.
     func setSiteControls(needsAttention: Bool) {
         guard needsAttention != (siteControlsBadge != nil) else { return }
@@ -1303,7 +1311,11 @@ final class SidebarView: NSView {
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
+        let systemPage = tab.map { !EdgeLensPolicy.takesPage(url: $0.url) } ?? false
+        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true,
+                         canSave: !systemPage && AddressView.canSave(for: tab))
+        // A system page has no site to control, in the window's sidebar and in the panel's mirror alike.
+        address.setSiteControls(showing: !systemPage)
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

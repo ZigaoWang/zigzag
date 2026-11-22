@@ -33,6 +33,18 @@ struct TopBarTests {
         #expect(controller.sidebar.holdsAddress)
     }
 
+    /// Zigzag's own pages have nothing to pin and no site to control: neither the star nor Site Controls is offered.
+    @Test func systemPagesHideTheStarAndSiteControls() {
+        let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 600))
+        let space = UUID()
+        sidebar.update(tab: Tab(url: URL(string: "https://example.com")!, title: "Example", spaceID: space))
+        #expect(!sidebar.address.saveButton.isHidden)
+        #expect(!sidebar.address.siteControlsButton.isHidden)
+        sidebar.update(tab: Tab(url: SettingsPage.url, title: "Settings", spaceID: space))
+        #expect(sidebar.address.saveButton.isHidden)
+        #expect(sidebar.address.siteControlsButton.isHidden)
+    }
+
     @Test func barSitsOnTheTrafficLightsLine() {
         #expect(bar / 2 == Tokens.Sidebar.lightsCenter)
         let frames = TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: 6)

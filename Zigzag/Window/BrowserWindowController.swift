@@ -3955,6 +3955,14 @@ extension BrowserWindowController {
         edgeSidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
     }
 
+    /// The note is up for one of Zigzag's own pages: the mirror's address is that page's, with no star and no Site
+    /// Controls, rather than the window's page behind it.
+    func updateEdgeSidebarForNotice(_ tab: Tab) {
+        guard let edgeSidebar, EdgePeek.shared.noticeTab === tab else { return }
+        edgeSidebar.update(tab: tab)
+        edgeSidebar.address.setCapture(camera: false, microphone: false)
+    }
+
     /// The mirror's clicks: the window's own, except that anything which changes the window's page brings Zigzag
     /// forward first, and a tab picked in it puts the panel away.
     private func wireEdgeSidebar(_ mirror: SidebarView) {
