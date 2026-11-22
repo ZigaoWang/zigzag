@@ -63,6 +63,8 @@ enum SiteUserAgents {
     static var customTitle: String { String(localized: "user-agent.custom", defaultValue: "Custom", comment: "Choice in the User agent dropdown of the site panel and Settings › Privacy › Sites: the site is sent a user agent you typed.") }
     static var customAction: String { String(localized: "user-agent.custom-action", defaultValue: "Custom…", comment: "Item at the end of the User agent dropdown in the site panel: opens a sheet to type the user agent this site is sent.") }
 
+    static var editCustomAction: String { String(localized: "user-agent.edit-custom-action", defaultValue: "Edit Custom…", comment: "Item at the end of the User agent dropdown in the site panel, once the site has a typed user agent: opens the sheet to change it.") }
+
     /// Hosts without "www.", each with its choice.
     static var all: [String: Choice] {
         get { (defaults.dictionary(forKey: key) as? [String: String] ?? [:]).compactMapValues(Choice.init(stored:)) }

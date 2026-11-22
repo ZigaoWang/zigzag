@@ -2714,6 +2714,8 @@ enum DebugBridge {
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         // sitepanelrow <index> <row title>: picks that choice in the open panel's This Site row.
         case "sitepanelrow": SitePanel.shown?.debugChooseRow(arg)
+        // sitepanelmenu <row title> | action <row title>: opens that row's dropdown, or runs its action.
+        case "sitepanelmenu": SitePanel.shown?.debugRowMenu(arg)
         case "panesite", "panemore":
             // panesite <pane>: that split pane's Site Controls button, as a click on it (#160). panemore <pane>: its ⋯.
             let cards = controller.root.paneCards

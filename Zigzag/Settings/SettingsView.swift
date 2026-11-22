@@ -4595,7 +4595,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     self?.reloadPrivacy()
                     self?.layoutDocument()
                 }
-                rows.append(makeRow(SiteUserAgents.title, detail: agent.isCustom ? agent.string : nil, control: dropdown) { SiteUserAgents.forget(site: site) })
+                rows.append(makeRow(SiteUserAgents.title, control: dropdown) { SiteUserAgents.forget(site: site) })
             }
             if SiteIcons.all[site] != nil {
                 rows.append(makeRow(String(localized: "Site icon", comment: "Row in Settings › Privacy › Sites: an icon you set for this site in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites."),

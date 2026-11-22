@@ -756,6 +756,14 @@ final class SitePanel: FloatingPanelView {
         guard f.count == 2, let index = Int(f[0]), let row = rows.first(where: { $0.debugTitle.hasPrefix(f[1] + ":") }) else { return }
         row.debugChoose(index)
     }
+
+    /// <row title>: opens that This Site row's dropdown; "action <row title>" runs its first action instead (Custom…).
+    func debugRowMenu(_ arg: String) {
+        let action = arg.hasPrefix("action ")
+        let title = action ? String(arg.dropFirst(7)) : arg
+        guard let dropdown = rows.first(where: { $0.debugTitle.hasPrefix(title + ":") })?.debugDropdown else { return }
+        if action { MenuPanel.current?.close(animated: false); dropdown.actions.first?.run() } else { dropdown.openMenu() }
+    }
     #endif
 
     #if DEBUG
@@ -1097,7 +1105,7 @@ final class SitePanel: FloatingPanelView {
         let tab = tab, url = url
         let now = SiteUserAgents.choice(for: url)
         let choices = SiteUserAgents.offered(with: now)
-        let custom = DropdownButton.Action(title: SiteUserAgents.customAction, symbol: nil) { [weak self] in
+        let custom = DropdownButton.Action(title: now?.isCustom == true ? SiteUserAgents.editCustomAction : SiteUserAgents.customAction, symbol: nil) { [weak self] in
             guard let self, let host = (self.controller?.window ?? self.pageHost?.window)?.contentView else { return }
             self.close()
             SiteUserAgents.showCustomSheet(for: url, in: host, tab: tab)
@@ -1823,6 +1831,8 @@ final class PanelRow: NSView {
         let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         return ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0)) + Tokens.Space.x2 + wanted.width
     }
+
+    var debugDropdown: DropdownButton? { control as? DropdownButton }
 
     /// choose <index>: picks that choice in the row's dropdown, as its menu would.
     func debugChoose(_ index: Int) {
