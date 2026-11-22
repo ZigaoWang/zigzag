@@ -37,14 +37,21 @@ nonisolated struct DeveloperState: Equatable {
         /// What the page is sent in its place; nil for Zigzag's own. Each as its browser sent it in November 2026
         /// (Safari 27, Chrome 157, Firefox 160): the one place to bring them up to date. Safari on an iPhone or iPad
         /// names iOS 18.7 whatever it runs on, and Chrome names macOS 10.15.7: both keep that part still on purpose.
+        /// Chrome's and Firefox's versions move on every four weeks, as their releases do (`major(_:on:)`).
         var string: String? {
             switch self {
             case .zigzag: nil
             case .iPhone: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1"
             case .iPad: "Mozilla/5.0 (iPad; CPU OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1"
-            case .chrome: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
-            case .firefox: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:160.0) Gecko/20100101 Firefox/160.0"
+            case .chrome: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/\(Self.major(157)).0.0.0 Safari/537.36"
+            case .firefox: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:\(Self.major(160)).0) Gecko/20100101 Firefox/\(Self.major(160)).0"
             }
+        }
+
+        /// A major version as of 2026-11-21, one more for each four weeks since; never less.
+        nonisolated static func major(_ base: Int, on date: Date = Date()) -> Int {
+            let weeks = date.timeIntervalSince(Date(timeIntervalSince1970: 1_795_219_200)) / (7 * 86_400)
+            return base + max(0, Int(weeks / 4))
         }
     }
 
@@ -94,7 +101,7 @@ extension Tab {
     func applyDeveloperState() {
         guard let webView else { return }
         let state = developerInEffect(at: webView.url ?? url)
-        if (webView.customUserAgent ?? "") != (state.userAgent.string ?? "") { webView.customUserAgent = state.userAgent.string }
+        applyUserAgent()
         PageImages.set(state.imagesOff, in: webView)
         DarkPages.lookChanged(for: webView)
     }

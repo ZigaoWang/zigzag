@@ -56,8 +56,9 @@ enum DebugBridge {
     /// minitype <text>, minimove, miniborrow, miniclose, minifind [text|close], minispace [name], minicopy, miniresize <w> <h>,
     /// minimenu <char> [cmd|shift|ctrl|opt...], ministate <path> (JSON), minishot <path> (PNG; web content may be
     /// blank), miniclosebrowsers, minijs <script>, miniesc, miniquit, miniask notifications, minianswer
-    /// allow|always|alternate|deny|notnow, minisave save|notnow, minieval <path> <script>, miniswipe <dx> [slow]
-    /// [noend], miniborderless on|off. Without a mini window, miniask and minianswer use the front browser window.
+    /// allow|always|alternate|deny|notnow|<action>, minisave save|notnow, minieval <path> <script>, miniswipe <dx> [slow]
+    /// [noend], miniborderless on|off, miniclick x y [real] (a click in its page; real counts it for
+    /// pop-ups), minikey on|off (taken for the key window), miniprompts on|off (questions show though it isn't key). Without a mini window, miniask and minianswer use the front browser window.
     /// pageprobe <path> [mark]: each tab's page state as JSON; `mark` tags live pages so a later probe shows which
     /// reloaded.
     /// capture [area|element|full|visible] (Capture begun in that mode, or switched to it), capture toggle (⇧⌘2),
@@ -280,6 +281,25 @@ enum DebugBridge {
         case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
         case "minisidebutton": if let window = mini?.window { sendSideButton(arg, to: window) }
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
+        case "miniprompts": MiniWindowController.debugPromptsShow = arg != "off"
+        case "miniclick":
+            // `pageclick`, in the newest Zigzag Mini (window points, top left).
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 2, let window = mini?.window else { break }
+            BrowserWebView.takesFirstMouse = true
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: NSPoint(x: f[0], y: window.frame.height - f[1]), modifierFlags: [],
+                                                  timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                  context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
+                    window.sendEvent(event)
+                }
+            }
+            BrowserWebView.takesFirstMouse = false
+            // `real`: counted as your own click for the page's pop-ups (`PopupNotice.noteInput`).
+            if arg.contains("real"), let webView = mini?.tab.webView { PopupNotice.noteInput(in: webView) }
+        case "minikey":
+            // As if Zigzag Mini were the key window (NSApp.keyWindow), for a test copy kept behind.
+            DebugKeyWindow.pretend(arg == "off" ? nil : mini?.window)
         case "miniesc": mini?.debugEscape()
         case "miniquit": NSApp.terminate(nil)
         case "miniask":
@@ -300,7 +320,9 @@ enum DebugBridge {
             case "always": answer = PermissionAnswer(action: "allow", remember: true)
             case "alternate": answer = PermissionAnswer(action: "screen", remember: false)
             case "deny": answer = PermissionAnswer(action: "deny", remember: false)
-            default: answer = nil
+            case "notnow", "": answer = nil
+            // Any other action by name, as the pop-up question's dropdown gives it (mini, thisTab, newTab).
+            default: answer = PermissionAnswer(action: arg, remember: false)
             }
             PermissionPrompt.debugAnswer(answer, in: host)
         case "minisave": SavePasswordPrompt.debugAnswer(saved: arg == "save")
@@ -477,6 +499,8 @@ enum DebugBridge {
         case "state":
             var state = popup.debugState
             state["window"] = window.windowNumber
+            state["level"] = window.level.rawValue
+            state["visible"] = window.isVisible
             state["sheet"] = window.attachedSheet.map { "\(type(of: $0))" } ?? "none"
             state["sheetWindow"] = window.attachedSheet?.windowNumber ?? 0
             state["firstResponder"] = window.firstResponder.map { "\(type(of: $0))" } ?? "nil"
@@ -2719,6 +2743,8 @@ enum DebugBridge {
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         // sitepanelrow <index> <row title>: picks that choice in the open panel's This Site row.
         case "sitepanelrow": SitePanel.shown?.debugChooseRow(arg)
+        // sitepanelmenu <row title> | action <row title>: opens that row's dropdown, or runs its action.
+        case "sitepanelmenu": SitePanel.shown?.debugRowMenu(arg)
         case "panesite", "panemore":
             // panesite <pane>: that split pane's Site Controls button, as a click on it (#160). panemore <pane>: its ⋯.
             let cards = controller.root.paneCards

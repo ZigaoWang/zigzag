@@ -78,7 +78,7 @@
       "catalog": "extension.limit.cookiePartitions",
       "order": 141
     },
-    "permissions": {
+    "hostAccessRequests": {
       "catalog": "extension.limit.hostAccessRequests",
       "order": 150
     },
@@ -344,17 +344,17 @@
     "permissions": {
       "status": "patched",
       "implementation": "js:permissions",
-      "group": "permissions",
+      "group": "hostAccessRequests",
       "members": {
         "addHostAccessRequest": {
           "status": "unsupported",
           "reason": "notImplemented",
-          "group": "permissions"
+          "group": "hostAccessRequests"
         },
         "removeHostAccessRequest": {
           "status": "unsupported",
           "reason": "notImplemented",
-          "group": "permissions"
+          "group": "hostAccessRequests"
         }
       }
     },
@@ -436,25 +436,7 @@
     },
     "bookmarks": {
       "status": "bridged",
-      "implementation": "swift:bookmarks",
-      "group": "bookmarks",
-      "members": {
-        "onImportBegan": {
-          "status": "unsupported",
-          "reason": "notImplemented",
-          "group": "bookmarks"
-        },
-        "onImportEnded": {
-          "status": "unsupported",
-          "reason": "notImplemented",
-          "group": "bookmarks"
-        },
-        "onChildrenReordered": {
-          "status": "unsupported",
-          "reason": "notImplemented",
-          "group": "bookmarks"
-        }
-      }
+      "implementation": "swift:bookmarks"
     },
     "downloads": {
       "status": "bridged",
@@ -709,19 +691,12 @@
       "group": "privacy"
     },
     "sessions": {
-      "status": "unsupported",
-      "reason": "notImplemented",
-      "group": "sessions",
+      "status": "bridged",
+      "implementation": "swift:sessions",
       "members": {
-        "getRecentlyClosed": {
-          "status": "emulated",
-          "implementation": "js:getRecentlyClosed",
-          "group": "sessions"
-        },
         "getDevices": {
           "status": "emulated",
-          "implementation": "js:getDevices",
-          "group": "sessions"
+          "implementation": "swift:sessions"
         }
       }
     },
@@ -972,9 +947,7 @@
       "group": "readingList"
     },
     "sessions": {
-      "status": "unsupported",
-      "reason": "notImplemented",
-      "group": "sessions"
+      "status": "supported"
     },
     "sidePanel": {
       "status": "supported"

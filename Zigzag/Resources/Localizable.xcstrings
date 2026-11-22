@@ -34,6 +34,46 @@
         }
       }
     },
+    "site.user-agent" : {
+      "comment" : "Row in the site panel's This Site group and in Settings › Privacy › Sites: the browser this site's pages are told they're in.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "User agent"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理"
+          }
+        }
+      }
+    },
+    "Custom User Agent" : {
+      "comment" : "Title of the sheet from Custom… in the site panel's User agent dropdown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义用户代理"
+          }
+        }
+      }
+    },
+    "Pages on %@ are sent this in place of Zigzag’s own." : {
+      "comment" : "Under the title of the Custom User Agent sheet. The placeholder is the site's name, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向 %@ 的网页发送它，代替 Zigzag 自己的用户代理。"
+          }
+        }
+      }
+    },
     "Stone" : {
       "comment" : "Name of a curated space color, in the space editor. A clear, barely warm gray glass.",
       "localizations" : {
@@ -294,6 +334,78 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "珊瑚"
+          }
+        }
+      }
+    },
+    "user-agent.default" : {
+      "comment" : "First choice in the User agent dropdown of the site panel: the site gets Zigzag's own user agent, as any site.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认"
+          }
+        }
+      }
+    },
+    "user-agent.custom" : {
+      "comment" : "Choice in the User agent dropdown of the site panel and Settings › Privacy › Sites: the site is sent a user agent you typed.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Custom"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义"
+          }
+        }
+      }
+    },
+    "user-agent.custom-action" : {
+      "comment" : "Item at the end of the User agent dropdown in the site panel: opens a sheet to type the user agent this site is sent.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Custom…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义…"
+          }
+        }
+      }
+    },
+    "user-agent.edit-custom-action" : {
+      "comment" : "Item at the end of the User agent dropdown in the site panel, once the site has a typed user agent: opens the sheet to change it.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Edit Custom…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑自定义…"
           }
         }
       }
@@ -8353,6 +8465,24 @@
         }
       }
     },
+    "extension.limit.firefoxProxy" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: Firefox's own proxy API, which VPN and proxy extensions built for Firefox use to send pages through their servers.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Setting a proxy (Firefox’s proxy API)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置代理（Firefox 的代理 API）"
+          }
+        }
+      }
+    },
     "extension.limit.fontSettings" : {
       "comment" : "A Chrome extension feature Zigzag cannot provide: the fontSettings API.",
       "extractionState" : "extracted_with_value",
@@ -8390,7 +8520,7 @@
       }
     },
     "extension.limit.hostAccessRequests" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.",
+      "comment" : "A Chrome extension feature Zigzag cannot provide: permissions.addHostAccessRequest, a request for a site's access shown on the extension's button.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
@@ -21853,6 +21983,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在从%@翻译… %lld%%"
+          }
+        }
+      }
+    },
+    "Translating Page…" : {
+      "comment" : "Tooltip of the address bar's translate button while the page is being translated.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在翻译网页…"
           }
         }
       }

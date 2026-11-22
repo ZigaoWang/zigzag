@@ -1406,6 +1406,8 @@ final class SpaceLookEditor: NSView {
             self.draft.intensity2 = nil
             self.draft.dayDepth = nil
             self.draft.nightDepth = nil
+            // A color from the wheel is custom, on a custom color's glass, as `Library.setHue` has it.
+            self.draft.clearTint = nil
             self.colorChosen = true
             self.changed(final: final, animated: false)
         }

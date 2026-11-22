@@ -17,7 +17,7 @@ struct PageLinkTests {
             #expect(Tab.route(forPageLink: URL(string: link)!, from: page) == .app, "\(link)")
         }
         // Never file, javascript, extension, zigzag or data: URLs (WebKit blocks data: top-level navigation).
-        for link in ["file:///etc/passwd", "javascript:alert(1)", "webkit-extension://abc/options.html", "zigzag://settings", "data:text/html,hi", "DATA:text/html;base64,PHA+"] {
+        for link in ["file:///etc/passwd", "javascript:alert(1)", "webkit-extension://abc/options.html", "chrome-extension://abc/options.html", "zigzag://settings", "data:text/html,hi", "DATA:text/html;base64,PHA+"] {
             #expect(Tab.route(forPageLink: URL(string: link)!, from: page) == .refuse, "\(link)")
         }
         // A local page may link to the file beside it.

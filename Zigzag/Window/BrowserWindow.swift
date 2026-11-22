@@ -41,6 +41,12 @@ final class BrowserWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
+    /// AppKit's drag by an empty space stays off in full screen (#483).
+    override var isMovableByWindowBackground: Bool {
+        get { super.isMovableByWindowBackground && dragMovesWindow }
+        set { super.isMovableByWindowBackground = newValue }
+    }
+
     /// Browser shortcuts win over the page: the menu bar sees key equivalents before the web view does.
     /// The last ⌘← or ⌘→ answered, to know it when WebKit hands it back.
     private var lastArrow: (timestamp: TimeInterval, keyCode: UInt16)?
@@ -273,7 +279,7 @@ final class BrowserWindow: NSWindow {
             updateMoveHand(flags: event.modifierFlags, at: event.locationInWindow)
             return false
         case .leftMouseDown:
-            guard Self.isMoveChord(event.modifierFlags), isInContent(event.locationInWindow) else { return false }
+            guard Self.isMoveChord(event.modifierFlags), dragMovesWindow, isInContent(event.locationInWindow) else { return false }
             // Twice, as on a title bar: the window zooms.
             if event.clickCount == 2 { performZoom(nil) } else { trackMove(from: event) }
             return true
@@ -303,7 +309,7 @@ final class BrowserWindow: NSWindow {
 
     /// The open hand while ⌥⌘ is held over the window, so it's clear a drag will move the window.
     private func updateMoveHand(flags: NSEvent.ModifierFlags, at point: NSPoint) {
-        let wanted = isKeyWindow && Self.isMoveChord(flags) && isInContent(point)
+        let wanted = isKeyWindow && Self.isMoveChord(flags) && dragMovesWindow && isInContent(point)
         guard wanted != showsMoveHand else { if wanted { NSCursor.openHand.set() }; return }
         showsMoveHand = wanted
         if wanted { NSCursor.openHand.push() } else { NSCursor.pop() }
@@ -543,10 +549,20 @@ extension NSWindow {
         (0..<3).map { NSPoint(x: origin.x + CGFloat($0) * step, y: titlebarHeight - origin.y - buttonHeight) }
     }
 
+    /// A full screen window stays put, also on its way in or out (#483).
+    static func dragMovesWindow(fullScreen: Bool, phase: FullScreenPhase) -> Bool {
+        !fullScreen && !phase.isMoving
+    }
+
+    var dragMovesWindow: Bool {
+        Self.dragMovesWindow(fullScreen: styleMask.contains(.fullScreen),
+                             phase: (self as? BrowserWindow)?.fullScreenPhase ?? .windowed)
+    }
+
     /// A press on chrome that stands in for the title bar (the sidebar, the bar above the page): a drag moves the
     /// window, and a double-click zooms it, or does whatever the Mac's title bar double-click is set to do.
     func titleBarMouseDown(_ event: NSEvent) {
-        guard event.clickCount == 2 else { performDrag(with: event); return }
+        guard event.clickCount == 2 else { if dragMovesWindow { performDrag(with: event) }; return }
         switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
         case "Minimize": miniaturize(nil)
         case "None": break

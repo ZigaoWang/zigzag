@@ -2498,7 +2498,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if let manifest = ExtensionStore.manifest(for: id) {
             // The lines only: the overlay is decoded once, behind ExtensionCompatibility.shared, and each row does
             // not build a whole report for them.
-            let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id)
+            let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id, firefox: ExtensionStore.kind(of: id) == .firefox)
             if let first = limits.first {
                 let names = Words.list([first.text] + limits.dropFirst().map { Words.lowercasedForList($0.text) })
                 let note = String(localized: "\(names) won’t work in Zigzag.",
@@ -4357,7 +4357,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
             && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
-            && SiteIcons.sites.isEmpty && kept.isEmpty
+            && SiteIcons.sites.isEmpty && SiteUserAgents.sites.isEmpty && kept.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
@@ -4379,6 +4379,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetAllSessions()
                 SiteBoosts.forgetAll()
                 SiteIcons.forgetAll()
+                SiteUserAgents.forgetAll()
                 KeptCookies.setSites([], in: profile.id)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
@@ -4399,7 +4400,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
             .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
-            .union(SiteIcons.sites).union(kept)
+            .union(SiteIcons.sites).union(SiteUserAgents.sites).union(kept)
         var listed = 0, more = 0
         for site in sites.sorted() {
             let origin = origins[site]
@@ -4593,6 +4594,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     SiteBoosts.set(boost, forSite: site)
                 })
             }
+            if let agent = SiteUserAgents.choice(forSite: site) {
+                let choices = SiteUserAgents.Choice.presets + (agent.isCustom ? [agent] : [])
+                let dropdown = DropdownButton()
+                dropdown.options = choices.map { DropdownButton.Option(title: $0.title) }
+                dropdown.selectedIndex = choices.firstIndex(of: agent) ?? 0
+                dropdown.onSelect = { [weak self] index in
+                    SiteUserAgents.set(choices[index], forSite: site)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(SiteUserAgents.title, control: dropdown) { SiteUserAgents.forget(site: site) })
+            }
             if SiteIcons.all[site] != nil {
                 rows.append(makeRow(String(localized: "Site icon", comment: "Row in Settings › Privacy › Sites: an icon you set for this site in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites."),
                                     control: NSView()) { SiteIcons.forget(site: site) })
@@ -4635,6 +4648,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetSessions(site: site)
                 SiteBoosts.forget(site: site)
                 SiteIcons.forget(site: site)
+                SiteUserAgents.forget(site: site)
                 KeptCookies.remove(site, in: profile.id)
                 self?.reloadPrivacy()
                 self?.layoutDocument()

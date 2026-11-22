@@ -70,6 +70,24 @@ struct TrafficLightTests {
         for phase in [FullScreenPhase.windowed, .entering, .fullScreen] { #expect(!phase.dropsTrafficLightBacking, "\(phase)") }
     }
 
+    /// A drag on empty chrome moves a window, never one in full screen or on its way in or out (#483).
+    @Test func fullScreenNeverMovesTheWindow() {
+        #expect(NSWindow.dragMovesWindow(fullScreen: false, phase: .windowed))
+        for phase in [FullScreenPhase.windowed, .entering, .fullScreen, .exiting] {
+            #expect(!NSWindow.dragMovesWindow(fullScreen: true, phase: phase), "\(phase)")
+        }
+        for phase in [FullScreenPhase.entering, .exiting] {
+            #expect(!NSWindow.dragMovesWindow(fullScreen: false, phase: phase), "\(phase)")
+        }
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500))
+        defer { window.close() }
+        #expect(window.dragMovesWindow && window.isMovableByWindowBackground)
+        window.fullScreenPhase = .entering
+        #expect(!window.dragMovesWindow && !window.isMovableByWindowBackground)
+        window.fullScreenPhase = window.fullScreenPhase.after(.didFailToEnter)
+        #expect(window.dragMovesWindow && window.isMovableByWindowBackground)
+    }
+
     /// The lights get a backing in full screen only when the page, not the bar or sidebar, is under them (#462).
     @Test func backingOnlyWhenNothingOfOursIsUnderTheLights() {
         #expect(BrowserWindowController.needsTrafficLightBacking(fullScreen: true, barShown: false,

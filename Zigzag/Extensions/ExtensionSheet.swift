@@ -65,6 +65,7 @@ final class ExtensionSheet: FloatingPanelView {
         confirmButton = PillButton(title: content.confirm, style: .prominent)
         cancelButton = PillButton(title: content.cancel, style: .plain)
         super.init(frame: .zero)
+        header.wrapsSubtitle = true
         if let icon = content.icon {
             header.setImage(icon)
         } else {

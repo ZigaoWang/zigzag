@@ -16,6 +16,8 @@ final class ExtensionInstalls {
         /// Permissions and site patterns the person approved. Nil until the first load records them.
         var grantedPermissions: [String]?
         var grantedMatchPatterns: [String]?
+        /// Site patterns allowed when it asked for them (permissions.request), on top of its site access.
+        var requestedMatchPatterns: [String]?
         /// Whether `grantedPermissions` also holds the permissions Zigzag's bridge answers (history, a proxy, user
         /// scripts), which WebKit doesn't know. Nil in records made before it did: those take what the manifest asks of
         /// the bridge as approved, once, as they always had, and keep it from then on.
@@ -32,7 +34,7 @@ final class ExtensionInstalls {
         /// Allowed in private windows (#353). Nil is off, as in Chrome.
         var allowsPrivate: Bool?
 
-        static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites", "localReceivers", "allowsPrivate"]
+        static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "requestedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites", "localReceivers", "allowsPrivate"]
 
         /// What another profile starts with when it gets this extension too: what was approved here and where it
         /// may run, so it gets nothing it wasn't allowed without the install sheet. Sites it was clicked on stay
@@ -155,6 +157,8 @@ final class ExtensionInstalls {
 
     func setSiteAccess(_ id: String, _ access: SiteAccess, sites: [String]? = nil) {
         update(id) {
+            // Another choice starts over, without the sites it asked for.
+            if ($0.siteAccess ?? .all) != access { $0.requestedMatchPatterns = nil }
             $0.siteAccess = access
             if access == .sites, let sites { $0.accessSites = sites } else if access != .sites { $0.accessSites = nil }
         }

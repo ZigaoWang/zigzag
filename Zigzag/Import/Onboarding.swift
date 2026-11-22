@@ -1902,6 +1902,7 @@ final class LiveBrowser: NSView {
     private var background2: NSColor?
     private var angle: Double = 90
     private var grain: Double = 0
+    private var texture: String?
     private var glass = false
     private var accent: NSColor = Brand.Theme.brand.accent
     private var isDark = false
@@ -1940,6 +1941,7 @@ final class LiveBrowser: NSView {
             self.background2 = space?.frameColor2.map { $0.usingColorSpace(.sRGB) ?? $0 }
             self.angle = space?.gradientAngle ?? 90
             self.grain = space?.grain ?? 0
+            self.texture = space?.texture
             self.accent = Brand.Theme.of(space).accent.usingColorSpace(.sRGB) ?? Brand.Theme.brand.accent
         }
         needsDisplay = true
@@ -1963,10 +1965,10 @@ final class LiveBrowser: NSView {
             bounds.fill(using: glass ? .sourceOver : .copy)
         }
         if grain > 0.01, let context = NSGraphicsContext.current?.cgContext {
+            // The space's own texture at the window's strength (`SpaceFrameView.setGrain`).
             context.saveGState()
-            context.setBlendMode(.overlay)
-            context.setAlpha(CGFloat(grain) * 0.22)
-            NSColor(patternImage: BrandSurface.noise).setFill()
+            context.setAlpha(CGFloat(min(grain, 1)) * 0.18)
+            MaterialImages.texture(texture).setFill()
             bounds.fill(using: .sourceOver)
             context.restoreGState()
         }

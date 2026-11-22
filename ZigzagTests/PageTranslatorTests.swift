@@ -560,17 +560,17 @@ struct PageLanguageChoiceTests {
         withChoices { choices in
             let french = Locale.Language(identifier: "fr-FR")
             @MainActor func automatic(site: String = "lemonde.fr", translatedHere: Bool = false, neverHere: Set<String> = [],
-                           offers: Bool = true, offered: Bool = false) -> PageTranslator.Automatic {
-                choices.automatic(language: french, site: site, translatedHere: translatedHere, neverHere: neverHere, offers: offers, offered: offered)
+                           offers: Bool = true, declined: Bool = false) -> PageTranslator.Automatic {
+                choices.automatic(language: french, site: site, translatedHere: translatedHere, neverHere: neverHere, offers: offers, declined: declined)
             }
-            // Nothing chosen: offered once per site, and not at all with the offer off.
+            // Nothing chosen: offered on each page until closed for the site, and not at all with the offer off.
             #expect(automatic() == .offer)
-            #expect(automatic(offered: true) == .nothing)
+            #expect(automatic(declined: true) == .nothing)
             #expect(automatic(offers: false) == .nothing)
             // Always French translates on every site, by language code, even with the offer off.
             choices.setAlways(true, "fr")
             #expect(automatic(offers: false) == .translate)
-            #expect(automatic(site: "liberation.fr", offered: true) == .translate)
+            #expect(automatic(site: "liberation.fr", declined: true) == .translate)
             // Never French replaces Always French.
             choices.setNever(true, "fr")
             #expect(choices.alwaysLanguages.isEmpty)
@@ -588,6 +588,32 @@ struct PageLanguageChoiceTests {
         }
     }
 
+    @Test func theAddressBarButtonSaysATranslationIsRunning() {
+        let address = AddressView()
+        address.setTranslation(available: true, translated: false, translating: true)
+        #expect(!address.translateButton.isSelected)
+        #expect(address.translateButton.toolTip == String(localized: "Translating Page…", comment: "Tooltip of the address bar's translate button while the page is being translated."))
+        address.setTranslation(available: true, translated: true)
+        #expect(address.translateButton.isSelected)
+        #expect(address.translateButton.tint == Tokens.Color.icon)
+    }
+
+    @Test func aPageLoadedAgainIsNoLongerTranslated() throws {
+        let tab = Tab(url: URL(string: "http://127.0.0.1:1/a.html"), spaceID: UUID())
+        _ = tab.ensureWebView()
+        tab.isTranslated = true
+        tab.webView(try #require(tab.webView), didCommit: nil)
+        #expect(!tab.isTranslated)
+    }
+
+    @Test func aTranslationIsRememberedForItsLanguagesOnly() {
+        let memory = TranslationMemory()
+        let french = Locale.Language(identifier: "fr"), dutch = Locale.Language(identifier: "nl"), english = Locale.Language(identifier: "en")
+        memory[.init("Aide", from: french, to: english)] = "Help"
+        #expect(memory[.init("Aide", from: french, to: english)] == "Help")
+        #expect(memory[.init("Aide", from: dutch, to: english)] == nil)
+    }
+
     /// A Never chosen while a site was translated this session wins at once: the site, or every site translated from
     /// that language, no longer translates its next page on its own.
     @Test func aNeverChoiceStopsASiteTranslatedThisSession() {
@@ -596,7 +622,7 @@ struct PageLanguageChoiceTests {
             let sites: [String: Locale.Language] = ["lemonde.fr": french, "liberation.fr": french, "spiegel.de": german]
             @MainActor func automatic(_ site: String, _ translated: [String: Locale.Language]) -> PageTranslator.Automatic {
                 choices.automatic(language: translated[site] ?? french, site: site, translatedHere: translated[site] != nil,
-                                  offers: true, offered: true)
+                                  offers: true, declined: true)
             }
             #expect(automatic("lemonde.fr", sites) == .translate)
             // Never This Site, from another tab of the site: only that site stops.
@@ -611,7 +637,7 @@ struct PageLanguageChoiceTests {
             #expect(afterLanguage.keys.sorted() == ["spiegel.de"])
             #expect(automatic("liberation.fr", afterLanguage) == .nothing)
             #expect(choices.automatic(language: german, site: "spiegel.de", translatedHere: afterLanguage["spiegel.de"] != nil,
-                                      offers: true, offered: true) == .translate)
+                                      offers: true, declined: true) == .translate)
         }
     }
 
@@ -620,7 +646,7 @@ struct PageLanguageChoiceTests {
         withChoices { choices in
             let french = Locale.Language(identifier: "fr-FR")
             @MainActor func automatic(_ site: String = "lemonde.fr") -> PageTranslator.Automatic {
-                choices.automatic(language: french, site: site, translatedHere: true, offers: true, offered: true)
+                choices.automatic(language: french, site: site, translatedHere: true, offers: true, declined: true)
             }
             #expect(automatic() == .translate)
             choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
@@ -641,7 +667,7 @@ struct PageLanguageChoiceTests {
             #expect(!choices.setNeverSite(false, "lemonde.fr", isPrivate: true))
             #expect(choices.neverSites == ["lemonde.fr"])
             #expect(choices.automatic(language: Locale.Language(identifier: "fr"), site: "lemonde.fr", translatedHere: false,
-                                      offers: true, offered: false) == .nothing)
+                                      offers: true, declined: false) == .nothing)
         }
     }
 

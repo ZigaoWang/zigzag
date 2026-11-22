@@ -41,7 +41,7 @@ enum OpenDisposition {
 /// A tab can be suspended (web view released, state kept) and restored without the user noticing.
 final class Tab: NSObject {
     enum Change {
-        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language
+        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language, document
         /// You renamed it (it also sends `.title`).
         case renamed
         /// Its PDF viewer came or went.
@@ -339,7 +339,7 @@ final class Tab: NSObject {
         self.id = id
         // A web view WebKit made for a page's new window shows no address until its first page arrives: the page
         // that opened it can write into it while a load that never finishes would name another site over it.
-        self.url = configuration == nil ? url : nil
+        self.url = configuration == nil ? url.map(Self.extensionPageAddress) : nil
         self.title = title ?? (SettingsPage.isSettings(self.url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : self.url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
         self.spaceID = spaceID
         // A page WebKit made for another page's new window is in that page's profile, whatever space it lands in.
@@ -608,7 +608,7 @@ final class Tab: NSObject {
         }
         // What you chose for this tab with the developer tools comes with a new web view, before its first page is
         // asked for: it's asked for as the browser chosen, and starts with the look chosen.
-        if !developer.isUnchanged { applyDeveloperState() }
+        if !developer.isUnchanged { applyDeveloperState() } else { applyUserAgent() }
 
         if Self.isExtensionPage(url), let url {
             // Extension pages always load fresh: their saved history state can come back as a blank page, and one
@@ -850,6 +850,7 @@ final class Tab: NSObject {
     /// `httpFallback`: `url` is https chosen for a scheme-less address; retry once over http if unreachable
     /// (`CommandRanker.Destination`).
     func load(_ url: URL, by sender: LoadSender = .zigzag, httpFallback: Bool = false) {
+        let url = Self.extensionPageAddress(url)
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
@@ -894,7 +895,7 @@ final class Tab: NSObject {
         let scheme = url.scheme?.lowercased() ?? ""
         if ["http", "https", "about", "blob"].contains(scheme) { return .load }
         if scheme == "file" { return page?.isFileURL == true ? .load : .refuse }
-        if scheme.isEmpty || ["javascript", "data", "webkit-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
+        if scheme.isEmpty || ["javascript", "data", "webkit-extension", "chrome-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
         return .app
     }
 
@@ -975,6 +976,20 @@ final class Tab: NSObject {
     private let downloads = DownloadPolicy()
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
+
+    /// Chrome's address for an extension's page, chrome-extension://<id>/<path>, as Zigzag's own: each extension's
+    /// pages are at webkit-extension://<id>/ (ExtensionHost). Any other address comes back as it was.
+    nonisolated static func extensionPageAddress(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "chrome-extension", var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let id = parts.host?.lowercased(), !id.isEmpty else { return url }
+        parts.scheme = "webkit-extension"
+        parts.host = id
+        parts.user = nil
+        parts.password = nil
+        parts.port = nil
+        if parts.percentEncodedPath.isEmpty { parts.percentEncodedPath = "/" }
+        return parts.url ?? url
+    }
 
     /// What a page may open in a new window or tab (window.open, target=_blank, Open Link in New Tab): anything but
     /// Zigzag's own pages, which open from Zigzag.
@@ -1105,8 +1120,8 @@ final class Tab: NSObject {
         let profile = Self.profile(of: webView)
         if isExtensionPage(url), extensionConfiguration(for: url, in: profile) == nil {
             // Opened by an extension that's still loading (1Password's welcome page, right after it installs):
-            // wait for it, briefly, before saying the page is unavailable.
-            if #available(macOS 15.4, *) {
+            // wait for it, briefly, before saying the page is unavailable. One that isn't installed says so at once.
+            if #available(macOS 15.4, *), url.host().map(profile.installs.hasRecord) == true {
                 var token: SignalToken?
                 var waited = false
                 token = profile.extensions.changed.observe { [weak webView] in
@@ -1193,6 +1208,8 @@ final class Tab: NSObject {
     }
     func reload() {
         guard let webView else { ensureWebView(); return }
+        // A reload isn't asked for again (`asksAgain`), so a user agent chosen since goes on first.
+        applyUserAgent()
         if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
     }
     func reloadFromOrigin() { webView?.reloadFromOrigin() }
@@ -1743,9 +1760,8 @@ extension Tab: WKNavigationDelegate {
         // The page is asked for as the browser it's to be told it's in (the developer tools' User Agent): a request
         // made as another is made again, so no page off the list is asked for as one you chose for your own site.
         if decidesMainFrame {
-            // addons.mozilla.org shows Add to Firefox only to Firefox.
-            let storeAgent = Self.addonsPage(url) != nil ? DeveloperState.UserAgent.firefox.string : nil
-            let wanted = storeAgent ?? developerInEffect(at: url).userAgent.string
+            // addons.mozilla.org shows Add to Firefox only to Firefox; then a site's kept choice (#392).
+            let wanted = userAgent(at: url)
             let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
                                        type: navigationAction.navigationType)
             if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }
@@ -1793,6 +1809,18 @@ extension Tab: WKNavigationDelegate {
         if url.scheme?.lowercased() == HistoryPage.scheme,
            !Self.mayGoToInternalPage(ownLoad: ownLoad, ownHistory: ownHistory, isBackForward: navigationAction.navigationType == .backForward,
                                      fromInternalPage: navigationAction.sourceFrame.securityOrigin.protocol == HistoryPage.scheme) {
+            return (.cancel, preferences)
+        }
+        // Chrome's address for an extension's page: opened from Zigzag or that extension's own pages, refused from others.
+        if url.scheme?.lowercased() == "chrome-extension" {
+            let page = Self.extensionPageAddress(url)
+            let source = navigationAction.sourceFrame.securityOrigin
+            let ownPage = source.protocol == "webkit-extension" && source.host.lowercased() == page.host()
+            if Self.isExtensionPage(page), navigationAction.targetFrame?.isMainFrame ?? true, ownSender != nil || ownPage {
+                DispatchQueue.main.async { [weak self] in self?.load(page, by: ownSender ?? .page) }
+            } else {
+                Diagnostics.note("Refused a page's link", site: webView.url?.host(), "chrome-extension:", isPrivate: isPrivate)
+            }
             return (.cancel, preferences)
         }
         if ExternalLinks.isExternal(url) {
@@ -2218,6 +2246,11 @@ extension Tab: WKNavigationDelegate {
         ruleDeclinedURL = nil
         declinedRuleDownload = false
         forgetPageErrors()
+        // A new document, even at the same address: nothing translated is in it.
+        isTranslated = false
+        changed.send(.document)
+        // A click on the page before doesn't let this one open a pop-up.
+        PopupNotice.forgetInput(in: webView)
         // The new page is here: its address shows.
         addressWaitsForCommit = false
         // Before the address updates, so a pinned page isn't marked as moved on.
@@ -2470,8 +2503,16 @@ extension Tab: WKNavigationDelegate {
 
 extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        let made = newWebView(for: webView, configuration: configuration, navigationAction: navigationAction, windowFeatures: windowFeatures)
+        // The new window's first request goes as the site's chosen browser, not asked for twice (#392).
+        SiteUserAgents.prepare(made, for: navigationAction.request.url)
+        return made
+    }
+
+    private func newWebView(for webView: WKWebView, configuration: WKWebViewConfiguration, navigationAction: WKNavigationAction,
+                            windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Zigzag Mini always opens; a page's own request needs a click or your say.
-        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
+        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isClicked(navigationAction, in: webView, isPrivate: isPrivate) {
             // Page pop-up: a saved destination for the site opens without asking, else the banner asks and nothing
             // opens yet. Zigzag pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
@@ -2527,6 +2568,10 @@ extension Tab: WKUIDelegate {
                                  "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             }
+            // For Report a Problem: whether you had just clicked or typed in a page, which WebKit didn't count.
+            Diagnostics.note("Pop-up without a click", site: url?.host(),
+                             PopupNotice.unclickedNote(inMini: host is MiniWindowController, sinceInput: Date().timeIntervalSince(UndoClock.lastPageInput)),
+                             isPrivate: isPrivate)
             return PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost,
                                    configuration: configuration, features: windowFeatures)
         }

@@ -646,15 +646,15 @@ struct SitePanelRowsTests {
     private typealias Context = SitePanelRows.Context
 
     @Test func anOrdinaryPage() {
-        #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .darkPage, .keepAwake, .userAgent])
         // The connection is a line under the site's name (#221), not a row into a page.
         #expect(SitePanelRows.links(Context()).isEmpty)
     }
 
-    /// The first page holds page switches only (zoom, ads, cookie banners, dark page, keep awake, full screen, translate, space); permissions, JavaScript and extensions are on the Permissions page (#311, #313).
+    /// The first page holds page switches only (zoom, ads, cookie banners, dark page, keep awake, user agent, full screen, translate, space); permissions, JavaScript and extensions are on the Permissions page (#311, #313).
     @Test func theFirstPageIsOnlyPageSwitches() {
         var c = Context()
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .userAgent])
         // Every web page's Permissions page has JavaScript, so it's always reachable.
         c.hasPermissions = true
         #expect(SitePanelRows.links(c) == [.permissions])
@@ -672,7 +672,7 @@ struct SitePanelRowsTests {
         var c = Context()
         c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .userAgent, .fullScreenFills, .alwaysTranslate])
     }
 
     /// Cookie banners (#175): there once a pop-up was found or a choice kept, under Ad blocking; never in a private
@@ -681,10 +681,10 @@ struct SitePanelRowsTests {
         var c = Context()
         #expect(!SitePanelRows.rows(c).contains(.cookieBanners))
         c.cookieBanners = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .cookieBanners, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .cookieBanners, .darkPage, .keepAwake, .userAgent])
         // Apart from ad blocking: there with ad blocking off too.
         c.adBlocking = false
-        #expect(SitePanelRows.rows(c) == [.zoom, .cookieBanners, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(c) == [.zoom, .cookieBanners, .darkPage, .keepAwake, .userAgent])
         var privately = c
         privately.isPrivate = true
         #expect(!SitePanelRows.rows(privately).contains(.cookieBanners))
@@ -698,7 +698,7 @@ struct SitePanelRowsTests {
         var c = Context()
         c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .userAgent, .fullScreenFills, .alwaysTranslate])
     }
 
     @Test func noZoomOverReaderOrAPDF() {
@@ -712,7 +712,7 @@ struct SitePanelRowsTests {
         var c = Context()
         #expect(!SitePanelRows.rows(c).contains(.keepCookies))
         c.clearsCookiesOnQuit = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .keepCookies])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .keepCookies, .userAgent])
         c.isPrivate = true
         c.siteChoices = false
         #expect(!SitePanelRows.rows(c).contains(.keepCookies))

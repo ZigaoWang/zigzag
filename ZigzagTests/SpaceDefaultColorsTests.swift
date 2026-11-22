@@ -450,6 +450,24 @@ struct ColorWheelDragTests {
         #expect(wheel.spots[0] == gradient[0])
     }
 
+    /// A palette color moved on the wheel becomes a custom color, off the palette's clear glass.
+    @Test func aWheelColorLeavesThePalettesGlass() throws {
+        var space = SpaceInfo(name: "School", color: .sky)
+        try #require(SpaceColor.azure.look).apply(to: &space)
+        #expect(space.clearTint == true)
+        let editor = SpaceLookEditor(space: space, defaultColor: .sky, dark: false)
+        editor.frame = NSRect(x: 0, y: 0, width: 276, height: 600)
+        editor.toggleCustom()
+        editor.layoutSubtreeIfNeeded()
+        let wheel = try #require(editor.subviews.compactMap { $0 as? ColorWheel }.first)
+        var grab = wheel.press(at: wheel.point(wheel.spots[0]))
+        let target = wheel.point(ColorWheel.Spot(hue: 0.3, amount: 0.7))
+        wheel.drag(&grab, to: target)
+        wheel.release(grab, at: target)
+        #expect(abs((editor.look.hue ?? 0) - 0.3) < 0.01)
+        #expect(editor.look.clearTint == nil)
+    }
+
     /// In the editor, dragging the second knob changes the gradient's second color and keeps it there.
     @Test func theEditorKeepsTheSecondColor() throws {
         var space = SpaceInfo(name: "School", color: .sky)

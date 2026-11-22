@@ -62,6 +62,10 @@
   // workers that never use it are left exactly as WebKit has them.
   const WORKER_PORT = '__zigzagWorkerClient';
   const TAB_PORT = '__zigzagTabPage';
+  // Whether a page listens for runtime messages, asked when one got no answer (ExtensionBridgeScript.receivers).
+  const RECEIVER_PROBE = '__zigzagReceiverProbe';
+  const NO_RECEIVER = 'Could not establish connection. Receiving end does not exist.';
+  let startedLate = false;
   // What can travel over a port: Chrome would carry an Error across, so its name and message go along.
   const portable = (value) => {
     try { return JSON.parse(JSON.stringify(value, (key, v) => (v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v))); } catch (e) { return value; }
@@ -593,7 +597,7 @@
       setMember(['runtime', 'onMessage'], 'addListener', (listener) => {
         if (typeof listener !== 'function') return add(listener);
         const wrapped = (message, sender, sendResponse) => {
-          if (message && message[WORKER_PORT]) return undefined;
+          if (message && (message[WORKER_PORT] || message[RECEIVER_PROBE])) return undefined;
           if (!sender || typeof sender.url !== 'string' || !sender.url.startsWith(ownPages)) return listener(message, sender, sendResponse);
           const result = listener(message, sender, (value) => sendResponse(withNul(value)));
           return result && typeof result.then === 'function' ? result.then(withNul) : result;
@@ -611,14 +615,54 @@
         });
       }
       if (has) setMember(['runtime', 'onMessage'], 'hasListener', (listener) => has(answering.get(listener) || listener));
+      // Asked by a content script or page whose runtime.sendMessage got no answer: whether anything here listens. A
+      // page that started late may have had listeners added before the count began, so it says yes.
+      add((message, sender, sendResponse) => {
+        if (!message || message[RECEIVER_PROBE] !== true) return undefined;
+        if (heard.size || startedLate) sendResponse(true);
+        return undefined;
+      });
     }
     if (ownPages && typeof api.runtime.sendMessage === 'function') {
       const sendMessage = api.runtime.sendMessage.bind(api.runtime);
+      // runtime.sendMessage that nothing listens for: Chrome fails it with "Receiving end does not exist", WebKit
+      // answers undefined, as when a listener gives no answer. An undefined answer is checked with the extension's
+      // other pages (above), and with none listening it fails as in Chrome. Content scripts do the same
+      // (ExtensionBridgeScript.receivers). A listener found is trusted for a few seconds.
+      let foundAt = -Infinity;
+      const listening = () => {
+        if (Date.now() - foundAt < 10000) return Promise.resolve(true);
+        return Promise.resolve().then(() => sendMessage({ [RECEIVER_PROBE]: true }))
+          .then((answer) => { if (answer === true) foundAt = Date.now(); return answer === true; }, () => null);
+      };
+      // bridge.js's, which also reaches a runtime whose lastError WebKit won't let be defined over.
+      const withError = (callback, error) => {
+        if (typeof globalThis.__zigzagWithLastError === 'function') return globalThis.__zigzagWithLastError(callback, error);
+        const lastError = { message: String((error && error.message) || error) };
+        const runtimes = [...new Set(roots.map((root) => root.runtime))].filter(Boolean);
+        const before = runtimes.map((runtime) => Object.getOwnPropertyDescriptor(runtime, 'lastError'));
+        for (const runtime of runtimes) { try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); } catch (e) {} }
+        try { callback(); } finally {
+          runtimes.forEach((runtime, index) => {
+            try { if (before[index]) Object.defineProperty(runtime, 'lastError', before[index]); else delete runtime.lastError; } catch (e) {}
+          });
+        }
+      };
       setMember(['runtime'], 'sendMessage', (...args) => {
         const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
-        if (callback) return sendMessage(...args, (value) => callback(unwrapNul(value)));
-        const sent = sendMessage(...args);
-        return sent && typeof sent.then === 'function' ? sent.then(unwrapNul) : sent;
+        // To another extension: as WebKit has it.
+        if (args.length >= 2 && typeof args[0] === 'string' && args[0] !== api.runtime.id) {
+          if (callback) return sendMessage(...args, (value) => callback(unwrapNul(value)));
+          const sent = sendMessage(...args);
+          return sent && typeof sent.then === 'function' ? sent.then(unwrapNul) : sent;
+        }
+        const result = Promise.resolve(sendMessage(...args)).then(unwrapNul).then((value) => {
+          if (value !== undefined) { foundAt = Date.now(); return value; }
+          return listening().then((yes) => { if (yes === false) throw new Error(NO_RECEIVER); return undefined; });
+        });
+        if (!callback) return result;
+        result.then((value) => callback(value), (error) => withError(callback, error));
+        return undefined;
       });
     }
 
@@ -1192,6 +1236,7 @@
     return true;
   };
   if (!start()) {
+    startedLate = true;
     let tries = 0;
     const again = () => { if (!start() && ++tries < 100) setTimeout(again, 20); };
     setTimeout(again, 0);
