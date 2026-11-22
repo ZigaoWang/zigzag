@@ -444,7 +444,7 @@ final class EdgeSidebar {
         guard isShowing, let host else { return }
         host.setEditor(nil)
         host.editorShowing = false
-        if isPageShowing {
+        if isPageShowing || isNoticeShowing {
             if let visible = shownScreen { host.sideWidth = EdgeSidebarLayout.pageWidth(in: visible) }
             resizeForSide()
         } else {
@@ -461,7 +461,8 @@ final class EdgeSidebar {
         let generation = sideGeneration
         host.sidebarWidth = target.edgeSidebarWidth
         if !closing {
-            let page = isPageShowing ? EdgeSidebarLayout.pageWidth(in: visible) : 0
+            // The note takes the page's third too: it stands in the page area, at the same size and in the same place.
+            let page = (isPageShowing || isNoticeShowing) ? EdgeSidebarLayout.pageWidth(in: visible) : 0
             let editor = isSpaceEditorOpen ? SpaceEditorPanel.width + Tokens.Space.x2 : 0
             host.sideWidth = max(page, editor)
         }
@@ -681,7 +682,6 @@ final class EdgeSidebar {
             || MenuPanel.current != nil
             || isCommandBarOpen
             || isSpaceEditorOpen
-            || isNoticeShowing
             || now < heldUntil
             || overPanel
             || ownedKey

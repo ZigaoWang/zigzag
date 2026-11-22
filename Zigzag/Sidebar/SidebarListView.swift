@@ -1700,8 +1700,13 @@ final class SidebarListView: NSView {
     private func observeHover(_ row: TabRowView) {
         row.hoverChanged = { [weak self, weak row] hovering in
             guard let self, let row, self.drag == nil else { return }
-            // A row the panel can't take still lights under the pointer, but brings no page and no preview.
-            if hovering, self.refusesSystemPages, !EdgeLensPolicy.takesPage(url: row.tab?.url) { return }
+            // A row the panel can't take still lights under the pointer, and the panel explains it in its own page
+            // area: the note, not a window preview and not a page.
+            if hovering, self.refusesSystemPages, !EdgeLensPolicy.takesPage(url: row.tab?.url) {
+                let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
+                self.onHoverTab?(row.tab, screenFrame)
+                return
+            }
             if hovering {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
