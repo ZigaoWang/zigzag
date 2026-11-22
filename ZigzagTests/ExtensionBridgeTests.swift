@@ -1545,3 +1545,59 @@ extension ExtensionBridgeTests {
         #expect(privateWindow.tabs(for: context).compactMap { ($0 as? Tab)?.displayTitle } == ["Private"])
     }
 }
+
+/// A large content script for many sites is held once, not once per site, and still runs once where it matches (#485).
+@MainActor
+struct ContentScriptCopiesTests {
+    private static func footprint() -> Int64 {
+        var usage = rusage_info_v4()
+        let result = withUnsafeMutablePointer(to: &usage) {
+            $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(getpid(), RUSAGE_INFO_V4, $0) }
+        }
+        return result == 0 ? Int64(usage.ri_phys_footprint) : 0
+    }
+
+    @Test func aLargeScriptForManySitesIsHeldOnce() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sites = (0..<60).map { "http://site\($0).example/*" } + ["http://localhost/*"]
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "Probe", "version": "1.0",
+                                       "content_scripts": [["matches": sites, "js": ["cs.js"], "run_at": "document_start"]]]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: folder.appendingPathComponent("manifest.json"))
+        // About 1 MB, with a character outside Latin-1 so WebKit holds it as UTF-16, as uBlacklist's is.
+        let padding = String(repeating: "var padding = 'padding padding padding padding padding padding';\n", count: 16_000)
+        let script = "// \u{2014}\n" + padding + "document.documentElement.dataset.cs = String(Number(document.documentElement.dataset.cs || 0) + 1);"
+        try Data(script.utf8).write(to: folder.appendingPathComponent("cs.js"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        let controller = WKWebExtensionController(configuration: .nonPersistent())
+        let context = WKWebExtensionContext(for: ext)
+        ExtensionHost.applySiteAccess(nil, approved: Array(ext.allRequestedMatchPatterns), sites: [], offSites: [], approvesActiveTab: false, to: context)
+        #expect(context.grantedPermissionMatchPatterns.count == sites.count)
+
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController = WKUserContentController()
+        configuration.webExtensionController = controller
+        let page = WKWebView(frame: .zero, configuration: configuration)
+        func load() async throws -> String? {
+            page.loadHTMLString("<!doctype html><title>t</title>", baseURL: URL(string: "http://localhost:8123/")!)
+            for _ in 0..<100 where page.isLoading || page.title != "t" { try await Task.sleep(for: .milliseconds(50)) }
+            return try await page.evaluateJavaScript("document.documentElement.dataset.cs || ''") as? String
+        }
+        // The page's process is running before the extension loads, as a restored tab's is at launch.
+        _ = try await load()
+        let before = Self.footprint()
+        try controller.load(context)
+        defer { try? controller.unload(context) }
+        var runs: String?
+        for _ in 0..<40 {
+            runs = try await load()
+            if runs == "1" { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        #expect(runs == "1")
+        // One copy per granted site would be about 120 MB.
+        let grown = Self.footprint() - before
+        #expect(grown < 40_000_000, "grew \(grown / 1_000_000) MB")
+    }
+}

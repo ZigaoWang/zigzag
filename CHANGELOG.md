@@ -65,6 +65,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - With Ask before quitting on, ⌘Q asks on a keyboard layout without Latin letters too, like Russian or Greek, where it quit at once. ([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 - An extension with access to a site reaches it when it sends its own headers without cookies, as password managers for a self-hosted server like Litewarden do with Vaultwarden. Zigzag sends such a request for it, without your cookies, where it used to fail because the server sent no CORS headers. Thanks to [Kronight](https://github.com/Kronight). ([#478](https://github.com/ZigaoWang/zigzag/issues/478))
 - In full screen, dragging an empty part of the sidebar, the bar above the page or the strip over a split page no longer moves the window. In a window it still does. Thanks to [liverHawk](https://github.com/liverHawk). ([#483](https://github.com/ZigaoWang/zigzag/issues/483))
+- Starting Zigzag with an extension that runs a large script on many sites, like uBlacklist, no longer fills gigabytes of memory and swap. WebKit kept a copy of the script for every site it runs on, in every page and extension process, up to 17 GB for uBlacklist's 1 MB script and its 193 Google sites. Zigzag now has WebKit keep one copy of each script, as Safari does. Thanks to [Kronight](https://github.com/Kronight). ([#485](https://github.com/ZigaoWang/zigzag/issues/485))
 
 ## [0.9.3] - 2026-11-21
 

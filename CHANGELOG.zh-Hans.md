@@ -72,6 +72,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 开着“退出前询问”时，在没有拉丁字母的键盘布局（比如俄语或希腊语）下按 ⌘Q 也会询问了，以前会直接退出。([#441](https://github.com/ZigaoWang/zigzag/issues/441))
 - 有网站访问权限的扩展，带着自己的请求头、不带 Cookie 去访问这个网站时能连上了，比如 Litewarden 这类连自建 Vaultwarden 的密码管理器。这种请求现在由 Zigzag 替它发出，不带你的 Cookie；以前服务器不返回 CORS 头就会失败。感谢 [Kronight](https://github.com/Kronight)。([#478](https://github.com/ZigaoWang/zigzag/issues/478))
 - 全屏时拖动边栏、页面上方的栏或分屏页面顶上那条的空白处，窗口不会再跟着移动了；不是全屏时还是可以拖动窗口。感谢 [liverHawk](https://github.com/liverHawk)。([#483](https://github.com/ZigaoWang/zigzag/issues/483))
+- 装了 uBlacklist 这类在很多网站上运行大脚本的扩展时，启动 Zigzag 不会再占满几 GB 内存和交换空间了。WebKit 以前会为脚本运行的每个网站各存一份，每个页面进程和扩展进程里都有，uBlacklist 1 MB 的脚本加上 193 个 Google 网站，最多用到 17 GB。现在 Zigzag 像 Safari 一样让 WebKit 每个脚本只存一份。感谢 [Kronight](https://github.com/Kronight)。([#485](https://github.com/ZigaoWang/zigzag/issues/485))
 
 ## [0.9.3] - 2026-11-21
 
