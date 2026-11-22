@@ -98,7 +98,7 @@ struct PinnedSplitTests {
     }
 }
 
-/// Arc's pinned folders come over as folders, nested as they were; a pinned split view is just its pages.
+/// Arc's pinned folders come over as folders, nested as they were; a pinned split view stays a pinned split view.
 struct ArcFolderTests {
     @Test func foldersAndSplitViews() throws {
         func tab(_ id: String, _ url: String) -> [String: Any] {
@@ -128,6 +128,135 @@ struct ArcFolderTests {
         #expect(folders.first?.bookmarkIDs == [space.bookmarks[1].id])
         #expect(folders.last?.bookmarkIDs == [space.bookmarks[2].id])
         #expect(folders.last?.parentID == folders.first?.id)
+    }
+
+    /// An Arc space with folders three deep, pages and folders mixed, and split views at the top and in a folder.
+    private static func nestedSidebar() throws -> Data {
+        func tab(_ id: String) -> [String: Any] {
+            ["id": id, "title": id, "data": ["tab": ["savedURL": "https://example.com/\(id)"]], "childrenIds": [String]()]
+        }
+        func folder(_ id: String, _ title: String, _ children: [String]) -> [String: Any] {
+            ["id": id, "title": title, "data": ["list": [:]], "childrenIds": children]
+        }
+        let items: [Any] = [
+            ["id": "pinned", "childrenIds": ["p1", "topSplit", "work", "hollow"], "data": ["itemContainer": [:]]],
+            tab("p1"),
+            ["id": "topSplit", "data": ["splitView": [:]], "childrenIds": ["p2", "p3"]],
+            tab("p2"), tab("p3"),
+            folder("work", "Work", ["p4", "docs", "inSplit", "p8"]),
+            tab("p4"),
+            folder("docs", "Docs", ["specs", "p9"]),
+            folder("specs", "Specs", ["p10"]),
+            tab("p10"), tab("p9"),
+            ["id": "inSplit", "data": ["splitView": [:]], "childrenIds": ["p5", "p6", "p7"]],
+            tab("p5"), tab("p6"), tab("p7"), tab("p8"),
+            folder("hollow", "Hollow", ["hollowInner"]),
+            folder("hollowInner", "Hollow Inner", []),
+        ]
+        let root: [String: Any] = ["sidebar": ["containers": [
+            ["global": [:]],
+            ["spaces": ["s1", ["id": "s1", "title": "Home", "containerIDs": ["unpinned", "u", "pinned", "pinned"]]], "items": items],
+        ]]]
+        return try JSONSerialization.data(withJSONObject: root)
+    }
+
+    /// Folders inside folders keep their names, nesting and Arc's order, shut as imports come; empty ones stay behind (#391).
+    @Test func nestedFoldersKeepTheirTreeAndOrder() throws {
+        let space = try #require(ArcImporter.parseSidebar(Self.nestedSidebar()).spaces.first)
+        let pages = space.bookmarks.map(\.url.lastPathComponent)
+        #expect(pages == ["p1", "p2", "p3", "p4", "p10", "p9", "p5", "p6", "p7", "p8"])
+        let folders = space.folders ?? []
+        #expect(folders.map(\.name) == ["Work", "Docs", "Specs"])
+        let work = try #require(folders.first { $0.name == "Work" })
+        let docs = try #require(folders.first { $0.name == "Docs" })
+        let specs = try #require(folders.first { $0.name == "Specs" })
+        #expect(work.parentID == nil && docs.parentID == work.id && specs.parentID == docs.id)
+        func ids(_ names: [String]) -> [UUID] { names.compactMap { n in space.bookmarks.first { $0.url.lastPathComponent == n }?.id } }
+        #expect(work.bookmarkIDs == ids(["p4", "p5", "p6", "p7", "p8"]))
+        #expect(docs.bookmarkIDs == ids(["p9"]))
+        #expect(specs.bookmarkIDs == ids(["p10"]))
+        #expect(folders.allSatisfy { !$0.isOpen })
+        // The sidebar's own rule leaves the tree as it came.
+        let tidy = Library.tidied(space.bookmarks, folders, space.pinnedSplits ?? [])
+        #expect(tidy.bookmarks.map(\.id) == space.bookmarks.map(\.id))
+        #expect(tidy.folders.map(\.bookmarkIDs) == folders.map(\.bookmarkIDs))
+    }
+
+    /// Arc's pinned split views stay split views, at the top and inside a folder (#391).
+    @Test func pinnedSplitViewsStaySplit() throws {
+        let space = try #require(ArcImporter.parseSidebar(Self.nestedSidebar()).spaces.first)
+        func ids(_ names: [String]) -> [UUID] { names.compactMap { n in space.bookmarks.first { $0.url.lastPathComponent == n }?.id } }
+        let splits = space.pinnedSplits ?? []
+        #expect(splits.map(\.ids) == [ids(["p2", "p3"]), ids(["p5", "p6", "p7"])])
+        #expect(splits.last?.regions == [.left, .topRight, .bottomRight])
+        #expect(Library.tidied(space.bookmarks, space.folders ?? [], splits).splits.count == 2)
+    }
+
+    /// Folders deeper than Zigzag keeps put their pages in the deepest folder kept, never leave them out (#391).
+    @Test func foldersDeeperThanTheLimitKeepTheirPages() throws {
+        let depth = Library.folderDepthLimit + 2
+        var items: [Any] = [["id": "pinned", "childrenIds": ["f1"], "data": ["itemContainer": [:]]]]
+        for level in 1...depth {
+            let children = level < depth ? ["f\(level + 1)", "page\(level)"] : ["page\(level)"]
+            items.append(["id": "f\(level)", "title": "L\(level)", "data": ["list": [:]], "childrenIds": children])
+            items.append(["id": "page\(level)", "title": "page\(level)", "data": ["tab": ["savedURL": "https://example.com/\(level)"]], "childrenIds": [String]()])
+        }
+        let root: [String: Any] = ["sidebar": ["containers": [
+            ["spaces": ["s1", ["id": "s1", "title": "Deep", "containerIDs": ["pinned", "pinned"]]], "items": items],
+        ]]]
+        let space = try #require(ArcImporter.parseSidebar(JSONSerialization.data(withJSONObject: root)).spaces.first)
+        #expect(space.bookmarks.count == depth)
+        let folders = space.folders ?? []
+        #expect(folders.count == Library.folderDepthLimit)
+        let deepest = try #require(folders.first { $0.name == "L\(Library.folderDepthLimit)" })
+        #expect(folders.depth(of: deepest.id) == Library.folderDepthLimit - 1)
+        #expect(deepest.bookmarkIDs.count == 3)
+        #expect(Set(folders.flatMap(\.bookmarkIDs)) == Set(space.bookmarks.map(\.id)))
+    }
+
+    /// Importing again into a space that came over before gains Arc's pinned split views, nested folders kept (#391).
+    @MainActor @Test func importingAgainGainsSplitViews() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        var incoming = try #require(ArcImporter.parseSidebar(Self.nestedSidebar()).spaces.first)
+        incoming.name = "Arc Merge \(UUID().uuidString)"
+        // As an import before split views came over: the same pages and folders, no splits.
+        var earlier = incoming
+        earlier.id = UUID()
+        earlier.pinnedSplits = nil
+        Library.shared.appendSpaces([earlier])
+        let added = ArcImporter.merge(incoming, into: earlier.id)
+        #expect(added == 0)
+        let space = try #require(Library.shared.space(earlier.id))
+        #expect(space.bookmarks.map(\.url) == incoming.bookmarks.map(\.url))
+        let urls = (space.pinnedSplits ?? []).map { split in split.ids.compactMap { id in space.bookmarks.first { $0.id == id }?.url.lastPathComponent } }
+        #expect(urls == [["p2", "p3"], ["p5", "p6", "p7"]])
+        #expect((space.folders ?? []).map(\.name) == ["Work", "Docs", "Specs"])
+        // A third time changes nothing.
+        #expect(ArcImporter.merge(incoming, into: earlier.id) == 0)
+        #expect(Library.shared.space(earlier.id)?.pinnedSplits?.count == 2)
+    }
+
+    /// Importing again never moves a page you moved: a split view whose pages aren't together any more stays apart (#391).
+    @MainActor @Test func importingAgainLeavesMovedPagesApart() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        var incoming = try #require(ArcImporter.parseSidebar(Self.nestedSidebar()).spaces.first)
+        incoming.name = "Arc Merge \(UUID().uuidString)"
+        var earlier = incoming
+        earlier.id = UUID()
+        earlier.pinnedSplits = nil
+        Library.shared.appendSpaces([earlier])
+        let p3 = try #require(earlier.bookmarks.first { $0.url.lastPathComponent == "p3" })
+        let work = try #require(earlier.folders?.first { $0.name == "Work" })
+        Library.shared.setFolder(of: p3.id, to: work.id)
+        let moved = try #require(Library.shared.space(earlier.id))
+        ArcImporter.merge(incoming, into: earlier.id)
+        let space = try #require(Library.shared.space(earlier.id))
+        #expect(space.bookmarks.map(\.id) == moved.bookmarks.map(\.id))
+        #expect(space.folders?.first { $0.name == "Work" }?.bookmarkIDs.contains(p3.id) == true)
+        let urls = (space.pinnedSplits ?? []).map { split in split.ids.compactMap { id in space.bookmarks.first { $0.id == id }?.url.lastPathComponent } }
+        #expect(urls == [["p5", "p6", "p7"]])
     }
 
     /// Newer Arc (and Arc Sync) wraps each item as {"value": …} and writes a container's kind as an object keyed by

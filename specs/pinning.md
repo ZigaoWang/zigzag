@@ -42,6 +42,18 @@
 - Collapse All Folders / Expand All Folders in a space's menu → all of that space's folders at once.
   Test: FolderBulkTests.aSpacesFoldersFoldAtOnceWithTheMenuOfferingOnlyWhatChanges
 
+## Importing from Arc
+- Arc's folders inside folders → the same tree in Pinned, in Arc's order with their names, shut; empty ones stay behind.
+  Test: ArcFolderTests.nestedFoldersKeepTheirTreeAndOrder
+- A split view pinned in Arc, at the top or in a folder → a pinned split view of the same pages, up to four.
+  Test: ArcFolderTests.pinnedSplitViewsStaySplit
+- Folders nested deeper than eight levels → their pages go in the eighth folder; none is left out.
+  Test: ArcFolderTests.foldersDeeperThanTheLimitKeepTheirPages
+- Importing again into a space from an earlier import → its pages still side by side in one folder become Arc's split views again; nothing is added twice.
+  Test: ArcFolderTests.importingAgainGainsSplitViews
+- Importing again where those pages were moved apart or into another folder → they stay where they are, not split.
+  Test: ArcFolderTests.importingAgainLeavesMovedPagesApart
+
 ## Favorites
 - Add to Favorites on a pinned page → it shows in Favorites in every space of its profile, as the same page, not a copy.
   Test: SavePathTests.inEverySpaceIsATickOnASavedPage
