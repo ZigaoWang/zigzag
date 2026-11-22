@@ -318,6 +318,8 @@ final class EdgeSidebar {
     /// The page's holder is in the panel's page area: widen the one panel so both collapse together. Another preview
     /// replacing the first changes the page only: the panel is already the right shape, and nothing slides again.
     func pageAttached(_ tab: Tab) {
+        // A page arriving during the note's fold takes the side at once.
+        host?.endPageFoldOut()
         let already = pageTab != nil
         pageTab = tab
         if let target { host?.sidebarWidth = target.edgeSidebarWidth }
@@ -373,6 +375,18 @@ final class EdgeSidebar {
                 self.host?.pageShowing = false
             }
         }
+    }
+
+    /// The page is making way for the note: it stays in the side under the note's fold, then goes back to its tab
+    /// once the fold has covered it.
+    func pageFoldingIntoNote() {
+        pageTab = nil
+        host?.beginPageFoldOut()
+    }
+
+    /// The note's fold has covered the old page: the side is the note's now.
+    func pageFoldedIntoNote() {
+        host?.endPageFoldOut()
     }
 
     /// A row of Zigzag's own pages has been previewed: no page can be lent, so the page area shows a note saying where
@@ -852,6 +866,8 @@ final class EdgeSidebar {
         host.onRight = onRight
         host.sidebarWidth = target.edgeSidebarWidth
         host.sideWidth = 0
+        // A fold still running as the panel went belongs to the last time it was out.
+        host.endPageFoldOut()
         host.pageShowing = false
         host.noticeShowing = false
         host.editorShowing = false
@@ -1012,16 +1028,38 @@ final class EdgeSidebarHost: NSView {
     var pageShowing = false { didSet { updateSideVisibility() } }
     var noticeShowing = false { didSet { updateSideVisibility() } }
     var editorShowing = false { didSet { updateSideVisibility() } }
+    /// A page making way for the note: it stays under the note's fold until the fold has covered it, so the page
+    /// doesn't vanish a frame before the note arrives.
+    private(set) var pageFoldingOut = false
     private weak var editor: NSView?
 
     /// The page area, the note and the editor share one side: the note is only there when no page is, and the editor
-    /// takes the side from both.
+    /// takes the side from both. While a page folds out, its area stays up under the note for the fold.
     private func updateSideVisibility() {
-        pageArea.isHidden = !pageShowing || editorShowing || noticeShowing
+        pageArea.isHidden = !(pageShowing || pageFoldingOut) || editorShowing
         notice.isHidden = !noticeShowing || editorShowing
         editor?.isHidden = !editorShowing
         placeCard()
     }
+
+    /// The note is taking the page's place: bring its card above the live page, still masked to nothing, so the
+    /// note's fold covers the page from the card's edge instead of uncovering a blank side.
+    func beginPageFoldOut() {
+        guard !pageFoldingOut else { return }
+        pageFoldingOut = true
+        addSubview(pageCard, positioned: .above, relativeTo: pageArea)
+        placeCard()
+    }
+
+    /// The fold has covered the old page: put the page area back above the card for the next page, and let it go.
+    func endPageFoldOut() {
+        guard pageFoldingOut else { return }
+        pageFoldingOut = false
+        pageShowing = false
+        pageCard.layer?.mask = nil
+        addSubview(pageArea, positioned: .above, relativeTo: pageCard)
+    }
+
     /// The panel is along the screen's right edge: its gutter is on the right.
     var onRight = false { didSet { placeCard() } }
     private var sideIsShowing: Bool { sideWidth > 0 }

@@ -130,4 +130,19 @@ struct EdgeSidebarCombinedTests {
         host.set(container)
         #expect(host.subviews.last === host.overlay)
     }
+
+    /// A page making way for the note stays in the side until the note's fold has covered it, rather than vanishing
+    /// a frame before the note arrives.
+    @Test @MainActor func aPageStaysUnderTheNoteUntilTheFoldEnds() {
+        let host = EdgeSidebarHost(frame: NSRect(x: 0, y: 0, width: 500, height: 800))
+        host.set(SidebarContainer(sidebar: SidebarView(frame: .zero)))
+        host.pageShowing = true
+        #expect(!host.pageArea.isHidden)
+        host.beginPageFoldOut()
+        #expect(host.pageFoldingOut)
+        #expect(!host.pageArea.isHidden)
+        host.endPageFoldOut()
+        #expect(!host.pageFoldingOut)
+        #expect(host.pageArea.isHidden)
+    }
 }

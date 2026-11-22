@@ -231,7 +231,7 @@ final class EdgePeek {
         let replacing = self.tab != nil
         let fromNotice = noticeTab != nil
         closeSitePanel()
-        if self.tab != nil { detach(.sidebarClick, resize: false) }
+        if self.tab != nil { detach(.sidebarClick, resize: false, forNote: true) }
         noticeTab = tab
         self.controller = controller
         controller.updateEdgeSidebarForNotice(tab)
@@ -413,7 +413,7 @@ final class EdgePeek {
         detach(.windowClose, resize: false)
     }
 
-    private func detach(_ reason: EdgeLensReason, resize: Bool) {
+    private func detach(_ reason: EdgeLensReason, resize: Bool, forNote: Bool = false) {
         debugLog("edge peek detach reason=\(reason) panel=\(EdgeSidebar.shared.isShowing) pointer=\(NSEvent.mouseLocation)")
         // A page still folding goes back to its tab first, so no holder is left in the panel. The site panel described
         // that page, so it goes too, rather than describing nothing over the note or the next page.
@@ -456,7 +456,17 @@ final class EdgePeek {
             }
         }
         let folding = resize && EdgeSidebar.shared.isShowing
-        if folding {
+        if forNote, !Tokens.Motion.reduceMotion {
+            // The note's fold covers the live page before it goes: the page stays in its place for the 0.16 s fold
+            // instead of snapping to its tab a frame before the note arrives.
+            EdgeSidebar.shared.pageFoldingIntoNote()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                MainActor.assumeIsolated {
+                    restore()
+                    EdgeSidebar.shared.pageFoldedIntoNote()
+                }
+            }
+        } else if folding {
             EdgeSidebar.shared.pageDetached(resize: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                 MainActor.assumeIsolated { restore() }
