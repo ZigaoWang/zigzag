@@ -220,8 +220,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
-        // From a full-screen window, a sign-in popup opens over it in the same Space, not off in another one.
-        if parent?.styleMask.contains(.fullScreen) == true { window.collectionBehavior.insert(.fullScreenAuxiliary) }
+        // From a full-screen window, or Zigzag Mini over a full-screen app, it opens over it in the same Space.
+        if let parent, parent.styleMask.contains(.fullScreen) || parent.collectionBehavior.contains(.fullScreenAuxiliary) {
+            window.collectionBehavior.insert(.fullScreenAuxiliary)
+        }
         window.setFrameOrigin(origin)
         window.placeTrafficLights()
         super.init(window: window)
@@ -267,6 +269,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             guard let window else { return }
             KeepOnTop.toggle(window)
         }
+        // From a window kept on top, the pop-up is kept on top too, or it would open behind it.
+        if let parent, KeepOnTop.isOn(parent) { KeepOnTop.set(true, for: window) }
         KeepOnTop.refresh(pinButton, for: window)
         keepOnTopToken = NotificationCenter.default.addObserver(forName: KeepOnTop.changed, object: window, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
