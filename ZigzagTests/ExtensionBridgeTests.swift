@@ -1682,3 +1682,36 @@ struct ExtensionSessionsTests {
     }
 }
 
+/// bookmarks.onChildrenReordered fires for a sort-like reorder, not a single move (#487).
+struct BookmarkReorderTests {
+    @Test func aSortIsAReorder() {
+        let sorted = BridgeBookmarks.reordered(before: ["s:1": ["d", "c", "b", "a"], "s:2": ["x", "y"]],
+                                               after: ["s:1": ["a", "b", "c", "d"], "s:2": ["x", "y"]])
+        #expect(sorted.map(\.parent) == ["s:1"])
+        #expect(sorted.first?.childIds == ["a", "b", "c", "d"])
+    }
+
+    @Test func oneMoveAddOrRemoveIsNot() {
+        #expect(BridgeBookmarks.reordered(before: ["1": ["a", "b", "c"]], after: ["1": ["b", "a", "c"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: ["1": ["c", "a", "b"]], after: ["1": ["a", "b", "c"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: ["1": ["a", "b", "c"]], after: ["1": ["c", "b", "a", "d"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: ["1": ["a", "b", "c"]], after: ["1": ["c", "a"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: [:], after: ["1": ["b", "a", "c"]]).isEmpty)
+        #expect(BridgeBookmarks.isOneMove(["a", "b", "c", "d"], ["b", "c", "d", "a"]))
+        #expect(!BridgeBookmarks.isOneMove(["a", "b", "c", "d"], ["b", "a", "d", "c"]))
+    }
+
+    @MainActor @Test func anImportIsBracketed() {
+        let library = Library.shared, profile = UUID()
+        var heard: [(started: Bool, profile: UUID)] = []
+        let token = library.bookmarkImport.observe { heard.append($0) }
+        defer { token.cancel() }
+        let value = library.importing(into: profile) { () -> Int in
+            #expect(heard.map(\.started) == [true])
+            return 7
+        }
+        #expect(value == 7)
+        #expect(heard.map(\.started) == [true, false])
+        #expect(heard.allSatisfy { $0.profile == profile })
+    }
+}

@@ -814,6 +814,16 @@ final class Library {
         if holding == 0, held { held = false; commit() }
     }
 
+    /// Fires as a browser import starts (true) and finishes (false) adding pages and spaces, with the profile it goes into.
+    let bookmarkImport = Signal<(started: Bool, profile: UUID)>()
+
+    /// A browser import's changes to the library, between the two `bookmarkImport` signals.
+    func importing<T>(into profile: UUID, _ body: () -> T) -> T {
+        bookmarkImport.send((true, profile))
+        defer { bookmarkImport.send((false, profile)) }
+        return body()
+    }
+
     // MARK: Spaces
 
     func space(_ id: UUID) -> SpaceInfo? { spaces.first { $0.id == id } }

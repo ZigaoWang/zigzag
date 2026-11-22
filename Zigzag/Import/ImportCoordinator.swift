@@ -361,7 +361,9 @@ enum ImportCoordinator {
         if isArc {
             let parts = ArcImporter.Parts(choice)
             if !parts.isEmpty {
-                let result = ArcImporter.importSidebar(into: profile.id, parts: parts).result
+                let sidebar = { ArcImporter.importSidebar(into: profile.id, parts: parts).result }
+                // Spaces and favorites are bookmarks to extensions; open tabs alone aren't.
+                let result = parts.isDisjoint(with: [.spaces, .favorites]) ? sidebar() : Library.shared.importing(into: profile.id, sidebar)
                 summary.spaces = result.spaces
                 summary.bookmarks = result.bookmarks
                 summary.tabs = result.tabs
@@ -431,7 +433,7 @@ enum ImportCoordinator {
         summary.problems += batch.problems
         if choice.contains(.passwords) { await savePasswords(batch.logins, into: &summary) }
         if choice.contains(.bookmarks), !batch.bookmarks.isEmpty {
-            let added = addBookmarks(batch.bookmarks, from: source.name, into: profile.id)
+            let added = Library.shared.importing(into: profile.id) { addBookmarks(batch.bookmarks, from: source.name, into: profile.id) }
             summary.bookmarks += added.bookmarks
             summary.spaces += added.spaces
         }

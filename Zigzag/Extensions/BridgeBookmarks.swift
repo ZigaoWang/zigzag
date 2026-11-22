@@ -20,6 +20,7 @@ final class BridgeBookmarks: BridgeNamespace {
     /// The tree as last told to listening extensions, to work out what changed (Library says only that something did).
     private var lastSeen: [String: Placed]?
     private var watching: SignalToken?
+    private var watchingImports: SignalToken?
 
     private static let root = "0", favorites = "1", spaces = "2"
 
@@ -324,6 +325,12 @@ final class BridgeBookmarks: BridgeNamespace {
         guard watching == nil else { return }
         lastSeen = snapshot()
         watching = library.changed.observe { [weak self] _ in self?.announceChanges() }
+        watchingImports = library.bookmarkImport.observe { [weak self] change in
+            guard let self, change.profile == host.profile.id else { return }
+            // Changes made before it belong outside it; its own onCreated events land between the two.
+            announceChanges()
+            host.bridge.emit(change.started ? "bookmarks.onImportBegan" : "bookmarks.onImportEnded", [])
+        }
     }
 
     private func snapshot() -> [String: Placed] {
@@ -346,7 +353,8 @@ final class BridgeBookmarks: BridgeNamespace {
         let after = snapshot()
         lastSeen = after
         let bridge = host.bridge
-        guard ["bookmarks.onCreated", "bookmarks.onRemoved", "bookmarks.onChanged", "bookmarks.onMoved"].contains(where: { bridge.isListened($0) }) else { return }
+        guard ["bookmarks.onCreated", "bookmarks.onRemoved", "bookmarks.onChanged", "bookmarks.onMoved", "bookmarks.onChildrenReordered"]
+            .contains(where: { bridge.isListened($0) }) else { return }
         for id in after.keys where before[id] == nil {
             bridge.emit("bookmarks.onCreated", [id, node(id, depth: 0)])
         }
@@ -373,6 +381,33 @@ final class BridgeBookmarks: BridgeNamespace {
             if moved {
                 bridge.emit("bookmarks.onMoved", [id, ["parentId": now.parentId, "index": now.index, "oldParentId": was.parentId, "oldIndex": was.index] as [String: Any]])
             }
+        }
+        for (parent, childIds) in Self.reordered(before: Self.childOrder(before), after: Self.childOrder(after)) {
+            bridge.emit("bookmarks.onChildrenReordered", [parent, ["childIds": childIds] as [String: Any]])
+        }
+    }
+
+    /// Each folder's children in order.
+    private static func childOrder(_ tree: [String: Placed]) -> [String: [String]] {
+        Dictionary(grouping: tree, by: \.value.parentId).mapValues { $0.sorted { $0.value.index < $1.value.index }.map(\.key) }
+    }
+
+    /// Folders whose children are the same but reordered beyond what one move explains, as a sort does; their onMoved
+    /// events still fire. A single move is onMoved alone, as in Chrome.
+    static func reordered(before: [String: [String]], after: [String: [String]]) -> [(parent: String, childIds: [String])] {
+        after.keys.sorted().compactMap { parent in
+            guard let was = before[parent], let now = after[parent], was != now, Set(was) == Set(now), was.count == now.count,
+                  !isOneMove(was, now) else { return nil }
+            return (parent, now)
+        }
+    }
+
+    /// Whether taking one child out and putting it back elsewhere turns `was` into `now`.
+    static func isOneMove(_ was: [String], _ now: [String]) -> Bool {
+        was.indices.contains { index in
+            var rest = was
+            let moved = rest.remove(at: index)
+            return rest == now.filter { $0 != moved }
         }
     }
 }

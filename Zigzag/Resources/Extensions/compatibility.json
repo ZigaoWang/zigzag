@@ -436,25 +436,7 @@
     },
     "bookmarks": {
       "status": "bridged",
-      "implementation": "swift:bookmarks",
-      "group": "bookmarks",
-      "members": {
-        "onImportBegan": {
-          "status": "unsupported",
-          "reason": "notImplemented",
-          "group": "bookmarks"
-        },
-        "onImportEnded": {
-          "status": "unsupported",
-          "reason": "notImplemented",
-          "group": "bookmarks"
-        },
-        "onChildrenReordered": {
-          "status": "unsupported",
-          "reason": "notImplemented",
-          "group": "bookmarks"
-        }
-      }
+      "implementation": "swift:bookmarks"
     },
     "downloads": {
       "status": "bridged",
