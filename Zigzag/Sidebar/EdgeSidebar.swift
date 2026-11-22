@@ -418,6 +418,55 @@ final class EdgeSidebar {
         resizeForSide(closing: true)
     }
 
+    // MARK: The sidebar's edge
+
+    /// The card's inner edge is the sidebar's edge in the panel, as in the window: the panel keeps the width a drag
+    /// gives it, and the page keeps its third beside it (#431).
+    func resizeBegan() {
+        holdOpen(for: 10)
+    }
+
+    func resizeDragged(toX windowX: CGFloat) {
+        guard isShowing, let target, let host, let panel, let visible = shownScreen else { return }
+        // The handle reports the window's x; the host fills the panel's content, so its x is the same space.
+        let x = host.convert(NSPoint(x: windowX, y: 0), from: nil).x
+        let inset = Tokens.Metric.cardInset
+        let raw = target.edgeSidebarOnRight ? host.bounds.width - inset - x : x - inset
+        let width = Tokens.Space.snap(min(max(raw, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
+        guard abs(width - host.sidebarWidth) >= 0.5 else { return }
+        host.sidebarWidth = width
+        // The window behind keeps the width too, as a drag on its own edge does (#431).
+        target.root.sidebarWidth = width
+        target.root.needsLayout = true
+        let panelWidth = EdgeSidebarLayout.width(sidebar: width, side: host.sideWidth, inset: inset, in: visible)
+        panel.setFrame(EdgeSidebarLayout.frame(in: visible, width: panelWidth, onRight: target.edgeSidebarOnRight),
+                       display: true)
+        holdOpen(for: 0.5)
+    }
+
+    func resizeEnded() {
+        guard let target else { return }
+        target.root.saveSidebarWidth()
+        target.root.onSidebarWidthChange?(target.root.sidebarWidth)
+        holdOpen(for: 0.5)
+    }
+
+    /// Double-clicking the edge puts the sidebar back to its usual width, as in the window.
+    func resetSidebarWidth() {
+        guard isShowing, let target, let host, let panel, let visible = shownScreen else { return }
+        let width = Tokens.Metric.sidebarWidth
+        host.sidebarWidth = width
+        target.root.sidebarWidth = width
+        target.root.needsLayout = true
+        let panelWidth = EdgeSidebarLayout.width(sidebar: width, side: host.sideWidth, inset: Tokens.Metric.cardInset,
+                                                 in: visible)
+        panel.setFrame(EdgeSidebarLayout.frame(in: visible, width: panelWidth, onRight: target.edgeSidebarOnRight),
+                       display: true)
+        target.root.saveSidebarWidth()
+        target.root.onSidebarWidthChange?(width)
+        holdOpen(for: 0.5)
+    }
+
     // MARK: The space editor
 
     /// A space editor opened from the panel: the panel widens to hold it beside the card, and the editor takes the
@@ -948,8 +997,12 @@ final class EdgeSidebarHost: NSView {
     /// button back to the window.
     let notice = EdgeSystemPageNotice()
     let inset = Tokens.Metric.cardInset
-    /// The sidebar's own width while a side is open; the card keeps it then.
-    var sidebarWidth: CGFloat = 0
+    /// The sidebar's own width while a side is open; the card keeps it then. Dragging the card's inner edge changes it
+    /// live, and the panel widens beside it.
+    var sidebarWidth: CGFloat = 0 { didSet { if sidebarWidth != oldValue { placeCard() } } }
+    /// The sidebar's edge in the panel, as in the window: the card's inner edge dragged to set the width every window
+    /// keeps. A thin band over the edge, above the page, so the page's own clicks stay its own away from the edge.
+    let resizeHandle = ResizeHandle()
     /// The side area's width: the page's third or the space editor, 0 while neither is open. Kept until the panel has
     /// finished narrowing, so the card never jumps wide and then shrinks.
     var sideWidth: CGFloat = 0 { didSet { if sideWidth != oldValue { placeCard() } } }
@@ -999,6 +1052,13 @@ final class EdgeSidebarHost: NSView {
             pageCard.addSubview(notice)
             addSubview(pageCard)
             addSubview(pageArea)
+        }
+        if resizeHandle.superview == nil {
+            resizeHandle.onBegin = { EdgeSidebar.shared.resizeBegan() }
+            resizeHandle.onDrag = { x, _ in EdgeSidebar.shared.resizeDragged(toX: x) }
+            resizeHandle.onEnd = { _ in EdgeSidebar.shared.resizeEnded() }
+            resizeHandle.onDoubleClick = { EdgeSidebar.shared.resetSidebarWidth() }
+            addSubview(resizeHandle)
         }
         // Above the card, whatever was added before: showing the panel again re-adds the card, and Site Controls and
         // the rest of the overlay must still draw over it.
@@ -1071,6 +1131,13 @@ final class EdgeSidebarHost: NSView {
                                   width: min(size.width, max(0, side.width - Tokens.Space.x2 * 2)),
                                   height: min(size.height, max(0, side.height - Tokens.Space.x2 * 2)))
         }
+        // The sidebar's edge: the card's inner side, whichever edge the panel is on.
+        let card = cardFrame
+        let handleWidth = Tokens.Metric.resizeHandleWidth
+        let edge = onRight ? card.minX : card.maxX
+        resizeHandle.frame = NSRect(x: edge - handleWidth / 2, y: card.minY, width: handleWidth, height: card.height)
+        resizeHandle.line = handleWidth / 2
+        resizeHandle.isHidden = container == nil
         overlay.frame = bounds
     }
 
@@ -1124,7 +1191,7 @@ final class EdgePageArea: NSView {
 final class EdgeSystemPageNotice: NSView {
     private let icon = NSImageView()
     private let title = Label("", font: Tokens.Font.heading(), color: Tokens.Color.textPrimary)
-    private let detail = Label(String(localized: "Zigzag's own pages work in the browser window.",
+    private let detail = Label(String(localized: "Zigzag's own pages only work in the browser window.",
                                       comment: "Under the page's name in the edge sidebar's note for one of Zigzag's own pages, which the panel can't show."),
                                font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
     let returnButton = PillButton(title: String(localized: "Return to Zigzag",

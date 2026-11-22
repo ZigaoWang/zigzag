@@ -4089,8 +4089,13 @@ extension BrowserWindowController {
         EdgePeek.shared.lock(tab: tab, from: self)
     }
 
-    /// The page the edge panel is showing: the lens's, or the one the panel's rows are on.
-    var edgePanelTab: Tab? { EdgePeek.shared.tab ?? tabManager.selectedTab }
+    /// The page the edge panel is showing: its own, or the one its rows are on. While the note for one of Zigzag's own
+    /// pages is up, it shows no page at all: the window's tab behind it is not what the panel's controls act on.
+    var edgePanelTab: Tab? {
+        if let tab = EdgePeek.shared.tab { return tab }
+        if EdgePeek.shared.noticeTab != nil { return nil }
+        return tabManager.selectedTab
+    }
 
     /// A pinned page picked in the edge panel: its live tab, opened in the popout like a tab row.
     private func openBookmarkFromEdgeSidebar(_ bookmark: Bookmark) {
@@ -4110,7 +4115,16 @@ extension BrowserWindowController {
     /// Site Controls from the panel's address: the page's own panel, over the sidebar, in the window the button is in.
     private func showEdgeSiteControls(from button: IconButton) {
         guard let tab = edgePanelTab, let overlay = EdgeSidebar.shared.panelOverlay,
-              EdgeSidebar.shared.panelWindow != nil else { return }
+              EdgeSidebar.shared.panelWindow != nil else {
+            // Nothing is showing to have sites: a panel left over from the page before goes rather than an empty box.
+            if SitePanel.isOpen(in: EdgeSidebar.shared.panelWindow) { SitePanel.closeCurrent() }
+            return
+        }
+        // Zigzag's own pages have no site to control: no empty box, and one left open goes.
+        guard EdgeLensPolicy.takesPage(url: tab.url) else {
+            if SitePanel.isOpen(in: EdgeSidebar.shared.panelWindow) { SitePanel.closeCurrent() }
+            return
+        }
         let host = EdgeSitePanelHost(tab: tab, overlay: overlay)
         edgeSiteHost = host
         SitePanel.toggle(in: host, from: button)

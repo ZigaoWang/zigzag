@@ -616,7 +616,8 @@ final class BrowserRootView: SpaceFrameView {
         return stored > 0 ? min(max(CGFloat(stored), Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth) : Tokens.Metric.sidebarWidth
     }
 
-    private func saveSidebarWidth() {
+    /// Saves the width the sidebar was dragged to, for every window and the edge panel to keep (#431).
+    func saveSidebarWidth() {
         Self.defaults.set(Double(sidebarWidth), forKey: Self.sidebarWidthKey)
     }
     private(set) var sidebarRevealed = false
