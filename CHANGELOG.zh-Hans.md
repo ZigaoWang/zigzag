@@ -73,6 +73,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 有网站访问权限的扩展，带着自己的请求头、不带 Cookie 去访问这个网站时能连上了，比如 Litewarden 这类连自建 Vaultwarden 的密码管理器。这种请求现在由 Zigzag 替它发出，不带你的 Cookie；以前服务器不返回 CORS 头就会失败。感谢 [Kronight](https://github.com/Kronight)。([#478](https://github.com/ZigaoWang/zigzag/issues/478))
 - 全屏时拖动边栏、页面上方的栏或分屏页面顶上那条的空白处，窗口不会再跟着移动了；不是全屏时还是可以拖动窗口。感谢 [liverHawk](https://github.com/liverHawk)。([#483](https://github.com/ZigaoWang/zigzag/issues/483))
 - 装了 uBlacklist 这类在很多网站上运行大脚本的扩展时，启动 Zigzag 不会再占满几 GB 内存和交换空间了。WebKit 以前会为脚本运行的每个网站各存一份，每个页面进程和扩展进程里都有，uBlacklist 1 MB 的脚本加上 193 个 Google 网站，最多用到 17 GB。现在 Zigzag 像 Safari 一样让 WebKit 每个脚本只存一份。感谢 [Kronight](https://github.com/Kronight)。([#485](https://github.com/ZigaoWang/zigzag/issues/485))
+- 在 macOS 26 上，从 Mac 的“密码”列表里选一个登录信息，应该会把用户名和密码都填好。macOS 26 只会填 Zigzag 盖在网页上的那个隐藏密码栏，从不填旁边的用户名栏，所以现在两个栏位用同一种类型，并且会稍等一下，接住密码之后才到的用户名。如果只拿回了密码，光标会停在空着的用户名栏里，直接输入就行。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 
 ## [0.9.3] - 2026-11-21
 

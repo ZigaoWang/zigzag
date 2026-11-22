@@ -618,14 +618,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             return
         }
         Task {
-            // Passed as arguments, never pasted into the script's source, held only for the call, and not marked as
-            // Zigzag's own fill: signing in with it never offers to save it.
-            let arguments: [String: Any] = ["username": username.withUnsafeString { String($0) }, "password": password.withUnsafeString { String($0) },
-                                            "expectedOrigin": request.origin.description, "mark": false]
+            let arguments = Self.systemFillArguments(username: username, password: password, origin: request.origin)
             let filled = try? await webView.callAsyncJavaScript(Self.filler, arguments: arguments, in: request.frame, contentWorld: .defaultClient) as? [String: Any]
             PasswordsLog.write("page-fill", ["answered": .flag(filled != nil), "moved": .flag(filled?["moved"] as? Bool == true),
                                              "username": .flag(filled?["username"] as? Bool == true), "password": .flag(filled?["password"] as? Bool == true),
-                                             "usernameEmpty": .flag(filled?["usernameEmpty"] as? Bool == true)])
+                                             "usernameEmpty": .flag(filled?["usernameEmpty"] as? Bool == true),
+                                             "usernameFocused": .flag(filled?["usernameFocused"] as? Bool == true)])
             guard let filled, filled["moved"] as? Bool != true else { Self.tell(Self.pageMovedOn, about: webView); return }
             guard filled["password"] as? Bool == true || filled["username"] as? Bool == true else { Self.tell(Self.noPasswordField, about: webView); return }
             // Only a password came back, and the username field is still empty: say so, or it looks like a slip.
@@ -634,6 +632,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                            symbol: "key", duration: 3, in: controller)
             }
         }
+    }
+
+    /// `filler`'s arguments for a login from the Mac's list. Passed as arguments, never pasted into the script's
+    /// source, held only for the call, and not marked as Zigzag's own fill: signing in with it never offers to save it.
+    static func systemFillArguments(username: SecretString, password: SecretString, origin: Origin) -> [String: Any] {
+        ["username": username.withUnsafeString { String($0) }, "password": password.withUnsafeString { String($0) },
+         "expectedOrigin": origin.description, "mark": false, "caretToUsername": true]
     }
 
     /// A login from the Mac's list goes only to the exact site it was asked for, in the tab you're looking at.
@@ -1038,10 +1043,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     try {
       if (userField && username) set(userField, username);
       if (passwordField && password) set(passwordField, password);
+      // A login from the Mac's list with no username: the cursor goes to the empty username field.
+      if (typeof caretToUsername !== 'undefined' && caretToUsername === true && !username && userField && !userField.value) userField.focus();
     } finally {
       setTimeout(() => { window.__zigzagFilling = false; }, 0);
     }
-    return { password: !!(passwordField && password), username: !!(userField && username), usernameEmpty: !!(userField && !userField.value) };
+    return { password: !!(passwordField && password), username: !!(userField && username), usernameEmpty: !!(userField && !userField.value),
+             usernameFocused: !!userField && document.activeElement === userField };
     """
 }
 

@@ -114,8 +114,31 @@ struct SystemPasswordsTests {
 
     private func fill(_ webView: WKWebView, username: String, password: String, origin: String = "https://example.com") async throws -> [String: Any]? {
         _ = try await webView.evaluateJavaScript("document.getElementById('p').focus()")
-        return try await webView.callAsyncJavaScript(Autofill.filler, arguments: ["username": username, "password": password, "expectedOrigin": origin, "mark": false],
-                                                     in: nil, contentWorld: .defaultClient) as? [String: Any]
+        let arguments = Autofill.systemFillArguments(username: SecretString(username), password: SecretString(password), origin: Origin(URL(string: origin))!)
+        return try await webView.callAsyncJavaScript(Autofill.filler, arguments: arguments, in: nil, contentWorld: .defaultClient) as? [String: Any]
+    }
+
+    private func focusedID(in webView: WKWebView) async -> String? {
+        try? await webView.evaluateJavaScript("document.activeElement && document.activeElement.id") as? String
+    }
+
+    @Test func aPasswordAloneLeavesTheCursorInTheEmptyUsernameField() async throws {
+        // macOS 26 can send back only the password (#378): the username is what's left to type.
+        let (webView, _, _) = await page(form)
+        let result = try await fill(webView, username: "", password: "fake-pass")
+        #expect(result?["password"] as? Bool == true && result?["usernameFocused"] as? Bool == true)
+        #expect(await focusedID(in: webView) == "u")
+        #expect(await value("p", in: webView) == "fake-pass")
+        // A username already typed keeps the cursor in the password field.
+        let (typed, _, _) = await page(form)
+        _ = try await typed.evaluateJavaScript("document.getElementById('u').value = 'typed'")
+        _ = try await fill(typed, username: "", password: "fake-pass")
+        #expect(await focusedID(in: typed) == "p")
+        // A whole login leaves it in the password field, as before.
+        let (whole, _, _) = await page(form)
+        let both = try await fill(whole, username: "sam@example.com", password: "fake-pass")
+        #expect(both?["usernameFocused"] as? Bool == false)
+        #expect(await focusedID(in: whole) == "p")
     }
 
     @Test func aLoginFromTheListFillsButIsNeverOfferedForSaving() async throws {
@@ -204,7 +227,7 @@ struct SystemPasswordsTests {
 
     @Test func appKitPairsTheFieldsBeforeTheListIsAskedFor() throws {
         let (_, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, textViewUsername: false, dismissSystem: {})
         let detection = try #require(SystemPasswordPicker.autoFillDetection)
         var group: NSDictionary?
         // AppKit's own pair as the list is asked for: what it fills a picked login into.
@@ -219,7 +242,7 @@ struct SystemPasswordsTests {
 
     @Test func whatAutoFillPutsInIsReadThenEmptied() async throws {
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, textViewUsername: false, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         picker.usernameField.stringValue = "sam@example.com"
@@ -240,7 +263,7 @@ struct SystemPasswordsTests {
 
     @Test func onlyAPasswordStillComesBack() async throws {
         let (_, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, textViewUsername: false, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         picker.passwordView.string = "fake-pass"
@@ -483,7 +506,7 @@ struct SystemPasswordsTests {
     @Test func aLoginSetWithoutAWordIsStillRead() async throws {
         // AutoFill sets the username field's value and the password view's text directly, telling no delegate.
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, textViewUsername: false, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         picker.usernameField.stringValue = "sam@example.com"
@@ -504,7 +527,7 @@ struct SystemPasswordsTests {
         let mode = NSSelectorFromString("autoFillModeForResponder:")
         guard type.instancesRespond(to: mode) else { return }
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil, settle: 5, dismissSystem: {})
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 5, textViewUsername: false, dismissSystem: {})
         picker.present(over: NSRect(x: 40, y: 60, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
         defer { picker.cancel() }
         let detection = type.init()
@@ -513,6 +536,78 @@ struct SystemPasswordsTests {
         let group = detection.value(forKey: "autoFillGroup") as? [AnyHashable: Any]
         #expect(group?[NSTextContentType.username.rawValue] as AnyObject? === picker.usernameField)
         #expect(group?[NSTextContentType.password.rawValue] as AnyObject? === picker.passwordView)
+    }
+
+    @Test func theUsernameHalfIsATextViewBeforeMacOS27() {
+        // AppKit on macOS 26 filled only the text view of the pair, never the text field (#378).
+        #expect(SystemPasswordPicker.fillsOnlyTextViews(macOS: 26))
+        #expect(SystemPasswordPicker.fillsOnlyTextViews(macOS: 15))
+        #expect(!SystemPasswordPicker.fillsOnlyTextViews(macOS: 27))
+        #expect(!SystemPasswordPicker.fillsOnlyTextViews(macOS: 28))
+        #expect(SystemPasswordPicker.fillsOnlyTextViews == SystemPasswordPicker.fillsOnlyTextViews(macOS: ProcessInfo.processInfo.operatingSystemVersion.majorVersion))
+        // Only there does a password alone wait for its username.
+        #expect(SystemPasswordPicker.holdsForUsername(username: false, password: true, textViewUsername: true, held: false))
+        #expect(!SystemPasswordPicker.holdsForUsername(username: false, password: true, textViewUsername: false, held: false))
+        #expect(!SystemPasswordPicker.holdsForUsername(username: false, password: true, textViewUsername: true, held: true))
+        #expect(!SystemPasswordPicker.holdsForUsername(username: true, password: true, textViewUsername: true, held: false))
+    }
+
+    @Test func aTextViewUsernameIsPairedAndRead() async throws {
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, textViewUsername: true, dismissSystem: {})
+        // Read as empty, as the password view is.
+        picker.usernameView.string = "sam"
+        #expect(picker.usernameView.accessibilityValue() as? String == "" && picker.usernameView.writablePasteboardTypes.isEmpty)
+        picker.usernameView.string = ""
+        let detection = SystemPasswordPicker.autoFillDetection
+        var group: NSDictionary?
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 40, y: 60, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in
+            group = detection?.perform(NSSelectorFromString("autoFillGroup"))?.takeUnretainedValue() as? NSDictionary
+            return true
+        }) { outcome = $0 }
+        #expect(picker.usernameView.superview === picker.anchor && picker.usernameField.superview == nil)
+        #expect(picker.usernameView.contentType == .username && !picker.usernameView.isAccessibilityElement())
+        if detection != nil {
+            #expect(group?[NSTextContentType.username.rawValue] as AnyObject? === picker.usernameView)
+            #expect(group?[NSTextContentType.password.rawValue] as AnyObject? === picker.passwordView)
+        }
+        #expect(window.firstResponder === picker.passwordView)
+        // Set by AutoFill without a word to the delegate.
+        picker.usernameView.string = "sam@example.com"
+        picker.passwordView.string = "fake-pass"
+        try await wait(0.5)
+        guard case .filled(let username, let password) = outcome else { Issue.record("expected a fill, got \(String(describing: outcome))"); return }
+        #expect(username.withUnsafeString { $0 } == "sam@example.com")
+        #expect(password.withUnsafeString { $0 } == "fake-pass")
+        #expect(picker.usernameView.string.isEmpty && picker.passwordView.string.isEmpty)
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func aPasswordAloneWaitsForItsUsernameBeforeMacOS27() async throws {
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, textViewUsername: true, dismissSystem: {})
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
+        picker.passwordView.string = "fake-pass"
+        try await wait(0.5)
+        #expect(outcome == nil)
+        picker.usernameView.string = "sam@example.com"
+        try await wait(0.5)
+        guard case .filled(let username, let password) = outcome else { Issue.record("expected a fill, got \(String(describing: outcome))"); return }
+        #expect(username.withUnsafeString { $0 } == "sam@example.com")
+        #expect(password.withUnsafeString { $0 } == "fake-pass")
+        // No username by the time the window is key again: the password alone.
+        var second: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { second = $0 }
+        picker.passwordView.string = "fake-pass"
+        try await wait(0.5)
+        #expect(second == nil)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        try await wait(SystemPasswordPicker.usernameAfterKey + 0.2)
+        guard case .filled(let alone, let kept) = second else { Issue.record("expected a fill, got \(String(describing: second))"); return }
+        #expect(alone.isEmpty && !kept.isEmpty)
+        #expect(picker.anchor.superview == nil)
     }
 
     @Test func aFieldOffThePageAsksNothing() async throws {

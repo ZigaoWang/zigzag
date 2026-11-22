@@ -60,13 +60,22 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     }
 
     let anchor = Anchor()
+    /// The username half on macOS 27 and later.
     let usernameField = NSTextField()
+    /// The username half before macOS 27 (`textViewUsername`).
+    let usernameView = WithheldTextView(frame: .zero)
     /// A text view of its own rather than a secure text field. AppKit pairs the username field with the password
     /// one around whatever has the focus, and works the pair out again each time the window becomes key, as it does
     /// around the list. A secure field's focus is its field editor, which isn't one of the window's fields, so the
     /// pair was lost and only the password came back (#378).
     let passwordView = SecretTextView(frame: .zero)
-    private var storageObserver: NSObjectProtocol?
+    /// macOS 26 filled only the password view, a text view, never the paired text field (#378).
+    let textViewUsername: Bool
+    var usernameHalf: NSView { textViewUsername ? usernameView : usernameField }
+    var username: String { textViewUsername ? usernameView.string : usernameField.stringValue }
+    private var storageObservers: [NSObjectProtocol] = []
+    /// A fill with no username was held once for a username that may come after it.
+    private var heldForUsername = false
     private var completion: ((Outcome) -> Void)?
     private weak var restoreTo: NSResponder?
     private var observers: [NSObjectProtocol] = []
@@ -97,57 +106,73 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     /// checks: the Mac can show its list inside Zigzag's own window, where Zigzag never stops being the active app).
     /// `settle`: how long the password field is focused before the list is asked for (0 asks at once).
     /// `dismissSystem`: closes whatever AutoFill still shows for the fields as they go.
+    /// `textViewUsername`: the username half is a text view, as AppKit before macOS 27 fills only text views.
     init(timeout: TimeInterval = SystemPasswordPicker.timeout, openCheck: TimeInterval? = nil, settle: TimeInterval = SystemPasswordPicker.settle,
+         textViewUsername: Bool = SystemPasswordPicker.fillsOnlyTextViews,
          dismissSystem: @escaping @MainActor () -> Void = SystemPasswordPicker.dismissSystemAutoFill) {
         self.timeout = timeout
         self.openCheck = openCheck
         self.settle = settle
+        self.textViewUsername = textViewUsername
         self.dismissSystem = dismissSystem
         super.init()
         usernameField.contentType = .username
         usernameField.delegate = self
         usernameField.focusRingType = .none
+        usernameView.contentType = .username
         // AppKit puts its own Passwords… suggestion only under a focused text field, never a text view, so this one
         // can be marked from the start (#378).
         passwordView.contentType = .password
-        passwordView.delegate = self
-        passwordView.isRichText = false
-        passwordView.importsGraphics = false
-        passwordView.allowsUndo = false
-        passwordView.isContinuousSpellCheckingEnabled = false
-        passwordView.isGrammarCheckingEnabled = false
-        // Autocorrection is left on: with it off, AutoFill skips the field.
-        passwordView.isAutomaticTextCompletionEnabled = false
-        passwordView.isAutomaticTextReplacementEnabled = false
-        passwordView.isAutomaticQuoteSubstitutionEnabled = false
-        passwordView.isAutomaticDashSubstitutionEnabled = false
-        passwordView.isAutomaticLinkDetectionEnabled = false
-        passwordView.isAutomaticDataDetectionEnabled = false
-        passwordView.smartInsertDeleteEnabled = false
-        passwordView.inlinePredictionType = .no
-        passwordView.writingToolsBehavior = .none
-        passwordView.usesFindBar = false
-        passwordView.drawsBackground = false
-        passwordView.textColor = .clear
-        passwordView.insertionPointColor = .clear
-        passwordView.textContainerInset = .zero
-        passwordView.isVerticallyResizable = false
-        passwordView.isHorizontallyResizable = false
-        for view in [usernameField, passwordView] as [NSView] {
+        for view in [usernameView, passwordView] { Self.hide(view, delegate: self) }
+        for view in [usernameHalf, passwordView] {
             // Nearly invisible: AppKit offers AutoFill only to a field that's on screen, but nobody should see it.
             view.alphaValue = 0.02
             view.setAccessibilityElement(false)
             anchor.addSubview(view)
         }
-        // AutoFill sets the text view's text without a word to its delegate.
-        storageObserver = NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: passwordView.textStorage,
-                                                                 queue: nil) { [weak self] _ in
-            MainActor.assumeIsolated {
-                // Read once the storage is done editing, never inside its edit.
-                guard let self, self.isPresented else { return }
-                self.after(0) { $0.fieldsChanged(in: $0.passwordView) }
+        // AutoFill sets a text view's text without a word to its delegate.
+        let center = NotificationCenter.default
+        storageObservers = [usernameView, passwordView].map { view in
+            center.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: view.textStorage, queue: nil) { [weak self, weak view] _ in
+                MainActor.assumeIsolated {
+                    // Read once the storage is done editing, never inside its edit.
+                    guard let self, self.isPresented else { return }
+                    self.after(0) { $0.fieldsChanged(in: view) }
+                }
             }
         }
+    }
+
+    /// AppKit before macOS 27 (`textViewUsername`).
+    static let fillsOnlyTextViews = fillsOnlyTextViews(macOS: ProcessInfo.processInfo.operatingSystemVersion.majorVersion)
+
+    nonisolated static func fillsOnlyTextViews(macOS major: Int) -> Bool { major < 27 }
+
+    /// A text view for one half of the pair: plain text, nothing drawn, nothing kept or checked.
+    private static func hide(_ view: NSTextView, delegate: NSTextViewDelegate) {
+        view.delegate = delegate
+        view.isRichText = false
+        view.importsGraphics = false
+        view.allowsUndo = false
+        view.isContinuousSpellCheckingEnabled = false
+        view.isGrammarCheckingEnabled = false
+        // Autocorrection is left on: with it off, AutoFill skips the field.
+        view.isAutomaticTextCompletionEnabled = false
+        view.isAutomaticTextReplacementEnabled = false
+        view.isAutomaticQuoteSubstitutionEnabled = false
+        view.isAutomaticDashSubstitutionEnabled = false
+        view.isAutomaticLinkDetectionEnabled = false
+        view.isAutomaticDataDetectionEnabled = false
+        view.smartInsertDeleteEnabled = false
+        view.inlinePredictionType = .no
+        view.writingToolsBehavior = .none
+        view.usesFindBar = false
+        view.drawsBackground = false
+        view.textColor = .clear
+        view.insertionPointColor = .clear
+        view.textContainerInset = .zero
+        view.isVerticallyResizable = false
+        view.isHorizontallyResizable = false
     }
 
     var isPresented: Bool { completion != nil }
@@ -167,17 +192,20 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         self.completion = completion
         restoreTo = responder
         opened = false
+        heldForUsername = false
         anchor.frame = rect.height < 16 ? rect.insetBy(dx: 0, dy: (rect.height - 16) / 2) : rect
         // The password field on top, where the list points; the username field under it, so AutoFill sees the pair.
-        usernameField.frame = anchor.bounds
+        usernameHalf.frame = anchor.bounds
         passwordView.frame = anchor.bounds
-        usernameField.font = .systemFont(ofSize: max(9, min(anchor.bounds.height * 0.5, 15)))
-        passwordView.font = usernameField.font
+        let font = NSFont.systemFont(ofSize: max(9, min(anchor.bounds.height * 0.5, 15)))
+        usernameField.font = font
+        usernameView.font = font
+        passwordView.font = font
         overlay.addSubview(anchor)
         debugLog("syspasswords present")
         let focused = overlay.window?.makeFirstResponder(passwordView) ?? false
         PasswordsLog.write("focus", ["window": .flag(overlay.window != nil), "took": .flag(focused), "responder": .type(overlay.window?.firstResponder),
-                                     "anchor": .size(anchor.frame.size), "overlay": .size(overlay.bounds.size)])
+                                     "username": .type(usernameHalf), "anchor": .size(anchor.frame.size), "overlay": .size(overlay.bounds.size)])
         guard let window = overlay.window, focused else { finish(.cancelled(.unavailable)); return }
         shownInVisibleWindow = window.isVisible
         let center = NotificationCenter.default
@@ -207,6 +235,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     PasswordsLog.write("window-key", ["after": self.elapsed, "responder": .type(self.anchor.window?.firstResponder)])
+                    if self.heldForUsername { self.after(Self.usernameAfterKey) { $0.collect() } }
                 }
             },
             center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
@@ -308,9 +337,13 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         var found: [Selector] = []
         if type?.instancesRespond(to: create) == true { found.append(create) }
         if detection?.responds(to: mode) == true { found.append(mode) }
+        let groupSelector = NSSelectorFromString("autoFillGroup")
+        let group = detection?.responds(to: groupSelector) == true ? detection?.perform(groupSelector)?.takeUnretainedValue() as? NSDictionary : nil
         PasswordsLog.write("pair", ["class": .flag(type != nil), "shared": .flag((type as? NSObject.Type)?.responds(to: NSSelectorFromString("sharedInstance")) ?? false),
                                     "ivar": .flag(ivar != nil), "ivarObject": .flag(encoding == "@"), "detection": .type(detection),
-                                    "found": .selectors(found), "mode": .number(result.map { Int(truncatingIfNeeded: $0) } ?? -1)])
+                                    "found": .selectors(found), "mode": .number(result.map { Int(truncatingIfNeeded: $0) } ?? -1),
+                                    "groupUsername": .type(group?[NSTextContentType.username.rawValue]),
+                                    "groupPassword": .type(group?[NSTextContentType.password.rawValue])])
     }
 
     /// The suggestion under a field, then the Passwords panel. AppKit closes the panel itself only for a field that
@@ -331,7 +364,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     }
 
     private func giveUpIfEmpty(_ reason: Reason) {
-        guard isPresented, !settling, usernameField.stringValue.isEmpty, passwordView.string.isEmpty else { return }
+        guard isPresented, !settling, username.isEmpty, passwordView.string.isEmpty else { return }
         finish(.cancelled(reason))
     }
 
@@ -342,7 +375,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     private func fieldsChanged(in field: NSView?) {
         guard isPresented else { return }
         let typing = Self.isTyping(NSApp.currentEvent)
-        PasswordsLog.write("changed", ["field": .type(field), "after": elapsed, "username": .text(usernameField.stringValue),
+        PasswordsLog.write("changed", ["field": .type(field), "after": elapsed, "username": .text(username),
                                        "password": .text(passwordView.string), "typing": .flag(typing)])
         // Keys pressed here aren't a login from the list (the fields can't be seen): hand the focus back.
         if typing { finish(.cancelled(.typed)); return }
@@ -365,11 +398,31 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
 
     private func collect() {
         settling = false
-        let username = SecretString(usernameField.stringValue), password = SecretString(passwordView.string)
+        let username = SecretString(self.username), password = SecretString(passwordView.string)
         PasswordsLog.write("collect", ["after": elapsed, "username": .flag(!username.isEmpty), "password": .flag(!password.isEmpty)])
         guard !username.isEmpty || !password.isEmpty else { return }
+        if Self.holdsForUsername(username: !username.isEmpty, password: !password.isEmpty, textViewUsername: textViewUsername, held: heldForUsername) {
+            heldForUsername = true
+            settling = true
+            let key = anchor.window?.isKeyWindow ?? false
+            PasswordsLog.write("hold-for-username", ["after": elapsed, "key": .flag(key)])
+            // AppKit may fill the rest once the window is key again.
+            after(key ? Self.usernameAfterKey : Self.usernameWait) { $0.collect() }
+            return
+        }
         finish(.filled(username: username, password: password))
     }
+
+    /// Before macOS 27 the password came back while Zigzag was behind the list, and the window was key again only
+    /// after the fields had gone (#378): a password alone is held once, in case the username follows.
+    nonisolated static func holdsForUsername(username: Bool, password: Bool, textViewUsername: Bool, held: Bool) -> Bool {
+        textViewUsername && password && !username && !held
+    }
+
+    /// How long a password alone waits for its username.
+    static let usernameWait: TimeInterval = 2
+    /// How long it waits once the window is key again.
+    static let usernameAfterKey: TimeInterval = 0.3
 
     func controlTextDidEndEditing(_ notification: Notification) {
         // The Mac's list taking the focus ends editing too, as it opens: that alone mustn't take the fields away.
@@ -385,7 +438,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     func textView(_ view: NSTextView, didCheckTextIn range: NSRange, types checkingTypes: NSTextCheckingTypes,
                   options: [NSSpellChecker.OptionKey: Any], results: [NSTextCheckingResult], orthography: NSOrthography,
                   wordCount: Int) -> [NSTextCheckingResult] {
-        guard view === passwordView else { return results }
+        guard view === passwordView || view === usernameView else { return results }
         return Self.keptChecks(results)
     }
 
@@ -416,13 +469,14 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
         clickMonitor = nil
         let window = anchor.window
-        let focused = window.map { $0.firstResponder === passwordView || Self.owns($0.firstResponder, [usernameField]) } ?? false
+        let focused = window.map { $0.firstResponder === passwordView || $0.firstResponder === usernameView || Self.owns($0.firstResponder, [usernameField]) } ?? false
         // Emptied before anything else, the field editor's copy too.
         usernameField.abortEditing()
         usernameField.stringValue = ""
+        usernameView.string = ""
         passwordView.string = ""
-        // Whatever the spell checker kept for this view (words it was told to ignore) goes with the password.
-        NSSpellChecker.shared.closeSpellDocument(withTag: passwordView.spellCheckerDocumentTag)
+        // Whatever the spell checker kept for these views (words it was told to ignore) goes with the login.
+        for view in [usernameView, passwordView] { NSSpellChecker.shared.closeSpellDocument(withTag: view.spellCheckerDocumentTag) }
         // Focus handed back while the fields are still in the window, so AppKit sees them let go of it.
         if focused, let window { window.makeFirstResponder(restoreTo.flatMap { ($0 as? NSView)?.window === window ? $0 : nil }) }
         dismissSystem()
@@ -689,10 +743,9 @@ enum AutofillKeyIcon {
     """
 }
 
-/// The password half of `SystemPasswordPicker`: a text view, so AppKit pairs it with the username field, that never
-/// gives its text away while it holds a password. Nothing copies, cuts, drags or hands it to a service, Select All does
-/// nothing, and accessibility reads it as empty, as a secure field reads.
-final class SecretTextView: NSTextView {
+/// A text view for `SystemPasswordPicker` that never gives its text away: nothing copies, cuts, drags or hands it to a
+/// service, Select All does nothing, and accessibility reads it as empty.
+class WithheldTextView: NSTextView {
     override func copy(_ sender: Any?) {}
     override func cut(_ sender: Any?) {}
     override func selectAll(_ sender: Any?) {}
@@ -714,6 +767,11 @@ final class SecretTextView: NSTextView {
     override func accessibilitySelectedText() -> String? { nil }
     override func accessibilityString(for range: NSRange) -> String? { nil }
     override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? { nil }
+}
+
+/// The password half of `SystemPasswordPicker`: a text view, so AppKit pairs it with the username half, that
+/// accessibility reads as a secure field.
+final class SecretTextView: WithheldTextView {
     override func accessibilitySubrole() -> NSAccessibility.Subrole? { .secureTextField }
 }
 
