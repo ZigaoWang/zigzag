@@ -1633,6 +1633,8 @@ nonisolated enum ExtensionWrite {
         default: break
         }
         for header in input.headers where mayBeSet(header[0], header[1]) { request.setValue(header[1], forHTTPHeaderField: header[0]) }
+        // URLSession gives a body without one application/x-www-form-urlencoded; CFNetwork can't leave the line out, so it's empty.
+        if input.body != nil, request.value(forHTTPHeaderField: "Content-Type") == nil { request.setValue("", forHTTPHeaderField: "Content-Type") }
         request.setValue(input.origin, forHTTPHeaderField: "Origin")
         var redirected = false
         // Whether this hop goes to a site the extension may reach; one it may not gets no cookies and needs CORS.

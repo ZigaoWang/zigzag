@@ -821,6 +821,32 @@ extension ExtensionBridgeTests {
         #expect(server.requests.withLock { $0 } == before)
     }
 
+    /// A body goes out with the Content-Type the extension's request had, or none: never URLSession's own form type,
+    /// which Chrome doesn't send for bytes (Hotspot Shield's protobuf sign-in, #475).
+    @Test func aBodySendsOnlyTheContentTypeItWasGiven() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        let requests = ExtensionFetchRequests()
+        func sentTypes(_ headers: [[String]], body: String = "CiAIAA==", encoding: String? = "base64") async throws -> [String] {
+            var options: [String: Any] = ["credentials": "omit", "method": "POST", "body": body, "headers": headers]
+            if let encoding { options["encoding"] = encoding }
+            let answer = try #require(try await requests.withHostAccess(options, url: url.appendingPathComponent("headers"), extensionID: "test", store: store,
+                                                                        keepsSameSiteCookies: { false }, authorize: { _ in true }) as? [String: Any])
+            let sent = String(decoding: Data(base64Encoded: answer["body"] as? String ?? "") ?? Data(), as: UTF8.self)
+            return sent.components(separatedBy: "\r\n").map { $0.lowercased() }.filter { $0.hasPrefix("content-type:") }
+        }
+        // Bytes, as an ArrayBuffer, a typed array or a Blob without a type: no type. CFNetwork always writes the line,
+        // so it goes empty, which servers read as none.
+        let none = try await sentTypes([])
+        #expect(none == ["content-type: "], "\(none)")
+        // What the request carried, as fetch derived it (a string's, a form's boundary) or the extension set it.
+        #expect(try await sentTypes([["content-type", "text/plain;charset=UTF-8"]], body: "hi", encoding: nil) == ["content-type: text/plain;charset=utf-8"])
+        #expect(try await sentTypes([["content-type", "multipart/form-data; boundary=----x"]]) == ["content-type: multipart/form-data; boundary=----x"])
+        #expect(try await sentTypes([["Content-Type", "application/x-protobuf"]]) == ["content-type: application/x-protobuf"])
+    }
+
     /// bridge.js hands omit to Zigzag like the other credentials, with what the request carries, and reads the answer
     /// as sent; Zigzag's fallback answer, as without host access, leaves it to WebKit.
     @Test func omitFetchGoesToZigzag() async throws {
