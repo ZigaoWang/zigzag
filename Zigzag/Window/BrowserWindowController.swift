@@ -2070,6 +2070,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             translationToastTab = nil
             Toast.hide(in: self)
         }
+        // Failed, timed out or cancelled too: the button leaves the accent.
+        updateTranslateButton()
     }
 
     #if DEBUG
