@@ -19,6 +19,12 @@ final class CapturePreview: FloatingPanelView {
     private let copyTile: PanelTile
     private let saveTile: PanelTile
     private let shareTile: PanelTile
+    /// An × in the corner while the pointer is on the card, white on a dark disc so it reads over any picture; at 13pt
+    /// its ink sits on the disc's middle.
+    private let closeButton = IconButton(symbol: "xmark", size: CapturePreview.closeSide, symbolSize: 13,
+                                         toolTip: String(localized: "Close", comment: "Tooltip of the × on the card a capture leaves in the page's corner: puts the card away."))
+    private let closeDisc = ColorView(color: NSColor(white: 0, alpha: 0.62))
+    private var tracking: NSTrackingArea?
     private var monitors: [Any] = []
     private var hideWork: DispatchWorkItem?
     private var closed = false
@@ -46,6 +52,15 @@ final class CapturePreview: FloatingPanelView {
         thumbnail.toolTip = String(localized: "Drag into Another App", comment: "Tooltip of a capture's picture on the card after Capture.")
         thumbnail.setAccessibilityLabel(String(localized: "Captured picture", comment: "VoiceOver name of a capture's picture on the card after Capture."))
         [thumbnail, copyTile, saveTile, shareTile].forEach { addSubview($0) }
+        closeButton.tint = .white
+        closeButton.isHidden = true
+        closeDisc.wantsLayer = true
+        closeDisc.isHidden = true
+        closeDisc.layer?.shadowColor = NSColor.black.cgColor
+        closeDisc.layer?.shadowOpacity = 0.25
+        closeDisc.layer?.shadowRadius = 3
+        closeDisc.layer?.shadowOffset = .zero
+        closeButton.onClick = { [weak self] _ in self?.close() }
         if let note {
             note.usesSingleLineMode = false
             note.maximumNumberOfLines = 2
@@ -53,6 +68,7 @@ final class CapturePreview: FloatingPanelView {
             note.cell?.wraps = true
             addSubview(note)
         }
+        [closeDisc, closeButton].forEach { addSubview($0) }
         copyTile.onClick = { [weak self] _ in self?.copyAgain() }
         saveTile.onClick = { [weak self] _ in self?.onSave?() }
         shareTile.onClick = { [weak self] _ in self?.share() }
@@ -69,6 +85,15 @@ final class CapturePreview: FloatingPanelView {
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel(String(localized: "Screenshot copied", comment: "Toast after taking a screenshot of the whole page."))
+        setAccessibilityCustomActions([
+            NSAccessibilityCustomAction(name: closeButton.toolTip ?? "") { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return false }
+                    self.close()
+                    return true
+                }
+            },
+        ])
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -78,6 +103,9 @@ final class CapturePreview: FloatingPanelView {
 
     private static let pad = Tokens.Space.x3
     private static let rowInset = Tokens.Space.x1
+    /// The ×'s disc, concentric with the card's corner.
+    private static let closeSide: CGFloat = 20
+    private static var closeInset: CGFloat { Tokens.Radius.panel - closeSide / 2 }
     private var pictureWidth: CGFloat { Tokens.Metric.capturePreviewWidth - Self.pad * 2 }
     private var pictureSize: NSSize {
         CaptureGeometry.thumbnailSize(for: image.size, width: pictureWidth, maxHeight: Tokens.Metric.capturePreviewMaxImage)
@@ -106,6 +134,27 @@ final class CapturePreview: FloatingPanelView {
         for (i, tile) in tiles.enumerated() {
             tile.frame = NSRect(x: Self.rowInset + CGFloat(i) * (width + Tokens.Space.x1), y: y, width: width, height: PanelTile.captionedHeight)
         }
+        let side = Self.closeSide, inset = Self.closeInset
+        closeButton.frame = NSRect(x: bounds.width - inset - side, y: inset, width: side, height: side)
+        closeButton.radius = side / 2
+        closeDisc.frame = closeButton.frame
+        closeDisc.layer?.cornerRadius = side / 2
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { showClose(true) }
+    override func mouseExited(with event: NSEvent) { showClose(false) }
+
+    private func showClose(_ shown: Bool) {
+        closeButton.isHidden = !shown
+        closeDisc.isHidden = !shown
     }
 
     private func copyAgain() {

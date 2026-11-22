@@ -6701,7 +6701,7 @@
       }
     },
     "Close" : {
-      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.\nTooltip of the × on a notice over the page, like a script's while it runs.",
+      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.\nTooltip of the × on a notice over the page, like a script's while it runs.\nTooltip of the × on the card a capture leaves in the page's corner: puts the card away.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

@@ -537,7 +537,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Element (the chosen one the soft card), a hairline, Full Page and Visible, Capture (the one prominent pill, once an
   area is drawn) and ×, names dropped for icons alone in a narrow pane; keys in the tooltips (A, E, F, V, Return,
   Esc). After it, the card in the page's bottom right, `capturePreviewWidth`, growing out of that corner: the picture
-  (a tall one from its top) to drag out, then Copied, Save and Share as Site Controls' captioned tiles. It goes after
+  (all of it at its own shape, a thin strip centered on `fieldFill`, a full page's top fading out below) to drag out, an × on a dark disc in its corner
+  while the pointer is on it, then Copied, Save and Share as Site Controls' captioned tiles. It goes after
   six seconds unless the pointer is on it, or at a click elsewhere or Esc.
 - **Full screen in the page** (`PageFullScreen`, #168): with Settings › Tabs › Full screen videos fill set to The Page,
   or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)
