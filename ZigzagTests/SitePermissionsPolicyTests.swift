@@ -458,6 +458,14 @@ import WebKit
         #expect(!PopupNotice.countsAsClicked(sinceInput: PopupNotice.sinceInput(in: other, now: 100.4), windowIsKey: true, fromMainFrame: true))
     }
 
+    /// A click on one page doesn't count for the next page's pop-up in the same web view.
+    @MainActor @Test func aNewPageDoesntCountInputOnThePageBefore() {
+        let webView = WKWebView()
+        PopupNotice.noteInput(in: webView, at: 100)
+        PopupNotice.forgetInput(in: webView)
+        #expect(PopupNotice.sinceInput(in: webView, now: 100.4) == nil)
+    }
+
     /// The diagnostics line for an unclicked pop-up says where it was and whether you had just used a page.
     @Test func anUnclickedPopUpNotesWhereAndYourLastInput() {
         #expect(PopupNotice.unclickedNote(inMini: true, sinceInput: 0.34) == "in Zigzag Mini, a click or key in a page 0.3 s before")

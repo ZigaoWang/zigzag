@@ -667,6 +667,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         openedByRule = false
+        // A click on the page before doesn't let this one open a pop-up.
+        PopupNotice.forgetInput(in: webView)
         PageDialogs.pageLoaded(webView)
         shownURL = webView.url
         errorShownFor = ErrorPage.consume(webView) ? webView.url : nil

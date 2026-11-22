@@ -2222,6 +2222,8 @@ extension Tab: WKNavigationDelegate {
         // A new document, even at the same address: nothing translated is in it.
         isTranslated = false
         changed.send(.document)
+        // A click on the page before doesn't let this one open a pop-up.
+        PopupNotice.forgetInput(in: webView)
         // The new page is here: its address shows.
         addressWaitsForCommit = false
         // Before the address updates, so a pinned page isn't marked as moved on.

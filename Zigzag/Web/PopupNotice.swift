@@ -99,6 +99,11 @@ enum PopupNotice {
         lastInput.setObject(NSNumber(value: time), forKey: webView)
     }
 
+    /// A new document in the web view: input on the page before it doesn't count for its pop-ups.
+    static func forgetInput(in webView: WKWebView) {
+        lastInput.removeObject(forKey: webView)
+    }
+
     /// Seconds since your last click or key in this page; nil if none.
     static func sinceInput(in webView: WKWebView, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> TimeInterval? {
         lastInput.object(forKey: webView).map { now - $0.doubleValue }
