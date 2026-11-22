@@ -89,6 +89,15 @@ final class EdgePeek {
     /// works and offers the window. Setting it does not change `tab`: the note has no page of its own.
     private(set) var noticeTab: Tab?
     var isVisible: Bool { tab != nil || noticeTab != nil }
+    /// Whether the panel in `owner` has this page, or takes it on this selection pass. The window keeps such a page
+    /// out of its card: the site is only ever given the panel's final size, and the fold over it stays a mask on the
+    /// holder. Another window sharing the tab keeps its own card.
+    func holdsPage(_ page: Tab, in owner: BrowserWindowController) -> Bool {
+        guard isVisible, controller === owner else { return false }
+        if tab === page { return true }
+        guard spaceHandoff != nil else { return false }
+        return owner.tabManager.selectedTab === page
+    }
     private weak var controller: BrowserWindowController?
     /// Where the page came from, so closing puts it back there.
     private weak var origin: NSView?
@@ -470,6 +479,22 @@ final class EdgePeek {
                 origin.needsLayout = true
             }
         }
+        // The window kept this page out of its card while the panel had it, so it goes back once the holder is free,
+        // if the window still shows that tab. Without this a page handed over with the space would be left with no
+        // view when the panel closed.
+        let showInWindow = {
+            guard reason != .windowClose, let controller, let tab, !tab.isClosed,
+                  controller.window?.isVisible == true, controller.tabManager.selectedTab === tab,
+                  tab.pageHolder?.window == nil else { return }
+            controller.showHere(tab)
+        }
+        // Let go of the page before the fold-out finishes so the window can take it back without the panel's claim
+        // on it stopping the card.
+        releaseObservers()
+        self.tab = nil
+        self.lockedTab = nil
+        self.controller = nil
+        self.origin = nil
         let folding = resize && EdgeSidebar.shared.isShowing
         if forNote, !Tokens.Motion.reduceMotion {
             // The note's fold covers the live page before it goes: the page stays in its place for the 0.16 s fold
@@ -479,22 +504,22 @@ final class EdgePeek {
                 MainActor.assumeIsolated {
                     restore()
                     EdgeSidebar.shared.pageFoldedIntoNote()
+                    showInWindow()
                 }
             }
         } else if folding {
             EdgeSidebar.shared.pageDetached(resize: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                MainActor.assumeIsolated { restore() }
+                MainActor.assumeIsolated {
+                    restore()
+                    showInWindow()
+                }
             }
         } else {
             restore()
             EdgeSidebar.shared.pageDetached(resize: false)
+            showInWindow()
         }
-        releaseObservers()
-        self.tab = nil
-        self.lockedTab = nil
-        self.controller = nil
-        self.origin = nil
         // The panel may stay (Esc, a blank click): its rows and address go back to the browser's selected tab.
         controller?.setEdgeSelection(nil)
         controller?.setEdgePeek(nil)

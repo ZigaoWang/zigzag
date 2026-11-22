@@ -1247,6 +1247,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             for (i, card) in cards.enumerated() {
                 guard pages.indices.contains(i) else { clear(card); continue }
                 let page = pages[i]
+                // The edge panel has this page (or takes it this pass): its card stays out of the way, so the site is
+                // never given the card's size on the way to the panel's final one, and the fold stays a mask.
+                if EdgePeek.shared.holdsPage(page, in: self) {
+                    page.reloadIfItStopped()
+                    // A card already showing it keeps its settings; one showing another page lets that page go.
+                    if card.webView !== page.webView { clear(card) }
+                    continue
+                }
                 // Swap and the layout are a split of two's; a tile group's pages keep the places they were dropped in.
                 card.header.arrangesSplit = !pair.isGroup
                 card.header.resetsLayout = pair.shape.isParted
@@ -1286,14 +1294,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.setZoomedPane(nil, animated: false)
             root.setTiles(nil, animated: true)
             root.isEmpty = tab == nil
-            if let tab, !tabManager.mayShow(tab) {
+            let edgeHasPage = tab.map { EdgePeek.shared.holdsPage($0, in: self) } ?? false
+            if edgeHasPage {
+                // The page is the panel's: its card stays out of the way, so the site only gets the panel's size.
+                if root.card.webView !== tab?.webView { clear(root.card) }
+            } else if let tab, !tabManager.mayShow(tab) {
                 root.card.showElsewhere(tab) { [weak self] in self?.showHere(tab) }
             } else {
                 root.card.showElsewhere(nil)
                 root.card.show(tab?.ensureWebView())
             }
             tab?.reloadIfItStopped()
-            root.card.showLoading(of: tab)
+            if !edgeHasPage { root.card.showLoading(of: tab) }
             root.card.isFocusedPane = false
             root.card.isUnfocusedPane = false
             root.card.showsHeader = false
