@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Open in (⌘O) in Zigzag Mini brings Zigzag forward with the page, in a browser window on the desktop you're on when there is one. It used to leave the window behind other apps or on another desktop.
-- Pointing at a split view's row in the sidebar no longer shows the Mac's gray tooltip with a page's title. Zigzag's own hover card shows its pages instead.
-
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, and Your Zigzag Card.
@@ -29,6 +25,8 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - New spaces start in Lagoon, teal running into blue on clear glass with the desktop showing through, airy on a light Mac and deep on a dark one, and the space editor has fourteen glass looks with moods of their own: gradients Lagoon, Sunset, Dusk and Citrus; deep Midnight, Petrol, Forest and Merlot; bright Watermelon, Fuchsia and Volt; and soft Lilac, Seafoam and Dune, beside solid white. Deep ones keep the window dark with light text. Your spaces keep the colors they have now.
 
 ### Fixed
+- Open in (⌘O) in Zigzag Mini brings Zigzag forward with the page, in a browser window on the desktop you're on when there is one. It used to leave the window behind other apps or on another desktop.
+- Pointing at a split view's row in the sidebar no longer shows the Mac's gray tooltip with a page's title. Zigzag's own hover card shows its pages instead.
 - Settings says less: lines under a label that only repeated it are gone, the lines that stay carry a consequence or a warning, and choices that asked the same question in different words now use one. Extension Site Access says On Click. ([#448](https://github.com/ZigaoWang/zigzag/issues/448))
 - The address field no longer shows the star where there is nothing to pin: on Zigzag's own pages (Settings, History, the archive), a new tab and private windows. It used to sit there dimmed, and the pins beside it now take its place. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#442](https://github.com/ZigaoWang/zigzag/issues/442))
 - A theme from the Chrome Web Store or Firefox Add-ons, or a theme folder picked with Install from Folder, isn't installed. Zigzag doesn't use browser themes, so it says that and points to a space's colors, where it used to add the theme as an extension that did nothing. Add on the bar over a store theme ends with that one line, without a Try Again that could only fail the same way. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#454](https://github.com/ZigaoWang/zigzag/issues/454))
