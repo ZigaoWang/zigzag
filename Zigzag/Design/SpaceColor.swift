@@ -5,11 +5,14 @@ import AppKit
 enum SpaceColor: String, Codable, CaseIterable {
     case snow, graphite, ink, sky, sage, sand, rose, lavender, mint, peach
     case slate, stone, smoke, azure, navy, seafoam, pine, fern, citron, coral, red, iris, pink
+    case mist, dew, shell, orchid
 
-    /// The space editor's glass (`look`): neutrals, then cool, then warm, then the violet and the pink.
-    static let palette: [SpaceColor] = [.slate, .stone, .smoke, .azure, .navy, .seafoam, .pine, .fern, .citron, .coral, .red, .iris, .pink]
+    /// The space editor's glass (`look`): neutrals, the washes, then cool, then warm, then the violet and the pink.
+    static let palette: [SpaceColor] = neutrals + washes + [.azure, .navy, .seafoam, .pine, .fern, .citron, .coral, .red, .iris, .pink]
     /// The neutral glasses, which lead the editor's row with white.
     static let neutrals: [SpaceColor] = [.slate, .stone, .smoke]
+    /// Near-white glass with a faint tint, after white in the editor's row. New spaces don't get them.
+    static let washes: [SpaceColor] = [.mist, .dew, .shell, .orchid]
     /// The order new spaces take them in: slate first, then each far from the one before.
     static let newSpaceOrder: [SpaceColor] = [.slate, .fern, .coral, .azure, .pine, .citron, .navy, .red, .seafoam, .iris, .smoke, .pink, .stone]
     /// The palette of the 0.9.4 betas, by the name each was saved under, and the color it reads as now.
@@ -73,6 +76,10 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .red: PaletteLook(hue: 0.9808, depth: 0.76, tint: 1.35, seeThrough: 0.35, day: 0.76, night: 0.86)
         case .iris: PaletteLook(hue: 0.7425, depth: 0.28, tint: 1.15, hue2: 0.7627, depth2: 0.315, seeThrough: 0.5, day: 0.28, night: 0.92)
         case .pink: PaletteLook(hue: 0.9005, depth: 0.28, tint: 1.15, seeThrough: 0.5, day: 0.28, night: 0.92)
+        case .mist: PaletteLook(hue: 0.6, depth: 0.07, tint: 0.9, seeThrough: 0.4, day: 0.07, night: 0.95)
+        case .dew: PaletteLook(hue: 0.42, depth: 0.07, tint: 0.8, seeThrough: 0.4, day: 0.07, night: 0.95)
+        case .shell: PaletteLook(hue: 0.075, depth: 0.07, tint: 0.9, seeThrough: 0.4, day: 0.07, night: 0.97)
+        case .orchid: PaletteLook(hue: 0.8, depth: 0.07, tint: 0.8, seeThrough: 0.4, day: 0.07, night: 0.95)
         default: nil
         }
     }
@@ -111,6 +118,10 @@ enum SpaceColor: String, Codable, CaseIterable {
         case .red: String(localized: "Red", comment: "Name of a curated space color, in the space editor. A true red.")
         case .iris: String(localized: "Iris", comment: "Name of a curated space color, in the space editor. A blue violet.")
         case .pink: String(localized: "Pink", comment: "Name of a curated space color, in the space editor. A clear pink.")
+        case .mist: String(localized: "Mist", comment: "Name of a curated space color, in the space editor. A near-white glass with a faint cool blue tint.")
+        case .dew: String(localized: "Dew", comment: "Name of a curated space color, in the space editor. A near-white glass with a faint mint green tint.")
+        case .shell: String(localized: "Shell", comment: "Name of a curated space color, in the space editor. A near-white glass with a faint warm peach tint, like a seashell.")
+        case .orchid: String(localized: "Orchid", comment: "Name of a curated space color, in the space editor. A near-white glass with a faint lilac tint.")
         }
     }
 

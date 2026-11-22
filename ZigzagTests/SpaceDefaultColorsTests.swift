@@ -226,7 +226,7 @@ struct SpacePaletteTests {
 
     @Test func thePaletteIsDistinctGlass() {
         let looks = SpaceColor.palette.compactMap(\.look)
-        #expect(looks.count == 13)
+        #expect(looks.count == 17)
         #expect(looks.allSatisfy { (0.35...0.55).contains($0.seeThrough) })
         // Deep ones and light ones, and at most three gradients, each a small drift of one hue.
         let spaces = looks.map(\.space)
@@ -239,8 +239,9 @@ struct SpacePaletteTests {
             let d = abs(okHue(look.hue) - okHue(look.hue2!)).truncatingRemainder(dividingBy: 360)
             #expect(min(d, 360 - d) <= 20, "\(look.name)")
         }
-        // Neutrals lead the editor's row, white among them.
+        // Neutrals lead the editor's row, white among them, then the washes.
         #expect(SpaceLook.presets.prefix(4).map(\.name) == SpaceColor.neutrals.map(\.name) + [SpaceLook.white.name])
+        #expect(SpaceLook.presets.dropFirst(4).prefix(SpaceColor.washes.count).map(\.name) == SpaceColor.washes.map(\.name))
         func lab(_ c: NSColor) -> (l: Double, a: Double, b: Double) {
             OKLab.lab(r: OKLab.decode(c.redComponent), g: OKLab.decode(c.greenComponent), b: OKLab.decode(c.blueComponent))
         }
@@ -253,6 +254,23 @@ struct SpacePaletteTests {
             }
             #expect(distance > 0.03, "\(a.name) and \(b.name): \(distance)")
         }
+    }
+
+    /// The washes are near-white glass with a faint tint of their own, for a preset only: new spaces don't get them.
+    @Test func theWashesAreFaintTintsNearWhite() {
+        for color in SpaceColor.washes {
+            let space = color.look!.space
+            let day = resolved(space.background, dark: false)
+            #expect(Brand.relativeLuminance(day) > 0.75, "\(color)")
+            #expect(day.saturationComponent > 0.03 && day.saturationComponent < 0.15, "\(color)")
+            #expect(space.readableAppearance == "light", "\(color)")
+            #expect(!SpaceColor.newSpaceOrder.contains(color))
+        }
+    }
+
+    /// The editor's swatches, Default and the picture and Custom with the presets, fill whole rows.
+    @Test func theEditorsSwatchesFillWholeRows() {
+        #expect(SpaceLookEditor.tileCount % SpaceLookEditor.columns == 0)
     }
 
     /// Primary text at 4.5:1 or more on every preset, in the mode its window takes, and on what new spaces get in both

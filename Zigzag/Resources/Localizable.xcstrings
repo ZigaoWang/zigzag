@@ -78,6 +78,50 @@
         }
       }
     },
+    "Mist" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint cool blue tint.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "雾蓝"
+          }
+        }
+      }
+    },
+    "Dew" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint mint green tint.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "露绿"
+          }
+        }
+      }
+    },
+    "Shell" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint warm peach tint, like a seashell.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "贝壳"
+          }
+        }
+      }
+    },
+    "Orchid" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint lilac tint.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兰紫"
+          }
+        }
+      }
+    },
     "Languages and sites you never translate show up here." : {
       "comment" : "Under Never Translate in Settings › Translation, when there's no language or site.",
       "localizations" : {
