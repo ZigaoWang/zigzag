@@ -5,9 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- A split favorite's × no longer sits on top of another page's icon. Pointing at one page's icon turns that icon into a ×, which unloads only that page, as the × on each page of a pinned split's row does. A middle-click still unloads them all.
-
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, and Your Zigzag Card.
@@ -28,6 +25,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - New spaces start in Lagoon, teal running into blue on clear glass with the desktop showing through, airy on a light Mac and deep on a dark one, and the space editor has fourteen glass looks with moods of their own: gradients Lagoon, Sunset, Dusk and Citrus; deep Midnight, Petrol, Forest and Merlot; bright Watermelon, Fuchsia and Volt; and soft Lilac, Seafoam and Dune, beside solid white. Deep ones keep the window dark with light text. Your spaces keep the colors they have now.
 
 ### Fixed
+- A split favorite's × no longer sits on top of another page's icon. Pointing at one page's icon turns that icon into a ×, which unloads only that page, as the × on each page of a pinned split's row does. A middle-click still unloads them all.
 - Open in (⌘O) in Zigzag Mini brings Zigzag forward with the page, in a browser window on the desktop you're on when there is one. It used to leave the window behind other apps or on another desktop.
 - Pointing at a split view's row in the sidebar no longer shows the Mac's gray tooltip with a page's title. Zigzag's own hover card shows its pages instead.
 - Settings says less: lines under a label that only repeated it are gone, the lines that stay carry a consequence or a warning, and choices that asked the same question in different words now use one. Extension Site Access says On Click. ([#448](https://github.com/ZigaoWang/zigzag/issues/448))
