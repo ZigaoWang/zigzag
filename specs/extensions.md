@@ -55,6 +55,10 @@
   Test: SiteExtensionsTests.thePinMarkFollowsThePins
 - Pinning → up to three; a new pin goes to the left of the others.
   Test: AddressTests.atMostThreeExtensionsArePinned
+- A chrome-extension://<id>/… address, typed or given by an extension → opens that extension's page; an extension that isn't installed → "This extension isn't here".
+  Test: ChromeExtensionAddressTests.chromesAddressBecomesZigzagsOwn
+- A website's link to a chrome-extension:// address → goes nowhere; only Zigzag and the extension's own pages open them.
+  Test: ChromeExtensionAddressTests.aWebsiteCantSendATabThere
 
 ## Keywords
 - Type an extension's keyword and a space → the address bar hands what follows to that extension.

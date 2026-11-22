@@ -339,7 +339,7 @@ final class Tab: NSObject {
         self.id = id
         // A web view WebKit made for a page's new window shows no address until its first page arrives: the page
         // that opened it can write into it while a load that never finishes would name another site over it.
-        self.url = configuration == nil ? url : nil
+        self.url = configuration == nil ? url.map(Self.extensionPageAddress) : nil
         self.title = title ?? (SettingsPage.isSettings(self.url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : self.url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
         self.spaceID = spaceID
         // A page WebKit made for another page's new window is in that page's profile, whatever space it lands in.
@@ -850,6 +850,7 @@ final class Tab: NSObject {
     /// `httpFallback`: `url` is https chosen for a scheme-less address; retry once over http if unreachable
     /// (`CommandRanker.Destination`).
     func load(_ url: URL, by sender: LoadSender = .zigzag, httpFallback: Bool = false) {
+        let url = Self.extensionPageAddress(url)
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
@@ -894,7 +895,7 @@ final class Tab: NSObject {
         let scheme = url.scheme?.lowercased() ?? ""
         if ["http", "https", "about", "blob"].contains(scheme) { return .load }
         if scheme == "file" { return page?.isFileURL == true ? .load : .refuse }
-        if scheme.isEmpty || ["javascript", "data", "webkit-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
+        if scheme.isEmpty || ["javascript", "data", "webkit-extension", "chrome-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
         return .app
     }
 
@@ -975,6 +976,20 @@ final class Tab: NSObject {
     private let downloads = DownloadPolicy()
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
+
+    /// Chrome's address for an extension's page, chrome-extension://<id>/<path>, as Zigzag's own: each extension's
+    /// pages are at webkit-extension://<id>/ (ExtensionHost). Any other address comes back as it was.
+    nonisolated static func extensionPageAddress(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "chrome-extension", var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let id = parts.host?.lowercased(), !id.isEmpty else { return url }
+        parts.scheme = "webkit-extension"
+        parts.host = id
+        parts.user = nil
+        parts.password = nil
+        parts.port = nil
+        if parts.percentEncodedPath.isEmpty { parts.percentEncodedPath = "/" }
+        return parts.url ?? url
+    }
 
     /// What a page may open in a new window or tab (window.open, target=_blank, Open Link in New Tab): anything but
     /// Zigzag's own pages, which open from Zigzag.
@@ -1105,8 +1120,8 @@ final class Tab: NSObject {
         let profile = Self.profile(of: webView)
         if isExtensionPage(url), extensionConfiguration(for: url, in: profile) == nil {
             // Opened by an extension that's still loading (1Password's welcome page, right after it installs):
-            // wait for it, briefly, before saying the page is unavailable.
-            if #available(macOS 15.4, *) {
+            // wait for it, briefly, before saying the page is unavailable. One that isn't installed says so at once.
+            if #available(macOS 15.4, *), url.host().map(profile.installs.hasRecord) == true {
                 var token: SignalToken?
                 var waited = false
                 token = profile.extensions.changed.observe { [weak webView] in
@@ -1794,6 +1809,18 @@ extension Tab: WKNavigationDelegate {
         if url.scheme?.lowercased() == HistoryPage.scheme,
            !Self.mayGoToInternalPage(ownLoad: ownLoad, ownHistory: ownHistory, isBackForward: navigationAction.navigationType == .backForward,
                                      fromInternalPage: navigationAction.sourceFrame.securityOrigin.protocol == HistoryPage.scheme) {
+            return (.cancel, preferences)
+        }
+        // Chrome's address for an extension's page: opened from Zigzag or that extension's own pages, refused from others.
+        if url.scheme?.lowercased() == "chrome-extension" {
+            let page = Self.extensionPageAddress(url)
+            let source = navigationAction.sourceFrame.securityOrigin
+            let ownPage = source.protocol == "webkit-extension" && source.host.lowercased() == page.host()
+            if Self.isExtensionPage(page), navigationAction.targetFrame?.isMainFrame ?? true, ownSender != nil || ownPage {
+                DispatchQueue.main.async { [weak self] in self?.load(page, by: ownSender ?? .page) }
+            } else {
+                Diagnostics.note("Refused a page's link", site: webView.url?.host(), "chrome-extension:", isPrivate: isPrivate)
+            }
             return (.cancel, preferences)
         }
         if ExternalLinks.isExternal(url) {

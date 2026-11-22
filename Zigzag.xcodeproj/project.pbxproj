@@ -321,6 +321,8 @@
 		FF59F27CC6FDECF72DCB1FB4 /* FirefoxManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF38357DDDD3FEBE61157B80 /* FirefoxManifestTests.swift */; };
 		FF8D840F91AF2964E0AE8A63 /* FirefoxInstallTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxInstallTests.swift; sourceTree = "<group>"; };
 		FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF8D840F91AF2964E0AE8A63 /* FirefoxInstallTests.swift */; };
+		C4E47500A0B1C2D3E4F50002 /* ChromeExtensionAddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E47500A0B1C2D3E4F50001 /* ChromeExtensionAddressTests.swift */; };
+		C4E47500A0B1C2D3E4F50001 /* ChromeExtensionAddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromeExtensionAddressTests.swift; sourceTree = "<group>"; };
 		8BCB7AC803E4BEF7AE6B163F /* PDFService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59FDCE08F5D924D2BB0AA3A /* PDFService.swift */; };
 		8BE0DCBEBFC4E933AA1C0531 /* BlockedScriptStandInsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5275896F347F531AE3C184 /* BlockedScriptStandInsTests.swift */; };
 		8C7416CD981D4B2160DB8AA4 /* darkreader.info.json in Resources */ = {isa = PBXBuildFile; fileRef = 1EC914DFACAD0B1C40DF98C9 /* darkreader.info.json */; };
@@ -1772,6 +1774,7 @@
 				FF8B61EA3ED59212399D4BA4 /* FirefoxSurfaceTests.swift */,
 				FF38357DDDD3FEBE61157B80 /* FirefoxManifestTests.swift */,
 				FF8D840F91AF2964E0AE8A63 /* FirefoxInstallTests.swift */,
+				C4E47500A0B1C2D3E4F50001 /* ChromeExtensionAddressTests.swift */,
 				DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */,
 				AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */,
 				8D4C44C0E24339E50B51709A /* AdFiltersTests.swift */,
@@ -2655,6 +2658,7 @@
 			files = (
 				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
 				FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */,
+				C4E47500A0B1C2D3E4F50002 /* ChromeExtensionAddressTests.swift in Sources */,
 				FF59F27CC6FDECF72DCB1FB4 /* FirefoxManifestTests.swift in Sources */,
 				FF3D11A4B887788C1215A37E /* FirefoxSurfaceTests.swift in Sources */,
 				FF4A41F3AC05F211C900F90D /* XPIPackageTests.swift in Sources */,

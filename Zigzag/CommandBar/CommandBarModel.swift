@@ -66,7 +66,9 @@ enum CommandRanker {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
         let lower = trimmed.lowercased()
-        if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("file://") || lower.hasPrefix("about:") {
+        // An extension's page as Chrome names it opens as Zigzag's own (Tab.extensionPageAddress).
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("file://") || lower.hasPrefix("about:")
+            || lower.hasPrefix("chrome-extension://") {
             return URL(string: trimmed).map { Destination(url: $0) }
         }
         // The host is everything before the first of / ? #; the port comes off too.

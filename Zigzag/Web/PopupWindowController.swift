@@ -641,6 +641,15 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
            await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, wasClicked: true) { return .cancel }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
+        // Chrome's address for a page of the extension showing here goes to Zigzag's own for it (Tab.extensionPageAddress).
+        if let url = navigationAction.request.url, url.scheme?.lowercased() == "chrome-extension" {
+            let page = Tab.extensionPageAddress(url)
+            let source = navigationAction.sourceFrame.securityOrigin
+            if navigationAction.targetFrame?.isMainFrame ?? true, source.protocol == "webkit-extension", source.host.lowercased() == page.host() {
+                DispatchQueue.main.async { [weak webView] in webView?.load(URLRequest(url: page)) }
+            }
+            return .cancel
+        }
         // Set WebRTC for the destination before its page is made, as in a tab.
         if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url, !ExternalLinks.isExternal(url) {
             WebRTCProtection.apply(to: webView, for: url, here: webRTCChoices)
@@ -1137,7 +1146,7 @@ final class PopupTab: NSObject, WKWebExtensionTab {
     func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { true }
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        popup?.webView.load(URLRequest(url: url))
+        popup?.webView.load(URLRequest(url: Tab.extensionPageAddress(url)))
         completionHandler(nil)
     }
 

@@ -1550,7 +1550,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void) {
         // A small window of the extension's own page (a volume control), as Chrome opens it, not a whole browser window.
         if configuration.windowType == .popup, configuration.tabURLs.count <= 1, !configuration.shouldBePrivate {
-            let url = configuration.tabURLs.first ?? extensionContext.baseURL
+            let url = configuration.tabURLs.first.map(Tab.extensionPageAddress) ?? extensionContext.baseURL
             let pageConfiguration = url.host() == extensionContext.baseURL.host() ? extensionContext.webViewConfiguration : nil
             let popup = PopupWindowController.openForExtension(url: url, configuration: pageConfiguration ?? WebKitSetup.makeConfiguration(for: profile),
                                                                frame: configuration.frame, parent: WindowManager.shared.keyController?.window)
