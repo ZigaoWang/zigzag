@@ -19,10 +19,8 @@
 ## The split row
 - A split shows as one sidebar row with a part per page; clicking a part selects that page.
   Test: SplitDropTests.aSplitShowsInOneRow
-- The row's × sits at its end, where a single tab's does, in the tab list and among the pinned pages.
-  Test: SplitCloseTests.theCloseButtonSitsWhereASingleTabsDoes
-- Click × on the row → closes every page of the split; one ⌘Z brings them all back.
-  Test: SplitCloseTests.theRowsCloseButtonClosesTheSplit
+- Click × on the row → closes only the page of the part it sits in.
+  Test: SplitCloseTests.theRowsCloseButtonClosesOnePart
 - A split of two, three or four pages draws the same row in the tab list and among the pinned pages.
   Test: PinnedGroupTests.bothSectionsDrawTheSameRow
 - Middle-click the row → closes the page of the part under the pointer.
@@ -47,6 +45,8 @@
   Test: PinnedGroupTests.onePageLeavesAPinnedSplitOfThree
 - Close one page of a pinned split → that page unloads; the pin keeps every page.
   Test: PinnedGroupTests.closingOnePinnedPageKeepsThePin
+- A pinned split's row has the same × in each part as a split of tabs; click it → only that page unloads.
+  Test: PinnedGroupTests.aPinnedPartsCloseButtonUnloadsOnlyIt
 - Drop a tab or a pinned page on either half of a pinned split's row → it joins as a third or fourth page, as on a split of tabs; at four, the row only moves.
   Test: PinnedGroupTests.aDropGrowsAPinnedSplitAsATabSplit
 - Drag one page of a pinned split out by its strip → into Pinned it stays pinned on its own there, into the tabs it's a tab; the rest stay a pinned split, or one pinned page.
@@ -87,7 +87,7 @@
   Test: PaneHeaderTests.aFileShowsItsNameAndAWebPageItsAddress
 
 ## Closing and suspending one page
-- Close one page of a split of two (⌘W, × on its strip, or a middle-click on its row part) → the one left takes the split row's place as a plain tab.
+- Close one page of a split of two (⌘W, or × on its strip or row part) → the one left takes the split row's place as a plain tab.
   Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
 - Suspend Page on one page of a split → that page leaves the split and sleeps; the other stays shown.
   Test: SidebarRowMenuTests.onePageOfASplitSleepsAndTheOtherStaysShown

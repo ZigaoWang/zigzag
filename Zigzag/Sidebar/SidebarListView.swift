@@ -1024,11 +1024,10 @@ final class SidebarListView: NSView {
             // In a row of several pages, the part double-clicked is the page renamed.
             row.onDoubleClick = { [weak row] in row?.beginRename(at: Self.pointer(in: row)) }
             row.onRename = { [weak row] name in (row?.renamingPage ?? row?.tab)?.customTitle = name.isEmpty ? nil : name }
-            // The × closes the row: a split's or group's every page, as a single tab's one. A middle-click closes the
-            // part's page alone (#404).
+            // A split row's × closes the page of the part it's on, as a middle-click there does; the rest stay open (#404).
             row.onClose = { [weak self, weak row] in
-                guard let row, let tab = row.tab else { return }
-                if row.pages.count > 1 { self?.delegate?.listClose(row.pages) } else { self?.delegate?.listClose(tab) }
+                guard let page = row?.closingPage else { return }
+                self?.delegate?.listClose(page)
             }
             row.onMiddleClick = { [weak self, weak row] in
                 guard let row, let page = Self.pointer(in: row).flatMap(row.partPage(at:)) ?? row.tab else { return }
@@ -1093,11 +1092,12 @@ final class SidebarListView: NSView {
                     self.delegate?.listClose(tab)
                 }
             }
-            // Away from its page, the button says "Back to Pinned Page", and does that. Otherwise the × unloads the row,
-            // and a middle-click the part's page alone, as on a tab's row.
-            row.onClose = { [weak self] in
+            // Away from its page, the button says "Back to Pinned Page", and does that. Otherwise the × unloads the page,
+            // in a split the part's alone, as a middle-click there does.
+            row.onClose = { [weak self, weak row] in
                 if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
-                unload()
+                guard let row, row.closesPart else { unload(); return }
+                if let page = row.closingPage { self?.delegate?.listClose(page) }
             }
             row.onMiddleClick = { [weak self, weak row] in
                 guard let row else { return }

@@ -86,17 +86,17 @@ extension SplitRowAlignmentTests {
         #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 1)
     }
 
-    /// When the close button would hide the last title, its room is reserved even at rest, so nothing shifts on hover.
-    @Test func aNarrowLastPartKeepsTheCloseButtonsRoom() {
+    /// Each part has its own ×, which comes over its faded title, so no room is kept at the row's end: the parts run
+    /// to it in equal widths.
+    @Test func aNarrowRowsPartsRunToItsEnd() {
         let parts = 3
         let r = row(parts: parts, width: 228)
         let shown = titles(of: r)
         #expect(shown.count == parts)
-        #expect((shown.last?.frame.maxX ?? .infinity) <= r.closeButton.frame.minX)
         let lines = lines(of: r)
-        let starts = [0] + lines.map(\.midX) + [r.closeButton.frame.minX]
+        let starts = [0] + lines.map(\.midX) + [r.bounds.width]
         let widths = zip(starts.dropFirst(), starts).map { $0 - $1 }
-        #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 3)
+        #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 1)
     }
 
     @Test func withoutTitlesEachIconIsCenteredInItsPart() {

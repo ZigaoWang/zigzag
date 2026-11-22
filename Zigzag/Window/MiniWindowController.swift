@@ -686,13 +686,37 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Moving into Zigzag
 
-    /// The browser window this one's pages go to: the front everyday window, else the session brought back, else a
-    /// new one. Never a private window: Zigzag Mini isn't private.
+    /// The browser window this one's pages go to: the front everyday window on this desktop, else the front one
+    /// anywhere, else the session brought back, else a new one. Never a private window: Zigzag Mini isn't private.
     static func browserWindow() -> BrowserWindowController {
         let manager = WindowManager.shared
         let key = manager.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
-        return key ?? manager.controllers.last { !$0.tabManager.isPrivate } ?? manager.restoreIfNoWindows()
-            ?? manager.newWindow(showCommandBar: false)
+        let everyday = manager.controllers.filter { !$0.tabManager.isPrivate }
+        let frontToBack = NSApp.orderedWindows.compactMap { window in everyday.first { $0.window === window } }
+        let here = Self.window(front: key, frontToBack: frontToBack) { controller in
+            guard let window = controller.window else { return false }
+            return window.isOnActiveSpace && window.isVisible && !window.isMiniaturized
+        }
+        return here ?? key ?? everyday.last ?? manager.restoreIfNoWindows() ?? manager.newWindow(showCommandBar: false)
+    }
+
+    /// The window in front when it's on this desktop, else the frontmost one that is; nil when none is.
+    nonisolated static func window<W>(front: W?, frontToBack: [W], isHere: (W) -> Bool) -> W? {
+        if let front, isHere(front) { return front }
+        return frontToBack.first(where: isHere)
+    }
+
+    /// Zigzag comes forward with the window the page went to, switching to its desktop when it's on another one.
+    private static func bringForward(_ target: BrowserWindowController) {
+        guard let window = target.window else { return }
+        if NSApp.isHidden { NSApp.unhide(nil) }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        if !NSApp.isActive {
+            // Only this window comes up, not every browser window held for a link.
+            MiniLinkWake.activatingForOneWindow()
+        }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
     }
 
     /// The window it came from while that's open, minimized or hidden too: its pages and private store stay with it.
@@ -717,6 +741,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// `then`: runs in the browser window the page went to.
     private func moveOut(then: ((BrowserWindowController) -> Void)? = nil) {
         guard tab.url != nil, !movedOut, !isLeaving else { return }
+        // You're going to Zigzag, not back to the app the link came from.
+        returnTo = nil
         commandBar.dismiss(restoringFocus: false)
         linkStatus.hide()
         fadeAway { [weak self] in
@@ -737,7 +763,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             window?.close()
             target.tabManager.switchToSpace(routed)
             target.tabManager.newTab(url: url, spaceID: routed, by: .zigzag)
-            target.window?.makeKeyAndOrderFront(nil)
+            Self.bringForward(target)
             target.toastRouted(to: routed)
             return target
         }
@@ -748,7 +774,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         let placed = fromPage && routed == nil && target === source && sourceTab.map { target.tabManager.insert(tab, after: $0) } == true
         if !placed { target.tabManager.insertAsNewTab(tab) }
         window?.close()
-        target.window?.makeKeyAndOrderFront(nil)
+        Self.bringForward(target)
         if let routed { target.toastRouted(to: routed) }
         return target
     }

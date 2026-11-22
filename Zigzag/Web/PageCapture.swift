@@ -686,11 +686,48 @@ enum CaptureGeometry {
         return String(localized: "\(name) \(day) at \(time).png", comment: "A captured picture's file name: the page's title, the day (2026-11-21) and the time (14.03.22).")
     }
 
-    /// The card's picture: the capture's shape at `width`, a tall one cut to `maxHeight` from its top.
-    static func thumbnailSize(for image: NSSize, width: CGFloat, maxHeight: CGFloat) -> NSSize {
+    /// The card's picture: the whole capture fitted in `width` by `maxHeight`, the frame on the picture itself; a side
+    /// thinner than `minSide` gets `minSide`, the picture centered in it. One so tall it would show as a sliver (a full
+    /// page) fills the frame instead, from its top.
+    static func thumbnailSize(for image: NSSize, width: CGFloat, maxHeight: CGFloat, minSide: CGFloat = Tokens.Space.x6) -> NSSize {
         guard image.width > 0, image.height > 0 else { return NSSize(width: width, height: maxHeight) }
-        let height = width * image.height / image.width
-        return NSSize(width: width, height: min(max(height, Tokens.Space.x8), maxHeight))
+        let scale = min(width / image.width, maxHeight / image.height)
+        if image.width * scale < width / 2 { return NSSize(width: width, height: maxHeight) }
+        func side(_ length: CGFloat) -> CGFloat {
+            let fitted = max(1, round(length * scale))
+            // Hugged when nearly there, so no sliver of backdrop shows beside it.
+            return fitted >= minSide - Tokens.Space.x1 ? fitted : minSide
+        }
+        return NSSize(width: side(image.width), height: side(image.height))
+    }
+
+    /// Whether the frame shows only the capture's top: it's far taller than the frame's shape.
+    static func thumbnailShowsTop(for image: NSSize, in box: NSSize) -> Bool {
+        guard image.width > 0, image.height > 0, box.width > 0, box.height > 0 else { return false }
+        return box.height / image.height * image.width < box.width / 2
+    }
+
+    /// Where the capture is drawn in its frame, at its own shape: centered, filling it when the frame only rounds the
+    /// picture's size, which the frame's clip trims by under a point; a tall one at the frame's width from its top.
+    static func thumbnailPicture(for image: NSSize, in box: NSSize) -> NSRect {
+        guard image.width > 0, image.height > 0, box.width > 0, box.height > 0 else { return NSRect(origin: .zero, size: box) }
+        if thumbnailShowsTop(for: image, in: box) {
+            return NSRect(x: 0, y: 0, width: box.width, height: box.width / image.width * image.height)
+        }
+        let fill = max(box.width / image.width, box.height / image.height)
+        let fills = image.width * fill - box.width < 1 && image.height * fill - box.height < 1
+        let scale = fills ? fill : min(box.width / image.width, box.height / image.height)
+        let size = NSSize(width: image.width * scale, height: image.height * scale)
+        return NSRect(x: (box.width - size.width) / 2, y: (box.height - size.height) / 2, width: size.width, height: size.height)
+    }
+
+    /// The part of the capture the frame shows, in the capture's pixels from its top left.
+    static func thumbnailSource(for image: NSSize, in box: NSSize) -> NSRect {
+        let drawn = thumbnailPicture(for: image, in: box)
+        guard drawn.width > 0, drawn.height > 0 else { return .zero }
+        let shown = drawn.intersection(NSRect(origin: .zero, size: box))
+        let scale = image.width / drawn.width
+        return NSRect(x: (shown.minX - drawn.minX) * scale, y: (shown.minY - drawn.minY) * scale, width: shown.width * scale, height: shown.height * scale)
     }
 }
 

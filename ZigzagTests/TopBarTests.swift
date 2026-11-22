@@ -352,7 +352,7 @@ struct TopBarTests {
         #expect(root.topBar.frame.minX == root.sidebarWidth)
         #expect(root.card.frame.minY == root.topBar.frame.maxY)
         // The favorites start where the page does: as far under the top row as the page.
-        #expect(sidebar.favoritesScroll.frame.minY == root.card.frame.minY)
+        #expect(sidebar.favoritesScroll.frame.minY + FavoriteTile.badgeOverhang == root.card.frame.minY)
         // The back button starts and the address ends the same inset in from the page's edges.
         let address = sidebar.address.convert(sidebar.address.bounds, to: root)
         let back = sidebar.backButton.convert(sidebar.backButton.bounds, to: root)

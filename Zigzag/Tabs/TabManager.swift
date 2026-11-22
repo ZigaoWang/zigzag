@@ -2086,9 +2086,8 @@ final class TabManager {
     func leaveGroup(_ tab: Tab, notify: Bool = true) -> Tab? {
         guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return nil }
         let pair = splits[index]
-        // A pinned group's pages keep their places: the rest stays open, each on its own, as a pinned split's other
-        // half does.
-        guard pair.isGroup, tab.bookmarkID == nil else {
+        // A group of three or four closes up around its place, pinned or not; a split of two ends.
+        guard pair.isGroup else {
             unsplit(tab, notify: notify)
             return pair.ids.first { $0 != tab.id }.flatMap { self.tab(with: $0) }
         }
@@ -2146,14 +2145,14 @@ final class TabManager {
         select(tabs[tabs.count - 1])
     }
 
-    /// Whether a tile group's pages may stay side by side: ordinary tabs of one space, or every page of one pinned or
-    /// favorite group.
+    /// Whether a tile group's pages may stay side by side: ordinary tabs of one space, or pages of one pinned or
+    /// favorite group (some may be unloaded, the rest closed up).
     private func groupFits(_ pages: [Tab]) -> Bool {
         guard let first = pages.first else { return false }
         if pages.allSatisfy({ $0.bookmarkID == nil }) { return pages.allSatisfy { $0.spaceID == first.spaceID } }
         let marks = pages.compactMap(\.bookmarkID)
         guard marks.count == pages.count, let pinned = Library.shared.pinnedSplit(containing: marks[0]) else { return false }
-        return Set(pinned.ids) == Set(marks) && pinned.ids.count == marks.count
+        return Set(marks).count == marks.count && Set(marks).isSubset(of: pinned.ids)
     }
 
     /// Ordinary tabs split, the two pinned pages of a pinned split, and a pinned page with a tab: the pinned page's

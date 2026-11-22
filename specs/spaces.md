@@ -1,7 +1,7 @@
 # Spaces
 
 ## Making and switching
-- New Space (⌥⌘N, or + in the sidebar) → a space at once, in the next unused palette color on glass (Lagoon, Sunset, Forest first), with its editor open to name it.
+- New Space (⌥⌘N, or + in the sidebar) → a space at once, in the next unused palette color on glass (Slate, Fern, Coral first), with its editor open to name it.
   Test: SpaceDefaultColorsTests.defaultIsTheColorTheSpaceWasMadeWith
 - ⌃1–⌃9 → that space; a number with no space does nothing.
   Test: NumberHintsTests.spaceNumbersGoToTheirOwnSpaceAndNinthIsTheNinth

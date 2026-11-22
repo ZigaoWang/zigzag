@@ -131,10 +131,51 @@ struct PageCaptureGeometryTests {
         #expect(CaptureGeometry.pixelAligned(NSRect(x: 10.3, y: 0.26, width: 100.1, height: 50), scale: 1) == NSRect(x: 10, y: 0, width: 100, height: 50))
     }
 
-    @Test func theCardShowsATallPictureFromItsTop() {
-        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 1000, height: 500), width: 216, maxHeight: 160) == NSSize(width: 216, height: 108))
-        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 1000, height: 10_000), width: 216, maxHeight: 160) == NSSize(width: 216, height: 160))
-        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 2000, height: 50), width: 216, maxHeight: 160).height == Tokens.Space.x8)
+    @Test func theCardShowsTheWholePictureAtItsShape() {
+        func size(_ w: CGFloat, _ h: CGFloat) -> NSSize { CaptureGeometry.thumbnailSize(for: NSSize(width: w, height: h), width: 216, maxHeight: 160) }
+        #expect(size(1000, 500) == NSSize(width: 216, height: 108))
+        #expect(size(1000, 1000) == NSSize(width: 160, height: 160))
+        #expect(size(1000, 1400) == NSSize(width: 114, height: 160))
+        // A banner: short and full width, not stretched taller.
+        #expect(size(1400, 150) == NSSize(width: 216, height: 23))
+        // Thinner than the least the card shows: that much, the picture centered in it.
+        #expect(size(2000, 50) == NSSize(width: 216, height: Tokens.Space.x6))
+    }
+
+    @Test func aFullPageShowsItsTopAtTheCardsWidth() {
+        for image in [NSSize(width: 1400, height: 9000), NSSize(width: 600, height: 1800), NSSize(width: 100, height: 20_000), NSSize(width: 333, height: 777)] {
+            let box = CaptureGeometry.thumbnailSize(for: image, width: 216, maxHeight: 160)
+            #expect(box == NSSize(width: 216, height: 160), "\(image)")
+            #expect(CaptureGeometry.thumbnailShowsTop(for: image, in: box), "\(image)")
+            let drawn = CaptureGeometry.thumbnailPicture(for: image, in: box)
+            #expect(drawn.origin == .zero && drawn.width == box.width, "\(image)")
+            #expect(abs(drawn.width / drawn.height - image.width / image.height) < 1e-9, "\(image)")
+            // The top of the capture, all its width, at the frame's shape.
+            let source = CaptureGeometry.thumbnailSource(for: image, in: box)
+            #expect(source.origin == .zero && abs(source.width - image.width) < 1e-6, "\(image)")
+            #expect(abs(source.width / source.height - box.width / box.height) < 1e-9, "\(image)")
+        }
+    }
+
+    @Test func theCardsPictureIsNeverStretched() {
+        let images: [NSSize] = [NSSize(width: 1000, height: 500), NSSize(width: 1400, height: 150), NSSize(width: 1000, height: 1000),
+                                NSSize(width: 1000, height: 1400), NSSize(width: 3000, height: 7), NSSize(width: 1, height: 1)]
+        for image in images {
+            let box = CaptureGeometry.thumbnailSize(for: image, width: 216, maxHeight: 160)
+            #expect(!CaptureGeometry.thumbnailShowsTop(for: image, in: box), "\(image)")
+            let drawn = CaptureGeometry.thumbnailPicture(for: image, in: box)
+            #expect(abs(drawn.width / drawn.height - image.width / image.height) < 1e-9 * image.width / image.height, "\(image)")
+            // The whole capture shows.
+            let source = CaptureGeometry.thumbnailSource(for: image, in: box)
+            #expect(source.width > image.width - image.width / box.width && source.height > image.height - image.height / box.height, "\(image)")
+            // Within the frame but for under a point of rounding, and centered in it.
+            #expect(drawn.width - box.width < 1 && drawn.height - box.height < 1, "\(image)")
+            #expect(abs(drawn.midX - box.width / 2) < 1e-9 && abs(drawn.midY - box.height / 2) < 1e-9, "\(image)")
+            // The frame hugs the picture unless the picture is thinner than the least the card shows.
+            if box.width > Tokens.Space.x6, box.height > Tokens.Space.x6 {
+                #expect(abs(drawn.width - box.width) < 1 && abs(drawn.height - box.height) < 1, "\(image)")
+            }
+        }
     }
 
     @Test func theFileIsNamedAfterThePageAndTheTime() {

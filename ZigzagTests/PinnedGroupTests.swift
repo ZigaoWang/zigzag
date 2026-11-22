@@ -610,6 +610,101 @@ import Testing
         }
     }
 
+    /// A pinned split's row has a tab split's × in each part: pointed at, it says Unload Page and unloads that page
+    /// alone, the pin keeping every page; an unloaded part has none.
+    @Test(arguments: [2, 4]) func aPinnedPartsCloseButtonUnloadsOnlyIt(count: Int) throws {
+        try inWindow((0..<count).map(String.init)) { controller, tabs, space in
+            let manager = controller.tabManager
+            let list = controller.sidebar.list
+            manager.makeGroup(tabs, shape: count == 2 ? Self.shapes[0] : Self.shapes[4])
+            manager.bookmarkTab(tabs[0], in: space)
+            tabs.forEach { _ = $0.ensureWebView() }
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == count)
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let row = try #require(list.row(forBookmark: marks[0]) as? TabRowView)
+            #expect(row.isSplit)
+            row.isHovered = true
+            row.debugPoint(atPart: 1)
+            row.layoutSubtreeIfNeeded()
+            #expect(!row.closeButton.isHidden)
+            #expect(row.closeButton.toolTip == "Unload Page")
+            let page = try #require(row.closingPage)
+            row.onClose?()
+            #expect(manager.bookmarkTab(for: try #require(page.bookmarkID)) == nil)
+            #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+            #expect(tabs.filter { $0 !== page }.allSatisfy { manager.bookmarkTab(for: $0.bookmarkID!) === $0 })
+            // Unloaded now: that part has no ×, as a pinned page that isn't loaded has none on its own row.
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let after = try #require(list.row(forBookmark: marks[0]) as? TabRowView)
+            after.isHovered = true
+            let unloaded = try #require(marks.firstIndex(of: page.bookmarkID!))
+            after.debugPoint(atPart: unloaded)
+            after.layoutSubtreeIfNeeded()
+            #expect(after.closeButton.isHidden)
+        }
+    }
+
+    /// Unloading the top-left page of a pinned split of four on screen, by its part's × or a middle-click there: the
+    /// other three stay side by side, you stay on one of them, and the pin opens all four again.
+    @Test(arguments: [false, true], [0, 3]) func unloadingOnePinnedPageKeepsTheRestOnScreen(middleClick: Bool, selected: Int) throws {
+        try inWindow((0..<4).map(String.init)) { controller, tabs, space in
+            let manager = controller.tabManager
+            let list = controller.sidebar.list
+            manager.makeGroup(tabs, shape: Self.shapes[4])
+            manager.bookmarkTab(tabs[0], in: space)
+            tabs.forEach { _ = $0.ensureWebView() }
+            manager.select(tabs[selected])
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == 4)
+            list.reload(animated: false)
+            list.layoutSubtreeIfNeeded()
+            let row = try #require(list.row(forBookmark: marks[0]) as? TabRowView)
+            if middleClick {
+                let page = try #require(row.partPage(at: NSPoint(x: 2, y: row.bounds.midY)))
+                #expect(page === tabs[0])
+                controller.listClose(page)
+            } else {
+                row.isHovered = true
+                row.debugPoint(atPart: 0)
+                row.layoutSubtreeIfNeeded()
+                #expect(row.closingPage === tabs[0])
+                row.onClose?()
+            }
+            expectRestOnScreen(manager, tabs: tabs, marks: marks)
+        }
+    }
+
+    /// The same for a favorite split of four: the other three stay side by side and the favorite opens all four again.
+    @Test(arguments: [0, 3]) func unloadingOneFavoritePageKeepsTheRestOnScreen(selected: Int) throws {
+        try inWindow((0..<4).map(String.init)) { controller, tabs, _ in
+            let manager = controller.tabManager
+            manager.makeGroup(tabs, shape: Self.shapes[4])
+            manager.favoriteTab(tabs[0])
+            tabs.forEach { _ = $0.ensureWebView() }
+            manager.select(tabs[selected])
+            let marks = tabs.compactMap(\.bookmarkID)
+            #expect(marks.count == 4)
+            #expect(Library.shared.isFavorite(marks[0]))
+            controller.listClose(tabs[0])
+            expectRestOnScreen(manager, tabs: tabs, marks: marks)
+        }
+    }
+
+    private func expectRestOnScreen(_ manager: TabManager, tabs: [Tab], marks: [UUID]) {
+        #expect(manager.bookmarkTab(for: marks[0]) == nil)
+        #expect(Library.shared.pinnedSplit(containing: marks[0])?.ids == marks)
+        guard let shown = manager.selectedTab else { Issue.record("nothing selected"); return }
+        #expect(tabs[1...].contains { $0 === shown })
+        #expect(manager.split(for: shown).map { Set($0.ids) } == Set(tabs[1...].map(\.id)))
+        guard let open = Library.shared.bookmark(marks[0]) else { Issue.record("no bookmark"); return }
+        manager.openBookmark(open)
+        #expect(manager.split(for: manager.selectedTab!).map { Set($0.ids) } == Set(marks.compactMap { manager.bookmarkTab(for: $0)?.id }))
+        #expect(manager.split(for: manager.selectedTab!)?.count == 4)
+    }
+
     /// A tab of three or four side by side says it pins the split view, as one of two does, in its menu and the
     /// menu bar; a pinned one's says it unpins the split view.
     @Test func theItemsNameTheSplitForEveryCount() throws {
@@ -641,8 +736,11 @@ import Testing
             list.layoutSubtreeIfNeeded()
             let tabRow = try #require(list.row(for: tabs[0]) as? TabRowView)
             let hairline = Tokens.Metric.hairline
+            // Loaded, so a pinned part has its × as a tab's part does.
+            tabs.forEach { _ = $0.ensureWebView() }
             func shape(_ row: TabRowView) -> [NSRect] {
                 row.isHovered = true
+                row.debugPoint(atPart: 0)
                 row.layoutSubtreeIfNeeded()
                 var parts: [NSRect] = []
                 for view in row.subviews where !view.isHidden && (view is FaviconView || view.frame.width == hairline) { parts.append(view.frame) }
@@ -863,6 +961,37 @@ import Testing
         #expect(frames[1].midX == frames[2].midX && frames[1].midX > frames[0].midX)
         #expect(tile.page(at: NSPoint(x: 4, y: 4))?.id == pages[0].id)
         #expect(tile.page(at: NSPoint(x: 4, y: tile.bounds.height - 4))?.id == pages[0].id)
+    }
+
+    /// A split favorite has one ×, the size of a single favorite's, hanging on the tile's top-right corner, clear of
+    /// every page's icon.
+    @Test(arguments: [[TileRegion.left, .right], [.left, .topRight, .bottomRight], [.topLeft, .topRight, .bottomLeft, .bottomRight]],
+          [48, 60, 80] as [CGFloat])
+    func aSplitsCloseButtonHangsOnTheCornerClearOfTheIcons(regions: [TileRegion], width: CGFloat) {
+        let (tile, _) = tile(regions)
+        tile.frame.size.width = width
+        tile.layoutSubtreeIfNeeded()
+        let close = tile.debugCloseButton.frame, side = Tokens.Sidebar.favoriteClose
+        #expect(close.size == NSSize(width: side, height: side))
+        #expect(abs(close.midX - width) <= 1 && abs(close.midY - 0) <= 1)
+        #expect(close.maxX > width && close.minY < 0)
+        let icons = Array(tile.pageIcons.prefix(regions.count))
+        #expect(icons.allSatisfy { !close.intersects($0.frame) })
+    }
+
+    /// A favorite of one page has the same × in the same place as a split's, hanging on the corner clear of its icon.
+    @Test(arguments: [48, 60, 80] as [CGFloat]) func aSingleFavoritesCloseButtonHangsOnTheSameCorner(width: CGFloat) {
+        let page = Bookmark(url: URL(string: "https://example.com/")!, title: "0")
+        let single = FavoriteTile(bookmark: page)
+        single.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.favoriteHeight)
+        single.layoutSubtreeIfNeeded()
+        let (split, _) = tile([.left, .right])
+        split.frame.size.width = width
+        split.layoutSubtreeIfNeeded()
+        let close = single.debugCloseButton.frame
+        #expect(close == FavoriteTile.badgeFrame(in: single.bounds, flipped: single.isFlipped))
+        #expect(close == split.debugCloseButton.frame)
+        #expect(!close.intersects(single.pageIcons[0].frame))
     }
 
     @Test func aPairStillShowsTwoIconsSideBySide() {

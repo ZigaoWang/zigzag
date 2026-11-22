@@ -502,6 +502,94 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// How many parts the row is split into: one, two halves, or a tile group's three or four.
     private var segmentCount: Int { isSplit ? 2 + extraCount : 1 }
 
+    /// A row of several pages, tabs or pinned, whose × closes one page (#404): the part pointed at, else the one you're in.
+    var closesPart: Bool { isSplit && !isAway }
+    /// The part under the pointer, in `half(at:)`'s numbering; nil while it's elsewhere.
+    private var pointedPart: Int? { didSet { if oldValue != pointedPart { stateDidChange(animated: false); needsLayout = true } } }
+    /// Whether the × sits in one part of the row, which it closes: the part under the pointer, or the one you're in.
+    private var closesInPart: Bool { closesPart && isSplit }
+    /// Whether a part has room for the × at its end beside its centered icon (always, with its title showing).
+    private func closeFitsBesideIcon(part: Int) -> Bool {
+        if showsPartTitles { return true }
+        let spatial = extraCount == 0 && partnerLeads ? 1 - part : part
+        let spans = partSpans
+        guard spans.indices.contains(spatial) else { return true }
+        let span = spans[spatial], side = Tokens.Sidebar.favicon, button = Tokens.Sidebar.rowButton
+        return span.end - Self.buttonEdge - button >= (span.start + span.end + side) / 2 + Self.buttonGap
+    }
+
+    /// The part the × is in, lit with the row's hover wash; made the first time it shows.
+    private var partWash: ColorView?
+
+    /// Lights the part spanning `span` (nil: none), inset as the zoomed part's light is, unless that light is there.
+    private func layoutPartWash(_ span: (start: CGFloat, end: CGFloat)?, lit: Bool) {
+        guard let span, !lit, !closeButton.isHidden else { partWash?.isHidden = true; return }
+        let wash = partWash ?? {
+            let wash = ColorView(color: Tokens.Chrome.hover)
+            wash.layer?.cornerRadius = Tokens.Sidebar.rowRadius - Tokens.Metric.dropInset
+            wash.layer?.cornerCurve = .continuous
+            addSubview(wash, positioned: .below, relativeTo: icon)
+            partWash = wash
+            return wash
+        }()
+        let inset = Tokens.Metric.dropInset
+        wash.frame = NSRect(x: span.start + inset, y: inset, width: max(0, span.end - span.start - inset * 2), height: bounds.height - inset * 2)
+        wash.isHidden = false
+    }
+    /// The part the × is on, in `half(at:)`'s numbering.
+    var closePart: Int {
+        guard closesPart, isSplit else { return 0 }
+        if let voicedPart { return voicedPart }
+        if let pointedPart, pointedPart < segmentCount { return pointedPart }
+        if isSelected { return min(focusedHalf, segmentCount - 1) }
+        return extraCount == 0 && partnerLeads ? 0 : segmentCount - 1
+    }
+    /// The page the × closes: one part's with `closesPart` (nil for a pinned part that isn't open), else the row's own.
+    var closingPage: Tab? {
+        guard closesPart else { return tab }
+        let pages = [tab, partner] + extraPages
+        return pages.indices.contains(closePart) ? pages[closePart] : nil
+    }
+    /// Whether the part's page has a × of its own: a tab always, a pinned page while it's loaded, as on its own row.
+    private func partCloses(_ page: Tab?) -> Bool {
+        guard let page else { return false }
+        return page.bookmarkID == nil || page.isLoaded
+    }
+    #if DEBUG
+    /// The debug bridge's pointer over one part of the row (`half(at:)`'s numbering).
+    func debugPoint(atPart part: Int?) { pointedPart = part }
+    #endif
+    private var moveTracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let moveTracking { removeTrackingArea(moveTracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInActiveApp, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        moveTracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        trackPointer(event)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        trackPointer(event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        pointedPart = nil
+    }
+
+    private func trackPointer(_ event: NSEvent) {
+        guard closesPart, isSplit else { pointedPart = nil; return }
+        let point = convert(event.locationInWindow, from: nil)
+        pointedPart = bounds.contains(point) ? half(at: point) : nil
+    }
+
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
     /// 0 = would open on the left, 1 = on the right, nil = not a drop target.
@@ -628,13 +716,38 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // What its ring shows: its page isn't running.
         let unloaded = showsUnloaded(tab) ? String(localized: "not loaded", comment: "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.") : nil
         let waiting = ([tab, partner] + extraPages).compactMap { $0 }.contains { PendingQuestions.hasPending(tabID: $0.id) }
-            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.")
+            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name: a question is waiting for that page.")
             : nil
         let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, waiting, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + zip(extraPages, extraTitles).map { sound($0, $1) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
         setAccessibilitySelected(isSelected)
+        refreshCloseActions()
+    }
+
+    /// The part VoiceOver's close action is for, while it runs.
+    private var voicedPart: Int?
+
+    /// VoiceOver closes each page of a split with its own action, as its part's × does.
+    private func refreshCloseActions() {
+        guard closesPart else { setAccessibilityCustomActions(nil); return }
+        let pages = [tab, partner] + extraPages
+        let names = partTitles.map(\.stringValue)
+        let actions = pages.indices.compactMap { i -> NSAccessibilityCustomAction? in
+            guard partCloses(pages[i]), names.indices.contains(i) else { return nil }
+            let name = pages[i]?.bookmarkID != nil
+                ? String(localized: "Unload \(names[i])", comment: "VoiceOver action on a split view's row in the sidebar: unloads one pinned page of it. The name is that page's title.")
+                : String(localized: "Close \(names[i])", comment: "VoiceOver action on a split view's row in the sidebar: closes one page of it. The name is that page's title.")
+            return NSAccessibilityCustomAction(name: name) { [weak self] in
+                guard let self else { return false }
+                self.voicedPart = i
+                defer { self.voicedPart = nil }
+                self.onClose?()
+                return true
+            }
+        }
+        setAccessibilityCustomActions(actions)
     }
 
     /// Which page the point is over: 0 for this row's own, 1 for its partner, 2 and 3 for a tile group's others.
@@ -659,32 +772,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// The title labels of the row's parts, in `half(at:)`'s order: its own, the partner's, a group's others.
     private var partTitles: [Label] { [title, partnerTitle] + (extraViews ?? []).map(\.title) }
-
-    /// Pointing at a part of a row of several pages names that page, as its title may be cut short or not shown.
-    private var showsPartTips = false
-
-    private func refreshPartTips() {
-        guard isSplit || showsPartTips else { return }
-        removeAllToolTips()
-        showsPartTips = isSplit
-        guard isSplit else { return }
-        for (start, end) in partSpans where end > start {
-            addToolTip(NSRect(x: start, y: 0, width: end - start, height: bounds.height), owner: self, userData: nil)
-        }
-    }
-
-    @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
-        let index = half(at: point)
-        let name = partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
-        // A part in Developer Mode says so under its name, with its host.
-        let pages = [tab, partner] + extraPages
-        let described = developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
-        // Mark parts with a waiting question so it isn't missed in a background tab.
-        if pages.indices.contains(index), let page = pages[index], PendingQuestions.hasPending(tabID: page.id) {
-            return "\(described)\n\(String(localized: "needs your answer", comment: "Shown in a tab row's tooltip, and spoken by VoiceOver after its name: a question is waiting for that page."))"
-        }
-        return described
-    }
 
     /// The page the point is over.
     func page(at point: NSPoint) -> Tab? {
@@ -819,15 +906,17 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func refreshAccessories() {
         // A pinned tab you're on stays clean, as Arc's does: its button (unload, or back to its page) comes with the
         // pointer. A plain tab you're on keeps its close button in view.
-        let resting = isSelected && !isBookmark
-        let showClose = (isHovered || resting) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil && number == nil
+        let pointing = closesInPart ? isHovered && pointedPart != nil : isHovered
+        // A part too narrow for its icon and the × beside it keeps its icon until you point at it.
+        let resting = isSelected && !isBookmark && (!closesInPart || closeFitsBesideIcon(part: closePart))
+        // In a split, each part's × is that page's own: none on a pinned part that isn't loaded.
+        let unloaded = closesInPart ? !partCloses(closingPage) : isBookmark && isUnloaded
+        let showClose = (pointing || resting) && !isLifted && !unloaded && renameField == nil && number == nil
+        if closesPart, closeButton.isHidden == showClose { needsLayout = true }
         closeButton.isHidden = !showClose
-        // The × closes the whole row, a split's or group's every page as a single tab's one.
-        let withTab = parts.contains { $0.page.map { $0.bookmarkID == nil } ?? false }
+        let closesPinned = closesInPart ? closingPage?.bookmarkID != nil : isBookmark
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
-            : isBookmark && isSplit && !withTab ? String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")
-            : isBookmark && !isSplit ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.")
-            : isSplit ? String(localized: "Close Split View", comment: "Item in a tab's context menu in the sidebar, for a page of a split view: closes all its pages.")
+            : closesPinned ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.")
             : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         refreshDeveloperMode()
@@ -853,8 +942,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         for (i, view) in icons.enumerated() {
             let on = badged.contains(i)
             view.developerBadge = on ? color : nil
-            // A row of several pages names each in its own tooltip; a row of one says it on its icon.
-            view.toolTip = on && !isSplit ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
+            // Each page in it says so on its own icon, with its host.
+            view.toolTip = on ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
         }
     }
 
@@ -925,6 +1014,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func stateDidChange(animated: Bool) {
         super.stateDidChange(animated: animated)
+        // Pointing at one part of a split, that part is lit (`partWash`), not the whole row.
+        if closesInPart, pointedPart != nil, isHovered, !isSelected, !isMarked, !isPressed, !isLifted {
+            layer?.set(backgroundColor: nil, animated: false)
+        }
         refreshTitleColor()
         refreshAccessories()
         refreshAccessibilityLabel()
@@ -974,9 +1067,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         if !isSplit { title.fadeTail(endingAt: covered ? closeButton.frame.minX - Self.buttonGap - title.frame.minX : nil) }
         if isAway { pinLabel.fadeTail() }
         // In a split, the last part's title fades before the close button (or ⌘ number).
-        let blocker: NSView? = !isSplit || !overlaysPartEnd ? nil : !closeButton.isHidden ? closeButton : showsNumber ? numberHint : nil
+        let closeOnPart = closesPart && isSplit && !closeButton.isHidden && partTitles.indices.contains(closePart) ? partTitles[closePart] : nil
+        let closeAtEnd = closeOnPart == nil || closeOnPart === lastPartTitle
+        let blocker: NSView? = !isSplit || !overlaysPartEnd ? nil : !closeButton.isHidden && closeAtEnd ? closeButton : showsNumber ? numberHint : nil
         for label in [partnerTitle] + (extraViews ?? []).map(\.title) + (isSplit ? [title] : []) {
-            if label === lastPartTitle, let blocker, label.frame.maxX > blocker.frame.minX {
+            if label === closeOnPart, !closeAtEnd, label.frame.maxX > closeButton.frame.minX {
+                label.fadeTail(endingAt: closeButton.frame.minX - Self.buttonGap - label.frame.minX)
+            } else if label === lastPartTitle, let blocker, label.frame.maxX > blocker.frame.minX {
                 label.fadeTail(endingAt: blocker.frame.minX - Self.buttonGap - label.frame.minX)
             } else {
                 label.fadeTail()
@@ -1002,15 +1099,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             end = nestedButton.frame.minX - Self.buttonGap
         }
         layoutDropHalf()
-        defer {
-            refreshPartTips()
-            layoutZoomMark()
-        }
+        defer { layoutZoomMark() }
 
         guard isSplit else {
             partEdges = []
+            partWash?.isHidden = true
             // Restore the title hidden for an icon-only split, unless it's being renamed.
             title.isHidden = renameField != nil
+            styleClose(chip: false)
             Self.showSpeaker(audioButton, badge: false, muted: tab?.isMuted == true)
             icon.speakerCut = nil
             return
@@ -1035,22 +1131,28 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         var titles = Self.segmentShowsTitle(width: bounds.width / CGFloat(count))
         let lastStart = Self.splitParts(count: count, end: bounds.width).last?.start ?? 0
         let titleUnderClose = kept - (lastStart + Self.inset + side + Tokens.Sidebar.iconGap)
-        let keepsRoom = (!titles || !(pieces.last?.audio.isHidden ?? true) || titleUnderClose < Tokens.Sidebar.splitTitleMin())
+        // A × that comes in each part needs no room at the row's end: the parts run to it.
+        let keepsRoom = !closesInPart && (!titles || !(pieces.last?.audio.isHidden ?? true) || titleUnderClose < Tokens.Sidebar.splitTitleMin())
         // Titles only where they'd show with the × at the row's end, so a part never shows a title the × covers.
-        if keepsRoom { titles = Self.segmentShowsTitle(width: kept / CGFloat(count)) }
+        if keepsRoom || closesInPart { titles = Self.segmentShowsTitle(width: kept / CGFloat(count)) }
         let contentEnd = keepsRoom ? kept : bounds.width
         overlaysPartEnd = !keepsRoom
         showsPartTitles = titles
         lastPartTitle = pieces.last?.title
         let parts = Self.splitParts(count: count, end: contentEnd)
         partEdges = parts.dropFirst().map(\.start)
+        // The part whose page the × closes, left to right; a row that closes all its pages keeps it at the row's end.
+        let closeSpatial = closesPart ? (extraCount == 0 && partnerLeads ? 1 - closePart : closePart) : count - 1
+        var washSpan: (start: CGFloat, end: CGFloat)?
         let iconY = icon.frame.minY
         let titleY = title.frame.minY, titleH = title.frame.height
         let renaming = renameField == nil ? nil : partTitles.indices.contains(renamingPart) ? partTitles[renamingPart] : nil
+        var chipOrigin: NSPoint?
         for (i, part) in parts.enumerated() {
             let (icon, title, audio, page) = pieces[i]
             let last = i == count - 1
-            let speakerEnd = last ? contentEnd : part.end - Self.buttonEdge
+            // Clear of the × that comes on this part, so it never moves under the pointer.
+            let speakerEnd = closesPart ? part.end - edge - size.width - Self.buttonGap : last ? contentEnd : part.end - Self.buttonEdge
             let titleX = part.start + Self.inset + side + Self.titleOffset
             // Where the speaker after the title would leave it too few letters, it's the icon's badge instead.
             let inline = titles && (audio.isHidden || speakerEnd - titleX - Label.inset - Tokens.Sidebar.inlineGlyphGap
@@ -1079,6 +1181,24 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             }
             title.isHidden = !titles || title === renaming
             icon.alphaValue = 1
+            if closesInPart, i == closeSpatial {
+                // At the part's own end, over its faded title or beside its icon; a part too narrow for both has a
+                // favorite's small × in its top corner, its icon and speaker staying, the part's wash saying whose it is.
+                let end = part.end - edge - size.width
+                let fits = titles || end >= icon.frame.maxX + Self.buttonGap
+                if !fits, !(isHovered && pointedPart != nil) { closeButton.isHidden = true }
+                if fits {
+                    closeButton.frame.origin.x = end
+                } else {
+                    let chip = Tokens.Sidebar.favoriteClose, inset = Tokens.Metric.dropInset + Self.chipInset
+                    chipOrigin = NSPoint(x: part.end - inset - chip, y: isFlipped ? inset : bounds.height - inset - chip)
+                }
+                washSpan = (part.start, part.end)
+            } else if i == closeSpatial, !last {
+                // With titles, at the part's end over its faded title; icons only, in the icon's place.
+                closeButton.frame.origin.x = titles ? part.end - edge - size.width : round(icon.frame.midX - size.width / 2)
+                if !titles, !closeButton.isHidden { icon.alphaValue = 0 }
+            }
             // The badge goes with its icon.
             audio.alphaValue = SpeakerBadge.isBadge(audio) ? icon.alphaValue : 1
             // Hairline between this part and the previous, inset from the row's ends.
@@ -1088,8 +1208,41 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 lines[i - 1].isHidden = false
             }
         }
+        // The light the zoomed part, or the selected icon-only row's page, already has (`layoutZoomMark`).
+        let marked = zoomedPart ?? (isSelected && !titles ? focusedHalf : nil)
+        let markedSpatial = marked.map { extraCount == 0 && partnerLeads ? 1 - $0 : $0 }
+        layoutPartWash(washSpan, lit: markedSpatial == closeSpatial)
+        // No hairline against the lit part's edges.
+        if partWash?.isHidden == false {
+            for j in [closeSpatial - 1, closeSpatial] where lines.indices.contains(j) { lines[j].isHidden = true }
+        }
+        // ⌘'s number at the row's end, over the last part's icon when there's no title to cover.
+        if closesInPart, showsNumber, !titles, let last = pieces.last, let hint = numberHint, last.icon.frame.maxX > hint.frame.minX - Self.buttonGap {
+            last.icon.alphaValue = 0
+            last.audio.alphaValue = 0
+        }
+        styleClose(chip: chipOrigin != nil)
+        if let chipOrigin { closeButton.frame.origin = chipOrigin }
     }
 
+    /// From the part's wash to a favorite's × in its corner.
+    private static let chipInset: CGFloat = 1.5
+    private var closeIsChip = false
+
+    /// The × as a row button, or as a favorite's small chip with a hairline (`FavoriteTile`).
+    private func styleClose(chip: Bool) {
+        if chip { Tokens.Motion.withoutAnimation { closeButton.layer?.borderColor = cgColor(Tokens.Color.controlEdge) } }
+        guard chip != closeIsChip else { return }
+        closeIsChip = chip
+        let side = chip ? Tokens.Sidebar.favoriteClose : Tokens.Sidebar.rowButton
+        closeButton.setFrameSize(NSSize(width: side, height: side))
+        closeButton.symbolSize = chip ? Tokens.Sidebar.favoriteCloseGlyph : Tokens.Sidebar.rowGlyph
+        closeButton.radius = chip ? side / 2 : Tokens.Radius.small + 1
+        closeButton.tint = chip ? Tokens.Color.textSecondary : Tokens.Color.icon
+        closeButton.showsFillAtRest = chip
+        closeButton.wantsLayer = true
+        Tokens.Motion.withoutAnimation { closeButton.layer?.borderWidth = chip ? Tokens.Metric.hairline : 0 }
+    }
 
     /// A speaker right after its title's text, as browsers put it with the page, not with the close button: in the
     /// title's line as a symbol in text is, a word space after it, the button round it a full row button to press.

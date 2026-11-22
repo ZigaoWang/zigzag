@@ -45,16 +45,20 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 The soul of the window. A space's color fills the sidebar and the frame around the page completely, by day and at
 night (`SpaceColor`, `Tokens.Frame`).
 
-- **Palette** (`SpaceColor.palette`, `SpaceColor.look`): fourteen looks on clear glass, each a mood rather than a hue
-  step, each a hue at a depth like a custom color, so the window's mode follows the depth day and night. Gradients,
-  two hues top to bottom and never across the wheel: Lagoon (teal to blue), Sunset (coral to violet), Dusk (indigo to
-  rose), Citrus (lime to tangerine). Deep and moody, with a dark window and light text: Midnight, Petrol, Forest,
-  Merlot. Bright: Watermelon, Fuchsia, Volt. Soft: Lilac, Seafoam, Dune. Only Lagoon and Midnight lean blue. Deep and
-  soft looks are see-through to 0.45 and bright ones to 0.4 (`paletteSeeThrough`, `vividSeeThrough`), as clear as
-  keeps text at 4.5:1 over a desktop that works against it. A new space takes the next of `SpaceColor.newSpaceOrder`
-  no other space has, Lagoon first, in its following version (`SpaceColor.defaultLook`): the same hues and glass, light
-  by day and deep at night with the Mac, so a fresh window on a light Mac is light. Use Default Colors gives that back;
-  the presets in the row keep their own depth, a choice made on purpose.
+- **Palette** (`SpaceColor.palette`, `SpaceColor.PaletteLook`): thirteen colors on clear glass, the desktop showing
+  through and the color a tint in it, never paint. Neutral first, in the editor's row with solid white: Slate (a
+  barely cool gray), Stone (barely warm) and Smoke (deep graphite). Then cool: Azure, Navy, Seafoam, Pine, Fern. Warm:
+  Citron, Coral, Red. Last, one violet and one pink: Iris, Pink. At most two blues, no brown or beige. Gradients are
+  only a drift of one hue a little deeper toward the bottom, 20° of OKLCH hue at most: Iris, Coral, Navy. Lively
+  colors go past a custom color's tint (`SpaceColor.maxTint`) so they read as color on glass, not chalk. See-through
+  is 0.5 for most, 0.55 for the soft and light neutral ones, 0.45 for the deep ones and 0.35 for Red, as clear as
+  keeps text at 4.5:1 over a desktop that works against it. Smoke, Navy, Pine and Red keep the window dark with light
+  text. A new space takes the next of `SpaceColor.newSpaceOrder` no other space has, Slate first, in its following
+  version (`SpaceColor.defaultLook`): the same glass, following the Mac between the color's own day and night depths
+  (`SpaceInfo.dayDepth`, `nightDepth`), so a fresh window is light on a light Mac and deep on a dark one; Smoke and
+  Red stay dark, and Citron and Coral stay light, since a deep yellow or coral reads as brown. Use Default Colors
+  gives that back; the presets in the row keep their own depth, a choice made on purpose. The 0.9.4 betas' palette
+  names read as the nearest of these (`SpaceColor.renamed`), Lagoon as Slate.
 - **Older colors**: white, sky, lavender, rose, peach, sand, sage, mint and graphite, at 0.915 and 0.045 by day and
   0.27 and 0.04 at night, solid. Spaces that have them keep them exactly, Use Default Colors included, and profiles
   still take their colors from these.
@@ -144,7 +148,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 |---|---|
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (midway down to the address, 20; `Sidebar.lightsCenter`, 22, with the address in the bar), reload's ink as far from the right edge as the lights from the left |
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 26pt with 14pt glyphs; up to 3 pinned extensions before Site Controls, dragged to reorder as the space icons are (the pin stays faint in its place, a see-through copy follows the pointer, a 2pt accent line marks the gap), hiding from the left before the host or the prompt is cut (and never below 72pt for it), each pin the same 26pt button as Reader and Site Controls with the extension's icon at 16pt in the middle, 2pt between every button; a count is a 12pt dark pill with 9pt semibold white figures in the button's bottom-right corner, 1pt inside it (the same pill, 3pt in, on a Site Controls tile); in Site Controls a 16pt round pin button (control fill, hairline, 9pt glyph, 20pt target) 2pt inside the tile's top-right corner, the top-left when the tile has a count: always there and filled (pin.fill) while pinned, an outline pin on hover otherwise, dimmed at the limit, and Pin to Address in the tile's menu; the accent ring from the keyboard |
-| Favorites | As many to a row as fit 56pt wide (3 at the usual width), or 2, 3 or 4 as chosen in Settings; 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is loaded (not while it sleeps or waits since a relaunch), the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
+| Favorites | As many to a row as fit 56pt wide (3 at the usual width), or 2, 3 or 4 as chosen in Settings; 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is loaded (not while it sleeps or waits since a relaunch), the card while it's the one you're on; the × chip 14pt on a solid `Color.surface` disc, one per tile, a split's too, hangs on the tile's top-right corner, 1pt in from centered so it stays inside the sidebar's edge, clear of every icon; a split's unloads all its pages |
 | Space name | As typed, its ink on the icon column: 13 semibold in a 30pt slot; large, 26 light (`Font.spaceName`), kern -0.6, 36pt slot |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36; a pinned page that's open has a fine `Chrome.openEdge`, as a favorite does, only while its page is loaded. A tab whose page isn't running looks the same however it got there (put to sleep, or not loaded yet since Zigzag reopened, #205): in the Tabs list, a split's parts, the ⌃Tab switcher and Show All Tabs, the sleeping ring (a hairline of even dashes in `textTertiary`, 1.5pt out, the icon at 85% inside it); a pinned page or favorite that isn't running has no edge and no ring, as one never opened. Its hover card, or a favorite's tooltip, says why: asleep, and what that freed, put to sleep by you (Suspend Page), or not loaded since Zigzag reopened |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
@@ -340,13 +344,15 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   speaker right after that title. Where a part is narrower than its icon, the gaps and a few letters
   (`TabRowView.segmentMinWidth`, 56 at Medium), every part shows its icon alone in its middle, hairlines still between.
   In the split you're on, the page you're in has its title in the row's ink and the others in `quietInk`; with icons
-  alone, the page you're in has the hover wash under its part. The close button comes as a tab's does, over the last
-  title's faded end, so nothing moves under the pointer; its room is kept, at rest too, where it would cover too much (icons
-  alone, a speaker in the last part, or the last part's whole title), decided by the row's width, never its state. A pinned page split beside a tab carries the pair in its own row, so each page
-  shows once and one row is lit. A pinned split of two, three or four is the same row (`TabRowView`) in Pinned. Its ×
-  closes the whole split in the tab list and unloads a pinned one; a middle-click closes the one page under it.
-  Pointing at a part names its page, and a double-click renames that page (over its
-  title, or the row for the moment when the part shows no title).
+  alone, the page you're in has the hover wash under its part. Each part has its own ×, closing that page alone (a
+  pinned one's unloads it, as on its own row): pointing at a part lights it with the hover wash and puts its × at the
+  part's end, the size and inset of a tab's, over its title's faded end, so nothing moves under the pointer; on the
+  split of tabs you're on, the page you're in shows it at rest. A part with only its icon and no room beside it shows a
+  favorite's small × in its corner. Close Split View in the menu closes them all. A pinned page split beside a tab carries the pair in its own row, so each page
+  shows once and one row is lit. A pinned split of two, three or four is the same row (`TabRowView`) in Pinned. A
+  double-click renames the part's page (over its
+  title, or the row for the moment when the part shows no title). No row shows the system's tooltip with a title: the
+  hover card names the pages.
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size
   (`Sidebar.spaceIcon`: a favorite's icon, 16, 18, 20), each in a 26pt key (28 at Large, `Sidebar.spaceTarget`).
@@ -535,7 +541,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Element (the chosen one the soft card), a hairline, Full Page and Visible, Capture (the one prominent pill, once an
   area is drawn) and ×, names dropped for icons alone in a narrow pane; keys in the tooltips (A, E, F, V, Return,
   Esc). After it, the card in the page's bottom right, `capturePreviewWidth`, growing out of that corner: the picture
-  (a tall one from its top) to drag out, then Copied, Save and Share as Site Controls' captioned tiles. It goes after
+  (all of it at its own shape, a thin strip centered on `fieldFill`, a full page's top fading out below) to drag out, an × on a dark disc in its corner
+  while the pointer is on it, then Copied, Save and Share as Site Controls' captioned tiles. It goes after
   six seconds unless the pointer is on it, or at a click elsewhere or Esc.
 - **Full screen in the page** (`PageFullScreen`, #168): with Settings › Tabs › Full screen videos fill set to The Page,
   or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)

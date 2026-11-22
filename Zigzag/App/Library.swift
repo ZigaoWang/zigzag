@@ -208,6 +208,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var brightness: Double? = nil
     /// The second color's own brightness; nil: the same as the first.
     var brightness2: Double? = nil
+    /// A palette color following the Mac: its depth by day and at night, both ends of a gradient alike. Nil: the
+    /// strength in `intensity` instead. Only used without `brightness`.
+    var dayDepth: Double? = nil
+    var nightDepth: Double? = nil
     /// How much of its hue the color has, from 0 (none: white, a gray or black) to 1 (all of it). Nil: all.
     var tint: Double? = nil
     /// The second color's own tint. Nil: all of it.
@@ -235,9 +239,14 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 
     /// No hue of its own: white, a gray, or black.
     var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
-    /// How much of its hue the first color has, 0 for white, grays and black.
-    var tintAmount: Double { isNeutral ? 0 : min(max(tint ?? 1, 0), 1) }
-    var tintAmount2: Double { min(max(tint2 ?? 1, 0), 1) }
+    /// How much of its hue the first color has, 0 for white, grays and black; past 1 for the palette's lively colors.
+    var tintAmount: Double { isNeutral ? 0 : min(max(tint ?? 1, 0), SpaceColor.maxTint) }
+    var tintAmount2: Double { min(max(tint2 ?? 1, 0), SpaceColor.maxTint) }
+    /// Following the Mac between a palette color's own depths.
+    private var followsDepths: (day: Double, night: Double)? {
+        guard brightness == nil, !isNeutral, let dayDepth, let nightDepth else { return nil }
+        return (dayDepth, nightDepth)
+    }
 
     /// How much of the desktop shows through, 0 when solid.
     var seeThrough: Double { min(max(translucency ?? 0, 0), 1) }
@@ -251,6 +260,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// The window frame color for this space, solid.
     var background: NSColor {
         if let brightness { return SpaceColor.paint(hue: baseHue, depth: brightness, tint: tintAmount) }
+        if let (day, night) = followsDepths {
+            return Tokens.Color.dynamic(light: SpaceColor.paint(hue: baseHue, depth: day, tint: tintAmount),
+                                        dark: SpaceColor.paint(hue: baseHue, depth: night, tint: tintAmount))
+        }
         if isNeutral {
             // Following the Mac and see-through: clear white by day, smoked black at night.
             if isSeeThrough { return Tokens.Color.dynamic(light: .white, dark: .black) }
@@ -264,6 +277,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             return isNeutral ? NSColor(white: 0.86 - 0.56 * brightness, alpha: 1)
                 : SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * brightness, tint: tintAmount)
         }
+        if let (day, night) = followsDepths {
+            return Tokens.Color.dynamic(light: SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * day, tint: tintAmount),
+                                        dark: SpaceColor.paint(hue: baseHue, depth: 0.35 + 0.45 * night, tint: tintAmount))
+        }
         if isNeutral { return color.isNeutral ? color.swatch : SpaceColor.graphite.swatch }
         return hue.map(SpaceColor.swatch(hue:)) ?? color.swatch
     }
@@ -273,6 +290,10 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var background2: NSColor? {
         hue2.map { h in
             if let depth = brightness2 ?? brightness { return SpaceColor.paint(hue: h, depth: depth, tint: tintAmount2) }
+            if let (day, night) = followsDepths {
+                return Tokens.Color.dynamic(light: SpaceColor.paint(hue: h, depth: day, tint: tintAmount2),
+                                            dark: SpaceColor.paint(hue: h, depth: night, tint: tintAmount2))
+            }
             return SpaceColor.background(hue: h, intensity: intensity2 ?? intensity ?? SpaceColor.defaultIntensity)
         }
     }
@@ -370,6 +391,8 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         space.glass = nil
         space.brightness = nil
         space.brightness2 = nil
+        space.dayDepth = nil
+        space.nightDepth = nil
         space.tint = nil
         space.tint2 = nil
         space.translucency = nil
@@ -389,7 +412,7 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             let two = s.hue2 != nil
             let values: [Any?] = [s.color.rawValue, s.hue, s.intensity, s.brightness, s.tint, s.translucency, s.grain, s.appearance,
                                   s.hue2, two ? s.intensity2 : nil, two ? s.brightness2 : nil, two ? s.tint2 : nil, two ? s.angle : nil,
-                                  s.isSeeThrough ? s.clearGlass : nil]
+                                  s.isSeeThrough ? s.clearGlass : nil, s.dayDepth, s.nightDepth]
             return values.map { $0.map { "\($0)" } ?? "-" }
         }
         return look(self) == look(withDefaultColors(color))
@@ -402,9 +425,25 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         guard brightness != nil else {
             // White and black stay themselves day and night, so the window's mode stays with them, never black text on black.
             if appearance == nil, hue == nil, !isSeeThrough { if color == .ink { return "dark" }; if color == .snow { return "light" } }
+            // A palette color deep by day too (red), or light at night too (citron), keeps its mode; the rest follow the Mac.
+            if appearance == nil, followsDepths != nil {
+                func mode(_ name: NSAppearance.Name) -> String? {
+                    var shown: String?
+                    NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+                        shown = Self.readable(on: [background] + (background2.map { [$0] } ?? []))
+                    }
+                    return shown
+                }
+                let day = mode(.aqua), night = mode(.darkAqua)
+                return day == night ? day : nil
+            }
             return appearance
         }
-        let colors = [background] + (background2.map { [$0] } ?? [])
+        return Self.readable(on: [background] + (background2.map { [$0] } ?? []))
+    }
+
+    /// "light" or "dark": whichever text reads better on all of `colors`, as they resolve now.
+    private static func readable(on colors: [NSColor]) -> String {
         func luminance(_ color: NSColor) -> Double {
             guard let c = color.usingColorSpace(.sRGB) else { return 0.5 }
             func linear(_ v: CGFloat) -> Double { let v = Double(v); return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
@@ -423,20 +462,21 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
 extension SpaceInfo {
     private enum CodingKeys: String, CodingKey {
         case id, name, color, bookmarks, folders, pinnedSplits, hue, intensity, appearance, grain, hue2, intensity2, angle,
-             glass, brightness, brightness2, tint, tint2, translucency, clearGlass, icon, importedFrom, defaultColor,
+             glass, brightness, brightness2, dayDepth, nightDepth, tint, tint2, translucency, clearGlass, icon, importedFrom, defaultColor,
              routedSites, backgroundImage, paletteColor, paletteDefaultColor
     }
 
     /// A stored color's name; one this version doesn't know reads as nil.
     private static func color(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> SpaceColor? {
-        ((try? c.decodeIfPresent(String.self, forKey: key)) ?? nil).flatMap(SpaceColor.init(rawValue:))
+        ((try? c.decodeIfPresent(String.self, forKey: key)) ?? nil).flatMap(SpaceColor.named)
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try c.decode(String.self, forKey: .name)
-        // A beta that wrote a palette color into `color` reads as it was, and is written the compatible way next time.
+        // A beta that wrote a palette color into `color` reads as it was, and is written the compatible way next time;
+        // the betas' palette names read as the colors that took their place.
         color = Self.color(c, .paletteColor) ?? Self.color(c, .color) ?? .graphite
         defaultColor = Self.color(c, .paletteDefaultColor) ?? Self.color(c, .defaultColor)
         bookmarks = try c.decodeIfPresent([Bookmark].self, forKey: .bookmarks) ?? []
@@ -452,6 +492,8 @@ extension SpaceInfo {
         glass = try c.decodeIfPresent(Bool.self, forKey: .glass)
         brightness = try c.decodeIfPresent(Double.self, forKey: .brightness)
         brightness2 = try c.decodeIfPresent(Double.self, forKey: .brightness2)
+        dayDepth = try c.decodeIfPresent(Double.self, forKey: .dayDepth)
+        nightDepth = try c.decodeIfPresent(Double.self, forKey: .nightDepth)
         tint = try c.decodeIfPresent(Double.self, forKey: .tint)
         tint2 = try c.decodeIfPresent(Double.self, forKey: .tint2)
         translucency = try c.decodeIfPresent(Double.self, forKey: .translucency)
@@ -483,6 +525,8 @@ extension SpaceInfo {
         try c.encodeIfPresent(glass, forKey: .glass)
         try c.encodeIfPresent(brightness, forKey: .brightness)
         try c.encodeIfPresent(brightness2, forKey: .brightness2)
+        try c.encodeIfPresent(dayDepth, forKey: .dayDepth)
+        try c.encodeIfPresent(nightDepth, forKey: .nightDepth)
         try c.encodeIfPresent(tint, forKey: .tint)
         try c.encodeIfPresent(tint2, forKey: .tint2)
         try c.encodeIfPresent(translucency, forKey: .translucency)
@@ -841,6 +885,8 @@ final class Library {
         spaces[i].color = color
         spaces[i].hue = nil
         spaces[i].intensity = nil
+        spaces[i].dayDepth = nil
+        spaces[i].nightDepth = nil
         spaces[i].tint = nil
         commit()
     }
@@ -856,6 +902,8 @@ final class Library {
         spaces[i].intensity2 = look.intensity2
         spaces[i].brightness = look.brightness
         spaces[i].brightness2 = look.brightness2
+        spaces[i].dayDepth = look.dayDepth
+        spaces[i].nightDepth = look.nightDepth
         spaces[i].angle = look.angle
         spaces[i].tint = look.tint
         spaces[i].tint2 = look.tint2
@@ -888,6 +936,8 @@ final class Library {
         keepDefaultColor(i)
         spaces[i].hue = hue
         spaces[i].tint = nil
+        spaces[i].dayDepth = nil
+        spaces[i].nightDepth = nil
         if let intensity { spaces[i].intensity = intensity }
         commit()
     }

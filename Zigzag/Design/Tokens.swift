@@ -1571,11 +1571,8 @@ enum Tokens {
         static let paletteChroma = 0.078
         static let paletteDarkLightness = 0.27
         static let paletteDarkChroma = 0.05
-        /// How see-through the palette's looks are, on clear glass: as clear as keeps text at 4.5:1 over a desktop
-        /// that works against it. Vivid ones are lighter, so a little less.
-        static let paletteSeeThrough = 0.45
-        static let vividSeeThrough = 0.4
-        /// How strong a new space's palette color is while it follows the Mac (`SpaceColor.background(hue:intensity:)`).
+        /// How strong a new space's palette color is to a Zigzag from before the palette's own day and night depths
+        /// (`SpaceColor.background(hue:intensity:)`).
         static let followingIntensity = 0.8
         static let softFollowingIntensity = 0.5
         /// A blank page in a palette space on glass: fainter than `wash`, near white by day and near the page's dark at night.
