@@ -622,9 +622,6 @@ final class BrowserRootView: SpaceFrameView {
     }
     private(set) var sidebarRevealed = false
     var onLayoutChange: (() -> Void)?
-    /// Called with the visibility the sidebar is about to have, before it moves: the address goes to the bar or back
-    /// with it, so the bar leaves and returns with the sidebar (#469).
-    var onSidebarVisibilityWillChange: ((Bool) -> Void)?
     /// Called when the sidebar starts a slide, with how long it lasts (0 = no animation) and its curve, so what rides
     /// along moves in step.
     var onSlide: ((TimeInterval, CAMediaTimingFunction) -> Void)?
@@ -814,14 +811,6 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
     static let addressPlaceChanged = Notification.Name("AddressPlaceChanged")
-
-    /// Where the address lives: above the page when the setting says so, and whenever the sidebar is away, which has
-    /// nowhere to keep it (#469).
-    enum AddressPlacement {
-        static func inBar(addressAbovePage: Bool, sidebarVisible: Bool) -> Bool {
-            addressAbovePage || !sidebarVisible
-        }
-    }
 
     /// The sidebar along the window's right edge instead of its left (#166), as Arc's Sidebar on the Right. Off unless
     /// turned on in Settings › Appearance or the View menu.
@@ -1508,7 +1497,6 @@ final class BrowserRootView: SpaceFrameView {
 
     func setSidebarVisible(_ visible: Bool, animated: Bool) {
         guard visible != sidebarVisible else { return }
-        onSidebarVisibilityWillChange?(visible)
         let oldSidebar = sidebarContainer.frame
         let oldBar = topBar.frame, oldControls = topBar.controlPositions
         topBarSlides += 1

@@ -191,6 +191,11 @@ final class EdgePeek {
         makeKey()
     }
 
+    /// A site panel describes one page: another page taking the area takes it away with it.
+    private func closeSitePanel() {
+        if SitePanel.isOpen(in: EdgeSidebar.shared.panelWindow) { SitePanel.closeCurrent() }
+    }
+
     /// A page opened from the panel replaces the one it shows; a click on the row already showing locks it.
     func show(tab: Tab, from controller: BrowserWindowController, replacing: Bool = false) {
         guard EdgeLensPolicy.takesPage(url: tab.url) else { return }
@@ -204,6 +209,7 @@ final class EdgePeek {
         }
         if isVisible {
             guard self.tab !== tab else { return }
+            closeSitePanel()
             attach(tab, from: controller, swapping: true)
         } else {
             guard EdgeSidebar.isOn, EdgeSidebar.shared.isShowing else { return }
@@ -224,6 +230,7 @@ final class EdgePeek {
         // the card's side, as another page would; a note already there just changes its words.
         let replacing = self.tab != nil
         let fromNotice = noticeTab != nil
+        closeSitePanel()
         if self.tab != nil { detach(.sidebarClick, resize: false) }
         noticeTab = tab
         self.controller = controller
@@ -407,7 +414,9 @@ final class EdgePeek {
 
     private func detach(_ reason: EdgeLensReason, resize: Bool) {
         debugLog("edge peek detach reason=\(reason) panel=\(EdgeSidebar.shared.isShowing) pointer=\(NSEvent.mouseLocation)")
-        // A page still folding goes back to its tab first, so no holder is left in the panel.
+        // A page still folding goes back to its tab first, so no holder is left in the panel. The site panel described
+        // that page, so it goes too, rather than describing nothing over the note or the next page.
+        closeSitePanel()
         finishFold()
         hoverWork?.cancel()
         hoverWork = nil

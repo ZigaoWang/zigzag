@@ -10,12 +10,27 @@ struct TopBarTests {
     let bar = TopBarView.height
     let inset = Tokens.Metric.cardInset
 
-    /// With the sidebar away the bar is the address's only home, and the lights' room with it (#469).
-    @Test func theAddressGoesToTheBarWhenTheSidebarIsAway() {
-        #expect(BrowserRootView.AddressPlacement.inBar(addressAbovePage: false, sidebarVisible: false))
-        #expect(BrowserRootView.AddressPlacement.inBar(addressAbovePage: true, sidebarVisible: false))
-        #expect(BrowserRootView.AddressPlacement.inBar(addressAbovePage: true, sidebarVisible: true))
-        #expect(!BrowserRootView.AddressPlacement.inBar(addressAbovePage: false, sidebarVisible: true))
+    /// A sidebar popped out is away while it shows: the address stays with it, not in the bar behind (#365).
+    @Test func thePopoutSidebarKeepsItsAddress() {
+        let before = Library.shared.snapshot
+        let above = BrowserRootView.addressAbovePage
+        defer {
+            BrowserRootView.addressAbovePage = above
+            Library.shared.restore(before)
+        }
+        BrowserRootView.addressAbovePage = false
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let controller = BrowserWindowController(tabManager: manager, frame: window, sidebarVisible: false)
+        defer { controller.window?.close() }
+        controller.placeAddress()
+        #expect(controller.sidebar.holdsAddress)
+        // Hidden and out on the pointer: the popout. The address is still the sidebar's.
+        controller.root.reveal(true)
+        #expect(controller.root.isSidebarFloatingVisible)
+        controller.placeAddress()
+        #expect(controller.sidebar.holdsAddress)
     }
 
     @Test func barSitsOnTheTrafficLightsLine() {

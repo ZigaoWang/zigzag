@@ -86,20 +86,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
-        if !sidebarVisible {
-            // The bar comes for the address once the window is up: a window restored with the sidebar away has it.
-            DispatchQueue.main.async { [weak self] in self?.placeAddress() }
-        }
         // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
         // view keeps the width dragged out last time, which every window shares (#431).
         if let sidebarWidth {
             // A window restored from a session keeps its own; the shared width is written only by a drag (#431).
             root.sidebarWidth = min(max(sidebarWidth, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth)
-        }
-        root.onSidebarVisibilityWillChange = { [weak self] visible in
-            guard let self else { return }
-            self.moveAddress(above: BrowserRootView.AddressPlacement.inBar(
-                addressAbovePage: BrowserRootView.addressAbovePage, sidebarVisible: visible))
         }
         root.onLayoutChange = { [weak self] in
             guard let self else { return }
@@ -655,15 +646,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
     /// from them is put away first. At once: a setting you change, not a layout you watch.
     @objc func placeAddress() {
-        moveAddress(above: BrowserRootView.AddressPlacement.inBar(addressAbovePage: BrowserRootView.addressAbovePage,
-                                                                  sidebarVisible: root.sidebarVisible))
-    }
-
-    /// The address above the page (`above`) or back in the sidebar. Used for the setting, and for the sidebar going
-    /// or coming: with it away the bar is the address's only home, so the bar is there with it (#469).
-    func moveAddress(above: Bool) {
+        let above = BrowserRootView.addressAbovePage
         guard sidebar.holdsAddress == above else { return }
         if window?.isVisible == true { closeFloatingPanels() }
+        // The edge panel's mirror keeps the address wherever the window's sidebar has it, whether the sidebar is
+        // showing, popped out or away.
         bothSidebars { $0.holdsAddress = !above }
         if above {
             // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
