@@ -1738,7 +1738,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               control: archiveAfter))
         energyToggle.onChange = { on in EnergyWatch.sleepsBusyTabs = on }
         let energyRow = FormRow(title: String(localized: "Put busy background tabs to sleep", comment: "A setting in Settings › Tabs."),
-                                detail: String(localized: "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its site controls.",
+                                detail: String(localized: "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its Site Controls.",
                                                comment: "Explanation under “Put busy background tabs to sleep” in Settings › Tabs. Keep tabs awake is the row in the site panel; site controls is the panel by the address."),
                                 control: energyToggle)
         energyRow.keywords = String(localized: "sleep asleep memory energy keep awake active exclude site", comment: "Words that find the Put busy background tabs to sleep setting with Find a setting in Settings. Not shown.")
@@ -1764,7 +1764,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         fullScreenFill.onSelect = { index in PageFullScreen.fill = PageFullScreen.Fill.allCases[index] }
         let fullScreenRow = FormRow(title: String(localized: "Full screen videos fill", comment: "A setting in Settings › Tabs: whether a video put in full screen covers the whole screen or only the page's area in the window. Followed by The Whole Screen or The Page."),
-                                    detail: String(localized: "Choose for a single site in its site controls.",
+                                    detail: String(localized: "Choose for a single site in its Site Controls.",
                                                    comment: "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address."),
                                     control: fullScreenFill)
         fullScreenRow.keywords = String(localized: "full screen fullscreen window tab pane video youtube in window", comment: "Words that find the Full screen videos fill setting with Find a setting in Settings. Not shown.")
@@ -4351,7 +4351,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Site controls offer Keep cookies only while quitting clears them (#383).
         func keptDetail(clearsOnQuit: Bool) -> String {
             kept.isEmpty && clearsOnQuit
-                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
+                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its Site Controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
                 : String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed.")
         }
         let keptRow = FormRow(title: String(localized: "Keep cookies for these sites", comment: "A setting in Settings › Privacy: the sites whose cookies Clear Cookies… and quitting leave alone, listed under it."),

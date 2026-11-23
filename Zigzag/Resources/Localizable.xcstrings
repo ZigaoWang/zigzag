@@ -1643,7 +1643,7 @@
         }
       }
     },
-    "Choose for a single site in its site controls." : {
+    "Choose for a single site in its Site Controls." : {
       "comment" : "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address.",
       "localizations" : {
         "en" : {
@@ -2938,7 +2938,7 @@
         }
       }
     },
-    "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its site controls." : {
+    "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its Site Controls." : {
       "comment" : "Explanation under “Put busy background tabs to sleep” in Settings › Tabs. Keep tabs awake is the row in the site panel; site controls is the panel by the address.",
       "localizations" : {
         "zh-Hans" : {
@@ -3389,7 +3389,7 @@
         }
       }
     },
-    "Added. Find it in site controls, by the address." : {
+    "Added. Find it in Site Controls, by the address." : {
       "comment" : "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address.",
       "localizations" : {
         "zh-Hans" : {
@@ -4711,7 +4711,7 @@
         }
       }
     },
-    "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls." : {
+    "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its Site Controls." : {
       "comment" : "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.",
       "localizations" : {
         "zh-Hans" : {
@@ -10726,13 +10726,13 @@
         }
       }
     },
-    "Find your extensions in site controls, by the address. You can bring more over anytime from Settings." : {
+    "Find your extensions in Site Controls, by the address. You can bring more over anytime from Settings." : {
       "comment" : "Import window when the import is done and only extensions came over. Site controls is the panel by the address.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的扩展在地址旁的网站控制中。你随时可以从设置中导入更多内容。"
+            "value" : "你的扩展在地址旁的网站设置中。你随时可以从设置中导入更多内容。"
           }
         }
       }

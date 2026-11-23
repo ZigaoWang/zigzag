@@ -416,7 +416,7 @@ final class ImportView: NSView {
                                     comment: "Import window when the import is done and sign-ins came over.")
             // Extensions are by the address, not in the sidebar.
             : summaries.allSatisfy({ $0.bookmarks + $0.history + $0.spaces == 0 }) && summaries.contains(where: { $0.extensions > 0 })
-            ? String(localized: "Find your extensions in site controls, by the address. You can bring more over anytime from Settings.",
+            ? String(localized: "Find your extensions in Site Controls, by the address. You can bring more over anytime from Settings.",
                      comment: "Import window when the import is done and only extensions came over. Site controls is the panel by the address.")
             : String(localized: "Everything that came over is in your sidebar. You can bring more over anytime from Settings.", comment: "Import window when the import is done.")
         // Rows that hit a problem stay, with their fix; the ones that went fine give way to the summary.
