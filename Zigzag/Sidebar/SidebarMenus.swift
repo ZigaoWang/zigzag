@@ -273,6 +273,9 @@ enum SidebarMenus {
                 // ⇧ held asks where, as ⇧⌘D does.
                 if C.shiftHeld { controller.save(tab, request: .picker) } else { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
             }, #selector(C.toggleBookmark(_:))))
+        }
+        // By its own rule, as the menu bar and the command bar have it: a tab of a group favorites alone.
+        if !isPrivate, tab.bookmarkID == nil, tab.url != nil, manager.canPin(tab, keepingGroup: false) {
             organize.append(keyed(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar."), symbol: Symbol.favorite) { controller.favoriteWithUndo(tab) }, #selector(C.addToFavorites(_:))))
         }
         if tab.bookmarkID == nil { organize += groupItems(for: tab, controller: controller) }

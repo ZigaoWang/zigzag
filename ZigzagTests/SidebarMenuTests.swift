@@ -586,6 +586,24 @@ struct SidebarRowMenuTests {
         }
     }
 
+    /// A tab whose group can't be pinned whole (Settings is in it) still adds to Favorites from its menu, as the menu
+    /// bar and the command bar offer.
+    @Test func aTabOfAnUnpinnableGroupStillAddsToFavorites() throws {
+        try inWindow(["A"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            manager.adopt([settings], in: space)
+            _ = try #require(manager.makeGroup(with: [tabs[0], settings], name: "Mixed"))
+            manager.select(tabs[0])
+            let menu = titles(SidebarMenus.tabMenu(for: tabs[0], controller: controller))
+            #expect(!menu.contains("Pin Group") && !menu.contains("Pin Tab"))
+            #expect(menu.contains("Add to Favorites"))
+            #expect(CommandRanker.context(for: manager).canFavorite)
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.addToFavorites(_:)), keyEquivalent: "")
+            #expect(controller.validateMenuItem(item))
+        }
+    }
+
     @Test func pickedRowsOrganizeThenClose() {
         inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.markedMenu(for: [.tab(tabs[0].id), .tab(tabs[1].id)], controller: controller)

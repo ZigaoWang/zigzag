@@ -63,6 +63,8 @@
   Test: SavePathTests.inEverySpaceIsATickOnASavedPage
 - A favorite moved into a space's Pinned or a folder → it leaves Favorites; a page is never both.
   Test: SavePathTests.aFavoriteFiledInASpaceLeavesFavorites
+- A tab's menu in a group that can't be pinned whole (Settings is in it) → still offers Add to Favorites, as the menu bar and the command bar do.
+  Test: SidebarRowMenuTests.aTabOfAnUnpinnableGroupStillAddsToFavorites
 - Move to Tabs on a favorite → it becomes a tab of the space you're in; Remove from Favorites → it's gone and its page closes.
   No test yet.
 
