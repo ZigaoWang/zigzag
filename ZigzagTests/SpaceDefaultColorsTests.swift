@@ -311,6 +311,8 @@ extension SpacePaletteTests {
     /// Power saving frosts all glass (`SpaceInfo.usesClearGlass`), so it runs on power only.
     @Test(.disabled(if: PowerSaving.onBattery || ProcessInfo.processInfo.isLowPowerModeEnabled, "Power saving frosts the glass"))
     func thePalettesGlassIsClear() {
+        // The power source can change mid-run; the check is only meaningful while nothing frosts the glass.
+        guard !PowerSaving.isOn else { return }
         func resolved(_ color: NSColor, dark: Bool) -> NSColor {
             var out = color
             NSAppearance(named: dark ? .darkAqua : .aqua)!.performAsCurrentDrawingAppearance { out = color.usingColorSpace(.sRGB) ?? color }
