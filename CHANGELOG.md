@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- With Settings › Tabs › Show a mini player when you leave Zigzag on, a video stays in its page when you move to another display and its window is still in view on its own. It moves into the mini player once that window is covered, minimized, hidden or its desktop is switched away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#496](https://github.com/ZigaoWang/zigzag/issues/496))
 - A finger's swipe across the sidebar switches spaces even when it curves up or down a little, as a thumb's swipe does. A steep flick still scrolls.
 
 ### New

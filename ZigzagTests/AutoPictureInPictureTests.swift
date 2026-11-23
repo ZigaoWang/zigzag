@@ -61,6 +61,34 @@ import Testing
         #expect(Model.delay <= 1)
     }
 
+    private static func sight(hidden: Bool = false, minimized: Bool = false, inView: Bool = true, window: UInt32? = 1,
+                              focus: UInt32? = 1) -> Model.Sight {
+        Model.Sight(isHidden: hidden, isMinimized: minimized, isInView: inView, windowDisplay: window, focusDisplay: focus)
+    }
+
+    @Test func movesOnlyOnceTheWindowIsOutOfSight() {
+        // Hidden, minimized, covered or on a desktop not showing.
+        #expect(Model.isOutOfSight(Self.sight(hidden: true)))
+        #expect(Model.isOutOfSight(Self.sight(minimized: true)))
+        #expect(Model.isOutOfSight(Self.sight(inView: false)))
+        #expect(Model.isOutOfSight(Self.sight(inView: false, window: 2)))
+        // Another app on the window's own display, as on a single display.
+        #expect(Model.isOutOfSight(Self.sight()))
+        #expect(Model.isOutOfSight(Self.sight(focus: nil)))
+        #expect(Model.isOutOfSight(Self.sight(window: nil)))
+    }
+
+    @Test func aWindowInViewOnAnotherDisplayKeepsItsVideo() {
+        // Focus moved to the main display, the window still showing on the second (#496).
+        #expect(!Model.isOutOfSight(Self.sight(window: 2, focus: 1)))
+        // Later covered, minimized, hidden or its desktop switched away: it moves then.
+        #expect(Model.isOutOfSight(Self.sight(inView: false, window: 2, focus: 1)))
+        #expect(Model.isOutOfSight(Self.sight(minimized: true, window: 2, focus: 1)))
+        #expect(Model.isOutOfSight(Self.sight(hidden: true, window: 2, focus: 1)))
+        // Or you switch to an app on its display.
+        #expect(Model.isOutOfSight(Self.sight(window: 2, focus: 2)))
+    }
+
     @Test func putsBackOnlyWhatItMovedOnceYoureBackOnItsTab() {
         let id = UUID(), other = UUID()
         var model = Model()

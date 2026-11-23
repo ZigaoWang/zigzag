@@ -72,6 +72,12 @@
 - Pause the video or audio a tab's sound came from → its speaker goes away after a moment, even if WebKit still says it plays.
   Test: MiniPlayerPageTests.aSoundFromAVideoEndsOnceItStops
 
+## Mini player when you leave
+- Show a mini player when you leave Zigzag on, and switch to another app with the window covered, minimized, hidden or on a desktop no longer showing → after a moment the watched video moves into the mini player.
+  Test: AutoPictureInPictureTests.movesOnlyOnceTheWindowIsOutOfSight
+- The same, with the window still in view on another display → the video stays in its page until that window goes out of sight.
+  Test: AutoPictureInPictureTests.aWindowInViewOnAnotherDisplayKeepsItsVideo
+
 ## Picked rows
 - ⌫, ⌦ or ⌘⌫ with two or more rows picked → picked tabs close and picked pinned pages are removed, once per press.
   Test: SidebarDeleteKeyTests.deleteClosesPickedRowsOnceAndOnlyWhilePicked
