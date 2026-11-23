@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - On a touch display, tapping the sidebar's grabber opens the sidebar and nothing else. The same tap used to land on the sidebar as it slid out, closing it again and opening a new tab; a pull from the edge and a tap on a sidebar toggle no longer carry over either.
 - On a touch display, tapping the button that shows the hidden sidebar opens it and nothing else. The same tap used to land on the sidebar as it slid out, closing it again and opening a new tab; a pull from the edge and a tap on a sidebar toggle no longer carry over either.
 - On a touch display, two taps on the top of the window beside the traffic lights, or beside the sidebar's back and forward buttons, zoom the window again, as a double-click there does.
+- Menus and buttons agree on names and keys: Copy Link, Unpin Tab and Move to Tabs show their keys on pinned pages and favorites, Close shows ⌘W on picked rows, Site Controls and Zigzag Mini's tooltips and note follow the keys you set in Settings › Shortcuts, the command bar says Settings… as the menu bar does, and Pin Tab in the menu bar is dimmed on pages that can't be pinned.
 
 ## [0.9.4] - 2026-11-21
 
