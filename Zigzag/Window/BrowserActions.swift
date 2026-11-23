@@ -981,11 +981,12 @@ extension BrowserWindowController: NSMenuItemValidation {
                 : tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
                 : String(localized: "Pin Tab", comment: "Menu bar item: pins the tab.")
-            return tab?.url != nil && !tabManager.isPrivate
+            // Dimmed where the sidebar and command bar leave Pin out: Zigzag's own pages can't be pinned (#472).
+            return tab?.url != nil && !tabManager.isPrivate && tab.map { tabManager.canPin($0) } == true
         case #selector(savePageToFolder(_:)):
             // ⇧⌘D: the same save, asking where in the space it goes. One word for the verb, everywhere.
             item.title = String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.")
-            return tab?.url != nil && !tabManager.isPrivate
+            return tab?.url != nil && !tabManager.isPrivate && tab.map { tabManager.canPin($0) } == true
         case #selector(addToFavorites(_:)):
             return tab?.url != nil && tab.map { tabManager.canPin($0, keepingGroup: false) } == true && tab?.isFavorite != true && !tabManager.isPrivate
         case #selector(toggleDevelopmentSite(_:)):
