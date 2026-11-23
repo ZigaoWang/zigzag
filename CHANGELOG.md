@@ -8,6 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - Swap on a split's strip moves the two pages on screen right away. Before, only the sidebar row swapped until you clicked somewhere, so a click on one pane could pick the other page, and ⌘F opened the find bar over one pane while searching the other.
 - Settings › General › On launch reads like the rest of Settings: Continue where you left off, or Open a new window. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#494](https://github.com/ZigaoWang/zigzag/issues/494))
+- A link in an installed app like Gmail that opens a new tab goes to the browser instead of replacing the app, also when the site sends it through its own redirect page first. Links to the app's own pages still open in the app. Thanks to [retorquere](https://github.com/retorquere). ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 
 ## [0.9.4] - 2026-11-21
 

@@ -298,3 +298,15 @@ extension WebAppTests {
         }
     }
 }
+
+extension WebAppTests {
+    /// Gmail's links go through google.com/url: same site, another host, so the browser gets them (#165).
+    @Test func onlyTheAppsOwnHostOpensInIt() {
+        let gmail = URL(string: "https://mail.google.com/mail/u/0/#inbox")!
+        #expect(WebAppWindowController.newTabStaysInApp(URL(string: "https://mail.google.com/mail/u/0/#sent")!, from: gmail))
+        #expect(!WebAppWindowController.newTabStaysInApp(URL(string: "https://www.google.com/url?q=https://example.com")!, from: gmail))
+        #expect(!WebAppWindowController.newTabStaysInApp(URL(string: "https://example.com/")!, from: gmail))
+        #expect(WebAppWindowController.newTabStaysInApp(URL(string: "https://accounts.google.com/signin")!, from: gmail))
+        #expect(WebAppWindowController.newTabStaysInApp(URL(string: "https://www.figma.com/file/1")!, from: URL(string: "https://figma.com/")!))
+    }
+}

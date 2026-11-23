@@ -15,6 +15,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 点分屏标题栏上的“交换”后，两边的页面会马上换位置。之前只有侧边栏那一行换了，屏幕上的页面要等再点一下才换，这时点一边可能会选中另一边的页面，⌘F 的查找栏也会出现在一边、却在另一边搜索。
 - “设置 › 通用 › 启动时”的选项改成和其他设置一样的说法：“接着上次继续”或“打开一个新窗口”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#494](https://github.com/ZigaoWang/zigzag/issues/494))
+- 在安装成 App 的网站（比如 Gmail）里点开新标签页的链接，会在浏览器里打开，不会再替换掉 App，网站先经过自己的跳转页也一样。指向 App 自己页面的链接还是在 App 里打开。感谢 [retorquere](https://github.com/retorquere)。([#165](https://github.com/ZigaoWang/zigzag/issues/165))
 
 ## [0.9.4] - 2026-11-21
 

@@ -391,11 +391,12 @@ extension WebAppWindowController: TabHost {
         if pending == nil, features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
             return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
-        // A plain click on a link to the same site that asks for a new tab: it opens here, as the app is that site.
+        // A plain click on a link to the app's own host (or its sign-in) that asks for a new tab: it opens here, as
+        // the app is that site. A link through the site's redirector (google.com/url from Gmail) goes to the browser.
         // An app's link from it (no site to leave) asks, as the page's own doing, and the site's Block holds.
         let modified = action.modifierFlags.contains(.command) || action.modifierFlags.contains(.shift)
         if pending == nil, !modified, let url = action.request.url, let here = tab.url,
-           Tab.route(forPageLink: url, from: here) != .load || !Tab.leavesSite(from: here, to: url) {
+           Tab.route(forPageLink: url, from: here) != .load || Self.newTabStaysInApp(url, from: here) {
             tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
             return nil
         }
@@ -407,6 +408,13 @@ extension WebAppWindowController: TabHost {
             NSApp.activate()
         }
         return newTab.ensureWebView()
+    }
+
+    /// A page's new-tab link the app keeps: the same host, or a sign-in on its own site (#165).
+    nonisolated static func newTabStaysInApp(_ url: URL, from here: URL) -> Bool {
+        guard !Tab.leavesSite(from: here, to: url) else { return false }
+        func bare(_ u: URL) -> String { let h = u.host()?.lowercased() ?? ""; return h.hasPrefix("www.") ? String(h.dropFirst(4)) : h }
+        return bare(url) == bare(here) || Tab.isSignIn(url)
     }
 
     func tabDidRequestClose(_ tab: Tab) { window?.performClose(nil) }
