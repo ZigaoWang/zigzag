@@ -588,6 +588,24 @@ struct TouchMovesTests {
 
     // MARK: Across the sidebar
 
+    /// A hold whose view goes before the finger has moved still ends when the finger lifts.
+    @Test func aHoldEndsAfterItsViewHasGone() throws {
+        let window = window(height: 200)
+        let content = try #require(window.contentView)
+        content.addGestureRecognizer(TouchFollow())
+        let view = NSView(frame: NSRect(x: 20, y: 20, width: 100, height: 30))
+        content.addSubview(view)
+        let point = middle(of: view)
+        let hold = TouchHold.begin(on: view, at: point, openMenu: nil, startDrag: nil)
+        #expect(hold.followed && TouchHold.current === hold)
+        // The recognizer on the view still hears the finger: the follower's lift is left to it.
+        hold.fingerLifted(at: point, in: window)
+        #expect(!hold.isFinished)
+        view.removeFromSuperview()
+        hold.fingerLifted(at: point, in: window)
+        #expect(hold.isFinished && TouchHold.current == nil)
+    }
+
     @Test func sidewaysIsMostlySideways() {
         #expect(TouchSwipe.isSideways(NSPoint(x: 12, y: 3)))
         #expect(TouchSwipe.isSideways(NSPoint(x: -12, y: 5)))

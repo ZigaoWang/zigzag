@@ -594,6 +594,8 @@ final class TouchHold {
     /// The list it was held in (the sidebar's): off the menu and out of it, the finger is taking it somewhere to drop,
     /// and picks it up even after passing over the menu.
     private weak var home: NSView?
+    /// The view the hold was recognized on.
+    private weak var source: NSView?
 
     init(at windowPoint: NSPoint, in window: NSWindow?, followed: Bool, scroll: NSScrollView?,
          openMenu: (() -> MenuPanel?)?, startDrag: ((NSPoint) -> Bool)?, ended: (() -> Void)? = nil) {
@@ -618,6 +620,7 @@ final class TouchHold {
         current?.cancelled()
         let hold = TouchHold(at: windowPoint, in: view.window, followed: TouchFollow.follows(view), scroll: view.enclosingScrollView,
                              openMenu: openMenu, startDrag: startDrag, ended: ended)
+        hold.source = view
         current = hold
         if openMenu != nil {
             let work = DispatchWorkItem { [weak hold] in MainActor.assumeIsolated { hold?.showMenu() } }
@@ -651,8 +654,14 @@ final class TouchHold {
         followSeen = true
         moved(to: windowPoint)
     }
-    func fingerLifted(at windowPoint: NSPoint, in window: NSWindow) { if followSeen, window === self.window { lifted(at: windowPoint) } }
-    func fingerCancelled(in window: NSWindow) { if followSeen, window === self.window { cancelled() } }
+    func fingerLifted(at windowPoint: NSPoint, in window: NSWindow) { if takesFollower(in: window) { lifted(at: windowPoint) } }
+    func fingerCancelled(in window: NSWindow) { if takesFollower(in: window) { cancelled() } }
+
+    /// The follower's lift ends the hold once it has reported the finger, or once the view held has gone, whose
+    /// recognizer then never hears the lift.
+    private func takesFollower(in window: NSWindow) -> Bool {
+        followed && window === self.window && (followSeen || source?.window == nil)
+    }
 
     func moved(to windowPoint: NSPoint) {
         guard !isFinished else { return }
