@@ -40,6 +40,7 @@ final class PageHolder: NSView {
         webView.autoresizingMask = [.width, .height]
         addSubview(webView)
         page = webView
+        if TouchGestures.isAvailable, overviewPinch == nil { addTouchGestures() }
         if let pageObserver { NotificationCenter.default.removeObserver(pageObserver) }
         // WebKit moves the page as the inspector docks, leaves or is dragged wider: said once the room really changed.
         // WebKit takes the page to a window of its own for an element's full screen, and puts it back here after.
@@ -89,6 +90,38 @@ final class PageHolder: NSView {
         guard size.width > 1, size.height > 1 else { return }
         page.setFrameSize(NSSize(width: size.width, height: size.height - 1))
         page.setFrameSize(size)
+    }
+
+    // MARK: Touch
+
+    /// Two fingers pinched in on the page at its usual size open Show All Tabs; the page still zooms as before.
+    private(set) var overviewPinch: TouchPinchRecognizer?
+    private var pinchStartZoom: CGFloat = 1
+    private var pinchFired = false
+
+    private func addTouchGestures() {
+        let pinch = TouchPinchRecognizer { [weak self] pinch in self?.pinchChanged(pinch) }
+        addGestureRecognizer(pinch)
+        overviewPinch = pinch
+    }
+
+    private func pinchChanged(_ pinch: TouchPinchRecognizer) {
+        switch pinch.state {
+        case .began:
+            pinchStartZoom = page?.magnification ?? 1
+            pinchFired = false
+        case .changed:
+            guard !pinchFired, TouchPinch.opensOverview(magnification: pinch.magnification, startZoom: pinchStartZoom) else { return }
+            pinchFired = true
+            touchPinchedIn()
+        default: break
+        }
+    }
+
+    /// Pinched in far enough: Show All Tabs, in a browser window.
+    func touchPinchedIn() {
+        guard let controller = window?.windowController as? BrowserWindowController, !controller.desk.isVisible else { return }
+        controller.desk.show()
     }
 
     // MARK: Into real full screen

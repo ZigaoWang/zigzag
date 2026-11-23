@@ -163,6 +163,25 @@ final class TouchPanRecognizer: NSPanGestureRecognizer {
     @objc private func fire() { handler?(self) }
 }
 
+/// Two fingers pinched: `handler` runs on each state change. Alongside the page's own pinch zoom.
+final class TouchPinchRecognizer: NSMagnificationGestureRecognizer {
+    let touchOnly = TouchOnly()
+    var handler: ((TouchPinchRecognizer) -> Void)?
+
+    init(handler: ((TouchPinchRecognizer) -> Void)? = nil) {
+        self.handler = handler
+        super.init(target: nil, action: nil)
+        target = self
+        action = #selector(fire)
+        TouchGestures.configure(self, touchOnly, yieldsToScrolling: false)
+        touchOnly.simultaneous = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func fire() { handler?(self) }
+}
+
 /// Watches fingers land and lift without ever recognizing, so it never takes a touch from anything under it: what a
 /// mouse-down tells `sendEvent` and the event monitors, which touches skip.
 final class TouchWatch: NSGestureRecognizer {
@@ -670,4 +689,20 @@ enum TouchSwipe {
     nonisolated static func isSideways(_ translation: NSPoint) -> Bool {
         abs(translation.x) >= 4 && abs(translation.x) > abs(translation.y) * 1.2
     }
+}
+
+
+/// Two fingers pinched in on a page at its usual size open Show All Tabs, as on an iPad; pinched out on a card there,
+/// it opens.
+enum TouchPinch {
+    /// How far in or out the fingers pinch, as the recognizer's magnification, before it counts.
+    nonisolated static let threshold: CGFloat = 0.2
+
+    /// Whether a pinch that began with the page at `startZoom` (its magnification) has gone far enough in to open the
+    /// overview. Zoomed in, the pinch is the page's, to zoom back out.
+    nonisolated static func opensOverview(magnification: CGFloat, startZoom: CGFloat) -> Bool {
+        startZoom <= 1.01 && magnification <= -threshold
+    }
+
+    nonisolated static func opensCard(magnification: CGFloat) -> Bool { magnification >= threshold }
 }
