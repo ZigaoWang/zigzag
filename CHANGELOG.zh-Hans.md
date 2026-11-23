@@ -17,6 +17,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ### 修复
 - 在别的网站里嵌入的视频上点“在 YouTube 上观看”，现在会和点 YouTube 链接一样，在你给 YouTube 选的空间中打开，不再留在当前空间。其他嵌入内容里会新开标签页的链接也一样，网页自己的弹窗仍然留在原处。感谢 [retorquere](https://github.com/retorquere)。([#286](https://github.com/ZigaoWang/zigzag/issues/286))
+- 回到某个空间时，YouTube 视频不会再直接带声音播放了。标签页自己重新载入时，比如它进入了睡眠、页面停止了，或是 Zigzag 重新打开后恢复的，现在有声音的内容会等你点播放，和 Safari、Chrome 一样。你自己打开的网页仍会自动播放，正在播放的标签页切走再切回来也会继续播放。感谢 [retorquere](https://github.com/retorquere)。([#493](https://github.com/ZigaoWang/zigzag/issues/493))
 
 ## [0.9.4] - 2026-11-21
 

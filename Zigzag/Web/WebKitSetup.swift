@@ -44,6 +44,13 @@ enum WebKitSetup {
         configuration.preferences = own
     }
 
+    /// This page's media with sound waits for a click or key in it; muted media still plays. WebKit's per-page policy
+    /// (`_WKWebsiteAutoplayPolicyAllowWithoutSound`), what Safari's Stop Media with Sound sets.
+    static func autoplayWithoutSound(_ preferences: WKWebpagePreferences) {
+        guard preferences.responds(to: NSSelectorFromString("_setAutoplayPolicy:")) else { return }
+        preferences.setValue(2, forKey: "autoplayPolicy")
+    }
+
     /// Sets a private WebKit preference by KVC key (`_set<Key>:`) if it exists and differs (reading only where the
     /// getter exists too).
     static func setIfAvailable(_ on: Bool, key: String, in preferences: WKPreferences) {

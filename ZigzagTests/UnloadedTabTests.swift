@@ -162,6 +162,62 @@ import Testing
         #expect(await until { sleeper.webView?.url == second && sleeper.canGoBack })
     }
 
+    /// A page you open may start sound on its own; the same page woken from sleep, or restored after a relaunch,
+    /// waits for you (#493). Like YouTube, the page tries again once it's shown. The sound is silence.
+    @Test func aWokenOrRestoredPageStartsNoSoundOnItsOwn() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("quiet-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Self.silentWAV().write(to: folder.appendingPathComponent("silent.wav"))
+        let page = folder.appendingPathComponent("sound.html")
+        try """
+        <title>waiting</title><audio id="a" loop src="silent.wav"></audio>
+        <script>
+        const play = () => document.getElementById('a').play().then(() => document.title = 'played', () => document.title = 'blocked ' + document.visibilityState);
+        play();
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) play(); });
+        </script>
+        """.write(to: page, atomically: true, encoding: .utf8)
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let other = Tab(url: nil, title: "Other", spaceID: space)
+        let sleeper = Tab(url: page, title: "Sound", spaceID: space)
+        let restored = Tab(url: page, title: "Sound", spaceID: space)
+        restored.isRestored = true
+        manager.adopt([other, sleeper, restored], in: space)
+        manager.select(sleeper)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        #expect(await until { sleeper.title == "played" })
+        // A tab playing sound doesn't sleep, nor one whose sound followed you into the mini player.
+        _ = await until { sleeper.isPlayingAudio }
+        _ = try await sleeper.webView?.evaluateJavaScript("document.getElementById('a').pause()")
+        #expect(await until { !sleeper.isPlayingAudio })
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep })
+        manager.select(sleeper)
+        #expect(await until { sleeper.title.hasPrefix("blocked") }, "\(sleeper.title)")
+        manager.select(restored)
+        #expect(await until { restored.title.hasPrefix("blocked") }, "\(restored.title)")
+        // Loading it yourself plays as before.
+        restored.reload()
+        #expect(await until { restored.title == "played" }, "\(restored.title)")
+    }
+
+    /// A second of 16-bit mono silence.
+    private static func silentWAV() -> Data {
+        let rate: UInt32 = 8000, bytes = rate * 2
+        var data = Data()
+        func put<T: FixedWidthInteger>(_ value: T) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        data.append(contentsOf: Array("RIFF".utf8)); put(UInt32(36 + bytes)); data.append(contentsOf: Array("WAVEfmt ".utf8))
+        put(UInt32(16)); put(UInt16(1)); put(UInt16(1)); put(rate); put(rate * 2); put(UInt16(2)); put(UInt16(16))
+        data.append(contentsOf: Array("data".utf8)); put(bytes)
+        data.append(Data(count: Int(bytes)))
+        return data
+    }
+
     /// Settings keeps its view when it sleeps, so closing the tab in front of it doesn't rebuild it (#357).
     @Test func aSleepingSettingsTabKeepsItsSettingsView() throws {
         let url = try #require(URL(string: "zigzag://settings"))

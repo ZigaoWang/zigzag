@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Watch on YouTube in a video embedded on another site opens in the space you chose for YouTube, as a link to it does, instead of in the space you're in. The same goes for other embeds' links that open a new tab, while a page's own pop-ups still stay with it. Thanks to [retorquere](https://github.com/retorquere). ([#286](https://github.com/ZigaoWang/zigzag/issues/286))
+- Going back to a space no longer starts its YouTube video playing out loud. A tab that loads again on its own, because it had gone to sleep, its page had stopped, or it came back after Zigzag reopened, now waits for you to press play before anything with sound plays, as in Safari and Chrome. A page you open yourself still plays on its own, and one already playing keeps playing as you switch away and back. Thanks to [retorquere](https://github.com/retorquere). ([#493](https://github.com/ZigaoWang/zigzag/issues/493))
 
 ## [0.9.4] - 2026-11-21
 

@@ -55,6 +55,8 @@
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.
   Test: UnloadedTabTests.aSleepingTabClickedLoadsAgainWhereItWas
+- A sleeping tab woken, or one restored after a relaunch → its page plays nothing with sound until you use it.
+  Test: UnloadedTabTests.aWokenOrRestoredPageStartsNoSoundOnItsOwn
 
 ## Handoff
 - The key window's tab on an http or https page → offered to your other devices; never a private window, Zigzag's own pages, a file, an error page or this Mac's own address.

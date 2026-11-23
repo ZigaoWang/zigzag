@@ -370,6 +370,9 @@ final class Tab: NSObject {
     /// Came back with the session after a relaunch and hasn't loaded since: its hover card says so, rather than
     /// that it was put to sleep.
     var isRestored = false
+    /// Its page came back on its own (`TabSleep.startsQuietly`): it starts no sound until you use it. Ends as that
+    /// page arrives, or with a page you load.
+    private(set) var startsQuietly = false
     /// Why its page isn't running, for its hover card or a favorite's tooltip; nil while it is. Only a tab put to
     /// sleep tells of memory it freed.
     var notLoadedNote: String? {
@@ -528,10 +531,11 @@ final class Tab: NSObject {
     @discardableResult
     func ensureWebView() -> BrowserWebView {
         if let webView { return webView }
+        let fromWebKit = pendingConfiguration != nil
+        let quiet = TabSleep.startsQuietly(restored: isRestored, asleep: sleepCause != nil, openedByPage: fromWebKit)
         sleepCause = nil
         isRestored = false
         freedMemory = nil
-        let fromWebKit = pendingConfiguration != nil
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
         pendingConfiguration = nil
@@ -624,6 +628,7 @@ final class Tab: NSObject {
         } else if let url, !fromWebKit {
             loadFirst(url, in: webView)
         }
+        startsQuietly = quiet
         // A new web view starts with sound and playing; carry over what you'd set on the old one.
         if isMuted { setMuted(true) }
         // A development tab's pages are listened to for the count of their errors.
@@ -1039,6 +1044,7 @@ final class Tab: NSObject {
     /// `httpFallback`: retry once over http if https is unreachable. Without it, a pending fallback holds only for the
     /// same address (a reload).
     private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender, httpFallback: Bool = false) {
+        startsQuietly = false
         ownLoadPending = sender == .page ? nil : OwnLoad(sender: sender, url: url)
         if httpFallback {
             pendingHTTPFallback = Self.overHTTP(url).map { HTTPFallback(secure: url, plain: $0, sender: sender) }
@@ -1208,6 +1214,7 @@ final class Tab: NSObject {
     }
     func reload() {
         guard let webView else { ensureWebView(); return }
+        startsQuietly = false
         // A reload isn't asked for again (`asksAgain`), so a user agent chosen since goes on first.
         applyUserAgent()
         if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
@@ -1754,6 +1761,14 @@ extension Tab: WKNavigationDelegate {
         // page, as WebKit decides per frame. Zigzag's error pages keep their own.
         SiteJavaScript.apply(to: preferences, for: decidesMainFrame ? url : webView.url, here: javaScriptHere,
                              errorPage: decidesMainFrame && ErrorPage.pending.contains(webView))
+        // A page that came back on its own plays no sound until you use it (#493); a click into another page may.
+        if decidesMainFrame {
+            if TabSleep.autoplaysWithoutSound(startsQuietly: startsQuietly, userInitiated: userInitiated) {
+                WebKitSetup.autoplayWithoutSound(preferences)
+            } else {
+                startsQuietly = false
+            }
+        }
         // JavaScript turned off with the developer tools is off for a development page: decided for the page being
         // gone to, so one anywhere else never loads without its scripts.
         if decidesMainFrame, developerInEffect(at: url).javaScriptOff { preferences.allowsContentJavaScript = false }
@@ -2239,6 +2254,7 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
         DarkPages.pageCommitted(in: webView)
+        startsQuietly = false
         // Page committed: no fallback needed.
         pendingHTTPFallback = nil
         // The rule-opened page arrived, so its links and downloads are normal again.
@@ -2492,6 +2508,7 @@ extension Tab: WKNavigationDelegate {
         guard reloadWhenShown, let webView else { return }
         reloadWhenShown = false
         if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
+        startsQuietly = true
     }
 
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
