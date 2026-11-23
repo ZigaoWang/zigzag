@@ -806,6 +806,64 @@ struct TopBarTests {
         #expect(root.topBar.pageColor == .systemRed)
     }
 
+    /// A trackpad scroll can close the bar and lock it, but the next key scroll is a new gesture: an arrow or space
+    /// back up the page brings it back.
+    @Test func aKeyScrollAfterATrackpadCloseBringsTheBarBack() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/key-reveal")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.layoutSubtreeIfNeeded()
+        let travel = root.autohideTravel(at: 0)
+        #expect(travel > 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel)
+        controller.pageScrolled(to: travel, trusted: true, editing: false, key: true)
+        #expect(root.autohideOffset(at: 0) < travel, "a key scroll is a new gesture")
+    }
+
+    /// The page's very top always puts the bar back, even after a scroll down locked it away; an untrusted report
+    /// from the page's own script still does not move it.
+    @Test func theVeryTopAlwaysBringsTheBarBack() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/top-reveal")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.layoutSubtreeIfNeeded()
+        let travel = root.autohideTravel(at: 0)
+        #expect(travel > 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel)
+        controller.pageScrolled(to: 0, trusted: false, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel, "the page's own scroll to the top is not the person's")
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == 0, "the top always brings the bar back")
+    }
+
     /// With the sidebar docked on the left, the window buttons stay in its row for the whole travel; only a hidden
     /// sidebar puts them over the page when the bar goes away.
     @Test func aDockedSidebarKeepsTheLightsInItsRowWhileTheBarTravels() {

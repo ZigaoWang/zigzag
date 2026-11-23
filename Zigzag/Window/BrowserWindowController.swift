@@ -1214,7 +1214,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// page's position: it moves out as the page goes down, and comes back with it on the way up, until this gesture
     /// has taken it fully out; after that it stays out until a new gesture or the pointer at the window's top.
     /// `inPane` is the tile the page is in: only its bar moves.
-    func pageScrolled(to y: CGFloat, trusted: Bool, editing: Bool, dragging: Bool = false,
+    func pageScrolled(to y: CGFloat, trusted: Bool, editing: Bool, dragging: Bool = false, key: Bool = false,
                       inPane index: Int = 0, tab: Tab? = nil) {
         let pane = max(0, min(index, root.autohidePaneCount - 1))
         var state = autohidePanes[pane] ?? AutohidePaneState()
@@ -1243,6 +1243,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         guard trusted, !autohideHeld(inPane: pane) else {
             autohidePanes[pane] = state
+            return
+        }
+        // A key scroll is its own gesture, and the page's very top is always the bar's place.
+        if key { state.locked = false }
+        if y <= 0.5 {
+            state.locked = false
+            autohidePanes[pane] = state
+            root.setAutohideOffset(0, at: pane, animated: false)
             return
         }
         let step = AddressBarAutohide.step(offset: root.autohideOffset(at: pane), pageDelta: delta,

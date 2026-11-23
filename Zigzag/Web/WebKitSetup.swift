@@ -330,13 +330,14 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
       // When the person last scrolled with their own hand: a wheel or trackpad (momentum keeps sending these) or a
       // scrolling key; and whether the scroll bar is held. A scroll event is trusted even when the page's own script
       // scrolled, so only a scroll this close to the person's input counts.
-      let input = 0, pressed = false;
+      let input = 0, keyInput = 0, pressed = false;
       const mark = () => { input = Date.now(); };
+      const markKey = () => { input = keyInput = Date.now(); };
       const keys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
       const options = { capture: true, passive: true };
       window.addEventListener('wheel', (event) => { if (event.isTrusted) mark(); }, options);
       window.addEventListener('touchmove', (event) => { if (event.isTrusted) mark(); }, options);
-      window.addEventListener('keydown', (event) => { if (event.isTrusted && keys.has(event.key)) mark(); }, options);
+      window.addEventListener('keydown', (event) => { if (event.isTrusted && keys.has(event.key)) markKey(); }, options);
       // On the scroll bar, not a click on the page: a link that jumps somewhere is the page scrolling.
       window.addEventListener('mousedown', (event) => {
         const html = document.documentElement;
@@ -360,8 +361,9 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
         if (target !== document && target !== document.documentElement && target !== root) return;
         // A key's smooth scroll runs on a little after the key, and a dragged scroll bar for as long as it's held.
         const trusted = pressed || Date.now() - input < 400;
+        const key = Date.now() - keyInput < 400;
         try {
-          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted, editing: editing(), dragging: pressed });
+          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted, key, editing: editing(), dragging: pressed });
         } catch (e) {}
       }, options);
     })();
@@ -376,6 +378,7 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
         controller.pageScrolled(to: CGFloat(y), trusted: (body["trusted"] as? Bool) ?? false,
                                 editing: (body["editing"] as? Bool) ?? false,
                                 dragging: (body["dragging"] as? Bool) ?? false,
+                                key: (body["key"] as? Bool) ?? false,
                                 inPane: pane, tab: tab)
     }
 }
