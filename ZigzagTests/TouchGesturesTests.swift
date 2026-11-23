@@ -858,24 +858,27 @@ struct TouchMovesTests {
     @Test func theGrabberSitsInsetOnTheSidebarsSide() {
         let bounds = NSRect(x: 0, y: 0, width: 1000, height: 700), page = NSRect(x: 8, y: 48, width: 984, height: 644)
         let left = TouchSidebarGrabber.pillFrame(in: bounds, page: page, onRight: false)
-        #expect(left.minX == 8 && left.size == NSSize(width: 5, height: 44))
+        #expect(left.minX == 14 && left.size == NSSize(width: 6, height: 56))
         #expect(left.midY == page.midY)
         let right = TouchSidebarGrabber.pillFrame(in: bounds, page: page, onRight: true)
-        #expect(right.maxX == 992 && right.midY == page.midY)
+        #expect(right.maxX == 986 && right.midY == page.midY)
+        let band = TouchSidebarPull.resizeBand
         for pill in [left, right] {
             let hit = TouchSidebarGrabber.hitFrame(around: pill, in: bounds)
-            #expect(hit.width >= 44 && hit.height >= 88)
+            #expect(hit.width >= 44 && hit.height >= 100)
             #expect(hit.contains(pill) && bounds.contains(hit))
+            // Clear of the band where macOS resizes the window.
+            #expect(hit.minX >= band && hit.maxX <= bounds.maxX - band)
             #expect(hit.midY == pill.midY)
         }
         // In the window: on the sidebar's side, whichever it is.
         let root = hiddenRoot()
         root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
-        #expect(root.grabber.frame.minX == 0)
+        #expect(root.grabber.frame.minX == band)
         let onRight = hiddenRoot(onRight: true)
         defer { onRight.setSidebarOnRight(false, animated: false) }
         onRight.noteTouch(at: ProcessInfo.processInfo.systemUptime)
-        #expect(onRight.grabber.frame.maxX == 1000)
+        #expect(onRight.grabber.frame.maxX == 1000 - band)
         #expect(root.grabber.accessibilityLabel() == String(localized: "Show Sidebar", comment: "Accessibility label of the touch grabber that shows the hidden sidebar."))
     }
 
