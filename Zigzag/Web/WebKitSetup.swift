@@ -330,13 +330,27 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
       // When the person last scrolled with their own hand: a wheel or trackpad (momentum keeps sending these) or a
       // scrolling key; and whether the scroll bar is held. A scroll event is trusted even when the page's own script
       // scrolled, so only a scroll this close to the person's input counts.
-      let input = 0, keyInput = 0, pressed = false;
+      let input = 0, keyInput = 0, pressed = false, touchY = null;
       const mark = () => { input = Date.now(); };
       const markKey = () => { input = keyInput = Date.now(); };
       const keys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
       const options = { capture: true, passive: true };
       window.addEventListener('wheel', (event) => { if (event.isTrusted) mark(); }, options);
-      window.addEventListener('touchmove', (event) => { if (event.isTrusted) mark(); }, options);
+      window.addEventListener('touchstart', (event) => {
+        if (event.isTrusted) { touchY = event.touches[0]?.clientY ?? null; }
+      }, options);
+      window.addEventListener('touchmove', (event) => {
+        if (!event.isTrusted) return;
+        mark();
+        const touch = event.touches[0];
+        if (touch) {
+          // A pull down at the page's top is the touch way back to the bar (the report lands on the top rule).
+          if (touchY != null && touch.clientY > touchY + 2 && y() <= 0.5) report(true);
+          touchY = touch.clientY;
+        }
+      }, options);
+      window.addEventListener('touchend', () => { touchY = null; }, options);
+      window.addEventListener('touchcancel', () => { touchY = null; }, options);
       window.addEventListener('keydown', (event) => { if (event.isTrusted && keys.has(event.key)) markKey(); }, options);
       // On the scroll bar, not a click on the page: a link that jumps somewhere is the page scrolling.
       window.addEventListener('mousedown', (event) => {
@@ -355,16 +369,17 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
         const tag = el.localName;
         return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
       };
+      const report = (trusted) => {
+        try {
+          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted, key: Date.now() - keyInput < 400, editing: editing(), dragging: pressed });
+        } catch (e) {}
+      };
       window.addEventListener('scroll', (event) => {
         const target = event.target;
         // A page's own elements scroll inside it all the time; only the page itself moves the bar.
         if (target !== document && target !== document.documentElement && target !== root) return;
         // A key's smooth scroll runs on a little after the key, and a dragged scroll bar for as long as it's held.
-        const trusted = pressed || Date.now() - input < 400;
-        const key = Date.now() - keyInput < 400;
-        try {
-          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted, key, editing: editing(), dragging: pressed });
-        } catch (e) {}
+        report(pressed || Date.now() - input < 400);
       }, options);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)

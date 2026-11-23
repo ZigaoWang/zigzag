@@ -365,10 +365,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showSelectedTab()
         downloadsChanged()
         window.eventInterceptor = { [weak self] event in self?.intercept(event) ?? false }
+        touchListener = TouchPress.listen { [weak self] event in self?.touchLanded(event) }
         numberHints = NumberHints(controller: self)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    isolated deinit {
+        if let touchListener { TouchPress.stopListening(touchListener) }
+    }
 
     /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435).
     func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?) {
@@ -1169,6 +1174,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var lastWheelAt: TimeInterval = 0
     }
     private var autohidePanes: [Int: AutohidePaneState] = [:]
+    /// Fingers landing anywhere in the window (`TouchPress`), for the top band's reveal.
+    private var touchListener: Int?
     /// The pointer monitor that brings an Autohide bar back near the window's top.
     private var autohidePointerMonitor: Any?
     /// While the sidebar is sliding: the bar stays as it is, so the lights don't have to cross it.
@@ -1291,8 +1298,27 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
         let point = root.convert(event.locationInWindow, from: nil)
         guard point.y <= Tokens.Space.x2 else { return }
-        // The pointer at the top asks for the bar back; in a split every pane that put its own away comes back with
-        // it, so reaching for one doesn't leave another out of sight.
+        revealAutohide()
+    }
+
+    /// A finger in the top band asks for the bar back; a pull down at the page's top is the same request through
+    /// the page's scroll report.
+    private func touchLanded(_ event: NSEvent) {
+        guard event.window === window else { return }
+        touchLanded(at: event.locationInWindow)
+    }
+
+    /// The top band, in window coordinates, from a finger or a test.
+    func touchLanded(at point: NSPoint) {
+        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar else { return }
+        let point = root.convert(point, from: nil)
+        guard point.y <= Tokens.Space.x2 else { return }
+        guard (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
+        revealAutohide()
+    }
+
+    /// The bar back in every pane that put its own away, so reaching for one doesn't leave another out of sight.
+    private func revealAutohide() {
         for index in 0..<root.autohidePaneCount {
             autohidePanes[index]?.locked = false
             root.setAutohideOffset(0, at: index, animated: true)
