@@ -996,8 +996,9 @@ enum DebugBridge {
             } else {
                 Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", in: controller) }
             }
-        // permremember on|off [mini], permkey <keyCode> [focused] [mini], permframes [mini]: the showing question.
-        case "permremember", "permkey", "permframes":
+        // permremember on|off [mini], permkey <keyCode> [focused] [mini], permframes [mini], permmenu [mini]: the
+        // showing question (permmenu opens its answering split's menu).
+        case "permremember", "permkey", "permframes", "permmenu":
             let words = arg.split(separator: " ").map(String.init)
             let host: PromptHost = words.contains("mini") ? (MiniWindowController.all.last ?? controller) : controller
             if name == "permremember" { PermissionPrompt.debugRemember(words.first == "on", in: host) }
@@ -1005,6 +1006,7 @@ enum DebugBridge {
                 PermissionPrompt.debugKey(code, focused: words.contains("focused"), in: host)
             }
             if name == "permframes" { debugLog("permframes \(PermissionPrompt.debugFrames(in: host).sorted { $0.key < $1.key })") }
+            if name == "permmenu" { PermissionPrompt.debugOpenAnswerMenu(in: host) }
         case "renamepanel": RenamePanel.show(title: "Google", in: controller) { _ in }
         case "importanim": IntoZigzag.shown?.set(arg == "done" ? .done : .importing)
         case "bartab": controller.commandBar.debugTab()

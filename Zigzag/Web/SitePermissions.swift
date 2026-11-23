@@ -874,8 +874,11 @@ final class PermissionPrompt: FloatingPanelView {
     private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the × on a site's permission question."))
     /// Only for a caller's own durations (a download rule's): one dropdown under the question.
     private let duration = DropdownButton()
-    /// One dropdown for answers of one kind (where a pop-up opens); choosing one answers.
+    /// The pick-only dropdown (where a web address opens).
     private let answerMenu = DropdownButton()
+    /// Answers of one kind (where a pop-up opens) as the filled answer: the shown one in one click, the rest from its
+    /// chevron's menu.
+    private let answerSplit = SplitPillButton()
     private var menuChoices: [PermissionAction] = []
     /// Whether the dropdown only picks (where a web address opens) instead of answering.
     private var hasChooser = false
@@ -1092,18 +1095,20 @@ final class PermissionPrompt: FloatingPanelView {
             for button in row { prompt.addSubview(button) }
             prompt.addSubview(prompt.moreWaiting)
             prompt.buttons = row.map { ($0 as InteractiveView, max($0.fittingWidth, Tokens.Dialog.minButtonWidth)) }
-            // Dropdown that answers (where a pop-up opens); acts as the filled answer.
+            // Split button that answers (where a pop-up opens); acts as the filled answer.
             if !menu.isEmpty {
                 prompt.menuChoices = menu
-                prompt.answerMenu.options = menu.map { DropdownButton.Option(title: $0.title) }
-                prompt.answerMenu.look = .primary
-                prompt.answerMenu.tint = accent
-                prompt.answerMenu.onSelect = { [weak prompt] index in
-                    guard let prompt, prompt.acceptsAllow, menu.indices.contains(index) else { return }
-                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: prompt.remembers && prompt.remember.isOn,
-                                                   scopeIndex: prompt.duration.isHidden ? 0 : prompt.duration.selectedIndex))
+                prompt.answerSplit.choices = menu.map(\.title)
+                prompt.answerSplit.tint = accent
+                prompt.answerSplit.accepts = { [weak prompt] in prompt?.acceptsAllow ?? false }
+                prompt.answerSplit.onChoose = { [weak prompt] index in
+                    guard let prompt, let answer = Self.menuAnswer(menu, index: index, accepts: prompt.acceptsAllow,
+                                                                   remember: prompt.remembers && prompt.remember.isOn,
+                                                                   scopeIndex: prompt.duration.isHidden ? 0 : prompt.duration.selectedIndex)
+                    else { return }
+                    prompt.finish(answer)
                 }
-                prompt.addSubview(prompt.answerMenu)
+                prompt.addSubview(prompt.answerSplit)
             }
             // Dropdown that only picks (where a web address opens), under the text. `chosenChoice` is read when a button
             // is pressed.
@@ -1259,6 +1264,7 @@ final class PermissionPrompt: FloatingPanelView {
         duration.isHidden = true
         duration.menuTakesOwnLook = true
         answerMenu.menuTakesOwnLook = true
+        answerSplit.menuTakesOwnLook = true
         [badge, picture, request, asker, closeButton, remember, duration].forEach { addSubview($0) }
         onLayout = { [weak self] in self?.layoutContent() }
     }
@@ -1309,17 +1315,24 @@ final class PermissionPrompt: FloatingPanelView {
                            scopeIndex: duration.isHidden ? 0 : duration.selectedIndex, choice: chosenChoice))
     }
 
+    /// What choice `index` of the answering split says: nil in the first half second or for no such choice.
+    static func menuAnswer(_ choices: [PermissionAction], index: Int, accepts: Bool, remember: Bool, scopeIndex: Int) -> PermissionAnswer? {
+        guard accepts, choices.indices.contains(index) else { return nil }
+        return PermissionAnswer(action: choices[index].id, remember: remember, scopeIndex: scopeIndex)
+    }
+
     /// Return: the filled answer, after its first half second like a click.
     private func pressPrimary() {
+        if answersMenu { answerSplit.chooseShown(); return }
         if let index = orderedActions.lastIndex(where: \.isProminent) {
             press(orderedActions[index])
         }
     }
 
-    /// Tab order: Remember, the duration, the answers, the menu.
+    /// Tab order: Remember, the duration, the answers, the menu (the split's two parts).
     private var focusable: [InteractiveView] {
-        ([remember, duration] + buttons.map(\.button) + (menuChoices.isEmpty ? [] : [answerMenu]))
-            .filter { !$0.isHidden && $0.superview === self }
+        ([remember, duration] + buttons.map(\.button) + (menuChoices.isEmpty ? [] : answersMenu ? [answerSplit.main, answerSplit.more] : [answerMenu]))
+            .filter { !$0.isHidden && $0.isDescendant(of: self) }
     }
 
     private func moveFocus(back: Bool) {
@@ -1423,7 +1436,14 @@ final class PermissionPrompt: FloatingPanelView {
                    "close": prompt.closeButton.isHidden ? "hidden" : NSStringFromRect(prompt.closeButton.frame),
                    "title": NSStringFromRect(prompt.request.frame), "detail": NSStringFromRect(prompt.asker.frame)]
         for (i, b) in prompt.buttons.enumerated() { out["button\(i)"] = NSStringFromRect(b.button.frame) }
+        if prompt.answersMenu { out["answer"] = NSStringFromRect(prompt.answerSplit.pillFrame) }
         return out
+    }
+
+    /// Debug bridge: the answering split's chevron, as a click on it.
+    static func debugOpenAnswerMenu(in host: PromptHost) {
+        guard let prompt = shown[ObjectIdentifier(host)], !prompt.isHidden, prompt.answersMenu else { return }
+        prompt.answerSplit.openMenu()
     }
     #endif
 
@@ -1471,10 +1491,10 @@ final class PermissionPrompt: FloatingPanelView {
     private var answersMenu: Bool { !menuChoices.isEmpty && !hasChooser }
 
     /// The answers left to right at the widths `layout` gives them: the buttons, then the dropdown that answers.
-    private func answerViews(_ layout: AnswerLayout) -> [(view: InteractiveView, width: CGFloat)] {
+    private func answerViews(_ layout: AnswerLayout) -> [(view: NSView, width: CGFloat)] {
         let shared = buttons.map(\.width).max() ?? 0
-        return buttons.map { ($0.button, layout == .shared ? shared : $0.width) }
-            + (answersMenu ? [(answerMenu as InteractiveView, answerMenu.intrinsicContentSize.width)] : [])
+        return buttons.map { ($0.button as NSView, layout == .shared ? shared : $0.width) }
+            + (answersMenu ? [(answerSplit as NSView, answerSplit.intrinsicContentSize.width)] : [])
     }
 
     enum AnswerLayout: Equatable {
@@ -1497,7 +1517,7 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private func answersLayout(for width: CGFloat) -> AnswerLayout {
-        Self.answerLayout(widths: buttons.map(\.width), menu: answersMenu ? answerMenu.intrinsicContentSize.width : nil,
+        Self.answerLayout(widths: buttons.map(\.width), menu: answersMenu ? answerSplit.intrinsicContentSize.width : nil,
                           available: width - Self.pad * 2, gap: Self.buttonGap)
     }
 
@@ -1520,6 +1540,11 @@ final class PermissionPrompt: FloatingPanelView {
         let waiting = Self.waitingLine(questionsWaiting: questionsWaiting) == nil ? 0
                                                                                  : moreWaiting.lineHeight + Tokens.Space.x2
         return header + optionHeight(for: width) + Self.answersGap + answersHeight(for: width) + waiting + Self.pad
+    }
+
+    /// The split button's frame reaches past its pill, for a finger.
+    private func place(_ view: NSView, _ rect: NSRect) {
+        if let split = view as? SplitPillButton { split.pillFrame = rect } else { view.frame = rect }
     }
 
     private func layoutContent() {
@@ -1564,13 +1589,13 @@ final class PermissionPrompt: FloatingPanelView {
                 // A lone answer wider than the card takes the row.
                 let bw = min(width, available)
                 x -= bw
-                view.frame = NSRect(x: x, y: y, width: bw, height: Self.buttonHeight)
+                place(view, NSRect(x: x, y: y, width: bw, height: Self.buttonHeight))
                 x -= Self.buttonGap
             }
         case .stacked:
             var row = y
             for (view, _) in views.reversed() {
-                view.frame = NSRect(x: pad, y: row, width: available, height: Self.buttonHeight)
+                place(view, NSRect(x: pad, y: row, width: available, height: Self.buttonHeight))
                 row += Self.buttonHeight + Self.buttonGap
             }
         }
