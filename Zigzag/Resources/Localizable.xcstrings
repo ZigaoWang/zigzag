@@ -7250,7 +7250,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收起分组"
+            "value" : "折叠分组"
           }
         }
       }
