@@ -1236,9 +1236,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         if editing {
-            state.locked = false
             autohidePanes[pane] = state
-            root.setAutohideOffset(0, at: pane, animated: false)
             return
         }
         guard trusted, !autohideHeld(inPane: pane) else {

@@ -806,6 +806,35 @@ struct TopBarTests {
         #expect(root.topBar.pageColor == .systemRed)
     }
 
+    /// Typing in a field holds the bar where it is, including away; it must not pop back to the top on every report.
+    @Test func typingInAFieldHoldsTheBarWhereItIs() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/editing")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.layoutSubtreeIfNeeded()
+        let travel = root.autohideTravel(at: 0)
+        #expect(travel > 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel)
+        controller.pageScrolled(to: travel * 2.5, trusted: true, editing: true)
+        #expect(root.autohideOffset(at: 0) == travel, "editing must hold it away, not pop it back")
+        controller.pageScrolled(to: 0, trusted: true, editing: true)
+        #expect(root.autohideOffset(at: 0) == travel, "editing holds it even at the page's top")
+    }
+
     /// A new main-frame document starts with the bar down; a navigation change such as an SPA's pushState must not
     /// pop it back mid-scroll.
     @Test func aNewDocumentResetsTheBarButANavigationChangeDoesNot() {
