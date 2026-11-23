@@ -359,8 +359,9 @@ struct SidebarRowMenuTests {
             let places = try #require(menu.items.first { $0.title == "Move To" }?.submenu)
             #expect(Array(titles(places).prefix(3)) == ["New Window", "Zigzag Mini", "-"])
             #expect(places.items.count > 3)
-            // Not the tab you're on: the menu bar's keys would act on another, so none show.
-            #expect(menu.items.allSatisfy { $0.keyEquivalent.isEmpty })
+            // Every tab's menu shows the menu bar's keys, the one you're on or not.
+            #expect(menu.items.first { $0.title == "Reload Page" }?.keyEquivalent == "r")
+            #expect(menu.items.first { $0.title == "Close Tab" }?.keyEquivalent == "w")
         }
     }
 
@@ -705,13 +706,13 @@ struct SidebarRowMenuTests {
         }
     }
 
-    /// The tab you're on shows the menu bar's keys in its drawn menu, as they are now.
+    /// Every tab's drawn menu shows the menu bar's keys, as they are now.
     @Test func theDrawnMenuShowsTheMenuBarsKeys() throws {
         try inWindow(["A", "B"]) { controller, tabs, _ in
             let close = item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[0], controller: controller))
             #expect(close?.shortcut == Shortcuts.keys(for: #selector(BrowserWindowController.closeTab(_:))))
             #expect(close?.shortcut.isEmpty == false)
-            #expect(item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[1], controller: controller))?.shortcut == "")
+            #expect(item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[1], controller: controller))?.shortcut == close?.shortcut)
         }
     }
 

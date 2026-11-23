@@ -233,9 +233,8 @@ enum SidebarMenus {
         typealias C = BrowserWindowController
         let manager = controller.tabManager
         let isPrivate = manager.isPrivate
-        // The menu bar's keys act on the tab you're on, so only its menu shows them.
-        let isCurrent = tab === manager.selectedTab
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { isCurrent ? withShortcut(item, of: action) : item }
+        // Every tab's menu shows the menu bar's keys, as Chrome's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
 
         var context: [NSMenuItem] = []
         if let split = manager.split(for: tab) {
@@ -328,8 +327,8 @@ enum SidebarMenus {
         let isPrivate = manager.isPrivate
         let live = manager.bookmarkTab(for: bookmark.id)
         let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
-        // The menu bar's keys act on the page you're on, so only its menu shows them.
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { live != nil && live === manager.selectedTab ? withShortcut(item, of: action) : item }
+        // Every page's menu shows the menu bar's keys, as a tab's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
 
         var context: [NSMenuItem] = []
         if let live, let url = live.url, manager.isAway(bookmark.id) {
@@ -518,8 +517,8 @@ enum SidebarMenus {
         let isPrivate = manager.isPrivate
         let live = manager.bookmarkTab(for: favorite.id)
         let pair = Library.shared.pinnedSplit(containing: favorite.id)
-        // The menu bar's keys act on the page you're on, so only its menu shows them.
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { live != nil && live === manager.selectedTab ? withShortcut(item, of: action) : item }
+        // Every page's menu shows the menu bar's keys, as a tab's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
 
         var context: [NSMenuItem] = []
         if let pair {
@@ -579,9 +578,9 @@ enum SidebarMenus {
         // Its profile on top once there's more than one, as the Move to Space menus head each profile's spaces.
         if let profile = Library.shared.directory.shownName(ofSpace: id, spaceName: space.name) { menu.addItem(.sectionHeader(title: profile)) }
         typealias C = BrowserWindowController
-        // The menu bar's Edit Space… and folder items act on the space you're in, so only its menu shows their keys.
         let isCurrent = id == controller.tabManager.currentSpaceID
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { isCurrent ? withShortcut(item, of: action) : item }
+        // Every space's menu shows the menu bar's keys, as a tab's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
         menu.addItem(keyed(Item(String(localized: "Edit Space…", comment: "Item in a space's context menu."), symbol: Symbol.edit) {
             controller.openSpaceEditor(id, anchor: anchor ?? controller.sidebar.list.headerView)
         }, #selector(C.renameSpace(_:))))
