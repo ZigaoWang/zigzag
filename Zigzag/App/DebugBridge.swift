@@ -1751,6 +1751,15 @@ enum DebugBridge {
                 let look = controller.selectedWebView?.appearance?.name.rawValue ?? "none"
                 debugLog("darkstate => \(result) tab=\(String(describing: tab)) pageColor=\(color) look=\(look)")
             }
+        // lookprobe [label]: the front page's look as WebKit was asked for it and as the page sees it.
+        case "lookprobe":
+            guard let webView = controller.selectedWebView else { debugLog("lookprobe \(arg) no web view"); break }
+            let views = "view=\(webView.appearance?.name.rawValue ?? "nil") effective=\(webView.effectiveAppearance.name.rawValue) window=\(controller.window?.effectiveAppearance.name.rawValue ?? "-") app=\(NSApp.effectiveAppearance.name.rawValue) appSet=\(NSApp.appearance?.name.rawValue ?? "nil")"
+            webView.evaluateJavaScript("JSON.stringify({url: location.href, prefersDark: matchMedia('(prefers-color-scheme: dark)').matches, mode: document.documentElement.getAttribute('data-color-mode'), bg: getComputedStyle(document.body).backgroundColor})") { result, _ in
+                debugLog("lookprobe \(arg) \(views) page=\(result as? String ?? "-")")
+            }
+        // reloadtab: the front tab loads again, as ⌘R does.
+        case "reloadtab": controller.tabManager.selectedTab?.reload()
         // darkseen forget: drops the profile's sites seen dark, as clearing History does.
         case "darkseen": if arg == "forget" { DarkSeen.forget(in: controller.tabManager.profile.store) }
         case "resize":
