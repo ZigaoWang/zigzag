@@ -301,3 +301,359 @@ struct TouchGesturesTests {
         TouchPress.removeMonitor(monitor)
     }
 }
+
+/// Touch, phase two: hold and slide through a menu or drag, a finger across the sidebar, pinch for Show All Tabs, and
+/// a finger in from a page's edge. The recognizers can't be fed real touches, so their actions are driven directly.
+@MainActor
+struct TouchMovesTests {
+    private func mouse(_ type: NSEvent.EventType, at point: NSPoint, window: NSWindow? = nil) -> NSEvent {
+        NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                           windowNumber: window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+    }
+
+    private func window(height: CGFloat = 700) -> NSWindow {
+        MenuPanel.current?.close(animated: false)
+        return NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: height), styleMask: [.titled], backing: .buffered, defer: true)
+    }
+
+    /// A control near the top of a tall window, so its menu opens below the finger with room to spare.
+    private func control(in window: NSWindow, chosen: @escaping (String) -> Void) -> InteractiveView {
+        let view = InteractiveView(frame: NSRect(x: 20, y: 600, width: 240, height: 34))
+        window.contentView?.addSubview(view)
+        view.drawsMenu = true
+        view.onRightClick = { _ in
+            let menu = NSMenu()
+            for title in ["One", "Two", "Three"] { menu.addItem(SidebarMenus.Item(title) { chosen(title) }) }
+            return menu
+        }
+        return view
+    }
+
+    private func middle(of view: NSView) -> NSPoint { view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil) }
+
+    // MARK: The helper
+
+    @Test func theNewRecognizersAreTouchOnly() throws {
+        let pinch = TouchPinchRecognizer()
+        let follow = TouchFollow()
+        for recognizer in [pinch, follow] as [NSGestureRecognizer] {
+            #expect(recognizer.allowedTouchTypes == .direct)
+            #expect(!recognizer.delaysPrimaryMouseButtonEvents && !recognizer.delaysMagnificationEvents)
+            let delegate = try #require(recognizer.delegate as? TouchOnly)
+            for type in [NSEvent.EventType.leftMouseDown, .rightMouseDown, .leftMouseDragged, .leftMouseUp] {
+                #expect(delegate.gestureRecognizer(recognizer, shouldAttemptToRecognizeWith: mouse(type, at: .zero)) == false)
+            }
+            // Alongside the page's own pinch zoom, and everything under the window's follower.
+            #expect(delegate.simultaneous)
+        }
+        // A list's scrolling waits for a swipe across it to fail only when the swipe says so.
+        let pan = TouchPanRecognizer()
+        let other = NSPanGestureRecognizer()
+        #expect(!pan.touchOnly.gestureRecognizer(pan, shouldBeRequiredToFailBy: other))
+        pan.touchOnly.outranks = { $0 === other }
+        #expect(pan.touchOnly.gestureRecognizer(pan, shouldBeRequiredToFailBy: other))
+        #expect(!pan.touchOnly.gestureRecognizer(pan, shouldBeRequiredToFailBy: NSPanGestureRecognizer()))
+    }
+
+    @Test func aDragByTouchGetsAHoldWithoutAMenu() {
+        let view = InteractiveView(frame: NSRect(x: 0, y: 0, width: 100, height: 30))
+        view.onDragStart = { _ in true }
+        #expect(view.touchMenuRecognizer == nil)
+        view.dragsByTouch = true
+        #expect(view.touchMenuRecognizer != nil)
+        view.onDragStart = nil
+        #expect(view.touchMenuRecognizer == nil)
+    }
+
+    // MARK: Hold, slide, lift
+
+    @Test func theHoldRules() {
+        let start = NSPoint(x: 100, y: 100)
+        // Onto the menu: an item lights, however near.
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 104, y: 96), onMenu: true, wasOnMenu: false, canDrag: true) == .highlight)
+        // Away from it past the distance: picked up.
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 100 - TouchHold.dragDistance, y: 100), onMenu: false, wasOnMenu: false, canDrag: true) == .drag)
+        // Not that far yet, nothing.
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 92, y: 106), onMenu: false, wasOnMenu: false, canDrag: true) == .wait)
+        // Off the menu again after being on it: never a drag, as on an iPhone.
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 40, y: 160), onMenu: false, wasOnMenu: true, canDrag: true) == .wait)
+        // Something that can't be dragged only has its menu.
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 40, y: 160), onMenu: false, wasOnMenu: false, canDrag: false) == .wait)
+        // Lifting.
+        #expect(TouchHold.lift(menuShown: true, onMenu: true, dragging: false) == .choose)
+        #expect(TouchHold.lift(menuShown: true, onMenu: false, dragging: false) == .keepOpen)
+        #expect(TouchHold.lift(menuShown: false, onMenu: false, dragging: true) == .drop)
+        #expect(TouchHold.lift(menuShown: false, onMenu: false, dragging: false) == .nothing)
+    }
+
+    @Test func slidingOntoTheMenuAndLiftingChooses() throws {
+        let window = window()
+        var chosen: [String] = []
+        let view = control(in: window) { chosen.append($0) }
+        let start = middle(of: view)
+        let hold = try #require(view.beginTouchHold(at: start))
+        #expect(TouchHold.current === hold)
+        // Still for a moment more: the menu opens where the finger is.
+        hold.showMenu()
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === view && menu.isHeldByTouch)
+        #expect(menu.highlightedIndex == nil)
+        hold.moved(to: menu.debugItemPoint(0))
+        #expect(menu.highlightedIndex == 0)
+        hold.moved(to: menu.debugItemPoint(2))
+        #expect(menu.highlightedIndex == 2)
+        hold.lifted(at: menu.debugItemPoint(2))
+        #expect(chosen == ["Three"])
+        #expect(MenuPanel.current == nil)
+        #expect(TouchHold.current == nil)
+        #expect(!view.isPressed)
+    }
+
+    @Test func liftingOffTheMenuLeavesItOpen() throws {
+        let window = window()
+        var chosen: [String] = []
+        let view = control(in: window) { chosen.append($0) }
+        let start = middle(of: view)
+        let hold = try #require(view.beginTouchHold(at: start))
+        hold.showMenu()
+        let menu = try #require(MenuPanel.current)
+        // Onto it, then off and far away: no drag, and lifting there leaves the menu as a menu, to be tapped.
+        hold.moved(to: menu.debugItemPoint(1))
+        hold.moved(to: NSPoint(x: start.x - 60, y: start.y + 60))
+        #expect(menu.highlightedIndex == nil)
+        hold.lifted(at: NSPoint(x: start.x - 60, y: start.y + 60))
+        #expect(chosen.isEmpty)
+        #expect(MenuPanel.current === menu)
+        #expect(!menu.isHeldByTouch)
+        menu.close(animated: false)
+    }
+
+    @Test func heldAndLiftedBeforeTheMenuStillOpensIt() throws {
+        let window = window()
+        let view = control(in: window) { _ in }
+        let start = middle(of: view)
+        let hold = try #require(view.beginTouchHold(at: start))
+        #expect(MenuPanel.current == nil)
+        hold.lifted(at: start)
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === view && !menu.isHeldByTouch)
+        // The hold's own delayed opening comes to nothing: one menu, where it was.
+        hold.showMenu()
+        #expect(MenuPanel.current === menu)
+        menu.close(animated: false)
+    }
+
+    /// The row's drag, as any caller has it: picked up through `onDragStart`, carried by `CarriedCopy.carry`.
+    private func draggable(_ view: InteractiveView, in window: NSWindow, starts: @escaping (NSPoint) -> Void,
+                           steps: @escaping (NSEvent) -> Void, ended: @escaping (NSEvent?) -> Void) {
+        view.onDragStart = { event in
+            starts(event.locationInWindow)
+            CarriedCopy.carry(in: window, moved: steps, ended: ended)
+            return true
+        }
+        view.dragsByTouch = true
+    }
+
+    @Test func movingAwayFromTheMenuPicksItUp() throws {
+        let window = window()
+        let view = control(in: window) { _ in }
+        var starts: [NSPoint] = [], steps: [(NSEvent.EventType, NSPoint)] = [], ends: [NSPoint?] = []
+        draggable(view, in: window, starts: { starts.append($0) }, steps: { steps.append(($0.type, $0.locationInWindow)) },
+                  ended: { ends.append($0?.locationInWindow) })
+        let start = middle(of: view)
+        let hold = try #require(view.beginTouchHold(at: start))
+        hold.showMenu()
+        #expect(MenuPanel.current != nil)
+        // The menu opens below and to the right of the finger: up and to the left is away from it.
+        hold.moved(to: NSPoint(x: start.x - 8, y: start.y + 8))
+        #expect(starts.isEmpty && MenuPanel.current != nil)
+        let away = NSPoint(x: start.x - 14, y: start.y + 14)
+        hold.moved(to: away)
+        // The menu goes and the row is picked up where it was held, the copy straight under the finger.
+        #expect(MenuPanel.current == nil)
+        #expect(starts == [start])
+        #expect(steps.count == 1 && steps.last?.0 == .leftMouseDragged && steps.last?.1 == away)
+        #expect(hold.carry != nil)
+        hold.moved(to: NSPoint(x: 200, y: 300))
+        hold.lifted(at: NSPoint(x: 210, y: 280))
+        // Every step, then the release as a mouse-up, then the drop where it was let go.
+        #expect(steps.map(\.0) == [.leftMouseDragged, .leftMouseDragged, .leftMouseUp])
+        #expect(steps.last?.1 == NSPoint(x: 210, y: 280))
+        #expect(ends.count == 1 && ends.first == NSPoint(x: 210, y: 280))
+        #expect(TouchHold.current == nil)
+    }
+
+    @Test func aHoldThatMovesBeforeTheMenuDragsAndCanBeCalledOff() throws {
+        let window = window()
+        let view = control(in: window) { _ in }
+        var starts = 0, ends: [NSPoint?] = []
+        draggable(view, in: window, starts: { _ in starts += 1 }, steps: { _ in }, ended: { ends.append($0?.locationInWindow) })
+        let start = middle(of: view)
+        let hold = try #require(view.beginTouchHold(at: start))
+        hold.moved(to: NSPoint(x: start.x, y: start.y - 30))
+        #expect(starts == 1)
+        // The menu's moment comes and goes: it never opens over a drag.
+        hold.showMenu()
+        #expect(MenuPanel.current == nil)
+        hold.cancelled()
+        #expect(ends.count == 1 && ends[0] == nil)
+        #expect(TouchHold.current == nil)
+    }
+
+    /// The mouse's loop and a finger feed a drag the same steps, in the same order, and end it the same way.
+    @Test func theMouseAndAFingerDriveTheSameDrag() throws {
+        let window = window()
+        let a = NSPoint(x: 50, y: 60), b = NSPoint(x: 80, y: 120)
+        var mouseSteps: [(NSEvent.EventType, NSPoint)] = [], mouseEnd: NSPoint??
+        var returned = false
+        CarriedCopy.carry(in: window, tracking: { window, moved in
+            let up = self.mouse(.leftMouseUp, at: b, window: window)
+            for event in [self.mouse(.leftMouseDragged, at: a, window: window), self.mouse(.leftMouseDragged, at: b, window: window), up] { moved(event) }
+            return up
+        }, moved: { mouseSteps.append(($0.type, $0.locationInWindow)) }, ended: { mouseEnd = .some($0?.locationInWindow) })
+        returned = true
+        // The mouse's drag is over before `carry` returns, as `track` always had it.
+        #expect(returned && mouseEnd == .some(b))
+
+        var fingerSteps: [(NSEvent.EventType, NSPoint)] = [], fingerEnd: NSPoint??
+        let finger = TouchCarry()
+        TouchCarry.starting = finger
+        CarriedCopy.carry(in: window, tracking: { _, _ in Issue.record("the mouse's loop ran for a finger"); return nil },
+                          moved: { fingerSteps.append(($0.type, $0.locationInWindow)) }, ended: { fingerEnd = .some($0?.locationInWindow) })
+        #expect(TouchCarry.starting == nil && finger.isAttached && fingerEnd == nil)
+        finger.move(to: a)
+        finger.move(to: b)
+        finger.release(at: b)
+        #expect(fingerSteps.map(\.0) == mouseSteps.map(\.0))
+        #expect(fingerSteps.map(\.1) == mouseSteps.map(\.1))
+        #expect(fingerEnd == .some(b))
+        // Called off: nil, as Esc gives the mouse's.
+        var cancelled: NSPoint?? = nil
+        let other = TouchCarry()
+        TouchCarry.starting = other
+        CarriedCopy.carry(in: window, moved: { _ in }, ended: { cancelled = .some($0?.locationInWindow) })
+        other.cancel()
+        #expect(cancelled == .some(nil))
+    }
+
+    @Test func aFingerCarriesAPinAlongTheField() throws {
+        let window = window(height: 200)
+        let address = AddressView(frame: NSRect(x: 0, y: 100, width: 224 + AddressView.buttonSide + 2, height: 30))
+        window.contentView?.addSubview(address)
+        address.setSaved(false, canSave: true)
+        address.setPins(["a", "b", "c"].map { AddressView.Pin(id: $0, image: nil, label: $0, badge: "", action: { _ in }, menu: { nil }) }, animated: false)
+        var order: [String]?
+        address.onPinsReordered = { order = $0 }
+        let a = try #require(address.pinButton(for: "a")), c = try #require(address.pinButton(for: "c"))
+        let hold = try #require(a.beginTouchHold(at: middle(of: a)))
+        hold.moved(to: address.convert(NSPoint(x: c.frame.midX + 9, y: c.frame.midY), to: nil))
+        #expect(address.pinDropDestination == 2)
+        #expect(a.alphaValue == CarriedCopy.faint)
+        hold.lifted(at: address.convert(NSPoint(x: c.frame.midX + 9, y: c.frame.midY), to: nil))
+        // What the mouse's drop gives (`droppingAPinReportsTheNewOrder`).
+        #expect(order == ["b", "c", "a"])
+        #expect(a.alphaValue == 1)
+    }
+
+    // MARK: Across the sidebar
+
+    @Test func sidewaysIsMostlySideways() {
+        #expect(TouchSwipe.isSideways(NSPoint(x: 12, y: 3)))
+        #expect(TouchSwipe.isSideways(NSPoint(x: -12, y: 5)))
+        #expect(!TouchSwipe.isSideways(NSPoint(x: 3, y: 12)))
+        #expect(!TouchSwipe.isSideways(NSPoint(x: 10, y: 9)))
+        #expect(!TouchSwipe.isSideways(NSPoint(x: 2, y: 0)))
+    }
+
+    @Test func aFingerAcrossTheSidebarSwitchesSpaces() throws {
+        let added = Library.shared.addSpace(name: "Touch swipe test")
+        defer { Library.shared.removeSpace(added.id) }
+        let spaces = Library.shared.spaces
+        let here = try #require(spaces.firstIndex { $0.id == added.id }).advanced(by: -1)
+        let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 260, height: 700))
+        sidebar.currentSpaceID = spaces[here].id
+        #expect(sidebar.touchSwipe != nil)
+        var switched: [Int] = []
+        sidebar.onSwipeSpace = { switched.append($0); return false }
+        let now = ProcessInfo.processInfo.systemUptime
+        // A short, slow move springs home.
+        sidebar.touchSwipeBegan()
+        sidebar.touchSwipeMoved(by: -20, at: now)
+        sidebar.touchSwipeEnded(velocity: 0, cancelled: false)
+        #expect(switched.isEmpty)
+        // A flick to the left brings in the next space, as two fingers on the trackpad do.
+        sidebar.touchSwipeBegan()
+        for step in 0..<4 { sidebar.touchSwipeMoved(by: -15, at: now + 1 + Double(step) * 0.016) }
+        sidebar.touchSwipeEnded(velocity: -800, cancelled: false)
+        #expect(switched == [1])
+        // Far enough, slowly: lands too. Called off: home.
+        sidebar.touchSwipeBegan()
+        sidebar.touchSwipeMoved(by: -200, at: now + 2)
+        sidebar.touchSwipeEnded(velocity: 0, cancelled: true)
+        #expect(switched == [1])
+    }
+
+    // MARK: In from the edge
+
+    @Test func theEdgesGoBackAndForward() {
+        #expect(TouchEdgeSwipe.direction(atX: 4, width: 800) == -1)
+        #expect(TouchEdgeSwipe.direction(atX: TouchEdgeSwipe.edge, width: 800) == -1)
+        #expect(TouchEdgeSwipe.direction(atX: 400, width: 800) == nil)
+        #expect(TouchEdgeSwipe.direction(atX: 790, width: 800) == 1)
+        // Too narrow a page has no edges to swipe from.
+        #expect(TouchEdgeSwipe.direction(atX: 4, width: 100) == nil)
+        // In from the left goes right; from the right goes left; along the edge is a scroll.
+        #expect(TouchEdgeSwipe.isInward(NSPoint(x: 20, y: 2), direction: -1))
+        #expect(!TouchEdgeSwipe.isInward(NSPoint(x: -20, y: 2), direction: -1))
+        #expect(TouchEdgeSwipe.isInward(NSPoint(x: -20, y: 2), direction: 1))
+        #expect(!TouchEdgeSwipe.isInward(NSPoint(x: 3, y: 30), direction: -1))
+    }
+
+    @Test func aPageWithNowhereToGoKeepsTheEdgeSwipe() {
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let holder = PageHolder(holding: page)
+        #expect(holder.edgeSwipe != nil && holder.overviewPinch != nil)
+        // No history and no window: neither way.
+        #expect(!page.swipeNavigator.takesTouchSwipe(-1))
+        #expect(!page.swipeNavigator.takesTouchSwipe(1))
+        // Nothing tracking, nothing happens.
+        page.swipeNavigator.touchMoved(dx: 120, at: 0)
+        page.swipeNavigator.touchEnded(at: 0, cancelled: false)
+        #expect(!page.swipeNavigator.isTracking)
+    }
+
+    @Test func aFingerDraggingThePageIsNotATrackpadSwipe() {
+        // A finger down, or one that landed a moment ago: its scroll is the page's.
+        #expect(TouchPress.isTouchScroll(at: 10.2, landedAt: 10, fingerDown: false))
+        #expect(TouchPress.isTouchScroll(at: 14, landedAt: 10, fingerDown: true))
+        // The trackpad, long after any finger: a swipe as before.
+        #expect(!TouchPress.isTouchScroll(at: 12, landedAt: 10, fingerDown: false))
+        #expect(!TouchPress.isTouchScroll(at: 12, landedAt: nil, fingerDown: false))
+        #expect(!TouchPress.isTouchScroll(at: 60, landedAt: 10, fingerDown: true))
+        #expect(!TouchPress.isTouchScroll(at: 9, landedAt: 10, fingerDown: true))
+    }
+
+    // MARK: Pinch
+
+    @Test func pinchingInAtTheUsualSizeOpensTheOverview() {
+        #expect(TouchPinch.opensOverview(magnification: -0.25, startZoom: 1))
+        #expect(!TouchPinch.opensOverview(magnification: -0.1, startZoom: 1))
+        // Pinching out zooms the page, never the overview.
+        #expect(!TouchPinch.opensOverview(magnification: 0.4, startZoom: 1))
+        // Zoomed in, pinching in zooms back out.
+        #expect(!TouchPinch.opensOverview(magnification: -0.5, startZoom: 1.6))
+        #expect(TouchPinch.opensCard(magnification: 0.25))
+        #expect(!TouchPinch.opensCard(magnification: 0.1))
+        #expect(!TouchPinch.opensCard(magnification: -0.3))
+    }
+
+    @Test func aPinchOutsideABrowserWindowDoesNothing() {
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let holder = PageHolder(holding: page)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView = holder
+        // A pop-up's page: no overview to open, and the pinch is only the page's.
+        holder.touchPinchedIn()
+        #expect(window.windowController == nil)
+    }
+}

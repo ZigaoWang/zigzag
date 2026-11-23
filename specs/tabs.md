@@ -89,3 +89,19 @@
   Test: TouchGesturesTests.aFingerNearTheCloseButtonCloses
 - Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.
   Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
+- Touch and hold a row, slide onto its menu without lifting → the item under the finger lights; lift on it → it runs.
+  Test: TouchMovesTests.slidingOntoTheMenuAndLiftingChooses
+- Touch and hold a row, lift off its menu → the menu stays open, to be tapped.
+  Test: TouchMovesTests.liftingOffTheMenuLeavesItOpen
+- Touch and hold a row, then move away from its menu, or before it shows → the row is picked up and drags as with the mouse.
+  Test: TouchMovesTests.movingAwayFromTheMenuPicksItUp
+- A finger and the mouse drag a row the same way: reorder, into a folder, a split, another space.
+  Test: TouchMovesTests.theMouseAndAFingerDriveTheSameDrag
+- One finger sideways across the sidebar → the previous or next space, as two fingers on the trackpad; up and down scrolls.
+  Test: TouchMovesTests.aFingerAcrossTheSidebarSwitchesSpaces
+- Pinch in on a page at its usual size → Show All Tabs; zoomed in, or pinching out, the page zooms. Pinch out on a card → it opens.
+  Test: TouchMovesTests.pinchingInAtTheUsualSizeOpensTheOverview
+- A finger in from a page's left edge → Back; from its right edge → Forward, when the Mac's touch setting and Zigzag's allow swiping.
+  Test: TouchMovesTests.theEdgesGoBackAndForward
+- A finger dragging a page sideways → it scrolls, never Back or Forward.
+  Test: TouchMovesTests.aFingerDraggingThePageIsNotATrackpadSwipe
