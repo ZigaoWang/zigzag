@@ -525,7 +525,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// so the row is told directly here (#326).
     private func refreshSavedState(of tab: Tab) {
         guard tab === tabManager.selectedTab else { return }
-        sidebar.update(tab: tab)
+        refreshAddress(for: tab)
     }
 
     /// Every save ends here (#326), so no two ways in can drift: `request` says whether it was the quick save or the

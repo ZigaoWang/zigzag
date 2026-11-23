@@ -5,6 +5,8 @@
   Test: SavePathTests.aQuickSaveFromEachPathLandsAtTheEndOfPinned
 - ⌘D or the star on a page that's pinned → it's unpinned; the star shows which at once.
   Test: SavePathTests.theQuickSaveTogglesAndTheStarFollows
+- Pin or unpin from a tab's menu, by a drag or with ⌘Z → the star shows it at once too.
+  Test: SavePathTests.theStarFollowsAPinMadeFromTheRow
 - Pin a page that's already pinned → it's filed where asked, never a second copy.
   Test: SavePathTests.savingAgainNeverMakesASecondCopy
 - Pin Link in a link's right-click menu → the link is pinned at the end of Pinned without being opened.

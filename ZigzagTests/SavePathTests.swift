@@ -444,6 +444,34 @@ import Testing
         }
     }
 
+    /// Pinned or unpinned some other way than the star or ⌘D (the row's menu, a drag, ⌘Z): the star shows it too.
+    @Test func theStarFollowsAPinMadeFromTheRow() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let tab = Tab(url: URL(string: "https://example.com/row")!, spaceID: space)
+            manager.adopt([tab], in: space)
+            manager.select(tab)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            #expect(!controller.sidebar.address.isSaved)
+
+            controller.bookmarkWithUndo(tab, at: nil, in: space)
+            #expect(tab.bookmarkID != nil)
+            #expect(controller.sidebar.address.isSaved)
+
+            controller.sidebarUndo.undo()
+            #expect(tab.bookmarkID == nil)
+            #expect(!controller.sidebar.address.isSaved)
+
+            controller.bookmarkWithUndo(tab, at: nil, in: space)
+            controller.unbookmarkWithUndo(try #require(tab.bookmarkID), to: 0)
+            let unpinned = try #require(manager.selectedTab)
+            #expect(unpinned.bookmarkID == nil)
+            #expect(!controller.sidebar.address.isSaved)
+        }
+    }
+
     /// Pin Tab and Pin Tab to Folder… in the menu bar are offered by the rule the star and the tab's menu use: not on
     /// Zigzag's own views.
     @Test func theMenuBarsPinFollowsTheStarsRule() throws {

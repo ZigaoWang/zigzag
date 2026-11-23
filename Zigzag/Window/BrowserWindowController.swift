@@ -420,6 +420,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Many at once (`TabManager.together`): once, when they're all done.
             if tabManager.isBatching { break }
             sidebar.list.reload(animated: window?.isVisible == true)
+            // Pinned or unpinned from a row, a drag or ⌘Z, or its opener closed: the star and Back follow.
+            refreshAddress(for: tabManager.selectedTab)
             newTabNote.listChanged()
             // A favorite opened or closed: its tile shows it.
             reloadFavorites()
@@ -720,6 +722,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
     }
 
+    /// Back, Forward, Reload, the address and its star for the page you're on, in the sidebar or the bar above the
+    /// page: the one place every path refreshes them, so none shows another's state.
+    func refreshAddress(for tab: Tab?) {
+        sidebar.update(tab: tab)
+        root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+        root.topBar.showPin(sidebar.address.canSave)
+    }
+
     private func showSelectedTab() {
         previews.hide()
         let tab = tabManager.selectedTab
@@ -747,9 +757,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         miniPlayer.tabsChanged()
         // Back on the tab whose video went to the mini player: return it to the page.
         AutoPictureInPicture.shared.reconsider()
-        sidebar.update(tab: tab)
-        root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-        root.topBar.showPin(sidebar.address.canSave)
+        refreshAddress(for: tab)
         paintTopBar()
         // A collapsed pinned section and a folded tab group (#209) show the current tab, so they update with the
         // selection.
@@ -1677,9 +1685,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 // Remove the translation offer for the previous page.
                 withdrawStaleTranslationOffer()
             }
-            sidebar.update(tab: tab)
-            root.topBar.showPage(url: tab.url, notSecure: tab.isNotSecure)
-            root.topBar.showPin(sidebar.address.canSave)
+            refreshAddress(for: tab)
             paintTopBar()
             updateWindowTitle()
             offerWebStoreExtension()
