@@ -3979,7 +3979,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用"
+            "value" : "App"
           }
         }
       }
@@ -6339,7 +6339,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选取应用…"
+            "value" : "选取 App…"
           }
         }
       }
@@ -6350,7 +6350,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选取应用…"
+            "value" : "选取 App…"
           }
         }
       }
@@ -13868,7 +13868,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有应用能打开这个网址。"
+            "value" : "没有 App 能打开这个网址。"
           }
         }
       }
@@ -14849,7 +14849,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开应用"
+            "value" : "打开 App"
           }
         }
       }
@@ -20772,7 +20772,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "该应用已不在了。"
+            "value" : "该 App 已不在了。"
           }
         }
       }
