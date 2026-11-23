@@ -1034,6 +1034,8 @@ final class SidebarView: NSView {
         newSpaceButton.onClick = { [weak self] _ in self?.showAddMenu() }
         address.onClick = { [weak self] _ in self?.delegate?.sidebarOpenCommandBar() }
         themeToken = Brand.themeChanged.observe { [weak self] in self?.tintDownloadsRing() }
+        // A finger held where a right-click opens the blank menu opens it too.
+        TouchGestures.addMenuPress(to: self) { [weak self] event in _ = self?.showBlankMenu(for: event) }
     }
 
     required init?(coder: NSCoder) { fatalError() }

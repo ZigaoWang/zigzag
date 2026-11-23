@@ -537,6 +537,13 @@ final class WebAppDragStrip: NSView {
     var lightsEnd: CGFloat = 70 { didSet { needsLayout = true } }
     var menuEntries: (() -> [MenuPanel.Entry])?
 
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        TouchGestures.addMenuPress(to: self) { [weak self] event in self?.showMenu(for: event) }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
 
@@ -554,7 +561,9 @@ final class WebAppDragStrip: NSView {
 
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
-    override func rightMouseDown(with event: NSEvent) {
+    override func rightMouseDown(with event: NSEvent) { showMenu(for: event) }
+
+    private func showMenu(for event: NSEvent) {
         guard let entries = menuEntries?(), !entries.isEmpty else { return }
         MenuPanel.show(entries, from: self, placement: .at(convert(event.locationInWindow, from: nil)))
     }
@@ -595,6 +604,7 @@ final class WebAppStripView: NSView {
         mark.isHidden = true
         [back, forward, reload, mark, title, site].forEach(addSubview)
         setAccessibilityRole(.toolbar)
+        TouchGestures.addMenuPress(to: self) { [weak self] event in self?.showMenu(for: event) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -612,7 +622,9 @@ final class WebAppStripView: NSView {
     }
     #endif
 
-    override func rightMouseDown(with event: NSEvent) {
+    override func rightMouseDown(with event: NSEvent) { showMenu(for: event) }
+
+    private func showMenu(for event: NSEvent) {
         guard let entries = menuEntries?(), !entries.isEmpty else { return }
         MenuPanel.show(entries, from: self, placement: .at(convert(event.locationInWindow, from: nil)))
     }

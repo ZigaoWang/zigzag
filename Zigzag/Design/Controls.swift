@@ -163,7 +163,7 @@ class InteractiveView: NSView {
 
     var onClick: ((NSEvent) -> Void)?
     var onDoubleClick: (() -> Void)?
-    var onRightClick: ((NSEvent) -> NSMenu?)?
+    var onRightClick: ((NSEvent) -> NSMenu?)? { didSet { updateTouchMenu() } }
     /// Called once the mouse moves far enough while pressed. Return true to take over the drag.
     var onDragStart: ((NSEvent) -> Bool)?
     /// Only sideways movement starts a drag, for something that moves along a row: a wobble up or down stays a click.
@@ -307,7 +307,46 @@ class InteractiveView: NSView {
     }
 
     /// The right-click menu as Zigzag's own (`MenuPanel`) rather than the system's: the sidebar's rows and buttons.
-    var drawsMenu = false
+    var drawsMenu = false { didSet { updateTouchMenu() } }
+
+    /// A finger held on a control with a drawn menu opens it; AppKit already does this for system menus.
+    private var touchMenu: TouchPressRecognizer?
+
+    private func updateTouchMenu() {
+        let wanted = TouchGestures.isAvailable && drawsMenu && onRightClick != nil
+        if wanted, touchMenu == nil {
+            let press = TouchPressRecognizer { [weak self] press in
+                guard let self, press.state == .began else { return }
+                self.touchHeld(at: press.location(in: self))
+            }
+            press.touchOnly.accepts = { [weak self] point in self?.ownsTouchMenu(at: point) ?? false }
+            addGestureRecognizer(press)
+            touchMenu = press
+        } else if !wanted, let touchMenu {
+            removeGestureRecognizer(touchMenu)
+            self.touchMenu = nil
+        }
+    }
+
+    /// The finger's on this control's menu, not a nested control's own.
+    private func ownsTouchMenu(at point: NSPoint) -> Bool {
+        isEnabled && !TouchGestures.controlHasMenu(at: point, in: self)
+    }
+
+    /// A finger held at `point` (own coordinates): the menu a right-click there opens. Not while a menu is open
+    /// (AppKit's own right-click from the hold).
+    @discardableResult
+    func touchHeld(at point: NSPoint) -> Bool {
+        guard isEnabled, drawsMenu, let onRightClick, let window, MenuPanel.current == nil else { return false }
+        let windowPoint = convert(point, to: nil)
+        guard let event = TouchGestures.rightMouseDown(at: windowPoint, in: window) else { return false }
+        if let menu = onRightClick(event) { showDrawnMenu(menu, at: windowPoint) }
+        return true
+    }
+
+    #if DEBUG
+    var touchMenuRecognizer: TouchPressRecognizer? { touchMenu }
+    #endif
 
     private func showDrawnMenu(_ menu: NSMenu, at windowPoint: NSPoint) {
         let entries = MenuPanel.entries(from: menu)
