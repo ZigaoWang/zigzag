@@ -519,6 +519,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         // A private page keeps to its window's space: nothing to choose.
         strip.spaceChip.isEnabled = !isPrivate
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
+        strip.refreshTips()
         strip.openButton.isEnabled = tab.url != nil
         strip.copyButton.isEnabled = tab.url != nil
         strip.siteButton.isEnabled = tab.url != nil
@@ -1250,13 +1251,23 @@ final class MiniStripView: NSView {
     /// The narrowest the address field opens: below this between the space and the buttons, it takes more of the strip.
     static let narrowestField: CGFloat = 160
     /// Back, forward and reload: the browser window's own three, with its tooltips, at a pane strip's size.
-    let backButton = MiniStripView.button("chevron.left", toolTip: Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))))
-    let forwardButton = MiniStripView.button("chevron.right", toolTip: Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))))
+    let backButton = MiniStripView.button("chevron.left", toolTip: MiniStripView.backTip)
+    let forwardButton = MiniStripView.button("chevron.right", toolTip: MiniStripView.forwardTip)
     let reloadButton = MiniStripView.button("arrow.clockwise", toolTip: SidebarView.reloadTip(loading: false))
     let spaceChip = MiniSpaceChip()
     let title = MiniTitleView()
-    let copyButton = MiniStripView.button("link", toolTip: Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."),
-                                                                            for: #selector(MiniWindowController.copyPageURL(_:))))
+    let copyButton = MiniStripView.button("link", toolTip: MiniStripView.copyTip)
+
+    private static var backTip: String { Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))) }
+    private static var forwardTip: String { Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))) }
+    private static var copyTip: String { Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."), for: #selector(MiniWindowController.copyPageURL(_:))) }
+
+    /// The tooltips with the keys as Settings › Shortcuts has them now.
+    func refreshTips() {
+        backButton.toolTip = Self.backTip
+        forwardButton.toolTip = Self.forwardTip
+        copyButton.toolTip = Self.copyTip
+    }
     /// Window › Keep on Top for this window: a pin, filled while it's on.
     let pinButton = MiniStripView.button("pin", toolTip: KeepOnTop.title)
     /// Site Controls, as by a browser window's address: the site panel for this page (#225).
@@ -1716,8 +1727,14 @@ enum AppSwitching {
 final class MiniLinksNote: FloatingPanelView {
     private let title = Label(String(localized: "Links from other apps open here", comment: "Title of the note shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. The note points at the Open in button."),
                               font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let line = Label(String(localized: "Glance, then get back to what you were doing. To keep the page, use this button or press ⌘O.", comment: "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like ⌘O) moves the page into a tab of a browser window."),
+    private let line = Label(MiniLinksNote.text(keys: Shortcuts.keys(for: #selector(MiniWindowController.openDocument(_:)))),
                              font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+
+    /// The note's line, with Open in's keys as Settings › Shortcuts has them, or without when it has none.
+    static func text(keys: String) -> String {
+        keys.isEmpty ? String(localized: "Glance, then get back to what you were doing. To keep the page, use this button.", comment: "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which moves the page into a tab of a browser window.")
+            : String(localized: "Glance, then get back to what you were doing. To keep the page, use this button or press \(keys).", comment: "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like its keys, such as ⌘O) moves the page into a tab of a browser window.")
+    }
     private let buttons = DialogButtons()
     private let useTabs = PillButton(title: String(localized: "Use Tabs Instead", comment: "Button on the note shown the first time a link from another app opens in Zigzag Mini: links from other apps open as tabs from now on, and this page moves into a tab."), style: .quiet)
     private let gotIt = PillButton(title: String(localized: "Got It", comment: "Button on the note shown the first time a link from another app opens in Zigzag Mini: puts the note away and keeps using Zigzag Mini."), style: .prominent)

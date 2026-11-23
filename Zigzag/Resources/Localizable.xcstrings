@@ -11183,13 +11183,24 @@
         }
       }
     },
-    "Glance, then get back to what you were doing. To keep the page, use this button or press ⌘O." : {
-      "comment" : "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like ⌘O) moves the page into a tab of a browser window.",
+    "Glance, then get back to what you were doing. To keep the page, use this button or press %@." : {
+      "comment" : "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like its keys, such as ⌘O) moves the page into a tab of a browser window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "看完就能回去。\n想留下这个网页，点这个按钮或按 ⌘O。"
+            "value" : "看完就能回去。\n想留下这个网页，点这个按钮或按 %@。"
+          }
+        }
+      }
+    },
+    "Glance, then get back to what you were doing. To keep the page, use this button." : {
+      "comment" : "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which moves the page into a tab of a browser window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看完就能回去。\n想留下这个网页，点这个按钮。"
           }
         }
       }
