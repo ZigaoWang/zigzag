@@ -588,6 +588,29 @@ struct TouchMovesTests {
 
     // MARK: Across the sidebar
 
+    /// Two taps on a control with a double-click action run it, as two clicks do; a mouse's single clicks don't.
+    @Test func twoTapsOnAControlAreADoubleClick() {
+        let saved = TouchPress.landedAt
+        defer { TouchPress.landedAt = saved }
+        let control = InteractiveView(frame: NSRect(x: 0, y: 0, width: 100, height: 30))
+        var doubles = 0
+        control.onDoubleClick = { doubles += 1 }
+        let point = NSPoint(x: 20, y: 10)
+        TouchPress.landedAt = nil
+        control.mouseDown(with: mouse(.leftMouseDown, at: point))
+        control.mouseDown(with: mouse(.leftMouseDown, at: point))
+        #expect(doubles == 0)
+        for _ in 0..<2 {
+            TouchPress.landedAt = ProcessInfo.processInfo.systemUptime
+            control.mouseDown(with: mouse(.leftMouseDown, at: point))
+        }
+        #expect(doubles == 1)
+        TouchPress.landedAt = nil
+        control.mouseDown(with: NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                   windowNumber: 0, context: nil, eventNumber: 0, clickCount: 2, pressure: 1)!)
+        #expect(doubles == 2)
+    }
+
     /// A hold whose view goes before the finger has moved still ends when the finger lifts.
     @Test func aHoldEndsAfterItsViewHasGone() throws {
         let window = window(height: 200)

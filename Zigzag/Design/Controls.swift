@@ -248,7 +248,8 @@ class InteractiveView: NSView {
             if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
             return
         }
-        if event.clickCount == 2, let onDoubleClick {
+        // A finger's two taps count too: AppKit's click from each comes as a single click.
+        if let onDoubleClick, TouchDoubleTap.clickCount(for: event) == 2 {
             onDoubleClick()
             return
         }
