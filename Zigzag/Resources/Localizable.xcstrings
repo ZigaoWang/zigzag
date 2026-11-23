@@ -2680,7 +2680,7 @@
       }
     },
     "%lld zapped" : {
-      "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.",
+      "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel that opens the list of them, and a choice made for a site in Settings › Privacy › Sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17707,7 +17707,7 @@
       }
     },
     "Restore" : {
-      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.",
+      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17718,7 +17718,7 @@
       }
     },
     "Restore All" : {
-      "comment" : "At the end of the row in the site panel that counts the elements zapped on the site: shows them all again.",
+      "comment" : "Under the list of elements zapped on the site, on its page in the site panel: shows them all again.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -26490,6 +26490,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "卡面"
+          }
+        }
+      }
+    },
+    "Zapped Elements" : {
+      "comment" : "Title of the site panel's page that lists the elements hidden on the site with Zap Element.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏的元素"
+          }
+        }
+      }
+    },
+    "Restore %@" : {
+      "comment" : "VoiceOver name of the × on one zapped element's row in the site panel and Settings › Privacy › Sites. The placeholder is the element's short name, like div.banner.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复 %@"
           }
         }
       }

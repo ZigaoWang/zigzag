@@ -60,7 +60,7 @@ enum SiteBoosts {
 
     /// "3 zapped", for Site Controls and Settings › Privacy › Sites.
     static func zapped(_ count: Int) -> String {
-        String(localized: "\(count) zapped", comment: "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.")
+        String(localized: "\(count) zapped", comment: "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel that opens the list of them, and a choice made for a site in Settings › Privacy › Sites.")
     }
 
     /// A private window's boosts, keyed by its store.
@@ -119,6 +119,101 @@ enum SiteBoosts {
         var boost = boost(forSite: site, privateStore: privateStore)
         boost.zaps = []
         set(boost, forSite: site, privateStore: privateStore)
+    }
+
+    /// Shows one zapped element again; the rest keep their order.
+    static func unzap(_ selector: String, forSite site: String, privateStore: WKWebsiteDataStore? = nil) {
+        var boost = boost(forSite: site, privateStore: privateStore)
+        guard let index = boost.zaps.firstIndex(of: selector) else { return }
+        boost.zaps.remove(at: index)
+        set(boost, forSite: site, privateStore: privateStore)
+    }
+
+    /// Tooltip of the × on one zapped element's row, in Site Controls and Settings › Privacy › Sites.
+    static let restoreTitle = String(localized: "Restore", comment: "Tooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.")
+
+    /// VoiceOver name of that ×, with the element's name, like “Restore div.banner”.
+    static func restoreLabel(_ name: String) -> String {
+        String(localized: "Restore \(name)", comment: "VoiceOver name of the × on one zapped element's row in the site panel and Settings › Privacy › Sites. The placeholder is the element's short name, like div.banner.")
+    }
+
+    /// A short name for a zapped element: the last step's tag with its id or first class ("#promo", "div.banner"),
+    /// or, for a bare tag, the nearest named step before it ("#list › li").
+    nonisolated static func label(forZap selector: String) -> String {
+        let steps = selectorSteps(selector).map(stepName)
+        guard let last = steps.last else { return selector }
+        if !last.mark.isEmpty { return last.shown }
+        let landmarks: Set = ["header", "nav", "main", "aside", "footer"]
+        let before = steps.dropLast()
+        if let named = before.last(where: { !$0.mark.isEmpty }) ?? before.last(where: { landmarks.contains($0.tag) }) {
+            return "\(named.shown) › \(last.tag.isEmpty ? "*" : last.tag)"
+        }
+        return last.tag.isEmpty ? selector : last.tag
+    }
+
+    /// Compound selectors, split at combinators outside brackets; escapes stay as written.
+    nonisolated static func selectorSteps(_ selector: String) -> [String] {
+        var steps: [String] = [], current = "", depth = 0
+        var chars = Array(selector)[...]
+        while let c = chars.popFirst() {
+            if c == "\\" {
+                current.append(c)
+                current += escapeTail(&chars)
+                continue
+            }
+            if c == "(" || c == "[" { depth += 1 } else if c == ")" || c == "]" { depth = max(0, depth - 1) }
+            if depth == 0, c.isWhitespace || ">+~".contains(c) {
+                if !current.isEmpty { steps.append(current) }
+                current = ""
+                continue
+            }
+            current.append(c)
+        }
+        if !current.isEmpty { steps.append(current) }
+        return steps
+    }
+
+    /// What follows a backslash: up to six hex digits and one space, or one character.
+    private nonisolated static func escapeTail(_ chars: inout ArraySlice<Character>) -> String {
+        var out = ""
+        while out.count < 6, let c = chars.first, c.isHexDigit { out.append(c); chars.removeFirst() }
+        if out.isEmpty { return chars.popFirst().map(String.init) ?? "" }
+        if let c = chars.first, c == " " || c == "\t" || c == "\n" { out.append(c); chars.removeFirst() }
+        return out
+    }
+
+    /// One step's tag, its id or first class, and how it's shown, unescaped.
+    private nonisolated static func stepName(_ step: String) -> (tag: String, mark: String, shown: String) {
+        var tag = "", id = "", firstClass = "", word = "", depth = 0
+        var part: Character?
+        func flush() {
+            let name = unescaped(word)
+            switch part {
+            case nil: tag = name == "*" ? "" : name.lowercased()
+            case "#": if id.isEmpty { id = name }
+            case ".": if firstClass.isEmpty { firstClass = name }
+            default: break
+            }
+            word = ""
+        }
+        var chars = Array(step)[...]
+        while let c = chars.popFirst() {
+            if depth > 0 {
+                if c == "(" || c == "[" { depth += 1 } else if c == ")" || c == "]" { depth -= 1 }
+                continue
+            }
+            if c == "\\" { word.append(c); word += escapeTail(&chars); continue }
+            if "#.:[(".contains(c) {
+                flush()
+                part = c == "(" ? ":" : c
+                if c == "[" || c == "(" { depth = 1 }
+                continue
+            }
+            word.append(c)
+        }
+        flush()
+        let mark = !id.isEmpty ? "#" + id : !firstClass.isEmpty ? "." + firstClass : ""
+        return (tag, mark, id.isEmpty ? tag + mark : mark)
     }
 
     /// Forget in Settings › Privacy › Sites.
@@ -248,6 +343,13 @@ enum PageBoosts {
         guard let site = SiteBoosts.site(of: url), !ErrorPage.pending.contains(webView) else { return }
         let css = SiteBoosts.css(for: SiteBoosts.boost(forSite: site, privateStore: tab.privateStore))
         webView.runOwnScript(source(css: css, site: site), world: world)
+    }
+
+    /// Applies a kept change to every open tab of `site` outside private windows (Settings › Privacy › Sites).
+    static func refreshOpenTabs(site: String) {
+        for tab in WindowManager.shared.openTabs where tab.privateStore == nil && SiteBoosts.site(of: tab.webView?.url ?? tab.url) == site {
+            refresh(tab)
+        }
     }
 
     /// Injects `css` under one name so the next change replaces it.
@@ -484,6 +586,12 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
     static func zap(_ selector: String, site: String, in tab: Tab) {
         guard SiteBoosts.zap(selector, forSite: site, privateStore: tab.privateStore) else { return }
         PageBoosts.refresh(tab)
+    }
+
+    /// Shows `selector` again on the site now and on later visits (in a private window, only there).
+    static func unzap(_ selector: String, site: String, in tab: Tab, refresh: @MainActor (Tab) -> Void = PageBoosts.refresh) {
+        SiteBoosts.unzap(selector, forSite: site, privateStore: tab.privateStore)
+        refresh(tab)
     }
 
     #if DEBUG

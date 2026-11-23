@@ -88,8 +88,14 @@ final class SitePanel: FloatingPanelView {
         return label
     }()
     private var permissionsRow: PanelLinkRow?
-    /// Zapped element count, with Restore All.
+    /// Zapped element count; opens the list of them.
     private var zappedRow: PanelLinkRow?
+    /// The zapped elements, newest first, each with ×, and Restore All under them (#498).
+    private let zapsGroup = PanelGroup()
+    private var restoreAllRow: PanelLinkRow?
+    /// The zaps `zapsGroup` was built from, in zap order.
+    private var listedZaps: [String] = []
+    private let zapsHeader = PanelPageHeader(String(localized: "Zapped Elements", comment: "Title of the site panel's page that lists the elements hidden on the site with Zap Element."))
     /// The site's custom CSS, if any; opens Edit Style.
     private var styleRow: PanelLinkRow?
     private let permissionsGroup = PanelGroup()
@@ -115,11 +121,12 @@ final class SitePanel: FloatingPanelView {
     private var zoomStepper: ZoomStepper?
 
     /// The panel's pages: the site at a glance, and one each for what's behind its rows.
-    enum Page: String { case main, connection, permissions }
+    enum Page: String { case main, connection, permissions, zapped }
     private(set) var page = Page.main
     var showsSubpage: Bool { page != .main }
     private let mainBox = FlippedView()
     private let permissionsBox = FlippedView()
+    private let zapsBox = FlippedView()
 
     /// The panel's content, in a sheet that scrolls when the window is too short for it.
     private let scroll = NSScrollView()
@@ -188,10 +195,11 @@ final class SitePanel: FloatingPanelView {
         scroll.documentView = content
         addSubview(scroll)
         // A page's header is the panel's own, over the sheet that scrolls: its way back and its title stay put (#220).
-        [permissionsHeader, certificateHeader, headerEdge].forEach { addSubview($0) }
-        [mainBox, permissionsBox].forEach { content.addSubview($0) }
+        [permissionsHeader, zapsHeader, certificateHeader, headerEdge].forEach { addSubview($0) }
+        [mainBox, permissionsBox, zapsBox].forEach { content.addSubview($0) }
         contentReady = true
         permissionsHeader.onBack = { [weak self] in self?.show(.main) }
+        zapsHeader.onBack = { [weak self] in self?.show(.main) }
         certificateHeader.onBack = { [weak self] in self?.show(.main) }
         scroll.contentView.postsBoundsChangedNotifications = true
         scrollToken = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main) { [weak self] _ in
@@ -566,7 +574,7 @@ final class SitePanel: FloatingPanelView {
         applyPage()
         resize()
         scroll.contentView.scroll(to: .zero)
-        let shown: [NSView?] = [mainBox, permissionsBox, certificatePage, pinnedHeader]
+        let shown: [NSView?] = [mainBox, permissionsBox, zapsBox, certificatePage, pinnedHeader]
         for view in shown.compactMap({ $0 }) where !view.isHidden && view.superview != nil {
             Tokens.Motion.present(view, from: .inPlace, entering: true)
         }
@@ -577,6 +585,8 @@ final class SitePanel: FloatingPanelView {
         mainBox.isHidden = page != .main
         permissionsBox.isHidden = page != .permissions
         permissionsHeader.isHidden = page != .permissions
+        zapsBox.isHidden = page != .zapped
+        zapsHeader.isHidden = page != .zapped
         certificateHeader.isHidden = page != .connection
         refreshHeaderEdge()
     }
@@ -587,6 +597,7 @@ final class SitePanel: FloatingPanelView {
         switch page {
         case .main: nil
         case .permissions: permissionsHeader
+        case .zapped: zapsHeader
         case .connection: certificateHeader
         }
     }
@@ -680,7 +691,9 @@ final class SitePanel: FloatingPanelView {
     /// As tall as its content, up to `maxHeight`.
     fileprivate var fittedHeight: CGFloat {
         let band = headerBand
-        return SitePanelSizing.fit(band: band, body: layoutContent(dryRun: true) - band, maxHeight: maxHeight).height
+        // A long list of zaps scrolls under its header instead of growing the panel to the window's bottom.
+        let most = page == .zapped ? min(maxHeight, band + SitePanelSizing.zapListHeight) : maxHeight
+        return SitePanelSizing.fit(band: band, body: layoutContent(dryRun: true) - band, maxHeight: most).height
     }
 
     /// The site at a glance goes in its own page; the other pages add theirs where they're built.
@@ -694,6 +707,10 @@ final class SitePanel: FloatingPanelView {
         // sitepage zap | restore: Zap Element in ⋯, or Restore All.
         if arg == "zap" { startZapping(); return }
         if arg == "restore" { restoreZaps(); return }
+        // sitepage unzap <index>: × on the zapped element at that row, newest first.
+        if arg.hasPrefix("unzap "), let index = Int(arg.dropFirst(6)), boost.zaps.reversed().indices.contains(index) {
+            unzap(Array(boost.zaps.reversed())[index]); return
+        }
         if arg == "style" { editStyle(); return }
         if arg == "icon" { MenuPanel.current?.close(animated: false); chooseSiteIcon(); return }
         if arg == "more" { showMoreMenu(); return }
@@ -709,7 +726,7 @@ final class SitePanel: FloatingPanelView {
         ["site": site, "page": page.rawValue, "certificate": certificatePage?.debugState ?? [:],
          "connection": connectionLine?.debugText ?? "",
          "links": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
-         "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle),
+         "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle), "zaps": zapsGroup.rows.map(\.debugTitle),
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
          "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY],
@@ -1264,14 +1281,20 @@ final class SitePanel: FloatingPanelView {
         SiteStyleSheet.show(for: tab, in: controller)
     }
 
-    /// "3 zapped" with Restore All, and Custom style, once the site has them.
+    /// "3 zapped", which opens the list of them with Restore All, and Custom style, once the site has them.
     private func buildBoostRows() {
         guard canBoost else { return }
         if zappedRow == nil {
-            let row = PanelLinkRow("", value: Self.restoreAllTitle) { [weak self] in self?.restoreZaps() }
+            let row = PanelLinkRow("", goes: true) { [weak self] in self?.show(.zapped) }
             addSubview(row)
             zappedRow = row
         }
+        if restoreAllRow == nil {
+            let row = PanelLinkRow(Self.restoreAllTitle) { [weak self] in self?.restoreZaps() }
+            zapsBox.addSubview(row)
+            restoreAllRow = row
+        }
+        if zapsGroup.superview == nil { zapsBox.addSubview(zapsGroup) }
         if styleRow == nil {
             let row = PanelLinkRow(String(localized: "Custom style", comment: "Row in the site panel, there while the site has CSS of your own: opens Edit Style. Its value says Edit…."),
                                    value: String(localized: "Edit…", comment: "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.")) { [weak self] in self?.editStyle() }
@@ -1281,13 +1304,17 @@ final class SitePanel: FloatingPanelView {
         refreshBoostRows()
     }
 
-    static let restoreAllTitle = String(localized: "Restore All", comment: "At the end of the row in the site panel that counts the elements zapped on the site: shows them all again.")
+    static let restoreAllTitle = String(localized: "Restore All", comment: "Under the list of elements zapped on the site, on its page in the site panel: shows them all again.")
 
     private func refreshBoostRows() {
-        let zaps = boost.zaps.count
-        zappedRow?.titleText = SiteBoosts.zapped(zaps)
-        zappedRow?.isHidden = zaps == 0
+        let zaps = boost.zaps
+        zappedRow?.titleText = SiteBoosts.zapped(zaps.count)
+        zappedRow?.isHidden = zaps.isEmpty
         styleRow?.isHidden = !boost.hasStyle
+        if zappedRow != nil, listedZaps != zaps {
+            listedZaps = zaps
+            zapsGroup.rows = zaps.reversed().map { selector in PanelRow.zap(selector) { [weak self] in self?.unzap(selector) } }
+        }
         needsLayout = true
     }
 
@@ -1296,7 +1323,16 @@ final class SitePanel: FloatingPanelView {
         SiteBoosts.restoreZaps(forSite: site, privateStore: tab.privateStore)
         PageBoosts.refresh(tab)
         refreshBoostRows()
-        resize()
+        // Nothing left to list.
+        if page == .zapped { show(.main) } else { resize() }
+    }
+
+    /// × on one zapped element: shows it again on the page now and on later visits.
+    private func unzap(_ selector: String) {
+        guard let site = SiteBoosts.site(of: url) else { return }
+        ZapPicker.unzap(selector, site: site, in: tab)
+        refreshBoostRows()
+        if boost.zaps.isEmpty, page == .zapped { show(.main) } else { resize() }
     }
 
     /// Permissions of the Permissions page rows, top to bottom.
@@ -1332,7 +1368,7 @@ final class SitePanel: FloatingPanelView {
         }
         scroll.frame = NSRect(x: 0, y: band, width: bounds.width, height: max(0, bounds.height - band))
         content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(body, scroll.frame.height))
-        for box in [mainBox, permissionsBox] { box.frame = content.bounds }
+        for box in [mainBox, permissionsBox, zapsBox] { box.frame = content.bounds }
         refreshHeaderEdge()
     }
 
@@ -1367,7 +1403,7 @@ final class SitePanel: FloatingPanelView {
         }
         func finish() -> CGFloat { headerBand + y - gapAfter - slack + pad }
         // A page's box covers the panel, so what's in it is placed in the panel's own terms.
-        for box in [mainBox, permissionsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
+        for box in [mainBox, permissionsBox, zapsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
         func group(_ group: PanelGroup) {
             place(group, NSRect(x: pad, y: y, width: inner, height: group.height))
             y += group.height
@@ -1389,6 +1425,15 @@ final class SitePanel: FloatingPanelView {
                 y += Tokens.Space.x2
                 link(resetPermissions)
                 end(0, slack: resetPermissions.bottomSlack)
+            }
+            return finish()
+        case .zapped:
+            group(zapsGroup)
+            if !zapsGroup.rows.isEmpty { end(0, slack: zapsGroup.bottomSlack) }
+            if let restoreAllRow {
+                y += Tokens.Space.x2
+                link(restoreAllRow)
+                end(0, slack: restoreAllRow.bottomSlack)
             }
             return finish()
         case .main, .connection:
@@ -1816,6 +1861,25 @@ final class PanelRow: NSView {
     /// A name and a control of the panel's own (the zoom stepper).
     static func custom(_ title: String, control: NSView) -> PanelRow { PanelRow(title, control: control) }
 
+    /// A zapped element: its short name, its selector under it cut in the middle (whole on hover and to VoiceOver),
+    /// and × to show it again.
+    static func zap(_ selector: String, remove: @escaping () -> Void) -> PanelRow {
+        let name = SiteBoosts.label(forZap: selector)
+        let button = IconButton(symbol: "xmark", size: .compact, toolTip: SiteBoosts.restoreTitle)
+        button.setAccessibilityLabel(SiteBoosts.restoreLabel(name))
+        button.onClick = { _ in remove() }
+        let row = PanelRow(name, control: button, value: selector)
+        row.value?.lineBreakMode = .byTruncatingMiddle
+        // A selector that is its own name ("div.banner") says it once.
+        row.value?.isHidden = name == selector
+        row.toolTip = selector
+        row.setAccessibilityElement(true)
+        row.setAccessibilityRole(.group)
+        row.setAccessibilityLabel(name)
+        row.setAccessibilityValue(selector)
+        return row
+    }
+
     #if DEBUG
     /// Its name, and what its dropdown or switch is set to.
     var debugTitle: String {
@@ -1855,6 +1919,8 @@ final class PanelRow: NSView {
 
     override func layout() {
         super.layout()
+        // Not placed yet: a control sized by its frame (an icon button) would be squeezed to nothing for good.
+        guard bounds.width > 0 else { return }
         let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         // Shorter titles keep only their own width, so they never squeeze the control.
         let named = ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0))
@@ -2338,6 +2404,9 @@ enum SitePanelSizing {
     static func maxHeight(overlayHeight: CGFloat, top: CGFloat) -> CGFloat {
         max(PanelLinkRow.height * 4, overlayHeight - top - Tokens.Metric.cardInset)
     }
+
+    /// The most a list of zapped elements shows before it scrolls: seven rows and half of the next.
+    static var zapListHeight: CGFloat { PanelRow.height * 7.5 + Tokens.Space.x2 + PanelLinkRow.height + Tokens.Space.x4 }
 
     /// The top a page's header keeps: the panel's padding, the header, and the room under it.
     static func headerBand(pad: CGFloat, header: CGFloat) -> CGFloat { pad + header + Tokens.Space.x3 }

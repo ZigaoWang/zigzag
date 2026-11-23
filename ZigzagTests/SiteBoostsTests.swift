@@ -145,6 +145,73 @@ struct SiteBoostsTests {
         }
     }
 
+    @Test func zapsHaveShortNames() {
+        let names = ["#promo": "#promo", "div.banner": "div.banner", "#list > li:nth-of-type(2)": "#list › li",
+                     "main > article:nth-of-type(2) > p": "main › p", "body > button > svg": "svg", "div.md\\:flex": "div.md:flex",
+                     "#\\31 23 > span": "#123 › span", "aside.cookie-banner.big:nth-of-type(1)": "aside.cookie-banner",
+                     "div#x.y": "#x", ".a .b:not(.c)": ".b", "section.card ~ div:nth-of-type(3)": "section.card › div",
+                     "DIV.Box": "div.Box", "div:nth-of-type(3)": "div", "*": "*"]
+        for (selector, name) in names { #expect(SiteBoosts.label(forZap: selector) == name, "\(selector)") }
+        #expect(SiteBoosts.selectorSteps("#\\31 23 > span  .a") == ["#\\31 23", "span", ".a"])
+    }
+
+    @Test func oneZapComesOffAndTheRestStayInOrder() async throws {
+        try await withDefaults {
+            for selector in ["#a", "#b", "#c"] { SiteBoosts.zap(selector, forSite: "example.com") }
+            SiteBoosts.unzap("#b", forSite: "example.com")
+            #expect(SiteBoosts.boost(forSite: "example.com").zaps == ["#a", "#c"])
+            SiteBoosts.unzap("#missing", forSite: "example.com")
+            #expect(SiteBoosts.boost(forSite: "example.com").zaps == ["#a", "#c"])
+            // Zapping again appends to the same list.
+            SiteBoosts.zap("#b", forSite: "example.com")
+            #expect(SiteBoosts.boost(forSite: "example.com").zaps == ["#a", "#c", "#b"])
+            // A private window removes from its own copy only.
+            let window = WKWebsiteDataStore.nonPersistent()
+            SiteBoosts.unzap("#a", forSite: "example.com", privateStore: window)
+            #expect(SiteBoosts.boost(forSite: "example.com", privateStore: window).zaps == ["#c", "#b"])
+            #expect(SiteBoosts.boost(forSite: "example.com").zaps == ["#a", "#c", "#b"])
+            SiteBoosts.unzap("#c", forSite: "example.com")
+            #expect(SiteBoosts.boost(forSite: "example.com", privateStore: window).zaps == ["#c", "#b"])
+            // The last one gone leaves nothing kept for the site.
+            SiteBoosts.unzap("#a", forSite: "example.com")
+            SiteBoosts.unzap("#b", forSite: "example.com")
+            #expect(SiteBoosts.sites.isEmpty)
+        }
+    }
+
+    @Test func removingAZapRefreshesThePage() async throws {
+        try await withDefaults {
+            SiteBoosts.zap("#promo", forSite: "example.com")
+            SiteBoosts.zap("div.banner", forSite: "example.com")
+            let tab = Tab(url: URL(string: "https://example.com/")!, title: "Example", spaceID: UUID())
+            var refreshed: [Tab] = []
+            ZapPicker.unzap("#promo", site: "example.com", in: tab) { refreshed.append($0) }
+            #expect(refreshed.count == 1 && refreshed.first === tab)
+            #expect(SiteBoosts.boost(forSite: "example.com").zaps == ["div.banner"])
+            // The next load hides only what's left.
+            let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+            let url = try #require(URL(string: "https://example.com/"))
+            PageBoosts.prepare(webView, for: url, privateStore: nil, errorPage: false)
+            await load(Self.page, in: webView, at: url.absoluteString)
+            #expect(try await webView.evaluateJavaScript("getComputedStyle(document.getElementById('promo')).display") as? String == "block")
+            #expect(try await webView.evaluateJavaScript("getComputedStyle(document.querySelector('.banner')).display") as? String == "none")
+        }
+    }
+
+    @Test func aZapRowKeepsItsButtonWhenLaidOutBeforeItHasAWidth() throws {
+        let group = PanelGroup()
+        group.rows = [PanelRow.zap("#list > li:nth-of-type(2)") {}]
+        group.layoutSubtreeIfNeeded()
+        group.frame = NSRect(x: 0, y: 0, width: 260, height: PanelRow.height)
+        group.layoutSubtreeIfNeeded()
+        let row = try #require(group.rows.first)
+        row.layoutSubtreeIfNeeded()
+        let button = try #require(row.subviews.compactMap { $0 as? IconButton }.first)
+        #expect(button.frame.width == Tokens.Metric.compactIconButton)
+        #expect(button.frame.maxX == row.bounds.width)
+        #expect(button.accessibilityLabel() == SiteBoosts.restoreLabel("#list › li"))
+    }
+
     @Test func selectorsCantWriteCSS() {
         #expect(SiteBoosts.isPlainSelector("#list > li:nth-of-type(2)"))
         #expect(SiteBoosts.isPlainSelector("div.md\\:flex"))
