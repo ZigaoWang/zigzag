@@ -306,8 +306,24 @@ final class FormRow: NSView, SettingsSearchable {
     /// past the picture it doesn't have.
     var isIndented = false { didSet { needsLayout = true } }
 
+    /// A row about an indented row (one zapped element, under Zapped elements): a step further in.
+    var isNested = false { didSet { needsLayout = true } }
+
+    /// The line under the title on one line, cut in the middle, for text that's one long word (a CSS selector).
+    var detailTruncatesMiddle = false {
+        didSet {
+            detail.cell?.wraps = !detailTruncatesMiddle
+            detail.usesSingleLineMode = detailTruncatesMiddle
+            detail.maximumNumberOfLines = detailTruncatesMiddle ? 1 : 0
+            detail.lineBreakMode = detailTruncatesMiddle ? .byTruncatingMiddle : .byWordWrapping
+            needsLayout = true
+        }
+    }
+
     /// Where the row's text starts.
-    var textInset: CGFloat { icon.isHidden && !isIndented ? pad : pad + Self.iconSide + Tokens.Space.x3 }
+    var textInset: CGFloat {
+        (icon.isHidden && !isIndented && !isNested ? pad : pad + Self.iconSide + Tokens.Space.x3) + (isNested ? Tokens.Space.x4 : 0)
+    }
 
     /// Narrow (half of a split, a small window), the control goes under the text instead of squeezing it.
     private func isStacked(_ width: CGFloat, _ control: NSSize) -> Bool {
@@ -1082,6 +1098,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var siteDataHadSizes = false
     /// Every site with a choice made for it, not only the first 30.
     private var sitesShowAll = false
+    /// Sites whose zapped elements are all listed, not just the newest few.
+    private var zapsShowAll: Set<String> = []
     /// Permissions changed here while Settings is open ("origin|permission"): set back to Ask, a row stays, so the
     /// choice you just made doesn't vanish under the pointer.
     private var permissionsChangedHere: Set<String> = []
@@ -4593,10 +4611,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 })
             }
 
-            if let zaps = SiteBoosts.all[site]?.zaps.count, zaps > 0 {
+            if let zaps = SiteBoosts.all[site]?.zaps, !zaps.isEmpty {
                 rows.append(makeRow(String(localized: "Zapped elements", comment: "Row in Settings › Privacy › Sites: elements hidden on this site."),
-                                    detail: String(localized: "\(zaps) hidden", comment: "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count."),
-                                    control: NSView()) { SiteBoosts.restoreZaps(forSite: site) })
+                                    detail: String(localized: "\(zaps.count) hidden", comment: "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count."),
+                                    control: NSView()) {
+                    SiteBoosts.restoreZaps(forSite: site)
+                    PageBoosts.refreshOpenTabs(site: site)
+                })
+                rows += zapRows(zaps, site: site)
             }
 
             if SiteBoosts.all[site]?.hasStyle == true {
@@ -4680,6 +4702,42 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             sitesGroup.add(FormRow(title: String(localized: "\(more) more sites", comment: "Under the first 30 sites in Settings › Privacy, beside Show All."), control: all))
         }
+    }
+
+    /// Each zapped element of `site`, newest first, with × to show it again: the newest five, then the rest on request.
+    private func zapRows(_ zaps: [String], site: String) -> [FormRow] {
+        let shown = zapsShowAll.contains(site) ? zaps.count : 5
+        var rows: [FormRow] = zaps.reversed().prefix(shown).map { selector in
+            let name = SiteBoosts.label(forZap: selector)
+            let x = IconButton(symbol: "xmark", size: .compact, toolTip: SiteBoosts.restoreTitle)
+            x.setAccessibilityLabel(SiteBoosts.restoreLabel(name))
+            x.onClick = { [weak self] _ in
+                SiteBoosts.unzap(selector, forSite: site)
+                PageBoosts.refreshOpenTabs(site: site)
+                self?.reloadPrivacy()
+                self?.layoutDocument()
+            }
+            let row = FormRow(title: name, detail: name == selector ? nil : selector, control: x)
+            row.isNested = true
+            row.detailTruncatesMiddle = true
+            row.toolTip = selector
+            row.keywords = site
+            return row
+        }
+        if zaps.count > shown {
+            let all = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))
+            all.onClick = { [weak self] _ in
+                self?.zapsShowAll.insert(site)
+                self?.reloadPrivacy()
+                self?.layoutDocument()
+            }
+            let more = FormRow(title: String(localized: "\(zaps.count - shown) more", comment: "Under the newest five zapped elements of a site in Settings › Privacy › Sites, beside Show All: how many more there are."),
+                               control: all)
+            more.isNested = true
+            more.keywords = site
+            rows.append(more)
+        }
+        return rows
     }
 
     /// What websites keep, read again where it's listed (with more than one profile that's Website Data, and

@@ -26515,6 +26515,17 @@
           }
         }
       }
+    },
+    "%lld more" : {
+      "comment" : "Under the newest five zapped elements of a site in Settings › Privacy › Sites, beside Show All: how many more there are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另外 %lld 个"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
