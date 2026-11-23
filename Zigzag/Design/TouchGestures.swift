@@ -730,6 +730,12 @@ enum TouchSwipe {
     nonisolated static func isSideways(_ translation: NSPoint) -> Bool {
         abs(translation.x) >= 4 && abs(translation.x) > abs(translation.y) * 1.2
     }
+
+    /// Across the sidebar, where up and down is a steep flick: a swipe up to about 55° off level counts, as a thumb's
+    /// arc rarely starts flat.
+    nonisolated static func isAcrossSidebar(_ translation: NSPoint) -> Bool {
+        abs(translation.x) >= 4 && abs(translation.x) >= abs(translation.y) * 0.7
+    }
 }
 
 /// A finger in from a page's edge goes back (the left edge) or forward (the right), as on an iPad.

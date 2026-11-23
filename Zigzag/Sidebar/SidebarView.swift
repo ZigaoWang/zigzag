@@ -2104,7 +2104,7 @@ final class SidebarView: NSView {
         let pan = TouchPanRecognizer { [weak self] pan in self?.touchSwipeChanged(pan) }
         pan.touchOnly.shouldBegin = { [weak self] recognizer in
             guard let self, TouchHold.current == nil, let pan = recognizer as? NSPanGestureRecognizer else { return false }
-            return TouchSwipe.isSideways(pan.translation(in: self))
+            return TouchSwipe.isAcrossSidebar(pan.translation(in: self))
         }
         pan.touchOnly.outranks = { [weak self] other in
             guard let self, #available(macOS 27, *) else { return false }
