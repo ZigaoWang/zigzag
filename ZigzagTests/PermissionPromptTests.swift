@@ -207,4 +207,107 @@ struct PermissionPromptTests {
         page.appearance = nil
         #expect(PageDialogSheet.look(of: page) == nil)
     }
+
+    // MARK: The pop-up question's split answer
+
+    /// A split answer in a window, with its choices; `chosen` collects what it answers.
+    private func split(accepts: @escaping () -> Bool = { true }, chosen: @escaping (Int) -> Void) -> (NSWindow, SplitPillButton) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: true)
+        let content = FlippedView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        window.contentView = content
+        let button = SplitPillButton()
+        button.choices = ["This Tab", "New Tab", "Zigzag Mini"]
+        button.accepts = accepts
+        button.onChoose = chosen
+        content.addSubview(button)
+        button.pillFrame = NSRect(x: 100, y: 100, width: button.fittingWidth, height: Tokens.Page.controlHeight)
+        button.layoutSubtreeIfNeeded()
+        return (window, button)
+    }
+
+    private func key(_ code: UInt16, _ characters: String = "", in window: NSWindow) -> NSEvent {
+        NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                         characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+    }
+
+    @Test func aClickOnTheMainPartAnswersWithTheShownChoice() {
+        var chosen: [Int] = []
+        let (window, button) = split { chosen.append($0) }
+        #expect(button.main.accessibilityLabel() == "This Tab")
+        #expect(button.main.accessibilityPerformPress())
+        #expect(chosen == [0])
+        #expect(MenuPanel.current == nil)
+        _ = window
+    }
+
+    @Test func theChevronOpensTheMenuWithoutAnswering() throws {
+        var chosen: [Int] = []
+        let (window, button) = split { chosen.append($0) }
+        #expect(button.more.accessibilityRole() == .popUpButton)
+        #expect(button.more.accessibilityLabel() == String(localized: "More Choices"))
+        #expect(button.more.accessibilityPerformPress())
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.itemTitles == ["This Tab", "New Tab", "Zigzag Mini"])
+        #expect(chosen.isEmpty)
+        menu.close(animated: false)
+        _ = window
+    }
+
+    @Test func aChoiceFromTheMenuAnswersWithIt() throws {
+        var chosen: [Int] = []
+        let (window, button) = split { chosen.append($0) }
+        button.openMenu()
+        let menu = try #require(MenuPanel.current)
+        // Down to New Tab, then Return.
+        while menu.highlightedIndex != 1 { #expect(menu.handleKey(key(125, in: window))) }
+        #expect(menu.handleKey(key(36, "\r", in: window)))
+        #expect(chosen == [1])
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func theFirstHalfSecondTakesNoClickOnEitherPart() throws {
+        var open = false
+        var chosen: [Int] = []
+        let (window, button) = split(accepts: { open }) { chosen.append($0) }
+        _ = button.main.accessibilityPerformPress()
+        _ = button.more.accessibilityPerformPress()
+        #expect(chosen.isEmpty)
+        #expect(MenuPanel.current == nil)
+        // A menu opened once it counts still takes no choice while it doesn't.
+        open = true
+        button.openMenu()
+        let menu = try #require(MenuPanel.current)
+        open = false
+        #expect(menu.handleKey(key(36, "\r", in: window)))
+        #expect(chosen.isEmpty)
+        open = true
+        button.chooseShown()
+        #expect(chosen == [0])
+    }
+
+    /// A finger beside the pill, within its 36pt reach, still lands on the part it's nearest.
+    @Test func eachPartTakesAFingerAtItsFullReach() {
+        let (window, button) = split { _ in }
+        let pill = button.pillFrame
+        #expect(button.frame.height >= TouchGestures.target)
+        let local = { (point: NSPoint) in button.convert(point, from: button.superview) }
+        #expect(button.segment(at: local(NSPoint(x: pill.minX + 10, y: pill.minY - 3))) === button.main)
+        #expect(button.segment(at: local(NSPoint(x: pill.maxX - 4, y: pill.maxY + 3))) === button.more)
+        #expect(button.segment(at: local(NSPoint(x: pill.maxX - SplitPillButton.chevronWidth + 2, y: pill.midY))) === button.more)
+        #expect(button.segment(at: local(NSPoint(x: pill.maxX - SplitPillButton.chevronWidth - 2, y: pill.midY))) === button.main)
+        _ = window
+    }
+
+    @Test func theSplitsAnswerKeepsRememberAndTheDuration() {
+        let choices: [PermissionAction] = [.alternate("thisTab", "This Tab"), .alternate("newTab", "New Tab"), .alternate("mini", "Zigzag Mini")]
+        let kept = PermissionPrompt.menuAnswer(choices, index: 2, accepts: true, remember: true, scopeIndex: 1)
+        #expect(kept?.action == "mini")
+        #expect(kept?.remember == true)
+        #expect(kept?.scopeIndex == 1)
+        let once = PermissionPrompt.menuAnswer(choices, index: 0, accepts: true, remember: false, scopeIndex: 0)
+        #expect(once?.action == "thisTab")
+        #expect(once?.remember == false)
+        #expect(PermissionPrompt.menuAnswer(choices, index: 0, accepts: false, remember: true, scopeIndex: 0) == nil)
+        #expect(PermissionPrompt.menuAnswer(choices, index: 3, accepts: true, remember: false, scopeIndex: 0) == nil)
+    }
 }
