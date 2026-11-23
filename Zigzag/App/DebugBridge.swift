@@ -1396,10 +1396,14 @@ enum DebugBridge {
                 controller.tabManager.tile(list[n], beside: current, .place(region: region, regions: placed))
             }
         case "tilehint":
-            // tilehint <x> <y>: the hint a tab dragged to that point of the page (shares of its width and height) shows;
+            // tilehint <x> <y> [n]: the hint a tab dragged to that point of the page (shares of its width and height) shows;
             // tilehint alone puts it away.
             let parts = arg.split(separator: " ").compactMap { Double($0) }
-            if parts.count == 2, let current = controller.tabManager.selectedTab {
+            if parts.count >= 2, let current = controller.tabManager.selectedTab {
+                // A third number: the tab at that sidebar position is the one carried, named in the hint.
+                let list = controller.tabManager.navigableTabs
+                controller.root.splitDropHint.incoming = parts.count == 3 && list.indices.contains(Int(parts[2]))
+                    ? controller.carried(.tab(list[Int(parts[2])].id)) : nil
                 let area = controller.root.cardFrame
                 let point = NSPoint(x: area.minX + area.width * parts[0], y: area.minY + area.height * parts[1])
                 controller.showDropHint(at: controller.root.convert(point, to: nil), beside: current)

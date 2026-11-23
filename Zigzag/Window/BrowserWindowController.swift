@@ -3524,7 +3524,21 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {
         guard let windowPoint, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { root.splitDropHint.show(nil); return }
+        root.splitDropHint.incoming = carried(item)
         showDropHint(at: windowPoint, beside: current)
+    }
+
+    /// The icon and title of a row carried over the page, as its row shows them.
+    func carried(_ item: SidebarItem) -> (icon: NSImage?, title: String)? {
+        switch item {
+        case .tab(let id):
+            return tabManager.tab(with: id).map { ($0.displayIcon, $0.displayTitle) }
+        case .bookmark(let id):
+            if let tab = tabManager.bookmarkTab(for: id) { return (tab.displayIcon, tab.displayTitle) }
+            return Library.shared.bookmark(id).map { ($0.displayIcon, $0.title) }
+        default:
+            return nil
+        }
     }
 
     /// Where a tab let go at a window point would open beside `current` and the pages with it (#160): the hint over
