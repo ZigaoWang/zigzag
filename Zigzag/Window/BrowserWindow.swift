@@ -335,6 +335,17 @@ final class BrowserWindow: NSWindow {
     private weak var pressTarget: NSView?
     /// When a press last went to one of them that way, so a tap there isn't clicked twice.
     private var lastTitlebarPress: TimeInterval = 0
+    /// A finger's last tap on the strip's empty space, for a double tap.
+    private var lastTitlebarTap: (time: TimeInterval, point: NSPoint)?
+
+    /// Whether `point` is on the title bar strip, off the window's own buttons and ours.
+    func isOnEmptyTitlebar(_ point: NSPoint) -> Bool {
+        guard let container = standardWindowButton(.closeButton)?.superview?.superview, container.frame.contains(point) else { return false }
+        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            if let b = standardWindowButton(button), !b.isHidden, b.convert(b.bounds, to: nil).insetBy(dx: -4, dy: -4).contains(point) { return false }
+        }
+        return control(at: point) == nil
+    }
 
     private func routeTitlebarEvent(_ event: NSEvent) -> Bool {
         switch event.type {
@@ -574,6 +585,10 @@ extension NSWindow {
     /// window, and a double-click zooms it, or does whatever the Mac's title bar double-click is set to do.
     func titleBarMouseDown(_ event: NSEvent, clicks: Int? = nil) {
         guard (clicks ?? TouchDoubleTap.clickCount(for: event)) == 2 else { if dragMovesWindow { performDrag(with: event) }; return }
+        // One finger double tap can reach both the title bar strip and the view under it; it acts once.
+        let now = ProcessInfo.processInfo.systemUptime
+        guard event.clickCount >= 2 || now - TitleBarAction.lastAt > 0.5 else { return }
+        TitleBarAction.lastAt = now
         switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
         case "Minimize": miniaturize(nil)
         case "None": break
@@ -591,6 +606,11 @@ enum QuietKeys {
     }
 }
 
+/// When chrome standing in for the title bar last zoomed or minimized the window.
+enum TitleBarAction {
+    static var lastAt: TimeInterval = 0
+}
+
 extension BrowserWindow: TouchPress.Handling {
     /// A finger landing: the press hooks `sendEvent` runs for a mouse-down (the window controller's included).
     func touchPressed(_ event: NSEvent) {
@@ -602,6 +622,16 @@ extension BrowserWindow: TouchPress.Handling {
     /// never reached `routeTitlebarEvent`: the control is clicked.
     func touchTapped(_ event: NSEvent, downAt time: TimeInterval) {
         let point = event.locationInWindow
+        // Two taps on the title bar strip's empty space: AppKit's own title bar takes them as single clicks.
+        if isOnEmptyTitlebar(point) {
+            let previous = lastTitlebarTap
+            lastTitlebarTap = (time, point)
+            if TouchDoubleTap.isSecondTap(after: previous, at: time, point: point, interval: NSEvent.doubleClickInterval) {
+                lastTitlebarTap = nil
+                titleBarMouseDown(event, clicks: 2)
+            }
+            return
+        }
         guard lastTitlebarPress < time, let target = control(at: point) as? InteractiveView, target.isEnabled,
               let frame = contentView?.superview, let hit = frame.hitTest(point), !hit.isDescendant(of: target) else { return }
         target.onClick?(event)

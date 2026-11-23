@@ -586,6 +586,17 @@ struct TouchMovesTests {
         #expect(!TouchDoubleTap.isSecondTap(after: nil, at: 10.3, point: NSPoint(x: 100, y: 20), interval: 0.5))
     }
 
+    /// The title bar strip's empty space counts for a double tap; the window's own buttons don't.
+    @Test func theTitlebarStripsEmptySpaceTakesADoubleTap() throws {
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600))
+        window.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let close = try #require(window.standardWindowButton(.closeButton))
+        let onClose = close.convert(NSPoint(x: close.bounds.midX, y: close.bounds.midY), to: nil)
+        #expect(!window.isOnEmptyTitlebar(onClose))
+        #expect(window.isOnEmptyTitlebar(NSPoint(x: 400, y: onClose.y)))
+        #expect(!window.isOnEmptyTitlebar(NSPoint(x: 400, y: 300)))
+    }
+
     @Test func aFingerAcrossTheSidebarSwitchesSpaces() throws {
         let added = Library.shared.addSpace(name: "Touch swipe test")
         defer { Library.shared.removeSpace(added.id) }
