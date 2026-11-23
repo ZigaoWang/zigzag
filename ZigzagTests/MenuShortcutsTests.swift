@@ -65,6 +65,12 @@ import Testing
     }
 
     /// ⌘T opens the command bar for a new tab; ⌘T again closes it.
+    /// Separate Tabs keeps clear of 1Password's global ⌥⌘\ and ⌘\.
+    @Test func separateTabsIsControlCommandBackslash() {
+        #expect(keys(#selector(BrowserWindowController.closeSplitView(_:))).contains("⌃⌘\\"))
+        #expect(!keys(#selector(BrowserWindowController.closeSplitView(_:))).contains("⌥⌘\\"))
+    }
+
     @Test func onlyTheCommandQKeyCountsAsTheQuitToAskAbout() {
         let quit = MainMenu.build().items.first?.submenu?.items.first { $0.keyEquivalent == "q" }
         #expect(quit?.action == #selector(AppDelegate.quitFromMenu(_:)))

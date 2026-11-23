@@ -31,7 +31,7 @@
   Test: SplitCloseTests.aMiddleClickClosesThePartUnderThePointer
 - Close Split View in the row's menu → closes every page; one ⌘Z brings them all back.
   Test: SplitCloseTests.theMenuOffersBoth
-- Separate Split View (or ⌥⌘\ Separate Tabs) → every page becomes its own tab and the selection stays.
+- Separate Split View (or ⌃⌘\ Separate Tabs) → every page becomes its own tab and the selection stays.
   Test: SidebarRowMenuTests.aSplitLeadsWithSeparatingItAndEachPageGetsItsOwnMenu
 - Remove from Split View on one page of three or four → only that page leaves; the rest close up.
   Test: SidebarRowMenuTests.onePageOfThreeCanLeaveTheRestSideBySide
