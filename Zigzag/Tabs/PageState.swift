@@ -5,7 +5,8 @@ import WebKit
 /// again (it slept, or its process stopped) comes back there. WebKit's own history does this for a plain page; a page
 /// that builds itself with script (a feed, a forum thread) is often still building when WebKit looks, so this tries
 /// again for a few seconds as it fills in. Only text you typed into an ordinary field is kept, never a password or
-/// card number, and only in memory, until the tab is back.
+/// card number, and only in memory, until the tab is back. A tab put to sleep also keeps its page's sessionStorage,
+/// in memory the same way (`session`).
 nonisolated struct PageState: Equatable, Sendable {
     struct Field: Equatable, Sendable {
         /// Where the field is on the page, as a CSS selector.
@@ -22,21 +23,41 @@ nonisolated struct PageState: Equatable, Sendable {
     /// you're reading in its address does: it's given a moment to put itself there, and only a page that stays at
     /// the top (a topic list, which never does) is scrolled back for it.
     let placesItself: Bool
+    /// The page's sessionStorage, read only as the tab goes to sleep (`sleepReader`): it goes with the web view, and a
+    /// site that keeps you signed in there would ask you to sign in again (#502). Put back by `sessionRestorer`.
+    let session: Session?
 
-    init(url: URL, scroll: CGPoint, fields: [Field] = [], hasTypedText: Bool = false, placesItself: Bool = false) {
+    struct Session: Equatable, Sendable {
+        let origin: String
+        let items: [[String]]
+    }
+
+    init(url: URL, scroll: CGPoint, fields: [Field] = [], hasTypedText: Bool = false, placesItself: Bool = false,
+         session: Session? = nil) {
         self.url = url
         self.scroll = scroll
         self.fields = fields
         self.hasTypedText = hasTypedText || !fields.isEmpty
         self.placesItself = placesItself
+        self.session = session
+    }
+
+    /// The same, without the sessionStorage: once it's been handed on, or its site's data was cleared.
+    var withoutSession: PageState {
+        PageState(url: url, scroll: scroll, fields: fields, hasTypedText: hasTypedText, placesItself: placesItself)
     }
 
     /// From what `reader` returns.
     init?(_ result: Any?, url: URL?) {
         guard let url, let result = result as? [String: Any] else { return nil }
         let fields = (result["fields"] as? [[String]] ?? []).compactMap { $0.count == 2 ? Field(selector: $0[0], value: $0[1]) : nil }
+        let stored = result["session"] as? [String: Any]
+        let session = (stored?["origin"] as? String).flatMap { origin in
+            (stored?["items"] as? [[String]]).map { Session(origin: origin, items: $0.filter { $0.count == 2 }) }
+        }
         self.init(url: url, scroll: CGPoint(x: result["x"] as? Double ?? 0, y: result["y"] as? Double ?? 0), fields: fields,
-                  hasTypedText: result["typed"] as? Bool ?? false, placesItself: result["manual"] as? Bool ?? false)
+                  hasTypedText: result["typed"] as? Bool ?? false, placesItself: result["manual"] as? Bool ?? false,
+                  session: session?.items.isEmpty == false ? session : nil)
     }
 
     /// Whether this is the page now loaded: the same address, give or take its #fragment.
@@ -119,6 +140,54 @@ nonisolated struct PageState: Equatable, Sendable {
     })()
     """
 
+    /// `reader`, and the page's sessionStorage too, for a tab going to sleep. Not Zigzag's own Dark Reader cache,
+    /// which builds itself again, and nothing when the rest is more than one page script should carry (#178).
+    static let sleepReader = """
+    Object.assign(\(reader), { session: (() => {
+      try {
+        if (location.origin === 'null') return null;
+        const items = [];
+        let stored = 0;
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key.startsWith('__darkreader__')) continue;
+          const value = sessionStorage.getItem(key) ?? '';
+          stored += key.length + value.length;
+          if (stored > 250000) return null;
+          items.push([key, value]);
+        }
+        return items.length ? { origin: location.origin, items } : null;
+      } catch (e) { return null; }
+    })() })
+    """
+
+    /// Marks `sessionRestorer`'s script.
+    static let sessionMark = "/* zigzag: sessionStorage of a woken tab */"
+
+    /// What `sessionRestorer` says once it has run on its origin, to Zigzag's world only (`SessionRestored`).
+    static let sessionMessage = "zigzagSessionRestored"
+
+    /// Puts `session` back into the page's sessionStorage as it starts, before the page's own scripts run: only on
+    /// its origin, and never over a key already there. Done, it says so, and the tab takes it out; a page on another
+    /// origin (a sign-in page the woken one sends you to) leaves it for the page you come back to.
+    @MainActor static func sessionRestorer(_ session: Session) -> WKUserScript? {
+        let options: JSONSerialization.WritingOptions = [.fragmentsAllowed, .withoutEscapingSlashes]
+        guard let origin = try? JSONSerialization.data(withJSONObject: session.origin, options: options),
+              let items = try? JSONSerialization.data(withJSONObject: session.items, options: options) else { return nil }
+        return WKUserScript(source: """
+        \(sessionMark)
+        (() => {
+          if (location.origin !== \(String(decoding: origin, as: UTF8.self))) return;
+          try {
+            for (const [key, value] of \(String(decoding: items, as: UTF8.self))) {
+              if (sessionStorage.getItem(key) === null) sessionStorage.setItem(key, value);
+            }
+          } catch (e) {}
+          try { window.webkit.messageHandlers.\(sessionMessage).postMessage(true); } catch (e) {}
+        })();
+        """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)
+    }
+
     /// Puts the page back: what you typed into fields that are empty again, and the scroll, unless the page has put
     /// itself somewhere or you've scrolled or typed since. Tried again as the page builds, for up to five seconds.
     /// `waits`: a page that does its own scrolling gets a second and a half to put itself somewhere first.
@@ -161,4 +230,14 @@ nonisolated struct PageState: Equatable, Sendable {
     }
     return { scrolled, left: left.length };
     """
+}
+
+/// Hears `PageState.sessionRestorer` say it has run, so its tab takes it out before any later page can get it.
+@MainActor final class SessionRestored: NSObject, WKScriptMessageHandler {
+    static let shared = SessionRestored()
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.frameInfo.isMainFrame, let tab = (message.webView as? BrowserWebView)?.owner else { return }
+        tab.sessionRestored()
+    }
 }

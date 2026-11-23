@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - View › Separate Tabs is now ⌃⌘\\, so it no longer clashes with 1Password, which uses ⌥⌘\\ everywhere. A key you set yourself in Settings › Shortcuts stays as it is.
 - Every tab's, pinned page's and space's menu in the sidebar shows its keyboard shortcuts, not only the menu of the one you're on.
 - Wording is the same across the app: Site Controls keeps its capitals in every sentence, the getting-started guide says choose for menu items, and the last straight apostrophes are curly. In Chinese, Choose, Custom, App and Site Controls read the same everywhere.
+- A tab woken from sleep keeps its page's session storage, where some sites keep you signed in. Putting the tab to sleep used to drop it, so such a site could ask you to sign in again, two-factor and all, each time you came back to the tab. It's kept only in memory while the tab sleeps, and only the page that loads first on waking gets it back. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.4] - 2026-11-21
 

@@ -213,6 +213,8 @@ final class Tab: NSObject {
         }
         // A configuration WebKit handed over belongs to the profile of the page that asked for it.
         pendingConfiguration = nil
+        // Nor does its sessionStorage go along to the other profile's sign-ins.
+        pageState = pageState?.withoutSession
         profile = new
         if #available(macOS 15.4, *), !isPrivate {
             ExtensionCenter.tabOpened(self)
@@ -283,7 +285,12 @@ final class Tab: NSObject {
     /// Why its page last stopped, until it has loaded again and that's been said.
     private var stoppedFor: PageStop?
     /// Where you were on the page and what you'd typed, read as you left it; it stays while the tab is out of sight.
+    /// A sleeping tab's also holds its page's sessionStorage.
     private(set) var pageState: PageState?
+    /// The script putting the woken page's sessionStorage back, until it has run on its origin or a page has loaded.
+    private var sessionScript: WKUserScript?
+    /// The origin `sessionScript` puts its sessionStorage back on.
+    private var sessionScriptOrigin: String?
     /// The page is loading again after it slept or stopped: once it's here, `pageState` puts it back.
     private var restoresPageState = false
     /// Its history was just restored, so WebKit's cached copy of its page is loaded again once it commits.
@@ -624,6 +631,15 @@ final class Tab: NSObject {
             loadOwn(url, in: webView)
         } else if let state = pendingInteractionState {
             restoredPage = .waiting
+            if let session = pageState?.session, pageState?.belongs(to: url) == true,
+               let script = PageState.sessionRestorer(session) {
+                let controller = webView.configuration.userContentController
+                controller.add(SessionRestored.shared, contentWorld: .defaultClient, name: PageState.sessionMessage)
+                controller.addUserScript(script)
+                sessionScript = script
+                sessionScriptOrigin = session.origin
+            }
+            pageState = pageState?.withoutSession
             restoreState(state, in: webView)
             pendingInteractionState = nil
             restoresPageState = pageState?.belongs(to: webView.url ?? url) == true
@@ -678,7 +694,9 @@ final class Tab: NSObject {
         guard !isPlayingAudio, !isInMiniPlayer else { return }
         sleepTicket += 1
         let ticket = sleepTicket
-        readPageState { [weak self] state in self?.sleep(webView, ticket: ticket, state: state, because: reason, chosen: chosen, refused: refused) }
+        readPageState(includingSession: true) { [weak self] state in
+            self?.sleep(webView, ticket: ticket, state: state, because: reason, chosen: chosen, refused: refused)
+        }
         // A page stuck in a loop (what EnergyWatch sleeps) never answers: what was read as you left it decides.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             MainActor.assumeIsolated { self?.sleep(webView, ticket: ticket, state: self?.pageState, because: reason, chosen: chosen, refused: refused) }
@@ -721,6 +739,7 @@ final class Tab: NSObject {
         captureSnapshot { [weak self] in
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
+            if let state, state.session != nil { self.pageState = state }
             let freed = chosen ? nil : self.memoryInUse(by: webView)
             self.tearDown(webView, keepingSettings: self.url.map(SettingsPage.isSettings) ?? false)
             self.freedMemory = freed
@@ -740,12 +759,18 @@ final class Tab: NSObject {
     }
 
     /// Reads where you are on the page and what you've typed (`pageState`), as you leave it and before it sleeps.
-    func readPageState(_ completion: ((PageState?) -> Void)? = nil) {
+    /// `includingSession`: its sessionStorage too, for a tab going to sleep.
+    func readPageState(includingSession: Bool = false, _ completion: ((PageState?) -> Void)? = nil) {
         guard let webView, hasLoadedOnce, !Self.isExtensionPage(url), pdfViewer == nil, settingsView == nil else { completion?(pageState); return }
-        webView.evaluateJavaScript(PageState.reader, in: nil, in: .defaultClient) { [weak self, weak webView] result in
+        webView.evaluateJavaScript(includingSession ? PageState.sleepReader : PageState.reader, in: nil, in: .defaultClient) { [weak self, weak webView] result in
             guard let self, let webView, self.webView === webView else { completion?(nil); return }
             // A page that won't say (still loading, or its process gone) keeps what was read before.
-            if case .success(let value) = result, let state = PageState(value, url: webView.url) { self.pageState = state }
+            // The sessionStorage goes only to the caller: a tab that then stays awake keeps none of it.
+            if case .success(let value) = result, let state = PageState(value, url: webView.url) {
+                self.pageState = state.withoutSession
+                completion?(state)
+                return
+            }
             completion?(self.pageState)
         }
     }
@@ -758,6 +783,44 @@ final class Tab: NSObject {
         darkPage = state
         changed.send(.darkPage)
         if state.darkened != wasDarkened { NotificationCenter.default.post(name: DarkPages.pageDarkenedNotification, object: self) }
+    }
+
+    /// Takes the woken page's sessionStorage script out: it has run, a page has loaded, or the tab moved on.
+    private func dropSessionScript(from webView: WKWebView) {
+        guard let script = sessionScript else { return }
+        sessionScript = nil
+        sessionScriptOrigin = nil
+        let controller = webView.configuration.userContentController
+        OwnScripts.remove(from: controller) { $0 === script }
+        controller.removeScriptMessageHandler(forName: PageState.sessionMessage, contentWorld: .defaultClient)
+    }
+
+    /// The woken page has its sessionStorage back (`SessionRestored`).
+    func sessionRestored() {
+        if let webView { dropSessionScript(from: webView) }
+    }
+
+    /// A site's data was cleared in `store` (`site` nil: every site's, but the `kept` sites'): sleeping tabs there
+    /// forget the sessionStorage they hold for it, so waking doesn't sign you back in.
+    static func forgetSessions(in store: WKWebsiteDataStore, site: String? = nil, keeping kept: Set<String> = []) {
+        for tab in WindowManager.shared.openTabs { tab.forgetSession(in: store, site: site, keeping: kept) }
+    }
+
+    /// `forgetSessions` for this tab.
+    /// Sites are compared as WebKit keeps their data, by registrable domain: clearing app.example.com's clears
+    /// accounts.example.com's too.
+    func forgetSession(in store: WKWebsiteDataStore, site: String? = nil, keeping kept: Set<String> = []) {
+        guard (privateStore ?? profile.storeIfMade) === store,
+              let origin = pageState?.session?.origin ?? sessionScriptOrigin else { return }
+        let domain = URL(string: origin)?.host().map(SiteDataListing.site(of:))
+        if let site {
+            guard let domain, domain == SiteDataListing.site(of: site) else { return }
+        } else if let domain, kept.contains(where: { SiteDataListing.site(of: $0) == domain }) {
+            return
+        }
+        pageState = pageState?.withoutSession
+        // Woken, with the script still waiting to run: it goes too.
+        if let webView { dropSessionScript(from: webView) }
     }
 
     /// Shown again: unless its page is loading back, what was read as you left it isn't needed.
@@ -795,6 +858,7 @@ final class Tab: NSObject {
     /// `keepingSettings`: the page may come back as it was (a sleep), so the Settings view stays for it: building one
     /// again costs the whole first-open time (#357).
     private func tearDown(_ webView: BrowserWebView, keepingSettings: Bool = false) {
+        dropSessionScript(from: webView)
         Autofill.shared.forget(webView)
         // Tabs that shared the rule keep their images.
         PageImages.set(false, in: webView)
@@ -860,6 +924,7 @@ final class Tab: NSObject {
     /// (`CommandRanker.Destination`).
     func load(_ url: URL, by sender: LoadSender = .zigzag, httpFallback: Bool = false) {
         let url = Self.extensionPageAddress(url)
+        if let webView { dropSessionScript(from: webView) }
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
@@ -2378,6 +2443,8 @@ extension Tab: WKNavigationDelegate {
         checkForPDF(webView)
         refreshFavicon()
         restorePageState(in: webView)
+        // A page has loaded: whatever woke it, the sessionStorage script has had its chance.
+        dropSessionScript(from: webView)
         // A tab without a picture yet gets one once its page has drawn.
         if snapshot == nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
