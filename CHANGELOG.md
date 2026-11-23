@@ -5,12 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- More of Zigzag works by touch. Touch and hold a tab, folder, favorite or space, then slide onto its menu and lift on an item to choose it, or lift elsewhere to keep the menu open. Move away from the menu instead and the tab is picked up, to reorder it, drop it in a folder, onto another tab or the page for a split, or onto a space. Swipe one finger sideways across the sidebar to change spaces, pinch in on a page to see all tabs (pinch out on one to open it), and swipe in from a page's left or right edge to go back or forward. The mouse and trackpad work exactly as before.
-
-### Fixed
-- A tab restored after a restart, or woken from sleep, shows the site's page as it is now. It came back as Zigzag last loaded it, however long ago, so a site whose theme or sign-in had changed since, like GitHub set to its dark theme, showed its old look until you reloaded.
-
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
@@ -33,6 +27,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - Mute Tab is always in a tab's menu in the sidebar, and in a pinned page's or favorite's while it's open, so a tab can be muted before it plays anything. It stays muted as you go to other pages in it, reload it or it goes to sleep. Thanks to [bkonia](https://github.com/bkonia). ([#490](https://github.com/ZigaoWang/zigzag/issues/490))
 - Settings › General has Install updates automatically, on by default. Turn it off to stay on the version you have. Zigzag still checks, and a new version shows on the update card as available: Update downloads it and restarts into it, and Skip stops offering that version until a newer one comes out. Check for Updates… still finds a skipped version. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#492](https://github.com/ZigaoWang/zigzag/issues/492))
 - Zigzag works with a touch display and with Sidecar on an iPad. Touch and hold a tab, a folder, a space or the empty sidebar to open its menu. Tapping links that open a new window works like clicking them, and tapping outside a panel or menu closes it. A tap on a row shows its × and other buttons that otherwise only appear under the pointer. The strips that resize the sidebar and split panes, and a row's ×, also answer a finger just beside them. The mouse and trackpad work exactly as before.
+- More of Zigzag works by touch. Touch and hold a tab, folder, favorite or space, then slide onto its menu and lift on an item to choose it, or lift elsewhere to keep the menu open. Move away from the menu instead and the tab is picked up, to reorder it, drop it in a folder, onto another tab or the page for a split, or onto a space. Swipe one finger sideways across the sidebar to change spaces, pinch in on a page to see all tabs (pinch out on one to open it), and swipe in from a page's left or right edge to go back or forward. The mouse and trackpad work exactly as before.
 
 ### Fixed
 - A solid space with the sidebar on hover no longer stutters on a 120 Hz display. The sidebar that slides out on hover is a card of glass, and in a solid space it was made of Liquid Glass; that glass view stays in the window while the sidebar is tucked away, and Liquid Glass anywhere in a window holds the whole window to 80 frames a second on a ProMotion display, so the page stuttered with the sidebar hidden and was smooth with it shown. The sidebar now slides out in frosted glass there, as it does in a frosted space, which looks the same and keeps the display's full rate. A clear space still slides it out in Liquid Glass. ([#394](https://github.com/ZigaoWang/zigzag/issues/394))
@@ -90,6 +85,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - Swap on a split's strip moves the two pages on screen right away. Before, only the sidebar row swapped until you clicked somewhere, so a click on one pane could pick the other page, and ⌘F opened the find bar over one pane while searching the other.
 - Settings › General › On launch reads like the rest of Settings: Continue where you left off, or Open a new window. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#494](https://github.com/ZigaoWang/zigzag/issues/494))
 - A link in an installed app like Gmail that opens a new tab goes to the browser instead of replacing the app, also when the site sends it through its own redirect page first. Links to the app's own pages still open in the app. Thanks to [retorquere](https://github.com/retorquere). ([#165](https://github.com/ZigaoWang/zigzag/issues/165))
+- A tab restored after a restart, or woken from sleep, shows the site's page as it is now. It came back as Zigzag last loaded it, however long ago, so a site whose theme or sign-in had changed since, like GitHub set to its dark theme, showed its old look until you reloaded.
 
 ## [0.9.3] - 2026-11-21
 
