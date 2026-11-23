@@ -988,3 +988,51 @@ enum TouchPinch {
 
     nonisolated static func opensCard(magnification: CGFloat) -> Bool { magnification >= threshold }
 }
+
+/// The hidden sidebar pulled out by a finger from the window's edge, as on an iPad, and pushed back the same way.
+/// Distances are from the window's edge on the sidebar's side, to the card's far edge (its reach).
+enum TouchSidebarPull {
+    /// How far in from the page's edge a finger lands to pull the sidebar out.
+    nonisolated static let edge: CGFloat = 24
+    /// Past all the way out the card gives at most this much more, slowing as it goes.
+    nonisolated static let overshoot: CGFloat = 24
+    /// A flick at least this fast (points a second) keeps it out, or sends it back, however far it went.
+    nonisolated static let flickSpeed: CGFloat = 300
+
+    /// Pulls it out from hidden, or pushes it back in.
+    nonisolated enum Take: Equatable { case pull, push }
+
+    /// What a finger landing `x` points in from the window's edge does, the page starting `pageEdge` in: with the
+    /// sidebar hidden, at the page's edge it pulls it out; held out by touch, anywhere off it (`onCard`) it pushes it
+    /// back, or sends it back if it doesn't swipe that way.
+    nonisolated static func take(atX x: CGFloat, pageEdge: CGFloat, revealed: Bool, held: Bool, onCard: Bool) -> Take? {
+        if !revealed { return x >= 0 && x <= pageEdge + edge ? .pull : nil }
+        return held && !onCard ? .push : nil
+    }
+
+    /// Whether fingers that let go without deciding were a tap: one, barely moved.
+    nonisolated static func isTap(fingers: Int, translation: NSPoint) -> Bool {
+        fingers == 1 && hypot(translation.x, translation.y) < TouchGestures.tapSlop
+    }
+
+    /// Whether a finger that moved by `translation`, positive away from the window's edge, goes `take`'s way.
+    nonisolated static func goes(_ take: Take, _ translation: NSPoint) -> Bool {
+        TouchSwipe.verdict(translation, forgiving: true) == .sideways && (take == .pull ? translation.x > 0 : translation.x < 0)
+    }
+
+    /// Where the card's far edge is for a finger `travel` points out from where it took the card at `base`: with
+    /// the finger one to one, never in past `hidden`, held back past `out`.
+    nonisolated static func reach(base: CGFloat, travel: CGFloat, hidden: CGFloat, out: CGFloat) -> CGFloat {
+        let reach = base + travel
+        guard reach > out else { return max(hidden, reach) }
+        return out + overshoot * (1 - exp(-(reach - out) / (overshoot * 2)))
+    }
+
+    /// Whether letting go at `reach`, going `velocity` points a second outward, leaves it out: a third of the way
+    /// out from hidden, or a third of the way back in from out (`wasOut`), or a flick either way.
+    nonisolated static func keeps(reach: CGFloat, out: CGFloat, velocity: CGFloat, wasOut: Bool) -> Bool {
+        if velocity >= flickSpeed { return true }
+        if velocity <= -flickSpeed { return false }
+        return reach >= out * (wasOut ? 2.0 / 3 : 1.0 / 3)
+    }
+}

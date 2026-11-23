@@ -912,6 +912,16 @@ enum DebugBridge {
         case "edgepointer":
             let f = arg.split(separator: " ").compactMap { Double($0) }
             controller.root.debugEdgePointer(f.count == 2 ? NSPoint(x: f[0], y: f[1]) : nil)
+        // touchpull <x> <dx> | end <velocity>: a finger landing x in from the edge pulls the hidden sidebar dx out,
+        // held there; end lets go.
+        case "touchpull":
+            let f = arg.split(separator: " ")
+            if f.first == "end" {
+                controller.root.touchPullEnded(velocity: f.count > 1 ? Double(f[1]).map { CGFloat($0) } ?? 0 : 0, cancelled: false)
+            } else if f.count == 2, let x = Double(f[0]), let dx = Double(f[1]) {
+                controller.root.touchPullBegan(.pull, base: x)
+                controller.root.touchPullMoved(by: dx)
+            }
         case "edgestate": debugLog("edgestate \(controller.root.isSidebarFloatingVisible ? "out" : controller.root.sidebarVisible ? "docked" : "hidden")")
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
         // holding ⌃ shows them), even with the window not in front. off hides both.

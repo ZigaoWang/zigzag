@@ -93,6 +93,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.placeFloatingUpdate()
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
+        root.onTouchPull = { [weak self] pulling in
+            guard let self else { return }
+            if pulling, !self.browserWindow.trafficLightsHidden, let image = self.browserWindow.trafficLightsImage() { self.trafficLightsPicture = image }
+            self.sidebarPulled = pulling
+            self.layoutTrafficLights()
+        }
         root.onSlide = { [weak self] duration, timing in
             guard let self else { return }
             self.sidebarSliding(duration)
@@ -2413,7 +2419,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var trafficLightsPicture: NSImage?
     /// Until this moment the sidebar is visually sliding, and the real traffic lights stay hidden.
     private var slideEndsAt = Date.distantPast
-    private var isSliding: Bool { Date() < slideEndsAt }
+    private var isSliding: Bool { Date() < slideEndsAt || sidebarPulled }
+    /// While a finger has the sidebar's card, it moves with the finger: the lights' picture rides in it as in a slide.
+    private var sidebarPulled = false
     /// Until this moment the sidebar slides under the bar above the page with the lights staying put: its toggle
     /// stays put with them, in the bar, and the sidebar's own (riding with it) is out of sight.
     private var toggleHeldUntil = Date.distantPast
@@ -2864,8 +2872,15 @@ extension BrowserWindowController: TabHost {
 // MARK: - SidebarDelegate
 
 extension BrowserWindowController: SidebarDelegate {
-    func listSelect(_ tab: Tab) { tabManager.select(tab) }
-    func listOpenBookmark(_ bookmark: Bookmark) { tabManager.openBookmark(bookmark) }
+    // Picking one sends a sidebar held out by touch back, as the pointer leaving sends back a hovered one.
+    func listSelect(_ tab: Tab) {
+        tabManager.select(tab)
+        root.endTouchHold()
+    }
+    func listOpenBookmark(_ bookmark: Bookmark) {
+        tabManager.openBookmark(bookmark)
+        root.endTouchHold()
+    }
     func listClose(_ tab: Tab) { closeWithUndo(tab) }
     func listClose(_ tabs: [Tab]) { closeManyWithUndo(tabs) }
 

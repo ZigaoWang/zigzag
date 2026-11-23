@@ -787,7 +787,10 @@ final class BrowserRootView: SpaceFrameView {
         pageDropRing.cornerCurve = .continuous
         pageDropRing.zPosition = 50
         layer?.addSublayer(pageDropRing)
-        if TouchGestures.isAvailable { addHandlePan() }
+        if TouchGestures.isAvailable {
+            addHandlePan()
+            addSidebarPull()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -847,6 +850,144 @@ final class BrowserRootView: SpaceFrameView {
         let hits = frames.indices.filter { TouchGestures.box(around: frames[$0]).contains(point) }
         return hits.min { hypot(frames[$0].midX - point.x, frames[$0].midY - point.y) < hypot(frames[$1].midX - point.x, frames[$1].midY - point.y) }
     }
+
+    // MARK: Touch: the hidden sidebar from the window's edge
+
+    /// One finger in from the page's edge pulls the hidden sidebar out with it, the overlay the pointer's edge shows;
+    /// held out that way, a finger on the page swipes it back, and a tap there sends it back.
+    private(set) var sidebarPull: TouchSwipeRecognizer?
+    /// While a finger has the card: how far its far edge reaches in from the window's edge on its side.
+    private var touchReach: CGFloat?
+    /// What the finger that has it is doing, and where the card reached when it took it.
+    private var pullTake: TouchSidebarPull.Take?
+    private var pullBase: CGFloat = 0
+    /// Out by a finger: it stays until a tap on the page, a tab is picked, it's swiped back, or the pointer moves.
+    private(set) var isTouchHeld = false
+    /// A finger has the card (true) or let it go: the window keeps the traffic lights' picture on it meanwhile.
+    var onTouchPull: ((Bool) -> Void)?
+
+    /// From the window's edge on the sidebar's side to `x`.
+    private func fromEdge(_ x: CGFloat) -> CGFloat { sidebarOnRight ? bounds.maxX - x : x - bounds.minX }
+
+    /// How far a card at `frame` reaches in from that edge, hidden and out.
+    private func reach(of frame: NSRect) -> CGFloat { fromEdge(sidebarOnRight ? frame.minX : frame.maxX) }
+    private var hiddenReach: CGFloat {
+        reach(of: Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: false, onRight: sidebarOnRight))
+    }
+    private var outReach: CGFloat {
+        reach(of: Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: sidebarOnRight))
+    }
+
+    /// What a finger landing at `point` does to the sidebar, if anything.
+    private func touchTake(at point: NSPoint) -> TouchSidebarPull.Take? {
+        guard !sidebarVisible, window != nil, bounds.contains(point), resizeHandle(atTouch: point) == nil else { return nil }
+        let page = pageAreaFrame
+        let pageEdge = fromEdge(sidebarOnRight ? page.maxX : page.minX)
+        let onCard = sidebarContainer.frame.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
+        let take = TouchSidebarPull.take(atX: fromEdge(point.x), pageEdge: pageEdge, revealed: sidebarRevealed, held: isTouchHeld, onCard: onCard)
+        if take == .pull, blocksEdgeReveal?() == true { return nil }
+        return take
+    }
+
+    private func addSidebarPull() {
+        let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.sidebarPullChanged(swipe) }
+        swipe.touchOnly.accepts = { [weak self] point in self?.touchTake(at: point) != nil }
+        swipe.decides = { [weak self] swipe in
+            guard let self, let take = self.touchTake(at: swipe.start) else { return false }
+            let moved = NSPoint(x: self.sidebarOnRight ? -swipe.translation.x : swipe.translation.x, y: swipe.translation.y)
+            guard TouchSidebarPull.goes(take, moved) else { return false }
+            self.pullTake = take
+            self.pullBase = take == .pull ? self.fromEdge(swipe.start.x) : self.outReach
+            return true
+        }
+        // A tap on the page while it's held out by touch sends it back; scrolling the page leaves it be.
+        swipe.failed = { [weak self, weak swipe] in
+            guard let self, let swipe, self.isTouchHeld,
+                  TouchSidebarPull.isTap(fingers: swipe.fingers, translation: swipe.translation) else { return }
+            self.endTouchHold()
+        }
+        addGestureRecognizer(swipe)
+        sidebarPull = swipe
+    }
+
+    private func sidebarPullChanged(_ swipe: TouchSwipeRecognizer) {
+        let dx = sidebarOnRight ? -swipe.translation.x : swipe.translation.x
+        switch swipe.state {
+        case .began:
+            guard let take = pullTake else { return }
+            touchPullBegan(take, base: pullBase)
+            touchPullMoved(by: dx)
+        case .changed:
+            touchPullMoved(by: dx)
+        case .ended:
+            touchPullEnded(velocity: sidebarOnRight ? -swipe.velocity.x : swipe.velocity.x, cancelled: false)
+        case .cancelled, .failed:
+            touchPullEnded(velocity: 0, cancelled: true)
+        default:
+            break
+        }
+    }
+
+    /// A finger took the card (`take`), its far edge `base` in from the window's edge.
+    func touchPullBegan(_ take: TouchSidebarPull.Take, base: CGFloat) {
+        guard !sidebarVisible else { return }
+        pullTake = take
+        pullBase = base
+        // From where it is on screen: a slide under way stops where it is.
+        sidebarContainer.layer?.removeAnimation(forKey: "slide")
+        sidebarContainer.layer?.removeAnimation(forKey: Self.revealFadeKey)
+        touchReach = base
+        onTouchPull?(true)
+        placePulledSidebar()
+    }
+
+    /// The finger is `dx` points from where it decided, positive away from the window's edge.
+    func touchPullMoved(by dx: CGFloat) {
+        guard touchReach != nil else { return }
+        touchReach = TouchSidebarPull.reach(base: pullBase, travel: dx, hidden: hiddenReach, out: outReach)
+        placePulledSidebar()
+    }
+
+    private func placePulledSidebar() {
+        Tokens.Motion.withoutAnimation { sidebarContainer.frame = sidebarFrame }
+    }
+
+    /// Let go going `velocity` points a second away from the edge: out it stays, or back it slides, from where the
+    /// finger left it. Called off, it goes back to how it was.
+    func touchPullEnded(velocity: CGFloat, cancelled: Bool) {
+        guard let reach = touchReach else { return }
+        let wasOut = pullTake == .push
+        var keep = cancelled ? wasOut : TouchSidebarPull.keeps(reach: reach, out: outReach, velocity: velocity, wasOut: wasOut)
+        // Something it opened keeps it out.
+        if !keep, wasOut, isHeld { keep = true }
+        let old = sidebarContainer.frame
+        touchReach = nil
+        pullTake = nil
+        if keep != sidebarRevealed {
+            isTouchHeld = keep
+            reveal(keep)
+        } else {
+            let target = sidebarFrame
+            let curve = keep ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
+            let duration = Self.together {
+                Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
+                return Tokens.Motion.slide(sidebarContainer, fromOffsetX: old.minX - target.minX, curve: curve)
+            }
+            onSlide?(duration, curve.timing)
+        }
+        onTouchPull?(false)
+    }
+
+    /// Sends a sidebar held out by touch back: a tab was picked, or the page tapped.
+    func endTouchHold() {
+        guard isTouchHeld else { return }
+        isTouchHeld = false
+        reveal(false)
+    }
+
+    #if DEBUG
+    var isPullingSidebar: Bool { touchReach != nil }
+    #endif
 
     private let pageDropRing = CALayer()
 
@@ -1342,7 +1483,12 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     var sidebarFrame: NSRect {
-        Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: sidebarVisible, revealed: sidebarRevealed, onRight: sidebarOnRight)
+        let frame = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: sidebarVisible, revealed: sidebarRevealed, onRight: sidebarOnRight)
+        guard let touchReach, !sidebarVisible else { return frame }
+        // Under a finger: the card's far edge where the finger has it.
+        let out = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: false)
+        let pulled = NSRect(x: bounds.minX + touchReach - sidebarWidth, y: out.minY, width: sidebarWidth, height: out.height)
+        return Self.mirrored(pulled, in: bounds, if: sidebarOnRight)
     }
 
     /// The sidebar's frame: docked along the window's edge, floating a frame's inset in from it while slid out, or
@@ -1587,6 +1733,8 @@ final class BrowserRootView: SpaceFrameView {
         let slide = topBarSlides
         sidebarVisible = visible
         sidebarRevealed = false
+        isTouchHeld = false
+        touchReach = nil
         watchPointer(false)
         leavesDocked = !visible && showsTopBar && animated && !Tokens.Motion.reduceMotion
         sidebarContainer.isFloating = !visible && !leavesDocked
@@ -1719,6 +1867,8 @@ final class BrowserRootView: SpaceFrameView {
         let elapsed = event.timestamp - lastMoveTime
         lastMoveSpeed = elapsed > 0 && elapsed < 0.1 ? (sidebarOnRight ? event.deltaX : -event.deltaX) / max(elapsed, 1.0 / 240) : 0
         lastMoveTime = event.timestamp
+        // Out by a finger, the pointer moving takes it over: from here it keeps the sidebar out as hovering does.
+        if isTouchHeld, !TouchPress.isTouchScroll(at: event.timestamp) { isTouchHeld = false }
         if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: lastMoveSpeed) }
     }
 
@@ -1839,7 +1989,7 @@ final class BrowserRootView: SpaceFrameView {
         guard !isDraggingSidebarEdge else { return }
         guard let point = pointer, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
         let wasLeaving = edgeReveal.isLeaving
-        let held = isHeld || NSEvent.pressedMouseButtons != 0
+        let held = isHeld || isTouchHeld || NSEvent.pressedMouseButtons != 0
         if edgeReveal.follow(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone, held: held) {
             let zone = edgeZone
             Self.edgeLog.notice("tuck at x=\(Int(point.x), privacy: .public) y=\(Int(point.y), privacy: .public) keeps=\(zone.keeps(at: point), privacy: .public) past=\(zone.isPast(point), privacy: .public) sidebar=\(Int(zone.sidebar.minX), privacy: .public)-\(Int(zone.sidebar.maxX), privacy: .public) active=\(NSApp.isActive, privacy: .public)")
@@ -1858,6 +2008,7 @@ final class BrowserRootView: SpaceFrameView {
         revealMeter.begin(show ? "out" : "in", in: self)
         #endif
         sidebarRevealed = show
+        if !show { isTouchHeld = false }
         // The edge handle follows the card, and only layout moves it.
         needsLayout = true
         let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
