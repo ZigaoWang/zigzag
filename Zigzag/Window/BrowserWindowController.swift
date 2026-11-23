@@ -1834,8 +1834,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func updateTranslateButton() {
         guard let tab = tabManager.selectedTab else { sidebar.address.setTranslation(available: false, translated: false); return }
         let foreign = tab.foreignLanguage != nil && PageTranslator.readsLanguage(of: tab.url, errorPage: tab.showsErrorPage)
+        let choices = PageTranslator.Choices()
+        let site = ContentBlocker.site(of: tab.url)
+        let never = (tab.foreignLanguage.map { choices.neverLanguages.contains(PageTranslator.code(of: $0)) } ?? false)
+            || site.map { choices.neverSites.contains($0) || neverTranslatedHere.contains($0) } ?? false
         let key = ObjectIdentifier(tab)
-        sidebar.address.setTranslation(available: foreign, translated: tab.isTranslated,
+        sidebar.address.setTranslation(available: PageTranslator.offersButton(foreign: foreign, translated: tab.isTranslated, never: never),
+                                       translated: tab.isTranslated,
                                        translating: translations.run(for: key) != nil || planningTranslation.contains(key))
     }
 
@@ -1867,6 +1872,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             entries.append(.item(MenuPanel.Item(title: String(localized: "Never Translate \(name)", comment: "Item in the translate menu: pages in this language are never offered or translated on their own. The name is a language's, like French."),
                                                 isChecked: never) { [weak self, weak tab] in
                 choices.setNever(!never, code)
+                defer { self?.updateTranslateButton() }
                 guard !never, let self else { return }
                 self.translatedSites = PageTranslator.translated(self.translatedSites, neverLanguage: code)
                 if let tab { self.stopOffering(tab) }
@@ -1877,6 +1883,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             entries.append(.item(MenuPanel.Item(title: String(localized: "Never Translate This Site", comment: "Item in the translate menu: pages on this site are never offered or translated on their own."),
                                                 isChecked: never) { [weak self, weak tab] in
                 guard let self else { return }
+                defer { self.updateTranslateButton() }
                 if never {
                     choices.setNeverSite(false, site, isPrivate: false)
                     self.neverTranslatedHere.remove(site)

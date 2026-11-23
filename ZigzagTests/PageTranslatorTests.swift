@@ -693,3 +693,13 @@ struct PageLanguageChoiceTests {
         }
     }
 }
+
+extension PageTranslatorTests {
+    /// A page in a language or on a site set to Never gets no translate button; a translated one keeps it.
+    @Test func neverHidesTheTranslateButton() {
+        #expect(PageTranslator.offersButton(foreign: true, translated: false, never: false))
+        #expect(!PageTranslator.offersButton(foreign: true, translated: false, never: true))
+        #expect(PageTranslator.offersButton(foreign: true, translated: true, never: true))
+        #expect(!PageTranslator.offersButton(foreign: false, translated: false, never: false))
+    }
+}

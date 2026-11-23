@@ -8,6 +8,12 @@ import WebKit
 /// The page's text is read and written back in Zigzag's own script world, so the page's scripts can't see
 /// or interfere; the original words are kept so "Show Original" puts them back exactly.
 enum PageTranslator {
+    /// The address bar's translate button shows for a foreign page, not one whose language or site is never
+    /// translated; a translated page keeps it, to show the original.
+    nonisolated static func offersButton(foreign: Bool, translated: Bool, never: Bool) -> Bool {
+        translated || (foreign && !never)
+    }
+
     /// The language pages are translated into: chosen in Settings, or the system's first language.
     static var readerLanguage: Locale.Language {
         if let chosen = UserDefaults.standard.string(forKey: "TranslateInto") { return Locale.Language(identifier: chosen) }
