@@ -496,11 +496,23 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
 
     /// The pieces of a page that cover `rect` (in its points) at `level`.
     private func chunkRange(page: Int, level: Int, covering rect: CGRect) -> (columns: ClosedRange<Int>, rows: ClosedRange<Int>)? {
-        let clipped = rect.intersection(CGRect(origin: .zero, size: pageSizes[page]))
-        guard !clipped.isNull, clipped.width > 0, clipped.height > 0 else { return nil }
-        let side = pointsPerChunk(level)
-        let columns = Int(floor(clipped.minX / side))...Int(floor((clipped.maxX - 0.001) / side))
-        let rows = Int(floor(clipped.minY / side))...Int(floor((clipped.maxY - 0.001) / side))
+        guard pageSizes.indices.contains(page) else { return nil }
+        return Self.chunkRange(of: rect, pageSize: pageSizes[page], side: pointsPerChunk(level))
+    }
+
+    /// The columns and rows of `side`-point pieces of a `pageSize` page that `rect` covers; nil for nothing, or a
+    /// rect or side that isn't a real size (#507: a sliver thinner than the edge allowance made a backwards range).
+    nonisolated static func chunkRange(of rect: CGRect, pageSize: CGSize, side: CGFloat) -> (columns: ClosedRange<Int>, rows: ClosedRange<Int>)? {
+        guard side.isFinite, side > 0 else { return nil }
+        let clipped = rect.intersection(CGRect(origin: .zero, size: pageSize))
+        guard !clipped.isNull, clipped.width > 0, clipped.height > 0,
+              [clipped.minX, clipped.maxX, clipped.minY, clipped.maxY].allSatisfy(\.isFinite) else { return nil }
+        func span(_ low: CGFloat, _ high: CGFloat) -> ClosedRange<Int>? {
+            let first = (low / side).rounded(.down), last = ((high - 0.001) / side).rounded(.down)
+            guard first.magnitude < 1e9, last.magnitude < 1e9 else { return nil }
+            return Int(first)...max(Int(first), Int(last))
+        }
+        guard let columns = span(clipped.minX, clipped.maxX), let rows = span(clipped.minY, clipped.maxY) else { return nil }
         return (columns, rows)
     }
 
