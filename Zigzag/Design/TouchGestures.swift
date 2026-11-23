@@ -288,6 +288,8 @@ enum TouchPress {
             window.touchTapped(event, downAt: downAt)
         }
         view.addGestureRecognizer(watch)
+        // A held finger's moves and lift, wherever in the window it goes (`TouchHold`).
+        view.addGestureRecognizer(TouchFollow())
     }
 
     /// When a finger last landed, and whether one is down now (`TouchFollow`).
@@ -495,7 +497,15 @@ final class TouchCarry {
         self.window = window
         self.moved = moved
         self.ended = ended
+        // Esc calls it off, as it does the mouse's; the finger's further moves and its lift then change nothing.
+        escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, let self, self.isAttached else { return event }
+            self.cancel()
+            return nil
+        }
     }
+
+    private var escape: Any?
 
     func move(to windowPoint: NSPoint) {
         guard let event = event(.leftMouseDragged, at: windowPoint) else { return }
@@ -516,6 +526,8 @@ final class TouchCarry {
         let ended = self.ended
         moved = nil
         self.ended = nil
+        if let escape { NSEvent.removeMonitor(escape) }
+        escape = nil
         ended?(event)
     }
 
@@ -540,10 +552,12 @@ final class TouchHold {
     enum Lift: Equatable { case choose, keepOpen, drop, nothing }
 
     /// What a finger at `point`, held at `start` (window coordinates), does: on the menu it lights an item; once it has
-    /// been on the menu it never drags; otherwise, far enough off, it picks the item up.
-    nonisolated static func step(from start: NSPoint, to point: NSPoint, onMenu: Bool, wasOnMenu: Bool, canDrag: Bool) -> Step {
+    /// been on the menu it doesn't drag, unless it has gone on out of the list it was held in (`leftHome`: onto the
+    /// page, past a menu that lay in the way); otherwise, far enough off, it picks the item up.
+    nonisolated static func step(from start: NSPoint, to point: NSPoint, onMenu: Bool, wasOnMenu: Bool, canDrag: Bool,
+                                 leftHome: Bool = false) -> Step {
         if onMenu { return .highlight }
-        guard canDrag, !wasOnMenu, hypot(point.x - start.x, point.y - start.y) >= dragDistance else { return .wait }
+        guard canDrag, !wasOnMenu || leftHome, hypot(point.x - start.x, point.y - start.y) >= dragDistance else { return .wait }
         return .drag
     }
 
@@ -571,8 +585,14 @@ final class TouchHold {
     private(set) var isFinished = false
     /// The list under the finger doesn't scroll while it's held, so moving drags rather than scrolls.
     private weak var frozen: NSScrollView?
-    /// Moves and the lift come from the window's `TouchFollow`, not the recognizer that saw the hold.
+    /// The window has a `TouchFollow`: once it reports this finger, its moves and lift are the ones taken, as the
+    /// recognizer that saw the hold may stop hearing the finger once it leaves that view, or the view goes.
     let followed: Bool
+    /// The follower has reported this finger moving.
+    private(set) var followSeen = false
+    /// The list it was held in (the sidebar's): off the menu and out of it, the finger is taking it somewhere to drop,
+    /// and picks it up even after passing over the menu.
+    private weak var home: NSView?
 
     init(at windowPoint: NSPoint, in window: NSWindow?, followed: Bool, scroll: NSScrollView?,
          openMenu: (() -> MenuPanel?)?, startDrag: ((NSPoint) -> Bool)?, ended: (() -> Void)? = nil) {
@@ -583,6 +603,7 @@ final class TouchHold {
         self.openMenu = openMenu
         self.startDrag = startDrag
         self.ended = ended
+        home = scroll
         if #available(macOS 27, *), let scroll, scroll.isTouchScrollingEnabled {
             scroll.isTouchScrollingEnabled = false
             frozen = scroll
@@ -618,22 +639,27 @@ final class TouchHold {
 
     // MARK: The finger
 
-    /// From the recognizer that saw the hold; only when the window has no `TouchFollow`.
-    func pressMoved(to windowPoint: NSPoint) { if !followed { moved(to: windowPoint) } }
-    func pressLifted(at windowPoint: NSPoint) { if !followed { lifted(at: windowPoint) } }
-    func pressCancelled() { if !followed { cancelled() } }
+    /// From the recognizer that saw the hold, until the window's `TouchFollow` has reported the finger.
+    func pressMoved(to windowPoint: NSPoint) { if !followSeen { moved(to: windowPoint) } }
+    func pressLifted(at windowPoint: NSPoint) { if !followSeen { lifted(at: windowPoint) } }
+    func pressCancelled() { if !followSeen { cancelled() } }
 
-    /// From the window's `TouchFollow`.
-    func fingerMoved(to windowPoint: NSPoint, in window: NSWindow) { if followed, window === self.window { moved(to: windowPoint) } }
-    func fingerLifted(at windowPoint: NSPoint, in window: NSWindow) { if followed, window === self.window { lifted(at: windowPoint) } }
-    func fingerCancelled(in window: NSWindow) { if followed, window === self.window { cancelled() } }
+    /// From the window's `TouchFollow`, which hears the finger anywhere in the window, over the page too.
+    func fingerMoved(to windowPoint: NSPoint, in window: NSWindow) {
+        guard followed, window === self.window else { return }
+        followSeen = true
+        moved(to: windowPoint)
+    }
+    func fingerLifted(at windowPoint: NSPoint, in window: NSWindow) { if followSeen, window === self.window { lifted(at: windowPoint) } }
+    func fingerCancelled(in window: NSWindow) { if followSeen, window === self.window { cancelled() } }
 
     func moved(to windowPoint: NSPoint) {
         guard !isFinished else { return }
         point = windowPoint
         if let carry { carry.move(to: windowPoint); return }
         let onMenu = menu?.touchContains(windowPoint) ?? false
-        switch Self.step(from: start, to: windowPoint, onMenu: onMenu, wasOnMenu: wasOnMenu, canDrag: startDrag != nil && !dragFailed) {
+        switch Self.step(from: start, to: windowPoint, onMenu: onMenu, wasOnMenu: wasOnMenu, canDrag: startDrag != nil && !dragFailed,
+                         leftHome: hasLeftHome(windowPoint)) {
         case .highlight:
             menu?.touchTrack(windowPoint: windowPoint)
             // On an item, not just the menu's corner the finger opened it at.
@@ -643,6 +669,12 @@ final class TouchHold {
         case .wait:
             menu?.touchTrack(windowPoint: windowPoint)
         }
+    }
+
+    /// Whether `windowPoint` is out of the list the finger was held in.
+    private func hasLeftHome(_ windowPoint: NSPoint) -> Bool {
+        guard let home, home.window != nil else { return false }
+        return !home.bounds.contains(home.convert(windowPoint, from: nil))
     }
 
     func lifted(at windowPoint: NSPoint) {
