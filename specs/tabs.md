@@ -79,3 +79,13 @@
   Test: OwnWindowTabsTests.aMovedTabLeavesOneWindowForTheOtherAsItIs
 - Drag a split to another window → it moves whole and stays a split.
   Test: OwnWindowTabsTests.aSplitMovesWholeAndStaysASplit
+
+## Touch
+- Touch and hold a row → its menu opens where the finger is, the same one a right-click opens.
+  Test: TouchGesturesTests.aHeldFingerOpensTheMenuARightClickOpens
+- Tap a row → its × and other hover-only buttons show until a finger lands outside the sidebar, another row is tapped, or the pointer moves over it.
+  Test: TouchGesturesTests.aTapShowsARowsButtonsUntilThePointerOrAFingerElsewhere
+- Tap just beside a row's showing × → the tab closes; a mouse click there is still the row's.
+  Test: TouchGesturesTests.aFingerNearTheCloseButtonCloses
+- Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.
+  Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
