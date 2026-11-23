@@ -2640,7 +2640,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // docked on the left keeps them in its own top row, level with its toggle, the bar there or not.
         let overPage = !fullScreen && !barShown && ((root.barHoldsAddress && onRight) || (!docked && !floating))
         let barKeepsLights = onRight && root.barHoldsAddress
-        let inBar = barShown && (root.barHoldsAddress || (!docked && !floating))
+        let inBar = barShown && (barKeepsLights || (!docked && !floating))
         let room = Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
         // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
         // nothing in the row moves while it's on screen; until then their picture rides in it.

@@ -806,6 +806,44 @@ struct TopBarTests {
         #expect(root.topBar.pageColor == .systemRed)
     }
 
+    /// With the sidebar docked on the left, the window buttons stay in its row for the whole travel; only a hidden
+    /// sidebar puts them over the page when the bar goes away.
+    @Test func aDockedSidebarKeepsTheLightsInItsRowWhileTheBarTravels() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/docked-lights")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.setSidebarVisible(true, animated: false)
+        root.setSidebarOnRight(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        controller.layoutTrafficLights()
+        func lightTopLeft() -> NSPoint? {
+            guard let window = controller.window, let close = window.standardWindowButton(.closeButton) else { return nil }
+            let r = close.convert(close.bounds, to: nil)
+            return NSPoint(x: r.minX, y: (window.contentView?.frame.height ?? 0) - r.maxY)
+        }
+        let docked = lightTopLeft()
+        let travel = root.autohideTravel(at: 0)
+        #expect(travel > 0)
+        for offset in [travel / 2, travel] {
+            root.setBarOffset(offset, animated: false)
+            root.layoutSubtreeIfNeeded()
+            controller.layoutTrafficLights()
+            #expect(lightTopLeft() == docked, "offset \(offset)")
+        }
+    }
+
     /// A page that gives no color of its own (`underPageBackgroundColor` clear) still has a bar: its band is the
     /// card's ground, never a hole where the page would show through behind the controls.
     @Test func aClearPageColorLeavesTheBarItsSurface() {
