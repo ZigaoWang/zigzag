@@ -806,6 +806,42 @@ struct TopBarTests {
         #expect(root.topBar.pageColor == .systemRed)
     }
 
+    /// A page that gives no color of its own (`underPageBackgroundColor` clear) still has a bar: its band is the
+    /// card's ground, never a hole where the page would show through behind the controls.
+    @Test func aClearPageColorLeavesTheBarItsSurface() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/clear-color")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        tab.webView?.underPageBackgroundColor = .clear
+        withBorderless(false) {
+            root.showsTopBar = true
+            root.barHoldsAddress = true
+            root.setSidebarVisible(true, animated: false)
+            root.paintTopBar(root.card.pageColor)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.card.band > 0)
+            let shown = root.card.debugSurface.layer?.backgroundColor
+            #expect((shown?.alpha ?? 0) > 0.99, "the bar's band must not be see-through")
+            #expect(root.topBar.pageColor?.alphaComponent ?? 0 > 0.99)
+        }
+        withBorderless(true) {
+            root.setSidebarVisible(false, animated: false)
+            root.paintTopBar(.clear)
+            root.layoutSubtreeIfNeeded()
+            let ground = root.card.debugSurface.layer?.backgroundColor
+            #expect((ground?.alpha ?? 0) > 0.99, "the page's card must still have a ground")
+        }
+    }
+
     /// Borderless, the panes meet the bar in a straight line as ever, and the strips keep the bar's ink.
     @Test func borderlessThePanesStartUnderTheBar() {
         withBorderless(true) {

@@ -86,14 +86,25 @@ final class PageCardView: NSView {
             view.layer?.add(animation, forKey: "autohideBand")
         }
     }
+    #if DEBUG
+    /// The card's own ground layer, for the bar's surface tests.
+    var debugSurface: NSView { surface }
+    #endif
     /// The page's own color (`Tab.pageColor`), for the card's ground and what lies on it. None for a page at a
     /// size of its own: it stands on plain ground, so its edges show.
     var pageColor: NSColor? { pageSize == nil ? (webView as? BrowserWebView)?.owner?.pageColor : nil }
+    /// The page's color as a card can wear it: a page can give a clear color for its background (a transparent
+    /// theme, a page WebKit hasn't painted yet), and a card drawn in it would be a hole with the page's own
+    /// contents showing through where the bar's band should be. Clear is no color here.
+    private var solidPageColor: NSColor? {
+        guard let pageColor, pageColor.alphaComponent > 0.01 else { return nil }
+        return pageColor
+    }
     /// The card's color wherever the page isn't: the page's own, so a split's two cards each have theirs; the plain
     /// card's with no page, under what covers it, or around a page at a size of its own.
     /// Around a page at a size of its own, the backdrop a PDF's pages lie on: the page reads as a sheet on it, as a
     /// device's screen does in a responsive view, whatever color the page is.
-    private var ground: NSColor { pageColor ?? (pageSize != nil ? Tokens.Color.pdfBackdrop : Tokens.Color.cardBackground) }
+    private var ground: NSColor { solidPageColor ?? (pageSize != nil ? Tokens.Color.pdfBackdrop : Tokens.Color.cardBackground) }
     /// A hairline around a page at a size of its own, so its edges show on any backdrop, light page or dark.
     private let pageOutline = ColorView(color: Tokens.Color.cardEdge)
     /// The page's part of the card, in the superview's terms: under the band.
@@ -637,8 +648,8 @@ final class PageCardView: NSView {
         Tokens.Motion.withoutAnimation { surface.layer?.backgroundColor = cgColor(ground) }
         let pageColor = pageColor
         Self.paintGround(of: webView, pageColor)
-        // The pane's strip lies on that color: its ink follows it.
-        header.ground = pageColor
+        // The pane's strip lies on the card's ground: its ink follows that, not a clear color the card can't wear.
+        header.ground = ground
     }
 
     private static let setGround = NSSelectorFromString("_setBackgroundColor:")

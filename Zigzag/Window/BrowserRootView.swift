@@ -1279,7 +1279,11 @@ final class BrowserRootView: SpaceFrameView {
 
     /// The bar's color: the page's, or framed, the card's own when the page has none (Settings, a PDF, Reader), so
     /// the bar is still the top of the page's card rather than a strip on the glass with the card floating under it.
-    private var barColor: NSColor? { pageColor ?? (topBarInset > 0 ? Tokens.Color.cardBackground : nil) }
+    /// A page's clear color is no color here: a band drawn in it would show the page through the bar's own controls.
+    private var barColor: NSColor? {
+        if let pageColor, pageColor.alphaComponent > 0.01 { return pageColor }
+        return topBarInset > 0 ? Tokens.Color.cardBackground : nil
+    }
 
     private var paintsTopBar: Bool { showsTopBar && barColor != nil && tiles == nil && !isEmpty }
 
