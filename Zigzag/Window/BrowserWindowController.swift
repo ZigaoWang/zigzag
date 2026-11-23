@@ -1219,7 +1219,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 card.header.isZoomed = i == zoomed
                 card.header.zoom.onClick = { [weak self] _ in self?.toggleZoom(page) }
                 // Pressed and dragged, the strip carries its pane somewhere else (#160).
-                card.header.onDrag = { [weak self] tab, press, moved in self?.dragPane(tab, press: press, moved: moved) }
+                card.header.onDrag = { [weak self] tab, press, moved in self?.dragPane(tab, press: press, moved: moved) ?? false }
                 card.header.onEditAddress = { [weak self, weak card] tab in
                     guard let self, let card else { return }
                     self.editAddress(of: tab, from: card.header.address)
