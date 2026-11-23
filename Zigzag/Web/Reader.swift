@@ -968,7 +968,7 @@ final class ReaderOptions: FloatingPanelView {
         panel.present(arrival: .pop)
         reader.optionsShown(true)
         current = panel
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+        panel.monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { return event }
             return panel.handle(event)
         }
@@ -988,7 +988,7 @@ final class ReaderOptions: FloatingPanelView {
     }
 
     func close() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         reader?.optionsShown(false)
         if Self.current === self { Self.current = nil }

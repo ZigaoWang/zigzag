@@ -247,7 +247,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         ]
         // A click in the window anywhere but the fields: you've moved on, so the fields go (a fill already on its
         // way still lands). Clicks in the Mac's own list are in its window, not this one.
-        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        clickMonitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             MainActor.assumeIsolated {
                 // The second click of a double-click is the first one's (`Autofill` keeps it off the page).
                 guard let self, self.isPresented, let window = self.anchor.window, event.window === window, event.clickCount < 2 else { return }
@@ -466,7 +466,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         settling = false
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
-        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        if let clickMonitor { TouchPress.removeMonitor(clickMonitor) }
         clickMonitor = nil
         let window = anchor.window
         let focused = window.map { $0.firstResponder === passwordView || $0.firstResponder === usernameView || Self.owns($0.firstResponder, [usernameField]) } ?? false
@@ -611,7 +611,7 @@ final class SystemPanelWatch {
         observers = []
         keyValueObservers.forEach { $0.invalidate() }
         keyValueObservers = []
-        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        if let scrollMonitor { TouchPress.removeMonitor(scrollMonitor) }
         scrollMonitor = nil
     }
 }

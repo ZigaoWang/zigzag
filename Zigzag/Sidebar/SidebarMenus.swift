@@ -771,7 +771,7 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         panel.present()
         controller.window?.makeFirstResponder(panel.field.field)
         panel.field.field.currentEditor()?.selectAll(nil)
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in
+        panel.monitor = TouchPress.addMonitor(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in
             guard let panel, event.window === panel.window else { return event }
             if event.type == .keyDown {
                 // Mid-word in a Chinese or Japanese input method, Return and Esc belong to it.
@@ -809,7 +809,7 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
 
     private func close(commit: Bool) {
         if commit, name.isEmpty { return }
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         if commit { done?(name) }
         done = nil

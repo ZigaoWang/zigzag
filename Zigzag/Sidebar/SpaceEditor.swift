@@ -2079,7 +2079,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     var onClose: (() -> Void)?
 
     private func startMonitoring() {
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             // The Profile menu, and a question asked from it, sit outside the panel: a click or key there is theirs.
             if MenuPanel.current != nil || self.isAsking { return event }
@@ -2263,7 +2263,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
 
     func close() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         if !cancelled { commitName() }
         if edited, !cancelled { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo(String(localized: "Edit Space", comment: "Undo action name, shown in Edit › Undo."), before: before) }

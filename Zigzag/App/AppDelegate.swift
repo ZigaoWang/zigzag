@@ -87,6 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
+        // Every other window (Settings, a sheet's) hears fingers once it's in use.
+        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { note in
+            let window = note.object as? NSWindow
+            MainActor.assumeIsolated { if let window { TouchPress.watch(window) } }
+        }
         settleSpaceNameStyle()
         Tutorial.migrate()
         // Getting started picks up where you left off, if you'd begun and haven't ended it.

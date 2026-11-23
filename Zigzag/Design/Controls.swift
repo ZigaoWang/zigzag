@@ -2078,7 +2078,7 @@ final class MenuPanel: FloatingPanelView {
     // MARK: Closing
 
     private func watch(_ window: NSWindow) {
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
             guard let self else { return event }
             return self.handle(event)
         }
@@ -2098,7 +2098,7 @@ final class MenuPanel: FloatingPanelView {
         if parentMenu != nil { root.close(animated: animated); return }
         closeChild(animated: false)
         guard Self.current === self || monitor != nil else { return }
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []

@@ -911,6 +911,11 @@ private final class PopupWindow: NSWindow {
         TrafficLightKeeper.install(in: self) { [weak self] in self?.placeTrafficLights() }
     }
 
+    /// Fingers skip `sendEvent`; the whole frame is watched for them (`TouchPress`).
+    override var contentView: NSView? {
+        didSet { TouchPress.watch(self) }
+    }
+
     /// Centered on the header, same left inset as the browser window.
     func placeTrafficLights() {
         guard !styleMask.contains(.fullScreen), let close = standardWindowButton(.closeButton) else { return }

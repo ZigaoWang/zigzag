@@ -312,7 +312,7 @@ final class SitePanel: FloatingPanelView {
         opener.isSelected = true
         current = panel
         // Only its own window: keys and clicks in Settings or another window are theirs.
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+        panel.monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { return event }
             return panel.handle(event)
         }
@@ -344,7 +344,7 @@ final class SitePanel: FloatingPanelView {
         panel.present(arrival: .pop)
         button.isSelected = true
         current = panel
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+        panel.monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { return event }
             return panel.handle(event)
         }
@@ -384,7 +384,7 @@ final class SitePanel: FloatingPanelView {
         scrollToken = nil
         extensionsToken = nil
         opener?.isSelected = false
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         if Self.current === self { Self.current = nil }
         dismiss()
@@ -2165,7 +2165,7 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
     /// was aimed.
     private func watchClicksOutside() {
         stopWatchingClicksOutside()
-        outsideClick = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+        outsideClick = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
             guard let self, !self.typedField.isHidden else { return event }
             let point = self.typedField.convert(event.locationInWindow, from: nil)
             if !self.typedField.bounds.contains(point) { self.endTyping(commit: true) }
@@ -2174,7 +2174,7 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
     }
 
     private func stopWatchingClicksOutside() {
-        if let outsideClick { NSEvent.removeMonitor(outsideClick) }
+        if let outsideClick { TouchPress.removeMonitor(outsideClick) }
         outsideClick = nil
     }
 

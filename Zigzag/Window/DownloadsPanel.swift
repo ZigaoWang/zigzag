@@ -425,7 +425,7 @@ final class DownloadsPanelView: FloatingPanelView {
         let standIn = !(controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible)
         growsFrom = CGPoint(x: standIn && controller.root.sidebarOnRight ? 0.9 : 0.1, y: 1)
         present(arrival: arrival)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
             // takes Esc and the click that closes it.
             guard let self, event.window === self.window, MenuPanel.current == nil else { return event }
@@ -471,7 +471,7 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     func close() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         dismiss()
         // With the sidebar hidden, the Downloads button that stood in for it goes with the panel.

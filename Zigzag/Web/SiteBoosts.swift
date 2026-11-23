@@ -431,7 +431,7 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
         webView.runOwnScript(PageBoosts.pickerSource(accent: accent, hint: Self.hint), world: PageBoosts.world)
         controller.window?.makeFirstResponder(webView)
         // Esc, shortcuts and clicks outside the page end it from Zigzag's side too.
-        picker.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { [weak picker] event in
+        picker.monitor = TouchPress.addMonitor(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { [weak picker] event in
             guard let picker else { return event }
             return picker.handle(event)
         }
@@ -457,7 +457,7 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
 
     /// Removes the picker so the page gets clicks again.
     func stop() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         tabToken = nil
         if let webView {

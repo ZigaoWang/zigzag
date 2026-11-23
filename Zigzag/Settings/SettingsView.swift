@@ -5195,7 +5195,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
         isRecording = true
         showHeld([])
         window?.makeFirstResponder(nil)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged, .leftMouseDown]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.keyDown, .flagsChanged, .leftMouseDown]) { [weak self] event in
             guard let self else { return event }
             switch event.type {
             case .leftMouseDown:
@@ -5262,7 +5262,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     }
 
     private func stopRecording() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         if ShortcutRow.recording === self { ShortcutRow.recording = nil }
         isRecording = false

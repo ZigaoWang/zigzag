@@ -478,7 +478,7 @@ final class ExtensionHost: NSObject {
     }
 
     private func watchGestures() {
-        gestureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+        gestureMonitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // Ignore key repeats.
             if let self, ExtensionUse.isGesture(event.type, isRepeat: event.type == .keyDown && event.isARepeat) {
                 if let id = self.extensionPage(under: event) {
@@ -570,7 +570,7 @@ final class ExtensionHost: NSObject {
         if !records.isEmpty { await controller.removeData(ofTypes: types, from: records) }
         controller.delegate = nil
         // What it watched app-wide goes with it.
-        if let gestureMonitor { NSEvent.removeMonitor(gestureMonitor) }
+        if let gestureMonitor { TouchPress.removeMonitor(gestureMonitor) }
         for observer in [menuObserver, popupOcclusionObserver].compactMap({ $0 }) { NotificationCenter.default.removeObserver(observer) }
         gestureMonitor = nil
         menuObserver = nil
@@ -1111,6 +1111,8 @@ final class ExtensionHost: NSObject {
     /// shown, so it's moved before it draws.
     private func show(_ popover: NSPopover, from rect: NSRect, of view: NSView) {
         popover.show(relativeTo: rect, of: view, preferredEdge: .maxY)
+        // A tap in the popup counts as using the extension, as a click does.
+        if let window = popover.contentViewController?.view.window { TouchPress.watch(window) }
         let key = ObjectIdentifier(popover)
         popupPlaces[key] = PopupAnchor(view: view, rect: rect, shownOn: view)
         keepInWindow(popover)
