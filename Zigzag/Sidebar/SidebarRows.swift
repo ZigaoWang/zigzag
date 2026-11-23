@@ -571,12 +571,34 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
+        TouchReveal.pointerMoved(over: self)
         trackPointer(event)
     }
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
+        TouchReveal.pointerMoved(over: self)
         trackPointer(event)
+    }
+
+    // MARK: Touch
+
+    /// Shown by a tap as hovering shows it, the × of a pinned tab or a split's part included (`TouchReveal`).
+    private(set) var touchRevealed = false {
+        didSet { if oldValue != touchRevealed { stateDidChange(animated: false) } }
+    }
+
+    /// A tap at `point` (own coordinates): the row's buttons show as if hovered, on the part tapped.
+    func touchReveal(at point: NSPoint) {
+        if closesPart, isSplit, bounds.contains(point) { pointedPart = half(at: point) }
+        touchRevealed = true
+        var area: NSView? = superview
+        while let current = area, !(current is SidebarView) { area = current.superview }
+        TouchReveal.reveal(self, keptWithin: area) { [weak self] in
+            guard let self else { return }
+            self.touchRevealed = false
+            if !self.isHovered { self.pointedPart = nil }
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -637,6 +659,18 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         addSubview(audioButton)
         addSubview(partnerAudioButton)
         addSubview(closeButton)
+        if TouchGestures.isAvailable { addTouchWatch() }
+    }
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
+        addGestureRecognizer(watch)
+    }
+
+    /// A tap, in window coordinates, once AppKit's click from it has gone through.
+    func touchTapped(at windowPoint: NSPoint) {
+        touchReveal(at: convert(windowPoint, from: nil))
     }
 
     /// The row's other pages after its own, in order (none: a row of one page). The only way a row becomes a split
@@ -906,7 +940,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func refreshAccessories() {
         // A pinned tab you're on stays clean, as Arc's does: its button (unload, or back to its page) comes with the
         // pointer. A plain tab you're on keeps its close button in view.
-        let pointing = closesInPart ? isHovered && pointedPart != nil : isHovered
+        let hovering = isHovered || touchRevealed
+        let pointing = closesInPart ? hovering && pointedPart != nil : hovering
         // A part too narrow for its icon and the × beside it keeps its icon until you point at it.
         let resting = isSelected && !isBookmark && (!closesInPart || closeFitsBesideIcon(part: closePart))
         // In a split, each part's × is that page's own: none on a pinned part that isn't loaded.
@@ -1186,7 +1221,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 // favorite's small × in its top corner, its icon and speaker staying, the part's wash saying whose it is.
                 let end = part.end - edge - size.width
                 let fits = titles || end >= icon.frame.maxX + Self.buttonGap
-                if !fits, !(isHovered && pointedPart != nil) { closeButton.isHidden = true }
+                if !fits, !((isHovered || touchRevealed) && pointedPart != nil) { closeButton.isHidden = true }
                 if fits {
                     closeButton.frame.origin.x = end
                 } else {

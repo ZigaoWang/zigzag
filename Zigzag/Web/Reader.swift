@@ -694,7 +694,11 @@ final class ReaderView: NSView {
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
         addSubview(optionsButton)
-        optionsButton.button.onClick = { [weak self] _ in self?.onOptions?() }
+        optionsButton.button.onClick = { [weak self] _ in
+            guard let self, !self.touchSwallow.takes() else { return }
+            self.onOptions?()
+        }
+        if TouchGestures.isAvailable { addTouchWatch() }
         // The page's own scripts are off; this one, in Zigzag's world, says where it's scrolled to.
         let scroll = ScrollMessages()
         scroll.reader = self
@@ -757,17 +761,42 @@ final class ReaderView: NSView {
     }
 
     /// The band along the top where the pointer brings Aa back.
+    private var topBand: NSRect {
+        NSRect(x: 0, y: 0, width: bounds.width, height: Self.buttonInset * 2 + ReaderOptionsButton.side + Tokens.Space.x4)
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let topArea { removeTrackingArea(topArea) }
-        let band = NSRect(x: 0, y: 0, width: bounds.width, height: Self.buttonInset * 2 + ReaderOptionsButton.side + Tokens.Space.x4)
-        let area = NSTrackingArea(rect: band, options: [.mouseEnteredAndExited, .activeInKeyWindow], owner: self)
+        let area = NSTrackingArea(rect: topBand, options: [.mouseEnteredAndExited, .activeInKeyWindow], owner: self)
         addTrackingArea(area)
         topArea = area
     }
 
     override func mouseEntered(with event: NSEvent) { presence.pointerNearTop = true }
     override func mouseExited(with event: NSEvent) { presence.pointerNearTop = false }
+
+    /// The click from a tap on Aa while it was hidden: the tap only shows it.
+    private var touchSwallow = TouchSwallow()
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onDown = { [weak self] point in self?.touchDown(at: point) }
+        watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
+        addGestureRecognizer(watch)
+    }
+
+    func touchDown(at windowPoint: NSPoint) {
+        if !presence.isShown, optionsButton.frame.contains(convert(windowPoint, from: nil)) { touchSwallow.arm() }
+    }
+
+    /// A tap along the top brings Aa back, as the pointer there does, and it stays until you read on.
+    func touchTapped(at windowPoint: NSPoint) {
+        touchSwallow.disarm()
+        guard topBand.contains(convert(windowPoint, from: nil)) else { return }
+        presence.pointerNearTop = true
+        presence.pointerNearTop = false
+    }
 
     #if DEBUG
     func debugPointerNearTop(_ near: Bool) { presence.pointerNearTop = near }

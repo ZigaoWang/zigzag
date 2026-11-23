@@ -125,9 +125,19 @@ final class PageHolder: NSView {
         let tip = String(localized: "Enter Full Screen", comment: "Tooltip of the button over a video that fills the page: puts it in the screen's own full screen.")
         let button = MiniPlayerView.overlayButton("arrow.up.left.and.arrow.down.right", side: Self.expandSide, glyph: 15, tip: tip)
         button.alphaValue = 0
-        button.onClick = { [weak self] _ in self?.onExpand?() }
+        button.onClick = { [weak self] _ in
+            guard let self, !self.touchSwallow.takes() else { return }
+            self.onExpand?()
+        }
         addSubview(button)
         expandButton = button
+        if TouchGestures.isAvailable, touchWatch == nil {
+            let watch = TouchWatch()
+            watch.onDown = { [weak self] point in self?.touchDown(at: point) }
+            watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
+            addGestureRecognizer(watch)
+            touchWatch = watch
+        }
         let tracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
         addTrackingArea(tracking)
         expandTracking = tracking
@@ -153,6 +163,22 @@ final class PageHolder: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
+        if showsExpand { revealExpand() }
+    }
+
+    private var touchWatch: TouchWatch?
+    /// The click from a tap on the faded-out button: the tap only shows it.
+    private var touchSwallow = TouchSwallow()
+
+    func touchDown(at windowPoint: NSPoint) {
+        guard showsExpand, let button = expandButton, button.alphaValue < 0.5,
+              button.frame.contains(convert(windowPoint, from: nil)) else { return }
+        touchSwallow.arm()
+    }
+
+    /// A tap on the page brings the button back, as moving the pointer does.
+    func touchTapped(at windowPoint: NSPoint) {
+        touchSwallow.disarm()
         if showsExpand { revealExpand() }
     }
 

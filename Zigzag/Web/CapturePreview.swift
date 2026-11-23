@@ -69,6 +69,12 @@ final class CapturePreview: FloatingPanelView {
             addSubview(note)
         }
         [closeDisc, closeButton].forEach { addSubview($0) }
+        if TouchGestures.isAvailable {
+            // A tap on it shows its ×, as the pointer over it does.
+            let watch = TouchWatch()
+            watch.onTap = { [weak self] _ in self?.showClose(true) }
+            addGestureRecognizer(watch)
+        }
         copyTile.onClick = { [weak self] _ in self?.copyAgain() }
         saveTile.onClick = { [weak self] _ in self?.onSave?() }
         shareTile.onClick = { [weak self] _ in self?.share() }
