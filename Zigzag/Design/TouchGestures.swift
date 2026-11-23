@@ -730,6 +730,49 @@ enum TouchSwipe {
     nonisolated static func isSideways(_ translation: NSPoint) -> Bool {
         abs(translation.x) >= 4 && abs(translation.x) > abs(translation.y) * 1.2
     }
+
+    /// Across the sidebar, where up and down is a steep flick: a swipe up to about 55° off level counts, as a thumb's
+    /// arc rarely starts flat.
+    nonisolated static func isAcrossSidebar(_ translation: NSPoint) -> Bool {
+        abs(translation.x) >= 4 && abs(translation.x) >= abs(translation.y) * 0.7
+    }
+}
+
+/// Two taps on chrome that stands in for the title bar count as a double-click, as two clicks do: AppKit's click
+/// from each tap comes as a single click.
+@MainActor
+enum TouchDoubleTap {
+    /// The last tap's click: when, and where in the window.
+    private static var last: (time: TimeInterval, point: NSPoint, window: Int)?
+
+    /// The click count for a press on such chrome: a mouse's own, or 2 for a finger's second tap close enough to its
+    /// first.
+    static func clickCount(for event: NSEvent) -> Int {
+        guard event.clickCount < 2, isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) else {
+            last = nil
+            return event.clickCount
+        }
+        let previous = last.flatMap { $0.window == event.windowNumber ? ($0.time, $0.point) : nil }
+        if isSecondTap(after: previous, at: event.timestamp, point: event.locationInWindow, interval: NSEvent.doubleClickInterval) {
+            last = nil
+            return 2
+        }
+        last = (event.timestamp, event.locationInWindow, event.windowNumber)
+        return 1
+    }
+
+    /// Whether a click at `time` is AppKit's click from a finger that landed at `landedAt`.
+    nonisolated static func isFromFinger(_ time: TimeInterval, landedAt: TimeInterval?) -> Bool {
+        guard let landedAt else { return false }
+        return time >= landedAt - 0.05 && time - landedAt < TouchGestures.tapDuration
+    }
+
+    /// Whether a tap at `point` and `time` is the second of a double tap after `previous`.
+    nonisolated static func isSecondTap(after previous: (time: TimeInterval, point: NSPoint)?, at time: TimeInterval, point: NSPoint,
+                                        interval: TimeInterval) -> Bool {
+        guard let previous, time > previous.time, time - previous.time <= interval else { return false }
+        return hypot(point.x - previous.point.x, point.y - previous.point.y) <= TouchGestures.target
+    }
 }
 
 /// A finger in from a page's edge goes back (the left edge) or forward (the right), as on an iPad.

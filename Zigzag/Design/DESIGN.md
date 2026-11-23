@@ -558,6 +558,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   or one of its web apps). Back in front of that tab, it goes back in its page; back on another tab or window, it
   plays on until you go to its tab. Picture in Picture or full screen you started, a mini player already showing, a
   video the page won't let float (`disablePictureInPicture`), and Zigzag Mini's page are left alone.
+  Leaving the window in view on another display isn't leaving it (#496): the video moves once that window is covered,
+  minimized, hidden or its desktop goes away, after the same 0.8 s.
 - **Capture** (`PageCapture`, `CapturePreview`, #457): ⇧⌘2, Site Controls or the command bar dims the page (or its
   pane) in `Color.captureScrim`, fading in and out like a sheet's scrim, its corners the page card's. Area: a drag
   draws the clear part with a hairline in `captureEdge`, round grips on its corners and sides (`captureHandle`), the

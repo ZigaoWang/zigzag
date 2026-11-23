@@ -565,6 +565,27 @@ struct TouchMovesTests {
         #expect(!TouchSwipe.isSideways(NSPoint(x: 2, y: 0)))
     }
 
+    /// The sidebar takes a curved swipe: up to about 55° off level is across, steeper is a scroll.
+    @Test func acrossTheSidebarForgivesACurvedSwipe() {
+        #expect(TouchSwipe.isAcrossSidebar(NSPoint(x: 10, y: 9)))
+        #expect(TouchSwipe.isAcrossSidebar(NSPoint(x: -14, y: 18)))
+        #expect(!TouchSwipe.isAcrossSidebar(NSPoint(x: 6, y: 12)))
+        #expect(!TouchSwipe.isAcrossSidebar(NSPoint(x: 3, y: 30)))
+        #expect(!TouchSwipe.isAcrossSidebar(NSPoint(x: 2, y: 0)))
+    }
+
+    /// Two taps on the title bar are a double-click; a mouse's own clicks are left alone.
+    @Test func twoTapsOnTheTitleBarAreADoubleClick() {
+        #expect(TouchDoubleTap.isFromFinger(10.02, landedAt: 10))
+        #expect(!TouchDoubleTap.isFromFinger(10, landedAt: nil))
+        #expect(!TouchDoubleTap.isFromFinger(12, landedAt: 10))
+        let first = (time: TimeInterval(10), point: NSPoint(x: 100, y: 20))
+        #expect(TouchDoubleTap.isSecondTap(after: first, at: 10.3, point: NSPoint(x: 110, y: 24), interval: 0.5))
+        #expect(!TouchDoubleTap.isSecondTap(after: first, at: 10.8, point: NSPoint(x: 110, y: 24), interval: 0.5))
+        #expect(!TouchDoubleTap.isSecondTap(after: first, at: 10.3, point: NSPoint(x: 200, y: 24), interval: 0.5))
+        #expect(!TouchDoubleTap.isSecondTap(after: nil, at: 10.3, point: NSPoint(x: 100, y: 20), interval: 0.5))
+    }
+
     @Test func aFingerAcrossTheSidebarSwitchesSpaces() throws {
         let added = Library.shared.addSpace(name: "Touch swipe test")
         defer { Library.shared.removeSpace(added.id) }

@@ -1107,7 +1107,8 @@ final class SidebarView: NSView {
     /// right-click. Double-click in empty tab space opens a new tab, as in Arc (#262), unless turned off.
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control), showBlankMenu(for: event) { return }
-        if event.clickCount == 2, Self.doubleClickOpensNewTab, isInList(event) {
+        let clicks = TouchDoubleTap.clickCount(for: event)
+        if clicks == 2, Self.doubleClickOpensNewTab, isInList(event) {
             delegate?.sidebarDoubleClickedBlank()
             return
         }
@@ -1116,7 +1117,7 @@ final class SidebarView: NSView {
             blankClick()
             return
         }
-        window?.titleBarMouseDown(event)
+        window?.titleBarMouseDown(event, clicks: clicks)
     }
 
     /// What a single click on empty space does, for the sidebar shown over the screen: the edge panel goes away, as it
@@ -2141,7 +2142,7 @@ final class SidebarView: NSView {
         let pan = TouchPanRecognizer { [weak self] pan in self?.touchSwipeChanged(pan) }
         pan.touchOnly.shouldBegin = { [weak self] recognizer in
             guard let self, TouchHold.current == nil, let pan = recognizer as? NSPanGestureRecognizer else { return false }
-            return TouchSwipe.isSideways(pan.translation(in: self))
+            return TouchSwipe.isAcrossSidebar(pan.translation(in: self))
         }
         pan.touchOnly.outranks = { [weak self] other in
             guard let self, #available(macOS 27, *) else { return false }

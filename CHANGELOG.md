@@ -5,7 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- With Settings › Tabs › Show a mini player when you leave Zigzag on, a video stays in its page when you move to another display and its window is still in view on its own. It moves into the mini player once that window is covered, minimized, hidden or its desktop is switched away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#496](https://github.com/ZigaoWang/zigzag/issues/496))
+- A finger's swipe across the sidebar switches spaces even when it curves up or down a little, as a thumb's swipe does. A steep flick still scrolls.
+
 ### New
+- Two taps with a finger on the top of the window, the sidebar's empty space or the bar above the page zoom the window, as a double-click does there (or whatever the Mac's title bar double-click is set to). Two taps in the empty tab list open a new tab, as a double-click does.
 - The sidebar comes out from the edge of the screen over whatever you're doing, the way the Dock does. Turn on Sidebar from the screen edge in Settings › Appearance and move the pointer to the edge the sidebar sits on: the whole sidebar shows there, with your spaces, favorites, address, tabs and what's playing, over the app you're in. Hover a tab, or a pinned page, and its live page comes out beside the sidebar in the panel itself, without leaving the app or switching Spaces; click to keep it, hover another row to preview that page, and move the pointer off the rows to go back to the kept one. The panel's back, reload, address, star and Site Controls act on the page it shows, and ⌘T or ⌘L open the browser's bar over the screen: what it opens or types lands in the panel, not the window behind. Esc closes the page first and the panel after; a click outside, another app, another Space or the browser coming forward puts both away, and the page goes back to its tab. Zigzag's own pages like Settings and History stay in the window: their rows grey out, and the panel offers Return to Zigzag to bring you to them. Switching spaces keeps the panel out, and moving the pointer away puts it back without taking focus from what you were doing. The window's own sidebar is left as it is, and the switch is off until you turn it on. ([#363](https://github.com/ZigaoWang/zigzag/issues/363))
 
 ## [0.9.4] - 2026-11-21

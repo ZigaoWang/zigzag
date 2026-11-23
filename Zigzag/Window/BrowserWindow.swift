@@ -572,8 +572,8 @@ extension NSWindow {
 
     /// A press on chrome that stands in for the title bar (the sidebar, the bar above the page): a drag moves the
     /// window, and a double-click zooms it, or does whatever the Mac's title bar double-click is set to do.
-    func titleBarMouseDown(_ event: NSEvent) {
-        guard event.clickCount == 2 else { if dragMovesWindow { performDrag(with: event) }; return }
+    func titleBarMouseDown(_ event: NSEvent, clicks: Int? = nil) {
+        guard (clicks ?? TouchDoubleTap.clickCount(for: event)) == 2 else { if dragMovesWindow { performDrag(with: event) }; return }
         switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
         case "Minimize": miniaturize(nil)
         case "None": break
