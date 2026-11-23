@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - More of Zigzag works by touch. Touch and hold a tab, folder, favorite or space, then slide onto its menu and lift on an item to choose it, or lift elsewhere to keep the menu open. Move away from the menu instead and the tab is picked up, to reorder it, drop it in a folder, onto another tab or the page for a split, or onto a space. Swipe one finger sideways across the sidebar to change spaces, pinch in on a page to see all tabs (pinch out on one to open it), and swipe in from a page's left or right edge to go back or forward. The mouse and trackpad work exactly as before.
+
 ### Fixed
 - A tab restored after a restart, or woken from sleep, shows the site's page as it is now. It came back as Zigzag last loaded it, however long ago, so a site whose theme or sign-in had changed since, like GitHub set to its dark theme, showed its old look until you reloaded.
 
