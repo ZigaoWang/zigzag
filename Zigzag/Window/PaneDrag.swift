@@ -98,6 +98,7 @@ final class PaneDrag {
         list = over
         // A pinned page can land among the pinned pages too, as its row can.
         over?.externalHover(at: screenPoint, allowsPinned: tab.bookmarkID != nil)
+        controller.root.splitDropHint.incoming = (tab.displayIcon, tab.displayTitle)
         controller.root.splitDropHint.follow(window.convertPoint(fromScreen: screenPoint))
         controller.root.splitDropHint.show(move: move)
         // A tick as it comes onto another place it would take.
@@ -142,20 +143,24 @@ final class PaneDrag {
 }
 
 extension BrowserWindowController {
-    /// A pane's strip pressed and dragged: the pane is carried until it's let go, or Esc calls it off.
-    func dragPane(_ tab: Tab, press: NSEvent, moved: NSEvent) {
+    /// A pane's strip pressed and dragged: the pane is carried until it's let go, or Esc calls it off. By the mouse
+    /// or, picked up by a finger (`TouchCarry.starting`), by that finger. Returns whether it was picked up.
+    @discardableResult
+    func dragPane(_ tab: Tab, press: NSEvent, moved: NSEvent) -> Bool {
         guard let window, tabManager.split(for: tab) != nil,
               let card = root.paneCards.first(where: { $0.header.tab === tab && !$0.isHidden }),
-              let drag = PaneDrag(controller: self, tab: tab, card: card, at: window.convertPoint(toScreen: press.locationInWindow)) else { return }
+              let drag = PaneDrag(controller: self, tab: tab, card: card, at: window.convertPoint(toScreen: press.locationInWindow)) else { return false }
         closeFloatingPanels()
         drag.lift()
         drag.moved(to: window.convertPoint(toScreen: moved.locationInWindow))
-        let released = CarriedCopy.track(in: window) { drag.moved(to: window.convertPoint(toScreen: $0.locationInWindow)) }
-        if let released {
-            drag.drop(at: window.convertPoint(toScreen: released.locationInWindow), option: released.modifierFlags.contains(.option))
-        } else {
-            drag.cancel()
+        CarriedCopy.carry(in: window, moved: { drag.moved(to: window.convertPoint(toScreen: $0.locationInWindow)) }) { released in
+            if let released {
+                drag.drop(at: window.convertPoint(toScreen: released.locationInWindow), option: released.modifierFlags.contains(.option))
+            } else {
+                drag.cancel()
+            }
         }
+        return true
     }
 
     /// Whether a pane can leave its group for a place in `owner`'s sidebar list: an ordinary tab, into this window's
