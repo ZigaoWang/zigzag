@@ -531,8 +531,13 @@ final class FavoriteTile: InteractiveView {
         !closeButton.isHidden && closeButton.frame.contains(point) ? closeButton : nil
     }
 
+    /// Whether the × shows: on an open favorite under the pointer or tapped, not over a number hint or a placeholder.
+    nonisolated static func showsClose(open: Bool, hovered: Bool, numbered: Bool, placeholder: Bool) -> Bool {
+        open && hovered && !numbered && !placeholder
+    }
+
     private func refreshClose() {
-        closeButton.isHidden = !(isOpen && isHovered) || number != nil || isPlaceholder
+        closeButton.isHidden = !Self.showsClose(open: isOpen, hovered: isHovered || touchRevealed, numbered: number != nil, placeholder: isPlaceholder)
         let backed = !closeButton.isHidden
         if backed, closeBacking == nil {
             let disc = ColorView(color: Tokens.Color.surface)
@@ -562,7 +567,29 @@ final class FavoriteTile: InteractiveView {
     override func mouseEntered(with event: NSEvent) {
         // Only the tile itself lights up; the × past its corner shows once it does.
         if let badgeTracking, event.trackingArea === badgeTracking { return }
+        TouchReveal.pointerMoved(over: self)
         super.mouseEntered(with: event)
+    }
+
+    // MARK: Touch
+
+    /// Shown by a tap as hovering shows it: the × of an open favorite (`TouchReveal`).
+    private(set) var touchRevealed = false {
+        didSet { if oldValue != touchRevealed { refreshClose() } }
+    }
+
+    /// A tap on the tile, once AppKit's click from it has gone through: its × shows as if hovered.
+    func touchTapped() {
+        touchRevealed = true
+        var area: NSView? = superview
+        while let current = area, !(current is SidebarView) { area = current.superview }
+        TouchReveal.reveal(self, keptWithin: area) { [weak self] in self?.touchRevealed = false }
+    }
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onTap = { [weak self] _ in self?.touchTapped() }
+        addGestureRecognizer(watch)
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -664,6 +691,7 @@ final class FavoriteTile: InteractiveView {
         addSubview(dropHalf, positioned: .below, relativeTo: icon)
         setAccessibilityRole(.button)
         describe()
+        if TouchGestures.isAvailable { addTouchWatch() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
