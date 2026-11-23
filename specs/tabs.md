@@ -99,6 +99,8 @@
   Test: TouchGesturesTests.aTapShowsAnOpenFavoritesClose
 - Tap the Tabs label above today's tabs → Clear shows, as hovering the list shows it, until a finger lands outside the sidebar or the pointer comes over the list.
   Test: TouchGesturesTests.aTapShowsClearAboveTheTabs
+- Two taps on a tab, a space's dot or a resize edge → what a double-click there does (rename, edit the space, the usual width or even tiles).
+  Test: TouchMovesTests.twoTapsOnAControlAreADoubleClick
 - Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.
   Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
 - Touch and hold a row, slide onto its menu without lifting → the item under the finger lights; lift on it → it runs.
