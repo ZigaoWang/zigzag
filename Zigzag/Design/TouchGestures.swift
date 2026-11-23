@@ -294,6 +294,15 @@ enum TouchPress {
     static var landedAt: TimeInterval?
     static var fingerDown = false
 
+    /// Whether a scroll starting at `time` comes from a finger on the screen rather than the trackpad: one is down, or
+    /// landed a moment ago. A finger left down longer than any pan is taken to be gone.
+    nonisolated static func isTouchScroll(at time: TimeInterval, landedAt: TimeInterval?, fingerDown: Bool) -> Bool {
+        guard let landedAt, time >= landedAt else { return false }
+        return time - landedAt < (fingerDown ? 30 : 0.8)
+    }
+
+    static func isTouchScroll(at time: TimeInterval) -> Bool { isTouchScroll(at: time, landedAt: landedAt, fingerDown: fingerDown) }
+
     /// A finger landed at `point` (window coordinates): the same hooks a mouse-down runs.
     static func pressed(at point: NSPoint, in window: NSWindow) {
         guard let event = mouseDown(at: point, in: window) else { return }
@@ -691,6 +700,25 @@ enum TouchSwipe {
     }
 }
 
+/// A finger in from a page's edge goes back (the left edge) or forward (the right), as on an iPad.
+enum TouchEdgeSwipe {
+    /// How far in from the edge a finger counts as starting on it.
+    nonisolated static let edge: CGFloat = 32
+
+    /// -1 for back from the left edge, 1 for forward from the right, nil elsewhere, for a finger landing at `x` on a
+    /// page `width` wide.
+    nonisolated static func direction(atX x: CGFloat, width: CGFloat) -> Int? {
+        guard width > edge * 4 else { return nil }
+        if x <= edge { return -1 }
+        if x >= width - edge { return 1 }
+        return nil
+    }
+
+    /// Whether a finger that moved by `translation` swipes in from its edge (`direction`'s), not along it.
+    nonisolated static func isInward(_ translation: NSPoint, direction: Int) -> Bool {
+        TouchSwipe.isSideways(translation) && (direction < 0 ? translation.x > 0 : translation.x < 0)
+    }
+}
 
 /// Two fingers pinched in on a page at its usual size open Show All Tabs, as on an iPad; pinched out on a card there,
 /// it opens.

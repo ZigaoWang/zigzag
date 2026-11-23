@@ -40,7 +40,7 @@ final class PageHolder: NSView {
         webView.autoresizingMask = [.width, .height]
         addSubview(webView)
         page = webView
-        if TouchGestures.isAvailable, overviewPinch == nil { addTouchGestures() }
+        if TouchGestures.isAvailable, edgeSwipe == nil { addTouchGestures() }
         if let pageObserver { NotificationCenter.default.removeObserver(pageObserver) }
         // WebKit moves the page as the inspector docks, leaves or is dragged wider: said once the room really changed.
         // WebKit takes the page to a window of its own for an element's full screen, and puts it back here after.
@@ -94,15 +94,51 @@ final class PageHolder: NSView {
 
     // MARK: Touch
 
+    /// A finger in from the left edge goes back, from the right edge forward, with the trackpad swipe's arrow.
+    private(set) var edgeSwipe: TouchPanRecognizer?
     /// Two fingers pinched in on the page at its usual size open Show All Tabs; the page still zooms as before.
     private(set) var overviewPinch: TouchPinchRecognizer?
+    private var edgeDirection = 0
     private var pinchStartZoom: CGFloat = 1
     private var pinchFired = false
 
     private func addTouchGestures() {
+        let pan = TouchPanRecognizer { [weak self] pan in self?.edgeSwipeChanged(pan) }
+        pan.touchOnly.accepts = { [weak self] point in
+            guard let self, TouchEdgeSwipe.direction(atX: point.x, width: self.bounds.width) != nil else { return false }
+            // A resize strip along the edge (the sidebar's, a split's) keeps the finger for itself.
+            let root = sequence(first: self.superview, next: { $0?.superview }).lazy.compactMap { $0 as? BrowserRootView }.first
+            return root.map { $0.resizeHandle(atTouch: $0.convert(point, from: self)) == nil } ?? true
+        }
+        pan.touchOnly.shouldBegin = { [weak self] recognizer in
+            guard let self, let pan = recognizer as? NSPanGestureRecognizer else { return false }
+            let start = pan.location(in: self).x - pan.translation(in: self).x
+            guard let direction = TouchEdgeSwipe.direction(atX: start, width: self.bounds.width),
+                  TouchEdgeSwipe.isInward(pan.translation(in: self), direction: direction),
+                  (self.page as? BrowserWebView)?.swipeNavigator.takesTouchSwipe(direction) == true else { return false }
+            self.edgeDirection = direction
+            return true
+        }
+        addGestureRecognizer(pan)
+        edgeSwipe = pan
+
         let pinch = TouchPinchRecognizer { [weak self] pinch in self?.pinchChanged(pinch) }
         addGestureRecognizer(pinch)
         overviewPinch = pinch
+    }
+
+    private func edgeSwipeChanged(_ pan: TouchPanRecognizer) {
+        guard let swipe = (page as? BrowserWebView)?.swipeNavigator else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        switch pan.state {
+        case .began:
+            swipe.touchBegan(direction: edgeDirection)
+            swipe.touchMoved(dx: pan.translation(in: self).x, at: now)
+        case .changed: swipe.touchMoved(dx: pan.translation(in: self).x, at: now)
+        case .ended: swipe.touchEnded(at: now, cancelled: false)
+        case .cancelled, .failed: swipe.touchEnded(at: now, cancelled: true)
+        default: break
+        }
     }
 
     private func pinchChanged(_ pinch: TouchPinchRecognizer) {
