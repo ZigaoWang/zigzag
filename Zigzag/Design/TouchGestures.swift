@@ -104,6 +104,8 @@ final class TouchOnly: NSObject, NSGestureRecognizerDelegate {
     var shouldBegin: ((NSGestureRecognizer) -> Bool)?
     /// Runs alongside the app's other recognizers.
     var simultaneous = false
+    /// Recognizers that wait for this one to fail first (a list's scrolling, for a sideways swipe across it).
+    var outranks: ((NSGestureRecognizer) -> Bool)?
 
     func gestureRecognizer(_ gestureRecognizer: NSGestureRecognizer, shouldAttemptToRecognizeWith event: NSEvent) -> Bool { false }
 
@@ -118,6 +120,11 @@ final class TouchOnly: NSObject, NSGestureRecognizerDelegate {
 
     func gestureRecognizer(_ gestureRecognizer: NSGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: NSGestureRecognizer) -> Bool { simultaneous }
+
+    func gestureRecognizer(_ gestureRecognizer: NSGestureRecognizer,
+                           shouldBeRequiredToFailBy otherGestureRecognizer: NSGestureRecognizer) -> Bool {
+        outranks?(otherGestureRecognizer) ?? false
+    }
 }
 
 /// A finger held still: `handler` runs on each state change (began, cancelled, ended).
@@ -654,5 +661,13 @@ final class TouchHold {
         frozen = nil
         if Self.current === self { Self.current = nil }
         ended?()
+    }
+}
+
+/// Which way a finger across something goes: sideways once it has moved mostly sideways, the few points
+/// `SpaceSwipe.axisLock` a trackpad swipe takes to decide.
+enum TouchSwipe {
+    nonisolated static func isSideways(_ translation: NSPoint) -> Bool {
+        abs(translation.x) >= 4 && abs(translation.x) > abs(translation.y) * 1.2
     }
 }
