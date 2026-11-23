@@ -13,6 +13,8 @@
   Test: PinnedGroupTests.commandDSavesTheWholeGroupAndUndoes
 - Pin Split View on a page of a split → both pages are pinned and stay a split.
   Test: SavePathTests.aSplitViewMovesAsOne
+- Pin Tab or Pin Tab to Folder… in the menu bar on Settings or History → off, as the star isn't there.
+  Test: SavePathTests.theMenuBarsPinFollowsTheStarsRule
 
 ## Asking where
 - ⇧ on the star, on a menu's Pin, on Pin Link, or ⇧⌘D → a sheet asks for the folder and the name.

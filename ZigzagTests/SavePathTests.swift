@@ -444,6 +444,30 @@ import Testing
         }
     }
 
+    /// Pin Tab and Pin Tab to Folder… in the menu bar are offered by the rule the star and the tab's menu use: not on
+    /// Zigzag's own views.
+    @Test func theMenuBarsPinFollowsTheStarsRule() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            let page = Tab(url: try #require(URL(string: "https://example.com/menu")), title: "Page", spaceID: space)
+            manager.adopt([settings, page], in: space)
+            manager.select(settings)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let pin = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleBookmark(_:)), keyEquivalent: "")
+            let folder = NSMenuItem(title: "", action: #selector(BrowserWindowController.savePageToFolder(_:)), keyEquivalent: "")
+            #expect(!AddressView.canSave(for: settings))
+            #expect(!controller.validateMenuItem(pin))
+            #expect(!controller.validateMenuItem(folder))
+            manager.select(page)
+            #expect(AddressView.canSave(for: page))
+            #expect(controller.validateMenuItem(pin))
+            #expect(controller.validateMenuItem(folder))
+        }
+    }
+
     // MARK: Names
 
     /// A page saved is called what the page says, with a home page shaved down to its site; the picker's name wins.
