@@ -93,6 +93,8 @@
   Test: PaneHeaderTests.anHttpPageIsMarkedNotSecure
 - A file or a Zigzag page (History, Settings) in a pane → its strip's address shows its name, never a cut "file:".
   Test: PaneHeaderTests.aFileShowsItsNameAndAWebPageItsAddress
+- Reader up over one page of a split, the other page focused → the address's Reader button shows it on, as the menu bar and Site Controls do; a press closes it.
+  Test: ReaderInSplitTests.everyPlaceSaysReaderIsOnInTheOtherPane
 
 ## Closing and suspending one page
 - Close one page of a split of two (⌘W, or × on its strip or row part) → the one left takes the split row's place as a plain tab.

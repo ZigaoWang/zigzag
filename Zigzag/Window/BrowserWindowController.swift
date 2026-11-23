@@ -2128,7 +2128,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private weak var readerTab: Tab?
     /// The pane the reading page covers: in a split, the one its tab is in.
     private weak var readerCard: PageCardView?
-    var isReaderOpen: Bool { readerCard != nil }
+    var isReaderOpen: Bool { isShowingReader }
     /// Reader is on over the page you're in.
     var isReaderOnHere: Bool { reader != nil && readerTab === tabManager.selectedTab }
     private var readerURL: URL?
@@ -2307,8 +2307,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func updateReaderButton() {
-        let tab = tabManager.selectedTab
-        sidebar.address.setReader(available: tab?.isArticle ?? false, active: reader != nil && readerTab === tab)
+        // Pressed while Reader is up in this split, as the menu and Site Controls say: a press then closes it.
+        sidebar.address.setReader(available: tabManager.selectedTab?.isArticle ?? false, active: isShowingReader)
     }
 
     private func updateWindowTitle() {

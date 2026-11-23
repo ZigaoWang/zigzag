@@ -338,6 +338,39 @@ struct ReaderToggleTests {
     }
 }
 
+/// Reader up over one page of a split, with the other page focused: the address's button, the menu bar and Site
+/// Controls all say it's on, since pressing any of them closes it.
+@MainActor
+struct ReaderInSplitTests {
+    @Test func everyPlaceSaysReaderIsOnInTheOtherPane() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let url = try #require(URL(string: "https://example.com/story"))
+        let story = Tab(url: url, title: "Story", spaceID: space)
+        let other = Tab(url: try #require(URL(string: "https://example.com/other")), title: "Other", spaceID: space)
+        manager.adopt([story, other], in: space)
+        manager.makeSplit(story, with: other)
+        manager.select(story)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let article = Reader.Article(title: "T", byline: "", site: "S", content: "<p>x</p>", length: 1, lang: "en")
+        controller.showReader(article, in: story, from: url, store: .nonPersistent())
+        manager.select(other)
+        #expect(controller.isShowingReader)
+        let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleReader(_:)), keyEquivalent: "")
+        _ = controller.validateMenuItem(item)
+        #expect(item.title == String(localized: "Hide Reader", comment: "Menu bar item: closes Reader."))
+        let button = controller.sidebar.address.readerButton
+        #expect(button.isSelected)
+        button.onClick?(NSEvent())
+        #expect(!controller.isShowingReader)
+        #expect(!button.isSelected)
+    }
+}
+
 /// Reader pressed while waiting for a load cancels the wait only on that tab.
 @MainActor
 struct ReaderWaitTests {
