@@ -71,6 +71,47 @@ import Testing
         #expect(!keys(#selector(BrowserWindowController.closeSplitView(_:))).contains("⌥⌘\\"))
     }
 
+    /// No two items in the menu bar ship with the same keys, the developer tools' included.
+    @Test func noTwoMenuBarItemsShareKeys() {
+        let main = MainMenu.build()
+        MainMenu.setDeveloperTools(true, in: main)
+        var owners: [String: String] = [:]
+        func walk(_ menu: NSMenu) {
+            for item in menu.items {
+                if let sub = item.submenu { walk(sub); continue }
+                guard !item.keyEquivalent.isEmpty else { continue }
+                let mods = item.keyEquivalentModifierMask.intersection([.command, .option, .control, .shift, .function]).rawValue
+                let combo = "\(mods) \(item.keyEquivalent.lowercased())"
+                #expect(owners[combo] == nil || owners[combo] == item.title, "\(item.title) and \(owners[combo] ?? "") share keys")
+                owners[combo] = item.title
+            }
+        }
+        walk(main)
+        #expect(owners.count > 50)
+    }
+
+    /// The command bar's commands are named as their menu bar items are.
+    @Test func theCommandBarsCommandsAreNamedAsInTheMenuBar() {
+        let main = MainMenu.build()
+        func title(of action: Selector, in menu: NSMenu) -> String? {
+            for item in menu.items {
+                if let sub = item.submenu, let found = title(of: action, in: sub) { return found }
+                if item.action == action { return item.title }
+            }
+            return nil
+        }
+        let bar: [String: Selector] = [
+            "clear-cache": #selector(BrowserWindowController.clearCache(_:)), "clear-cookies": #selector(BrowserWindowController.clearCookies(_:)),
+            "settings": #selector(AppDelegate.showSettings(_:)), "archive": #selector(AppDelegate.showArchive(_:)),
+            "passwords": #selector(AppDelegate.showPasswords(_:)), "import": #selector(AppDelegate.importFromBrowser(_:)),
+            "feedback": #selector(BrowserWindowController.sendFeedback(_:)), "report": #selector(BrowserWindowController.reportProblem(_:)),
+        ]
+        for action in CommandRanker.actions {
+            guard let selector = bar[action.id] else { Issue.record("\(action.id) has no menu bar item listed"); continue }
+            #expect(title(of: selector, in: main) == action.title, "\(action.id)")
+        }
+    }
+
     @Test func onlyTheCommandQKeyCountsAsTheQuitToAskAbout() {
         let quit = MainMenu.build().items.first?.submenu?.items.first { $0.keyEquivalent == "q" }
         #expect(quit?.action == #selector(AppDelegate.quitFromMenu(_:)))

@@ -716,6 +716,48 @@ struct SidebarRowMenuTests {
         }
     }
 
+    /// Every drawn sidebar menu shows the menu bar's keys on an item for the same action: a tab's, a pinned page's
+    /// (loaded or not), a favorite's, a space's, picked rows' and the +'s.
+    @Test func everySidebarMenuShowsTheMenuBarsKeysForTheSameAction() throws {
+        try inWindow(["A", "B", "C"]) { controller, tabs, space in
+            typealias C = BrowserWindowController
+            let manager = controller.tabManager
+            manager.bookmarkTab(tabs[2], in: space)
+            let pin = try #require(tabs[2].bookmarkID.flatMap { Library.shared.bookmark($0) })
+            let resting = Library.shared.addBookmark(url: URL(string: "https://example.com/menu/resting")!, title: "Resting", to: space)
+            let favorite = Library.shared.addFavorite(url: URL(string: "https://example.com/menu/favorite")!, title: "Favorite", in: manager.profile.id)
+            let actions: [String: Selector] = [
+                "Reload Page": #selector(C.reloadPage(_:)), "Duplicate Tab": #selector(C.duplicateTab(_:)), "Suspend Page": #selector(C.suspendPage(_:)),
+                "Mute Tab": #selector(C.toggleMute(_:)), "Unmute Tab": #selector(C.toggleMute(_:)), "Copy Link": #selector(C.copyPageURL(_:)),
+                "Pin Tab": #selector(C.toggleBookmark(_:)), "Unpin Tab": #selector(C.toggleBookmark(_:)), "Move to Tabs": #selector(C.toggleBookmark(_:)),
+                "Add to Favorites": #selector(C.addToFavorites(_:)), "Close Tab": #selector(C.closeTab(_:)), "Close Tabs Below": #selector(C.closeTabsBelow(_:)),
+                "Close Other Tabs": #selector(C.closeOtherTabs(_:)), "Edit Space…": #selector(C.renameSpace(_:)), "New Space": #selector(C.newSpace(_:)),
+                "New Tab": #selector(C.newTab(_:)),
+            ]
+            var menus: [[MenuPanel.Entry]] = [
+                SidebarMenus.tabMenu(for: tabs[0], controller: controller), SidebarMenus.tabMenu(for: tabs[1], controller: controller),
+                SidebarMenus.bookmarkMenu(for: pin, controller: controller), SidebarMenus.favoriteMenu(for: favorite, controller: controller),
+                SidebarMenus.spaceMenu(for: space, controller: controller),
+                SidebarMenus.markedMenu(for: [.tab(tabs[0].id), .tab(tabs[1].id)], controller: controller),
+            ].map(MenuPanel.entries(from:))
+            if let resting { menus.append(MenuPanel.entries(from: SidebarMenus.bookmarkMenu(for: resting, controller: controller))) }
+            menus += [SidebarMenus.addPanel(controller: controller), SidebarMenus.blankPanel(controller: controller)]
+            @MainActor func items(_ entries: [MenuPanel.Entry]) -> [MenuPanel.Item] {
+                entries.flatMap { entry -> [MenuPanel.Item] in
+                    guard case .item(let item) = entry else { return [] }
+                    return [item] + items(item.submenu ?? [])
+                }
+            }
+            var checked = Set<String>()
+            for item in menus.flatMap(items) {
+                guard let action = actions[item.title] else { continue }
+                #expect(item.shortcut == Shortcuts.keys(for: action), "\(item.title)")
+                checked.insert(item.title)
+            }
+            #expect(checked.isSuperset(of: ["Copy Link", "Unpin Tab", "Move to Tabs", "Close Tab", "New Tab", "Edit Space…"]))
+        }
+    }
+
     /// A right-click on a tab's row opens the drawn menu and gives AppKit none.
     @Test func aRightClickOnARowOpensTheDrawnMenu() throws {
         try inWindow(["A", "B"]) { controller, tabs, _ in
