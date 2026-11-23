@@ -974,26 +974,6 @@ enum TouchDoubleTap {
     }
 }
 
-/// A finger in from a page's edge goes back (the left edge) or forward (the right), as on an iPad.
-enum TouchEdgeSwipe {
-    /// How far in from the edge a finger counts as starting on it.
-    nonisolated static let edge: CGFloat = 32
-
-    /// -1 for back from the left edge, 1 for forward from the right, nil elsewhere, for a finger landing at `x` on a
-    /// page `width` wide.
-    nonisolated static func direction(atX x: CGFloat, width: CGFloat) -> Int? {
-        guard width > edge * 4 else { return nil }
-        if x <= edge { return -1 }
-        if x >= width - edge { return 1 }
-        return nil
-    }
-
-    /// Whether a finger that moved by `translation` swipes in from its edge (`direction`'s), not along it.
-    nonisolated static func isInward(_ translation: NSPoint, direction: Int) -> Bool {
-        TouchSwipe.isSideways(translation) && (direction < 0 ? translation.x > 0 : translation.x < 0)
-    }
-}
-
 /// Two fingers pinched in on a page at its usual size open Show All Tabs, as on an iPad; pinched out on a card there,
 /// it opens.
 enum TouchPinch {

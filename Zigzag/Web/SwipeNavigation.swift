@@ -89,7 +89,7 @@ final class SwipeNavigator {
             watchdog?.cancel()
             stopWatchingRest()
             guard webView.window != nil else { state = .idle; return false }
-            // A finger dragging the page on the screen scrolls it; only a swipe in from its edge goes back.
+            // Fingers dragging the page on the screen scroll it; their own swipe goes back (PageHolder).
             if TouchPress.isTouchScroll(at: event.timestamp) { state = .ignoring; return false }
             state = .deciding
             dx = 0; dy = 0; direction = 0; arming = SwipeArming(); pageScrolls = nil; overFrame = false; samples = []
@@ -165,9 +165,9 @@ final class SwipeNavigator {
         if page == .took, state == .tracking { cancel(); state = .ignoring }
     }
 
-    // MARK: A finger in from the edge
+    // MARK: Two fingers on the screen
 
-    /// Whether a finger swiping in from the page's edge may go `wanted`'s way (-1 back, 1 forward): the system's
+    /// Whether two fingers swiping sideways on the page may go `wanted`'s way (-1 back, 1 forward): the system's
     /// setting for touch swipes and Zigzag's own allow it, and there's somewhere to go.
     func takesTouchSwipe(_ wanted: Int) -> Bool {
         guard let webView, Self.isOn, webView.fullscreenState == .notInFullscreen, webView.window != nil else { return false }
@@ -175,7 +175,7 @@ final class SwipeNavigator {
         return wanted < 0 ? webView.owner?.canGoBackOrReturn ?? webView.canGoBack : webView.canGoForward
     }
 
-    /// A finger came in from the edge going `wanted`'s way: the arrow comes, as for two fingers on the trackpad.
+    /// Fingers on the screen are swiping `wanted`'s way: the arrow comes, as for two fingers on the trackpad.
     func touchBegan(direction wanted: Int) {
         if state == .tracking { cancel() }
         if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
@@ -188,7 +188,7 @@ final class SwipeNavigator {
         update()
     }
 
-    /// The finger is `dx` points from where it came in (positive to the right) at `time`.
+    /// The fingers are `dx` points from where they landed (positive to the right) at `time`.
     func touchMoved(dx moved: CGFloat, at time: TimeInterval) {
         guard state == .tracking else { return }
         dx = moved

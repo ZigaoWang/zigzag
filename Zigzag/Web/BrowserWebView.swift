@@ -87,7 +87,7 @@ final class BrowserWebView: WKWebView {
 
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
-        if swipe.handle(event) { return }
+        if TouchSwipeRecognizer.claims(event) || swipe.handle(event) { return }
         owner?.scrolledSinceSave = true
         super.scrollWheel(with: event)
     }
