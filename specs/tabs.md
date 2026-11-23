@@ -9,6 +9,8 @@
   Test: TabCloseSelectionTests.closingAPinnedPageOrFavoriteUnloadsItAndKeepsIt
 - ⌘W on the last tab of a space → the space's most recent page, else the space shows empty.
   Test: TabCloseSelectionTests.closingTheLastTabGoesToTheSpacesRecentPageElseEmpty
+- Close a tab → its page is let go at once, so WebKit can end its process; ⇧⌘T loads it again with its history.
+  Test: PageReleaseTests.aClosedTabLetsGoOfItsPageAndItself
 
 ## Reopening
 - ⇧⌘T → whatever closed last comes back, app-wide: a tab, a tab of a closed window, or a whole window.
@@ -51,6 +53,8 @@
   Test: TabSleepTests.typedTextAndTabsInUseNeverSleep
 - Suspend Page on a running tab → it sleeps now, and you move to its opener or a neighbor.
   Test: SidebarRowMenuTests.theTabYoureOnGoesOutOfSightAsItSleeps
+- A tab goes to sleep → its page is let go, not paused, so WebKit can end its process.
+  Test: PageReleaseTests.aSleepingTabLetsGoOfItsPage
 - A sleeping tab in the tab list → its icon wears a dashed ring.
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.
