@@ -29,6 +29,24 @@ import Testing
         #expect(PaneHeaderView.fit(width: 80, edge: edge, address: address) == .noReload)
     }
 
+    @Test func theSidebarToggleTakesItsOwnRoom() {
+        // The touch toggle in the top strip is one more button: the others give way a step sooner.
+        #expect(PaneHeaderView.fit(width: 225, edge: edge, address: address) == .separateInMore)
+        #expect(PaneHeaderView.fit(width: 225, edge: edge, address: address, toggle: true) > .separateInMore)
+        #expect(PaneHeaderView.fit(width: 700, edge: edge, address: address, toggle: true) == .all)
+        let header = PaneHeaderView(frame: NSRect(x: 0, y: 0, width: 600, height: PaneHeaderView.height))
+        header.layoutSubtreeIfNeeded()
+        #expect(header.sidebarButton.isHidden)
+        let back = header.back.frame
+        header.showsSidebarButton = true
+        header.layoutSubtreeIfNeeded()
+        #expect(!header.sidebarButton.isHidden && header.sidebarButton.frame.minX == back.minX && header.back.frame.minX == back.maxX)
+        header.sidebarOnRight = true
+        header.layoutSubtreeIfNeeded()
+        #expect(header.back.frame.minX == back.minX && header.sidebarButton.frame.minX > header.closeTab.frame.maxX)
+        #expect(header.sidebarButton.symbol == SidebarView.toggleSymbol(onRight: true))
+    }
+
     @Test func aShortAddressNeedsLessRoom() {
         #expect(PaneHeaderView.fit(width: 250, edge: edge, address: 30) == .all)
     }

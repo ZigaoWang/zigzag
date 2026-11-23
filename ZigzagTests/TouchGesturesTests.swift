@@ -985,17 +985,109 @@ struct TouchMovesTests {
             root.setSidebarVisible(false, animated: false)
             root.layoutSubtreeIfNeeded()
             controller.layoutTrafficLights()
+            let window = controller.browserWindow
+            #expect(window.standardWindowButton(.closeButton)?.isHidden == true)
             root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
-            #expect(root.isGrabberShown)
+            #expect(root.isGrabberShown && root.grabberPlace == .lights && root.grabberStrip == nil)
             // Same place, size and symbol as the sidebar's own toggle, in the title bar beside the lights.
-            #expect(abs(root.grabber.frame.minX - toggle.minX) < 0.5 && abs(root.grabber.frame.minY - toggle.minY) < 0.5)
-            #expect(root.grabber.frame.size == toggle.size)
+            let shown = root.convert(root.grabber.toggleFrame, from: root.grabber)
+            #expect(abs(shown.minX - toggle.minX) < 0.5 && abs(shown.minY - toggle.minY) < 0.5)
+            #expect(shown.size == toggle.size)
             #expect(root.grabber.button.symbol == SidebarView.toggleSymbol(onRight: onRight))
-            let container = try #require(controller.window?.standardWindowButton(.closeButton)?.superview?.superview)
-            #expect(container.frame.contains(root.convert(NSPoint(x: root.grabber.frame.midX, y: root.grabber.frame.midY), to: nil)))
+            // The lights show with it, on its backing: one group, never the toggle alone.
+            let close = try #require(window.standardWindowButton(.closeButton)), zoom = try #require(window.standardWindowButton(.zoomButton))
+            #expect(!close.isHidden)
+            let lights = root.convert(close.convert(close.bounds, to: nil), from: nil).union(root.convert(zoom.convert(zoom.bounds, to: nil), from: nil))
+            #expect(root.grabber.frame.contains(lights) && root.grabber.frame.contains(shown))
+            // The lights as far in from its leading edge as the toggle's glyph from its trailing one.
+            #expect(abs((lights.minX - root.grabber.frame.minX) - (root.grabber.frame.maxX - shown.maxX + (shown.width - Tokens.Sidebar.glyph) / 2)) < 1)
+            // A finger's target at least 44 points each way, clear of the lights.
+            #expect(root.grabberTarget.width >= 44 && root.grabberTarget.height >= 44)
+            #expect(root.grabberTarget.contains(NSPoint(x: shown.midX, y: shown.midY)) && root.grabberTarget.minX >= lights.maxX - 0.5)
+            let container = try #require(window.standardWindowButton(.closeButton)?.superview?.superview)
+            #expect(container.frame.contains(root.convert(NSPoint(x: shown.midX, y: shown.midY), to: nil)))
             // A finger on it is heard on the title bar, where it lands.
             if TouchGestures.isAvailable { #expect(root.titlebarPull?.view === container) }
+            // The pointer moving: the group goes, and the lights with it.
+            root.notePointerMoved(at: ProcessInfo.processInfo.systemUptime + 1)
+            #expect(root.grabberPlace == nil && close.isHidden)
         }
+    }
+
+    @Test func theGrabberJoinsTheTopPanesStrip() throws {
+        for onRight in [false, true] {
+            let manager = TabManager(spaceID: Library.shared.spaces[0].id)
+            defer { manager.invalidate() }
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1100, height: 700))
+            defer { controller.window?.close() }
+            let root = controller.root
+            if onRight { root.setSidebarOnRight(true, animated: false) }
+            defer { if onRight { root.setSidebarOnRight(false, animated: false) } }
+            root.showsTopBar = false
+            root.setSidebarVisible(false, animated: false)
+            let shapes = [TileShape(regions: [.left, .right]), TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])]
+            for shape in shapes {
+                root.setTiles(shape, animated: false)
+                for card in root.paneCards.prefix(shape.regions.count) { card.showsHeader = true }
+                root.layoutSubtreeIfNeeded()
+                controller.layoutTrafficLights()
+                root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
+                root.layoutSubtreeIfNeeded()
+                // In the top pane's strip on the sidebar's side, as one of its buttons; nothing floats over the page.
+                #expect(root.grabberPlace == .strip && root.grabber.isHidden)
+                #expect(controller.browserWindow.standardWindowButton(.closeButton)?.isHidden == true)
+                let strip = try #require(root.grabberStrip)
+                let owner = try #require(root.paneCards.first { $0.header === strip })
+                let tops = root.paneCards.prefix(shape.regions.count).filter { abs($0.frame.maxY - owner.frame.maxY) < 0.5 }
+                #expect(tops.allSatisfy { onRight ? $0.frame.maxX <= owner.frame.maxX : $0.frame.minX >= owner.frame.minX })
+                #expect(root.paneCards.filter { $0.header.showsSidebarButton }.count == 1)
+                strip.layoutSubtreeIfNeeded()
+                let button = strip.sidebarButton
+                #expect(!button.isHidden && button.frame.size == strip.back.frame.size)
+                #expect(button.symbol == SidebarView.toggleSymbol(onRight: onRight))
+                if onRight {
+                    #expect(button.frame.maxX > strip.closeTab.frame.maxX && abs(button.frame.minY - strip.closeTab.frame.minY) < 0.5)
+                } else {
+                    #expect(abs(button.frame.maxX - strip.back.frame.minX) < 0.5 && abs(button.frame.minY - strip.back.frame.minY) < 0.5)
+                }
+                // A finger takes it within 44 points, but Back stays Back's.
+                let target = TouchSidebarGrabber.target(around: button.frame)
+                #expect(target.width >= 44 && target.height >= 44)
+                #expect(strip.fingerTakesSidebarButton(at: NSPoint(x: button.frame.midX, y: button.frame.midY)))
+                #expect(!strip.fingerTakesSidebarButton(at: NSPoint(x: strip.back.frame.midX, y: strip.back.frame.midY)))
+                // A tap brings the sidebar out to stay, and the strip gives the button back.
+                #expect(button.accessibilityPerformPress())
+                #expect(root.sidebarRevealed && root.isTouchHeld && root.grabberPlace == nil && !strip.showsSidebarButton)
+                root.endTouchHold()
+            }
+            // Out of split view: back with the lights.
+            root.setTiles(nil, animated: false)
+            root.card.showsHeader = false
+            root.layoutSubtreeIfNeeded()
+            #expect(root.grabberPlace == .lights && root.paneCards.allSatisfy { !$0.header.showsSidebarButton })
+        }
+    }
+
+    @Test func theGrabbersPlacesAndTarget() {
+        #expect(TouchSidebarGrabber.place(stripOnTop: true) == .strip)
+        #expect(TouchSidebarGrabber.place(stripOnTop: false) == .lights)
+        // Bottom-up frames: a 2×2 grid, and a split stacked top and bottom.
+        let grid = [NSRect(x: 0, y: 350, width: 500, height: 350), NSRect(x: 500, y: 350, width: 500, height: 350),
+                    NSRect(x: 0, y: 0, width: 500, height: 350), NSRect(x: 500, y: 0, width: 500, height: 350)]
+        #expect(TouchSidebarGrabber.stripPane(grid, onRight: false) == 0)
+        #expect(TouchSidebarGrabber.stripPane(grid, onRight: true) == 1)
+        let stacked = [NSRect(x: 0, y: 0, width: 1000, height: 350), NSRect(x: 0, y: 350, width: 1000, height: 350)]
+        #expect(TouchSidebarGrabber.stripPane(stacked, onRight: false) == 1)
+        #expect(TouchSidebarGrabber.stripPane([], onRight: false) == nil)
+        let toggle = NSRect(x: 90, y: 9, width: 26, height: 26)
+        let target = TouchSidebarGrabber.target(around: toggle)
+        #expect(target.width == 44 && target.height == 44 && target.contains(toggle))
+        let clear = TouchSidebarGrabber.target(around: toggle, clearOf: 86)
+        #expect(clear.minX == 86 && clear.width == 44 && clear.contains(toggle))
+        let group = TouchSidebarGrabber.groupFrame(toggle: toggle, lightsMinX: 20)
+        #expect(group.minX == 20 - TouchSidebarGrabber.lightsMargin && group.maxX == toggle.maxX + TouchSidebarGrabber.inset)
+        #expect(group.height == toggle.height + 2 * TouchSidebarGrabber.inset)
+        #expect(TouchSidebarGrabber.groupFrame(toggle: toggle, lightsMinX: nil) == toggle.insetBy(dx: -3, dy: -3))
     }
 
     @Test func aTapOnTheGrabberBringsTheSidebarOutToStay() {
@@ -1067,7 +1159,8 @@ struct TouchMovesTests {
         let landed = TouchPress.landedAt
         TouchPress.landedAt = now
         defer { TouchPress.landedAt = landed }
-        let point = NSPoint(x: root.grabber.frame.midX, y: root.grabber.frame.midY)
+        let grabbed = root.convert(root.grabber.toggleFrame, from: root.grabber)
+        let point = NSPoint(x: grabbed.midX, y: grabbed.midY)
         let inWindow = root.convert(point, to: nil)
         root.grabberTapped(at: point)
         root.layoutSubtreeIfNeeded()

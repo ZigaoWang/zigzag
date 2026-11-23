@@ -35,6 +35,18 @@ final class PaneHeaderView: NSView {
     /// Closes this pane's page, as closing it from the sidebar does: in a split of two the other page fills the
     /// window, and in a group of three or four the rest stay tiled.
     let closeTab = PaneHeaderView.button("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button in the strip on top of each page of a split view: closes that page's tab, leaving the other page."))
+    /// Shows the hidden sidebar while a finger is in use (`TouchSidebarGrabber`): in the top pane's strip on the
+    /// sidebar's side, before Back on the left, after the close button on the right.
+    let sidebarButton = PaneHeaderView.button(SidebarView.toggleSymbol(onRight: false),
+                                              toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
+    var showsSidebarButton = false { didSet { if showsSidebarButton != oldValue { needsLayout = true } } }
+    var sidebarOnRight = false {
+        didSet {
+            guard sidebarOnRight != oldValue else { return }
+            sidebarButton.symbol = SidebarView.toggleSymbol(onRight: sidebarOnRight)
+            needsLayout = true
+        }
+    }
     /// Where the split's own buttons go when the pane is too narrow for them beside its address.
     let more = PaneHeaderView.button("ellipsis", toolTip: String(localized: "More", comment: "Tooltip of a button in the strip on top of each page of a narrow split view: opens a menu with the split's buttons that don't fit."))
     /// The page's address: click it to edit it, as the sidebar's address does for the page you're in.
@@ -78,7 +90,8 @@ final class PaneHeaderView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [windowGuard, back, forward, reload, address, zoom, swap, orientation, resetLayout, close, more, closeTab, line].forEach { addSubview($0) }
+        [windowGuard, sidebarButton, back, forward, reload, address, zoom, swap, orientation, resetLayout, close, more, closeTab, line].forEach { addSubview($0) }
+        sidebarButton.isHidden = true
         more.onClick = { [weak self] _ in self?.showMore() }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }
@@ -153,13 +166,20 @@ final class PaneHeaderView: NSView {
     /// Whether a finger at `point` (own coordinates) drags the pane: on the strip itself, not a button or the address,
     /// and not while the strip is the window's bar.
     func takesTouchDrag(at point: NSPoint) -> Bool {
-        guard !isInBar, tab != nil, onDrag != nil, bounds.contains(point), let superview else { return false }
+        guard !isInBar, tab != nil, onDrag != nil, bounds.contains(point), !fingerTakesSidebarButton(at: point), let superview else { return false }
         var view = hitTest(convert(point, to: superview))
         while let current = view, current !== self {
             if current is InteractiveView { return false }
             view = current.superview
         }
         return true
+    }
+
+    /// Whether a finger at `point` (own coordinates) is on the sidebar toggle: within `TouchSidebarGrabber.target`
+    /// around it, and not on another of the strip's buttons.
+    func fingerTakesSidebarButton(at point: NSPoint) -> Bool {
+        guard showsSidebarButton, !sidebarButton.isHidden, TouchSidebarGrabber.target(around: sidebarButton.frame).contains(point) else { return false }
+        return ![back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab].contains { !$0.isHidden && $0.frame.contains(point) }
     }
 
     private func touchDragChanged(_ pan: NSPanGestureRecognizer) {
@@ -213,7 +233,7 @@ final class PaneHeaderView: NSView {
         // Up in the bar on the window's frame, the bar's own appearance is the strip's; over its card, its card's.
         appearance = overCard ? PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:)) : nil
         let onPage = overCard && ground != nil
-        [back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab, address.siteControls].forEach { $0.isOnPage = onPage; $0.ground = ground }
+        [sidebarButton, back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab, address.siteControls].forEach { $0.isOnPage = onPage; $0.ground = ground }
     }
 
     func setVertical(_ vertical: Bool) {
@@ -278,18 +298,23 @@ final class PaneHeaderView: NSView {
     /// The first fit, most buttons first, that leaves the address its room. Zoom, swap, the layout and reset stay out
     /// only while the address shows whole, up to twice `Pane.addressMinWidth`; the rest give way only to keep it that
     /// minimum. Too narrow for any, the fewest buttons.
-    /// Without swap and the layout (`arrangesSplit` off), they take no room in any fit; zoom does.
-    static func fit(width: CGFloat, edge: CGFloat, address: CGFloat, splitButtons: Bool = true, resetLayout: Bool = false) -> Fit {
+    /// Without swap and the layout (`arrangesSplit` off), they take no room in any fit; zoom does. The sidebar toggle
+    /// (`toggle`) takes `toggleRoom` in every fit.
+    static func fit(width: CGFloat, edge: CGFloat, address: CGFloat, splitButtons: Bool = true, resetLayout: Bool = false,
+                    toggle: Bool = false) -> Fit {
         let b = Tokens.Pane.button, gap = Tokens.Space.x2
         for fit in Fit.allCases {
             let need = min(address, Tokens.Pane.addressMinWidth * (fit == .all ? 2 : 1))
-            let lo = edge + CGFloat(fit.leading) * b + gap
+            let lo = edge + CGFloat(fit.leading) * b + gap + (toggle ? toggleRoom : 0)
             let trailing = fit.trailing - (!splitButtons && fit.showsSplitButtons ? 2 : 0) + (resetLayout && fit.showsSplitButtons ? 1 : 0)
             let hi = width - edge - b - gap - CGFloat(trailing) * b - gap
             if hi - lo >= need { return fit }
         }
         return .noReload
     }
+
+    /// The sidebar toggle's room: a button, and the gap that keeps it apart from the close button on the right.
+    static var toggleRoom: CGFloat { Tokens.Pane.button + Tokens.Space.x2 }
 
     /// The address pill in a button row: centered on `center` (the page's middle), as wide as its address (`fitting`),
     /// within the `room` the buttons leave and shifted to avoid clipping. Over the card it widens to a comfortable
@@ -353,8 +378,9 @@ final class PaneHeaderView: NSView {
         let scale = window?.backingScaleFactor ?? 2
         let y = isInBar ? round((bounds.height - b) / 2) : round((bounds.height - Tokens.Metric.hairline - b) / 2 * scale) / scale
         let fit = Self.fit(width: bounds.width, edge: edge, address: address.text.isEmpty ? 0 : address.fittingWidth,
-                           splitButtons: arrangesSplit, resetLayout: resetsLayout)
+                           splitButtons: arrangesSplit, resetLayout: resetsLayout, toggle: showsSidebarButton)
         currentFit = fit
+        sidebarButton.isHidden = !showsSidebarButton
         forward.isHidden = !fit.showsForward
         reload.isHidden = !fit.showsReload
         swap.isHidden = !fit.showsSplitButtons || !arrangesSplit
@@ -364,18 +390,22 @@ final class PaneHeaderView: NSView {
         close.isHidden = !fit.showsSeparate
         more.isHidden = !fit.showsMore
         var x = edge
-        for button in [back, forward, reload] where !button.isHidden {
+        let leadingToggle = showsSidebarButton && !sidebarOnRight, trailingToggle = showsSidebarButton && sidebarOnRight
+        for button in (leadingToggle ? [sidebarButton] : []) + [back, forward, reload] where !button.isHidden {
             button.frame = NSRect(x: x, y: y, width: b, height: b)
             x += b
         }
-        closeTab.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b)
+        if trailingToggle { sidebarButton.frame = NSRect(x: bounds.width - edge - b, y: y, width: b, height: b) }
+        // On the right, the toggle comes last, apart from the close button as the split's buttons are.
+        let closeMaxX = trailingToggle ? sidebarButton.frame.minX - Tokens.Space.x2 : bounds.width - edge
+        closeTab.frame = NSRect(x: closeMaxX - b, y: y, width: b, height: b)
         // A little room between the split's own buttons and the one that closes the page, so it isn't hit by mistake.
         var trailing = closeTab.frame.minX - Tokens.Space.x2
         for button in [more, close, orientation, swap, zoom, resetLayout] where !button.isHidden {
             button.frame = NSRect(x: trailing - b, y: y, width: b, height: b)
             trailing -= b
         }
-        [back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab].forEach { $0.radius = Tokens.Radius.control }
+        [sidebarButton, back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab].forEach { $0.radius = Tokens.Radius.control }
         // The address pill is centered over its pane, as wide as its text, within the room the buttons leave, and
         // nudged clear of them where centering would cut it.
         addressRoom = x + Tokens.Space.x2...max(x + Tokens.Space.x2, trailing - Tokens.Space.x2)

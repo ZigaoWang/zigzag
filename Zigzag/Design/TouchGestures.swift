@@ -1044,10 +1044,51 @@ enum TouchSidebarPull {
     }
 }
 
-/// A sidebar toggle in the title bar while the sidebar is hidden and a finger has been used in the window lately,
-/// where the sidebar's own toggle sits when it shows: a tap brings the sidebar out, a finger dragged from it pulls it
-/// out.
+/// A sidebar toggle while the sidebar is hidden and a finger has been used in the window lately: in the top pane's
+/// strip while the strips run along the page's top, otherwise beside the traffic lights, shown with them. A tap brings
+/// the sidebar out, a finger dragged from it pulls it out.
 enum TouchSidebarGrabber {
+    /// Where it shows.
+    enum Place: Equatable {
+        /// A button in the strip on top of a split's pane.
+        case strip
+        /// With the traffic lights, on one backing, where the docked sidebar has them and its toggle.
+        case lights
+    }
+
+    /// The least a finger's target around it is, each way.
+    static let fingerTarget: CGFloat = 44
+
+    /// The finger's target around the toggle at `toggle`, kept clear of the traffic lights ending at `lightsMaxX`.
+    static func target(around toggle: NSRect, clearOf lightsMaxX: CGFloat? = nil) -> NSRect {
+        var box = TouchGestures.box(around: toggle, minimum: fingerTarget)
+        if let lightsMaxX, box.minX < lightsMaxX { box.origin.x = lightsMaxX }
+        return box
+    }
+
+    /// In a strip while a pane's strip is at the top of the page area, otherwise with the lights.
+    static func place(stripOnTop: Bool) -> Place { stripOnTop ? .strip : .lights }
+
+    /// Which pane's strip takes it, of panes at `frames` (bottom-up, as AppKit's): the top one on the sidebar's side.
+    static func stripPane(_ frames: [NSRect], onRight: Bool) -> Int? {
+        guard let top = frames.map(\.maxY).max() else { return nil }
+        let row = frames.indices.filter { frames[$0].maxY >= top - 0.5 }
+        return onRight ? row.max { frames[$0].maxX < frames[$1].maxX } : row.min { frames[$0].minX < frames[$1].minX }
+    }
+
+    /// The backing's inset around the toggle.
+    static let inset: CGFloat = 3
+    /// The backing's room before the lights: as much as from the toggle's glyph to its trailing edge.
+    static var lightsMargin: CGFloat { inset + (Tokens.Sidebar.button - Tokens.Sidebar.glyph) / 2 }
+
+    /// The group's frame, top-down: around the toggle at `toggle`, reaching back over the lights from `lightsMinX`.
+    static func groupFrame(toggle: NSRect, lightsMinX: CGFloat?) -> NSRect {
+        let around = toggle.insetBy(dx: -inset, dy: -inset)
+        guard let lightsMinX else { return around }
+        let minX = lightsMinX - lightsMargin
+        return NSRect(x: minX, y: around.minY, width: around.maxX - minX, height: around.height)
+    }
+
     /// A finger landed in the window this recently: it shows.
     nonisolated static let recent: TimeInterval = 15 * 60
 
@@ -1059,7 +1100,7 @@ enum TouchSidebarGrabber {
         return pointerMovedAt.map { $0 < touchedAt } ?? true
     }
 
-    /// Where it goes, top-down from the window's top left: where the docked sidebar, starting `sidebarMinX` in, has
-    /// its toggle (`toggle`, in the sidebar).
+    /// Where its toggle goes with the lights, top-down from the window's top left: where the docked sidebar, starting
+    /// `sidebarMinX` in, has its toggle (`toggle`, in the sidebar).
     nonisolated static func frame(toggle: NSRect, sidebarMinX: CGFloat) -> NSRect { toggle.offsetBy(dx: sidebarMinX, dy: 0) }
 }

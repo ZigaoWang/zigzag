@@ -337,8 +337,9 @@ final class TileSnapGuide: ColorView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// The sidebar toggle in the title bar while the sidebar is hidden and touch is in use (`TouchSidebarGrabber`), on
-/// the title bar's material so it reads over any page, as the lights do in full screen (#462).
+/// The traffic lights and the sidebar toggle as one group in the title bar, while the sidebar is hidden and touch is
+/// in use (`TouchSidebarGrabber`): on the title bar's material so it reads over any page, as the lights do in full
+/// screen (#462). AppKit draws the lights over its leading end.
 final class SidebarGrabber: NSView {
     /// A tap, a click or VoiceOver's press: the sidebar comes out.
     var onOpen: ((NSEvent) -> Void)?
@@ -346,6 +347,11 @@ final class SidebarGrabber: NSView {
                                           toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
     private let backing = NSVisualEffectView()
     var onRight = false { didSet { if onRight != oldValue { button.symbol = SidebarView.toggleSymbol(onRight: onRight) } } }
+    /// The toggle's frame in the group, at its trailing end.
+    var toggleFrame: NSRect {
+        let side = SidebarView.toolbarButton, inset = TouchSidebarGrabber.inset
+        return NSRect(x: bounds.maxX - inset - side, y: inset, width: side, height: side)
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -364,8 +370,9 @@ final class SidebarGrabber: NSView {
     override func layout() {
         super.layout()
         backing.frame = bounds
-        backing.layer?.cornerRadius = button.radius
-        button.frame = bounds
+        // Concentric with the toggle's hover box.
+        backing.layer?.cornerRadius = button.radius + TouchSidebarGrabber.inset
+        button.frame = toggleFrame
     }
 }
 
@@ -749,6 +756,12 @@ final class BrowserRootView: SpaceFrameView {
             self?.openFromGrabber()
             (self?.window as? BrowserWindow)?.spendFingerClick(event)
         }
+        for pane in paneCards {
+            pane.header.sidebarButton.onClick = { [weak self] event in
+                self?.openFromGrabber()
+                (self?.window as? BrowserWindow)?.spendFingerClick(event)
+            }
+        }
         addSubview(grabber)
         addSubview(sidebarContainer)
         // Over the sidebar, so the part of its edge's band inside the sidebar takes the pointer too (#362).
@@ -1109,38 +1122,85 @@ final class BrowserRootView: SpaceFrameView {
         refreshGrabber()
     }
 
-    /// A finger takes it anywhere in `TouchGestures.target` around it.
-    private func grabberTakes(_ point: NSPoint) -> Bool { isGrabberShown && TouchGestures.box(around: grabber.frame).contains(point) }
+    /// Where it shows now, nil while hidden.
+    private(set) var grabberPlace: TouchSidebarGrabber.Place?
+    /// The strip showing it, while it's in one.
+    private(set) weak var grabberStrip: PaneHeaderView?
+    /// Where the lights end in the group, in own coordinates; nil with no lights in it (full screen).
+    private var grabberLightsMaxX: CGFloat?
+    /// The group with the lights moved or came or went: the window puts the lights with it.
+    var onGrabberMoved: (() -> Void)?
 
-    /// Where the docked sidebar has its toggle, on the lights' line.
-    func placeGrabber() {
-        let sidebar = sidebarContainer.sidebar
-        let row = SidebarView.topRowFrames(width: sidebarWidth, trafficLightsWidth: sidebar.trafficLightsWidth, onRight: sidebarOnRight,
-                                           mirrored: sidebarOnRight && !sidebar.holdsAddress)
-        let side = SidebarView.toolbarButton
-        let toggle = NSRect(x: row.toggle.minX, y: sidebar.trafficLightCenterY - side / 2, width: side, height: side)
-        var frame = TouchSidebarGrabber.frame(toggle: toggle, sidebarMinX: sidebarOnRight ? bounds.width - sidebarWidth : 0)
-        if !isFlipped { frame.origin.y = bounds.height - frame.maxY }
-        grabber.frame = frame
-        grabber.onRight = sidebarOnRight
+    /// The strip at the top of the page area on the sidebar's side: in split view, with the strips on the cards.
+    private var topStrip: PaneHeaderView? {
+        guard tiles != nil else { return nil }
+        let cards = paneCards.filter { !$0.isHidden && $0.showsHeader && !$0.liftsHeader }
+        if let zoomed = zoomedPane, paneCards.indices.contains(zoomed), cards.contains(where: { $0 === paneCards[zoomed] }) {
+            return paneCards[zoomed].header
+        }
+        let frames = cards.map { isFlipped ? NSRect(x: $0.frame.minX, y: bounds.height - $0.frame.maxY, width: $0.frame.width, height: $0.frame.height) : $0.frame }
+        return TouchSidebarGrabber.stripPane(frames, onRight: sidebarOnRight).map { cards[$0].header }
     }
 
-    /// Shows or hides the grabber as `TouchSidebarGrabber.shows` says, fading.
+    /// The toggle's finger target with the lights, in own coordinates.
+    var grabberTarget: NSRect { TouchSidebarGrabber.target(around: convert(grabber.toggleFrame, from: grabber), clearOf: grabberLightsMaxX) }
+
+    /// A finger takes it anywhere in its target, off the strip's other buttons.
+    private func grabberTakes(_ point: NSPoint) -> Bool {
+        switch grabberPlace {
+        case .strip?: grabberStrip.map { $0.fingerTakesSidebarButton(at: $0.convert(point, from: self)) } ?? false
+        case .lights?: grabberTarget.contains(point)
+        case nil: false
+        }
+    }
+
+    /// Where the docked sidebar has its lights and toggle, on the lights' line.
+    func placeGrabber() {
+        let sidebar = sidebarContainer.sidebar
+        let mirrored = sidebarOnRight && !sidebar.holdsAddress
+        let row = SidebarView.topRowFrames(width: sidebarWidth, trafficLightsWidth: sidebar.trafficLightsWidth, onRight: sidebarOnRight,
+                                           mirrored: mirrored)
+        let side = SidebarView.toolbarButton
+        let toggle = NSRect(x: row.toggle.minX, y: sidebar.trafficLightCenterY - side / 2, width: side, height: side)
+        let sidebarMinX = sidebarOnRight ? bounds.width - sidebarWidth : 0
+        let lightsMinX = sidebar.trafficLightsWidth > 0 && !mirrored ? sidebarMinX + SidebarView.trafficLightsX : nil
+        var frame = TouchSidebarGrabber.groupFrame(toggle: TouchSidebarGrabber.frame(toggle: toggle, sidebarMinX: sidebarMinX), lightsMinX: lightsMinX)
+        if !isFlipped { frame.origin.y = bounds.height - frame.maxY }
+        grabber.frame = frame
+        grabberLightsMaxX = lightsMinX.map { $0 + sidebar.trafficLightsWidth }
+        grabber.onRight = sidebarOnRight
+        // Light or dark as the page's top is, so it reads as that page's title bar.
+        grabber.appearance = PageBar.inkAppearance(on: pageColor).flatMap(NSAppearance.init(named:))
+    }
+
+    /// Shows or hides the grabber as `TouchSidebarGrabber.shows` says: in the top strip, or with the lights, fading.
     func refreshGrabber() {
         let show = TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
                                              now: ProcessInfo.processInfo.systemUptime)
-        guard show != isGrabberShown else { return }
+        let strip = show ? topStrip : nil
+        if strip !== grabberStrip {
+            grabberStrip?.showsSidebarButton = false
+            strip?.showsSidebarButton = true
+            grabberStrip = strip
+        }
+        grabberStrip?.sidebarOnRight = sidebarOnRight
         isGrabberShown = show
-        if show {
+        let place = show ? TouchSidebarGrabber.place(stripOnTop: strip != nil) : nil
+        guard place != grabberPlace else { return }
+        let lights = place == .lights, hadLights = grabberPlace == .lights
+        grabberPlace = place
+        if lights {
             placeGrabber()
             grabber.isHidden = false
         }
+        onGrabberMoved?()
+        guard lights != hadLights else { return }
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade : show ? Tokens.Motion.enter : Tokens.Motion.exit
-            grabber.animator().alphaValue = show ? 1 : 0
+            context.duration = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade : lights ? Tokens.Motion.enter : Tokens.Motion.exit
+            grabber.animator().alphaValue = lights ? 1 : 0
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, !self.isGrabberShown else { return }
+                guard let self, self.grabberPlace != .lights else { return }
                 self.grabber.isHidden = true
             }
         })

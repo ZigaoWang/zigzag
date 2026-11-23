@@ -135,10 +135,12 @@
   Test: TouchMovesTests.aFingerFromTheEdgePullsOutTheSidebar
 - A finger landing on the window's outer 12 points is left to macOS, which resizes the window there; the pull starts from 12 to 40 points in from the page's edge.
   Test: TouchMovesTests.theEdgeRules
-- Sidebar hidden, no bar above the page, and a finger used in the window in the last 15 minutes → a sidebar toggle shows in the title bar, where the sidebar's own toggle sits when it shows; the pointer moving, the sidebar shown or the bar above the page shown hides it.
+- Sidebar hidden, no bar above the page, and a finger used in the window in the last 15 minutes → a sidebar toggle shows; the pointer moving, the sidebar shown or the bar above the page shown hides it.
   Test: TouchMovesTests.theGrabberShowsForARecentFinger
-- That toggle has the sidebar toggle's symbol and size, on the traffic lights' line, on the sidebar's side, left or right, on the title bar's material so it reads over any page.
+- Over a page, that toggle shows with the traffic lights as one group on the title bar's material, light or dark as the page's top, where the docked sidebar has its lights and toggle, left or right. In full screen, where the lights come down with the menu bar, it shows there on its own. A finger takes it anywhere in 44 points around it, clear of the lights.
   Test: TouchMovesTests.theGrabberSitsWhereTheSidebarsToggleDoes
+- In split view with the panes' strips along the top of the page, it is a button in the top pane's strip on the sidebar's side instead, like the strip's own: before Back on the left, after the close button on the right.
+  Test: TouchMovesTests.theGrabberJoinsTheTopPanesStrip
 - Tap it → the sidebar slides out and stays, as after a finger's pull; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
   Test: TouchMovesTests.aTapOnTheGrabberBringsTheSidebarOutToStay
 - A finger's tap or pull that brings the sidebar out does only that: the sidebar now under the finger takes neither its click nor its tap; a mouse click there after is the sidebar's.
