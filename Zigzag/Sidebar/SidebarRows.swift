@@ -664,13 +664,66 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func addTouchWatch() {
         let watch = TouchWatch()
+        watch.onDown = { [weak self] point in self?.touchDown(at: point) }
         watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
         addGestureRecognizer(watch)
     }
 
+    /// A finger landing near the × but off it (`closeTouchBox`): the click AppKit makes from it is the ×'s.
+    private enum CloseTouch { case none, armed(NSPoint, TimeInterval), taken }
+    private var closeTouch = CloseTouch.none
+    /// The press the × took over from the row, until it lifts.
+    private var closePress: NSEvent?
+
+    /// The × is 20 points; a finger takes it anywhere in `TouchGestures.target` around it, within the row.
+    var closeTouchBox: NSRect { TouchGestures.box(around: closeButton.frame).intersection(bounds) }
+
+    /// A finger landed, in window coordinates.
+    func touchDown(at windowPoint: NSPoint) {
+        let point = convert(windowPoint, from: nil)
+        let nearClose = !closeButton.isHidden && !closeButton.frame.contains(point) && closeTouchBox.contains(point)
+        closeTouch = nearClose ? .armed(windowPoint, ProcessInfo.processInfo.systemUptime) : .none
+    }
+
     /// A tap, in window coordinates, once AppKit's click from it has gone through.
     func touchTapped(at windowPoint: NSPoint) {
-        touchReveal(at: convert(windowPoint, from: nil))
+        switch closeTouch {
+        case .armed:
+            // No click came from it: the tap is the ×'s all the same.
+            closeTouch = .none
+            let event = NSEvent.mouseEvent(with: .leftMouseUp, location: windowPoint, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
+            if let event { closeButton.onClick?(event) }
+        case .taken:
+            closeTouch = .none
+        case .none:
+            touchReveal(at: convert(windowPoint, from: nil))
+        }
+    }
+
+    /// Whether a mouse-down is the click AppKit made from a finger near the ×.
+    private func takesCloseTouch(_ event: NSEvent) -> Bool {
+        guard case .armed(let point, let time) = closeTouch, ProcessInfo.processInfo.systemUptime - time < 1,
+              hypot(event.locationInWindow.x - point.x, event.locationInWindow.y - point.y) < TouchGestures.tapSlop else { return false }
+        closeTouch = .taken
+        return true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if takesCloseTouch(event) { closePress = event; return }
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if closePress != nil { return }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard let press = closePress else { return super.mouseUp(with: event) }
+        closePress = nil
+        let moved = hypot(event.locationInWindow.x - press.locationInWindow.x, event.locationInWindow.y - press.locationInWindow.y)
+        if moved < TouchGestures.tapSlop { closeButton.onClick?(event) }
     }
 
     /// The row's other pages after its own, in order (none: a row of one page). The only way a row becomes a split

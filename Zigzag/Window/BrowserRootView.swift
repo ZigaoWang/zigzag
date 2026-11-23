@@ -302,6 +302,34 @@ final class ResizeHandle: NSView {
     nonisolated static func dragged(_ pointer: CGFloat, grab: CGFloat) -> CGFloat { pointer - grab }
 
     override func mouseUp(with event: NSEvent) { onEnd?(event.modifierFlags.contains(.shift)) }
+
+    // MARK: Touch
+
+    /// A finger dragging it, from `BrowserRootView`'s touch pan: what a press, drag and release do, in window
+    /// coordinates. Shift is the keyboard's.
+    func touchBegan(at windowPoint: NSPoint) {
+        let point = convert(windowPoint, from: nil)
+        grab = (isVertical ? point.y : point.x) - line
+        pressedAt = windowPoint
+        onBegin?()
+    }
+
+    func touchMoved(to windowPoint: NSPoint) {
+        let shift = NSEvent.modifierFlags.contains(.shift)
+        if let onDragPoint {
+            onDragPoint(windowPoint, shift)
+        } else {
+            onDrag?(Self.dragged(isVertical ? windowPoint.y : windowPoint.x, grab: grab), shift)
+        }
+    }
+
+    func touchEnded() { onEnd?(NSEvent.modifierFlags.contains(.shift)) }
+
+    /// Whether a finger moving by `translation` drags it rather than scrolling past it.
+    nonisolated static func touchDrags(_ translation: NSPoint, vertical: Bool, bothWays: Bool) -> Bool {
+        if bothWays { return true }
+        return vertical ? abs(translation.y) >= abs(translation.x) : abs(translation.x) >= abs(translation.y)
+    }
 }
 
 /// The line shown at the middle while a tile divider comes near even: a guide, never a control, so it takes no pointer.
@@ -759,9 +787,66 @@ final class BrowserRootView: SpaceFrameView {
         pageDropRing.cornerCurve = .continuous
         pageDropRing.zPosition = 50
         layer?.addSublayer(pageDropRing)
+        if TouchGestures.isAvailable { addHandlePan() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: Touch
+
+    /// The resize strips are 8 points wide: a finger takes one anywhere in `TouchGestures.target` around it.
+    private var touchedHandle: ResizeHandle?
+
+    private func addHandlePan() {
+        let pan = TouchPanRecognizer { [weak self] pan in self?.handlePan(pan) }
+        pan.touchOnly.accepts = { [weak self] point in self?.resizeHandle(atTouch: point) != nil }
+        pan.touchOnly.shouldBegin = { [weak self] recognizer in
+            guard let self, let pan = recognizer as? NSPanGestureRecognizer else { return false }
+            let moved = pan.translation(in: self)
+            let start = NSPoint(x: pan.location(in: self).x - moved.x, y: pan.location(in: self).y - moved.y)
+            guard let handle = self.resizeHandle(atTouch: start) else { return false }
+            return ResizeHandle.touchDrags(moved, vertical: handle.isVertical, bothWays: handle.dragsBothWays)
+        }
+        addGestureRecognizer(pan)
+    }
+
+    private func handlePan(_ pan: NSPanGestureRecognizer) {
+        let now = pan.location(in: self), moved = pan.translation(in: self)
+        switch pan.state {
+        case .began:
+            let start = NSPoint(x: now.x - moved.x, y: now.y - moved.y)
+            guard let handle = resizeHandle(atTouch: start) else { return }
+            touchedHandle = handle
+            handle.touchBegan(at: convert(start, to: nil))
+            handle.touchMoved(to: convert(now, to: nil))
+        case .changed:
+            touchedHandle?.touchMoved(to: convert(now, to: nil))
+        case .ended, .cancelled, .failed:
+            touchedHandle?.touchEnded()
+            touchedHandle = nil
+        default:
+            break
+        }
+    }
+
+    /// The resize strip a finger at `point` (own coordinates) takes: the nearest whose touch box holds it.
+    func resizeHandle(atTouch point: NSPoint) -> ResizeHandle? {
+        var handles: [ResizeHandle] = []
+        func collect(_ view: NSView) {
+            for child in view.subviews where !child.isHidden {
+                if let handle = child as? ResizeHandle { handles.append(handle) } else { collect(child) }
+            }
+        }
+        collect(self)
+        let frames = handles.map { convert($0.bounds, from: $0) }
+        return Self.touchTarget(frames, at: point).map { handles[$0] }
+    }
+
+    /// Of `frames`, the one whose touch box holds `point` with its middle nearest; nil when none does.
+    nonisolated static func touchTarget(_ frames: [NSRect], at point: NSPoint) -> Int? {
+        let hits = frames.indices.filter { TouchGestures.box(around: frames[$0]).contains(point) }
+        return hits.min { hypot(frames[$0].midX - point.x, frames[$0].midY - point.y) < hypot(frames[$1].midX - point.x, frames[$1].midY - point.y) }
+    }
 
     private let pageDropRing = CALayer()
 
