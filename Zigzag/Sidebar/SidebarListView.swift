@@ -2178,7 +2178,10 @@ final class SidebarListView: NSView {
                local.x > -(onRight ? inner : outer), local.x < container.bounds.width + (onRight ? outer : inner) {
                 // The sidebar's very edge and just past it, clear of the icons and close buttons in the rows.
                 let zone = Tokens.Space.x2
-                let side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                var side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                // Out over the page while it offers to open the page there, the page's offer is what's meant.
+                let overPage = onRight ? local.x < 0 : local.x > container.bounds.width
+                if overPage, root?.splitDropHint.isShowing == true { side = nil }
                 // Only once the pointer has been away from the edges, so a row picked up near one doesn't flip at once.
                 if side == nil { edgeArmed = true }
                 edge = edgeArmed ? side : nil
