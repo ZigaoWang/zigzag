@@ -1061,6 +1061,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var flagsToken: SignalToken?
     private var shortcutsToken: SignalToken?
     private var translationToken: SignalToken?
+    private var sitePanelToken: SignalToken?
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
     private let blockingGroup = FormGroup()
@@ -1513,6 +1514,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         // Changed in Site Controls, maybe in another window: the site rows follow (#420).
         sitePermissionsToken = SitePermissions.changed.observe { [weak self] in
+            guard let self, self.showsWebsiteData else { return }
+            self.reloadPrivacy()
+            self.layoutDocument()
+        }
+        // The site's other choices (zoom, ad blocking, JavaScript, dark pages) once Site Controls closes.
+        sitePanelToken = SitePanel.closed.observe { [weak self] in
             guard let self, self.showsWebsiteData else { return }
             self.reloadPrivacy()
             self.layoutDocument()

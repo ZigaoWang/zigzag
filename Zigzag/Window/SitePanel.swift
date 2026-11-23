@@ -27,6 +27,8 @@ final class SitePanel: FloatingPanelView {
     /// The open panel, for debugging.
     static var shown: SitePanel? { current }
     static func closeCurrent() { current?.close() }
+    /// A panel closed: what was chosen in it is settled, for lists of those choices to read again.
+    static let closed = Signal<Void>()
 
     private weak var controller: BrowserWindowController?
     /// Opened in Zigzag Mini (#225) or an installed app's window (#356): its one page, with what a page's own settings
@@ -396,6 +398,7 @@ final class SitePanel: FloatingPanelView {
         monitor = nil
         if Self.current === self { Self.current = nil }
         dismiss()
+        Self.closed.send()
     }
 
     // MARK: Content
