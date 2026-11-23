@@ -157,8 +157,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Right-click Back or Forward: the pages that way, to jump several at once.
         sidebar.backButton.onRightClick = { [weak self] _ in self?.historyMenu(back: true) }
         sidebar.forwardButton.onRightClick = { [weak self] _ in self?.historyMenu(back: false) }
-        sidebar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
-        root.topBar.sidebarButton.onClick = { [weak self] _ in self?.toggleBrowserSidebar(nil) }
+        // A finger's tap toggles once: the other toggle, now under it, doesn't take its tap.
+        sidebar.sidebarButton.onClick = { [weak self] event in
+            self?.toggleBrowserSidebar(nil)
+            self?.browserWindow.spendFingerClick(event)
+        }
+        root.topBar.sidebarButton.onClick = { [weak self] event in
+            self?.toggleBrowserSidebar(nil)
+            self?.browserWindow.spendFingerClick(event)
+        }
         sidebar.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
         sidebar.address.onRightClick = { [weak self] _ in
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }

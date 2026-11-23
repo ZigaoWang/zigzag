@@ -1025,6 +1025,53 @@ struct TouchMovesTests {
         #expect(root.sidebarVisible)
     }
 
+    /// AppKit's click at `point` (window coordinates), as a finger's tap makes it.
+    private func click(at point: NSPoint, in window: NSWindow, time: TimeInterval) {
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: time, windowNumber: window.windowNumber,
+                                              context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
+                window.sendEvent(event)
+            }
+        }
+    }
+
+    @Test func aTapThatOpensTheSidebarDoesNothingElse() {
+        let manager = TabManager(spaceID: Library.shared.spaces[0].id)
+        defer { manager.invalidate() }
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root, window = controller.browserWindow
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        let now = ProcessInfo.processInfo.systemUptime
+        root.noteTouch(at: now)
+        let landed = TouchPress.landedAt
+        TouchPress.landedAt = now
+        defer { TouchPress.landedAt = landed }
+        let point = NSPoint(x: root.grabber.frame.midX, y: root.grabber.frame.midY)
+        let inWindow = root.convert(point, to: nil)
+        root.grabberTapped(at: point)
+        #expect(root.sidebarRevealed && root.isTouchHeld)
+        // The same tap's click, now over the sidebar, then the window's tap: both go nowhere.
+        click(at: inWindow, in: window, time: now)
+        if let event = TouchPress.mouseDown(at: inWindow, in: window) { window.touchTapped(event, downAt: now) }
+        #expect(root.sidebarRevealed && root.isTouchHeld && !root.sidebarVisible)
+        #expect(!controller.commandBar.isVisible)
+    }
+
+    @Test func aSpentTouchDropsOnlyItsOwnClick() {
+        var swallow = TouchSwallow()
+        swallow.arm(at: [NSPoint(x: 20, y: 300)], now: 10)
+        let away = swallow.takes(at: NSPoint(x: 400, y: 300), now: 10.1)
+        let near = swallow.takes(at: NSPoint(x: 24, y: 296), now: 10.1)
+        // Once: the next click there is a click.
+        let again = swallow.takes(at: NSPoint(x: 20, y: 300), now: 10.2)
+        #expect(!away && near && !again)
+        swallow.arm(at: [NSPoint(x: 20, y: 300)], now: 10)
+        let late = swallow.takes(at: NSPoint(x: 20, y: 300), now: 11.1)
+        #expect(!late)
+    }
+
     /// The bar's sidebar toggle takes a finger anywhere in 36 points around it.
     @Test func theBarsToggleTakesAFingerBesideIt() {
         let toggle = NSRect(x: 80, y: 7, width: 26, height: 26)

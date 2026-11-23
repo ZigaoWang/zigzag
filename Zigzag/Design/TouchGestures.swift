@@ -411,14 +411,20 @@ enum TouchReveal {
 /// A tap where a hidden control sits shows it without pressing it: the click AppKit makes from that tap is dropped.
 struct TouchSwallow {
     private var until: TimeInterval = 0
+    /// Where the tap's finger was, in window coordinates; empty takes a click anywhere.
+    private var points: [NSPoint] = []
 
-    /// The next click within a moment is the tap's.
-    mutating func arm(now: TimeInterval = ProcessInfo.processInfo.systemUptime) { until = now + 1 }
+    /// The next click within a moment is the tap's: anywhere, or near one of `points`.
+    mutating func arm(at points: [NSPoint] = [], now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        until = now + 1
+        self.points = points
+    }
     mutating func disarm() { until = 0 }
 
-    /// Whether this click is the tap's, which it then drops.
-    mutating func takes(now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Bool {
+    /// Whether this click, at `point` when given, is the tap's, which it then drops.
+    mutating func takes(at point: NSPoint? = nil, now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Bool {
         guard now < until else { return false }
+        if let point, !points.isEmpty, !points.contains(where: { hypot($0.x - point.x, $0.y - point.y) <= TouchGestures.target }) { return false }
         until = 0
         return true
     }

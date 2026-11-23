@@ -973,7 +973,11 @@ final class BrowserRootView: SpaceFrameView {
         // A tap on the page while it's held out by touch sends it back; scrolling the page leaves it be.
         swipe.failed = { [weak self, weak swipe] in
             guard let self, let swipe, TouchSidebarPull.isTap(fingers: swipe.fingers, translation: swipe.translation) else { return }
-            if self.grabberTakes(swipe.start) { self.openFromGrabber() } else if self.isTouchHeld { self.endTouchHold() }
+            if self.grabberTakes(swipe.start) {
+                self.grabberTapped(at: swipe.start)
+            } else if self.isTouchHeld {
+                self.endTouchHold()
+            }
         }
         addGestureRecognizer(swipe)
         sidebarPull = swipe
@@ -998,6 +1002,8 @@ final class BrowserRootView: SpaceFrameView {
             touchPullMoved(by: dx)
         case .ended:
             touchPullEnded(velocity: sidebarOnRight ? -swipe.velocity.x : swipe.velocity.x, cancelled: false)
+            // The card now under the lifted finger doesn't take its click.
+            if sidebarRevealed { spendTouch(at: [swipe.start, NSPoint(x: swipe.start.x + swipe.translation.x, y: swipe.start.y + swipe.translation.y)]) }
         case .cancelled, .failed:
             touchPullEnded(velocity: 0, cancelled: true)
         default:
@@ -1055,6 +1061,12 @@ final class BrowserRootView: SpaceFrameView {
         }
         onTouchPull?(false)
         refreshGrabber()
+    }
+
+    /// The finger at `points` (own coordinates) did its one thing: what slid under it takes neither its click nor
+    /// its tap.
+    func spendTouch(at points: [NSPoint]) {
+        (window as? BrowserWindow)?.spendTouch(at: points.map { convert($0, to: nil) })
     }
 
     /// Sends a sidebar held out by touch back: a tab was picked, or the page tapped.
@@ -1137,6 +1149,13 @@ final class BrowserRootView: SpaceFrameView {
         guard !sidebarVisible, !sidebarRevealed else { return }
         reveal(true)
         isTouchHeld = true
+    }
+
+    /// A finger's tap on the grabber at `point`: the sidebar comes out, and what slides under the finger takes
+    /// neither AppKit's click from it nor its tap.
+    func grabberTapped(at point: NSPoint) {
+        openFromGrabber()
+        spendTouch(at: [point])
     }
 
     /// The grabber's finger is `dy` points down from where it landed: one space step a swipe.

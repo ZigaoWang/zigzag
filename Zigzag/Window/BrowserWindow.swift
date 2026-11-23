@@ -216,6 +216,7 @@ final class BrowserWindow: NSWindow {
             UndoClock.lastPageInput = Date()
             sidebarHasTheClick = false
         }
+        if dropsSpentClick(event) { return }
         if event.type == .leftMouseDown { notePress(at: event.locationInWindow) }
         if let eventInterceptor, eventInterceptor(event) { return }
         if let side = SideButton(event.type, button: event.buttonNumber) {
@@ -227,6 +228,47 @@ final class BrowserWindow: NSWindow {
         if routeTitlebarEvent(event) { return }
         if swallowsPanelPress(event) { return }
         super.sendEvent(event)
+    }
+
+    /// AppKit's click from a finger whose tap already did its one thing, and the window's tap from it (`TouchPress`).
+    private var spentClick = TouchSwallow()
+    private var spentTap = TouchSwallow()
+    private var spentAt: TimeInterval = 0
+    /// The click dropped went down: its drags and lift go too.
+    private var dropsClick = false
+
+    /// The finger at `points` (window coordinates) has done what it does: the click AppKit makes from it, unless
+    /// that's what is running now (`clickToCome` false), and its tap go nowhere else.
+    func spendTouch(at points: [NSPoint], clickToCome: Bool = true) {
+        spentAt = ProcessInfo.processInfo.systemUptime
+        if clickToCome { spentClick.arm(at: points) }
+        spentTap.arm(at: points)
+    }
+
+    /// A finger's click on chrome did its tap's one thing: the tap that follows goes nowhere.
+    func spendFingerClick(_ event: NSEvent?) {
+        guard let event, event.windowNumber == windowNumber, isFingerClick(event) else { return }
+        spendTouch(at: [event.locationInWindow], clickToCome: false)
+    }
+
+    private func isFingerClick(_ event: NSEvent) -> Bool {
+        TouchPress.fingerDown || TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt)
+            || ProcessInfo.processInfo.systemUptime - spentAt < 0.3
+    }
+
+    private func dropsSpentClick(_ event: NSEvent) -> Bool {
+        switch event.type {
+        case .leftMouseDown:
+            dropsClick = isFingerClick(event) && spentClick.takes(at: event.locationInWindow)
+            return dropsClick
+        case .leftMouseDragged:
+            return dropsClick
+        case .leftMouseUp:
+            defer { dropsClick = false }
+            return dropsClick
+        default:
+            return false
+        }
     }
 
     /// A press at `point`: whether the sidebar has the click, and a click in a page for its own undo.
@@ -622,6 +664,7 @@ extension BrowserWindow: TouchPress.Handling {
     /// never reached `routeTitlebarEvent`: the control is clicked.
     func touchTapped(_ event: NSEvent, downAt time: TimeInterval) {
         let point = event.locationInWindow
+        if spentTap.takes(at: point) { return }
         // Two taps on the title bar strip's empty space: AppKit's own title bar takes them as single clicks.
         if isOnEmptyTitlebar(point) {
             let previous = lastTitlebarTap
@@ -635,5 +678,7 @@ extension BrowserWindow: TouchPress.Handling {
         guard lastTitlebarPress < time, let target = control(at: point) as? InteractiveView, target.isEnabled,
               let frame = contentView?.superview, let hit = frame.hitTest(point), !hit.isDescendant(of: target) else { return }
         target.onClick?(event)
+        // Clicked from here, there's no click of its own to come.
+        spentTap.disarm()
     }
 }

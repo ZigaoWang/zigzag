@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - View › Separate Tabs is now ⌃⌘\\, so it no longer clashes with 1Password, which uses ⌥⌘\\ everywhere. A key you set yourself in Settings › Shortcuts stays as it is.
 - Every tab's, pinned page's and space's menu in the sidebar shows its keyboard shortcuts, not only the menu of the one you're on.
 - Wording is the same across the app: Site Controls keeps its capitals in every sentence, the getting-started guide says choose for menu items, and the last straight apostrophes are curly. In Chinese, Choose, Custom, App and Site Controls read the same everywhere.
+- On a touch display, tapping the sidebar's grabber opens the sidebar and nothing else. The same tap used to land on the sidebar as it slid out, closing it again and opening a new tab; a pull from the edge and a tap on a sidebar toggle no longer carry over either.
 
 ## [0.9.4] - 2026-11-21
 
