@@ -1044,55 +1044,22 @@ enum TouchSidebarPull {
     }
 }
 
-/// A small pill at the window's edge on the sidebar's side while the sidebar is hidden and a finger has been used in
-/// the window lately: a tap brings the sidebar out, a finger dragged from it pulls it out, and one moved up or down
-/// from it changes space. Inset past the band where macOS resizes the window.
+/// A sidebar toggle in the title bar while the sidebar is hidden and a finger has been used in the window lately,
+/// where the sidebar's own toggle sits when it shows: a tap brings the sidebar out, a finger dragged from it pulls it
+/// out.
 enum TouchSidebarGrabber {
     /// A finger landed in the window this recently: it shows.
     nonisolated static let recent: TimeInterval = 15 * 60
-    nonisolated static let pill = NSSize(width: 6, height: 56)
-    /// From the window's edge to the pill, clear of the resize band.
-    nonisolated static let inset: CGFloat = 14
-    /// The box a finger may hit.
-    nonisolated static let target = NSSize(width: 44, height: 100)
-    /// How far a finger goes up or down from it to change space.
-    nonisolated static let spaceTravel: CGFloat = 24
 
-    /// Whether it shows: the sidebar hidden, a finger landed at `touchedAt` within `recent` of `now`, and the
-    /// pointer hasn't moved since.
-    nonisolated static func shows(sidebarShown: Bool, touchedAt: TimeInterval?, pointerMovedAt: TimeInterval?, now: TimeInterval) -> Bool {
-        guard !sidebarShown, let touchedAt, now >= touchedAt, now - touchedAt < recent else { return false }
+    /// Whether it shows: the sidebar hidden, no bar above the page (which has a toggle of its own), a finger landed
+    /// at `touchedAt` within `recent` of `now`, and the pointer hasn't moved since.
+    nonisolated static func shows(sidebarShown: Bool, barShown: Bool = false, touchedAt: TimeInterval?, pointerMovedAt: TimeInterval?,
+                                  now: TimeInterval) -> Bool {
+        guard !sidebarShown, !barShown, let touchedAt, now >= touchedAt, now - touchedAt < recent else { return false }
         return pointerMovedAt.map { $0 < touchedAt } ?? true
     }
 
-    /// The pill, `inset` in from the window's edge on the sidebar's side, centered up and down on the page area.
-    nonisolated static func pillFrame(in bounds: NSRect, page: NSRect, onRight: Bool) -> NSRect {
-        let x = onRight ? bounds.maxX - inset - pill.width : bounds.minX + inset
-        return NSRect(x: x, y: (page.midY - pill.height / 2).rounded(), width: pill.width, height: pill.height)
-    }
-
-    /// The box a finger may hit around `pill`, kept off the window's resize band.
-    nonisolated static func hitFrame(around pill: NSRect, in bounds: NSRect) -> NSRect {
-        var box = TouchGestures.box(around: pill, minimum: target.width, minimumHeight: target.height)
-        let band = TouchSidebarPull.resizeBand
-        box.origin.x = min(max(box.minX, bounds.minX + band), bounds.maxX - band - box.width)
-        return box
-    }
-
-    /// What a finger from it does: mostly away from the window's edge it pulls the sidebar out, mostly up or down it
-    /// changes space; toward the edge, nothing.
-    nonisolated enum Move: Equatable { case pull, space }
-
-    /// For a finger moved by `translation`, positive x away from the window's edge.
-    nonisolated static func move(_ translation: NSPoint) -> Move? {
-        if abs(translation.y) > abs(translation.x) { return .space }
-        return translation.x > 0 ? .pull : nil
-    }
-
-    /// The space step for a finger `dy` points down (negative up) from where it landed: the previous space up, the
-    /// next down, once it has gone `spaceTravel`; one step a swipe (`stepped`).
-    nonisolated static func spaceStep(dy: CGFloat, stepped: Bool) -> Int? {
-        guard !stepped, abs(dy) >= spaceTravel else { return nil }
-        return dy > 0 ? 1 : -1
-    }
+    /// Where it goes, top-down from the window's top left: where the docked sidebar, starting `sidebarMinX` in, has
+    /// its toggle (`toggle`, in the sidebar).
+    nonisolated static func frame(toggle: NSRect, sidebarMinX: CGFloat) -> NSRect { toggle.offsetBy(dx: sidebarMinX, dy: 0) }
 }

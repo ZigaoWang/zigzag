@@ -924,10 +924,6 @@ enum DebugBridge {
             }
         // touchrecent: as if a finger had just landed in the window, so the touch grabber shows.
         case "touchrecent": controller.root.debugTouchedRecently()
-        // grabberswipe <dy>: a finger from the grabber dy points down (negative up), then lifted.
-        case "grabberswipe":
-            controller.root.debugStartGrabberSwipe()
-            controller.root.grabberSwiped(dy: CGFloat(Double(arg) ?? 0))
         case "edgestate": debugLog("edgestate \(controller.root.isSidebarFloatingVisible ? "out" : controller.root.sidebarVisible ? "docked" : "hidden")")
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
         // holding ⌃ shows them), even with the window not in front. off hides both.

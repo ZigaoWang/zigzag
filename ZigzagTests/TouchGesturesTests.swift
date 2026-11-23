@@ -937,6 +937,7 @@ struct TouchMovesTests {
         #expect(!TouchSidebarGrabber.shows(sidebarShown: false, touchedAt: 100, pointerMovedAt: nil, now: 100 + recent))
         #expect(!TouchSidebarGrabber.shows(sidebarShown: true, touchedAt: 100, pointerMovedAt: nil, now: 200))
         #expect(!TouchSidebarGrabber.shows(sidebarShown: false, touchedAt: nil, pointerMovedAt: nil, now: 200))
+        #expect(!TouchSidebarGrabber.shows(sidebarShown: false, barShown: true, touchedAt: 100, pointerMovedAt: nil, now: 200))
         let root = hiddenRoot()
         #expect(!root.isGrabberShown)
         let now = ProcessInfo.processInfo.systemUptime
@@ -952,39 +953,56 @@ struct TouchMovesTests {
         #expect(!root.isGrabberShown)
         root.setSidebarVisible(false, animated: false)
         #expect(root.isGrabberShown)
+        // The bar above the page has its own toggle: no second one.
+        root.showsTopBar = true
+        #expect(!root.isGrabberShown)
+        root.showsTopBar = false
+        #expect(root.isGrabberShown)
     }
 
-    @Test func theGrabberSitsInsetOnTheSidebarsSide() {
-        let bounds = NSRect(x: 0, y: 0, width: 1000, height: 700), page = NSRect(x: 8, y: 48, width: 984, height: 644)
-        let left = TouchSidebarGrabber.pillFrame(in: bounds, page: page, onRight: false)
-        #expect(left.minX == 14 && left.size == NSSize(width: 6, height: 56))
-        #expect(left.midY == page.midY)
-        let right = TouchSidebarGrabber.pillFrame(in: bounds, page: page, onRight: true)
-        #expect(right.maxX == 986 && right.midY == page.midY)
-        let band = TouchSidebarPull.resizeBand
-        for pill in [left, right] {
-            let hit = TouchSidebarGrabber.hitFrame(around: pill, in: bounds)
-            #expect(hit.width >= 44 && hit.height >= 100)
-            #expect(hit.contains(pill) && bounds.contains(hit))
-            // Clear of the band where macOS resizes the window.
-            #expect(hit.minX >= band && hit.maxX <= bounds.maxX - band)
-            #expect(hit.midY == pill.midY)
+    /// The docked sidebar's toggle, in the root's coordinates.
+    private func dockedToggle(_ controller: BrowserWindowController) -> NSRect {
+        let root = controller.root
+        root.setSidebarVisible(true, animated: false)
+        root.layoutSubtreeIfNeeded()
+        controller.layoutTrafficLights()
+        root.sidebarContainer.sidebar.layoutSubtreeIfNeeded()
+        let button = root.sidebarContainer.sidebar.sidebarButton
+        return root.convert(button.bounds, from: button)
+    }
+
+    @Test func theGrabberSitsWhereTheSidebarsToggleDoes() throws {
+        for onRight in [false, true] {
+            let manager = TabManager(spaceID: Library.shared.spaces[0].id)
+            defer { manager.invalidate() }
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let root = controller.root
+            if onRight { root.setSidebarOnRight(true, animated: false) }
+            defer { if onRight { root.setSidebarOnRight(false, animated: false) } }
+            root.showsTopBar = false
+            let toggle = dockedToggle(controller)
+            root.setSidebarVisible(false, animated: false)
+            root.layoutSubtreeIfNeeded()
+            controller.layoutTrafficLights()
+            root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
+            #expect(root.isGrabberShown)
+            // Same place, size and symbol as the sidebar's own toggle, in the title bar beside the lights.
+            #expect(abs(root.grabber.frame.minX - toggle.minX) < 0.5 && abs(root.grabber.frame.minY - toggle.minY) < 0.5)
+            #expect(root.grabber.frame.size == toggle.size)
+            #expect(root.grabber.button.symbol == SidebarView.toggleSymbol(onRight: onRight))
+            let container = try #require(controller.window?.standardWindowButton(.closeButton)?.superview?.superview)
+            #expect(container.frame.contains(root.convert(NSPoint(x: root.grabber.frame.midX, y: root.grabber.frame.midY), to: nil)))
+            // A finger on it is heard on the title bar, where it lands.
+            if TouchGestures.isAvailable { #expect(root.titlebarPull?.view === container) }
         }
-        // In the window: on the sidebar's side, whichever it is.
-        let root = hiddenRoot()
-        root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
-        #expect(root.grabber.frame.minX == band)
-        let onRight = hiddenRoot(onRight: true)
-        defer { onRight.setSidebarOnRight(false, animated: false) }
-        onRight.noteTouch(at: ProcessInfo.processInfo.systemUptime)
-        #expect(onRight.grabber.frame.maxX == 1000 - band)
-        #expect(root.grabber.accessibilityLabel() == String(localized: "Show Sidebar", comment: "Accessibility label of the touch grabber that shows the hidden sidebar."))
     }
 
     @Test func aTapOnTheGrabberBringsTheSidebarOutToStay() {
         let root = hiddenRoot()
         root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
-        #expect(root.grabber.accessibilityPerformPress())
+        #expect(root.grabber.button.accessibilityLabel() == String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
+        #expect(root.grabber.button.accessibilityPerformPress())
         #expect(root.sidebarRevealed && root.isTouchHeld)
         #expect(!root.isGrabberShown)
         // Out as after a finger's pull: a tap on the page or a picked tab sends it back, and the grabber returns.
@@ -1003,34 +1021,6 @@ struct TouchMovesTests {
         root.touchPullMoved(by: (width + inset) / 3 + 10)
         root.touchPullEnded(velocity: 0, cancelled: false)
         #expect(root.sidebarRevealed && root.isTouchHeld)
-    }
-
-    @Test func aFingerFromTheGrabberPullsOrChangesSpace() {
-        // Mostly away from the edge pulls; mostly up or down changes space; toward the edge does nothing.
-        #expect(TouchSidebarGrabber.move(NSPoint(x: 12, y: 3)) == .pull)
-        #expect(TouchSidebarGrabber.move(NSPoint(x: 3, y: 12)) == .space)
-        #expect(TouchSidebarGrabber.move(NSPoint(x: -2, y: -12)) == .space)
-        #expect(TouchSidebarGrabber.move(NSPoint(x: -12, y: 2)) == nil)
-        // Up is the previous space, down the next, after 24 points; once a swipe.
-        #expect(TouchSidebarGrabber.spaceStep(dy: 20, stepped: false) == nil)
-        #expect(TouchSidebarGrabber.spaceStep(dy: 24, stepped: false) == 1)
-        #expect(TouchSidebarGrabber.spaceStep(dy: -30, stepped: false) == -1)
-        #expect(TouchSidebarGrabber.spaceStep(dy: 80, stepped: true) == nil)
-        let root = hiddenRoot()
-        var steps: [Int] = []
-        root.onGrabberSpace = { steps.append($0); return true }
-        root.debugStartGrabberSwipe()
-        root.grabberSwiped(dy: 10)
-        root.grabberSwiped(dy: 30)
-        root.grabberSwiped(dy: 90)
-        root.grabberSwiped(dy: 200)
-        #expect(steps == [1])
-        root.debugStartGrabberSwipe()
-        root.grabberSwiped(dy: -40)
-        root.grabberSwiped(dy: -120)
-        #expect(steps == [1, -1])
-        // The sidebar stays hidden through it.
-        #expect(!root.sidebarRevealed && !root.sidebarVisible)
     }
 
     @Test func aTapOnTheBarsToggleDocksTheSidebar() {
@@ -1068,8 +1058,10 @@ struct TouchMovesTests {
         let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
         defer { controller.window?.close() }
         let root = controller.root, window = controller.browserWindow
+        root.showsTopBar = false
         root.setSidebarVisible(false, animated: false)
         root.layoutSubtreeIfNeeded()
+        controller.layoutTrafficLights()
         let now = ProcessInfo.processInfo.systemUptime
         root.noteTouch(at: now)
         let landed = TouchPress.landedAt
@@ -1078,12 +1070,20 @@ struct TouchMovesTests {
         let point = NSPoint(x: root.grabber.frame.midX, y: root.grabber.frame.midY)
         let inWindow = root.convert(point, to: nil)
         root.grabberTapped(at: point)
+        root.layoutSubtreeIfNeeded()
+        controller.layoutTrafficLights()
         #expect(root.sidebarRevealed && root.isTouchHeld)
-        // The same tap's click, now over the sidebar, then the window's tap: both go nowhere.
+        // The same tap's click, now over the sidebar's own toggle, then the window's tap: both go nowhere.
         click(at: inWindow, in: window, time: now)
         if let event = TouchPress.mouseDown(at: inWindow, in: window) { window.touchTapped(event, downAt: now) }
         #expect(root.sidebarRevealed && root.isTouchHeld && !root.sidebarVisible)
         #expect(!controller.commandBar.isVisible)
+        // A mouse's click there a moment later is the toggle's, as always.
+        TouchPress.landedAt = nil
+        let toggle = root.sidebarContainer.sidebar.sidebarButton
+        let onToggle = toggle.convert(NSPoint(x: toggle.bounds.midX, y: toggle.bounds.midY), to: nil)
+        click(at: onToggle, in: window, time: ProcessInfo.processInfo.systemUptime)
+        #expect(root.sidebarVisible)
     }
 
     @Test func aSpentTouchDropsOnlyItsOwnClick() {

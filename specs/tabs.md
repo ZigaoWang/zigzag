@@ -135,14 +135,14 @@
   Test: TouchMovesTests.aFingerFromTheEdgePullsOutTheSidebar
 - A finger landing on the window's outer 12 points is left to macOS, which resizes the window there; the pull starts from 12 to 40 points in from the page's edge.
   Test: TouchMovesTests.theEdgeRules
-- Sidebar hidden and a finger used in the window in the last 15 minutes → a small grabber shows at the window's edge on the sidebar's side, 14 points in, centered on the page; the pointer moving, or the sidebar shown, hides it.
+- Sidebar hidden, no bar above the page, and a finger used in the window in the last 15 minutes → a sidebar toggle shows in the title bar, where the sidebar's own toggle sits when it shows; the pointer moving, the sidebar shown or the bar above the page shown hides it.
   Test: TouchMovesTests.theGrabberShowsForARecentFinger
-- The grabber sits on the sidebar's side, left or right, and takes a finger in a 44 by 100 point box, clear of the window's outer 12 points.
-  Test: TouchMovesTests.theGrabberSitsInsetOnTheSidebarsSide
-- Tap the grabber → the sidebar slides out and stays, as after a finger's pull; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
+- That toggle has the sidebar toggle's symbol and size, on the traffic lights' line, on the sidebar's side, left or right, on the title bar's material so it reads over any page.
+  Test: TouchMovesTests.theGrabberSitsWhereTheSidebarsToggleDoes
+- Tap it → the sidebar slides out and stays, as after a finger's pull; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
   Test: TouchMovesTests.aTapOnTheGrabberBringsTheSidebarOutToStay
-- A finger from the grabber up or down 24 points → the previous or next space, one a swipe, its name shown beside the grabber; the sidebar stays hidden.
-  Test: TouchMovesTests.aFingerFromTheGrabberPullsOrChangesSpace
+- A finger's tap or pull that brings the sidebar out does only that: the sidebar now under the finger takes neither its click nor its tap; a mouse click there after is the sidebar's.
+  Test: TouchMovesTests.aTapThatOpensTheSidebarDoesNothingElse
 - Tap the sidebar toggle in the bar above the page with the sidebar hidden or out by touch → it docks, as a click does.
   Test: TouchMovesTests.aTapOnTheBarsToggleDocksTheSidebar
 - Out by a finger, the sidebar stays until a tap on the page, a tab is picked, a finger on the page swipes it back, or the pointer moves.

@@ -337,55 +337,35 @@ final class TileSnapGuide: ColorView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// The touch grabber for the hidden sidebar (`TouchSidebarGrabber`): a small rounded pill, dark on a light page and
-/// light on a dark one, edged and shadowed so it shows on any page. Its frame is the finger's box; `pill` is drawn.
+/// The sidebar toggle in the title bar while the sidebar is hidden and touch is in use (`TouchSidebarGrabber`), on
+/// the title bar's material so it reads over any page, as the lights do in full screen (#462).
 final class SidebarGrabber: NSView {
     /// A tap, a click or VoiceOver's press: the sidebar comes out.
-    var onOpen: (() -> Void)?
-    /// The pill, in own coordinates.
-    var pill = NSRect.zero { didSet { if pill != oldValue { needsLayout = true } } }
-    var onDarkPage = false { didSet { if onDarkPage != oldValue { needsLayout = true } } }
-    private let shape = CALayer()
+    var onOpen: ((NSEvent) -> Void)?
+    let button = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false),
+                                          toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
+    private let backing = NSVisualEffectView()
+    var onRight = false { didSet { if onRight != oldValue { button.symbol = SidebarView.toggleSymbol(onRight: onRight) } } }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        wantsLayer = true
-        shape.cornerCurve = .continuous
-        layer?.addSublayer(shape)
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(String(localized: "Show Sidebar", comment: "Accessibility label of the touch grabber that shows the hidden sidebar."))
+        backing.material = .titlebar
+        backing.blendingMode = .withinWindow
+        backing.state = .followsWindowActiveState
+        backing.wantsLayer = true
+        backing.layer?.cornerCurve = .continuous
+        addSubview(backing)
+        button.onClick = { [weak self] event in self?.onOpen?(event) }
+        addSubview(button)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override var isFlipped: Bool { true }
-
     override func layout() {
         super.layout()
-        Tokens.Motion.withoutAnimation {
-            shape.frame = pill
-            shape.cornerRadius = pill.width / 2
-            shape.backgroundColor = Tokens.Color.hex(onDarkPage ? 0xFFFFFF : 0x1C1C1E, alpha: onDarkPage ? 0.62 : 0.36).cgColor
-            shape.borderWidth = 0.5
-            shape.borderColor = Tokens.Color.hex(onDarkPage ? 0x000000 : 0xFFFFFF, alpha: onDarkPage ? 0.28 : 0.6).cgColor
-            shape.shadowColor = NSColor.black.cgColor
-            shape.shadowOpacity = onDarkPage ? 0.5 : 0.16
-            shape.shadowRadius = 3
-            shape.shadowOffset = .zero
-            shape.shadowPath = CGPath(roundedRect: shape.bounds, cornerWidth: pill.width / 2, cornerHeight: pill.width / 2, transform: nil)
-        }
-    }
-
-    // A finger's tap comes through the sidebar's pull (`BrowserRootView`); this is the mouse's click.
-    override func mouseDown(with event: NSEvent) {
-        guard !TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) else { return }
-        onOpen?()
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        onOpen?()
-        return true
+        backing.frame = bounds
+        backing.layer?.cornerRadius = button.radius
+        button.frame = bounds
     }
 }
 
@@ -655,6 +635,7 @@ final class BrowserRootView: SpaceFrameView {
             needsLayout = true
             refreshGlassFrame()
             refreshGlassOcclusion()
+            refreshGrabber()
         }
     }
     /// Highlights where a dragged tab would open beside the current page.
@@ -669,7 +650,7 @@ final class BrowserRootView: SpaceFrameView {
     private let snapGuideRow = TileSnapGuide(color: Tokens.Color.accent)
     /// Glow on the sidebar edge while a question waits that this window can't show.
     private let attentionEdge = AttentionEdge()
-    /// The pill a finger brings the hidden sidebar out by, while touch is in use (`TouchSidebarGrabber`).
+    /// The sidebar toggle in the title bar while the sidebar is hidden and touch is in use (`TouchSidebarGrabber`).
     let grabber = SidebarGrabber()
     private var attentionToken: SignalToken?
     /// Floating surfaces (command bar, previews) live here, above everything.
@@ -764,7 +745,10 @@ final class BrowserRootView: SpaceFrameView {
         addSubview(attentionEdge)
         grabber.isHidden = true
         grabber.alphaValue = 0
-        grabber.onOpen = { [weak self] in self?.openFromGrabber() }
+        grabber.onOpen = { [weak self] event in
+            self?.openFromGrabber()
+            (self?.window as? BrowserWindow)?.spendFingerClick(event)
+        }
         addSubview(grabber)
         addSubview(sidebarContainer)
         // Over the sidebar, so the part of its edge's band inside the sidebar takes the pointer too (#362).
@@ -951,47 +935,62 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func addSidebarPull() {
+        let swipe = makeSidebarPull()
+        addGestureRecognizer(swipe)
+        sidebarPull = swipe
+    }
+
+    /// A pull for fingers on this view, or with `onlyGrabber` on the title bar, where they start only on the grabber.
+    private func makeSidebarPull(onlyGrabber: Bool = false) -> TouchSwipeRecognizer {
         let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.sidebarPullChanged(swipe) }
-        swipe.touchOnly.accepts = { [weak self] point in self?.touchTake(at: point) != nil }
+        swipe.touchOnly.accepts = { [weak self, weak swipe] point in
+            guard let self, let view = swipe?.view else { return false }
+            let here = self.convert(point, from: view)
+            return onlyGrabber ? self.grabberTakes(here) : self.touchTake(at: here) != nil
+        }
         swipe.decides = { [weak self] swipe in
-            guard let self, let take = self.touchTake(at: swipe.start) else { return false }
+            guard let self else { return false }
+            let start = self.pullStart(swipe)
+            guard let take = self.touchTake(at: start) else { return false }
             let moved = NSPoint(x: self.sidebarOnRight ? -swipe.translation.x : swipe.translation.x, y: swipe.translation.y)
-            // From the grabber: up or down changes space, away from the edge pulls.
-            if self.grabberTakes(swipe.start) {
-                guard let move = TouchSidebarGrabber.move(moved) else { return false }
-                if move == .space {
-                    self.grabberSpaceSwipe = false
-                    return true
-                }
-            } else {
-                guard TouchSidebarPull.goes(take, moved) else { return false }
-            }
+            guard TouchSidebarPull.goes(take, moved) else { return false }
             self.pullTake = take
-            self.pullBase = take == .pull ? self.fromEdge(swipe.start.x) : self.outReach
+            self.pullBase = take == .pull ? self.fromEdge(start.x) : self.outReach
             return true
         }
         // A tap on the page while it's held out by touch sends it back; scrolling the page leaves it be.
         swipe.failed = { [weak self, weak swipe] in
             guard let self, let swipe, TouchSidebarPull.isTap(fingers: swipe.fingers, translation: swipe.translation) else { return }
-            if self.grabberTakes(swipe.start) {
-                self.grabberTapped(at: swipe.start)
+            let start = self.pullStart(swipe)
+            if self.grabberTakes(start) {
+                self.grabberTapped(at: start)
             } else if self.isTouchHeld {
                 self.endTouchHold()
             }
         }
-        addGestureRecognizer(swipe)
-        sidebarPull = swipe
+        return swipe
+    }
+
+    /// Where a pull's fingers landed, in own coordinates.
+    private func pullStart(_ swipe: TouchSwipeRecognizer) -> NSPoint {
+        guard let view = swipe.view, view !== self else { return swipe.start }
+        return convert(swipe.start, from: view)
+    }
+
+    /// The pull from the grabber, on AppKit's title bar, which takes the fingers landing there.
+    private(set) var titlebarPull: TouchSwipeRecognizer?
+
+    /// Puts it on the title bar AppKit has now, again after it makes a new one (full screen).
+    func attachTitlebarPull() {
+        guard TouchGestures.isAvailable, let window, let container = window.standardWindowButton(.closeButton)?.superview?.superview,
+              container.window === window, titlebarPull?.view !== container else { return }
+        let swipe = titlebarPull ?? makeSidebarPull(onlyGrabber: true)
+        titlebarPull = swipe
+        swipe.view?.removeGestureRecognizer(swipe)
+        container.addGestureRecognizer(swipe)
     }
 
     private func sidebarPullChanged(_ swipe: TouchSwipeRecognizer) {
-        if grabberSpaceSwipe != nil {
-            switch swipe.state {
-            case .began, .changed: grabberSwiped(dy: swipe.translation.y)
-            case .ended, .cancelled, .failed: grabberSpaceSwipe = nil
-            default: break
-            }
-            return
-        }
         let dx = sidebarOnRight ? -swipe.translation.x : swipe.translation.x
         switch swipe.state {
         case .began:
@@ -1003,7 +1002,8 @@ final class BrowserRootView: SpaceFrameView {
         case .ended:
             touchPullEnded(velocity: sidebarOnRight ? -swipe.velocity.x : swipe.velocity.x, cancelled: false)
             // The card now under the lifted finger doesn't take its click.
-            if sidebarRevealed { spendTouch(at: [swipe.start, NSPoint(x: swipe.start.x + swipe.translation.x, y: swipe.start.y + swipe.translation.y)]) }
+            let start = pullStart(swipe)
+            if sidebarRevealed { spendTouch(at: [start, NSPoint(x: start.x + swipe.translation.x, y: start.y + swipe.translation.y)]) }
         case .cancelled, .failed:
             touchPullEnded(velocity: 0, cancelled: true)
         default:
@@ -1083,10 +1083,6 @@ final class BrowserRootView: SpaceFrameView {
     private(set) var touchedAt: TimeInterval?
     private(set) var pointerMovedAt: TimeInterval?
     private var grabberHideWork: DispatchWorkItem?
-    /// A finger from the grabber going up or down: whether it has changed space yet.
-    private var grabberSpaceSwipe: Bool?
-    /// The grabber's finger changed space by this step: the window switches, and says whether it did.
-    var onGrabberSpace: ((Int) -> Bool)?
     private(set) var isGrabberShown = false
 
     /// Hidden in the window: not docked, not out, not under a finger.
@@ -1113,19 +1109,25 @@ final class BrowserRootView: SpaceFrameView {
         refreshGrabber()
     }
 
-    private func grabberTakes(_ point: NSPoint) -> Bool { isGrabberShown && grabber.frame.contains(point) }
+    /// A finger takes it anywhere in `TouchGestures.target` around it.
+    private func grabberTakes(_ point: NSPoint) -> Bool { isGrabberShown && TouchGestures.box(around: grabber.frame).contains(point) }
 
-    private func placeGrabber() {
-        let pill = TouchSidebarGrabber.pillFrame(in: bounds, page: pageAreaFrame, onRight: sidebarOnRight)
-        let hit = TouchSidebarGrabber.hitFrame(around: pill, in: bounds)
-        grabber.frame = hit
-        grabber.pill = pill.offsetBy(dx: -hit.minX, dy: -hit.minY)
-        grabber.onDarkPage = card.pageColor.map(DarkPages.isDark) ?? effectiveAppearance.isDark
+    /// Where the docked sidebar has its toggle, on the lights' line.
+    func placeGrabber() {
+        let sidebar = sidebarContainer.sidebar
+        let row = SidebarView.topRowFrames(width: sidebarWidth, trafficLightsWidth: sidebar.trafficLightsWidth, onRight: sidebarOnRight,
+                                           mirrored: sidebarOnRight && !sidebar.holdsAddress)
+        let side = SidebarView.toolbarButton
+        let toggle = NSRect(x: row.toggle.minX, y: sidebar.trafficLightCenterY - side / 2, width: side, height: side)
+        var frame = TouchSidebarGrabber.frame(toggle: toggle, sidebarMinX: sidebarOnRight ? bounds.width - sidebarWidth : 0)
+        if !isFlipped { frame.origin.y = bounds.height - frame.maxY }
+        grabber.frame = frame
+        grabber.onRight = sidebarOnRight
     }
 
     /// Shows or hides the grabber as `TouchSidebarGrabber.shows` says, fading.
     func refreshGrabber() {
-        let show = TouchSidebarGrabber.shows(sidebarShown: sidebarShown, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
+        let show = TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
                                              now: ProcessInfo.processInfo.systemUptime)
         guard show != isGrabberShown else { return }
         isGrabberShown = show
@@ -1158,22 +1160,6 @@ final class BrowserRootView: SpaceFrameView {
         spendTouch(at: [point])
     }
 
-    /// The grabber's finger is `dy` points down from where it landed: one space step a swipe.
-    func grabberSwiped(dy: CGFloat) {
-        guard let swipe = grabberSpaceSwipe, let step = TouchSidebarGrabber.spaceStep(dy: dy, stepped: swipe) else { return }
-        grabberSpaceSwipe = true
-        if onGrabberSpace?(step) == true { Haptics.snap() }
-    }
-
-    /// Where a toast about the grabber goes: beside it, on the page side.
-    var grabberToastArea: NSRect {
-        let pill = TouchSidebarGrabber.pillFrame(in: bounds, page: pageAreaFrame, onRight: sidebarOnRight)
-        let y = pill.midY - ToastView.height / 2 - Tokens.Space.x3
-        let width: CGFloat = 320
-        return sidebarOnRight ? NSRect(x: pill.minX - Tokens.Space.x3 - width, y: y, width: width, height: ToastView.height)
-            : NSRect(x: pill.maxX + Tokens.Space.x3, y: y, width: width, height: ToastView.height)
-    }
-
     #if DEBUG
     var isPullingSidebar: Bool { touchReach != nil }
 
@@ -1182,8 +1168,6 @@ final class BrowserRootView: SpaceFrameView {
         pointerMovedAt = nil
         noteTouch(at: ProcessInfo.processInfo.systemUptime)
     }
-
-    func debugStartGrabberSwipe() { grabberSpaceSwipe = false }
     #endif
 
     private let pageDropRing = CALayer()

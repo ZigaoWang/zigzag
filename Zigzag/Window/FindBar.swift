@@ -983,8 +983,6 @@ enum Toast {
         var hideWork: DispatchWorkItem?
         /// The object the toast is about, for toasts that should go with it (an offer for a tab's page).
         weak var owner: AnyObject?
-        /// Shown at the start of its area rather than over the page's middle (beside the sidebar's touch grabber).
-        var leading = false
     }
     private static var showing: [ObjectIdentifier: Showing] = [:]
 
@@ -1061,10 +1059,9 @@ enum Toast {
     }
 
     /// Top center of the page: where your eyes already are, clear of the content you're reading.
-    private static func place(_ toast: ToastView, in area: NSRect, leading: Bool = false) {
-        let size = toast.size(maxWidth: max(160, area.width - (leading ? 0 : Tokens.Space.x12)))
-        let x = leading ? area.minX : round(area.midX - size.width / 2)
-        toast.frame = NSRect(x: x, y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
+    private static func place(_ toast: ToastView, in area: NSRect) {
+        let size = toast.size(maxWidth: max(160, area.width - Tokens.Space.x12))
+        toast.frame = NSRect(x: round(area.midX - size.width / 2), y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
         toast.needsLayout = true
     }
 
@@ -1073,8 +1070,7 @@ enum Toast {
     /// same curve.
     static func reposition(in controller: BrowserWindowController, slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.drawer) {
         let host = controller.root.overlay
-        guard let state = showing[ObjectIdentifier(host)], let toast = state.toast, toast.superview === host, !toast.dismissing,
-              !state.leading else { return }
+        guard let toast = showing[ObjectIdentifier(host)]?.toast, toast.superview === host, !toast.dismissing else { return }
         let old = toast.frame
         place(toast, in: area(in: controller))
         let dx = old.minX - toast.frame.minX, dy = old.minY - toast.frame.minY
@@ -1103,7 +1099,7 @@ enum Toast {
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      actionMenu: (() -> NSMenu?)? = nil, options: (() -> [MenuPanel.Entry])? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
-                     leading: Bool = false, announces: Bool = true, onClose: (() -> Void)? = nil) {
+                     announces: Bool = true, onClose: (() -> Void)? = nil) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1162,7 +1158,7 @@ enum Toast {
             state.toast = nil
             onClose?()
         }
-        place(toast, in: area, leading: leading)
+        place(toast, in: area)
         if isNew {
             host.addSubview(toast)
             // A confirmation of something you just did, often from a key: it drops the few points from the top of the
@@ -1176,7 +1172,6 @@ enum Toast {
         // A repeat that's still up (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
         state.toast = toast
         state.owner = nil
-        state.leading = leading
         state.hideWork?.cancel()
         // Toasts with an action wait for the pointer to leave before going, however long it stays, so Undo never
         // slips away from under it.
