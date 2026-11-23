@@ -1815,11 +1815,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Each card shows its own page's load (`PageCardView.showLoading`); the sidebar follows the page you're in.
         switch change {
         case .url, .navigation, .loading:
-            if change == .navigation {
-                // A new page starts at its top, and the bar is there for it, however far down the page before was
-                // left (#359). Its next report is measured from the top.
-                resetAutohide(of: tab, animated: true)
-            }
             if change == .url {
                 refreshExtensionActions()
                 updateHandoff()
@@ -1852,6 +1847,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             updateTranslateButton()
             offerTranslation()
         case .document:
+            // A new main-frame document starts at its top; an SPA's pushState is not one (#359).
+            resetAutohide(of: tab, animated: true)
             updateTranslateButton()
         case .themeColor, .darkPage:
             paintTopBar()

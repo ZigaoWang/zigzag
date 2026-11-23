@@ -806,6 +806,36 @@ struct TopBarTests {
         #expect(root.topBar.pageColor == .systemRed)
     }
 
+    /// A new main-frame document starts with the bar down; a navigation change such as an SPA's pushState must not
+    /// pop it back mid-scroll.
+    @Test func aNewDocumentResetsTheBarButANavigationChangeDoesNot() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/document")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.layoutSubtreeIfNeeded()
+        let travel = root.autohideTravel(at: 0)
+        #expect(travel > 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel)
+        tab.changed.send(.navigation)
+        #expect(root.autohideOffset(at: 0) == travel, "a navigation change is not a new page")
+        tab.changed.send(.document)
+        #expect(root.autohideOffset(at: 0) == 0, "a new document starts with the bar down")
+    }
+
     /// A trackpad scroll can close the bar and lock it, but the next key scroll is a new gesture: an arrow or space
     /// back up the page brings it back.
     @Test func aKeyScrollAfterATrackpadCloseBringsTheBarBack() {
