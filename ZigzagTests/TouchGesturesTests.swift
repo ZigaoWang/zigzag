@@ -574,6 +574,18 @@ struct TouchMovesTests {
         #expect(!TouchSwipe.isAcrossSidebar(NSPoint(x: 2, y: 0)))
     }
 
+    /// Two taps on the title bar are a double-click; a mouse's own clicks are left alone.
+    @Test func twoTapsOnTheTitleBarAreADoubleClick() {
+        #expect(TouchDoubleTap.isFromFinger(10.02, landedAt: 10))
+        #expect(!TouchDoubleTap.isFromFinger(10, landedAt: nil))
+        #expect(!TouchDoubleTap.isFromFinger(12, landedAt: 10))
+        let first = (time: TimeInterval(10), point: NSPoint(x: 100, y: 20))
+        #expect(TouchDoubleTap.isSecondTap(after: first, at: 10.3, point: NSPoint(x: 110, y: 24), interval: 0.5))
+        #expect(!TouchDoubleTap.isSecondTap(after: first, at: 10.8, point: NSPoint(x: 110, y: 24), interval: 0.5))
+        #expect(!TouchDoubleTap.isSecondTap(after: first, at: 10.3, point: NSPoint(x: 200, y: 24), interval: 0.5))
+        #expect(!TouchDoubleTap.isSecondTap(after: nil, at: 10.3, point: NSPoint(x: 100, y: 20), interval: 0.5))
+    }
+
     @Test func aFingerAcrossTheSidebarSwitchesSpaces() throws {
         let added = Library.shared.addSpace(name: "Touch swipe test")
         defer { Library.shared.removeSpace(added.id) }

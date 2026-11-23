@@ -1084,11 +1084,12 @@ final class SidebarView: NSView {
     /// right-click. Double-click in empty tab space opens a new tab, as in Arc (#262), unless turned off.
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control), showBlankMenu(for: event) { return }
-        if event.clickCount == 2, Self.doubleClickOpensNewTab, isInList(event) {
+        let clicks = TouchDoubleTap.clickCount(for: event)
+        if clicks == 2, Self.doubleClickOpensNewTab, isInList(event) {
             delegate?.sidebarDoubleClickedBlank()
             return
         }
-        window?.titleBarMouseDown(event)
+        window?.titleBarMouseDown(event, clicks: clicks)
     }
 
     /// Settings › Appearance › Double-click the sidebar for a new tab. On by default.
