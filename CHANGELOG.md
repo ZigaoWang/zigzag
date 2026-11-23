@@ -5,6 +5,13 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- On a touch display, a small grabber shows at the window's edge while the sidebar is hidden. Tap it and the sidebar slides out and stays until you tap the page, pick a tab or swipe it back; drag it and the sidebar follows your finger. Swipe up or down on it to go to the previous or next space, without opening the sidebar. It shows only after you've touched the screen, and goes away when you use the mouse or trackpad. It sits on the right with the sidebar on the right.
+
+### Fixed
+- On a touch display, swiping in from the window's edge to pull out the sidebar starts a little further in, so it no longer resizes the window instead.
+- Three fingers on a page no longer try to change spaces: macOS takes them for switching desktops.
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
@@ -31,7 +38,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - Dragging a tab or a pinned page over the page shows a clearer preview: the half or quarter it would take is shaded in the space's accent, with a card naming the page and where it opens, like Open on the Left. The card keeps out from under the pointer or your finger, the shading glides between places, and it fades away when you drag back off the page. Dragging a page of a split by its strip shows the same.
 - On a touch display you can drag a page of a split by its strip with your finger, to move it to another place in the split or out to the sidebar, as with the mouse.
 - Two taps with a finger on the top of the window, the sidebar's empty space or the bar above the page zoom the window, as a double-click does there (or whatever the Mac's title bar double-click is set to). Two taps in the empty tab list open a new tab, as a double-click does.
-- On a touch display, swipe three fingers sideways on a page to change spaces. The sidebar slides with your fingers as it does when you swipe across it, and the window's color changes with them, even with the sidebar hidden. Two fingers across the sidebar change spaces too.
+- On a touch display, two fingers sideways across the sidebar change spaces too, as one does.
 - On a touch display, swipe in with one finger from the edge of the window to pull out a hidden sidebar. Let go a third of the way out, or flick it, and it stays until you tap the page, pick a tab or swipe it back from the page; otherwise it slides back. This works in full screen too. The sidebar button in the bar above the page also takes a tap just beside it.
 - Zapped elements can be shown again one at a time. In Site Controls, the “3 zapped” row opens a list of them, newest first, each with a short name like div.cookie-banner, its selector under it, and × to show it again on the page right away; Restore All is at the end of the list. Settings › Privacy › Sites lists the same elements under Zapped elements, the newest five first, with the same ×. A private window's list is that window's own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#498](https://github.com/ZigaoWang/zigzag/issues/498))
 
