@@ -285,6 +285,7 @@ final class FavoritesView: NSView {
                     self.drag(tile, favorite: favorite, event: event)
                     return true
                 }
+                tile.dragsByTouch = true
                 addSubview(tile)
                 if animated {
                     tile.alphaValue = 0
@@ -335,7 +336,7 @@ final class FavoritesView: NSView {
         let carried = TabManager.SplitSide(kind: .favorite, inSplit: !tile.partners.isEmpty)
         var last = start
         var inside = true
-        let released = CarriedCopy.track(in: window) { event in
+        CarriedCopy.carry(in: window, moved: { event in
             last = window.convertPoint(toScreen: event.locationInWindow)
             copy.follow(last)
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
@@ -347,34 +348,35 @@ final class FavoritesView: NSView {
                 self.aim(at: self.convert(window.convertPoint(fromScreen: last), from: nil), carried: carried, moving: tile)
             }
             copy.showsAlternate = self.onDragMove?(favorite, last) ?? false
-        }
-        scrollNearEdge(at: nil)
-        let split = splitTarget, index = dropIndex
-        clearAim()
-        var landing: NSView? = tile
-        if released == nil {
-            copy.showsAlternate = false
-        } else if inside {
-            if let split {
-                onJoin?(favorite, split.id, split.onRight)
+        }) { released in
+            self.scrollNearEdge(at: nil)
+            let split = self.splitTarget, index = self.dropIndex
+            self.clearAim()
+            var landing: NSView? = tile
+            if released == nil {
+                copy.showsAlternate = false
+            } else if inside {
+                if let split {
+                    self.onJoin?(favorite, split.id, split.onRight)
+                } else {
+                    // The bar counts the carried favorite where it is; past it, everything is one place earlier.
+                    var slot = index ?? from
+                    if slot > from { slot -= 1 }
+                    if slot != from { self.onReorder?(favorite, slot) }
+                }
+                copy.showsAlternate = false
+                self.layoutSubtreeIfNeeded()
+                landing = self.tile(for: favorite.id)
+                landing?.scrollToVisible(landing?.bounds ?? .zero)
+            } else if let dropped = self.onDrop?(favorite, last), dropped.handled {
+                landing = dropped.landing
             } else {
-                // The bar counts the carried favorite where it is; past it, everything is one place earlier.
-                var slot = index ?? from
-                if slot > from { slot -= 1 }
-                if slot != from { onReorder?(favorite, slot) }
+                copy.showsAlternate = false
             }
-            copy.showsAlternate = false
-            layoutSubtreeIfNeeded()
-            landing = self.tile(for: favorite.id)
-            landing?.scrollToVisible(landing?.bounds ?? .zero)
-        } else if let dropped = onDrop?(favorite, last), dropped.handled {
-            landing = dropped.landing
-        } else {
-            copy.showsAlternate = false
+            self.onDragEnd?(released == nil)
+            tile.alphaValue = 1
+            copy.land(on: landing)
         }
-        onDragEnd?(released == nil)
-        tile.alphaValue = 1
-        copy.land(on: landing)
     }
 
     /// While true, tiles already in place slide to their new places instead of jumping there.

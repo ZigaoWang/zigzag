@@ -234,8 +234,9 @@ final class AddressView: InteractiveView {
     /// goes back.
     private func dragPin(_ entry: PinEntry, event: NSEvent) -> Bool {
         guard let window, beginPinDrag(entry.pin.id, at: event.locationInWindow) else { return false }
-        let released = CarriedCopy.track(in: window) { self.movePinDrag(to: $0.locationInWindow) }
-        endPinDrag(drop: released != nil)
+        CarriedCopy.carry(in: window, moved: { self.movePinDrag(to: $0.locationInWindow) }) { released in
+            self.endPinDrag(drop: released != nil)
+        }
         return true
     }
 
@@ -374,6 +375,7 @@ final class AddressView: InteractiveView {
                 guard let self, let entry else { return false }
                 return self.dragPin(entry, event: event)
             }
+            entry.button.dragsByTouch = true
             let id = entry.pin.id
             var actions: [NSAccessibilityCustomAction] = []
             if index > 0 { actions.append(moveAction(id, by: -1)) }
@@ -1321,6 +1323,7 @@ final class SidebarView: NSView {
                     guard let self, let dot else { return false }
                     return self.dragSpace(dot, event: event)
                 }
+                dot.dragsByTouch = true
                 dotStrip.addSubview(dot)
                 return dot
             }
@@ -1390,10 +1393,11 @@ final class SidebarView: NSView {
     /// bar between two dots shows where it would go. Let go on the row, it moves there; off it, or with Esc, it goes back.
     private func dragSpace(_ dot: SpaceDotView, event: NSEvent) -> Bool {
         guard let window, beginSpaceDrag(dot, at: window.convertPoint(toScreen: event.locationInWindow)) else { return false }
-        let released = CarriedCopy.track(in: window) { event in
+        CarriedCopy.carry(in: window, moved: { event in
             self.moveSpaceDrag(to: window.convertPoint(toScreen: event.locationInWindow))
+        }) { released in
+            self.endSpaceDrag(drop: released != nil)
         }
-        endSpaceDrag(drop: released != nil)
         return true
     }
 

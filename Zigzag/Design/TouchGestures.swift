@@ -45,9 +45,20 @@ enum TouchGestures {
     static func addMenuPress(to view: NSView, open: @escaping (NSEvent) -> Void) -> TouchPressRecognizer? {
         guard isAvailable else { return nil }
         let press = TouchPressRecognizer { [weak view] press in
-            guard press.state == .began, MenuPanel.current == nil, let window = view?.window,
-                  let event = rightMouseDown(at: press.location(in: nil), in: window) else { return }
-            open(event)
+            let point = press.location(in: nil)
+            switch press.state {
+            case .began:
+                guard let view else { return }
+                TouchHold.begin(on: view, at: point, openMenu: { [weak view] in
+                    guard MenuPanel.current == nil, let window = view?.window, let event = rightMouseDown(at: point, in: window) else { return nil }
+                    open(event)
+                    return MenuPanel.current
+                }, startDrag: nil)
+            case .changed: TouchHold.current?.pressMoved(to: point)
+            case .ended: TouchHold.current?.pressLifted(at: point)
+            case .cancelled, .failed: TouchHold.current?.pressCancelled()
+            default: break
+            }
         }
         press.touchOnly.accepts = { [weak view] point in view.map { !controlHasMenu(at: point, in: $0) } ?? false }
         view.addGestureRecognizer(press)
@@ -253,6 +264,10 @@ enum TouchPress {
         view.addGestureRecognizer(watch)
     }
 
+    /// When a finger last landed, and whether one is down now (`TouchFollow`).
+    static var landedAt: TimeInterval?
+    static var fingerDown = false
+
     /// A finger landed at `point` (window coordinates): the same hooks a mouse-down runs.
     static func pressed(at point: NSPoint, in window: NSWindow) {
         guard let event = mouseDown(at: point, in: window) else { return }
@@ -368,5 +383,276 @@ struct TouchSwallow {
         guard now < until else { return false }
         until = 0
         return true
+    }
+}
+
+/// Follows the first finger in a window until it lifts, never recognizing, so it takes nothing from what's under it:
+/// a held finger's moves and lift still arrive here after the view it was held on has gone (a row, when the list
+/// changes space under a drag).
+final class TouchFollow: NSGestureRecognizer {
+    let touchOnly = TouchOnly()
+    private var finger: (any NSCopying & NSObjectProtocol)?
+
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        TouchGestures.configure(self, touchOnly, yieldsToScrolling: false)
+        touchOnly.simultaneous = true
+    }
+
+    convenience init() { self.init(target: nil, action: nil) }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func windowPoint(_ event: NSEvent, _ phase: NSTouch.Phase) -> NSPoint? {
+        guard let view, let finger else { return nil }
+        guard let touch = event.touches(matching: phase, in: view).first(where: { $0.identity.isEqual(finger) }) else { return nil }
+        return view.convert(touch.location(in: view), to: nil)
+    }
+
+    override func touchesBegan(with event: NSEvent) {
+        guard finger == nil, let view, let touch = event.touches(matching: .began, in: view).first else { return }
+        finger = touch.identity
+        TouchPress.landedAt = event.timestamp
+        TouchPress.fingerDown = true
+    }
+
+    override func touchesMoved(with event: NSEvent) {
+        guard let point = windowPoint(event, .moved), let window = view?.window else { return }
+        TouchHold.current?.fingerMoved(to: point, in: window)
+    }
+
+    override func touchesEnded(with event: NSEvent) {
+        guard let point = windowPoint(event, .ended) else { return }
+        if let window = view?.window { TouchHold.current?.fingerLifted(at: point, in: window) }
+        state = .failed
+    }
+
+    override func touchesCancelled(with event: NSEvent) {
+        if let window = view?.window { TouchHold.current?.fingerCancelled(in: window) }
+        state = .failed
+    }
+
+    override func reset() {
+        super.reset()
+        finger = nil
+        TouchPress.fingerDown = false
+    }
+
+    /// Whether `view` or a view it's in has one.
+    static func follows(_ view: NSView?) -> Bool {
+        sequence(first: view, next: { $0?.superview }).contains { $0?.gestureRecognizers.contains { $0 is TouchFollow } == true }
+    }
+}
+
+/// A carried drag (`CarriedCopy.carry`) a finger moves, in place of the mouse's tracking loop: each step and the
+/// release reach the drag as the mouse events they stand for.
+@MainActor
+final class TouchCarry {
+    /// Set while a hold asks a view to start its drag: the drag it starts follows this finger.
+    static var starting: TouchCarry?
+    private weak var window: NSWindow?
+    private var moved: ((NSEvent) -> Void)?
+    private var ended: ((NSEvent?) -> Void)?
+
+    var isAttached: Bool { moved != nil }
+
+    func attach(to window: NSWindow, moved: @escaping (NSEvent) -> Void, ended: @escaping (NSEvent?) -> Void) {
+        self.window = window
+        self.moved = moved
+        self.ended = ended
+    }
+
+    func move(to windowPoint: NSPoint) {
+        guard let event = event(.leftMouseDragged, at: windowPoint) else { return }
+        moved?(event)
+    }
+
+    /// Let go at `windowPoint`: the last step, then the drop, as the mouse's release.
+    func release(at windowPoint: NSPoint) {
+        let event = event(.leftMouseUp, at: windowPoint)
+        if let event { moved?(event) }
+        finish(event)
+    }
+
+    /// Called off: nothing changes.
+    func cancel() { finish(nil) }
+
+    private func finish(_ event: NSEvent?) {
+        let ended = self.ended
+        moved = nil
+        self.ended = nil
+        ended?(event)
+    }
+
+    private func event(_ type: NSEvent.EventType, at point: NSPoint) -> NSEvent? {
+        NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                           windowNumber: window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1,
+                           pressure: type == .leftMouseUp ? 0 : 1)
+    }
+}
+
+/// Touch and hold, as an iPhone's menus work, in one motion: the drawn menu opens at the finger; sliding onto it lights
+/// the item under the finger and lifting there chooses it; lifting anywhere else leaves it open, to be tapped. Moving
+/// away from the menu instead, or before it shows, picks the item up and drags it as the mouse does.
+@MainActor
+final class TouchHold {
+    /// How far from where it was held the finger moves, off the menu, before the item is picked up.
+    nonisolated static let dragDistance: CGFloat = 16
+    /// Held this much longer after the hold is recognized, the menu opens; moving before then drags straight away.
+    nonisolated static let menuDelay: TimeInterval = 0.15
+
+    enum Step: Equatable { case wait, highlight, drag }
+    enum Lift: Equatable { case choose, keepOpen, drop, nothing }
+
+    /// What a finger at `point`, held at `start` (window coordinates), does: on the menu it lights an item; once it has
+    /// been on the menu it never drags; otherwise, far enough off, it picks the item up.
+    nonisolated static func step(from start: NSPoint, to point: NSPoint, onMenu: Bool, wasOnMenu: Bool, canDrag: Bool) -> Step {
+        if onMenu { return .highlight }
+        guard canDrag, !wasOnMenu, hypot(point.x - start.x, point.y - start.y) >= dragDistance else { return .wait }
+        return .drag
+    }
+
+    /// What lifting does: drops what's carried, chooses the item under the finger, or leaves the menu open.
+    nonisolated static func lift(menuShown: Bool, onMenu: Bool, dragging: Bool) -> Lift {
+        if dragging { return .drop }
+        guard menuShown else { return .nothing }
+        return onMenu ? .choose : .keepOpen
+    }
+
+    /// The hold in progress; one at a time.
+    private(set) static var current: TouchHold?
+
+    private weak var window: NSWindow?
+    private let start: NSPoint
+    private var point: NSPoint
+    private let openMenu: (() -> MenuPanel?)?
+    private let startDrag: ((NSPoint) -> Bool)?
+    private let ended: (() -> Void)?
+    private(set) weak var menu: MenuPanel?
+    private var menuWork: DispatchWorkItem?
+    private var wasOnMenu = false
+    private var dragFailed = false
+    private(set) var carry: TouchCarry?
+    private(set) var isFinished = false
+    /// The list under the finger doesn't scroll while it's held, so moving drags rather than scrolls.
+    private weak var frozen: NSScrollView?
+    /// Moves and the lift come from the window's `TouchFollow`, not the recognizer that saw the hold.
+    let followed: Bool
+
+    init(at windowPoint: NSPoint, in window: NSWindow?, followed: Bool, scroll: NSScrollView?,
+         openMenu: (() -> MenuPanel?)?, startDrag: ((NSPoint) -> Bool)?, ended: (() -> Void)? = nil) {
+        self.window = window
+        start = windowPoint
+        point = windowPoint
+        self.followed = followed
+        self.openMenu = openMenu
+        self.startDrag = startDrag
+        self.ended = ended
+        if #available(macOS 27, *), let scroll, scroll.isTouchScrollingEnabled {
+            scroll.isTouchScrollingEnabled = false
+            frozen = scroll
+        }
+    }
+
+    /// A hold recognized on `view` at `windowPoint`: the one in progress from now. The menu opens after `menuDelay`.
+    @discardableResult
+    static func begin(on view: NSView, at windowPoint: NSPoint, openMenu: (() -> MenuPanel?)?, startDrag: ((NSPoint) -> Bool)?,
+                      ended: (() -> Void)? = nil) -> TouchHold {
+        current?.cancelled()
+        let hold = TouchHold(at: windowPoint, in: view.window, followed: TouchFollow.follows(view), scroll: view.enclosingScrollView,
+                             openMenu: openMenu, startDrag: startDrag, ended: ended)
+        current = hold
+        if openMenu != nil {
+            let work = DispatchWorkItem { [weak hold] in MainActor.assumeIsolated { hold?.showMenu() } }
+            hold.menuWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + menuDelay, execute: work)
+        }
+        return hold
+    }
+
+    /// Opens the menu where the finger was held, unless the item is already carried.
+    func showMenu() {
+        menuWork?.cancel()
+        menuWork = nil
+        guard !isFinished, carry == nil, menu == nil, let openMenu else { return }
+        menu = openMenu()
+        menu?.isHeldByTouch = true
+        // Opened under the finger (slid up for room): the item there lights at once.
+        if let menu, menu.touchContains(point) { moved(to: point) }
+    }
+
+    // MARK: The finger
+
+    /// From the recognizer that saw the hold; only when the window has no `TouchFollow`.
+    func pressMoved(to windowPoint: NSPoint) { if !followed { moved(to: windowPoint) } }
+    func pressLifted(at windowPoint: NSPoint) { if !followed { lifted(at: windowPoint) } }
+    func pressCancelled() { if !followed { cancelled() } }
+
+    /// From the window's `TouchFollow`.
+    func fingerMoved(to windowPoint: NSPoint, in window: NSWindow) { if followed, window === self.window { moved(to: windowPoint) } }
+    func fingerLifted(at windowPoint: NSPoint, in window: NSWindow) { if followed, window === self.window { lifted(at: windowPoint) } }
+    func fingerCancelled(in window: NSWindow) { if followed, window === self.window { cancelled() } }
+
+    func moved(to windowPoint: NSPoint) {
+        guard !isFinished else { return }
+        point = windowPoint
+        if let carry { carry.move(to: windowPoint); return }
+        let onMenu = menu?.touchContains(windowPoint) ?? false
+        switch Self.step(from: start, to: windowPoint, onMenu: onMenu, wasOnMenu: wasOnMenu, canDrag: startDrag != nil && !dragFailed) {
+        case .highlight:
+            menu?.touchTrack(windowPoint: windowPoint)
+            // On an item, not just the menu's corner the finger opened it at.
+            if menu?.highlightedIndex != nil || menu?.openSubmenu != nil { wasOnMenu = true }
+        case .drag:
+            beginDrag()
+        case .wait:
+            menu?.touchTrack(windowPoint: windowPoint)
+        }
+    }
+
+    func lifted(at windowPoint: NSPoint) {
+        guard !isFinished else { return }
+        point = windowPoint
+        // Held and let go before the menu came: it opens now and stays, as a held finger's menu does.
+        if menu == nil, carry == nil { showMenu() }
+        let onMenu = menu?.touchContains(windowPoint) ?? false
+        switch Self.lift(menuShown: menu != nil, onMenu: onMenu, dragging: carry != nil) {
+        case .drop: carry?.release(at: windowPoint)
+        case .choose: menu?.touchChoose(windowPoint: windowPoint)
+        case .keepOpen, .nothing: break
+        }
+        finish()
+    }
+
+    func cancelled() {
+        guard !isFinished else { return }
+        carry?.cancel()
+        finish()
+    }
+
+    private func beginDrag() {
+        menuWork?.cancel()
+        menuWork = nil
+        menu?.close()
+        menu = nil
+        guard let startDrag else { return }
+        let carry = TouchCarry()
+        TouchCarry.starting = carry
+        let started = startDrag(start)
+        TouchCarry.starting = nil
+        guard started, carry.isAttached else { dragFailed = true; return }
+        self.carry = carry
+        carry.move(to: point)
+    }
+
+    private func finish() {
+        isFinished = true
+        menuWork?.cancel()
+        menuWork = nil
+        menu?.touchLifted()
+        if #available(macOS 27, *) { frozen?.isTouchScrollingEnabled = true }
+        frozen = nil
+        if Self.current === self { Self.current = nil }
+        ended?()
     }
 }

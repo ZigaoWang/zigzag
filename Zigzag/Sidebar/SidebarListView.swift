@@ -970,6 +970,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             return row
         case .tabGroup(let id):
             // Same as a folder: click toggles, menu renames, ungroups or closes.
@@ -984,6 +985,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             return row
         case .separator:
             let separator = SeparatorRowView()
@@ -1042,6 +1044,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             observeHover(row)
             return row
         case .bookmark(let id):
@@ -1109,6 +1112,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             observeHover(row)
             return row
         }
@@ -1966,8 +1970,9 @@ final class SidebarListView: NSView {
         (rows[.separator] as? SeparatorRowView)?.showsClear = false
         for item in faint { rows[item]?.alphaValue = CarriedCopy.faint }
         copy.lift()
-        let released = CarriedCopy.track(in: window) { self.dragMoved(to: $0) }
-        endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
+        CarriedCopy.carry(in: window, moved: { self.dragMoved(to: $0) }) { released in
+            self.endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
+        }
         return true
     }
 
