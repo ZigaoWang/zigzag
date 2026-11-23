@@ -5,7 +5,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-## [0.9.4] - 2026-11-21
+## [0.9.4] - 2026-11-24
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
 
@@ -1606,8 +1606,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.3...HEAD
-[0.9.4]: https://github.com/ZigaoWang/zigzag/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/ZigaoWang/zigzag/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...v0.9.1
