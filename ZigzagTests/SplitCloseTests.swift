@@ -316,6 +316,32 @@ import Testing
         }
     }
 
+    /// Swap trades the panes on screen at once: the page you're in stays yours, find goes over its new place, and a
+    /// click picks the page shown where you click.
+    @Test func swapMovesThePagesOnScreen() throws {
+        try inWindow(["A", "B"]) { controller, tabs in
+            let manager = controller.tabManager
+            manager.makeSplit(tabs[0], with: tabs[1])
+            manager.select(tabs[0])
+            let cards = controller.root.paneCards
+            #expect(cards[0].header.tab === tabs[0] && cards[1].header.tab === tabs[1])
+            cards[0].header.swap.onClick?(try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                                         context: nil, eventNumber: 0, clickCount: 1, pressure: 1)))
+            #expect(manager.split(for: tabs[0])?.ids == [tabs[1].id, tabs[0].id])
+            #expect(cards[0].header.tab === tabs[1] && cards[1].header.tab === tabs[0])
+            #expect(manager.selectedTab === tabs[0])
+            let frames = controller.root.tileFrames
+            #expect(controller.focusedPaneFrame == frames[1])
+            // A click on the left pane is for B, shown there now; on the right, back to A.
+            func click(_ pane: NSRect) { controller.focusPane(at: controller.root.convert(NSPoint(x: pane.midX, y: pane.midY), to: nil)) }
+            click(frames[0])
+            #expect(manager.selectedTab === tabs[1])
+            #expect(controller.focusedPaneFrame == frames[0])
+            click(frames[1])
+            #expect(manager.selectedTab === tabs[0])
+        }
+    }
+
     /// Back, Forward and Reload on a pane's strip go to that pane's page, the other pane left where it is.
     @Test func aStripsButtonsActOnItsOwnPane() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("strip-\(UUID().uuidString)", isDirectory: true)

@@ -77,6 +77,8 @@
   Test: SplitCloseTests.aPanesAddressEditsThatPane
 - Back, Forward and Reload on a strip → act on that pane's page only.
   Test: SplitCloseTests.aStripsButtonsActOnItsOwnPane
+- Swap on a strip → the two pages trade places on screen at once; the page you're in stays yours, and a click on a pane picks the page shown there.
+  Test: SplitCloseTests.swapMovesThePagesOnScreen
 - Narrow a strip → its buttons move into ⋯ in stages; Back and × always stay.
   Test: PaneHeaderTests.fewerButtonsAsItNarrows
 - Zoom on a strip (or ⇧⌘↩) → that pane fills the page; Zoom again puts it back.
