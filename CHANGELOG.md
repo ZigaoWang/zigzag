@@ -5,18 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- View › Separate Tabs is now ⌃⌘\\, so it no longer clashes with 1Password, which uses ⌥⌘\\ everywhere. A key you set yourself in Settings › Shortcuts stays as it is.
-- Every tab's, pinned page's and space's menu in the sidebar shows its keyboard shortcuts, not only the menu of the one you're on.
-- Wording is the same across the app: Site Controls keeps its capitals in every sentence, the getting-started guide says choose for menu items, and the last straight apostrophes are curly. In Chinese, Choose, Custom, App and Site Controls read the same everywhere.
-- On a touch display, tapping the sidebar's grabber opens the sidebar and nothing else. The same tap used to land on the sidebar as it slid out, closing it again and opening a new tab; a pull from the edge and a tap on a sidebar toggle no longer carry over either.
-- On a touch display, tapping the button that shows the hidden sidebar opens it and nothing else. The same tap used to land on the sidebar as it slid out, closing it again and opening a new tab; a pull from the edge and a tap on a sidebar toggle no longer carry over either.
-- On a touch display, two taps on the top of the window beside the traffic lights, or beside the sidebar's back and forward buttons, zoom the window again, as a double-click there does.
-- Menus and buttons agree on names and keys: Copy Link, Unpin Tab and Move to Tabs show their keys on pinned pages and favorites, Close shows ⌘W on picked rows, Site Controls and Zigzag Mini's tooltips and note follow the keys you set in Settings › Shortcuts, the command bar says Settings… as the menu bar does, and Pin Tab in the menu bar is dimmed on pages that can't be pinned.
-- What the address bar and menus show stays in step however you make a change. The pin star shows a pin or unpin made from a tab's menu, by dragging or with ⌘Z. File › Pin Tab and Pin Tab to Folder… are off on Settings and History, where the star isn't shown. The Reader button stays pressed while Reader is open over the other page of a split. A shortcut you change in Settings shows in the buttons' tooltips right away, in Zigzag Mini too. Always or Never Translate chosen in one window updates the translate button in the others and Settings › Translation. Settings › Privacy lists a site's choices as soon as Site Controls closes. A tab in a group that has Settings in it can still be added to Favorites from its menu.
-- Scrolling a PDF could make Zigzag quit when the edge of a page came into view by a hair. Thanks to [ldhieu](https://github.com/ldhieu). ([#507](https://github.com/ZigaoWang/zigzag/issues/507))
-- A split view's menu in the sidebar says Separate Tabs, as the View menu and the command bar do, instead of Separate Split View.
-
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
@@ -117,6 +105,15 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - Two taps with a finger on the empty strip beside the traffic lights zoom the window too, as a double-click there does. Before, only the sidebar and the bar above the page took them.
 - The translate button no longer shows on pages in a language or on a site you set to Never Translate. View › Translate Page still translates one when you want to.
 - When a site opens a pop-up by itself, like a Sign in with Google window, the filled answer on Zigzag's question now opens it where it says in one click, and so does Return. Before, it only opened a list, so you clicked twice even for the choice it showed. The other places are in the menu from the arrow beside it, still one click away.
+- View › Separate Tabs is now ⌃⌘\, so it no longer clashes with 1Password, which uses ⌥⌘\ everywhere. A key you set yourself in Settings › Shortcuts stays as it is.
+- Every tab's, pinned page's and space's menu in the sidebar shows its keyboard shortcuts, not only the menu of the one you're on.
+- Wording is the same across the app: Site Controls keeps its capitals in every sentence, the getting-started guide says choose for menu items, and the last straight apostrophes are curly. In Chinese, Choose, Custom, App and Site Controls read the same everywhere.
+- On a touch display, tapping the button that shows the hidden sidebar opens it and nothing else. The same tap used to land on the sidebar as it slid out, closing it again and opening a new tab; a pull from the edge and a tap on a sidebar toggle no longer carry over either.
+- On a touch display, two taps on the top of the window beside the traffic lights, or beside the sidebar's back and forward buttons, zoom the window again, as a double-click there does.
+- Menus and buttons agree on names and keys: Copy Link, Unpin Tab and Move to Tabs show their keys on pinned pages and favorites, Close shows ⌘W on picked rows, Site Controls and Zigzag Mini's tooltips and note follow the keys you set in Settings › Shortcuts, the command bar says Settings… as the menu bar does, and Pin Tab in the menu bar is dimmed on pages that can't be pinned.
+- What the address bar and menus show stays in step however you make a change. The pin star shows a pin or unpin made from a tab's menu, by dragging or with ⌘Z. File › Pin Tab and Pin Tab to Folder… are off on Settings and History, where the star isn't shown. The Reader button stays pressed while Reader is open over the other page of a split. A shortcut you change in Settings shows in the buttons' tooltips right away, in Zigzag Mini too. Always or Never Translate chosen in one window updates the translate button in the others and Settings › Translation. Settings › Privacy lists a site's choices as soon as Site Controls closes. A tab in a group that has Settings in it can still be added to Favorites from its menu.
+- Scrolling a PDF could make Zigzag quit when the edge of a page came into view by a hair. Thanks to [ldhieu](https://github.com/ldhieu). ([#507](https://github.com/ZigaoWang/zigzag/issues/507))
+- A split view's menu in the sidebar says Separate Tabs, as the View menu and the command bar do, instead of Separate Split View.
 
 ## [0.9.3] - 2026-11-21
 
