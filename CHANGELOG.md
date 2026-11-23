@@ -5,18 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- On a touch display, a small grabber shows at the window's edge while the sidebar is hidden. Tap it and the sidebar slides out and stays until you tap the page, pick a tab or swipe it back; drag it and the sidebar follows your finger. Swipe up or down on it to go to the previous or next space, without opening the sidebar. It shows only after you've touched the screen, and goes away when you use the mouse or trackpad. It sits on the right with the sidebar on the right.
-- On a touch display, tapping an open favorite shows its ×, and tapping the Tabs label shows Clear, as hovering does with the pointer.
-
-### Fixed
-- On a touch display, swiping in from the window's edge to pull out the sidebar starts a little further in, so it no longer resizes the window instead.
-- Three fingers on a page no longer try to change spaces: macOS takes them for switching desktops.
-- Two taps with a finger on a tab, a space's dot or the sidebar's edge do what a double-click does there: rename the tab, edit the space, put the usual width back.
-- Two taps with a finger on the empty strip beside the traffic lights zoom the window too, as a double-click there does. Before, only the sidebar and the bar above the page took them.
-- The translate button no longer shows on pages in a language or on a site you set to Never Translate. View › Translate Page still translates one when you want to.
-- When a site opens a pop-up by itself, like a Sign in with Google window, the filled answer on Zigzag's question now opens it where it says in one click, and so does Return. Before, it only opened a list, so you clicked twice even for the choice it showed. The other places are in the menu from the arrow beside it, still one click away.
-
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
@@ -46,6 +34,8 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - On a touch display, two fingers sideways across the sidebar change spaces too, as one does.
 - On a touch display, swipe in with one finger from the edge of the window to pull out a hidden sidebar. Let go a third of the way out, or flick it, and it stays until you tap the page, pick a tab or swipe it back from the page; otherwise it slides back. This works in full screen too. The sidebar button in the bar above the page also takes a tap just beside it.
 - Zapped elements can be shown again one at a time. In Site Controls, the “3 zapped” row opens a list of them, newest first, each with a short name like div.cookie-banner, its selector under it, and × to show it again on the page right away; Restore All is at the end of the list. Settings › Privacy › Sites lists the same elements under Zapped elements, the newest five first, with the same ×. A private window's list is that window's own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#498](https://github.com/ZigaoWang/zigzag/issues/498))
+- On a touch display, a small grabber shows at the window's edge while the sidebar is hidden. Tap it and the sidebar slides out and stays until you tap the page, pick a tab or swipe it back; drag it and the sidebar follows your finger. Swipe up or down on it to go to the previous or next space, without opening the sidebar. It shows only after you've touched the screen, and goes away when you use the mouse or trackpad. It sits on the right with the sidebar on the right.
+- On a touch display, tapping an open favorite shows its ×, and tapping the Tabs label shows Clear, as hovering does with the pointer.
 
 ### Fixed
 - A solid space with the sidebar on hover no longer stutters on a 120 Hz display. The sidebar that slides out on hover is a card of glass, and in a solid space it was made of Liquid Glass; that glass view stays in the window while the sidebar is tucked away, and Liquid Glass anywhere in a window holds the whole window to 80 frames a second on a ProMotion display, so the page stuttered with the sidebar hidden and was smooth with it shown. The sidebar now slides out in frosted glass there, as it does in a frosted space, which looks the same and keeps the display's full rate. A clear space still slides it out in Liquid Glass. ([#394](https://github.com/ZigaoWang/zigzag/issues/394))
@@ -109,6 +99,12 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - With Settings › Tabs › Show a mini player when you leave Zigzag on, a video stays in its page when you move to another display and its window is still in view on its own. It moves into the mini player once that window is covered, minimized, hidden or its desktop is switched away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#496](https://github.com/ZigaoWang/zigzag/issues/496))
 - The address no longer flashes a cut-off name, like “…eloper.apple.com”, when you switch spaces or tabs and the new page has fewer buttons in the address bar.
 - A finger's swipe across the sidebar now waits until the finger has moved a little before deciding between switching spaces and scrolling, so a slow or slightly curved swipe no longer turns into scrolling, and the space follows the finger from where it is without a jump. A steep flick still scrolls.
+- On a touch display, swiping in from the window's edge to pull out the sidebar starts a little further in, so it no longer resizes the window instead.
+- Three fingers on a page no longer try to change spaces: macOS takes them for switching desktops.
+- Two taps with a finger on a tab, a space's dot or the sidebar's edge do what a double-click does there: rename the tab, edit the space, put the usual width back.
+- Two taps with a finger on the empty strip beside the traffic lights zoom the window too, as a double-click there does. Before, only the sidebar and the bar above the page took them.
+- The translate button no longer shows on pages in a language or on a site you set to Never Translate. View › Translate Page still translates one when you want to.
+- When a site opens a pop-up by itself, like a Sign in with Google window, the filled answer on Zigzag's question now opens it where it says in one click, and so does Return. Before, it only opened a list, so you clicked twice even for the choice it showed. The other places are in the menu from the arrow beside it, still one click away.
 
 ## [0.9.3] - 2026-11-21
 
