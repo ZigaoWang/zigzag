@@ -2761,7 +2761,9 @@ extension BrowserWindowController: TabHost {
         if let url = action.request.url, Tab.route(forPageLink: url, from: tab.url) == .load,
            features.width == nil, features.height == nil {
             let pending = BrowserWebView.pendingDisposition(for: tab.webView)
-            let clicked = pending == nil && action.navigationType == .linkActivated && PopupNotice.isUserInitiated(action)
+            let clicked = pending == nil && SiteRoutes.newWindowIsClickedLink(
+                linkActivated: action.navigationType == .linkActivated, userInitiated: PopupNotice.isUserInitiated(action),
+                fromMainFrame: action.sourceFrame.isMainFrame, frameHost: action.sourceFrame.securityOrigin.host, pageHost: tab.url?.host())
             if pending == .foregroundTab || pending == .backgroundTab || clicked {
                 let flags = action.modifierFlags
                 let background = pending == .backgroundTab || (clicked && flags.contains(.command) && !flags.contains(.shift))

@@ -49,6 +49,8 @@
   Test: SiteRoutesTests.whatThePageDoesOnItsOwnIsNot
 - A link to a sign-in page → stays in the tab that sent you; typed, it still goes to its space.
   Test: SiteRoutesTests.aSignInALinkSendsYouToStaysPut
+- Click a link that opens a new tab or window in an embed from another site (Watch on YouTube) → it opens in its rule's space.
+  Test: SiteRoutesTests.anEmbedsClickedNewWindowIsRoutedLikeALink
 - Private windows, Zigzag Mini and site apps → never sent anywhere; Open in Zigzag from Mini is.
   Test: SiteRoutesTests.miniAndAppsKeepTheirPages
 
