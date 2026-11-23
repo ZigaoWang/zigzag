@@ -7,9 +7,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - With Settings › Tabs › Show a mini player when you leave Zigzag on, a video stays in its page when you move to another display and its window is still in view on its own. It moves into the mini player once that window is covered, minimized, hidden or its desktop is switched away. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#496](https://github.com/ZigaoWang/zigzag/issues/496))
-- A finger's swipe across the sidebar switches spaces even when it curves up or down a little, as a thumb's swipe does. A steep flick still scrolls.
 - The address no longer flashes a cut-off name, like “…eloper.apple.com”, when you switch spaces or tabs and the new page has fewer buttons in the address bar.
-- A finger's swipe across the sidebar now waits until the finger has moved a little before deciding between changing spaces and scrolling, so a slow start no longer scrolls the list instead, and the sidebar follows the finger from where it is without a jump.
+- A finger's swipe across the sidebar now waits until the finger has moved a little before deciding between switching spaces and scrolling, so a slow or slightly curved swipe no longer turns into scrolling, and the space follows the finger from where it is without a jump. A steep flick still scrolls.
 
 ### New
 - Two taps with a finger on the top of the window, the sidebar's empty space or the bar above the page zoom the window, as a double-click does there (or whatever the Mac's title bar double-click is set to). Two taps in the empty tab list open a new tab, as a double-click does.
