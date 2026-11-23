@@ -369,10 +369,23 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
         const tag = el.localName;
         return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
       };
+      let pending = null, frame = 0;
       const report = (trusted) => {
-        try {
-          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted, key: Date.now() - keyInput < 400, editing: editing(), dragging: pressed });
-        } catch (e) {}
+        const next = { y: y(), trusted, key: Date.now() - keyInput < 400, editing: editing(), dragging: pressed };
+        if (pending) {
+          // The last place is the one that counts; a real gesture anywhere in the frame still marks it.
+          next.trusted = next.trusted || pending.trusted;
+          next.key = next.key || pending.key;
+        }
+        pending = next;
+        if (frame) return;
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          const out = pending;
+          pending = null;
+          if (!out) return;
+          try { window.webkit.messageHandlers.\(messageName).postMessage(out); } catch (e) {}
+        });
       };
       window.addEventListener('scroll', (event) => {
         const target = event.target;

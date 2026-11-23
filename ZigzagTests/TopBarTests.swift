@@ -806,6 +806,21 @@ struct TopBarTests {
         #expect(root.topBar.pageColor == .systemRed)
     }
 
+    /// The page's reports are coalesced to one per display frame, keeping the last place and any real gesture.
+    @Test func theScrollScriptKeepsOneReportPerFrame() {
+        let script = ScrollMessages.script.source
+        #expect(script.contains("requestAnimationFrame"))
+        #expect(script.contains("pending = next"))
+        #expect(script.contains("pending = null"))
+    }
+
+    /// The bar's travel is taken out of the page's scroll: the content moves once, by the part the bar did not take.
+    @Test func theBarsTravelTakesItsPartOfThePageScroll() {
+        #expect(BrowserWindowController.pageScrollAfterBarTravel(100, consumed: 40) == 60)
+        #expect(BrowserWindowController.pageScrollAfterBarTravel(40, consumed: -20) == 60)
+        #expect(BrowserWindowController.pageScrollAfterBarTravel(10, consumed: 40) == 0)
+    }
+
     /// In full screen the pointer at the screen's top brings down the menu bar only; the address bar does not follow.
     @Test func fullScreenGivesTheScreenTopToTheMenuBar() {
         #expect(!BrowserWindowController.topPointerRevealsBar(fullScreen: true))

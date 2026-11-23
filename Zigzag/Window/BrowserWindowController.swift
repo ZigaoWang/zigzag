@@ -1258,11 +1258,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             root.setAutohideOffset(0, at: pane, animated: false)
             return
         }
-        let step = AddressBarAutohide.step(offset: root.autohideOffset(at: pane), pageDelta: delta,
+        let was = root.autohideOffset(at: pane)
+        let step = AddressBarAutohide.step(offset: was, pageDelta: delta,
                                            travel: root.autohideTravel(at: pane), locked: state.locked)
         state.locked = step.locked
         autohidePanes[pane] = state
         root.setAutohideOffset(step.offset, at: pane, animated: false)
+        // The bar's travel is the scroll for that part of the gesture: take it out of the page, so the content
+        // doesn't also move by the part the bar just covered.
+        let consumed = step.offset - was
+        if abs(consumed) > 0.5, let tab, let webView = tab.webView {
+            let target = Self.pageScrollAfterBarTravel(y, consumed: consumed)
+            state.lastScrollY = target
+            autohidePanes[pane] = state
+            webView.evaluateJavaScript("window.scrollTo(0, \(Double(target)))", completionHandler: nil)
+        }
     }
 
     /// A new page starts at its top, and the bar is there for it, however far down the page before was left (#359).
@@ -1305,6 +1315,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// In full screen the pointer at the screen's top belongs to the system menu bar; the address bar must not also
     /// come down there. A scroll, key or touch still reveals it.
     nonisolated static func topPointerRevealsBar(fullScreen: Bool) -> Bool { !fullScreen }
+
+    /// The page keeps only the scroll the bar did not take: the bar's travel is the rest, so the content moves once.
+    nonisolated static func pageScrollAfterBarTravel(_ y: CGFloat, consumed: CGFloat) -> CGFloat { max(0, y - consumed) }
 
     /// A finger in the top band asks for the bar back; a pull down at the page's top is the same request through
     /// the page's scroll report.
