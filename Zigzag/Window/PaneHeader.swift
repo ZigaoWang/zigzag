@@ -315,8 +315,8 @@ final class PaneHeaderView: NSView {
     /// The buttons the strip has no room for, in its own menu under ⋯.
     private func showMore() {
         if let open = MenuPanel.current, open.anchor === more { open.close(); return }
-        func item(_ button: IconButton, title: String? = nil) -> MenuPanel.Entry {
-            .item(.init(title: title ?? button.toolTip ?? "", symbol: button.symbol, isEnabled: button.isEnabled) { [weak button] in
+        func item(_ button: IconButton, title: String? = nil, shortcut: String = "") -> MenuPanel.Entry {
+            .item(.init(title: title ?? button.toolTip ?? "", symbol: button.symbol, isEnabled: button.isEnabled, shortcut: shortcut) { [weak button] in
                 if let button, let event = NSApp.currentEvent { button.onClick?(event) }
             })
         }
@@ -333,7 +333,9 @@ final class PaneHeaderView: NSView {
         if resetsLayout { entries.append(item(resetLayout)) }
         if arrangesSplit { entries += [item(swap), item(orientation)] }
         if !currentFit.showsSeparate {
-            entries.append(item(close, title: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.")))
+            // The whole split's, with its keys, as the button's tooltip says them.
+            entries.append(item(close, title: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."),
+                                shortcut: Shortcuts.keys(for: #selector(BrowserWindowController.closeSplitView(_:)))))
         }
         more.isSelected = true
         MenuPanel.show(entries, from: more) { [weak self] in self?.more.isSelected = false }
