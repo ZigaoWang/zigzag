@@ -5,6 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Dragging a tab or a pinned page over the page shows a clearer preview: the half or quarter it would take is shaded in the space's accent, with a card naming the page and where it opens, like Open on the Left. The card keeps out from under the pointer or your finger, the shading glides between places, and it fades away when you drag back off the page. Dragging a page of a split by its strip shows the same.
+- On a touch display you can drag a page of a split by its strip with your finger, to move it to another place in the split or out to the sidebar, as with the mouse.
+
+### Fixed
+- On a touch display, touching and holding a tab and dragging it onto the page now opens it beside the page, as with the mouse. Before, the tab's menu could get in the way and the drag stopped, or never started.
+- Carrying a tab just past the sidebar onto the page no longer flips to the next space while the page is offering to open it there.
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
