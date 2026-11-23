@@ -113,14 +113,26 @@
   Test: TouchMovesTests.pinchingInAtTheUsualSizeOpensTheOverview
 - Two fingers sideways on a page → Back or Forward with the trackpad swipe's arrow, when the Mac's touch setting and Zigzag's allow swiping.
   Test: TouchMovesTests.twoFingersOnAPageGoBackAndForward
-- One finger on a page is the page's, two go back or forward, three switch spaces; each decides only after the fingers have moved ten points.
+- One finger on a page is the page's, two go back or forward; each decides only after the fingers have moved ten points.
   Test: TouchMovesTests.fingersOnAPageRouteByCount
-- Three fingers sideways on a page → the previous or next space, sliding with the fingers as across the sidebar, with the sidebar hidden too.
-  Test: TouchMovesTests.threeFingersOnAPageSwitchSpaces
+- Three fingers on a page are left to macOS, which takes them for switching desktops.
+  Test: TouchMovesTests.threeFingersRouteNowhere
 - Two fingers sideways across the sidebar → the previous or next space, as one does.
   Test: TouchMovesTests.theSwipesAreTouchOnly
 - Sidebar hidden, a finger in from the page's edge → the sidebar slides out under it; let go a third of the way out or with a flick and it stays, otherwise it slides back.
   Test: TouchMovesTests.aFingerFromTheEdgePullsOutTheSidebar
+- A finger landing on the window's outer 12 points is left to macOS, which resizes the window there; the pull starts from 12 to 40 points in from the page's edge.
+  Test: TouchMovesTests.theEdgeRules
+- Sidebar hidden and a finger used in the window in the last 15 minutes → a small grabber shows at the window's edge on the sidebar's side, 8 points in, centered on the page; the pointer moving, or the sidebar shown, hides it.
+  Test: TouchMovesTests.theGrabberShowsForARecentFinger
+- The grabber sits on the sidebar's side, left or right, and takes a finger in a 44 by 88 point box.
+  Test: TouchMovesTests.theGrabberSitsInsetOnTheSidebarsSide
+- Tap the grabber → the sidebar slides out and stays, as after a finger's pull; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
+  Test: TouchMovesTests.aTapOnTheGrabberBringsTheSidebarOutToStay
+- A finger from the grabber up or down 24 points → the previous or next space, one a swipe, its name shown beside the grabber; the sidebar stays hidden.
+  Test: TouchMovesTests.aFingerFromTheGrabberPullsOrChangesSpace
+- Tap the sidebar toggle in the bar above the page with the sidebar hidden or out by touch → it docks, as a click does.
+  Test: TouchMovesTests.aTapOnTheBarsToggleDocksTheSidebar
 - Out by a finger, the sidebar stays until a tap on the page, a tab is picked, a finger on the page swipes it back, or the pointer moves.
   Test: TouchMovesTests.theEdgeRules
 - Tap just beside the sidebar toggle in the bar above the page → it shows the sidebar; a mouse click there is still the bar's.
