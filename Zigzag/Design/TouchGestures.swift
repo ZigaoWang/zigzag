@@ -981,8 +981,10 @@ enum TouchPinch {
 /// The hidden sidebar pulled out by a finger from the window's edge, as on an iPad, and pushed back the same way.
 /// Distances are from the window's edge on the sidebar's side, to the card's far edge (its reach).
 enum TouchSidebarPull {
-    /// How far in from the page's edge a finger lands to pull the sidebar out.
-    nonisolated static let edge: CGFloat = 24
+    /// How far in from the page's edge a finger may land to pull the sidebar out.
+    nonisolated static let edge: CGFloat = 40
+    /// The window's outer band, where macOS takes a finger to resize the window: a finger landing there is left to it.
+    nonisolated static let resizeBand: CGFloat = 12
     /// Past all the way out the card gives at most this much more, slowing as it goes.
     nonisolated static let overshoot: CGFloat = 24
     /// A flick at least this fast (points a second) keeps it out, or sends it back, however far it went.
@@ -995,7 +997,7 @@ enum TouchSidebarPull {
     /// sidebar hidden, at the page's edge it pulls it out; held out by touch, anywhere off it (`onCard`) it pushes it
     /// back, or sends it back if it doesn't swipe that way.
     nonisolated static func take(atX x: CGFloat, pageEdge: CGFloat, revealed: Bool, held: Bool, onCard: Bool) -> Take? {
-        if !revealed { return x >= 0 && x <= pageEdge + edge ? .pull : nil }
+        if !revealed { return x >= resizeBand && x <= pageEdge + edge ? .pull : nil }
         return held && !onCard ? .push : nil
     }
 
