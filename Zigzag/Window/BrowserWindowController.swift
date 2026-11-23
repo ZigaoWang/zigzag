@@ -253,6 +253,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
         // Tools above the page turned on or off (Settings › Developer): the page you're on gains or loses them.
         tokens.append(DeveloperTools.changed.observe { [weak self] in self?.showDeveloperBarTools() })
+        // A shortcut changed in Settings: the buttons' tooltips say the new keys at once.
+        tokens.append(Shortcuts.changed.observe { [weak self] in
+            self?.layoutTrafficLights()
+            self?.updateReaderButton()
+        })
         // Reduce Transparency turned on or off while Zigzag is open: the window follows at once.
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(displayOptionsChanged),
                                                           name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
