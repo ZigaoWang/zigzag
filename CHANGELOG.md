@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- More of Zigzag works by touch. Touch and hold a tab, folder, favorite or space, then slide onto its menu and lift on an item to choose it, or lift elsewhere to keep the menu open. Move away from the menu instead and the tab is picked up, to reorder it, drop it in a folder, onto another tab or the page for a split, or onto a space. Swipe one finger sideways across the sidebar to change spaces, pinch in on a page to see all tabs (pinch out on one to open it), and swipe in from a page's left or right edge to go back or forward. The mouse and trackpad work exactly as before.
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
