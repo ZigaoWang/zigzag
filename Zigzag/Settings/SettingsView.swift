@@ -1363,14 +1363,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(defaultRow)
         launchChoice.options = LaunchChoice.allCases.map { choice in
             switch choice {
-            case .resume: DropdownButton.Option(title: String(localized: "Pick Up Where You Left Off", comment: "A choice for “On launch” in Settings › General: the last session's windows come back."))
-            case .fresh: DropdownButton.Option(title: String(localized: "Start Fresh", comment: "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session."))
+            case .resume: DropdownButton.Option(title: String(localized: "Continue where you left off", comment: "A choice for “On launch” in Settings › General: the last session's windows come back."))
+            case .fresh: DropdownButton.Option(title: String(localized: "Open a new window", comment: "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session."))
             }
         }
         launchChoice.selectedIndex = LaunchChoice.allCases.firstIndex(of: LaunchChoice.choice) ?? 0
         launchChoice.onSelect = { index in LaunchChoice.choice = LaunchChoice.allCases[index] }
         let launchRow = FormRow(title: String(localized: "On launch", comment: "A setting in Settings › General: what a launch does with the last session."),
-                                detail: String(localized: "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session.", comment: "Explanation under “On launch” in Settings › General."),
+                                detail: String(localized: "Continue where you left off brings back the windows and tabs you had. Open a new window starts with one window and keeps the last session in History › Reopen Last Session.", comment: "Explanation under “On launch” in Settings › General."),
                                 control: launchChoice)
         launchRow.keywords = String(localized: "startup launch on start restore session reopen windows fresh blank resume", comment: "Words that find the On launch setting with Find a setting in Settings. Not shown.")
         generalGroup.add(launchRow)

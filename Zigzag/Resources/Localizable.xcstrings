@@ -16032,7 +16032,7 @@
         }
       }
     },
-    "Pick Up Where You Left Off" : {
+    "Continue where you left off" : {
       "comment" : "A choice for “On launch” in Settings › General: the last session's windows come back.",
       "localizations" : {
         "zh-Hans" : {
@@ -16043,13 +16043,13 @@
         }
       }
     },
-    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session." : {
+    "Continue where you left off brings back the windows and tabs you had. Open a new window starts with one window and keeps the last session in History › Reopen Last Session." : {
       "comment" : "Explanation under “On launch” in Settings › General.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“历史记录 › 重新打开上次会话”里找回。"
+            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“打开一个新窗口”只打开一个窗口，上次的会话可以在“历史记录 › 重新打开上次会话”里找回。"
           }
         }
       }
@@ -20033,13 +20033,13 @@
         }
       }
     },
-    "Start Fresh" : {
+    "Open a new window" : {
       "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全新开始"
+            "value" : "打开一个新窗口"
           }
         }
       }
