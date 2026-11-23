@@ -11,6 +11,12 @@
   Test: PermissionPromptTests.theAppQuestionPutsCancelFirstAndOpenLast
 - A pop-up the page opens without a click → asks where: this tab, a new tab or Zigzag Mini, or not at all; a clicked one opens at once.
   Test: SitePermissionsPolicyTests.everyPopupActionIsADistinctStandingAnswer
+- The pop-up question's filled answer → one click (or Return) answers with the choice it shows.
+  Test: PermissionPromptTests.aClickOnTheMainPartAnswersWithTheShownChoice
+- The chevron beside it → opens the other choices without answering; one click on a choice answers with it.
+  Test: PermissionPromptTests.aChoiceFromTheMenuAnswersWithIt
+- Either part in the question's first half second → takes no click.
+  Test: PermissionPromptTests.theFirstHalfSecondTakesNoClickOnEitherPart
 - A download → no question by default; with asking turned on in Settings, a site's first download asks.
   Test: SitePermissionsPolicyTests.askingBeforeADownloadIsOffByDefault
 
