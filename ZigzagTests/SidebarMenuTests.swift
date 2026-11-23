@@ -546,7 +546,7 @@ struct SidebarRowMenuTests {
             manager.makeSplit(tabs[0], with: tabs[1])
             // The right half of the row: its own menu, not the left page's.
             let menu = try #require(controller.listMenu(for: .tab(tabs[0].id), page: tabs[1]))
-            #expect(Array(titles(menu).prefix(2)) == ["Separate Split View", "-"])
+            #expect(Array(titles(menu).prefix(2)) == ["Separate Tabs", "-"])
             #expect(titles(menu).contains("Pin Split View"))
             #expect(!titles(menu).contains("Remove from Split View"))
             #expect(!titles(menu).contains("Open in Split View"))
@@ -564,7 +564,7 @@ struct SidebarRowMenuTests {
             manager.tile(tabs[2], beside: tabs[0], .place(region: .bottomRight, regions: placed))
             #expect(manager.split(for: tabs[2])?.isGroup == true)
             let menu = SidebarMenus.tabMenu(for: tabs[2], controller: controller)
-            #expect(Array(titles(menu).prefix(3)) == ["Remove from Split View", "Separate Split View", "-"])
+            #expect(Array(titles(menu).prefix(3)) == ["Remove from Split View", "Separate Tabs", "-"])
             try run(menu.items.first)
             #expect(manager.split(for: tabs[2]) == nil)
             #expect(manager.split(for: tabs[0])?.ids.count == 2)

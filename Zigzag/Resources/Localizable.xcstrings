@@ -18812,17 +18812,6 @@
         }
       }
     },
-    "Separate Split View" : {
-      "comment" : "Item at the top of the context menu of a tab, pinned tab or favorite in a split view, in the sidebar: ends the split view, each page a tab of its own again.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "结束分屏浏览"
-          }
-        }
-      }
-    },
     "Separate Tabs" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item.",
       "localizations" : {

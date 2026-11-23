@@ -885,7 +885,7 @@ import Testing
         }
     }
 
-    /// Out of a pinned split of two, the page left is a pinned page on its own, as Separate Split View leaves it.
+    /// Out of a pinned split of two, the page left is a pinned page on its own, as Separate Tabs leaves it.
     @Test func aPagePulledOutOfAPinnedSplitOfTwo() throws {
         try inWindow(["0", "1"]) { controller, tabs, space in
             let manager = controller.tabManager

@@ -631,7 +631,7 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   lines (a space rule's match types) open the same way as a `.note`, read by VoiceOver as a popover; Zigzag shows
   no system popover of its own.
 - **A row's right-click menu** (`SidebarMenus`, #327): first what only this row has (Back to Pinned Page and Set
-  Current Page as Pinned while a pinned page or favorite is off its address; Separate Split View, and Remove from
+  Current Page as Pinned while a pinned page or favorite is off its address; Separate Tabs, and Remove from
   Split View for one page of three or four; Mute Tab while it plays), then the page (Reload Page, Suspend Page while a
   tab's page runs, Duplicate Tab, Copy
   Link), where it's kept (Pin, Favorites, Group, Folder, Move to Space), where it's shown (Open in Split View, Move

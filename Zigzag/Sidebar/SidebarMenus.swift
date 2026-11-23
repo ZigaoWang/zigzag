@@ -115,7 +115,7 @@ enum SidebarMenus {
     }
 
     static var separateSplitTitle: String {
-        String(localized: "Separate Split View", comment: "Item at the top of the context menu of a tab, pinned tab or favorite in a split view, in the sidebar: ends the split view, each page a tab of its own again.")
+        String(localized: "Separate Tabs", comment: "View menu item.")
     }
 
     static var removeFromSplitTitle: String {
