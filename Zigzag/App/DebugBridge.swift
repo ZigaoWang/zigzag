@@ -799,6 +799,9 @@ enum DebugBridge {
         // button; updatestate <path>: menu title and staged update (JSON).
         if name == "updateready" { Updater.shared.debugStage(arg == "off" || arg.isEmpty ? nil : arg); return }
         if name == "updatedismiss" { Updater.shared.dismissCard(); return }
+        // updateoffer <version>|off: a pretend update on offer, as with automatic installs off; updateskip: its Skip.
+        if name == "updateoffer" { Updater.shared.debugOffer(arg == "off" || arg.isEmpty ? nil : arg); return }
+        if name == "updateskip" { Updater.shared.skipOffered(); return }
         // updatesim <version> [share|preparing]: Check for Updates… with a pretend download, held at that step if
         // given.
         if name == "updatesim" {
@@ -808,7 +811,7 @@ enum DebugBridge {
         }
         if name == "updatestate" {
             let readiness = Updater.shared.readiness
-            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats,
+            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats, "offered": Updater.shared.offer.available?.version ?? "",
                                         "shown": !controller.sidebar.updateCard.isHidden, "frame": NSStringFromRect(controller.sidebar.updateCard.frame)]
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
             return
@@ -1398,10 +1401,14 @@ enum DebugBridge {
                 controller.tabManager.tile(list[n], beside: current, .place(region: region, regions: placed))
             }
         case "tilehint":
-            // tilehint <x> <y>: the hint a tab dragged to that point of the page (shares of its width and height) shows;
+            // tilehint <x> <y> [n]: the hint a tab dragged to that point of the page (shares of its width and height) shows;
             // tilehint alone puts it away.
             let parts = arg.split(separator: " ").compactMap { Double($0) }
-            if parts.count == 2, let current = controller.tabManager.selectedTab {
+            if parts.count >= 2, let current = controller.tabManager.selectedTab {
+                // A third number: the tab at that sidebar position is the one carried, named in the hint.
+                let list = controller.tabManager.navigableTabs
+                controller.root.splitDropHint.incoming = parts.count == 3 && list.indices.contains(Int(parts[2]))
+                    ? controller.carried(.tab(list[Int(parts[2])].id)) : nil
                 let area = controller.root.cardFrame
                 let point = NSPoint(x: area.minX + area.width * parts[0], y: area.minY + area.height * parts[1])
                 controller.showDropHint(at: controller.root.convert(point, to: nil), beside: current)
@@ -1543,6 +1550,16 @@ enum DebugBridge {
         case "unsplit": controller.closeSplitView(nil)
         // splitorient: side by side to stacked or back, as the split's own button does.
         case "splitorient": controller.toggleSplitOrientation(nil)
+        // swapsplit: the two pages trade places, as the strip's swap button does.
+        case "swapsplit": if let tab = controller.tabManager.selectedTab { controller.tabManager.swapSplit(for: tab) }
+        // panestate: the pane you're in, each pane's page and frame, the find bar's frame, and the keyboard's page.
+        case "panestate":
+            let m = controller.tabManager
+            let ids = m.selectedTab.flatMap { m.split(for: $0) }?.ids ?? []
+            let names = ids.map { m.tab(with: $0)?.displayTitle ?? "?" }
+            let responder = controller.window?.firstResponder as? NSView
+            let keyboard = controller.root.paneCards.firstIndex { card in responder.map { $0.isDescendant(of: card) } ?? false }
+            debugLog("panestate selected=\(m.selectedTab?.displayTitle ?? "-") panes=\(names) frames=\(controller.root.tileFrames.map(NSStringFromRect)) focused=\(NSStringFromRect(controller.focusedPaneFrame)) cards=\(controller.root.paneCards.prefix(ids.count).map { ($0.webView as? BrowserWebView)?.owner?.displayTitle ?? "-" }) keyboardCard=\(keyboard.map(String.init) ?? "-") responder=\(responder.map { String(describing: type(of: $0)) } ?? "nil") find=\(controller.findBar.debugFrame)")
         case "closetab": controller.closeTab(nil)
         case "flydownload": controller.debugFlyDownload(arg.isEmpty ? "Shanghai Guide.pdf" : arg)
         case "readerjs":
@@ -1743,6 +1760,15 @@ enum DebugBridge {
                 let look = controller.selectedWebView?.appearance?.name.rawValue ?? "none"
                 debugLog("darkstate => \(result) tab=\(String(describing: tab)) pageColor=\(color) look=\(look)")
             }
+        // lookprobe [label]: the front page's look as WebKit was asked for it and as the page sees it.
+        case "lookprobe":
+            guard let webView = controller.selectedWebView else { debugLog("lookprobe \(arg) no web view"); break }
+            let views = "view=\(webView.appearance?.name.rawValue ?? "nil") effective=\(webView.effectiveAppearance.name.rawValue) window=\(controller.window?.effectiveAppearance.name.rawValue ?? "-") app=\(NSApp.effectiveAppearance.name.rawValue) appSet=\(NSApp.appearance?.name.rawValue ?? "nil")"
+            webView.evaluateJavaScript("JSON.stringify({url: location.href, prefersDark: matchMedia('(prefers-color-scheme: dark)').matches, mode: document.documentElement.getAttribute('data-color-mode'), bg: getComputedStyle(document.body).backgroundColor})") { result, _ in
+                debugLog("lookprobe \(arg) \(views) page=\(result as? String ?? "-")")
+            }
+        // reloadtab: the front tab loads again, as ⌘R does.
+        case "reloadtab": controller.tabManager.selectedTab?.reload()
         // darkseen forget: drops the profile's sites seen dark, as clearing History does.
         case "darkseen": if arg == "forget" { DarkSeen.forget(in: controller.tabManager.profile.store) }
         case "resize":

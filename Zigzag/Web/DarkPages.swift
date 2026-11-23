@@ -401,6 +401,8 @@ enum DarkPages {
         /// The look again a moment after the address last changed: a single-page app changing its address as you
         /// scroll is looked at once it settles, not for every change.
         var recheck: DispatchWorkItem?
+        /// `generation` when its last page committed (`pageCommitted`).
+        var committed = 0
         init(_ webView: WKWebView) { self.webView = webView }
     }
 
@@ -421,6 +423,7 @@ enum DarkPages {
         controller.removeScriptMessageHandler(forName: imageMessageName, contentWorld: world)
         controller.addScriptMessageHandler(Images.shared, contentWorld: world, name: imageMessageName)
         let entry = Entry(webView)
+        entry.committed = generation
         // Going to another site, its own choice applies before its page starts.
         entry.observation = webView.observe(\.url, options: [.new]) { [weak entry] webView, _ in
             MainActor.assumeIsolated {
@@ -525,6 +528,16 @@ enum DarkPages {
     /// Whether dark pages are wanted for the page a web view is at: for its address, and not where they stand back.
     private static func wanted(in webView: WKWebView) -> Bool {
         !standsBack(for: webView) && applies(to: webView.url) && wants(webView.url)
+    }
+
+    /// A page committed: WebKit tells only the page showing of a new look, so one on its way in another process kept the old.
+    static func pageCommitted(in webView: WKWebView) {
+        // Resent to the page now showing; WebKit drops it when the look is the same.
+        webView.viewDidChangeEffectiveAppearance()
+        guard let entry = entries[ObjectIdentifier(webView)], entry.committed != generation else { return }
+        // The choices changed while it was on its way: what was sent then went to the page before it.
+        entry.committed = generation
+        refresh(webView)
     }
 
     /// A page's look was chosen, or given back to follow the Mac: it changes at once, without loading again, and

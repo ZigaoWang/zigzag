@@ -40,6 +40,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         change(sidebar)
         if let edgeSidebar { change(edgeSidebar) }
     }
+
+    /// The update card's actions and state, the same in the window's sidebar and the mirror.
+    private func configureUpdateCard(_ sidebar: SidebarView) {
+        sidebar.updateCard.onUpdate = { Updater.shared.getUpdate() }
+        sidebar.updateCard.onSkip = { Updater.shared.skipOffered() }
+        sidebar.setUpdateCard(Updater.shared.cardState)
+    }
+
     var browserWindow: BrowserWindow { window as! BrowserWindow }
 
     private var tokens: [SignalToken] = []
@@ -231,7 +239,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // quitting.
         sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         sidebar.updateCard.onHide = { Updater.shared.dismissCard() }
-        bothSidebars { $0.setUpdateCard(Updater.shared.cardState) }
+        bothSidebars { self.configureUpdateCard($0) }
         tokens.append(Updater.changed.observe { [weak self] in
             guard let self else { return }
             // Closed in this window: hide like a closed card; fade in others.
@@ -1290,7 +1298,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 card.header.isZoomed = i == zoomed
                 card.header.zoom.onClick = { [weak self] _ in self?.toggleZoom(page) }
                 // Pressed and dragged, the strip carries its pane somewhere else (#160).
-                card.header.onDrag = { [weak self] tab, press, moved in self?.dragPane(tab, press: press, moved: moved) }
+                card.header.onDrag = { [weak self] tab, press, moved in self?.dragPane(tab, press: press, moved: moved) ?? false }
                 card.header.onEditAddress = { [weak self, weak card] tab in
                     guard let self, let card else { return }
                     self.editAddress(of: tab, from: card.header.address)
@@ -1391,6 +1399,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         card.isFloating = true
         card.onRestart = { Updater.shared.restartToUpdate() }
         card.onHide = { Updater.shared.dismissCard() }
+        card.onUpdate = { Updater.shared.getUpdate() }
+        card.onSkip = { Updater.shared.skipOffered() }
         panel.addSubview(card)
         panel.onLayout = { [weak panel, weak card] in
             guard let panel, let card else { return }
@@ -2837,7 +2847,9 @@ extension BrowserWindowController: TabHost {
         if let url = action.request.url, Tab.route(forPageLink: url, from: tab.url) == .load,
            features.width == nil, features.height == nil {
             let pending = BrowserWebView.pendingDisposition(for: tab.webView)
-            let clicked = pending == nil && action.navigationType == .linkActivated && PopupNotice.isUserInitiated(action)
+            let clicked = pending == nil && SiteRoutes.newWindowIsClickedLink(
+                linkActivated: action.navigationType == .linkActivated, userInitiated: PopupNotice.isUserInitiated(action),
+                fromMainFrame: action.sourceFrame.isMainFrame, frameHost: action.sourceFrame.securityOrigin.host, pageHost: tab.url?.host())
             if pending == .foregroundTab || pending == .backgroundTab || clicked {
                 let flags = action.modifierFlags
                 let background = pending == .backgroundTab || (clicked && flags.contains(.command) && !flags.contains(.shift))
@@ -3610,7 +3622,21 @@ extension BrowserWindowController: SidebarDelegate {
 
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {
         guard let windowPoint, canDropBeside(item), let current = shownTab ?? tabManager.selectedTab else { root.splitDropHint.show(nil); return }
+        root.splitDropHint.incoming = carried(item)
         showDropHint(at: windowPoint, beside: current)
+    }
+
+    /// The icon and title of a row carried over the page, as its row shows them.
+    func carried(_ item: SidebarItem) -> (icon: NSImage?, title: String)? {
+        switch item {
+        case .tab(let id):
+            return tabManager.tab(with: id).map { ($0.displayIcon, $0.displayTitle) }
+        case .bookmark(let id):
+            if let tab = tabManager.bookmarkTab(for: id) { return (tab.displayIcon, tab.displayTitle) }
+            return Library.shared.bookmark(id).map { ($0.displayIcon, $0.title) }
+        default:
+            return nil
+        }
     }
 
     /// Where a tab let go at a window point would open beside `current` and the pages with it (#160): the hint over
@@ -3989,7 +4015,7 @@ extension BrowserWindowController {
         let shownTab = EdgePeek.shared.tab ?? tabManager.selectedTab
         edgeSidebar.update(tab: shownTab)
         edgeSidebar.list.reload(animated: false)
-        edgeSidebar.setUpdateCard(Updater.shared.cardState)
+        configureUpdateCard(edgeSidebar)
         edgeSidebar.address.setCapture(camera: shownTab?.isUsingCamera ?? false,
                                       microphone: shownTab?.isUsingMicrophone ?? false)
     }

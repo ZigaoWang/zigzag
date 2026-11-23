@@ -255,7 +255,7 @@ nonisolated enum HostText {
             if fits(lead + domain, smallest) { return Fit(size: smallest, lead: lead, domain: String(domain)) }
             kept -= 1
         }
-        return Fit(size: smallest, lead: lead, domain: label.prefix(1) + ellipsis + ending)
+        return Fit(size: smallest, lead: lead, domain: String(label.prefix(1)) + ellipsis + ending)
     }
 
     /// The fit as styled text: the lead quiet, the domain in `color`.

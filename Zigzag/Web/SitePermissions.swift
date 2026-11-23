@@ -1138,7 +1138,7 @@ final class PermissionPrompt: FloatingPanelView {
                 }
             }
             // A click anywhere else, outside it and the address it hangs from, puts it off too.
-            prompt.clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak prompt, weak controller] event in
+            prompt.clickMonitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown]) { [weak prompt, weak controller] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
                 // The command bar over it has its own clicks.
                 if controller?.promptIsCovered == true { return event }
@@ -1362,9 +1362,9 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private func stopListening() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
-        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        if let clickMonitor { TouchPress.removeMonitor(clickMonitor) }
         clickMonitor = nil
         tabsToken = nil
         urlToken = nil

@@ -482,7 +482,7 @@ final class IconPickerPanel: FloatingPanelView {
         self.growsFrom = growsFrom
         present(arrival: .pop)
         IconPickerPanel.current = self
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
                 // Mid-word in an input method (the emoji field takes any text), Esc belongs to it.
@@ -500,7 +500,7 @@ final class IconPickerPanel: FloatingPanelView {
     }
 
     func close() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         dismiss()
         if IconPickerPanel.current === self { IconPickerPanel.current = nil }

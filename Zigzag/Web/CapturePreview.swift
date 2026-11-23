@@ -69,6 +69,12 @@ final class CapturePreview: FloatingPanelView {
             addSubview(note)
         }
         [closeDisc, closeButton].forEach { addSubview($0) }
+        if TouchGestures.isAvailable {
+            // A tap on it shows its ×, as the pointer over it does.
+            let watch = TouchWatch()
+            watch.onTap = { [weak self] _ in self?.showClose(true) }
+            addGestureRecognizer(watch)
+        }
         copyTile.onClick = { [weak self] _ in self?.copyAgain() }
         saveTile.onClick = { [weak self] _ in self?.onSave?() }
         shareTile.onClick = { [weak self] _ in self?.share() }
@@ -167,7 +173,7 @@ final class CapturePreview: FloatingPanelView {
         growsFrom = CGPoint(x: 1, y: 1)
         layoutSubtreeIfNeeded()
         present(arrival: .pop)
-        let clicks = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        let clicks = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, !self.holds, event.window === self.window else { return event }
             if !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }
             return event
@@ -205,7 +211,7 @@ final class CapturePreview: FloatingPanelView {
         guard !closed else { return }
         closed = true
         hideWork?.cancel()
-        monitors.forEach { NSEvent.removeMonitor($0) }
+        monitors.forEach { TouchPress.removeMonitor($0) }
         monitors = []
         dismiss()
         onClose?()

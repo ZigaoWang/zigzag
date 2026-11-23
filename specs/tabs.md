@@ -55,6 +55,10 @@
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.
   Test: UnloadedTabTests.aSleepingTabClickedLoadsAgainWhereItWas
+- A sleeping tab woken, or one restored after a relaunch → its page plays nothing with sound until you use it.
+  Test: UnloadedTabTests.aWokenOrRestoredPageStartsNoSoundOnItsOwn
+- A sleeping tab woken, or one restored after a relaunch → its page is the site's page now, not a copy kept from before.
+  Test: UnloadedTabTests.aRestoredPageIsTheSitesPageNowNotWebKitsOldCopy
 
 ## Handoff
 - The key window's tab on an http or https page → offered to your other devices; never a private window, Zigzag's own pages, a file, an error page or this Mac's own address.
@@ -77,3 +81,31 @@
   Test: OwnWindowTabsTests.aMovedTabLeavesOneWindowForTheOtherAsItIs
 - Drag a split to another window → it moves whole and stays a split.
   Test: OwnWindowTabsTests.aSplitMovesWholeAndStaysASplit
+
+## Touch
+- Touch and hold a row → its menu opens where the finger is, the same one a right-click opens.
+  Test: TouchGesturesTests.aHeldFingerOpensTheMenuARightClickOpens
+- Tap a row → its × and other hover-only buttons show until a finger lands outside the sidebar, another row is tapped, or the pointer moves over it.
+  Test: TouchGesturesTests.aTapShowsARowsButtonsUntilThePointerOrAFingerElsewhere
+- Tap just beside a row's showing × → the tab closes; a mouse click there is still the row's.
+  Test: TouchGesturesTests.aFingerNearTheCloseButtonCloses
+- Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.
+  Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
+- Touch and hold a row, slide onto its menu without lifting → the item under the finger lights; lift on it → it runs.
+  Test: TouchMovesTests.slidingOntoTheMenuAndLiftingChooses
+- Touch and hold a row, lift off its menu → the menu stays open, to be tapped.
+  Test: TouchMovesTests.liftingOffTheMenuLeavesItOpen
+- Touch and hold a row, then move away from its menu, or before it shows → the row is picked up and drags as with the mouse.
+  Test: TouchMovesTests.movingAwayFromTheMenuPicksItUp
+- A finger and the mouse drag a row the same way: reorder, into a folder, a split, another space.
+  Test: TouchMovesTests.theMouseAndAFingerDriveTheSameDrag
+- A row carried by a finger out over the page → it keeps following the finger there until it lifts.
+  Test: SplitDragTests.theWindowFollowsTheFingerOverThePage
+- One finger sideways across the sidebar → the previous or next space, as two fingers on the trackpad; up and down scrolls.
+  Test: TouchMovesTests.aFingerAcrossTheSidebarSwitchesSpaces
+- Pinch in on a page at its usual size → Show All Tabs; zoomed in, or pinching out, the page zooms. Pinch out on a card → it opens.
+  Test: TouchMovesTests.pinchingInAtTheUsualSizeOpensTheOverview
+- A finger in from a page's left edge → Back; from its right edge → Forward, when the Mac's touch setting and Zigzag's allow swiping.
+  Test: TouchMovesTests.theEdgesGoBackAndForward
+- A finger dragging a page sideways → it scrolls, never Back or Forward.
+  Test: TouchMovesTests.aFingerDraggingThePageIsNotATrackpadSwipe

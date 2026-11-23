@@ -302,6 +302,34 @@ final class ResizeHandle: NSView {
     nonisolated static func dragged(_ pointer: CGFloat, grab: CGFloat) -> CGFloat { pointer - grab }
 
     override func mouseUp(with event: NSEvent) { onEnd?(event.modifierFlags.contains(.shift)) }
+
+    // MARK: Touch
+
+    /// A finger dragging it, from `BrowserRootView`'s touch pan: what a press, drag and release do, in window
+    /// coordinates. Shift is the keyboard's.
+    func touchBegan(at windowPoint: NSPoint) {
+        let point = convert(windowPoint, from: nil)
+        grab = (isVertical ? point.y : point.x) - line
+        pressedAt = windowPoint
+        onBegin?()
+    }
+
+    func touchMoved(to windowPoint: NSPoint) {
+        let shift = NSEvent.modifierFlags.contains(.shift)
+        if let onDragPoint {
+            onDragPoint(windowPoint, shift)
+        } else {
+            onDrag?(Self.dragged(isVertical ? windowPoint.y : windowPoint.x, grab: grab), shift)
+        }
+    }
+
+    func touchEnded() { onEnd?(NSEvent.modifierFlags.contains(.shift)) }
+
+    /// Whether a finger moving by `translation` drags it rather than scrolling past it.
+    nonisolated static func touchDrags(_ translation: NSPoint, vertical: Bool, bothWays: Bool) -> Bool {
+        if bothWays { return true }
+        return vertical ? abs(translation.y) >= abs(translation.x) : abs(translation.x) >= abs(translation.y)
+    }
 }
 
 /// The line shown at the middle while a tile divider comes near even: a guide, never a control, so it takes no pointer.
@@ -760,9 +788,66 @@ final class BrowserRootView: SpaceFrameView {
         pageDropRing.cornerCurve = .continuous
         pageDropRing.zPosition = 50
         layer?.addSublayer(pageDropRing)
+        if TouchGestures.isAvailable { addHandlePan() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: Touch
+
+    /// The resize strips are 8 points wide: a finger takes one anywhere in `TouchGestures.target` around it.
+    private var touchedHandle: ResizeHandle?
+
+    private func addHandlePan() {
+        let pan = TouchPanRecognizer { [weak self] pan in self?.handlePan(pan) }
+        pan.touchOnly.accepts = { [weak self] point in self?.resizeHandle(atTouch: point) != nil }
+        pan.touchOnly.shouldBegin = { [weak self] recognizer in
+            guard let self, let pan = recognizer as? NSPanGestureRecognizer else { return false }
+            let moved = pan.translation(in: self)
+            let start = NSPoint(x: pan.location(in: self).x - moved.x, y: pan.location(in: self).y - moved.y)
+            guard let handle = self.resizeHandle(atTouch: start) else { return false }
+            return ResizeHandle.touchDrags(moved, vertical: handle.isVertical, bothWays: handle.dragsBothWays)
+        }
+        addGestureRecognizer(pan)
+    }
+
+    private func handlePan(_ pan: NSPanGestureRecognizer) {
+        let now = pan.location(in: self), moved = pan.translation(in: self)
+        switch pan.state {
+        case .began:
+            let start = NSPoint(x: now.x - moved.x, y: now.y - moved.y)
+            guard let handle = resizeHandle(atTouch: start) else { return }
+            touchedHandle = handle
+            handle.touchBegan(at: convert(start, to: nil))
+            handle.touchMoved(to: convert(now, to: nil))
+        case .changed:
+            touchedHandle?.touchMoved(to: convert(now, to: nil))
+        case .ended, .cancelled, .failed:
+            touchedHandle?.touchEnded()
+            touchedHandle = nil
+        default:
+            break
+        }
+    }
+
+    /// The resize strip a finger at `point` (own coordinates) takes: the nearest whose touch box holds it.
+    func resizeHandle(atTouch point: NSPoint) -> ResizeHandle? {
+        var handles: [ResizeHandle] = []
+        func collect(_ view: NSView) {
+            for child in view.subviews where !child.isHidden {
+                if let handle = child as? ResizeHandle { handles.append(handle) } else { collect(child) }
+            }
+        }
+        collect(self)
+        let frames = handles.map { convert($0.bounds, from: $0) }
+        return Self.touchTarget(frames, at: point).map { handles[$0] }
+    }
+
+    /// Of `frames`, the one whose touch box holds `point` with its middle nearest; nil when none does.
+    nonisolated static func touchTarget(_ frames: [NSRect], at point: NSPoint) -> Int? {
+        let hits = frames.indices.filter { TouchGestures.box(around: frames[$0]).contains(point) }
+        return hits.min { hypot(frames[$0].midX - point.x, frames[$0].midY - point.y) < hypot(frames[$1].midX - point.x, frames[$1].midY - point.y) }
+    }
 
     private let pageDropRing = CALayer()
 
@@ -2044,32 +2129,63 @@ final class PassthroughView: NSView {
 }
 
 /// Shown while a tab is dragged over the page: where it would open, beside what's there (`TileDrop`): a half or a
-/// quarter of the page, or in place of a page that can't split again.
+/// quarter of the page, or in place of a page that can't split again. The place is shaded in the accent, and a card in
+/// it names the page coming in and what the drop does; it glides from place to place and fades in and out.
 final class SplitDropHint: NSView {
     private let zone = ColorView()
-    /// What the hint says, on a toast's pill so it reads over any page, kept clear of what the pointer carries.
-    private let pill = FloatingPanelView()
+    /// The page coming in and what the drop does, on a panel's surface so it reads over any page.
+    private let card = FloatingPanelView()
+    private let icon = FaviconView()
+    private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-    /// The pointer, in this view's terms, while something is carried over the page: the label keeps out from under
-    /// the picture that hangs below it.
+    /// The pointer, in this view's terms, while something is carried over the page: the card keeps out from under it
+    /// (and from under a finger, which hides more than a pointer does).
     private var pointer: CGPoint?
     /// Where a drop now would go, in this view's terms (it covers the page area); nil while it's not over the page.
     private(set) var drop: TileDrop?
+    /// Whether a place shows; while it fades out it no longer does.
+    private(set) var isShowing = false
+
+    /// The page being carried: its icon and title show in the card. Nil: the card says only what the drop does.
+    var incoming: (icon: NSImage?, title: String)? {
+        didSet {
+            guard incoming?.title != oldValue?.title || incoming?.icon !== oldValue?.icon else { return }
+            icon.image = incoming?.icon
+            name.stringValue = incoming?.title ?? ""
+            let solo = incoming == nil
+            icon.isHidden = solo
+            name.isHidden = solo
+            label.font = solo ? Tokens.Font.body(.medium) : Tokens.Font.small()
+            label.textColor = solo ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            if isShowing { place(animated: false) }
+        }
+    }
+
+    /// Room kept clear round the pointer: about a fingertip and what hangs below it.
+    nonisolated static let pointerClearance: CGFloat = 44
+    private static let iconSide: CGFloat = 20
+    /// A long title is cut at this width rather than stretching the card across the page.
+    static let maxCardWidth: CGFloat = 320
+    private static let padding = NSEdgeInsets(top: Tokens.Space.x2 + 2, left: Tokens.Space.x3, bottom: Tokens.Space.x2 + 2, right: Tokens.Space.x3)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        wantsLayer = true
         zone.wantsLayer = true
         zone.layer?.cornerRadius = Tokens.Radius.card
         zone.layer?.cornerCurve = .continuous
         zone.layer?.borderWidth = 2
         addSubview(zone)
-        pill.radius = Tokens.Metric.toastHeight / 2
-        // Laid out with the pill, inside its surface, as a toast lays out its label.
-        pill.onLayout = { [weak self] in self?.layoutLabel() }
-        pill.addSubview(label)
-        addSubview(pill)
-        label.alignment = .center
+        card.radius = Tokens.Radius.panel
+        // Laid out with the card, inside its surface, as a toast lays out its label.
+        card.onLayout = { [weak self] in self?.layoutCard() }
+        icon.isHidden = true
+        name.isHidden = true
+        [icon, name, label].forEach(card.addSubview)
+        addSubview(card)
         isHidden = true
+        alphaValue = 0
+        setAccessibilityElement(false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -2095,49 +2211,126 @@ final class SplitDropHint: NSView {
         present(move?.frame, title: move.map { Self.title(forMove: $0.kind) })
     }
 
+    /// The zone for a place: inside the page's edges, so the page's own corners still show round it.
+    static func zoneFrame(for place: CGRect) -> CGRect { place.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2) }
+
     private func present(_ frame: CGRect?, title: String?) {
-        isHidden = frame == nil
-        guard let frame else { return }
-        let target = frame.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
-        zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
-        zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
-        label.stringValue = title ?? ""
-        let place = labelFrame(in: target)
-        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) {
-            self.zone.animator().frame = target
-            self.pill.animator().frame = place
+        guard let frame else {
+            hide()
+            return
         }
-        if zone.frame.isEmpty { zone.frame = target }
-        if pill.frame.isEmpty { pill.frame = place }
-        pill.needsLayout = true
+        let target = Self.zoneFrame(for: frame)
+        zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
+        zone.edgeColor = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha)
+        label.stringValue = title ?? ""
+        let arriving = !isShowing
+        isShowing = true
+        if arriving {
+            // Fades in growing a little into its place, rather than flying in from where it last was.
+            isHidden = false
+            Tokens.Motion.withoutAnimation {
+                zone.frame = target.insetBy(dx: min(12, target.width / 8), dy: min(12, target.height / 8))
+                card.frame = cardFrame(in: target)
+            }
+        }
+        let cardPlace = cardFrame(in: target)
+        card.needsLayout = true
+        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) {
+            self.animator().alphaValue = 1
+            self.zone.animator().frame = target
+            self.card.animator().frame = cardPlace
+        }
     }
 
-    /// The pointer moved (a window point; nil: nothing carried): the label moves out of its way if it has to.
+    private func hide() {
+        guard isShowing else { return }
+        isShowing = false
+        Tokens.Motion.animate(Tokens.Motion.change, { self.animator().alphaValue = 0 }, completion: { [weak self] in
+            // Shown again meanwhile: it stays.
+            guard let self, !self.isShowing else { return }
+            self.isHidden = true
+        })
+    }
+
+    /// Lays the card out again where it is now.
+    private func place(animated: Bool) {
+        guard isShowing, !zone.frame.isEmpty else { return }
+        let target = cardFrame(in: zone.frame)
+        card.needsLayout = true
+        if animated {
+            Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.card.animator().frame = target }
+        } else {
+            Tokens.Motion.withoutAnimation { card.frame = target }
+        }
+    }
+
+    /// The pointer moved (a window point; nil: nothing carried): the card moves out of its way if it has to.
     func follow(_ windowPoint: NSPoint?) {
         pointer = windowPoint.map { convert($0, from: nil) }
-        guard !isHidden, !zone.frame.isEmpty else { return }
-        let place = labelFrame(in: zone.frame)
-        guard place != pill.frame else { return }
-        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.pill.animator().frame = place }
+        guard isShowing, !zone.frame.isEmpty else { return }
+        let target = cardFrame(in: zone.frame)
+        guard target != card.frame else { return }
+        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.card.animator().frame = target }
     }
 
-    /// The label's pill in `zone`: centered across it, near its top, or near its bottom while the pointer is in its
-    /// upper half, as what's carried hangs below the pointer.
-    private func labelFrame(in zone: CGRect) -> CGRect {
-        let h = Tokens.Metric.toastHeight, inset = Tokens.Space.x4
-        // A few points in hand, as a field's text keeps before it cuts.
-        let w = min(ceil(label.inkWidth) + Tokens.Space.x2 + inset * 2, max(0, zone.width - inset * 2))
+    /// The card's size for what it says, at most `width` wide.
+    private func cardSize(fitting width: CGFloat) -> CGSize {
+        let p = Self.padding
+        let text: CGFloat
+        let height: CGFloat
+        if incoming == nil {
+            text = ceil(label.inkWidth) + Tokens.Space.x2
+            height = Tokens.Metric.toastHeight
+            // A pill, as before: even ends.
+            return CGSize(width: min(text + Tokens.Space.x4 * 2, width), height: height)
+        }
+        text = max(ceil(name.inkWidth), ceil(label.inkWidth)) + 1
+        height = p.top + Self.iconSide + 1 + label.lineHeight + p.bottom
+        return CGSize(width: min(p.left + Self.iconSide + Tokens.Space.x2 + text + p.right, width, Self.maxCardWidth), height: height)
+    }
+
+    /// The card in `zone`: in its middle, or, while the pointer is on or near the middle, near its top or bottom,
+    /// whichever is further from the pointer.
+    private func cardFrame(in zone: CGRect) -> CGRect {
+        let inset = Tokens.Space.x4
+        let size = cardSize(fitting: max(0, zone.width - inset * 2))
+        return Self.cardFrame(size: size, in: zone, pointer: pointer)
+    }
+
+    /// Where a card of `size` sits in `zone` with the pointer at `pointer` (all in the hint's top-down terms).
+    static func cardFrame(size: CGSize, in zone: CGRect, pointer: CGPoint?) -> CGRect {
+        let inset = Tokens.Space.x4
         // Clear of a pane's strip at the top, so the pane's address still shows.
         let top = zone.minY + Tokens.Pane.height + Tokens.Space.x3
-        let high = pointer.map { $0.y < zone.midY } ?? false
-        let y = high ? max(top, zone.maxY - inset - h) : min(top, max(zone.minY, zone.maxY - inset - h))
-        return CGRect(x: round(zone.midX - w / 2), y: round(y), width: w, height: h)
+        let bottom = zone.maxY - inset - size.height
+        let x = round(zone.midX - size.width / 2)
+        var y = round(zone.midY - size.height / 2)
+        if let pointer {
+            let clear = Self.pointerClearance
+            let middle = CGRect(x: x, y: y, width: size.width, height: size.height).insetBy(dx: -clear, dy: -clear)
+            if middle.contains(pointer) {
+                y = pointer.y < zone.midY ? max(top, bottom) : min(top, bottom)
+            }
+        }
+        return CGRect(x: x, y: round(max(zone.minY, y)), width: size.width, height: size.height)
     }
 
-    private func layoutLabel() {
-        let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x4 - Label.inset, y: (pill.bounds.height - h) / 2,
-                             width: max(0, pill.bounds.width - Tokens.Space.x4 * 2 + Label.inset * 2), height: h)
+    private func layoutCard() {
+        let p = Self.padding
+        if incoming == nil {
+            let h = label.lineHeight
+            label.alignment = .center
+            label.frame = NSRect(x: Tokens.Space.x4 - Label.inset, y: (card.bounds.height - h) / 2,
+                                 width: max(0, card.bounds.width - Tokens.Space.x4 * 2 + Label.inset * 2), height: h)
+            return
+        }
+        label.alignment = .left
+        let side = Self.iconSide
+        icon.frame = NSRect(x: p.left, y: p.top, width: side, height: side)
+        let textX = icon.frame.maxX + Tokens.Space.x2 - Label.inset
+        let textWidth = max(0, card.bounds.width - textX - p.right + Label.inset)
+        name.frame = NSRect(x: textX, y: p.top + name.centeredY(in: side), width: textWidth, height: name.lineHeight)
+        label.frame = NSRect(x: textX, y: p.top + side + 1, width: textWidth, height: label.lineHeight)
     }
 
     /// What the hint says over where the page would open.

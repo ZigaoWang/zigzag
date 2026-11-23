@@ -180,7 +180,7 @@ Updates install by themselves. What changed in each version is in the
 
 ## Build from source
 
-Requirements: macOS 15.4 or later, Xcode 26 or later, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Requirements: macOS 15.4 or later, Xcode 27 or later, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 brew install xcodegen

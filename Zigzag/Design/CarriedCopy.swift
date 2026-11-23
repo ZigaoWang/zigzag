@@ -136,6 +136,20 @@ final class CarriedCopy {
         return result
     }
 
+    /// Runs a drag in `window`: `moved` for every step and for the release, then `ended` with the release, or nil when
+    /// it was called off. By the mouse it's `track`'s loop, over before this returns; picked up by a finger
+    /// (`TouchCarry.starting`), the finger drives the same steps and this returns at once. `tracking` stands in for
+    /// the mouse's loop in tests.
+    static func carry(in window: NSWindow, tracking: @MainActor (NSWindow, (NSEvent) -> Void) -> NSEvent? = track(in:_:),
+                      moved: @escaping (NSEvent) -> Void, ended: @escaping (NSEvent?) -> Void) {
+        if let touch = TouchCarry.starting {
+            TouchCarry.starting = nil
+            touch.attach(to: window, moved: moved, ended: ended)
+            return
+        }
+        ended(tracking(window, moved))
+    }
+
     private func frame(alternate: Bool) -> NSRect {
         let size = alternate ? alternateSize : self.size, grab = alternate ? alternateGrab : self.grab
         return NSRect(x: anchor.x - grab.x, y: anchor.y - grab.y, width: size.width, height: size.height)

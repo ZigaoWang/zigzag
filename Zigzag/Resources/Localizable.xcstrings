@@ -16032,7 +16032,7 @@
         }
       }
     },
-    "Pick Up Where You Left Off" : {
+    "Continue where you left off" : {
       "comment" : "A choice for “On launch” in Settings › General: the last session's windows come back.",
       "localizations" : {
         "zh-Hans" : {
@@ -16043,13 +16043,13 @@
         }
       }
     },
-    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session." : {
+    "Continue where you left off brings back the windows and tabs you had. Open a new window starts with one window and keeps the last session in History › Reopen Last Session." : {
       "comment" : "Explanation under “On launch” in Settings › General.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“历史记录 › 重新打开上次会话”里找回。"
+            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“打开一个新窗口”只打开一个窗口，上次的会话可以在“历史记录 › 重新打开上次会话”里找回。"
           }
         }
       }
@@ -20066,13 +20066,13 @@
         }
       }
     },
-    "Start Fresh" : {
+    "Open a new window" : {
       "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全新开始"
+            "value" : "打开一个新窗口"
           }
         }
       }
@@ -22625,6 +22625,100 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要更新密码吗？"
+          }
+        }
+      }
+    },
+    "Install updates automatically" : {
+      "comment" : "A setting in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动安装更新"
+          }
+        }
+      }
+    },
+    "Skip This Version" : {
+      "comment" : "Tooltip and VoiceOver action of Skip on the sidebar's update card: this version isn't offered again; a newer one is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过这个版本"
+          }
+        }
+      }
+    },
+    "Update available" : {
+      "comment" : "Title of the sidebar's update card for an update found while automatic installs are off: Update downloads it and restarts.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用更新"
+          }
+        }
+      }
+    },
+    "Version %@ is available. You have %@." : {
+      "comment" : "Under Zigzag's name in Settings › General while automatic installs are off and an update was found, beside Update. The placeholders are the new version and the one running.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ is available. You have %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %1$@ 可供更新，当前是 %2$@。"
+          }
+        }
+      }
+    },
+    "When off, Zigzag still checks and asks before downloading an update." : {
+      "comment" : "Explanation under “Install updates automatically” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后，Zigzag 仍会检查更新，下载前会先问你。"
+          }
+        }
+      }
+    },
+    "Zigzag %@ is available. Update downloads it and restarts Zigzag." : {
+      "comment" : "VoiceOver label of the sidebar's update card while automatic installs are off. The placeholder is the version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag %@ 可供更新。点按“更新”会下载它并重新启动 Zigzag。"
+          }
+        }
+      }
+    },
+    "Zigzag would download %@ and restart now." : {
+      "comment" : "Debug builds only: toast after Update on a pretend update. The placeholder is its version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 现在会下载 %@ 并重新启动。"
+          }
+        }
+      }
+    },
+    "automatic updates download install skip version" : {
+      "comment" : "Words that find the Install updates automatically setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动更新 下载 安装 跳过 版本 automatic updates download install skip version"
           }
         }
       }

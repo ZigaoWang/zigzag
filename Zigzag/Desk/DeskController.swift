@@ -361,6 +361,31 @@ final class DeskController {
                 return false
             }
         }
+        if TouchGestures.isAvailable {
+            let pinch = TouchPinchRecognizer { [weak self] pinch in self?.cardPinched(pinch) }
+            canvas.addGestureRecognizer(pinch)
+        }
+    }
+
+    /// Pinched out on a card, it opens, as on an iPad's tab overview. Once a pinch.
+    private var pinchOpened = false
+
+    private func cardPinched(_ pinch: TouchPinchRecognizer) {
+        switch pinch.state {
+        case .began: pinchOpened = false
+        case .changed:
+            guard !pinchOpened, TouchPinch.opensCard(magnification: pinch.magnification) else { return }
+            pinchOpened = openCard(at: pinch.location(in: canvas))
+        default: break
+        }
+    }
+
+    /// Opens the card at `point` in the canvas; false when there's none.
+    @discardableResult
+    func openCard(at point: NSPoint) -> Bool {
+        guard isVisible, let card = cards.values.first(where: { !$0.isHidden && $0.frame.contains(point) }), let tab = card.tab else { return false }
+        hide(openingTab: tab)
+        return true
     }
 
     isolated deinit {

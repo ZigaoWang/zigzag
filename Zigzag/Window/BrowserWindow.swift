@@ -41,6 +41,11 @@ final class BrowserWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
+    /// Fingers skip `sendEvent`; the whole frame is watched for them (`TouchPress`).
+    override var contentView: NSView? {
+        didSet { TouchPress.watch(self) }
+    }
+
     /// AppKit's drag by an empty space stays off in full screen (#483).
     override var isMovableByWindowBackground: Bool {
         get { super.isMovableByWindowBackground && dragMovesWindow }
@@ -211,15 +216,7 @@ final class BrowserWindow: NSWindow {
             UndoClock.lastPageInput = Date()
             sidebarHasTheClick = false
         }
-        if event.type == .leftMouseDown {
-            let hit = contentView?.hitTest(event.locationInWindow)
-            sidebarHasTheClick = sidebar.map { hit?.isDescendant(of: $0) == true } ?? false
-        }
-        // A click in a page counts too: a web app (Figma, Docs) keeps its own undo, which a click can change.
-        if event.type == .leftMouseDown, contentView?.hitTest(event.locationInWindow).map(Self.isInPage) == true {
-            UndoClock.lastPageEdit = Date()
-            UndoClock.lastPageInput = Date()
-        }
+        if event.type == .leftMouseDown { notePress(at: event.locationInWindow) }
         if let eventInterceptor, eventInterceptor(event) { return }
         if let side = SideButton(event.type, button: event.buttonNumber) {
             if let action = side.action { windowController?.tryToPerform(action, with: nil) }
@@ -230,6 +227,17 @@ final class BrowserWindow: NSWindow {
         if routeTitlebarEvent(event) { return }
         if swallowsPanelPress(event) { return }
         super.sendEvent(event)
+    }
+
+    /// A press at `point`: whether the sidebar has the click, and a click in a page for its own undo.
+    private func notePress(at point: NSPoint) {
+        let hit = contentView?.hitTest(point)
+        sidebarHasTheClick = sidebar.map { hit?.isDescendant(of: $0) == true } ?? false
+        // A click in a page counts too: a web app (Figma, Docs) keeps its own undo, which a click can change.
+        if hit.map(Self.isInPage) == true {
+            UndoClock.lastPageEdit = Date()
+            UndoClock.lastPageInput = Date()
+        }
     }
 
     /// Side buttons go back and forward in every page window, as in Chrome; on release, with the press taken too (#345).
@@ -325,12 +333,15 @@ final class BrowserWindow: NSWindow {
     /// Our controls sit in the title bar area, where AppKit sends presses to the title bar first, so presses on them
     /// are delivered directly.
     private weak var pressTarget: NSView?
+    /// When a press last went to one of them that way, so a tap there isn't clicked twice.
+    private var lastTitlebarPress: TimeInterval = 0
 
     private func routeTitlebarEvent(_ event: NSEvent) -> Bool {
         switch event.type {
         case .leftMouseDown, .rightMouseDown:
             guard let target = control(at: event.locationInWindow) else { return false }
             pressTarget = target
+            lastTitlebarPress = ProcessInfo.processInfo.systemUptime
             if event.type == .leftMouseDown {
                 makeKeyAndOrderFront(nil)
                 target.mouseDown(with: event)
@@ -577,5 +588,22 @@ enum QuietKeys {
     static func passQuietly(_ selector: Selector, _ event: NSEvent?) -> Bool {
         guard selector == #selector(NSResponder.keyDown(with:)), let event, event.type == .keyDown else { return false }
         return !event.modifierFlags.contains(.command)
+    }
+}
+
+extension BrowserWindow: TouchPress.Handling {
+    /// A finger landing: the press hooks `sendEvent` runs for a mouse-down (the window controller's included).
+    func touchPressed(_ event: NSEvent) {
+        notePress(at: event.locationInWindow)
+        _ = eventInterceptor?(event)
+    }
+
+    /// A tap on one of our controls in the title bar strip, where AppKit's click from it went to the title bar and
+    /// never reached `routeTitlebarEvent`: the control is clicked.
+    func touchTapped(_ event: NSEvent, downAt time: TimeInterval) {
+        let point = event.locationInWindow
+        guard lastTitlebarPress < time, let target = control(at: point) as? InteractiveView, target.isEnabled,
+              let frame = contentView?.superview, let hit = frame.hitTest(point), !hit.isDescendant(of: target) else { return }
+        target.onClick?(event)
     }
 }

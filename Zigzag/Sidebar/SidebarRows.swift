@@ -596,12 +596,34 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
+        TouchReveal.pointerMoved(over: self)
         trackPointer(event)
     }
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
+        TouchReveal.pointerMoved(over: self)
         trackPointer(event)
+    }
+
+    // MARK: Touch
+
+    /// Shown by a tap as hovering shows it, the × of a pinned tab or a split's part included (`TouchReveal`).
+    private(set) var touchRevealed = false {
+        didSet { if oldValue != touchRevealed { stateDidChange(animated: false) } }
+    }
+
+    /// A tap at `point` (own coordinates): the row's buttons show as if hovered, on the part tapped.
+    func touchReveal(at point: NSPoint) {
+        if closesPart, isSplit, bounds.contains(point) { pointedPart = half(at: point) }
+        touchRevealed = true
+        var area: NSView? = superview
+        while let current = area, !(current is SidebarView) { area = current.superview }
+        TouchReveal.reveal(self, keptWithin: area) { [weak self] in
+            guard let self else { return }
+            self.touchRevealed = false
+            if !self.isHovered { self.pointedPart = nil }
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -668,6 +690,71 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         addSubview(audioButton)
         addSubview(partnerAudioButton)
         addSubview(closeButton)
+        if TouchGestures.isAvailable { addTouchWatch() }
+    }
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onDown = { [weak self] point in self?.touchDown(at: point) }
+        watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
+        addGestureRecognizer(watch)
+    }
+
+    /// A finger landing near the × but off it (`closeTouchBox`): the click AppKit makes from it is the ×'s.
+    private enum CloseTouch { case none, armed(NSPoint, TimeInterval), taken }
+    private var closeTouch = CloseTouch.none
+    /// The press the × took over from the row, until it lifts.
+    private var closePress: NSEvent?
+
+    /// The × is 20 points; a finger takes it anywhere in `TouchGestures.target` around it, within the row.
+    var closeTouchBox: NSRect { TouchGestures.box(around: closeButton.frame).intersection(bounds) }
+
+    /// A finger landed, in window coordinates.
+    func touchDown(at windowPoint: NSPoint) {
+        let point = convert(windowPoint, from: nil)
+        let nearClose = !closeButton.isHidden && !closeButton.frame.contains(point) && closeTouchBox.contains(point)
+        closeTouch = nearClose ? .armed(windowPoint, ProcessInfo.processInfo.systemUptime) : .none
+    }
+
+    /// A tap, in window coordinates, once AppKit's click from it has gone through.
+    func touchTapped(at windowPoint: NSPoint) {
+        switch closeTouch {
+        case .armed:
+            // No click came from it: the tap is the ×'s all the same.
+            closeTouch = .none
+            let event = NSEvent.mouseEvent(with: .leftMouseUp, location: windowPoint, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
+            if let event { closeButton.onClick?(event) }
+        case .taken:
+            closeTouch = .none
+        case .none:
+            touchReveal(at: convert(windowPoint, from: nil))
+        }
+    }
+
+    /// Whether a mouse-down is the click AppKit made from a finger near the ×.
+    private func takesCloseTouch(_ event: NSEvent) -> Bool {
+        guard case .armed(let point, let time) = closeTouch, ProcessInfo.processInfo.systemUptime - time < 1,
+              hypot(event.locationInWindow.x - point.x, event.locationInWindow.y - point.y) < TouchGestures.tapSlop else { return false }
+        closeTouch = .taken
+        return true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if takesCloseTouch(event) { closePress = event; return }
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if closePress != nil { return }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard let press = closePress else { return super.mouseUp(with: event) }
+        closePress = nil
+        let moved = hypot(event.locationInWindow.x - press.locationInWindow.x, event.locationInWindow.y - press.locationInWindow.y)
+        if moved < TouchGestures.tapSlop { closeButton.onClick?(event) }
     }
 
     /// The row's other pages after its own, in order (none: a row of one page). The only way a row becomes a split
@@ -937,7 +1024,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func refreshAccessories() {
         // A pinned tab you're on stays clean, as Arc's does: its button (unload, or back to its page) comes with the
         // pointer. A plain tab you're on keeps its close button in view.
-        let pointing = closesInPart ? isHovered && pointedPart != nil : isHovered
+        let hovering = isHovered || touchRevealed
+        let pointing = closesInPart ? hovering && pointedPart != nil : hovering
         // A part too narrow for its icon and the × beside it keeps its icon until you point at it.
         let resting = isSelected && !isBookmark && (!closesInPart || closeFitsBesideIcon(part: closePart))
         // In a split, each part's × is that page's own: none on a pinned part that isn't loaded.
@@ -1217,7 +1305,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 // favorite's small × in its top corner, its icon and speaker staying, the part's wash saying whose it is.
                 let end = part.end - edge - size.width
                 let fits = titles || end >= icon.frame.maxX + Self.buttonGap
-                if !fits, !(isHovered && pointedPart != nil) { closeButton.isHidden = true }
+                if !fits, !((isHovered || touchRevealed) && pointedPart != nil) { closeButton.isHidden = true }
                 if fits {
                     closeButton.frame.origin.x = end
                 } else {

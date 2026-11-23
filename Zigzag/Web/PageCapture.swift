@@ -123,7 +123,7 @@ final class PageCapture {
 
     /// Takes the mode down: the dim fades and the toolbar drops away; the page gets the pointer back.
     private func end() {
-        monitors.forEach { NSEvent.removeMonitor($0) }
+        monitors.forEach { TouchPress.removeMonitor($0) }
         monitors = []
         urlObservation = nil
         if let webView { setPageCursor(nil, in: webView) }
@@ -221,7 +221,7 @@ final class PageCapture {
             return self.handle(event) ? nil : event
         }
         // A click anywhere else in the window (the sidebar, the address) leaves capture mode and goes on.
-        let clicks = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        let clicks = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.isActive, event.window === self.controller?.window, let controller = self.controller else { return event }
             let point = controller.root.overlay.convert(event.locationInWindow, from: nil)
             let inside = [self.overlay, self.toolbar].contains { $0?.frame.contains(point) == true }

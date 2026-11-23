@@ -97,6 +97,7 @@ final class PaneHeaderView: NSView {
         }
         address.siteControls.onClick = { [weak self] _ in self?.openSiteControls() }
         address.siteControls.onRightClick = { [weak self] _ in self?.openSiteControls(); return nil }
+        addTouchDrag()
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -112,7 +113,8 @@ final class PaneHeaderView: NSView {
 
     /// Pressed on the strip (not its buttons or address) and moved past `dragThreshold`: the pane is picked up, to be
     /// put somewhere else in its group (#160). Called with the press and the move that got past it.
-    var onDrag: ((Tab, _ press: NSEvent, _ moved: NSEvent) -> Void)?
+    /// Returns whether it was picked up.
+    var onDrag: ((Tab, _ press: NSEvent, _ moved: NSEvent) -> Bool)?
     /// How far the pointer goes before a press is a drag, so a click stays a click.
     static let dragThreshold: CGFloat = 4
 
@@ -130,7 +132,69 @@ final class PaneHeaderView: NSView {
                 stop.pointee = true
             }
         }
-        if let moved { onDrag(tab, event, moved) }
+        if let moved { _ = onDrag(tab, event, moved) }
+    }
+
+    // MARK: Touch
+
+    /// A finger dragging the strip, off its buttons and address, picks the pane up as the mouse does: the same
+    /// hint, the same drop. `touchCarry` is that finger's drag once it's picked up.
+    private(set) var touchDrag: TouchPanRecognizer?
+    private var touchCarry: TouchCarry?
+
+    private func addTouchDrag() {
+        guard TouchGestures.isAvailable else { return }
+        let pan = TouchPanRecognizer { [weak self] pan in self?.touchDragChanged(pan) }
+        pan.touchOnly.accepts = { [weak self] point in self?.takesTouchDrag(at: point) ?? false }
+        addGestureRecognizer(pan)
+        touchDrag = pan
+    }
+
+    /// Whether a finger at `point` (own coordinates) drags the pane: on the strip itself, not a button or the address,
+    /// and not while the strip is the window's bar.
+    func takesTouchDrag(at point: NSPoint) -> Bool {
+        guard !isInBar, tab != nil, onDrag != nil, bounds.contains(point), let superview else { return false }
+        var view = hitTest(convert(point, to: superview))
+        while let current = view, current !== self {
+            if current is InteractiveView { return false }
+            view = current.superview
+        }
+        return true
+    }
+
+    private func touchDragChanged(_ pan: NSPanGestureRecognizer) {
+        let now = convert(pan.location(in: self), to: nil)
+        switch pan.state {
+        case .began:
+            let moved = pan.translation(in: self), here = pan.location(in: self)
+            touchDragBegan(at: convert(NSPoint(x: here.x - moved.x, y: here.y - moved.y), to: nil), now: now)
+        case .changed:
+            touchCarry?.move(to: now)
+        case .ended:
+            touchCarry?.release(at: now)
+            touchCarry = nil
+        case .cancelled, .failed:
+            touchCarry?.cancel()
+            touchCarry = nil
+        default:
+            break
+        }
+    }
+
+    /// A finger pressed at `start` and moved to `now` (window points): the pane is picked up and follows it.
+    @discardableResult
+    func touchDragBegan(at start: NSPoint, now: NSPoint) -> TouchCarry? {
+        guard let window, let tab, let onDrag, let press = TouchPress.mouseDown(at: start, in: window),
+              let moved = NSEvent.mouseEvent(with: .leftMouseDragged, location: now, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                             windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) else { return nil }
+        let carry = TouchCarry()
+        TouchCarry.starting = carry
+        let started = onDrag(tab, press, moved)
+        TouchCarry.starting = nil
+        guard started, carry.isAttached else { return nil }
+        touchCarry = carry
+        carry.move(to: now)
+        return carry
     }
 
     // MARK: Ink

@@ -2273,6 +2273,8 @@ final class TabManager {
         splits[index].ratio = 1 - pair.ratio
         rememberPinnedLayout(splits[index])
         structureChanged()
+        // The panes on screen trade places too, or clicks and find go to the page that was there.
+        selectionChanged()
     }
 
     /// Where the lines between a tile group's pages are (shares of the width and height); a split of two takes the

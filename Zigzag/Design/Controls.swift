@@ -182,9 +182,12 @@ class InteractiveView: NSView {
 
     var onClick: ((NSEvent) -> Void)?
     var onDoubleClick: (() -> Void)?
-    var onRightClick: ((NSEvent) -> NSMenu?)?
+    var onRightClick: ((NSEvent) -> NSMenu?)? { didSet { updateTouchMenu() } }
     /// Called once the mouse moves far enough while pressed. Return true to take over the drag.
-    var onDragStart: ((NSEvent) -> Bool)?
+    var onDragStart: ((NSEvent) -> Bool)? { didSet { updateTouchMenu() } }
+    /// A finger held and moved picks it up too, through `onDragStart`: only for drags run by `CarriedCopy.carry`,
+    /// which a finger can drive.
+    var dragsByTouch = false { didSet { updateTouchMenu() } }
     /// Only sideways movement starts a drag, for something that moves along a row: a wobble up or down stays a click.
     var dragsHorizontally = false
     /// Fires the click on mouse down instead of mouse up (tabs feel faster this way).
@@ -328,7 +331,75 @@ class InteractiveView: NSView {
     }
 
     /// The right-click menu as Zigzag's own (`MenuPanel`) rather than the system's: the sidebar's rows and buttons.
-    var drawsMenu = false
+    var drawsMenu = false { didSet { updateTouchMenu() } }
+
+    /// A finger held on a control with a drawn menu opens it (AppKit already does this for system menus), and held
+    /// then moved, drags it (`dragsByTouch`).
+    private var touchMenu: TouchPressRecognizer?
+
+    private func updateTouchMenu() {
+        let wanted = TouchGestures.isAvailable && ((drawsMenu && onRightClick != nil) || (dragsByTouch && onDragStart != nil))
+        if wanted, touchMenu == nil {
+            let press = TouchPressRecognizer { [weak self] press in self?.touchHoldChanged(press) }
+            press.touchOnly.accepts = { [weak self] point in self?.ownsTouchMenu(at: point) ?? false }
+            addGestureRecognizer(press)
+            touchMenu = press
+        } else if !wanted, let touchMenu {
+            removeGestureRecognizer(touchMenu)
+            self.touchMenu = nil
+        }
+    }
+
+    /// The finger's on this control's menu, not a nested control's own.
+    private func ownsTouchMenu(at point: NSPoint) -> Bool {
+        isEnabled && !TouchGestures.controlHasMenu(at: point, in: self)
+    }
+
+    /// A finger held at `point` (own coordinates): the menu a right-click there opens. Not while a menu is open
+    /// (AppKit's own right-click from the hold).
+    @discardableResult
+    func touchHeld(at point: NSPoint) -> Bool {
+        guard isEnabled, drawsMenu, let onRightClick, let window, MenuPanel.current == nil else { return false }
+        let windowPoint = convert(point, to: nil)
+        guard let event = TouchGestures.rightMouseDown(at: windowPoint, in: window) else { return false }
+        if let menu = onRightClick(event) { showDrawnMenu(menu, at: windowPoint) }
+        return true
+    }
+
+    private func touchHoldChanged(_ press: TouchPressRecognizer) {
+        let point = press.location(in: nil)
+        switch press.state {
+        case .began: beginTouchHold(at: point)
+        case .changed: TouchHold.current?.pressMoved(to: point)
+        case .ended: TouchHold.current?.pressLifted(at: point)
+        case .cancelled, .failed: TouchHold.current?.pressCancelled()
+        default: break
+        }
+    }
+
+    /// A finger held at `windowPoint`: the menu opens there a moment later, and moving off it picks the control up.
+    @discardableResult
+    func beginTouchHold(at windowPoint: NSPoint) -> TouchHold? {
+        guard isEnabled, window != nil else { return nil }
+        let point = convert(windowPoint, from: nil)
+        let menu: (() -> MenuPanel?)? = drawsMenu && onRightClick != nil ? { [weak self] in
+            guard let self, self.touchHeld(at: point) else { return nil }
+            return MenuPanel.current?.anchor === self ? MenuPanel.current : nil
+        } : nil
+        let drag: ((NSPoint) -> Bool)? = dragsByTouch && onDragStart != nil ? { [weak self] start in
+            guard let self, let window = self.window, let onDragStart = self.onDragStart,
+                  let event = TouchPress.mouseDown(at: start, in: window) else { return false }
+            self.isPressed = false
+            return onDragStart(event)
+        } : nil
+        guard menu != nil || drag != nil else { return nil }
+        isPressed = true
+        return TouchHold.begin(on: self, at: windowPoint, openMenu: menu, startDrag: drag) { [weak self] in self?.isPressed = false }
+    }
+
+    #if DEBUG
+    var touchMenuRecognizer: TouchPressRecognizer? { touchMenu }
+    #endif
 
     private func showDrawnMenu(_ menu: NSMenu, at windowPoint: NSPoint) {
         let entries = MenuPanel.entries(from: menu)
@@ -2067,7 +2138,7 @@ final class MenuPanel: FloatingPanelView {
     // MARK: Closing
 
     private func watch(_ window: NSWindow) {
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
             guard let self else { return event }
             return self.handle(event)
         }
@@ -2087,7 +2158,7 @@ final class MenuPanel: FloatingPanelView {
         if parentMenu != nil { root.close(animated: animated); return }
         closeChild(animated: false)
         guard Self.current === self || monitor != nil else { return }
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
@@ -2223,9 +2294,55 @@ final class MenuPanel: FloatingPanelView {
         if let index = row(at: windowPoint) { choose(index) }
     }
 
+    // MARK: A held finger
+
+    /// Opened by a finger still held down (`TouchHold`): the clicks AppKit makes from that finger outside the menu
+    /// are its own, and neither close nor open a menu, until a moment after it lifts.
+    var isHeldByTouch = false
+    private var heldUntil: TimeInterval = 0
+
+    /// The finger lifted; a click made from the hold can still arrive a moment later.
+    func touchLifted() {
+        isHeldByTouch = false
+        heldUntil = ProcessInfo.processInfo.systemUptime + 0.3
+    }
+
+    func touchContains(_ windowPoint: NSPoint) -> Bool { contains(windowPoint: windowPoint) }
+
+    /// The held finger at `windowPoint`: the item under it lights, with a tap where the hardware gives one, and an
+    /// item with a submenu opens it.
+    func touchTrack(windowPoint: NSPoint) {
+        if let child, child.touchContains(windowPoint) {
+            keepChild()
+            child.touchTrack(windowPoint: windowPoint)
+            return
+        }
+        let index = row(at: windowPoint)
+        // Off this menu toward its open submenu's item, that item stays lit.
+        if index == nil, childIndex != nil { return }
+        guard index != highlighted else { return }
+        highlighted = index
+        if let index {
+            Haptics.snap()
+            if rows[index].item.submenu != nil { openChild(index, fromKey: false) } else { closeChild(animated: true) }
+        }
+    }
+
+    /// The held finger lifted at `windowPoint`, on the menu: the item there is chosen.
+    func touchChoose(windowPoint: NSPoint) {
+        if let child, child.touchContains(windowPoint) { child.touchChoose(windowPoint: windowPoint); return }
+        if let index = row(at: windowPoint) { choose(index) }
+    }
+
+    /// Whether a click outside the menu is one AppKit made from the finger that opened it.
+    private var takesHeldClick: Bool {
+        root.isHeldByTouch || ProcessInfo.processInfo.systemUptime < root.heldUntil
+    }
+
     private func handle(_ event: NSEvent) -> NSEvent? {
         let inSameWindow = event.window === window
         let inside = inSameWindow && contains(windowPoint: event.locationInWindow)
+        if !inside, event.type != .keyDown, event.type != .scrollWheel, takesHeldClick { return nil }
         switch event.type {
         case .keyDown:
             return handleKey(event) ? nil : event
@@ -2259,6 +2376,12 @@ final class MenuPanel: FloatingPanelView {
                                            windowNumber: window?.windowNumber ?? 0, context: nil, characters: chars,
                                            charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { return }
         _ = handleKey(event)
+    }
+
+    /// The middle of item `index`, in window coordinates.
+    func debugItemPoint(_ index: Int) -> NSPoint {
+        let row = rows[index]
+        return row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
     }
 
     /// Opens the submenu of the item with this title, as hovering it does.

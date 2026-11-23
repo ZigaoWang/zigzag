@@ -1705,6 +1705,14 @@ final class Library {
         commit()
     }
 
+    /// Pages already pinned in a space become these splits, in one change; any that don't hold together are left out.
+    func addPinnedSplits(_ layouts: [PinnedSplit], in spaceID: UUID) {
+        guard let s = self.index(of: spaceID), !layouts.isEmpty else { return }
+        spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + layouts
+        tidyFolders(s)
+        commit()
+    }
+
     /// Pins a tab group (#209) as one folder, keeping its name and fold state.
     func addPinnedGroup(_ marks: [Bookmark], splits: [PinnedSplit] = [], named name: String, group: UUID, isOpen: Bool, to spaceID: UUID, at index: Int? = nil) {
         guard let s = self.index(of: spaceID), !marks.isEmpty else { return }

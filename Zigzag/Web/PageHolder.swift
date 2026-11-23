@@ -40,6 +40,7 @@ final class PageHolder: NSView {
         webView.autoresizingMask = [.width, .height]
         addSubview(webView)
         page = webView
+        if TouchGestures.isAvailable, edgeSwipe == nil { addTouchGestures() }
         if let pageObserver { NotificationCenter.default.removeObserver(pageObserver) }
         // WebKit moves the page as the inspector docks, leaves or is dragged wider: said once the room really changed.
         // WebKit takes the page to a window of its own for an element's full screen, and puts it back here after.
@@ -91,6 +92,74 @@ final class PageHolder: NSView {
         page.setFrameSize(size)
     }
 
+    // MARK: Touch
+
+    /// A finger in from the left edge goes back, from the right edge forward, with the trackpad swipe's arrow.
+    private(set) var edgeSwipe: TouchPanRecognizer?
+    /// Two fingers pinched in on the page at its usual size open Show All Tabs; the page still zooms as before.
+    private(set) var overviewPinch: TouchPinchRecognizer?
+    private var edgeDirection = 0
+    private var pinchStartZoom: CGFloat = 1
+    private var pinchFired = false
+
+    private func addTouchGestures() {
+        let pan = TouchPanRecognizer { [weak self] pan in self?.edgeSwipeChanged(pan) }
+        pan.touchOnly.accepts = { [weak self] point in
+            guard let self, TouchEdgeSwipe.direction(atX: point.x, width: self.bounds.width) != nil else { return false }
+            // A resize strip along the edge (the sidebar's, a split's) keeps the finger for itself.
+            let root = sequence(first: self.superview, next: { $0?.superview }).lazy.compactMap { $0 as? BrowserRootView }.first
+            return root.map { $0.resizeHandle(atTouch: $0.convert(point, from: self)) == nil } ?? true
+        }
+        pan.touchOnly.shouldBegin = { [weak self] recognizer in
+            guard let self, let pan = recognizer as? NSPanGestureRecognizer else { return false }
+            let start = pan.location(in: self).x - pan.translation(in: self).x
+            guard let direction = TouchEdgeSwipe.direction(atX: start, width: self.bounds.width),
+                  TouchEdgeSwipe.isInward(pan.translation(in: self), direction: direction),
+                  (self.page as? BrowserWebView)?.swipeNavigator.takesTouchSwipe(direction) == true else { return false }
+            self.edgeDirection = direction
+            return true
+        }
+        addGestureRecognizer(pan)
+        edgeSwipe = pan
+
+        let pinch = TouchPinchRecognizer { [weak self] pinch in self?.pinchChanged(pinch) }
+        addGestureRecognizer(pinch)
+        overviewPinch = pinch
+    }
+
+    private func edgeSwipeChanged(_ pan: TouchPanRecognizer) {
+        guard let swipe = (page as? BrowserWebView)?.swipeNavigator else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        switch pan.state {
+        case .began:
+            swipe.touchBegan(direction: edgeDirection)
+            swipe.touchMoved(dx: pan.translation(in: self).x, at: now)
+        case .changed: swipe.touchMoved(dx: pan.translation(in: self).x, at: now)
+        case .ended: swipe.touchEnded(at: now, cancelled: false)
+        case .cancelled, .failed: swipe.touchEnded(at: now, cancelled: true)
+        default: break
+        }
+    }
+
+    private func pinchChanged(_ pinch: TouchPinchRecognizer) {
+        switch pinch.state {
+        case .began:
+            pinchStartZoom = page?.magnification ?? 1
+            pinchFired = false
+        case .changed:
+            guard !pinchFired, TouchPinch.opensOverview(magnification: pinch.magnification, startZoom: pinchStartZoom) else { return }
+            pinchFired = true
+            touchPinchedIn()
+        default: break
+        }
+    }
+
+    /// Pinched in far enough: Show All Tabs, in a browser window.
+    func touchPinchedIn() {
+        guard let controller = window?.windowController as? BrowserWindowController, !controller.desk.isVisible else { return }
+        controller.desk.show()
+    }
+
     // MARK: Into real full screen
 
     /// On a page-filled video (Full screen videos fill: The Page), a top-corner button that sends it to real full
@@ -125,9 +194,19 @@ final class PageHolder: NSView {
         let tip = String(localized: "Enter Full Screen", comment: "Tooltip of the button over a video that fills the page: puts it in the screen's own full screen.")
         let button = MiniPlayerView.overlayButton("arrow.up.left.and.arrow.down.right", side: Self.expandSide, glyph: 15, tip: tip)
         button.alphaValue = 0
-        button.onClick = { [weak self] _ in self?.onExpand?() }
+        button.onClick = { [weak self] _ in
+            guard let self, !self.touchSwallow.takes() else { return }
+            self.onExpand?()
+        }
         addSubview(button)
         expandButton = button
+        if TouchGestures.isAvailable, touchWatch == nil {
+            let watch = TouchWatch()
+            watch.onDown = { [weak self] point in self?.touchDown(at: point) }
+            watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
+            addGestureRecognizer(watch)
+            touchWatch = watch
+        }
         let tracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
         addTrackingArea(tracking)
         expandTracking = tracking
@@ -153,6 +232,22 @@ final class PageHolder: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
+        if showsExpand { revealExpand() }
+    }
+
+    private var touchWatch: TouchWatch?
+    /// The click from a tap on the faded-out button: the tap only shows it.
+    private var touchSwallow = TouchSwallow()
+
+    func touchDown(at windowPoint: NSPoint) {
+        guard showsExpand, let button = expandButton, button.alphaValue < 0.5,
+              button.frame.contains(convert(windowPoint, from: nil)) else { return }
+        touchSwallow.arm()
+    }
+
+    /// A tap on the page brings the button back, as moving the pointer does.
+    func touchTapped(at windowPoint: NSPoint) {
+        touchSwallow.disarm()
         if showsExpand { revealExpand() }
     }
 

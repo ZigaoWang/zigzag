@@ -242,8 +242,9 @@ final class AddressView: InteractiveView {
     /// goes back.
     private func dragPin(_ entry: PinEntry, event: NSEvent) -> Bool {
         guard let window, beginPinDrag(entry.pin.id, at: event.locationInWindow) else { return false }
-        let released = CarriedCopy.track(in: window) { self.movePinDrag(to: $0.locationInWindow) }
-        endPinDrag(drop: released != nil)
+        CarriedCopy.carry(in: window, moved: { self.movePinDrag(to: $0.locationInWindow) }) { released in
+            self.endPinDrag(drop: released != nil)
+        }
         return true
     }
 
@@ -382,6 +383,7 @@ final class AddressView: InteractiveView {
                 guard let self, let entry else { return false }
                 return self.dragPin(entry, event: event)
             }
+            entry.button.dragsByTouch = true
             let id = entry.pin.id
             var actions: [NSAccessibilityCustomAction] = []
             if index > 0 { actions.append(moveAction(id, by: -1)) }
@@ -1057,6 +1059,9 @@ final class SidebarView: NSView {
         newSpaceButton.onClick = { [weak self] _ in self?.showAddMenu() }
         address.onClick = { [weak self] _ in self?.delegate?.sidebarOpenCommandBar() }
         themeToken = Brand.themeChanged.observe { [weak self] in self?.tintDownloadsRing() }
+        // A finger held where a right-click opens the blank menu opens it too.
+        TouchGestures.addMenuPress(to: self) { [weak self] event in _ = self?.showBlankMenu(for: event) }
+        if TouchGestures.isAvailable { addTouchSwipe() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1356,6 +1361,7 @@ final class SidebarView: NSView {
                     guard let self, let dot else { return false }
                     return self.dragSpace(dot, event: event)
                 }
+                dot.dragsByTouch = true
                 dotStrip.addSubview(dot)
                 return dot
             }
@@ -1425,10 +1431,11 @@ final class SidebarView: NSView {
     /// bar between two dots shows where it would go. Let go on the row, it moves there; off it, or with Esc, it goes back.
     private func dragSpace(_ dot: SpaceDotView, event: NSEvent) -> Bool {
         guard let window, beginSpaceDrag(dot, at: window.convertPoint(toScreen: event.locationInWindow)) else { return false }
-        let released = CarriedCopy.track(in: window) { event in
+        CarriedCopy.carry(in: window, moved: { event in
             self.moveSpaceDrag(to: window.convertPoint(toScreen: event.locationInWindow))
+        }) { released in
+            self.endSpaceDrag(drop: released != nil)
         }
-        endSpaceDrag(drop: released != nil)
         return true
     }
 
@@ -2121,6 +2128,71 @@ final class SidebarView: NSView {
         moveSwipe()
         scheduleSwipeEnd()
         return true
+    }
+
+    // MARK: A finger across the sidebar
+
+    /// One finger sideways across the sidebar: the same swipe two fingers make on the trackpad. Up and down still
+    /// scrolls the list, which waits only until the finger shows which way it goes.
+    private(set) var touchSwipe: TouchPanRecognizer?
+    private var touchSwipeX: CGFloat = 0
+
+    private func addTouchSwipe() {
+        let pan = TouchPanRecognizer { [weak self] pan in self?.touchSwipeChanged(pan) }
+        pan.touchOnly.shouldBegin = { [weak self] recognizer in
+            guard let self, TouchHold.current == nil, let pan = recognizer as? NSPanGestureRecognizer else { return false }
+            return TouchSwipe.isSideways(pan.translation(in: self))
+        }
+        pan.touchOnly.outranks = { [weak self] other in
+            guard let self, #available(macOS 27, *) else { return false }
+            return [self.scrollView, self.panes.left.scroll, self.panes.right.scroll].contains { $0.scrollGestureForRelationships === other }
+        }
+        addGestureRecognizer(pan)
+        touchSwipe = pan
+    }
+
+    private func touchSwipeChanged(_ pan: TouchPanRecognizer) {
+        let x = pan.translation(in: self).x
+        let now = ProcessInfo.processInfo.systemUptime
+        switch pan.state {
+        case .began:
+            touchSwipeX = x
+            touchSwipeBegan()
+            touchSwipeMoved(by: x, at: now)
+        case .changed:
+            touchSwipeMoved(by: x - touchSwipeX, at: now)
+            touchSwipeX = x
+        case .ended:
+            touchSwipeEnded(velocity: pan.velocity(in: self).x, cancelled: false)
+        case .cancelled, .failed:
+            touchSwipeEnded(velocity: 0, cancelled: true)
+        default:
+            break
+        }
+    }
+
+    /// The finger is going sideways: from here the list follows it, as it follows two fingers on the trackpad.
+    func touchSwipeBegan() {
+        if swipeState == .tracking { finishSwipe(velocity: 0) }
+        beginSwipe()
+        startTracking()
+    }
+
+    /// The finger moved `dx` points (positive to the right) at `time`.
+    func touchSwipeMoved(by dx: CGFloat, at time: TimeInterval) {
+        guard swipeState == .tracking else { return }
+        swipeTravel += dx
+        swipeSamples.append((time, dx))
+        swipeSamples.removeAll { time - $0.time > SpaceSwipe.velocityWindow }
+        moveSwipe()
+    }
+
+    /// Lifted going `velocity` points a second: lands on the next space or springs home, as letting go of a trackpad
+    /// swipe does.
+    func touchSwipeEnded(velocity: CGFloat, cancelled: Bool) {
+        guard swipeState == .tracking else { return }
+        finishSwipe(velocity: velocity, cancelled: cancelled)
+        swipeState = .idle
     }
 
     /// One turn of the wheel, however many notches or fine steps it sends, moves one space: steps closer together

@@ -1015,6 +1015,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             return row
         case .tabGroup(let id):
             // Same as a folder: click toggles, menu renames, ungroups or closes.
@@ -1029,6 +1030,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             return row
         case .separator:
             let separator = SeparatorRowView()
@@ -1091,6 +1093,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             observeHover(row)
             return row
         case .bookmark(let id):
@@ -1161,6 +1164,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             observeHover(row)
             return row
         }
@@ -2045,8 +2049,9 @@ final class SidebarListView: NSView {
         (rows[.separator] as? SeparatorRowView)?.showsClear = false
         for item in faint { rows[item]?.alphaValue = CarriedCopy.faint }
         copy.lift()
-        let released = CarriedCopy.track(in: window) { self.dragMoved(to: $0) }
-        endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
+        CarriedCopy.carry(in: window, moved: { self.dragMoved(to: $0) }) { released in
+            self.endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
+        }
         return true
     }
 
@@ -2252,7 +2257,10 @@ final class SidebarListView: NSView {
                local.x > -(onRight ? inner : outer), local.x < container.bounds.width + (onRight ? outer : inner) {
                 // The sidebar's very edge and just past it, clear of the icons and close buttons in the rows.
                 let zone = Tokens.Space.x2
-                let side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                var side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                // Out over the page while it offers to open the page there, the page's offer is what's meant.
+                let overPage = onRight ? local.x < 0 : local.x > container.bounds.width
+                if overPage, root?.splitDropHint.isShowing == true { side = nil }
                 // Only once the pointer has been away from the edges, so a row picked up near one doesn't flip at once.
                 if side == nil { edgeArmed = true }
                 edge = edgeArmed ? side : nil

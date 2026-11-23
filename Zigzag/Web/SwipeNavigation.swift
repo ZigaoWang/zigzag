@@ -89,6 +89,8 @@ final class SwipeNavigator {
             watchdog?.cancel()
             stopWatchingRest()
             guard webView.window != nil else { state = .idle; return false }
+            // A finger dragging the page on the screen scrolls it; only a swipe in from its edge goes back.
+            if TouchPress.isTouchScroll(at: event.timestamp) { state = .ignoring; return false }
             state = .deciding
             dx = 0; dy = 0; direction = 0; arming = SwipeArming(); pageScrolls = nil; overFrame = false; samples = []
             began = event.timestamp
@@ -162,6 +164,49 @@ final class SwipeNavigator {
         // It took it after all, answering after the swipe had started: the arrow goes and the page has the rest.
         if page == .took, state == .tracking { cancel(); state = .ignoring }
     }
+
+    // MARK: A finger in from the edge
+
+    /// Whether a finger swiping in from the page's edge may go `wanted`'s way (-1 back, 1 forward): the system's
+    /// setting for touch swipes and Zigzag's own allow it, and there's somewhere to go.
+    func takesTouchSwipe(_ wanted: Int) -> Bool {
+        guard let webView, Self.isOn, webView.fullscreenState == .notInFullscreen, webView.window != nil else { return false }
+        guard #available(macOS 27, *), NSEvent.isTouchSwipeNavigationEnabled else { return false }
+        return wanted < 0 ? webView.owner?.canGoBackOrReturn ?? webView.canGoBack : webView.canGoForward
+    }
+
+    /// A finger came in from the edge going `wanted`'s way: the arrow comes, as for two fingers on the trackpad.
+    func touchBegan(direction wanted: Int) {
+        if state == .tracking { cancel() }
+        if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
+        watchdog?.cancel()
+        stopWatchingRest()
+        direction = wanted
+        dx = 0; dy = 0; arming = SwipeArming(); samples = []
+        state = .tracking
+        showArrow()
+        update()
+    }
+
+    /// The finger is `dx` points from where it came in (positive to the right) at `time`.
+    func touchMoved(dx moved: CGFloat, at time: TimeInterval) {
+        guard state == .tracking else { return }
+        dx = moved
+        samples.append((time, moved))
+        if samples.count > 8 { samples.removeFirst(samples.count - 8) }
+        update()
+    }
+
+    /// Lifted at `time`: goes when the arrow is filled or with a flick, as letting go of the trackpad does.
+    func touchEnded(at time: TimeInterval, cancelled: Bool) {
+        guard state == .tracking else { return }
+        if !cancelled, arming.release(progress: progress, speed: speed(at: time)) { go() } else { cancel() }
+        state = .idle
+    }
+
+    #if DEBUG
+    var isTracking: Bool { state == .tracking }
+    #endif
 
     private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / threshold }
 

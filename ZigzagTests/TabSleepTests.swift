@@ -44,6 +44,20 @@ struct TabSleepTests {
         #expect(TabSleep.sleepers(tabs, awake: 40, memory: .low).isEmpty)
     }
 
+    @Test func onlyAPageThatComesBackOnItsOwnStartsQuietly() {
+        #expect(TabSleep.startsQuietly(restored: true, asleep: false, openedByPage: false))
+        #expect(TabSleep.startsQuietly(restored: false, asleep: true, openedByPage: false))
+        // A page you open, or one a page opened (a ⌘-clicked link's), autoplays as before.
+        #expect(!TabSleep.startsQuietly(restored: false, asleep: false, openedByPage: false))
+        #expect(!TabSleep.startsQuietly(restored: false, asleep: false, openedByPage: true))
+    }
+
+    @Test func aClickEndsAQuietStart() {
+        #expect(TabSleep.autoplaysWithoutSound(startsQuietly: true, userInitiated: false))
+        #expect(!TabSleep.autoplaysWithoutSound(startsQuietly: true, userInitiated: true))
+        #expect(!TabSleep.autoplaysWithoutSound(startsQuietly: false, userInitiated: false))
+    }
+
     @Test func aPageOnItsWayIsLetArriveFirst() {
         // Sleeping a tab mid-redirect after wake crashed WebKit committing the new page (#305).
         var loading = tab(5 * 60 * minute)
