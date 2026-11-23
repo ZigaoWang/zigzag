@@ -3,11 +3,13 @@ import Foundation
 /// Words put together in the language Zigzag speaks, which can differ from the Mac's region: someone in the US may
 /// run Zigzag in Chinese.
 enum Words {
-    /// The locale of the language Zigzag is showing. The Mac's own locale when they share a language, so its
-    /// conventions (the comma before "and" in American English, say) stay as they are.
+    /// The locale of the language Zigzag is showing. Keep the Mac's conventions when the language and script
+    /// agree, but don't format a Traditional Chinese interface with a Simplified Chinese locale or vice versa.
     nonisolated static let locale: Locale = {
-        let language = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en").language
-        return Locale.current.language.languageCode == language.languageCode ? .current : Locale(identifier: language.minimalIdentifier)
+        let language = Locale.Language(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+        let current = Locale.current.language
+        return current.languageCode == language.languageCode && current.script == language.script
+            ? .current : Locale(identifier: language.minimalIdentifier)
     }()
 
     /// The locale dates are written in: the language's own, with American English kept as Zigzag always wrote

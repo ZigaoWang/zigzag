@@ -1,5 +1,7 @@
 # Simplified Chinese glossary
 
+For Traditional Chinese (Taiwan), see [the zh-Hant glossary](glossary.zh-Hant.md).
+
 The words Zigzag uses most, and what they become in Simplified Chinese (zh-Hans). Translating the catalog
 (`Zigzag/Resources/Localizable.xcstrings`) starts from this table, so one English word is one Chinese word everywhere.
 
