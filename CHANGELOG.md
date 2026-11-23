@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - On a touch display, a small grabber shows at the window's edge while the sidebar is hidden. Tap it and the sidebar slides out and stays until you tap the page, pick a tab or swipe it back; drag it and the sidebar follows your finger. Swipe up or down on it to go to the previous or next space, without opening the sidebar. It shows only after you've touched the screen, and goes away when you use the mouse or trackpad. It sits on the right with the sidebar on the right.
+- On a touch display, tapping an open favorite shows its ×, and tapping the Tabs label shows Clear, as hovering does with the pointer.
 
 ### Fixed
 - On a touch display, swiping in from the window's edge to pull out the sidebar starts a little further in, so it no longer resizes the window instead.
