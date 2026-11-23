@@ -806,6 +806,12 @@ struct TopBarTests {
         #expect(root.topBar.pageColor == .systemRed)
     }
 
+    /// In full screen the pointer at the screen's top brings down the menu bar only; the address bar does not follow.
+    @Test func fullScreenGivesTheScreenTopToTheMenuBar() {
+        #expect(!BrowserWindowController.topPointerRevealsBar(fullScreen: true))
+        #expect(BrowserWindowController.topPointerRevealsBar(fullScreen: false))
+    }
+
     /// A finger in the top band asks for the bar back, and so does a pull down at the page's top; a touch in the
     /// page away from the band does not.
     @Test func aTouchInTheTopBandOrAPullAtThePageTopBringsTheBarBack() {

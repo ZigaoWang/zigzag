@@ -1295,11 +1295,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func autohidePointerMoved(_ event: NSEvent) {
         guard event.window === window, root.autohidesBar, root.barHoldsAddress, root.showsTopBar else { return }
+        guard Self.topPointerRevealsBar(fullScreen: window?.styleMask.contains(.fullScreen) == true) else { return }
         guard (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
         let point = root.convert(event.locationInWindow, from: nil)
         guard point.y <= Tokens.Space.x2 else { return }
         revealAutohide()
     }
+
+    /// In full screen the pointer at the screen's top belongs to the system menu bar; the address bar must not also
+    /// come down there. A scroll, key or touch still reveals it.
+    nonisolated static func topPointerRevealsBar(fullScreen: Bool) -> Bool { !fullScreen }
 
     /// A finger in the top band asks for the bar back; a pull down at the page's top is the same request through
     /// the page's scroll report.
@@ -2655,8 +2660,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let fullScreen = window.styleMask.contains(.fullScreen)
         // The page is under the lights only in full screen with neither the bar nor the sidebar there; then they
         // get a backing so they don't float over it (#462). The bar or sidebar is their backing otherwise.
-        let backing = Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.showsTopBar,
-                                                    sidebarVisible: docked, sidebarFloating: floating)
+        let backing = trafficLightBacking(fullScreen: fullScreen)
         if (fullScreenBar != nil) != backing, !window.fullScreenPhase.isMoving { showFullScreenBar(backing) }
         // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
         // Beside a sidebar on the right, the bar holding the address keeps them there always: the window's top left.
@@ -2737,8 +2741,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fullScreenBar = bar
     }
 
-    /// Whether the lights need a backing of their own: in full screen, when the page is under them because neither
-    /// the bar nor the sidebar is. With either there, they sit on Zigzag's own chrome (#462).
+    /// Whether the lights need their own backing in this window: the page is under them only in full screen with
+    /// neither the bar on screen nor the sidebar there (#462).
+    func trafficLightBacking(fullScreen: Bool) -> Bool {
+        Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.barOnScreen,
+                                      sidebarVisible: root.sidebarVisible,
+                                      sidebarFloating: root.isSidebarFloatingVisible)
+    }
+
+    /// The lights' backing decision from the parts, so the full-screen case can be tested without a full-screen window.
     nonisolated static func needsTrafficLightBacking(fullScreen: Bool, barShown: Bool, sidebarVisible: Bool,
                                                      sidebarFloating: Bool) -> Bool {
         fullScreen && !barShown && !sidebarVisible && !sidebarFloating
