@@ -1,6 +1,9 @@
 import AppKit
 import Foundation
+import Network
+import os
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// A tab whose page isn't running looks the same however it got there: put to sleep, restored after a relaunch and
@@ -206,6 +209,42 @@ import Testing
         #expect(await until { restored.title == "played" }, "\(restored.title)")
     }
 
+    /// WebKit brings a restored tab's page back from its cache however old, so a page changed since (its site's theme,
+    /// a sign-in) came back as it was until reloaded. It's asked of the site again and keeps its history.
+    @Test func aRestoredPageIsTheSitesPageNowNotWebKitsOldCopy() async throws {
+        let server = try VersionServer()
+        let base = try await server.start()
+        defer { server.stop() }
+        let page = base.appendingPathComponent("page")
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let first = Tab(url: page, title: "Page", spaceID: space)
+        manager.adopt([first], in: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        #expect(await until { first.title == "v1" }, "\(first.title)")
+        let state = try #require(first.interactionStateForSaving)
+        let restored = Tab(url: page, title: "Page", spaceID: space, interactionState: state)
+        restored.isRestored = true
+        manager.adopt([first, restored], in: space)
+        manager.select(restored)
+        #expect(await until { restored.title == "v2" }, "\(restored.title)")
+        #expect(restored.webView?.backForwardList.backList.isEmpty == true)
+        #expect(restored.webView?.url == page)
+    }
+
+    @Test func onlyARestoredWebPageFetchedWithGetIsAskedAgain() throws {
+        let page = try #require(URL(string: "https://example.com/a"))
+        #expect(Tab.revalidatesRestoredPage(url: page, method: "GET", type: .backForward))
+        #expect(Tab.revalidatesRestoredPage(url: page, method: nil, type: .backForward))
+        #expect(!Tab.revalidatesRestoredPage(url: page, method: "POST", type: .backForward))
+        #expect(!Tab.revalidatesRestoredPage(url: page, method: "GET", type: .other))
+        #expect(!Tab.revalidatesRestoredPage(url: URL(fileURLWithPath: "/tmp/a.html"), method: "GET", type: .backForward))
+        #expect(!Tab.revalidatesRestoredPage(url: URL(string: "zigzag://settings"), method: "GET", type: .backForward))
+    }
+
     /// A second of 16-bit mono silence.
     private static func silentWAV() -> Data {
         let rate: UInt32 = 8000, bytes = rate * 2
@@ -227,5 +266,64 @@ import Testing
         tab.suspend(because: "test")
         #expect(tab.settingsView === view)
         tab.close()
+    }
+}
+
+/// `/page` is titled with how many times it was asked for ("v1", "v2"); WebKit keeps it in its cache, stale at once.
+nonisolated private final class VersionServer: @unchecked Sendable {
+    let listener: NWListener
+    private let served = OSAllocatedUnfairLock(initialState: 0)
+    private let queue = DispatchQueue(label: "zigzag.tests.version-server")
+
+    init() throws {
+        listener = try NWListener(using: .tcp, on: .any)
+        let queue = queue, served = served
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: queue)
+            Self.receive(connection, bytes: Data(), served: served)
+        }
+    }
+
+    func start() async throws -> URL {
+        try await withCheckedThrowingContinuation { done in
+            listener.stateUpdateHandler = { [listener] state in
+                switch state {
+                case .ready:
+                    listener.stateUpdateHandler = nil
+                    done.resume(returning: URL(string: "http://127.0.0.1:\(listener.port!.rawValue)/")!)
+                case .failed(let error):
+                    listener.stateUpdateHandler = nil
+                    done.resume(throwing: error)
+                default: break
+                }
+            }
+            listener.start(queue: queue)
+        }
+    }
+
+    func stop() { listener.cancel() }
+
+    private static func receive(_ connection: NWConnection, bytes: Data, served: OSAllocatedUnfairLock<Int>) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, complete, error in
+            var bytes = bytes
+            if let data { bytes.append(data) }
+            guard let boundary = bytes.range(of: Data("\r\n\r\n".utf8)) else {
+                if !complete && error == nil && bytes.count < 65536 { receive(connection, bytes: bytes, served: served) } else { connection.cancel() }
+                return
+            }
+            let line = String(decoding: bytes[..<boundary.lowerBound], as: UTF8.self).components(separatedBy: "\r\n").first ?? ""
+            let path = line.components(separatedBy: " ").dropFirst().first ?? "/"
+            let head: String, body: Data
+            switch path {
+            case "/page":
+                let n = served.withLock { $0 += 1; return $0 }
+                body = Data("<title>v\(n)</title><p>v\(n)".utf8)
+                head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: max-age=0\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            default:
+                body = Data("not found".utf8)
+                head = "HTTP/1.1 404 Not Found\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            }
+            connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
+        }
     }
 }

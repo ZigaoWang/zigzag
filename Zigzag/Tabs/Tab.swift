@@ -286,6 +286,9 @@ final class Tab: NSObject {
     private(set) var pageState: PageState?
     /// The page is loading again after it slept or stopped: once it's here, `pageState` puts it back.
     private var restoresPageState = false
+    /// Its history was just restored, so WebKit's cached copy of its page is loaded again once it commits.
+    private enum RestoredPage { case waiting, reloads }
+    private var restoredPage: RestoredPage?
     /// The host whose certificate warning this tab last showed: the only one its "Visit anyway" link may trust.
     private var certificateWarningHost: String?
     /// The certificate that warning was about: the one "Visit anyway" trusts.
@@ -620,6 +623,7 @@ final class Tab: NSObject {
             pendingInteractionState = nil
             loadOwn(url, in: webView)
         } else if let state = pendingInteractionState {
+            restoredPage = .waiting
             restoreState(state, in: webView)
             pendingInteractionState = nil
             restoresPageState = pageState?.belongs(to: webView.url ?? url) == true
@@ -1703,6 +1707,13 @@ extension Tab: WKNavigationDelegate {
         let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
+            // WebKit brings a restored page back from its cache, however old.
+            if restoredPage == .waiting {
+                restoredPage = Self.revalidatesRestoredPage(url: navigationAction.request.url, method: navigationAction.request.httpMethod,
+                                                            type: navigationAction.navigationType) ? .reloads : nil
+            } else {
+                restoredPage = nil
+            }
             // A click on AMO's file, read from the page it was made on; any navigation to something else ends it.
             if let click = ExtensionStore.AddonsClick(target: navigationAction.request.url, page: webView.url ?? url, userInitiated: userInitiated) {
                 addonsClick = click
@@ -1981,6 +1992,12 @@ extension Tab: WKNavigationDelegate {
         targetsMainFrame && sourceIsMainFrame && sameWebView && userInitiated && warnedHost != nil && pageHost == warnedHost
     }
 
+    /// Whether a restored page is loaded again: a web page fetched with GET, so a form is never sent twice.
+    nonisolated static func revalidatesRestoredPage(url: URL?, method: String?, type: WKNavigationType) -> Bool {
+        guard type == .backForward, (method ?? "GET").uppercased() == "GET", let scheme = url?.scheme?.lowercased() else { return false }
+        return scheme == "http" || scheme == "https"
+    }
+
     /// Whether a navigation may land on one of Zigzag's own pages: Zigzag's own load, Back or Forward, or a link
     /// from another of its pages. Back and Forward only when Zigzag started them: a page can call history.back().
     static func mayGoToInternalPage(ownLoad: Bool, ownHistory: Bool, isBackForward: Bool, fromInternalPage: Bool) -> Bool {
@@ -2254,7 +2271,14 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
         DarkPages.pageCommitted(in: webView)
-        startsQuietly = false
+        // A reload asks the site again and keeps the restored history.
+        let reloadsRestored = restoredPage == .reloads
+        if reloadsRestored {
+            restoredPage = nil
+            webView.reload()
+        }
+        // The reload starts as quietly as the restored page would have.
+        if !reloadsRestored { startsQuietly = false }
         // Page committed: no fallback needed.
         pendingHTTPFallback = nil
         // The rule-opened page arrived, so its links and downloads are normal again.
@@ -2405,6 +2429,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLeavingPage = false
+        restoredPage = nil
         addressWaitsForCommit = false
         // Failed load: clear rule-opened and declined state.
         openedByRule = false
