@@ -58,7 +58,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定义用户代理"
+            "value" : "自定用户代理"
           }
         }
       }
@@ -369,7 +369,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定义"
+            "value" : "自定"
           }
         }
       }
@@ -387,7 +387,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定义…"
+            "value" : "自定…"
           }
         }
       }
@@ -405,7 +405,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "编辑自定义…"
+            "value" : "编辑自定…"
           }
         }
       }
@@ -6295,7 +6295,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择文件夹…"
+            "value" : "选取文件夹…"
           }
         }
       }
@@ -6328,7 +6328,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择脚本…"
+            "value" : "选取脚本…"
           }
         }
       }
@@ -6427,7 +6427,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择…"
+            "value" : "选取…"
           }
         }
       }
@@ -16183,7 +16183,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "固定这个页面"
+            "value" : "固定此页面"
           }
         }
       }
@@ -25947,7 +25947,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定义…"
+            "value" : "自定…"
           }
         }
       }
@@ -26082,7 +26082,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "网页是否可以运行自己的脚本。你在网站控制中改过的网站会保留各自的选择。"
+            "value" : "网页是否可以运行自己的脚本。你在网站设置中改过的网站会保留各自的选择。"
           }
         }
       }
