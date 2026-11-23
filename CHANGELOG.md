@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- On a touch display, the sidebar toggle that shows while the sidebar is hidden no longer floats over the page as a dark tile. On a page it shows with the traffic lights, in one title bar piece that's light or dark like the top of the page; in a split view it's a button in the top pane's strip, next to Back. A finger now hits it anywhere close by.
+
 ## [0.9.4] - 2026-11-24
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
