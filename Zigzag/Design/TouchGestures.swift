@@ -729,13 +729,13 @@ final class TouchHold {
 /// `SpaceSwipe.axisLock` a trackpad swipe takes to decide.
 enum TouchSwipe {
     nonisolated static func isSideways(_ translation: NSPoint) -> Bool {
-        abs(translation.x) >= 4 && abs(translation.x) > abs(translation.y) * 1.2
+        abs(translation.x) >= SpaceSwipe.axisLock && abs(translation.x) > abs(translation.y) * 1.2
     }
 
     /// Across the sidebar, where up and down is a steep flick: a swipe up to about 55° off level counts, as a thumb's
     /// arc rarely starts flat.
     nonisolated static func isAcrossSidebar(_ translation: NSPoint) -> Bool {
-        abs(translation.x) >= 4 && abs(translation.x) >= abs(translation.y) * 0.7
+        abs(translation.x) >= SpaceSwipe.axisLock && abs(translation.x) >= abs(translation.y) * 0.7
     }
 
     /// How far the fingers go before a touch swipe decides which way it goes, for all of it: past the jitter of a
@@ -809,7 +809,7 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
     var velocity: NSPoint { Self.velocity(samples, at: endedAt ?? samples.last?.time ?? 0) }
     private var endedAt: TimeInterval?
     /// How much recent movement counts toward the speed, as for a trackpad swipe (`SpaceSwipe.velocityWindow`).
-    nonisolated static let velocityWindow: TimeInterval = 0.08
+    nonisolated static let velocityWindow = SpaceSwipe.velocityWindow
 
     /// From `samples` of the translation, over the moment before `now`: still for that long, nothing.
     nonisolated static func velocity(_ samples: [(time: TimeInterval, point: NSPoint)], at now: TimeInterval) -> NSPoint {
@@ -989,7 +989,7 @@ enum TouchSidebarPull {
     /// Past all the way out the card gives at most this much more, slowing as it goes.
     nonisolated static let overshoot: CGFloat = 24
     /// A flick at least this fast (points a second) keeps it out, or sends it back, however far it went.
-    nonisolated static let flickSpeed: CGFloat = 300
+    nonisolated static let flickSpeed = SpaceSwipe.flickSpeed
 
     /// Pulls it out from hidden, or pushes it back in.
     nonisolated enum Take: Equatable { case pull, push }

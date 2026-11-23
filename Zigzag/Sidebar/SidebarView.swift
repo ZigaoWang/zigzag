@@ -2403,13 +2403,13 @@ final class SidebarView: NSView {
 /// velocities are in points, positive when the list moves right (which brings in the space on the left).
 enum SpaceSwipe {
     /// How far the fingers move before a gesture counts as sideways or up and down, for the rest of it.
-    static let axisLock: CGFloat = 4
+    nonisolated static let axisLock: CGFloat = 4
     /// Letting go past this share of the width lands on the next space: a third of the way is enough to mean it.
     static let landingShare: CGFloat = 0.35
     /// A flick at least this fast (points per second) lands, however short: an easy flick, not a hard one.
-    static let flickSpeed: CGFloat = 300
+    nonisolated static let flickSpeed: CGFloat = 300
     /// How much recent movement counts toward the speed at letting go.
-    static let velocityWindow: TimeInterval = 0.08
+    nonisolated static let velocityWindow: TimeInterval = 0.08
     /// A mouse wheel going quiet this long ends one turn of it; the next turn can move another space.
     static let wheelTurnGap: TimeInterval = 0.25
     /// Past the first or last space the list gives less the further it's pulled, up to this share of the width.
