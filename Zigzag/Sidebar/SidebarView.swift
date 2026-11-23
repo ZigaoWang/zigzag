@@ -2118,29 +2118,31 @@ final class SidebarView: NSView {
     // MARK: A finger across the sidebar
 
     /// One finger sideways across the sidebar: the same swipe two fingers make on the trackpad. Up and down still
-    /// scrolls the list, which waits only until the finger shows which way it goes.
-    private(set) var touchSwipe: TouchPanRecognizer?
+    /// scrolls the list, which waits only until the finger has gone far enough to show which way it goes.
+    private(set) var touchSwipe: TouchSwipeRecognizer?
     private var touchSwipeX: CGFloat = 0
 
     private func addTouchSwipe() {
-        let pan = TouchPanRecognizer { [weak self] pan in self?.touchSwipeChanged(pan) }
-        pan.touchOnly.shouldBegin = { [weak self] recognizer in
-            guard let self, TouchHold.current == nil, let pan = recognizer as? NSPanGestureRecognizer else { return false }
-            return TouchSwipe.isAcrossSidebar(pan.translation(in: self))
+        let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.touchSwipeChanged(swipe) }
+        // Two fingers too, as on the trackpad.
+        swipe.maxFingers = 2
+        swipe.decides = { swipe in
+            TouchHold.current == nil && TouchSwipe.verdict(swipe.translation, forgiving: true) == .sideways
         }
-        pan.touchOnly.outranks = { [weak self] other in
+        swipe.touchOnly.outranks = { [weak self] other in
             guard let self, #available(macOS 27, *) else { return false }
             return [self.scrollView, self.panes.left.scroll, self.panes.right.scroll].contains { $0.scrollGestureForRelationships === other }
         }
-        addGestureRecognizer(pan)
-        touchSwipe = pan
+        addGestureRecognizer(swipe)
+        touchSwipe = swipe
     }
 
-    private func touchSwipeChanged(_ pan: TouchPanRecognizer) {
-        let x = pan.translation(in: self).x
+    private func touchSwipeChanged(_ swipe: TouchSwipeRecognizer) {
+        let x = swipe.translation.x
         let now = ProcessInfo.processInfo.systemUptime
-        switch pan.state {
+        switch swipe.state {
         case .began:
+            // From where the finger is now: the travel it took to decide counts, so nothing jumps.
             touchSwipeX = x
             touchSwipeBegan()
             touchSwipeMoved(by: x, at: now)
@@ -2148,7 +2150,7 @@ final class SidebarView: NSView {
             touchSwipeMoved(by: x - touchSwipeX, at: now)
             touchSwipeX = x
         case .ended:
-            touchSwipeEnded(velocity: pan.velocity(in: self).x, cancelled: false)
+            touchSwipeEnded(velocity: swipe.velocity.x, cancelled: false)
         case .cancelled, .failed:
             touchSwipeEnded(velocity: 0, cancelled: true)
         default:

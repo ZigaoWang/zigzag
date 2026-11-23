@@ -736,6 +736,205 @@ enum TouchSwipe {
     nonisolated static func isAcrossSidebar(_ translation: NSPoint) -> Bool {
         abs(translation.x) >= 4 && abs(translation.x) >= abs(translation.y) * 0.7
     }
+
+    /// How far the fingers go before a touch swipe decides which way it goes, for all of it: past the jitter of a
+    /// finger landing, so the angle is the hand's and not noise.
+    nonisolated static let decision: CGFloat = 10
+
+    nonisolated enum Verdict: Equatable { case undecided, sideways, other }
+
+    /// Which way fingers that have moved by `translation` go, once they have gone `decision` points. `forgiving`: up
+    /// to about 55° off level counts as sideways (`isAcrossSidebar`), else about 40° (`isSideways`).
+    nonisolated static func verdict(_ translation: NSPoint, forgiving: Bool) -> Verdict {
+        guard hypot(translation.x, translation.y) >= decision else { return .undecided }
+        return (forgiving ? isAcrossSidebar(translation) : isSideways(translation)) ? .sideways : .other
+    }
+
+    /// What fingers sideways on a page do.
+    nonisolated enum OnPage: Equatable { case backForward, spaces }
+
+    /// For `fingers` on a page that moved by `translation` and spread apart by `spread`: one is the page's own (it
+    /// scrolls), two go back or forward as on the trackpad unless they pinch, three switch spaces.
+    nonisolated static func onPage(fingers: Int, translation: NSPoint, spread: CGFloat) -> OnPage? {
+        switch fingers {
+        case 2:
+            guard verdict(translation, forgiving: false) == .sideways, abs(spread) < abs(translation.x) / 2 else { return nil }
+            return .backForward
+        case 3:
+            return verdict(translation, forgiving: true) == .sideways ? .spaces : nil
+        default:
+            return nil
+        }
+    }
+}
+
+/// Fingers moved across something, decided once: it stays undecided until they have gone `TouchSwipe.decision`
+/// points, then begins if `decides` takes the swipe, with the travel so far, or fails, so what waits on it (a list's
+/// scrolling) waits only that long. Ends as the first finger lifts.
+final class TouchSwipeRecognizer: NSGestureRecognizer {
+    let touchOnly = TouchOnly()
+    var handler: ((TouchSwipeRecognizer) -> Void)?
+    /// Whether the swipe is this one's, asked once the fingers have gone far enough.
+    var decides: ((TouchSwipeRecognizer) -> Bool)?
+    /// More fingers than this down and it isn't this swipe.
+    var maxFingers = 1
+    /// The fingers turned out not to be this swipe: a tap, another way, or more of them.
+    var failed: (() -> Void)?
+    /// The fingers down so far, or when it decided.
+    private(set) var fingers = 0
+    /// How far the fingers have moved together since they landed, in the view's terms.
+    private(set) var translation = NSPoint.zero
+    /// Where the fingers landed, in the view's terms.
+    private(set) var start = NSPoint.zero
+    /// How much further apart the fingers are than when they landed.
+    private(set) var spread: CGFloat = 0
+    private var touches: [(id: any NSCopying & NSObjectProtocol, start: NSPoint, last: NSPoint)] = []
+    private var samples: [(time: TimeInterval, point: NSPoint)] = []
+    private var following = false
+
+    /// How many of these are following fingers now: the scrolls those fingers make aren't the page's meanwhile.
+    private(set) static var followingCount = 0
+    static var isFollowing: Bool { followingCount > 0 }
+
+    /// Whether a scroll comes from fingers one of these is following, so it isn't the page's to scroll by. Its end
+    /// still goes through, so what saw it begin sees it end.
+    static func claims(_ event: NSEvent) -> Bool {
+        guard isFollowing, TouchPress.isTouchScroll(at: event.timestamp) else { return false }
+        return event.phase != .ended && event.phase != .cancelled && event.momentumPhase.isEmpty
+    }
+
+    init(handler: ((TouchSwipeRecognizer) -> Void)? = nil) {
+        self.handler = handler
+        super.init(target: nil, action: nil)
+        target = self
+        action = #selector(fire)
+        TouchGestures.configure(self, touchOnly, yieldsToScrolling: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func fire() { handler?(self) }
+
+    /// Points a second, over the last moment before the fingers lifted (or the last move, while they're down).
+    var velocity: NSPoint { Self.velocity(samples, at: endedAt ?? samples.last?.time ?? 0) }
+    private var endedAt: TimeInterval?
+    /// How much recent movement counts toward the speed, as for a trackpad swipe (`SpaceSwipe.velocityWindow`).
+    nonisolated static let velocityWindow: TimeInterval = 0.08
+
+    /// From `samples` of the translation, over the moment before `now`: still for that long, nothing.
+    nonisolated static func velocity(_ samples: [(time: TimeInterval, point: NSPoint)], at now: TimeInterval) -> NSPoint {
+        let recent = samples.filter { now - $0.time <= velocityWindow && $0.time <= now }
+        guard let first = recent.first, let last = recent.last, last.time > first.time else { return .zero }
+        let dt = CGFloat(last.time - first.time)
+        return NSPoint(x: (last.point.x - first.point.x) / dt, y: (last.point.y - first.point.y) / dt)
+    }
+
+    private func centroid(_ points: [NSPoint]) -> NSPoint {
+        guard !points.isEmpty else { return .zero }
+        let n = CGFloat(points.count)
+        return NSPoint(x: points.map(\.x).reduce(0, +) / n, y: points.map(\.y).reduce(0, +) / n)
+    }
+
+    /// The fingers' shared movement and spread, from where each landed to where it is.
+    private func measure() {
+        let from = centroid(touches.map(\.start)), to = centroid(touches.map(\.last))
+        translation = NSPoint(x: to.x - from.x, y: to.y - from.y)
+        guard touches.count > 1 else { spread = 0; return }
+        let before = touches.map { hypot($0.start.x - from.x, $0.start.y - from.y) }.reduce(0, +)
+        let now = touches.map { hypot($0.last.x - to.x, $0.last.y - to.y) }.reduce(0, +)
+        spread = (now - before) / CGFloat(touches.count)
+    }
+
+    override func touchesBegan(with event: NSEvent) {
+        guard let view, state == .possible else { return }
+        for touch in event.touches(matching: .began, in: view) {
+            let point = touch.location(in: view)
+            touches.append((touch.identity, point, point))
+        }
+        if fingers == 0 { start = centroid(touches.map(\.start)) }
+        fingers = touches.count
+        measure()
+        if fingers > maxFingers { fail() }
+    }
+
+    override func touchesMoved(with event: NSEvent) {
+        guard let view else { return }
+        for touch in event.touches(matching: .moved, in: view) {
+            guard let i = touches.firstIndex(where: { $0.id.isEqual(touch.identity) }) else { continue }
+            touches[i].last = touch.location(in: view)
+        }
+        measure()
+        samples.append((event.timestamp, translation))
+        samples.removeAll { event.timestamp - $0.time > 0.2 }
+        switch state {
+        case .possible:
+            guard hypot(translation.x, translation.y) >= TouchSwipe.decision else { return }
+            if decides?(self) == true {
+                following = true
+                Self.followingCount += 1
+                state = .began
+            } else {
+                fail()
+            }
+        case .began, .changed:
+            state = .changed
+        default:
+            break
+        }
+    }
+
+    override func touchesEnded(with event: NSEvent) {
+        endedAt = event.timestamp
+        switch state {
+        case .began, .changed:
+            stopFollowing()
+            state = .ended
+        case .possible: fail()
+        default: break
+        }
+    }
+
+    override func touchesCancelled(with event: NSEvent) {
+        switch state {
+        case .began, .changed:
+            stopFollowing()
+            state = .cancelled
+        case .possible: fail()
+        default: break
+        }
+    }
+
+    /// It isn't this swipe: `failed` hears.
+    private func fail() {
+        state = .failed
+        failed?()
+    }
+
+    private func stopFollowing() {
+        if following { Self.followingCount -= 1 }
+        following = false
+    }
+
+    isolated deinit { stopFollowing() }
+
+    override func reset() {
+        super.reset()
+        stopFollowing()
+        touches = []
+        fingers = 0
+        translation = .zero
+        start = .zero
+        spread = 0
+        samples = []
+        endedAt = nil
+    }
+
+    override func location(in view: NSView?) -> NSPoint {
+        guard let own = self.view else { return .zero }
+        let point = NSPoint(x: start.x + translation.x, y: start.y + translation.y)
+        guard let view else { return own.convert(point, to: nil) }
+        return view.convert(point, from: own)
+    }
 }
 
 /// Two taps on chrome that stands in for the title bar count as a double-click, as two clicks do: AppKit's click
