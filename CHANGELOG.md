@@ -5,6 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A finger's swipe across the sidebar switches spaces even when it curves up or down a little, as a thumb's swipe does. A steep flick still scrolls.
+
+### New
+- Two taps with a finger on the top of the window, the sidebar's empty space or the bar above the page zoom the window, as a double-click does there (or whatever the Mac's title bar double-click is set to). Two taps in the empty tab list open a new tab, as a double-click does.
+
 ## [0.9.4] - 2026-11-21
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
