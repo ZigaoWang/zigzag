@@ -187,10 +187,11 @@ enum SidebarMenus {
             })
         }
         if !rows.isEmpty {
-            close.append(Item(rows.count == 1 ? String(localized: "Close Tab", comment: "Menu item")
+            // ⌘W closes the picked rows too, so the item shows it.
+            close.append(withShortcut(Item(rows.count == 1 ? String(localized: "Close Tab", comment: "Menu item")
                               : String(localized: "Close \(rows.count) Tabs", comment: "Menu item for several picked tabs"), symbol: Symbol.close) {
                 controller.closeManyWithUndoToast(controller.markedTabs(items))
-            })
+            }, of: #selector(BrowserWindowController.closeTab(_:))))
         }
         if !pins.isEmpty, !isPrivate {
             close.append(Item(Self.removePinsTitle(pins.count), symbol: Symbol.remove) { controller.removePinnedWithUndo(pins) })
@@ -362,7 +363,7 @@ enum SidebarMenus {
         let soundsNow = live.map { $0.isPlayingAudio || $0.isMuted } ?? false
         if soundsNow, let mute { context.append(mute) }
 
-        var page = [Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(bookmark.url, title: bookmark.title) }]
+        var page = [keyed(Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(bookmark.url, title: bookmark.title) }, #selector(BrowserWindowController.copyPageURL(_:)))]
         if !soundsNow, let mute { page.insert(mute, at: 0) }
 
         var organize: [NSMenuItem] = []
@@ -371,11 +372,11 @@ enum SidebarMenus {
             let unpin = Library.shared.pinnedGroup(containing: bookmark.id) != nil ? unpinGroupTitle
                 : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
                 : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
-            organize.append(Item(unpin, symbol: Symbol.unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
-            organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.favorite) {
+            organize.append(keyed(Item(unpin, symbol: Symbol.unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) }, #selector(BrowserWindowController.toggleBookmark(_:))))
+            organize.append(keyed(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.favorite) {
                 controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
                 live?.isFavorite = true
-            })
+            }, #selector(BrowserWindowController.addToFavorites(_:))))
         }
         // Folders of this space's pinned pages.
         let folder = Library.shared.folderID(containing: bookmark.id)
@@ -544,10 +545,10 @@ enum SidebarMenus {
         let soundsNow = live.map { $0.isPlayingAudio || $0.isMuted } ?? false
         if soundsNow, let mute { context.append(mute) }
 
-        var page = [Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu."), symbol: Symbol.copyLink) { controller.copyLink(favorite.url, title: favorite.title) }]
+        var page = [keyed(Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu."), symbol: Symbol.copyLink) { controller.copyLink(favorite.url, title: favorite.title) }, #selector(BrowserWindowController.copyPageURL(_:)))]
         if !soundsNow, let mute { page.insert(mute, at: 0) }
         // Favorites are shared by every window: a private one doesn't take them away.
-        let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in."), symbol: Symbol.toTabs) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
+        let organize = isPrivate ? [] : [keyed(Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in."), symbol: Symbol.toTabs) { controller.unfavoriteWithUndo(favorite.id, to: 0) }, #selector(BrowserWindowController.toggleBookmark(_:)))]
 
         // Not a split favorite: a new name or icon would only reach its left page.
         var edit: [NSMenuItem] = []
