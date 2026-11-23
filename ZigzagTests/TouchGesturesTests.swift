@@ -614,33 +614,233 @@ struct TouchMovesTests {
         #expect(switched == [1])
     }
 
-    // MARK: In from the edge
+    // MARK: Deciding
 
-    @Test func theEdgesGoBackAndForward() {
-        #expect(TouchEdgeSwipe.direction(atX: 4, width: 800) == -1)
-        #expect(TouchEdgeSwipe.direction(atX: TouchEdgeSwipe.edge, width: 800) == -1)
-        #expect(TouchEdgeSwipe.direction(atX: 400, width: 800) == nil)
-        #expect(TouchEdgeSwipe.direction(atX: 790, width: 800) == 1)
-        // Too narrow a page has no edges to swipe from.
-        #expect(TouchEdgeSwipe.direction(atX: 4, width: 100) == nil)
-        // In from the left goes right; from the right goes left; along the edge is a scroll.
-        #expect(TouchEdgeSwipe.isInward(NSPoint(x: 20, y: 2), direction: -1))
-        #expect(!TouchEdgeSwipe.isInward(NSPoint(x: -20, y: 2), direction: -1))
-        #expect(TouchEdgeSwipe.isInward(NSPoint(x: -20, y: 2), direction: 1))
-        #expect(!TouchEdgeSwipe.isInward(NSPoint(x: 3, y: 30), direction: -1))
+    /// Nothing is decided in the first ten points, where a landing finger jitters; then the angle is the hand's.
+    @Test func aTouchSwipeDecidesAfterTenPoints() {
+        #expect(TouchSwipe.decision == 10)
+        #expect(TouchSwipe.verdict(NSPoint(x: 3, y: 0), forgiving: true) == .undecided)
+        #expect(TouchSwipe.verdict(NSPoint(x: 6, y: 7), forgiving: true) == .undecided)
+        #expect(TouchSwipe.verdict(NSPoint(x: 10, y: 0), forgiving: true) == .sideways)
+        #expect(TouchSwipe.verdict(NSPoint(x: -10, y: 1), forgiving: false) == .sideways)
+        // About 50° off level: across the sidebar, not on a page.
+        #expect(TouchSwipe.verdict(NSPoint(x: 8, y: 9.5), forgiving: true) == .sideways)
+        #expect(TouchSwipe.verdict(NSPoint(x: 8, y: 9.5), forgiving: false) == .other)
+        // Steeper than 55°: a scroll either way.
+        #expect(TouchSwipe.verdict(NSPoint(x: 6, y: 12), forgiving: true) == .other)
+        #expect(TouchSwipe.verdict(NSPoint(x: 0, y: -10), forgiving: true) == .other)
     }
 
-    @Test func aPageWithNowhereToGoKeepsTheEdgeSwipe() {
+    /// One finger on a page is the page's; two go back or forward unless they pinch; three switch spaces.
+    @Test func fingersOnAPageRouteByCount() {
+        let sideways = NSPoint(x: 14, y: 2)
+        #expect(TouchSwipe.onPage(fingers: 1, translation: sideways, spread: 0) == nil)
+        #expect(TouchSwipe.onPage(fingers: 2, translation: sideways, spread: 0) == .backForward)
+        #expect(TouchSwipe.onPage(fingers: 2, translation: NSPoint(x: -14, y: 3), spread: 1) == .backForward)
+        #expect(TouchSwipe.onPage(fingers: 2, translation: NSPoint(x: 2, y: 14), spread: 0) == nil)
+        #expect(TouchSwipe.onPage(fingers: 2, translation: sideways, spread: 10) == nil)
+        #expect(TouchSwipe.onPage(fingers: 3, translation: sideways, spread: 0) == .spaces)
+        #expect(TouchSwipe.onPage(fingers: 3, translation: NSPoint(x: -9, y: 10), spread: 0) == .spaces)
+        #expect(TouchSwipe.onPage(fingers: 3, translation: NSPoint(x: 3, y: 14), spread: 0) == nil)
+        #expect(TouchSwipe.onPage(fingers: 4, translation: sideways, spread: 0) == nil)
+        #expect(TouchSwipe.onPage(fingers: 2, translation: NSPoint(x: 5, y: 0), spread: 0) == nil)
+    }
+
+    @Test func aTouchSwipesSpeedIsItsLastMoment() {
+        let samples: [(time: TimeInterval, point: NSPoint)] = [(0, .zero), (0.9, NSPoint(x: 10, y: 0)), (0.95, NSPoint(x: 40, y: 0)),
+                                                               (1, NSPoint(x: 70, y: 0))]
+        #expect(abs(TouchSwipeRecognizer.velocity(samples, at: 1).x - 600) < 1)
+        // Resting before lifting: no flick.
+        #expect(TouchSwipeRecognizer.velocity(samples, at: 1.5) == .zero)
+        #expect(TouchSwipeRecognizer.velocity([], at: 1) == .zero)
+    }
+
+    @Test func theSwipesAreTouchOnly() throws {
         let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         let holder = PageHolder(holding: page)
-        #expect(holder.edgeSwipe != nil && holder.overviewPinch != nil)
-        // No history and no window: neither way.
+        let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 260, height: 700))
+        let root = BrowserRootView(sidebar: SidebarView())
+        let swipes = [holder.pageSwipe, sidebar.touchSwipe, root.sidebarPull].compactMap { $0 }
+        #expect(swipes.count == 3)
+        for swipe in swipes {
+            #expect(swipe.allowedTouchTypes == .direct)
+            #expect(!swipe.delaysPrimaryMouseButtonEvents && !swipe.delaysKeyEvents)
+            let delegate = try #require(swipe.delegate as? TouchOnly)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseDragged, .leftMouseUp, .rightMouseDown] {
+                #expect(delegate.gestureRecognizer(swipe, shouldAttemptToRecognizeWith: mouse(type, at: .zero)) == false)
+            }
+        }
+        #expect(holder.pageSwipe?.maxFingers == 3)
+        #expect(sidebar.touchSwipe?.maxFingers == 2 && root.sidebarPull?.maxFingers == 1)
+    }
+
+    /// A trackpad's scrolls are never taken for a finger's: nothing is following one.
+    @Test func theTrackpadsScrollsAreNotClaimed() throws {
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: -20, wheel3: 0))
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 2)
+        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        let event = try #require(NSEvent(cgEvent: cg))
+        #expect(!TouchSwipeRecognizer.isFollowing)
+        #expect(!TouchSwipeRecognizer.claims(event))
+    }
+
+    // MARK: On the page
+
+    @Test func twoFingersOnAPageGoBackAndForward() {
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let holder = PageHolder(holding: page)
+        #expect(holder.pageSwipe != nil && holder.overviewPinch != nil)
+        // No history and no window: neither way, and the page keeps the fingers.
+        #expect(!holder.takes(.backForward, dx: 20))
+        #expect(!holder.takes(.backForward, dx: -20))
         #expect(!page.swipeNavigator.takesTouchSwipe(-1))
-        #expect(!page.swipeNavigator.takesTouchSwipe(1))
-        // Nothing tracking, nothing happens.
-        page.swipeNavigator.touchMoved(dx: 120, at: 0)
-        page.swipeNavigator.touchEnded(at: 0, cancelled: false)
+        // Decided: the arrow follows the fingers from where they are, and calling it off puts it away.
+        holder.touchSwipeBegan(.backForward, dx: 30)
+        #expect(page.swipeNavigator.isTracking)
+        holder.touchSwipeMoved(dx: 120)
+        holder.touchSwipeEnded(velocity: 0, cancelled: true)
         #expect(!page.swipeNavigator.isTracking)
+        // Nothing tracking, nothing happens.
+        holder.touchSwipeMoved(dx: 200)
+        holder.touchSwipeEnded(velocity: 900, cancelled: false)
+        #expect(!page.swipeNavigator.isTracking)
+    }
+
+    @Test func threeFingersOnAPageSwitchSpaces() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let added = Library.shared.addSpace(name: "Three fingers")
+        let spaces = Library.shared.spaces
+        let here = try #require(spaces.firstIndex { $0.id == added.id }) - 1
+        let manager = TabManager(spaceID: spaces[here].id)
+        defer { manager.invalidate() }
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let holder = PageHolder(holding: BrowserWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 500)))
+        controller.window?.contentView?.addSubview(holder)
+        controller.root.layoutSubtreeIfNeeded()
+        #expect(controller.sidebar.bounds.width > 0)
+        #expect(holder.takes(.spaces, dx: -20))
+        let start = manager.currentSpaceID
+        // A short, slow move springs home.
+        holder.touchSwipeBegan(.spaces, dx: -12)
+        holder.touchSwipeMoved(dx: -30)
+        holder.touchSwipeEnded(velocity: 0, cancelled: false)
+        #expect(manager.currentSpaceID == start)
+        // A flick to the left brings in the next space, as one finger across the sidebar does.
+        holder.touchSwipeBegan(.spaces, dx: -12)
+        holder.touchSwipeMoved(dx: -60)
+        holder.touchSwipeEnded(velocity: -900, cancelled: false)
+        #expect(manager.currentSpaceID == added.id)
+        // With the sidebar hidden too.
+        controller.root.setSidebarVisible(false, animated: false)
+        holder.touchSwipeBegan(.spaces, dx: 12)
+        holder.touchSwipeMoved(dx: 60)
+        holder.touchSwipeEnded(velocity: 900, cancelled: false)
+        #expect(manager.currentSpaceID == start)
+    }
+
+    // MARK: The hidden sidebar from the edge
+
+    @Test func theEdgeRules() {
+        // Hidden: in from the page's edge pulls; further in is the page's.
+        #expect(TouchSidebarPull.take(atX: 4, pageEdge: 0, revealed: false, held: false, onCard: false) == .pull)
+        #expect(TouchSidebarPull.take(atX: 32, pageEdge: 8, revealed: false, held: false, onCard: false) == .pull)
+        #expect(TouchSidebarPull.take(atX: 40, pageEdge: 8, revealed: false, held: false, onCard: false) == nil)
+        // Out by touch: off it pushes back; on it is the sidebar's own. Out by the pointer: nothing.
+        #expect(TouchSidebarPull.take(atX: 400, pageEdge: 8, revealed: true, held: true, onCard: false) == .push)
+        #expect(TouchSidebarPull.take(atX: 100, pageEdge: 8, revealed: true, held: true, onCard: true) == nil)
+        #expect(TouchSidebarPull.take(atX: 400, pageEdge: 8, revealed: true, held: false, onCard: false) == nil)
+        // Pulling goes away from the edge, pushing toward it, both sideways.
+        #expect(TouchSidebarPull.goes(.pull, NSPoint(x: 12, y: 4)))
+        #expect(!TouchSidebarPull.goes(.pull, NSPoint(x: -12, y: 4)))
+        #expect(!TouchSidebarPull.goes(.pull, NSPoint(x: 3, y: 14)))
+        #expect(TouchSidebarPull.goes(.push, NSPoint(x: -12, y: 4)))
+        #expect(!TouchSidebarPull.goes(.push, NSPoint(x: 12, y: 0)))
+        // One to one, never past hidden, held back past out.
+        #expect(TouchSidebarPull.reach(base: 10, travel: 50, hidden: -32, out: 248) == 60)
+        #expect(TouchSidebarPull.reach(base: 248, travel: -400, hidden: -32, out: 248) == -32)
+        let over = TouchSidebarPull.reach(base: 10, travel: 400, hidden: -32, out: 248)
+        #expect(over > 248 && over < 248 + TouchSidebarPull.overshoot)
+        // Let go a third of the way out, or flicked out, it stays; pushed a third back in, or flicked in, it goes.
+        #expect(!TouchSidebarPull.keeps(reach: 70, out: 248, velocity: 0, wasOut: false))
+        #expect(TouchSidebarPull.keeps(reach: 90, out: 248, velocity: 0, wasOut: false))
+        #expect(TouchSidebarPull.keeps(reach: 40, out: 248, velocity: 500, wasOut: false))
+        #expect(TouchSidebarPull.keeps(reach: 200, out: 248, velocity: 0, wasOut: true))
+        #expect(!TouchSidebarPull.keeps(reach: 150, out: 248, velocity: 0, wasOut: true))
+        #expect(!TouchSidebarPull.keeps(reach: 240, out: 248, velocity: -500, wasOut: true))
+        // A tap sends it back; a scroll or more fingers don't.
+        #expect(TouchSidebarPull.isTap(fingers: 1, translation: NSPoint(x: 2, y: 3)))
+        #expect(!TouchSidebarPull.isTap(fingers: 1, translation: NSPoint(x: 2, y: 30)))
+        #expect(!TouchSidebarPull.isTap(fingers: 3, translation: .zero))
+    }
+
+    @Test func aFingerFromTheEdgePullsOutTheSidebar() {
+        let root = BrowserRootView(sidebar: SidebarView())
+        root.frame = NSRect(x: 0, y: 0, width: 1000, height: 700)
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        let width = root.sidebarWidth, inset = Tokens.Metric.cardInset
+        // The card's far edge comes to the finger and follows it.
+        root.touchPullBegan(.pull, base: 12)
+        root.touchPullMoved(by: 40)
+        #expect(root.isPullingSidebar)
+        #expect(abs(root.sidebarContainer.frame.maxX - 52) < 0.5)
+        // Let go short and slow: back out of sight.
+        root.touchPullEnded(velocity: 0, cancelled: false)
+        #expect(!root.isPullingSidebar && !root.sidebarRevealed)
+        #expect(root.sidebarContainer.frame.maxX <= 0)
+        // Past a third: it stays out, held for the finger.
+        root.touchPullBegan(.pull, base: 12)
+        root.touchPullMoved(by: (width + inset) / 3 + 10)
+        root.touchPullEnded(velocity: 0, cancelled: false)
+        #expect(root.sidebarRevealed && root.isTouchHeld)
+        #expect(root.sidebarContainer.frame.minX == inset)
+        // Pushed back a little: it stays; flicked toward the edge: it goes.
+        root.touchPullBegan(.push, base: width + inset)
+        root.touchPullMoved(by: -30)
+        root.touchPullEnded(velocity: 0, cancelled: false)
+        #expect(root.sidebarRevealed && root.isTouchHeld)
+        #expect(root.sidebarContainer.frame.minX == inset)
+        root.touchPullBegan(.push, base: width + inset)
+        root.touchPullMoved(by: -20)
+        root.touchPullEnded(velocity: -800, cancelled: false)
+        #expect(!root.sidebarRevealed && !root.isTouchHeld)
+        // A flick out keeps it however short; picking a tab sends it back.
+        root.touchPullBegan(.pull, base: 6)
+        root.touchPullMoved(by: 20)
+        root.touchPullEnded(velocity: 900, cancelled: false)
+        #expect(root.sidebarRevealed && root.isTouchHeld)
+        root.endTouchHold()
+        #expect(!root.sidebarRevealed && !root.isTouchHeld)
+        // Showing the sidebar ends any of it.
+        root.touchPullBegan(.pull, base: 6)
+        root.touchPullEnded(velocity: 900, cancelled: false)
+        root.setSidebarVisible(true, animated: false)
+        #expect(!root.isTouchHeld && !root.sidebarRevealed)
+    }
+
+    @Test func aSidebarOnTheRightComesFromTheRightEdge() {
+        let root = BrowserRootView(sidebar: SidebarView())
+        root.frame = NSRect(x: 0, y: 0, width: 1000, height: 700)
+        root.setSidebarOnRight(true, animated: false)
+        defer { root.setSidebarOnRight(false, animated: false) }
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        root.touchPullBegan(.pull, base: 12)
+        root.touchPullMoved(by: 40)
+        #expect(abs(root.sidebarContainer.frame.minX - (1000 - 52)) < 0.5)
+        root.touchPullEnded(velocity: 0, cancelled: true)
+        #expect(!root.sidebarRevealed)
+    }
+
+    /// The bar's sidebar toggle takes a finger anywhere in 36 points around it.
+    @Test func theBarsToggleTakesAFingerBesideIt() {
+        let toggle = NSRect(x: 80, y: 7, width: 26, height: 26)
+        #expect(TopBarView.fingerTakesToggle(at: NSPoint(x: 77, y: 20), toggle: toggle))
+        #expect(TopBarView.fingerTakesToggle(at: NSPoint(x: 110, y: 3), toggle: toggle))
+        #expect(!TopBarView.fingerTakesToggle(at: NSPoint(x: 70, y: 20), toggle: toggle))
+        #expect(!TopBarView.fingerTakesToggle(at: NSPoint(x: 93, y: 40), toggle: toggle))
     }
 
     @Test func aFingerDraggingThePageIsNotATrackpadSwipe() {
