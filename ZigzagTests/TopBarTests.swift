@@ -33,6 +33,37 @@ struct TopBarTests {
         #expect(controller.sidebar.holdsAddress)
     }
 
+    /// The edge panel's mirror has no bar to lend its address to, so it keeps its own row and buttons while the
+    /// window's address goes above the page. Setting the window's sidebar to lend its address, or preparing the
+    /// panel, must not take the mirror's away (#365).
+    @Test func theEdgePanelKeepsItsAddressWhileTheBarHoldsTheWindows() {
+        let before = Library.shared.snapshot
+        let above = BrowserRootView.addressAbovePage
+        defer {
+            BrowserRootView.addressAbovePage = above
+            Library.shared.restore(before)
+        }
+        BrowserRootView.addressAbovePage = false
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let controller = BrowserWindowController(tabManager: manager, frame: window, sidebarVisible: true)
+        defer { controller.window?.close() }
+        let mirror = controller.edgeSidebarForDisplay().sidebar
+        controller.prepareEdgeSidebar()
+        #expect(mirror.holdsAddress)
+
+        BrowserRootView.addressAbovePage = true
+        controller.placeAddress()
+        #expect(!controller.sidebar.holdsAddress)
+        #expect(mirror.holdsAddress)
+        #expect(mirror.addressButtons.allSatisfy { !$0.isHidden })
+
+        controller.prepareEdgeSidebar()
+        #expect(mirror.holdsAddress)
+        #expect(mirror.addressButtons.allSatisfy { !$0.isHidden })
+    }
+
     /// Zigzag's own pages have nothing to pin. The window's sidebar keeps Site Controls as main did; only the
     /// panel's mirror hides it.
     @Test func systemPagesHideTheStarAndOnlyTheMirrorHidesSiteControls() {

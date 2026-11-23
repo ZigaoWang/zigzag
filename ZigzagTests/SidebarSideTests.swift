@@ -19,13 +19,13 @@ struct SidebarSideTests {
         #expect(mirror(mirror(rect)) == rect)
     }
 
-    @Test func aMirrorHidesItsAddressButtonsWhileTheBarHoldsTheAddress() {
-        let mirror = SidebarView(frame: .zero)
-        mirror.hasTopBar = false
-        mirror.holdsAddress = false
-        #expect(mirror.addressButtons.allSatisfy { $0.isHidden })
-        mirror.holdsAddress = true
-        #expect(mirror.addressButtons.allSatisfy { !$0.isHidden })
+    @Test func aSidebarWithNeitherItsAddressNorABarHidesTheAddressButtons() {
+        let sidebar = SidebarView(frame: .zero)
+        sidebar.hasTopBar = false
+        sidebar.holdsAddress = false
+        #expect(sidebar.addressButtons.allSatisfy { $0.isHidden })
+        sidebar.holdsAddress = true
+        #expect(sidebar.addressButtons.allSatisfy { !$0.isHidden })
         // The window's sidebar keeps them: they leave for the bar above the page, they don't hide.
         let windowSidebar = SidebarView(frame: .zero)
         windowSidebar.holdsAddress = false

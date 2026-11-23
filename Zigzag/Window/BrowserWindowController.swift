@@ -657,9 +657,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let above = BrowserRootView.addressAbovePage
         guard sidebar.holdsAddress == above else { return }
         if window?.isVisible == true { closeFloatingPanels() }
-        // The edge panel's mirror keeps the address wherever the window's sidebar has it, whether the sidebar is
-        // showing, popped out or away.
-        bothSidebars { $0.holdsAddress = !above }
+        // The edge panel's mirror has no bar to lend its address to, so it keeps its own row and buttons, whether
+        // the sidebar is showing, popped out or away.
+        sidebar.holdsAddress = !above
+        edgeSidebar?.holdsAddress = true
         if above {
             // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
             sidebar.address.starInPill = true
@@ -3952,8 +3953,8 @@ extension BrowserWindowController {
             if EdgePeek.shared.isVisible { EdgePeek.shared.dismiss(.sidebarClick) }
             else { EdgeSidebar.shared.hide() }
         }
-        // A mirror, not a window's sidebar: no bar to lend its address buttons to, and no close button, since
-        // moving the pointer away is what puts the panel back.
+        // A mirror, not a window's sidebar: it keeps its own address row, since there is no bar at the screen's edge
+        // to lend it to, and has no close button, since moving the pointer away is what puts the panel back.
         mirror.hasTopBar = false
         mirror.sidebarButton.isHidden = true
         // Over another app, the app is inactive and the panel never key: its hover states still answer the pointer.
@@ -4005,7 +4006,8 @@ extension BrowserWindowController {
         guard let edgeSidebar else { return }
         edgeSidebar.isPrivate = tabManager.isPrivate
         edgeSidebar.isOnRight = root.sidebarOnRight
-        edgeSidebar.holdsAddress = sidebar.holdsAddress
+        // The mirror has no bar of its own, so it keeps its address even while the window's is above the page.
+        edgeSidebar.holdsAddress = true
         edgeSidebar.trafficLightsWidth = 0
         edgeSidebar.currentSpaceID = tabManager.currentSpaceID
         reloadFavorites()

@@ -961,9 +961,8 @@ final class SidebarView: NSView {
             needsLayout = true
         }
     }
-    /// The window's sidebar lends its back, forward, reload and address to the bar above the page. A mirror at the
-    /// screen's edge has no bar to lend them to, so with the address above the page it hides its own instead of
-    /// leaving them at the frames they last had.
+    /// Whether back, forward and reload stay put while the address is in the bar above the page: true for the
+    /// window's sidebar, whose buttons the bar holds; false for a mirror, which keeps its address instead.
     var hasTopBar = true { didSet { refreshAddressButtons() } }
     /// Whether everything in it keeps its hover states while Zigzag is inactive and its panel isn't key: the sidebar
     /// at the screen's edge, which shows over another app.
