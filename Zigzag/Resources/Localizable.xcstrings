@@ -12915,6 +12915,17 @@
         }
       }
     },
+    "More Choices" : {
+      "comment" : "VoiceOver name of the chevron beside a filled answer, like where a pop-up opens: opens a menu of the other choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多选项"
+          }
+        }
+      }
+    },
     "More Developer Tools" : {
       "comment" : "Tooltip of the ⋯ button among the developer tools above a development site's page: opens a menu with the rest of the tools.",
       "localizations" : {

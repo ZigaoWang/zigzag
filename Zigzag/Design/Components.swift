@@ -389,6 +389,206 @@ final class PillButton: InteractiveView {
     }
 }
 
+// MARK: - Split pill buttons
+
+/// A filled pill in two parts, as a Mac split button: the main part does the choice it shows in one click, and the
+/// narrow chevron after a hairline opens the drawn menu of every choice, the shown one checked, where one click
+/// chooses. `PillButton.prominent`'s look, each part lighting on its own. Its frame reaches past the pill to
+/// `TouchGestures.target` tall, for a finger only; place it with `pillFrame`.
+final class SplitPillButton: NSView {
+    /// One part of the pill: paints itself through its owner.
+    final class Segment: InteractiveView {
+        fileprivate var paint: (() -> Void)?
+        fileprivate var showMenu: (() -> Bool)?
+        fileprivate var openedAt: TimeInterval = 0
+
+        override func stateDidChange(animated: Bool) { paint?() }
+        override var offersMenu: Bool { showMenu != nil }
+        override func accessibilityPerformShowMenu() -> Bool { showMenu?() ?? false }
+
+        override func keyDown(with event: NSEvent) {
+            // Up or Down opens the chevron's menu, as a pop-up button does.
+            if hasKeyboardFocus, showMenu != nil, [125, 126].contains(event.keyCode) { _ = showMenu?(); return }
+            super.keyDown(with: event)
+        }
+
+        // Press the chevron, drag to an item and let go: chosen in one movement, as macOS menus allow.
+        override func mouseDragged(with event: NSEvent) {
+            guard showMenu != nil, let menu = MenuPanel.current, menu.anchor === superview else { return super.mouseDragged(with: event) }
+            menu.track(windowPoint: event.locationInWindow)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            super.mouseUp(with: event)
+            guard showMenu != nil, let menu = MenuPanel.current, menu.anchor === superview else { return }
+            let held = ProcessInfo.processInfo.systemUptime - openedAt > 0.35
+            if held && !bounds.contains(convert(event.locationInWindow, from: nil)) { menu.chooseTracked(windowPoint: event.locationInWindow) }
+        }
+    }
+
+    let main = Segment()
+    let more = Segment()
+    /// The two parts, at the pill's size; the menu hangs from it.
+    private let pill = NSView()
+    private let label = Label("", font: Tokens.Font.control(), color: Tokens.Color.textPrimary)
+    private let chevron = NSImageView()
+    private let divider = ColorView(color: .clear)
+
+    var choices: [String] = [] { didSet { refresh() } }
+    /// The choice the main part shows and does.
+    var selectedIndex = 0 { didSet { refresh() } }
+    /// The fill in place of the space's accent.
+    var tint: NSColor? { didSet { paint() } }
+    /// The menu follows the button's appearance, not the window's (a card in the page's look).
+    var menuTakesOwnLook = false
+    /// Whether a click counts now; a click while it's false does nothing (a question's first half second).
+    var accepts: () -> Bool = { true }
+    /// A choice was made, from the main part or the menu: its index.
+    var onChoose: ((Int) -> Void)?
+
+    static let chevronWidth: CGFloat = Tokens.Space.x7Height
+    private static let sidePad: CGFloat = Tokens.Space.x4 - 2
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        pill.wantsLayer = true
+        addSubview(pill)
+        for segment in [main, more] {
+            segment.layer?.cornerCurve = .continuous
+            segment.paint = { [weak self] in self?.paint() }
+            segment.pressChanged = { [weak self] _ in self?.showPressed() }
+            pill.addSubview(segment)
+        }
+        main.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        more.layer?.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        main.addSubview(label)
+        chevron.image = Tokens.Symbol.image("chevron.down", size: Tokens.Symbol.inline)
+        chevron.imageScaling = .scaleNone
+        more.addSubview(chevron)
+        pill.addSubview(divider)
+        main.onClick = { [weak self] _ in self?.chooseShown() }
+        more.clicksOnMouseDown = true
+        more.onClick = { [weak self] _ in self?.openMenu() }
+        more.showMenu = { [weak self] in self?.openMenu() ?? false }
+        main.setAccessibilityRole(.button)
+        more.setAccessibilityRole(.popUpButton)
+        more.setAccessibilityLabel(String(localized: "More Choices", comment: "VoiceOver name of the chevron beside a filled answer, like where a pop-up opens: opens a menu of the other choices."))
+        paint()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    private var current: String { choices.indices.contains(selectedIndex) ? choices[selectedIndex] : "" }
+
+    private func refresh() {
+        label.stringValue = current
+        main.setAccessibilityLabel(current)
+        invalidateIntrinsicContentSize()
+        needsLayout = true
+        superview?.needsLayout = true
+    }
+
+    /// The main part fits the shown choice, as a pill button its title.
+    var fittingWidth: CGFloat { ceil(Self.sidePad * 2 + label.inkWidth) + Self.chevronWidth }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: fittingWidth, height: Tokens.Page.controlHeight) }
+
+    /// Where the pill goes, in the superview; the frame grows around it to a finger's reach.
+    var pillFrame: NSRect {
+        get { convert(pill.frame, to: superview) }
+        set {
+            let chevron = NSRect(x: newValue.maxX - Self.chevronWidth, y: newValue.minY, width: Self.chevronWidth, height: newValue.height)
+            let reach = TouchGestures.box(around: newValue, minimum: 0, minimumHeight: TouchGestures.target)
+                .union(TouchGestures.box(around: chevron))
+            frame = reach
+            pill.frame = NSRect(x: newValue.minX - reach.minX, y: newValue.minY - reach.minY, width: newValue.width, height: newValue.height)
+            needsLayout = true
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        let h = pill.bounds.height, w = pill.bounds.width
+        let split = max(0, w - Self.chevronWidth)
+        main.frame = NSRect(x: 0, y: 0, width: split, height: h)
+        more.frame = NSRect(x: split, y: 0, width: w - split, height: h)
+        for segment in [main, more] { segment.layer?.cornerRadius = h / 2 }
+        let inset = Tokens.Space.x2
+        divider.frame = NSRect(x: split - Tokens.Metric.hairline / 2, y: inset, width: Tokens.Metric.hairline, height: max(0, h - inset * 2))
+        label.frame = NSRect(x: round((split - label.inkWidth) / 2) - Label.inset, y: label.centeredY(in: h),
+                             width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+        let side = Tokens.Space.x4
+        chevron.frame = NSRect(x: round((more.bounds.width - side) / 2), y: round((h - side) / 2), width: side, height: side)
+        // A finger lifting anywhere in its reach still counts.
+        let top = pill.frame.minY, bottom = bounds.height - pill.frame.maxY
+        main.pressOutset = NSEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
+        more.pressOutset = NSEdgeInsets(top: top, left: 0, bottom: bottom, right: bounds.width - pill.frame.maxX)
+    }
+
+    /// The pill takes the pointer; the reach around it only a finger.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        guard bounds.contains(local), !isHidden else { return nil }
+        let inPill = pill.frame.contains(local)
+        if !inPill {
+            guard let event = NSApp.currentEvent, [.leftMouseDown, .leftMouseUp].contains(event.type),
+                  TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) else { return nil }
+        }
+        return segment(at: local)
+    }
+
+    /// The part a point in its own coordinates falls to: on the pill, the side of the hairline it's on; around it,
+    /// the chevron within a finger's box of it, else the main part.
+    func segment(at point: NSPoint) -> Segment {
+        let chevron = more.convert(more.bounds, to: self)
+        if pill.frame.contains(point) { return point.x >= chevron.minX ? more : main }
+        return TouchGestures.box(around: chevron).contains(point) ? more : main
+    }
+
+    /// The main part's choice, as a click on it or Return.
+    func chooseShown() {
+        guard accepts(), choices.indices.contains(selectedIndex) else { return }
+        onChoose?(selectedIndex)
+    }
+
+    /// Opens the menu of every choice under the pill.
+    @discardableResult
+    func openMenu() -> Bool {
+        guard accepts(), !choices.isEmpty, MenuPanel.current?.anchor !== pill else { return false }
+        let items: [MenuPanel.Entry] = choices.enumerated().map { index, title in
+            .item(MenuPanel.Item(title: title, isChecked: index == selectedIndex) { [weak self] in
+                guard let self, self.accepts() else { return }
+                self.onChoose?(index)
+            })
+        }
+        more.openedAt = ProcessInfo.processInfo.systemUptime
+        MenuPanel.show(items, from: pill, placement: .below, minWidth: pill.bounds.width,
+                       appearance: menuTakesOwnLook ? effectiveAppearance : nil)
+        return true
+    }
+
+    private func showPressed() { pill.showSink(main.isPressed || more.isPressed) }
+
+    private func paint() {
+        let theme = Brand.Theme.for(self)
+        let fill = tint ?? theme.accent
+        let ink = tint.map(Brand.ink(on:)) ?? theme.onAccent
+        main.applyButtonLook(.primary, tint: fill, ink: ink)
+        more.applyButtonLook(.primary, tint: fill, ink: ink)
+        label.textColor = ink
+        chevron.contentTintColor = ink
+        divider.color = ink.withAlphaComponent(0.35)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        paint()
+    }
+}
+
 // MARK: - Keycaps
 
 /// A key, drawn small: Return on a chosen result, Tab beside "Search YouTube", a shortcut in a hint. A word or a
