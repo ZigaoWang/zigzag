@@ -11,9 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - On a touch display, swiping in from the window's edge to pull out the sidebar starts a little further in, so it no longer resizes the window instead.
 - Three fingers on a page no longer try to change spaces: macOS takes them for switching desktops.
-### Fixed
 - Two taps with a finger on the empty strip beside the traffic lights zoom the window too, as a double-click there does. Before, only the sidebar and the bar above the page took them.
-### Fixed
 - The translate button no longer shows on pages in a language or on a site you set to Never Translate. View › Translate Page still translates one when you want to.
 
 ## [0.9.4] - 2026-11-21
