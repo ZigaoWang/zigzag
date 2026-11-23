@@ -1060,6 +1060,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var flagsShowAll = false
     private var flagsToken: SignalToken?
     private var shortcutsToken: SignalToken?
+    private var translationToken: SignalToken?
     private let tabsGroup = FormGroup()
     private let searchGroup = FormGroup()
     private let blockingGroup = FormGroup()
@@ -1882,6 +1883,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         Task { @MainActor in
             languages = await PageTranslator.targetLanguages()
             reloadTranslation()
+        }
+        // Always or Never chosen from a page's translate menu, here or in another window: the lists follow.
+        translationToken = PageTranslator.choicesChanged.observe { [weak self] in
+            guard let self else { return }
+            self.reloadTranslation()
+            if self.pane == .translation || self.isSearching { self.layoutDocument() }
         }
 
         // Extensions

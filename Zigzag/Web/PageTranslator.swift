@@ -44,6 +44,9 @@ enum PageTranslator {
 
     static func setTranslatesAlways(_ always: Bool, _ language: Locale.Language) { Choices().setAlways(always, code(of: language)) }
 
+    /// An Always or Never choice changed, from the translate menu or Settings, in any window.
+    static let choicesChanged = Signal<Void>()
+
     /// Always and Never Translate choices, by language code and by site.
     struct Choices {
         var defaults: UserDefaults = .standard
@@ -64,6 +67,7 @@ enum PageTranslator {
         private func read(_ key: String) -> Set<String> { Set(defaults.stringArray(forKey: key) ?? []) }
         private func write(_ value: Set<String>, _ key: String) {
             if value.isEmpty { defaults.removeObject(forKey: key) } else { defaults.set(value.sorted(), forKey: key) }
+            PageTranslator.choicesChanged.send()
         }
 
         /// A language is either always or never translated, not both.

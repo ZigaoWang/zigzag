@@ -253,6 +253,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
         // Tools above the page turned on or off (Settings › Developer): the page you're on gains or loses them.
         tokens.append(DeveloperTools.changed.observe { [weak self] in self?.showDeveloperBarTools() })
+        // Always or Never Translate chosen in another window or Settings: the translate button follows.
+        tokens.append(PageTranslator.choicesChanged.observe { [weak self] in self?.updateTranslateButton() })
         // A shortcut changed in Settings: the buttons' tooltips say the new keys at once.
         tokens.append(Shortcuts.changed.observe { [weak self] in
             self?.layoutTrafficLights()

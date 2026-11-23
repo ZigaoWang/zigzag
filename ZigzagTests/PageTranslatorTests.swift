@@ -703,3 +703,28 @@ extension PageTranslatorTests {
         #expect(!PageTranslator.offersButton(foreign: false, translated: false, never: false))
     }
 }
+
+extension PageTranslatorTests {
+    /// Every Always or Never choice says it changed, so each window's translate button and Settings › Translation
+    /// follow one made anywhere.
+    @MainActor @Test func everyChoiceSaysItChanged() {
+        let name = "PageTranslatorTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let choices = PageTranslator.Choices(defaults: defaults)
+        var heard = 0
+        let token = PageTranslator.choicesChanged.observe { heard += 1 }
+        defer { token.cancel() }
+        choices.setNever(true, "fr")
+        #expect(heard > 0)
+        heard = 0
+        choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+        #expect(heard > 0)
+        heard = 0
+        choices.remove(.neverSite("lemonde.fr"))
+        #expect(heard > 0)
+        heard = 0
+        choices.setAlways(true, "ja")
+        #expect(heard > 0)
+    }
+}
