@@ -1044,11 +1044,11 @@ enum TouchSidebarPull {
 enum TouchSidebarGrabber {
     /// A finger landed in the window this recently: it shows.
     nonisolated static let recent: TimeInterval = 15 * 60
-    nonisolated static let pill = NSSize(width: 6, height: 56)
-    /// From the window's edge to the pill, clear of the resize band.
-    nonisolated static let inset: CGFloat = 14
+    nonisolated static let pill = NSSize(width: 5, height: 44)
+    /// From the window's edge to the pill.
+    nonisolated static let inset: CGFloat = 8
     /// The box a finger may hit.
-    nonisolated static let target = NSSize(width: 44, height: 100)
+    nonisolated static let target = NSSize(width: 44, height: 88)
     /// How far a finger goes up or down from it to change space.
     nonisolated static let spaceTravel: CGFloat = 24
 
@@ -1065,11 +1065,10 @@ enum TouchSidebarGrabber {
         return NSRect(x: x, y: (page.midY - pill.height / 2).rounded(), width: pill.width, height: pill.height)
     }
 
-    /// The box a finger may hit around `pill`, kept off the window's resize band.
+    /// The box a finger may hit around `pill`, kept inside the window.
     nonisolated static func hitFrame(around pill: NSRect, in bounds: NSRect) -> NSRect {
         var box = TouchGestures.box(around: pill, minimum: target.width, minimumHeight: target.height)
-        let band = TouchSidebarPull.resizeBand
-        box.origin.x = min(max(box.minX, bounds.minX + band), bounds.maxX - band - box.width)
+        box.origin.x = min(max(box.minX, bounds.minX), bounds.maxX - box.width)
         return box
     }
 
