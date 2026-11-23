@@ -6707,13 +6707,13 @@
         }
       }
     },
-    "Click + in the sidebar, then New Space" : {
+    "Click + in the sidebar, then choose New Space" : {
       "comment" : "Under the new space step's title in the getting-started guide, a card in the window. New Space is an item in the menu of the sidebar's +.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按边栏中的 +，然后点按“新建空间”"
+            "value" : "点按边栏中的 +，然后选取“新建空间”"
           }
         }
       }
@@ -6746,13 +6746,13 @@
         }
       }
     },
-    "Click New Space" : {
+    "Choose New Space" : {
       "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while the menu of the sidebar's + is open. New Space is an item in that menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按“新建空间”"
+            "value" : "选取“新建空间”"
           }
         }
       }
@@ -15338,13 +15338,13 @@
         }
       }
     },
-    "Or click + in the sidebar, then New Space" : {
+    "Or click + in the sidebar, then choose New Space" : {
       "comment" : "Under the new space step's title in the getting-started guide, a card in the window, after the keys that make a space. New Space is an item in the menu of the sidebar's +.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "或者点按边栏中的 +，然后点按“新建空间”"
+            "value" : "或者点按边栏中的 +，然后选取“新建空间”"
           }
         }
       }
@@ -17871,13 +17871,13 @@
         }
       }
     },
-    "Right-click its tab, then Pin Tab" : {
+    "Right-click its tab, then choose Pin Tab" : {
       "comment" : "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "右键点按它的标签页，然后点按“固定标签页”"
+            "value" : "右键点按它的标签页，然后选取“固定标签页”"
           }
         }
       }

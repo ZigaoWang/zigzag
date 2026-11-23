@@ -300,7 +300,7 @@ final class GuidedTour: NSView {
         }
         // The + opens a menu: the space is its last item.
         if task.id == "space", let menu = MenuPanel.current, menu.anchor === controller.sidebar.newSpaceAnchor {
-            return Display(keys: [], title: String(localized: "Click New Space", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while the menu of the sidebar's + is open. New Space is an item in that menu."),
+            return Display(keys: [], title: String(localized: "Choose New Space", comment: "A hint in the middle of a step in the getting-started guide, a card in the window, while the menu of the sidebar's + is open. New Space is an item in that menu."),
                            note: "", count: "", isDone: false, isFinal: false, target: "addmenu")
         }
         // Names the very tab to drag, and a cursor in the window shows the drag on it: a ring alone reads as the tab
