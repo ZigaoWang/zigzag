@@ -101,7 +101,7 @@ enum MainMenu {
             item(String(localized: "About Zigzag", comment: "Zigzag menu item."), #selector(AppDelegate.showAbout(_:)), ""),
             item(String(localized: "Check for Updates…", comment: "Zigzag menu item."), #selector(AppDelegate.checkForUpdates(_:)), ""),
             .separator(),
-            item(String(localized: "Settings…", comment: "Zigzag menu item."), #selector(AppDelegate.showSettings(_:)), ","),
+            item(String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar."), #selector(AppDelegate.showSettings(_:)), ","),
             item(String(localized: "Passwords", comment: "Zigzag menu item."), #selector(AppDelegate.showPasswords(_:)), "k", [.command, .option]),
             item(String(localized: "Set as Default Browser", comment: "Zigzag menu item."), #selector(AppDelegate.makeDefaultBrowser(_:)), ""),
             .separator(),
@@ -270,7 +270,7 @@ enum MainMenu {
         let servicesItem = NSMenuItem(title: services.title, action: nil, keyEquivalent: "")
         servicesItem.submenu = services
         main.addItem(submenu(name, [
-            item(String(localized: "Settings…", comment: "Zigzag menu item."), #selector(AppDelegate.showSettings(_:)), ","),
+            item(String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar."), #selector(AppDelegate.showSettings(_:)), ","),
             .separator(),
             servicesItem,
             .separator(),

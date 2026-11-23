@@ -18945,7 +18945,7 @@
       }
     },
     "Settings" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in an extension's menu: opens the extension's own settings page.\nThe address bar's name for Zigzag's Settings page.\nThe name of the tab showing Zigzag's Settings.\nTitle of the Settings page, also its tab's name.",
+      "comment" : "Item in an extension's menu: opens the extension's own settings page.\nThe address bar's name for Zigzag's Settings page.\nThe name of the tab showing Zigzag's Settings.\nTitle of the Settings page, also its tab's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18956,7 +18956,7 @@
       }
     },
     "Settings…" : {
-      "comment" : "Zigzag menu item.",
+      "comment" : "Zigzag menu item, and a command in the command bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

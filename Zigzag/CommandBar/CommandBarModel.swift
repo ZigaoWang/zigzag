@@ -200,7 +200,7 @@ enum CommandRanker {
                keywords: ["clear", "cache", "empty", "reset", "refresh"], symbol: "arrow.clockwise"),
         Action(id: "clear-cookies", title: String(localized: "Clear Cookies…", comment: "A command in the command bar, named as in the menu bar."),
                keywords: ["clear", "cookies", "sign", "out", "logout", "reset", "data"], symbol: "trash"),
-        Action(id: "settings", title: String(localized: "Settings", comment: "A command in the command bar, named as in the menu bar."),
+        Action(id: "settings", title: String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar."),
                keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
         Action(id: "archive", title: String(localized: "Show Archive", comment: "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs."),
                keywords: ["archive", "archived", "tabs", "old", "tidy", "restore"], symbol: "archivebox"),
