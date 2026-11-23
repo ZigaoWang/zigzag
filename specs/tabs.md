@@ -105,6 +105,8 @@
   Test: TouchGesturesTests.aTapShowsClearAboveTheTabs
 - Two taps on a tab, a space's dot or a resize edge → what a double-click there does (rename, edit the space, the usual width or even tiles).
   Test: TouchMovesTests.twoTapsOnAControlAreADoubleClick
+- Two taps with a finger on the title bar strip's empty space, beside the traffic lights or the sidebar's buttons → what a double-click there does, once.
+  Test: TouchMovesTests.theTitlebarHearsADoubleTapAndZooms
 - Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.
   Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
 - Touch and hold a row, slide onto its menu without lifting → the item under the finger lights; lift on it → it runs.

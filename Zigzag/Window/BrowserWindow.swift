@@ -380,6 +380,42 @@ final class BrowserWindow: NSWindow {
     /// A finger's last tap on the strip's empty space, for a double tap.
     private var lastTitlebarTap: (time: TimeInterval, point: NSPoint)?
 
+    /// A finger's two taps on the title bar strip's empty space. AppKit's title bar is what a finger there lands on,
+    /// so it's watched there; the window's own watch never hears those touches.
+    private(set) var titlebarDoubleTap: NSClickGestureRecognizer?
+    private let titlebarTouchOnly = TouchOnly()
+
+    /// On the title bar AppKit has now, again after it makes a new one (full screen).
+    func attachTitlebarDoubleTap() {
+        guard TouchGestures.isAvailable, let container = standardWindowButton(.closeButton)?.superview?.superview,
+              container.window === self, titlebarDoubleTap?.view !== container else { return }
+        let tap = titlebarDoubleTap ?? {
+            let tap = NSClickGestureRecognizer(target: self, action: #selector(titlebarDoubleTapped(_:)))
+            tap.numberOfClicksRequired = 2
+            TouchGestures.configure(tap, titlebarTouchOnly)
+            titlebarTouchOnly.simultaneous = true
+            titlebarTouchOnly.accepts = { [weak self, weak tap] point in
+                guard let self, let view = tap?.view else { return false }
+                return self.isOnEmptyTitlebar(view.convert(point, to: nil))
+            }
+            titlebarDoubleTap = tap
+            return tap
+        }()
+        tap.view?.removeGestureRecognizer(tap)
+        container.addGestureRecognizer(tap)
+    }
+
+    @objc private func titlebarDoubleTapped(_ tap: NSClickGestureRecognizer) {
+        titlebarDoubleTapped(at: tap.location(in: nil))
+    }
+
+    /// Two taps at `point` (window coordinates) on the strip: what a double-click there does.
+    func titlebarDoubleTapped(at point: NSPoint) {
+        guard isOnEmptyTitlebar(point), let event = TouchPress.mouseDown(at: point, in: self) else { return }
+        lastTitlebarTap = nil
+        titleBarMouseDown(event, clicks: 2)
+    }
+
     /// Whether `point` is on the title bar strip, off the window's own buttons and ours.
     func isOnEmptyTitlebar(_ point: NSPoint) -> Bool {
         guard let container = standardWindowButton(.closeButton)?.superview?.superview, container.frame.contains(point) else { return false }
@@ -453,6 +489,7 @@ final class BrowserWindow: NSWindow {
 
     /// Moves the system buttons into our top row. AppKit re-lays them out on resize, so this runs often.
     func layoutTrafficLights() {
+        attachTitlebarDoubleTap()
         guard let origin = trafficLightOrigin else { return }
         // AppKit moves the title bar between the window and the full screen bar meanwhile; resizing it then could
         // leave full screen half made (#401). The controller lays them out once it's done.

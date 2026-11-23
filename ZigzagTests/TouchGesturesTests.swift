@@ -669,6 +669,33 @@ struct TouchMovesTests {
         #expect(!window.isOnEmptyTitlebar(NSPoint(x: 400, y: 300)))
     }
 
+    /// A finger's two taps there are heard on AppKit's title bar, which takes them, and zoom the window once.
+    @Test func theTitlebarHearsADoubleTapAndZooms() throws {
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600))
+        window.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { window.close() }
+        window.attachTitlebarDoubleTap()
+        let container = try #require(window.standardWindowButton(.closeButton)?.superview?.superview)
+        let tap = try #require(window.titlebarDoubleTap)
+        #expect(tap.view === container && tap.numberOfClicksRequired == 2 && tap.buttonMask == 0)
+        // Again on the same title bar: still one.
+        window.attachTitlebarDoubleTap()
+        #expect(container.gestureRecognizers.filter { $0 === tap }.count == 1)
+        let close = try #require(window.standardWindowButton(.closeButton))
+        let onClose = close.convert(NSPoint(x: close.bounds.midX, y: close.bounds.midY), to: nil)
+        let before = TitleBarAction.lastAt
+        TitleBarAction.lastAt = 0
+        defer { TitleBarAction.lastAt = before }
+        window.titlebarDoubleTapped(at: onClose)
+        #expect(TitleBarAction.lastAt == 0)
+        window.titlebarDoubleTapped(at: NSPoint(x: 400, y: onClose.y))
+        let zoomed = TitleBarAction.lastAt
+        #expect(zoomed > 0)
+        // The window's own watch hearing the same taps doesn't zoom it back.
+        window.titlebarDoubleTapped(at: NSPoint(x: 400, y: onClose.y))
+        #expect(TitleBarAction.lastAt == zoomed)
+    }
+
     @Test func aFingerAcrossTheSidebarSwitchesSpaces() throws {
         let added = Library.shared.addSpace(name: "Touch swipe test")
         defer { Library.shared.removeSpace(added.id) }
