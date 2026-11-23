@@ -750,21 +750,10 @@ enum TouchSwipe {
         return (forgiving ? isAcrossSidebar(translation) : isSideways(translation)) ? .sideways : .other
     }
 
-    /// What fingers sideways on a page do.
-    nonisolated enum OnPage: Equatable { case backForward, spaces }
-
-    /// For `fingers` on a page that moved by `translation` and spread apart by `spread`: one is the page's own (it
-    /// scrolls), two go back or forward as on the trackpad unless they pinch, three switch spaces.
-    nonisolated static func onPage(fingers: Int, translation: NSPoint, spread: CGFloat) -> OnPage? {
-        switch fingers {
-        case 2:
-            guard verdict(translation, forgiving: false) == .sideways, abs(spread) < abs(translation.x) / 2 else { return nil }
-            return .backForward
-        case 3:
-            return verdict(translation, forgiving: true) == .sideways ? .spaces : nil
-        default:
-            return nil
-        }
+    /// For `fingers` on a page that moved by `translation` and spread apart by `spread`: two go back or forward as on
+    /// the trackpad unless they pinch. One is the page's own (it scrolls); macOS takes three for switching desktops.
+    nonisolated static func goesBackOrForward(fingers: Int, translation: NSPoint, spread: CGFloat) -> Bool {
+        fingers == 2 && verdict(translation, forgiving: false) == .sideways && abs(spread) < abs(translation.x) / 2
     }
 }
 

@@ -94,24 +94,22 @@ final class PageHolder: NSView {
 
     // MARK: Touch
 
-    /// Two fingers sideways go back or forward, three switch spaces; one is the page's own.
+    /// Two fingers sideways go back or forward; one is the page's own.
     private(set) var pageSwipe: TouchSwipeRecognizer?
     /// Two fingers pinched in on the page at its usual size open Show All Tabs; the page still zooms as before.
     private(set) var overviewPinch: TouchPinchRecognizer?
-    /// What the fingers on the page are doing, once decided.
-    private var swiping: TouchSwipe.OnPage?
-    private var swipeX: CGFloat = 0
+    /// The fingers on the page decided on back or forward.
+    private var swiping = false
     private var pinchStartZoom: CGFloat = 1
     private var pinchFired = false
 
     private func addTouchGestures() {
         let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.pageSwipeChanged(swipe) }
-        swipe.maxFingers = 3
+        swipe.maxFingers = 2
         swipe.decides = { [weak self] swipe in
-            guard let self, let kind = TouchSwipe.onPage(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread),
-                  self.takes(kind, dx: swipe.translation.x) else { return false }
-            self.swiping = kind
-            return true
+            guard let self, TouchSwipe.goesBackOrForward(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread)
+            else { return false }
+            return self.takesBackForward(dx: swipe.translation.x)
         }
         addGestureRecognizer(swipe)
         pageSwipe = swipe
@@ -121,76 +119,48 @@ final class PageHolder: NSView {
         overviewPinch = pinch
     }
 
-    /// The browser window this page is in, with the sidebar that switches its spaces.
-    private var browser: BrowserWindowController? { window?.windowController as? BrowserWindowController }
-
-    /// Whether fingers going `dx` this way may do `kind`: back or forward when the Mac's touch setting, Zigzag's
-    /// and the page's history allow; spaces in a browser window, outside Show All Tabs.
-    func takes(_ kind: TouchSwipe.OnPage, dx: CGFloat) -> Bool {
-        switch kind {
-        case .backForward:
-            return (page as? BrowserWebView)?.swipeNavigator.takesTouchSwipe(dx > 0 ? -1 : 1) == true
-        case .spaces:
-            guard let browser else { return false }
-            return !browser.desk.isVisible
-        }
+    /// Whether fingers going `dx` this way may go back or forward: the Mac's touch setting, Zigzag's and the page's
+    /// history allow it.
+    func takesBackForward(dx: CGFloat) -> Bool {
+        (page as? BrowserWebView)?.swipeNavigator.takesTouchSwipe(dx > 0 ? -1 : 1) == true
     }
 
     private func pageSwipeChanged(_ swipe: TouchSwipeRecognizer) {
         let x = swipe.translation.x
         switch swipe.state {
         case .began:
-            guard let swiping else { return }
-            touchSwipeBegan(swiping, dx: x)
+            touchSwipeBegan(dx: x)
         case .changed:
             touchSwipeMoved(dx: x)
         case .ended:
-            touchSwipeEnded(velocity: swipe.velocity.x, cancelled: false)
+            touchSwipeEnded(cancelled: false)
         case .cancelled, .failed:
-            touchSwipeEnded(velocity: 0, cancelled: true)
+            touchSwipeEnded(cancelled: true)
         default:
             break
         }
     }
 
-    /// The fingers decided on `kind`, `dx` points sideways so far (positive to the right): the arrow comes, as for
-    /// two fingers on the trackpad, or the spaces slide as under a finger across the sidebar.
-    func touchSwipeBegan(_ kind: TouchSwipe.OnPage, dx: CGFloat) {
-        swiping = kind
-        let now = ProcessInfo.processInfo.systemUptime
-        switch kind {
-        case .backForward:
-            guard let swipe = (page as? BrowserWebView)?.swipeNavigator else { return }
-            swipe.touchBegan(direction: dx > 0 ? -1 : 1)
-            swipe.touchMoved(dx: dx, at: now)
-        case .spaces:
-            swipeX = dx
-            browser?.sidebar.touchSwipeBegan()
-            browser?.sidebar.touchSwipeMoved(by: dx, at: now)
-        }
+    /// The fingers decided, `dx` points sideways so far (positive to the right): the arrow comes, as for two fingers
+    /// on the trackpad.
+    func touchSwipeBegan(dx: CGFloat) {
+        guard let swipe = (page as? BrowserWebView)?.swipeNavigator else { return }
+        swiping = true
+        swipe.touchBegan(direction: dx > 0 ? -1 : 1)
+        swipe.touchMoved(dx: dx, at: ProcessInfo.processInfo.systemUptime)
     }
 
     /// The fingers are `dx` points sideways from where they landed.
     func touchSwipeMoved(dx: CGFloat) {
-        let now = ProcessInfo.processInfo.systemUptime
-        switch swiping {
-        case .backForward: (page as? BrowserWebView)?.swipeNavigator.touchMoved(dx: dx, at: now)
-        case .spaces:
-            browser?.sidebar.touchSwipeMoved(by: dx - swipeX, at: now)
-            swipeX = dx
-        case nil: break
-        }
+        guard swiping else { return }
+        (page as? BrowserWebView)?.swipeNavigator.touchMoved(dx: dx, at: ProcessInfo.processInfo.systemUptime)
     }
 
-    /// Lifted going `velocity` points a second sideways, or called off.
-    func touchSwipeEnded(velocity: CGFloat, cancelled: Bool) {
-        let kind = swiping
-        swiping = nil
-        switch kind {
-        case .backForward: (page as? BrowserWebView)?.swipeNavigator.touchEnded(at: ProcessInfo.processInfo.systemUptime, cancelled: cancelled)
-        case .spaces: browser?.sidebar.touchSwipeEnded(velocity: velocity, cancelled: cancelled)
-        case nil: break
-        }
+    /// Lifted, or called off.
+    func touchSwipeEnded(cancelled: Bool) {
+        guard swiping else { return }
+        swiping = false
+        (page as? BrowserWebView)?.swipeNavigator.touchEnded(at: ProcessInfo.processInfo.systemUptime, cancelled: cancelled)
     }
 
     private func pinchChanged(_ pinch: TouchPinchRecognizer) {
