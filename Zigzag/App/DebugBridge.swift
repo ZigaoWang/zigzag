@@ -1541,6 +1541,16 @@ enum DebugBridge {
         case "unsplit": controller.closeSplitView(nil)
         // splitorient: side by side to stacked or back, as the split's own button does.
         case "splitorient": controller.toggleSplitOrientation(nil)
+        // swapsplit: the two pages trade places, as the strip's swap button does.
+        case "swapsplit": if let tab = controller.tabManager.selectedTab { controller.tabManager.swapSplit(for: tab) }
+        // panestate: the pane you're in, each pane's page and frame, the find bar's frame, and the keyboard's page.
+        case "panestate":
+            let m = controller.tabManager
+            let ids = m.selectedTab.flatMap { m.split(for: $0) }?.ids ?? []
+            let names = ids.map { m.tab(with: $0)?.displayTitle ?? "?" }
+            let responder = controller.window?.firstResponder as? NSView
+            let keyboard = controller.root.paneCards.firstIndex { card in responder.map { $0.isDescendant(of: card) } ?? false }
+            debugLog("panestate selected=\(m.selectedTab?.displayTitle ?? "-") panes=\(names) frames=\(controller.root.tileFrames.map(NSStringFromRect)) focused=\(NSStringFromRect(controller.focusedPaneFrame)) cards=\(controller.root.paneCards.prefix(ids.count).map { ($0.webView as? BrowserWebView)?.owner?.displayTitle ?? "-" }) keyboardCard=\(keyboard.map(String.init) ?? "-") responder=\(responder.map { String(describing: type(of: $0)) } ?? "nil") find=\(controller.findBar.debugFrame)")
         case "closetab": controller.closeTab(nil)
         case "flydownload": controller.debugFlyDownload(arg.isEmpty ? "Shanghai Guide.pdf" : arg)
         case "readerjs":

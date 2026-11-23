@@ -494,6 +494,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
     }
 
+    /// Where the bar is, and which PDF it last searched (`panestate`).
+    var debugFrame: String { isVisible ? "\(NSStringFromRect(panel.frame)) pdf=\(searchedPDF?.url.lastPathComponent ?? "-")" : "hidden" }
+
     /// Same as clicking a tick (`findtick`).
     func debugPickTick(_ index: Int) { search(backwards: false, toMatch: index) }
     #endif
