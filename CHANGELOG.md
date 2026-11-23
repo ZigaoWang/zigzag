@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Zigzag works with a touch display and with Sidecar on an iPad. Touch and hold a tab, a folder, a space or the empty sidebar to open its menu. Tapping links that open a new window works like clicking them, and tapping outside a panel or menu closes it. A tap on a row shows its × and other buttons that otherwise only appear under the pointer, the strips that resize the sidebar and split panes take a finger a little either side of them, and so does a row's ×. The mouse and trackpad work exactly as before.
+
 ### Fixed
 - Swap on a split's strip moves the two pages on screen right away. Before, only the sidebar row swapped until you clicked somewhere, so a click on one pane could pick the other page, and ⌘F opened the find bar over one pane while searching the other.
 - Settings › General › On launch reads like the rest of Settings: Continue where you left off, or Open a new window. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#494](https://github.com/ZigaoWang/zigzag/issues/494))
