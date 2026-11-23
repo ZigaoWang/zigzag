@@ -255,6 +255,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(placeAddress), name: BrowserRootView.addressPlaceChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(placeSidebarSide), name: BrowserRootView.sidebarSideChanged, object: nil)
         placeAddress()
+        // Autohide's pointer reveal: the person's pointer near the top brings the bar back, trusted input only.
+        autohidePointerMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            self?.autohidePointerMoved(event)
+            return event
+        }
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
         tokens.append(DownloadManager.shared.started.observe { [weak self] item, window in
             guard let self, window == nil || window === self.window else { return }
@@ -615,26 +620,30 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func displayOptionsChanged() { applySpaceColor(animated: false) }
 
-    /// Settings › Appearance › Address bar above the page: the sidebar's own back, forward, reload and address move
-    /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
-    /// from them is put away first. At once: a setting you change, not a layout you watch.
+    /// Settings › Appearance › Address bar above the page: Off, Autohide, or Always (#359). The sidebar's own back,
+    /// forward, reload and address move to the bar above the page, or back. The same views, so everything that hangs
+    /// from them follows; what was open from them is put away first. At once: a setting you change, not a layout you
+    /// watch.
     @objc func placeAddress() {
-        let above = BrowserRootView.addressAbovePage
-        guard sidebar.holdsAddress == above else { return }
-        if window?.isVisible == true { closeFloatingPanels() }
-        sidebar.holdsAddress = !above
-        if above {
-            // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
-            sidebar.address.starInPill = true
-            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
-            let tab = tabManager.selectedTab
-            root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-            root.topBar.showPin(sidebar.address.canSave)
-        } else {
-            root.topBar.pin = nil
-            sidebar.address.starInPill = false
+        let place = BrowserRootView.addressBarPlace
+        let above = place != .off
+        if sidebar.holdsAddress != !above {
+            if window?.isVisible == true { closeFloatingPanels() }
+            sidebar.holdsAddress = !above
+            if above {
+                // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
+                sidebar.address.starInPill = true
+                root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
+                let tab = tabManager.selectedTab
+                root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+                root.topBar.showPin(sidebar.address.canSave)
+            } else {
+                root.topBar.pin = nil
+                sidebar.address.starInPill = false
+            }
         }
         root.barHoldsAddress = above
+        root.autohidesBar = place == .autohide
         showTopBar()
     }
 
@@ -717,6 +726,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if tab !== shownTab {
             // So is Capture.
             capture.cancel()
+            // Each tab starts over: its page is wherever that tab was left, so the bar is there, not away for the
+            // page you were reading a moment ago (#359).
+            resetAutohide(animated: false)
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && (tab.map { tabManager.partners(of: $0) } ?? []).contains { $0 === readerTab }
             if !readerStillShown { closeReader() }
@@ -1137,11 +1149,148 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The address and the sidebar's rows are where the setting puts them either way: nothing in the sidebar moves
     /// for a bar that's there for the tools alone.
     private func showTopBar() {
+        root.autohidesBar = root.barHoldsAddress && BrowserRootView.addressBarPlace == .autohide
         root.showsTopBar = root.barHoldsAddress || root.topBar.accessory != nil
         root.needsLayout = true
         root.layoutSubtreeIfNeeded()
         layoutTrafficLights()
         paintTopBar()
+    }
+
+    /// One pane's Autohide state (#359). A split scrolls one page at a time: each pane's bar follows its own page,
+    /// and one pane's gesture can't move another pane's strip.
+    private struct AutohidePaneState {
+        var tab: ObjectIdentifier?
+        var lastScrollY: CGFloat = 0
+        var reported = false
+        var locked = false
+        var dragging = false
+        var gestureActive = false
+        var lastWheelAt: TimeInterval = 0
+    }
+    private var autohidePanes: [Int: AutohidePaneState] = [:]
+    /// The pointer monitor that brings an Autohide bar back near the window's top.
+    private var autohidePointerMonitor: Any?
+    /// While the sidebar is sliding: the bar stays as it is, so the lights don't have to cross it.
+    private var sidebarMovingUntil = Date.distantPast
+
+    /// The pane a page is in: its place in the selected tab's group, one page with index 0.
+    func paneIndex(of tab: Tab) -> Int? {
+        guard let selected = tabManager.selectedTab else { return nil }
+        return tabManager.panes(of: selected).firstIndex { $0 === tab }
+    }
+
+    /// A new gesture may move the bar again after one took it out. Opening it doesn't lock, so the same gesture can
+    /// close it once more; only closing locks, and only against reopening in that gesture.
+    private func beginAutohideGesture(inPane index: Int, state: inout AutohidePaneState) {
+        state.locked = false
+    }
+
+    /// Trackpad gestures end and begin with AppKit's phases; a wheel's burst is one gesture until it pauses; a drag
+    /// on a page's scroll bar is one gesture from press to release. The bar follows the page either way, but a gesture
+    /// that closed it can't reopen it. Each pane keeps its own gesture: scrolling one tile never locks another.
+    private func noteScrollGesture(_ event: NSEvent, inPane index: Int) {
+        var state = autohidePanes[index] ?? AutohidePaneState()
+        if event.phase == .began {
+            beginAutohideGesture(inPane: index, state: &state)
+            state.gestureActive = true
+        } else if event.phase == .changed, !state.gestureActive {
+            // Some devices send a change without a began; treat it as the gesture's start.
+            beginAutohideGesture(inPane: index, state: &state)
+            state.gestureActive = true
+        } else if event.phase == .ended || event.phase == .cancelled {
+            // The gesture is over. The lock stays until the next gesture begins.
+            state.gestureActive = false
+        } else if event.phase.isEmpty, event.momentumPhase.isEmpty {
+            // A wheel or a mouse's scroll: a new burst after a pause, one gesture while it keeps coming.
+            if event.timestamp - state.lastWheelAt > 0.25 { beginAutohideGesture(inPane: index, state: &state) }
+            state.lastWheelAt = event.timestamp
+        }
+        autohidePanes[index] = state
+    }
+
+    /// A page says where it is on a scroll. Autohide follows the person's own scrolls only, and only while the page's
+    /// field doesn't have the focus, nothing is open over the page, and the sidebar is still. The bar is bound to the
+    /// page's position: it moves out as the page goes down, and comes back with it on the way up, until this gesture
+    /// has taken it fully out; after that it stays out until a new gesture or the pointer at the window's top.
+    /// `inPane` is the tile the page is in: only its bar moves.
+    func pageScrolled(to y: CGFloat, trusted: Bool, editing: Bool, dragging: Bool = false,
+                      inPane index: Int = 0, tab: Tab? = nil) {
+        let pane = max(0, min(index, root.autohidePaneCount - 1))
+        var state = autohidePanes[pane] ?? AutohidePaneState()
+        // A page put into this pane since the last report starts over: its first place is its own.
+        if let tab, state.tab != ObjectIdentifier(tab) {
+            state = AutohidePaneState(tab: ObjectIdentifier(tab))
+            root.setAutohideOffset(0, at: pane, animated: false)
+        }
+        let delta = state.reported ? y - state.lastScrollY : 0
+        state.lastScrollY = y
+        state.reported = true
+        // A scroll-bar drag is one gesture from press to release, as a trackpad swipe is.
+        if dragging, !state.dragging {
+            beginAutohideGesture(inPane: pane, state: &state)
+        }
+        state.dragging = dragging
+        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar else {
+            autohidePanes[pane] = state
+            return
+        }
+        if editing {
+            state.locked = false
+            autohidePanes[pane] = state
+            root.setAutohideOffset(0, at: pane, animated: false)
+            return
+        }
+        guard trusted, !autohideHeld(inPane: pane) else {
+            autohidePanes[pane] = state
+            return
+        }
+        let step = AddressBarAutohide.step(offset: root.autohideOffset(at: pane), pageDelta: delta,
+                                           travel: root.autohideTravel(at: pane), locked: state.locked)
+        state.locked = step.locked
+        autohidePanes[pane] = state
+        root.setAutohideOffset(step.offset, at: pane, animated: false)
+    }
+
+    /// A new page starts at its top, and the bar is there for it, however far down the page before was left (#359).
+    /// Its next report is measured from the top.
+    private func resetAutohide(animated: Bool) {
+        autohidePanes.removeAll()
+        root.setBarPutAway(false, animated: animated)
+    }
+
+    /// One page starts over: only its own pane's bar comes back, not the tiles beside it.
+    private func resetAutohide(of tab: Tab, animated: Bool) {
+        guard root.tiles != nil, let pane = paneIndex(of: tab) else { resetAutohide(animated: animated); return }
+        autohidePanes[pane] = nil
+        root.setAutohideOffset(0, at: pane, animated: animated)
+    }
+
+    /// What keeps the bar where it is, whatever a page reports: a field being typed in (the page says so), a sheet or
+    /// the command bar open over it, the sidebar sliding, or the pointer on the bar itself (you're reaching for it).
+    /// Not the window's focus: a page scrolled in a window that isn't key is still the person scrolling it.
+    private func autohideHeld(inPane index: Int) -> Bool {
+        if root.isSidebarFloatingVisible || isSidebarSliding() { return true }
+        if window?.attachedSheet != nil || commandBar.isVisible { return true }
+        guard root.autohideOffset(at: index) < root.autohideTravel(at: index) - 0.5,
+              let window else { return false }
+        let point = root.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        return root.autohideBarContains(point, at: index)
+    }
+
+    private func isSidebarSliding() -> Bool { Date() < sidebarMovingUntil }
+
+    private func autohidePointerMoved(_ event: NSEvent) {
+        guard event.window === window, root.autohidesBar, root.barHoldsAddress, root.showsTopBar else { return }
+        guard (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
+        let point = root.convert(event.locationInWindow, from: nil)
+        guard point.y <= Tokens.Space.x2 else { return }
+        // The pointer at the top asks for the bar back; in a split every pane that put its own away comes back with
+        // it, so reaching for one doesn't leave another out of sight.
+        for index in 0..<root.autohidePaneCount {
+            autohidePanes[index]?.locked = false
+            root.setAutohideOffset(0, at: index, animated: true)
+        }
     }
 
     /// Gives the page you're on the size chosen for it with the developer tools, or its room back. A page's own
@@ -1183,6 +1332,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let layout = pages.count == pair?.count ? "\(pair?.ids ?? []) \(String(describing: pair?.shape)) \(zoomed ?? -1)" : ""
         if layout != shownPaneLayout {
             shownPaneLayout = layout
+            autohidePanes.removeAll()
             if SitePanel.isOpen(in: window), SitePanel.shown?.isFromPane == true { SitePanel.closeCurrent() }
         }
         defer {
@@ -1657,6 +1807,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Each card shows its own page's load (`PageCardView.showLoading`); the sidebar follows the page you're in.
         switch change {
         case .url, .navigation, .loading:
+            if change == .navigation {
+                // A new page starts at its top, and the bar is there for it, however far down the page before was
+                // left (#359). Its next report is measured from the top.
+                resetAutohide(of: tab, animated: true)
+            }
             if change == .url {
                 refreshExtensionActions()
                 updateHandoff()
@@ -2431,12 +2586,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Visibility is recomputed from the clock, so nothing can leave the buttons stuck hidden.
     private func sidebarSliding(_ duration: TimeInterval) {
         if !browserWindow.trafficLightsHidden, let image = browserWindow.trafficLightsImage() { trafficLightsPicture = image }
-        // Docked and in the bar above the page, the lights are in the same spot: they stay put while the sidebar
-        // slides out from under them or back, and go straight back to it as the floating sidebar leaves.
-        // Beside a sidebar on the right they're in the bar holding the address the whole time, slid out or not; with
-        // only a page's tools there, they ride in the sidebar at the window's other edge, and go with it.
-        let barKeepsLights = root.sidebarOnRight && root.barHoldsAddress
-        let stays = root.showsTopBar && (barKeepsLights || (!root.sidebarOnRight && !root.isSidebarFloatingVisible))
+        sidebarMovingUntil = duration > 0 ? Date().addingTimeInterval(duration) : .distantPast
+        // The bar holds the address: the lights stay at the window's leading edge, on the bar's line, or over the page
+        // while Autohide has the bar away (#359). They don't ride the sidebar, and the bar's hold keeps the bar there
+        // through the slide, so this never crosses it.
+        if root.barHoldsAddress {
+            slideEndsAt = .distantPast
+            if root.showsTopBar, duration > 0 {
+                toggleHeldUntil = Date().addingTimeInterval(duration)
+            }
+            layoutTrafficLights()
+            if duration > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.01) { [weak self] in self?.layoutTrafficLights() }
+            }
+            return
+        }
+        // Beside a sidebar on the right, a bar there for a page's tools alone leaves them in the sidebar's row, and
+        // they ride with it; on the left with the bar there they stay put while it slides out from under them.
+        let stays = root.showsTopBar && (!root.sidebarOnRight && !root.isSidebarFloatingVisible)
         // On either side the bar's toggle is where the sidebar's lands (on the right, both at the window's right end).
         if stays, duration > 0 {
             toggleHeldUntil = Date().addingTimeInterval(duration)
@@ -2467,26 +2634,33 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Without it they're in the sidebar's top row on either side, the page running up to the top as on the left
         // (#166), and a bar there for a page's tools alone leaves them be, as on the left.
         let onRight = root.sidebarOnRight
+        let barShown = root.barOnScreen
+        // Autohide has put the bar away: over the page, on the line an installed app puts its own, where the page's
+        // title bar would be (#358, #359). With Autohide off that only happens with the sidebar hidden. A sidebar
+        // docked on the left keeps them in its own top row, level with its toggle, the bar there or not.
+        let overPage = !fullScreen && !barShown && ((root.barHoldsAddress && onRight) || (!docked && !floating))
         let barKeepsLights = onRight && root.barHoldsAddress
-        let inBar = root.showsTopBar && (barKeepsLights || (!docked && !floating))
+        let inBar = barShown && (root.barHoldsAddress || (!docked && !floating))
         let room = Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
         // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
         // nothing in the row moves while it's on screen; until then their picture rides in it.
         if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
         sidebar.showTrafficLightsPicture(sliding && !fullScreen && sidebar.trafficLightsWidth > 0 ? trafficLightsPicture : nil)
-        window.trafficLightsHidden = sliding || !(docked || floating || inBar)
+        window.trafficLightsHidden = sliding || !(docked || floating || inBar || overPage)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
         // Docked, from where the docked sidebar starts: the window's left edge, or on the right its width in from the
         // right edge.
         let dockedMinX = onRight ? root.bounds.width - root.sidebarWidth : 0
-        let x = (inBar ? 0 : docked ? dockedMinX : container.minX) + SidebarView.trafficLightsX
+        let x = (inBar || overPage ? 0 : docked ? dockedMinX : container.minX) + SidebarView.trafficLightsX
         // In the bar, on its middle line, wherever the bar starts: not the sidebar's line, which is still the docked
-        // one while it slides away.
-        let center = inBar ? root.topBarFrame.minY + Tokens.Sidebar.lightsCenter : (docked ? 0 : container.minY) + sidebar.trafficLightCenterY
+        // one while it slides away. Over the page, the installed app's own line.
+        let barCenter = root.barTop + Tokens.Sidebar.lightsCenter
+        let pageCenter = Tokens.Metric.webAppTitleBarHeight / 2
+        let center = inBar ? barCenter : overPage ? pageCenter : (docked ? 0 : container.minY) + sidebar.trafficLightCenterY
         let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
-        if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
+        if !sliding, docked || floating || inBar || overPage, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
         // Full screen included: the lights come down with the menu bar, so the bar leaves their space
         // rather than drawing its controls under them.
@@ -2630,9 +2804,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         if DownloadsPanel.isOpen(in: window) { DownloadsPanel.closeCurrent() }
         if let editor = SpaceEditorPanel.current, editor.window === window { editor.close() }
-        // Nor the zoomed pane's Esc.
+        // Nor the zoomed pane's Esc, or Autohide's pointer reveal.
         if let monitor = zoomEscMonitor { NSEvent.removeMonitor(monitor) }
         zoomEscMonitor = nil
+        if let monitor = autohidePointerMonitor { NSEvent.removeMonitor(monitor) }
+        autohidePointerMonitor = nil
         // Its page is no longer on offer to your other devices.
         handoff = HandoffPage.update(handoff, to: nil)
         onClose?(self)
@@ -2721,6 +2897,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         #if DEBUG
         if event.type == .scrollWheel, sidebarContains(event) { DebugBridge.recordScroll(event) }
         #endif
+        // The page's scroll gesture, for Autohide: AppKit's phases tell a new swipe from the rest of one, so a
+        // gesture that closed the bar doesn't reopen it on the way back.
+        if event.type == .scrollWheel, event.window === window,
+           root.cardFrame.contains(root.convert(event.locationInWindow, from: nil)), !sidebarContains(event) {
+            let point = root.convert(event.locationInWindow, from: nil)
+            noteScrollGesture(event, inPane: root.paneIndex(at: point) ?? 0)
+        }
         if event.type == .scrollWheel, !desk.isVisible, sidebarContains(event), sidebar.handleSwipe(event) { return true }
         if event.type == .keyDown, #available(macOS 15.4, *), !event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
            ExtensionCenter.performCommand(for: event) {

@@ -3770,7 +3770,7 @@
       }
     },
     "Always" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.\nAddress bar above the page: the bar stays above the page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4365,6 +4365,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动填充"
+          }
+        }
+      }
+    },
+    "Autohide" : {
+      "comment" : "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动隐藏"
           }
         }
       }
@@ -14490,7 +14501,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nAddress bar above the page: the address stays in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20663,6 +20674,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开启后，网站发来第一个文件时会先询问是否允许。允许过的网站会记住答案；关闭后，下载会和以前一样直接保存。"
+          }
+        }
+      }
+    },
+    "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top." : {
+      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退、前进、重新载入和地址放在页面上方的栏里，不放在边栏中。选“自动隐藏”时，向下滚动会收起这一栏，向上滚动或把指针移到窗口顶部时会重新出现。"
           }
         }
       }

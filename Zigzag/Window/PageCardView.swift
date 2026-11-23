@@ -44,10 +44,48 @@ final class PageCardView: NSView {
     var headerAlpha: CGFloat { isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1 }
     /// Whether the header takes the top of the card.
     private var headerOnCard: Bool { showsHeader && !liftsHeader }
+    /// Autohide in a split: how far this pane's own strip has slid up out of its card, 0 while it's there. The page
+    /// starts that much higher, so the strip and the page move as one; the card itself stays where it is.
+    var headerOffset: CGFloat = 0 { didSet { if headerOffset != oldValue { needsLayout = true } } }
+    /// The part of the strip that's still on the card, as it slides out.
+    private var shownHeaderOffset: CGFloat { min(max(headerOffset, 0), PaneHeaderView.height) }
     /// Under the bar above the page, the card's top this tall is the bar's: the page starts under it, and the card's
     /// ground shows there in the page's own color (`ground`), so the bar and the page read as one card: its
     /// corners, edge and shadow are the card's, and it moves with it.
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
+
+    /// Moves the band from where it is to `target` on `curve`: Autohide slides the bar up and the page's top by the
+    /// same amount, so the page and the bar travel as one. The page keeps its place for the first frame and glides to
+    /// the new one on the render server, with the card's own frame when that changes too.
+    func moveBand(to target: CGFloat, with curve: Tokens.Motion.Curve) {
+        guard band != target else { return }
+        let fromFrame = frame
+        let oldBand = band
+        band = target
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        let toFrame = frame
+        frame = fromFrame
+        if fromFrame != toFrame {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = curve.duration
+                context.timingFunction = curve.timing
+                animator().frame = toFrame
+            }
+        }
+        // The clip and the header were laid out at the new band. Start them where they were, in the clip's own
+        // (unflipped) coordinates, and let both travel the difference on the same curve as the bar.
+        let shift = target - oldBand
+        guard abs(shift) > 0.5 else { return }
+        for view in [clip, header] {
+            let animation = CABasicAnimation(keyPath: "transform.translation.y")
+            animation.fromValue = shift
+            animation.toValue = 0
+            animation.duration = curve.duration
+            animation.timingFunction = curve.timing
+            view.layer?.add(animation, forKey: "autohideBand")
+        }
+    }
     /// The page's own color (`Tab.pageColor`), for the card's ground and what lies on it. None for a page at a
     /// size of its own: it stands on plain ground, so its edges show.
     var pageColor: NSColor? { pageSize == nil ? (webView as? BrowserWebView)?.owner?.pageColor : nil }
@@ -175,7 +213,9 @@ final class PageCardView: NSView {
     }
 
     /// How far down the card the page starts: under the bar's band and a split pane's header.
-    private var contentTop: CGFloat { band + (headerOnCard ? PaneHeaderView.height : 0) }
+    private var contentTop: CGFloat { band + (headerOnCard ? PaneHeaderView.height - shownHeaderOffset : 0) }
+    /// How far down the card the page starts, for what lays out against it.
+    var pageTop: CGFloat { contentTop }
     /// The page's own area as the card last laid it out, without what's docked beside it; whoever says the page's
     /// size hears when it changes.
     private(set) var pageArea = NSSize.zero { didSet { if pageArea != oldValue { onPageArea?(pageArea) } } }
@@ -484,7 +524,8 @@ final class PageCardView: NSView {
             clip.frame = bounds
             // The clip isn't flipped: the band and then the header are at its top edge, the page fills the rest below.
             if !liftsHeader {
-                header.frame = NSRect(x: 0, y: bounds.height - band - PaneHeaderView.height, width: bounds.width, height: PaneHeaderView.height)
+                header.frame = NSRect(x: 0, y: bounds.height - band - PaneHeaderView.height + shownHeaderOffset,
+                                      width: bounds.width, height: PaneHeaderView.height)
             }
             // The holder is sized, not the page (it fills the holder beside a docked Web Inspector, and in full screen
             // WebKit sizes it), and only while it's in this card: the mini player or another window may have borrowed it.

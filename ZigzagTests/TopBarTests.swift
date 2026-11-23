@@ -602,6 +602,210 @@ struct TopBarTests {
         }
     }
 
+    @Test func splitAutohideMovesOnlyItsOwnPane() {
+        withBorderless(false) {
+            let (root, _) = splitRoot()
+            root.autohidesBar = true
+            root.barHoldsAddress = true
+            root.layoutSubtreeIfNeeded()
+            let panes = root.tileFrames, barTop = root.topBarFrame.minY
+            let other = (frame: root.secondCard.frame, band: root.secondCard.band, page: root.secondCard.pageFrame)
+            let travel = root.autohideTravel(at: 0)
+            #expect(travel == root.topBarFrame.maxY)
+            let half = travel / 2
+            root.setAutohideOffset(half, at: 0, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.autohideOffset(at: 0) == half)
+            #expect(root.autohideOffset(at: 1) == 0)
+            #expect(!root.barPutAway && root.barOnScreen)
+            // The other pane keeps its strip and its page exactly as they were.
+            #expect(root.secondCard.frame == other.frame)
+            #expect(root.secondCard.band == other.band && root.secondCard.pageFrame == other.page)
+            // This pane's card still reaches the bar's top, its page rises under it, and its strip rides up.
+            #expect(root.card.frame.minY == barTop)
+            #expect(root.card.band == panes[0].minY - barTop - min(half, bar))
+            #expect(root.card.pageFrame.minY == panes[0].minY - min(half, bar))
+            #expect(root.card.header.isInBar && !root.card.header.isHidden)
+            #expect(root.topBar.stripOffsets == [half, 0])
+            #expect(root.card.header.convert(root.card.header.bounds, to: root).minY == root.topBar.frame.minY - half)
+        }
+    }
+
+    @Test func aSplitBarFullyAwayStaysAwayWithoutTakingTheOtherWithIt() {
+        withBorderless(false) {
+            let (root, _) = splitRoot()
+            root.autohidesBar = true
+            root.barHoldsAddress = true
+            root.layoutSubtreeIfNeeded()
+            let other = root.secondCard.frame
+            root.setAutohideOffset(root.autohideTravel(at: 0), at: 0, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.autohideOffset(at: 0) == root.autohideTravel(at: 0))
+            #expect(root.autohideOffset(at: 1) == 0)
+            #expect(!root.barPutAway && root.barOnScreen)
+            #expect(root.secondCard.frame == other)
+            #expect(root.card.pageFrame.minY == root.topBarFrame.minY)
+            // Fully out, its strip is above the window, not handed back to the card beneath it.
+            #expect(root.card.header.isInBar)
+            #expect(root.card.header.convert(root.card.header.bounds, to: root).maxY <= 0)
+            // Only when every pane's own bar is away is the row put away.
+            root.setAutohideOffset(root.autohideTravel(at: 1), at: 1, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.barPutAway && !root.barOnScreen)
+            #expect(root.secondCard.header.isInBar)
+            for i in 0..<2 { #expect(root.paneCards[i].pageFrame.minY == root.topBarFrame.minY) }
+            // The bar back: each pane has its own again.
+            root.setBarPutAway(false, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(!root.barPutAway && root.barOnScreen)
+            for i in 0..<2 { #expect(root.paneCards[i].pageFrame == root.tileFrames[i]) }
+        }
+    }
+
+    @Test func aStackedPaneKeepsItsBarOnItsOwnCardWhenThatBarGoes() {
+        withBorderless(false) {
+            let (root, _) = splitRoot(vertical: true)
+            root.autohidesBar = true
+            root.barHoldsAddress = true
+            root.layoutSubtreeIfNeeded()
+            let top = (frame: root.card.frame, band: root.card.band)
+            let lower = root.secondCard.frame
+            #expect(!root.secondCard.header.isInBar)
+            #expect(root.secondCard.pageTop == PaneHeaderView.height)
+            #expect(root.autohideTravel(at: 1) == PaneHeaderView.height)
+            root.setAutohideOffset(10, at: 1, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.autohideOffset(at: 1) == 10)
+            #expect(root.autohideOffset(at: 0) == 0)
+            // The card stays where it is; its strip slides up inside it and the page grows into the room.
+            #expect(root.secondCard.frame == lower)
+            #expect(root.secondCard.pageTop == PaneHeaderView.height - 10)
+            #expect(root.secondCard.header.frame.minY == root.secondCard.bounds.height - PaneHeaderView.height + 10)
+            #expect(root.card.frame == top.frame && root.card.band == top.band)
+        }
+    }
+
+    /// The scroll report knows which pane its page is in: a split's other bar stays exactly where it was.
+    @Test func aSplitScrollHidesOnlyItsOwnBar() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = [Tab(url: URL(string: "https://example.com/autohide/0")!, title: "A", spaceID: space),
+                    Tab(url: URL(string: "https://example.com/autohide/1")!, title: "B", spaceID: space)]
+        manager.adopt(tabs, in: space)
+        manager.makeSplit(tabs[0], with: tabs[1])
+        manager.select(tabs[0])
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.setTiles(manager.split(for: tabs[0])?.shape, animated: false)
+        root.layoutSubtreeIfNeeded()
+        let other = root.secondCard.frame
+
+        // The page's first report sets its place; the next one scrolls it far down.
+        controller.pageScrolled(to: 0, trusted: true, editing: false, inPane: 0, tab: tabs[0])
+        controller.pageScrolled(to: 500, trusted: true, editing: false, inPane: 0, tab: tabs[0])
+        #expect(root.autohideOffset(at: 0) > 0)
+        #expect(root.autohideOffset(at: 1) == 0)
+        #expect(root.secondCard.frame == other)
+
+        // The other pane scrolls: its own bar goes, and the first pane's is left where it was.
+        let first = root.autohideOffset(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false, inPane: 1, tab: tabs[1])
+        controller.pageScrolled(to: 500, trusted: true, editing: false, inPane: 1, tab: tabs[1])
+        #expect(root.autohideOffset(at: 1) > 0)
+        #expect(root.autohideOffset(at: 0) == first)
+    }
+
+    /// A page's scroll bar is one gesture from press to release: once that drag has taken the bar fully out, dragging
+    /// the same bar back up leaves it out. A fresh drag is a new gesture and brings it back.
+    @Test func aScrollBarDragThatClosedTheBarDoesNotReopenIt() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/autohide/scrollbar")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.layoutSubtreeIfNeeded()
+        let travel = root.autohideTravel(at: 0)
+        #expect(travel > 0)
+
+        // The drag starts at the top, then takes the bar all the way out.
+        controller.pageScrolled(to: 0, trusted: true, editing: false, dragging: true, inPane: 0, tab: tab)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false, dragging: true, inPane: 0, tab: tab)
+        #expect(root.autohideOffset(at: 0) == travel)
+
+        // The same drag comes back up: the bar stays out.
+        controller.pageScrolled(to: travel, trusted: true, editing: false, dragging: true, inPane: 0, tab: tab)
+        #expect(root.autohideOffset(at: 0) == travel)
+
+        // The drag ends; a fresh drag is a new gesture, and the same upward travel now brings it back.
+        controller.pageScrolled(to: travel, trusted: true, editing: false, dragging: false, inPane: 0, tab: tab)
+        controller.pageScrolled(to: travel, trusted: true, editing: false, dragging: true, inPane: 0, tab: tab)
+        controller.pageScrolled(to: travel - 12, trusted: true, editing: false, dragging: true, inPane: 0, tab: tab)
+        #expect(root.autohideOffset(at: 0) == travel - 12)
+    }
+
+    /// The bar comes back whole, not just its controls: the page card reaches up under it again, in the page's color,
+    /// and the bar itself is there. Both a jump and the pointer's animated reveal end in that state.
+    @Test func theBarComesBackWholeAfterAHide() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/autohide/whole")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.paintTopBar(.systemRed)
+        root.layoutSubtreeIfNeeded()
+        let openFrame = root.card.frame
+        let openBand = root.card.band
+        let openBar = root.topBar.frame
+        #expect(openBand > 0 && root.topBar.pageColor == .systemRed)
+
+        root.setBarPutAway(true, animated: false)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.band == 0)
+
+        root.setBarPutAway(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.frame == openFrame)
+        #expect(root.card.band == openBand)
+        #expect(root.topBar.frame == openBar && !root.topBar.isHidden)
+        #expect(root.topBar.pageColor == .systemRed)
+
+        // And the reveal the pointer asks for, which animates, leaves the same state behind.
+        root.setBarPutAway(true, animated: false)
+        root.setBarPutAway(false, animated: true)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.card.band == openBand)
+        #expect(root.topBar.frame == openBar && !root.topBar.isHidden)
+        #expect(root.topBar.pageColor == .systemRed)
+    }
+
     /// Borderless, the panes meet the bar in a straight line as ever, and the strips keep the bar's ink.
     @Test func borderlessThePanesStartUnderTheBar() {
         withBorderless(true) {
@@ -672,5 +876,129 @@ struct TopBarTests {
         address.layoutSubtreeIfNeeded()
         #expect(address.saveButton.isHidden)
         #expect(address.buttonsWidth < wide)
+    }
+
+    // MARK: Autohide (#359)
+
+    @Test func autohideIsBoundToThePagesPosition() {
+        let travel = TopBarView.height + inset
+        // The bar is the page's top edge: from the page's first point it travels with the page, so half the travel is
+        // half the bar out. There is no dead zone to scroll through first.
+        let half = AddressBarAutohide.step(offset: 0, pageDelta: travel / 2, travel: travel, locked: false)
+        #expect(half.offset == travel / 2 && !half.locked)
+        // Fully out and no further; reaching the end locks.
+        let away = AddressBarAutohide.step(offset: 0, pageDelta: travel * 2, travel: travel, locked: false)
+        #expect(away.offset == travel && away.locked)
+        #expect(AddressBarAutohide.step(offset: travel, pageDelta: 50, travel: travel, locked: false).offset == travel)
+        // A gesture that only opened it can bring it back at the same speed.
+        #expect(AddressBarAutohide.step(offset: 20, pageDelta: -12, travel: travel, locked: false).offset == 8)
+        #expect(AddressBarAutohide.step(offset: 20, pageDelta: -50, travel: travel, locked: false).offset == 0)
+        // A rubber-band above the top never puts it above its place.
+        #expect(AddressBarAutohide.step(offset: 0, pageDelta: -20, travel: travel, locked: false).offset == 0)
+    }
+
+    @Test func aGestureThatClosedTheBarDoesNotReopenIt() {
+        let travel = TopBarView.height + inset
+        let closed = AddressBarAutohide.step(offset: 0, pageDelta: travel * 2, travel: travel, locked: false)
+        #expect(closed.offset == travel && closed.locked)
+        // The same gesture leaves it out on the way back, however far the page comes up.
+        let stillOut = AddressBarAutohide.step(offset: closed.offset, pageDelta: -travel, travel: travel,
+                                               locked: closed.locked)
+        #expect(stillOut.offset == travel && stillOut.locked)
+        // A new gesture unlocks it: the next upward travel brings it back at the same speed.
+        let reopened = AddressBarAutohide.step(offset: travel, pageDelta: -12, travel: travel, locked: false)
+        #expect(reopened.offset == travel - 12 && !reopened.locked)
+    }
+
+    @Test func autohidePutsTheBarAwayAndTakesItsRoomOutOfThePage() {
+        withBorderless(false) {
+            let sidebar = SidebarView()
+            let root = BrowserRootView(sidebar: sidebar)
+            root.frame = window
+            sidebar.holdsAddress = false
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            root.barHoldsAddress = true
+            root.autohidesBar = true
+            root.showsTopBar = true
+            root.layoutSubtreeIfNeeded()
+            let shownPage = root.cardFrame
+            let shownFavorites = sidebar.favorites.frame.minY
+            #expect(root.barOnScreen && root.topBar.frame.minY == inset)
+
+            root.setBarPutAway(true, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.barPutAway && !root.barOnScreen)
+            // The bar sits just above the window; the page takes the row it had.
+            #expect(root.topBar.frame.maxY == 0)
+            // Its controls travel with it: the URL pill and the buttons don't stay over the page.
+            #expect(root.topBar.convert(root.topBar.pill.frame, to: root).maxY <= 0)
+            #expect(root.topBar.convert(sidebar.addressButtons[0].frame, to: root).maxY <= 0)
+            #expect(root.cardFrame.minY == inset && root.cardFrame.height == shownPage.height + bar)
+            // The sidebar's rows stay where they were: its top row is not under the pointer's reach any more than before.
+            #expect(sidebar.favorites.frame.minY == shownFavorites)
+
+            root.setBarPutAway(false, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.barOnScreen && root.cardFrame == shownPage)
+            #expect(sidebar.favorites.frame.minY == shownFavorites)
+        }
+    }
+
+    @Test func turningAutohideOffBringsTheBarBack() {
+        withBorderless(false) {
+            let sidebar = SidebarView()
+            let root = BrowserRootView(sidebar: sidebar)
+            root.frame = window
+            sidebar.holdsAddress = false
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            root.barHoldsAddress = true
+            root.autohidesBar = true
+            root.showsTopBar = true
+            root.layoutSubtreeIfNeeded()
+            root.setBarPutAway(true, animated: false)
+            #expect(root.barPutAway)
+            // The setting goes back to Off or Always while the bar is away: the bar comes back with it.
+            root.autohidesBar = false
+            root.layoutSubtreeIfNeeded()
+            #expect(!root.barPutAway && root.barOnScreen)
+            #expect(root.topBar.frame.minY == inset)
+            // The same when the address goes back to the sidebar first, as the setting changes it.
+            root.autohidesBar = true
+            root.setBarPutAway(true, animated: false)
+            root.barHoldsAddress = false
+            root.autohidesBar = false
+            root.layoutSubtreeIfNeeded()
+            #expect(!root.barPutAway)
+        }
+    }
+
+    @Test func autohideIsOnlyForABarThatHoldsTheAddress() {
+        let sidebar = SidebarView()
+        let root = BrowserRootView(sidebar: sidebar)
+        root.frame = window
+        root.autohidesBar = true
+        root.barHoldsAddress = false
+        root.showsTopBar = true
+        root.layoutSubtreeIfNeeded()
+        root.setBarPutAway(true, animated: false)
+        #expect(!root.barPutAway)
+        root.barHoldsAddress = true
+        root.autohidesBar = false
+        root.setBarPutAway(true, animated: false)
+        #expect(!root.barPutAway)
+    }
+
+    @Test func theOldSwitchIsAlwaysAndStillWrittenForAnOlderZigzag() throws {
+        let name = "TopBarTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(BrowserRootView.addressBarPlace(in: defaults) == .off)
+        defaults.set(true, forKey: "addressAbovePage")
+        #expect(BrowserRootView.addressBarPlace(in: defaults) == .always)
+        BrowserRootView.setAddressBarPlace(.autohide, in: defaults)
+        #expect(BrowserRootView.addressBarPlace(in: defaults) == .autohide)
+        #expect(defaults.bool(forKey: "addressAbovePage"))
+        BrowserRootView.setAddressBarPlace(.off, in: defaults)
+        #expect(defaults.object(forKey: "addressAbovePage") as? Bool == false)
     }
 }
