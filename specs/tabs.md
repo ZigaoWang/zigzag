@@ -99,6 +99,8 @@
   Test: TouchMovesTests.movingAwayFromTheMenuPicksItUp
 - A finger and the mouse drag a row the same way: reorder, into a folder, a split, another space.
   Test: TouchMovesTests.theMouseAndAFingerDriveTheSameDrag
+- A row carried by a finger out over the page → it keeps following the finger there until it lifts.
+  Test: SplitDragTests.theWindowFollowsTheFingerOverThePage
 - One finger sideways across the sidebar → the previous or next space, as two fingers on the trackpad; up and down scrolls.
   Test: TouchMovesTests.aFingerAcrossTheSidebarSwitchesSpaces
 - Pinch in on a page at its usual size → Show All Tabs; zoomed in, or pinching out, the page zooms. Pinch out on a card → it opens.

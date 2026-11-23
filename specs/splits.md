@@ -15,6 +15,10 @@
   Test: SplitCloseTests.aLinkDroppedOnThePageOpensATabNotASplit
 - Open in Split View in a tab's sidebar menu or the command bar → it opens on the right of the current page.
   Test: SplitCloseTests.openInSplitViewFromTheMenuOpensOnTheRight
+- Drag a tab or pinned row over the page → the half or quarter it would take is shaded, with a card naming the page and where it opens, kept clear of the pointer; it fades away off the page.
+  Test: SplitDragTests.theHintFadesAndNamesThePageComingIn
+- Touch and hold a tab, then drag it onto the page, across its menu or not → it opens there as with the mouse.
+  Test: SplitDragTests.aFingerPastTheMenuStillReachesThePage
 
 ## The split row
 - A split shows as one sidebar row with a part per page; clicking a part selects that page.
@@ -83,6 +87,8 @@
   Test: PaneHeaderTests.fewerButtonsAsItNarrows
 - Zoom on a strip (or ⇧⌘↩) → that pane fills the page; Zoom again puts it back.
   Test: PaneMoveTests.aPaneZoomsAndGoesBack
+- Drag a pane's strip with a finger → it moves or leaves the split as with the mouse, with the same preview naming it.
+  Test: SplitDragTests.aFingerDragsAPaneByItsStripAsTheMouseDoes
 - An http page in a pane → its strip's address shows the not-secure mark, as the sidebar's does.
   Test: PaneHeaderTests.anHttpPageIsMarkedNotSecure
 - A file or a Zigzag page (History, Settings) in a pane → its strip's address shows its name, never a cut "file:".
