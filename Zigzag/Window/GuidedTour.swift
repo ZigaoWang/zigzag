@@ -11,7 +11,7 @@ final class GuidedTour: NSView {
     private let card = FloatingPanelView()
     private let step = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let check = NSImageView()
-    private let title = Label("", font: .systemFont(ofSize: 22, weight: .semibold), color: Tokens.Color.textPrimary)
+    private let title = Label("", font: .systemFont(ofSize: Tokens.TypeSize.display, weight: .semibold), color: Tokens.Color.textPrimary)
     private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var caps: [(ColorView, Label)] = []
     private let skip = PillButton(title: String(localized: "Skip", comment: "Button in the getting-started guide, a card in the window: skips the step."), style: .quiet)
@@ -470,7 +470,7 @@ final class GuidedTour: NSView {
         note.isHidden = d.isFinal || d.note.isEmpty
         [wordmark, letter, signature].forEach { $0.isHidden = !d.isFinal }
         title.alignment = d.isFinal ? .center : .left
-        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : .systemFont(ofSize: 22, weight: .semibold)
+        title.font = d.isFinal ? Brand.displayFont(Tokens.TypeSize.display) : .systemFont(ofSize: Tokens.TypeSize.display, weight: .semibold)
         if animated {
             let fade = CATransition()
             fade.type = .fade

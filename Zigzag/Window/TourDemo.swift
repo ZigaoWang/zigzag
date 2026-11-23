@@ -162,7 +162,7 @@ final class TourDemo {
             // The key, held: a small cap just past the pointer, in the guide's dark.
             let label = CATextLayer()
             label.string = key
-            label.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+            label.font = Tokens.Font.body(.semibold)
             label.fontSize = 13
             label.alignmentMode = .center
             label.foregroundColor = .white
