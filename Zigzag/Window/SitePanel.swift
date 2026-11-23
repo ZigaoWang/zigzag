@@ -406,8 +406,8 @@ final class SitePanel: FloatingPanelView {
         // Zigzag Mini and an app's window (`pageHost`) have the page's own actions: sharing, the link and Picture in Picture.
         guard controller != nil || pageHost != nil else { return }
         let readerOn = controller?.isShowingReader ?? false
-        // (symbol, caption, full name for the tooltip and VoiceOver, on, action)
-        var specs: [(String, String, String, Bool, () -> Void)] = []
+        // (symbol, caption, full name for the tooltip and VoiceOver, on, action, the menu bar item whose keys the tooltip shows)
+        var specs: [(String, String, String, Bool, () -> Void, Selector?)] = []
         let share = String(localized: "Share", comment: "Action in the site panel: shares the page.")
         specs.append(("square.and.arrow.up", share, share, false, { [weak self] in
             guard let self else { return }
@@ -416,22 +416,22 @@ final class SitePanel: FloatingPanelView {
             if let controller = self.controller { controller.sharePage(nil); return }
             guard let opener else { return }
             NSSharingServicePicker(items: [CleanLink.clean(url) as NSURL]).show(relativeTo: opener.bounds, of: opener, preferredEdge: .minY)
-        }))
+        }, #selector(BrowserWindowController.sharePage(_:))))
         let copyLink = String(localized: "Copy Link", comment: "Action in the site panel: copies the page's address.")
         specs.append(("link", copyLink, copyLink, false, { [weak self] in
             guard let self else { return }
             if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.pageHost?.copyPageURL(nil) }
             self.close()
-        }))
+        }, #selector(BrowserWindowController.copyPageURL(_:))))
         if let controller, controller.capture.canBegin, !readerOn {
             specs.append(("camera.viewfinder",
                           String(localized: "Capture", comment: "Action in the site panel, under its icon: takes a screenshot of the whole page."),
-                          String(localized: "Capture an Area, an Element or the Whole Page (⇧⌘2)", comment: "Tooltip of the Capture action in the site panel."),
+                          String(localized: "Capture an Area, an Element or the Whole Page", comment: "Tooltip of the Capture action in the site panel; its keyboard shortcut follows."),
                           false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
                 controller.capture.begin()
-            }))
+            }, #selector(BrowserWindowController.takePageScreenshot(_:))))
         }
         // Always here, as in the menu, for when the offer went by or never came: a page that's already in your
         // language says so, and a translated one goes back to its original.
@@ -439,12 +439,12 @@ final class SitePanel: FloatingPanelView {
         if controller != nil { specs.append(("translate",
                       tab.isTranslated ? String(localized: "Original", comment: "Action in the site panel, under its icon: shows the translated page as it was.") : translate,
                       tab.isTranslated ? String(localized: "Show Original", comment: "Tooltip of the Original action in the site panel.") : translate,
-                      tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() })) }
+                      tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }, #selector(BrowserWindowController.translatePage(_:)))) }
         if controller != nil, tab.isArticle || readerOn {
             specs.append(("doc.plaintext", String(localized: "Reader", comment: "Action in the site panel, under its icon: opens or closes Reader."),
                           readerOn ? String(localized: "Hide Reader", comment: "Tooltip of the Reader action in the site panel, while Reader is on.")
                                    : String(localized: "Show Reader", comment: "Tooltip of the Reader action in the site panel."),
-                          readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
+                          readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }, #selector(BrowserWindowController.toggleReader(_:))))
         }
         let floating = tab.webView?.isPictureInPictureActive ?? false
         if floating || tab.webView?.canTogglePictureInPicture ?? false {
@@ -455,12 +455,12 @@ final class SitePanel: FloatingPanelView {
                 guard let self else { return }
                 if let controller = self.controller { controller.togglePictureInPicture(nil) } else { self.tab.webView?.togglePictureInPicture() }
                 self.close()
-            }))
+            }, controller != nil ? #selector(BrowserWindowController.togglePictureInPicture(_:)) : nil))
         }
-        actionTiles = specs.map { symbol, caption, title, on, run in
-            // The panel's own short action words; the tooltip and VoiceOver keep the full name.
+        actionTiles = specs.map { symbol, caption, title, on, run, action in
+            // The panel's own short action words; the tooltip and VoiceOver keep the full name, the tooltip with its keys.
             let tile = PanelTile(symbol: symbol, caption: caption)
-            tile.toolTip = title
+            tile.toolTip = action.map { Shortcuts.tooltip(title, for: $0) } ?? title
             tile.setAccessibilityLabel(title)
             tile.isOn = on
             tile.onClick = { _ in run() }

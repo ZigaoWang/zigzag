@@ -5904,13 +5904,13 @@
         }
       }
     },
-    "Capture an Area, an Element or the Whole Page (⇧⌘2)" : {
-      "comment" : "Tooltip of the Capture action in the site panel.",
+    "Capture an Area, an Element or the Whole Page" : {
+      "comment" : "Tooltip of the Capture action in the site panel; its keyboard shortcut follows.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "截取区域、元素或整个页面（⇧⌘2）"
+            "value" : "截取区域、元素或整个页面"
           }
         }
       }
