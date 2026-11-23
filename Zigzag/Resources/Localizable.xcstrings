@@ -19275,7 +19275,7 @@
       }
     },
     "Show Sidebar" : {
-      "comment" : "Menu bar item: shows the sidebar.\nTooltip of the sidebar button while the sidebar is hidden.",
+      "comment" : "Accessibility label of the touch grabber that shows the hidden sidebar.\nMenu bar item: shows the sidebar.\nTooltip of the sidebar button while the sidebar is hidden.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

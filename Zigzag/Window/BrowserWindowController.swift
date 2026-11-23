@@ -142,6 +142,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.tabManager.switchSpace(by: offset)
             return before != self.tabManager.currentSpaceID
         }
+        // A finger up or down from the touch grabber: the space before or after, named beside the grabber.
+        root.onGrabberSpace = { [weak self] offset in
+            guard let self else { return false }
+            let before = self.tabManager.currentSpaceID
+            self.tabManager.switchSpace(by: offset)
+            let now = self.tabManager.currentSpaceID
+            guard before != now, let space = Library.shared.spaces.first(where: { $0.id == now }) else { return false }
+            Toast.show(space.name, over: self.root.overlay, area: self.root.grabberToastArea, leading: true)
+            return true
+        }
         sidebar.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         // Right-click Back or Forward: the pages that way, to jump several at once.
