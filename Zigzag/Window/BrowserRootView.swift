@@ -11,8 +11,7 @@ enum AddressBarPlace: String, CaseIterable {
     var menuIndex: Int { Self.allCases.firstIndex(of: self) ?? 0 }
 }
 
-/// How Autohide moves the bar (#359). The bar's place is a position, not an animation: it is the page's top edge, so
-/// a scroll report moves it by the same amount the page moved, from the very first point, with no dead zone.
+/// How Autohide moves the bar: by the page's own movement, from its first point (#359).
 enum AddressBarAutohide {
     struct Step: Equatable {
         var offset: CGFloat
@@ -1185,10 +1184,7 @@ final class BrowserRootView: SpaceFrameView {
                       onRight: sidebarOnRight)
     }
 
-    /// Where the pages go. With the bar above the page, they start under it: framed, the bar stands in for the gap
-    /// above the page; borderless or edge to edge, the page meets it in a straight line, as Zigzag Mini's meets its strip.
-    /// `barOffset`: how far Autohide has taken the bar out; the page's top follows it, never above the area's own top.
-    /// `onRight`: the sidebar is on the right, and the page is the mirror image of its place beside a left one.
+    /// Where the pages go: under the bar, or up into its room as Autohide takes it out (#359).
     static func pageArea(in bounds: NSRect, sidebarVisible: Bool, sidebarWidth: CGFloat, edgeToEdge: Bool, borderless: Bool, topBar: Bool,
                          barInset: CGFloat = 0, barOffset: CGFloat = 0, onRight: Bool = false) -> NSRect {
         let inset = Tokens.Metric.cardInset
@@ -1204,12 +1200,8 @@ final class BrowserRootView: SpaceFrameView {
         }
         area = mirrored(area, in: bounds, if: onRight)
         guard topBar else { return area }
-        let bottom = area.maxY
-        let base = area.minY
-        area.origin.y = base
-        area.size.height = max(0, bottom - base)
-        let top = max(base, bounds.minY + barInset + TopBarView.height - barOffset)
-        area.size.height = max(0, bottom - top)
+        let top = max(area.minY, bounds.minY + barInset + TopBarView.height - barOffset)
+        area.size.height = max(0, area.maxY - top)
         area.origin.y = top
         return area
     }
@@ -1743,21 +1735,14 @@ final class BrowserRootView: SpaceFrameView {
         showsTopBar && barHoldsAddress && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
     }
 
-    /// Autohide: moves the bar out or back by `offset`, the page's top following it by the same amount (#359). Only
-    /// while it holds the address; a page's own tools in the bar keep it where it is. Putting it away is Autohide's
-    /// alone; bringing it back is always allowed, so turning the setting off or giving the address back to the
-    /// sidebar can never leave the bar above the window.
-    ///
-    /// Scrolling passes `animated: false`: the bar's place is the page's position, so it moves with the page, not on
-    /// a drawer animation of its own. The setting and the sidebar's toggle still glide.
+    /// Moves the bar and the page's top by `offset`; only Autohide may put it away (#359).
     func setBarOffset(_ offset: CGFloat, animated: Bool) {
         guard showsTopBar else { return }
         guard tiles == nil else {
-            // A split has no single bar: move each pane's own, as far as its own bar can go. Like one page's bar,
-            // only Autohide may put it away; bringing it back is always allowed.
+            // A split moves each pane's own bar; only Autohide may put it away.
             let target = autohidesBar && barHoldsAddress ? max(0, offset) : 0
             for index in 0..<autohidePaneCount {
-                setAutohideOffset(min(target, autohideTravel(at: index)), at: index, animated: animated)
+                setAutohideOffset(min(target, autohideTravel(at: index)), at: index)
             }
             return
         }
@@ -1777,8 +1762,7 @@ final class BrowserRootView: SpaceFrameView {
         refreshGlassFrame()
         refreshGlassOcclusion()
         guard animated, window != nil, !Tokens.Motion.reduceMotion else { return }
-        // Back where it was, then the bar and the page travel together: the page's top moves by as much as the bar
-        // does, so nothing is left behind as a hole.
+        // The bar and the page travel together, so nothing is left behind as a hole.
         let curve = Tokens.Motion.Role.drawer.curve(entering: target < was)
         Tokens.Motion.withoutAnimation {
             topBar.frame = oldBar
@@ -1815,8 +1799,8 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// Moves one pane's bar in a split, its page following by the same amount. The other panes keep their bars.
-    func setAutohideOffset(_ offset: CGFloat, at index: Int, animated: Bool) {
-        guard tiles != nil else { setBarOffset(offset, animated: animated); return }
+    func setAutohideOffset(_ offset: CGFloat, at index: Int) {
+        guard tiles != nil else { setBarOffset(offset, animated: false); return }
         guard paneCards.indices.contains(index) else { return }
         ensurePaneBarOffsets()
         let target = min(max(offset, 0), autohideTravel(at: index))
@@ -1826,10 +1810,7 @@ final class BrowserRootView: SpaceFrameView {
         layoutSubtreeIfNeeded()
         refreshGlassFrame()
         refreshGlassOcclusion()
-        // Scrolling is the page's own speed, with no animation of its own. A reveal at the window's top moves at
-        // once in a split too: one shared row cannot glide some of its strips while the others stay; `animated` is
-        // kept for callers that ask, and the whole row changes together.
-        _ = animated
+        // A split's row changes together; only the single-page bar (setBarOffset) animates.
     }
 
     private func ensurePaneBarOffsets() {

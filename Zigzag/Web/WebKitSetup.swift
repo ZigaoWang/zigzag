@@ -315,10 +315,7 @@ enum PageScripts {
     """
 }
 
-/// Where the page is, on the person's own scrolls, for Autohide (#359): the bar goes after a scroll down and comes
-/// back at the top or on any scroll up. A page that scrolls itself (a lazy feed, a chat jumping to a message) says
-/// `trusted: false`; the window ignores it. Only the main frame's scroll counts, and only a report's last place is
-/// kept: a page can scroll faster than the window needs to know.
+/// The page's own scrolls for Autohide: one report a frame, from the main frame only (#359).
 final class ScrollMessages: NSObject, WKScriptMessageHandler {
     static let shared = ScrollMessages()
     static let messageName = "zigzagScroll"

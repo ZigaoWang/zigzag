@@ -613,7 +613,7 @@ struct TopBarTests {
             let travel = root.autohideTravel(at: 0)
             #expect(travel == root.topBarFrame.maxY)
             let half = travel / 2
-            root.setAutohideOffset(half, at: 0, animated: false)
+            root.setAutohideOffset(half, at: 0)
             root.layoutSubtreeIfNeeded()
             #expect(root.autohideOffset(at: 0) == half)
             #expect(root.autohideOffset(at: 1) == 0)
@@ -638,7 +638,7 @@ struct TopBarTests {
             root.barHoldsAddress = true
             root.layoutSubtreeIfNeeded()
             let other = root.secondCard.frame
-            root.setAutohideOffset(root.autohideTravel(at: 0), at: 0, animated: false)
+            root.setAutohideOffset(root.autohideTravel(at: 0), at: 0)
             root.layoutSubtreeIfNeeded()
             #expect(root.autohideOffset(at: 0) == root.autohideTravel(at: 0))
             #expect(root.autohideOffset(at: 1) == 0)
@@ -649,7 +649,7 @@ struct TopBarTests {
             #expect(root.card.header.isInBar)
             #expect(root.card.header.convert(root.card.header.bounds, to: root).maxY <= 0)
             // Only when every pane's own bar is away is the row put away.
-            root.setAutohideOffset(root.autohideTravel(at: 1), at: 1, animated: false)
+            root.setAutohideOffset(root.autohideTravel(at: 1), at: 1)
             root.layoutSubtreeIfNeeded()
             #expect(root.barPutAway && !root.barOnScreen)
             #expect(root.secondCard.header.isInBar)
@@ -673,7 +673,7 @@ struct TopBarTests {
             #expect(!root.secondCard.header.isInBar)
             #expect(root.secondCard.pageTop == PaneHeaderView.height)
             #expect(root.autohideTravel(at: 1) == PaneHeaderView.height)
-            root.setAutohideOffset(10, at: 1, animated: false)
+            root.setAutohideOffset(10, at: 1)
             root.layoutSubtreeIfNeeded()
             #expect(root.autohideOffset(at: 1) == 10)
             #expect(root.autohideOffset(at: 0) == 0)
@@ -1237,6 +1237,29 @@ struct TopBarTests {
         root.autohidesBar = false
         root.setBarPutAway(true, animated: false)
         #expect(!root.barPutAway)
+    }
+
+    @Test func theThreeAddressBarChoicesPlaceTheBar() {
+        let before = BrowserRootView.addressBarPlace
+        defer { BrowserRootView.addressBarPlace = before }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/places")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        BrowserRootView.addressBarPlace = .off
+        controller.placeAddress()
+        #expect(!root.barHoldsAddress && !root.autohidesBar && !root.showsTopBar)
+        BrowserRootView.addressBarPlace = .autohide
+        controller.placeAddress()
+        #expect(root.barHoldsAddress && root.autohidesBar && root.showsTopBar)
+        BrowserRootView.addressBarPlace = .always
+        controller.placeAddress()
+        #expect(root.barHoldsAddress && !root.autohidesBar && root.showsTopBar)
     }
 
     @Test func theOldSwitchIsAlwaysAndStillWrittenForAnOlderZigzag() throws {

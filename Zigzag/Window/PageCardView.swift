@@ -49,14 +49,10 @@ final class PageCardView: NSView {
     var headerOffset: CGFloat = 0 { didSet { if headerOffset != oldValue { needsLayout = true } } }
     /// The part of the strip that's still on the card, as it slides out.
     private var shownHeaderOffset: CGFloat { min(max(headerOffset, 0), PaneHeaderView.height) }
-    /// Under the bar above the page, the card's top this tall is the bar's: the page starts under it, and the card's
-    /// ground shows there in the page's own color (`ground`), so the bar and the page read as one card: its
-    /// corners, edge and shadow are the card's, and it moves with it.
+    /// The card's top under the bar, in the page's ground, so the bar and page read as one card.
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
 
-    /// Moves the band from where it is to `target` on `curve`: Autohide slides the bar up and the page's top by the
-    /// same amount, so the page and the bar travel as one. The page keeps its place for the first frame and glides to
-    /// the new one on the render server, with the card's own frame when that changes too.
+    /// Moves the band to `target`, the page and bar gliding together.
     func moveBand(to target: CGFloat, with curve: Tokens.Motion.Curve) {
         guard band != target else { return }
         let fromFrame = frame
@@ -93,17 +89,12 @@ final class PageCardView: NSView {
     /// The page's own color (`Tab.pageColor`), for the card's ground and what lies on it. None for a page at a
     /// size of its own: it stands on plain ground, so its edges show.
     var pageColor: NSColor? { pageSize == nil ? (webView as? BrowserWebView)?.owner?.pageColor : nil }
-    /// The page's color as a card can wear it: a page can give a clear color for its background (a transparent
-    /// theme, a page WebKit hasn't painted yet), and a card drawn in it would be a hole with the page's own
-    /// contents showing through where the bar's band should be. Clear is no color here.
+    /// The page's colour, unless clear: a card cannot be a hole for the page behind it.
     private var solidPageColor: NSColor? {
         guard let pageColor, pageColor.alphaComponent > 0.01 else { return nil }
         return pageColor
     }
-    /// The card's color wherever the page isn't: the page's own, so a split's two cards each have theirs; the plain
-    /// card's with no page, under what covers it, or around a page at a size of its own.
-    /// Around a page at a size of its own, the backdrop a PDF's pages lie on: the page reads as a sheet on it, as a
-    /// device's screen does in a responsive view, whatever color the page is.
+    /// The card's ground: the page's own colour, a PDF's backdrop, or the plain card.
     private var ground: NSColor { solidPageColor ?? (pageSize != nil ? Tokens.Color.pdfBackdrop : Tokens.Color.cardBackground) }
     /// A hairline around a page at a size of its own, so its edges show on any backdrop, light page or dark.
     private let pageOutline = ColorView(color: Tokens.Color.cardEdge)
