@@ -61,11 +61,12 @@ targets:
       - path: Zigzag
         # Notes for whoever works on the design, not for the app.
         excludes: [Design/DESIGN.md]
-      # The release notes the app shows after an update: this version's section of the changelog, in Chinese
-      # from the Chinese changelog when the app speaks Chinese.
+      # The release notes the app shows after an update: this version's section of the changelog in the app's language.
       - path: CHANGELOG.md
         buildPhase: resources
       - path: CHANGELOG.zh-Hans.md
+        buildPhase: resources
+      - path: CHANGELOG.zh-Hant.md
         buildPhase: resources
       # The licenses About Zigzag › Acknowledgments shows: the same files as the repository's, never a copy.
       - path: LICENSE
@@ -102,7 +103,7 @@ targets:
         # The languages Zigzag speaks, so macOS offers them in Language & Region and the frameworks' own words
         # (Sparkle's update windows) follow. A language joins only once its catalogs are fully translated; xcodegen
         # adds it to the project's known regions from the catalogs themselves.
-        CFBundleLocalizations: [en, zh-Hans]
+        CFBundleLocalizations: [en, zh-Hans, zh-Hant]
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
         CFBundleIconName: AppIcon
         CFBundleName: $(APP_DISPLAY_NAME)

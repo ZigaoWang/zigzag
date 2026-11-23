@@ -58,6 +58,7 @@
 	<array>
 		<string>en</string>
 		<string>zh-Hans</string>
+		<string>zh-Hant</string>
 	</array>
 	<key>CFBundleName</key>
 	<string>$(APP_DISPLAY_NAME)</string>

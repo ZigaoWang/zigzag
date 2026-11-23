@@ -2,8 +2,7 @@ import AppKit
 import WebKit
 
 /// After an update: a note that Zigzag updated, and this version's notes on a sheet. The notes are this version's
-/// section of CHANGELOG.md, the same section the update window, the GitHub release and the website show, or of
-/// CHANGELOG.zh-Hans.md when the app speaks Chinese.
+/// section of CHANGELOG.md, or of the matching localized changelog when the app speaks Chinese.
 enum WhatsNew {
     /// A GitHub issue or pull request a note is about: "#32" at its end, linked.
     struct Issue: Equatable {
@@ -32,7 +31,7 @@ enum WhatsNew {
     static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
 
     /// This version's notes, read once from the copies of the changelog in the app: in the app's language when
-    /// that has notes for it (CHANGELOG.zh-Hans.md), in English otherwise.
+    /// that has notes for it, in English otherwise.
     static let release: Release = {
         func text(_ name: String) -> String? {
             Bundle.main.url(forResource: name, withExtension: "md").flatMap { try? String(contentsOf: $0, encoding: .utf8) }
@@ -44,7 +43,9 @@ enum WhatsNew {
     /// The changelog in the app's language, next to CHANGELOG.md in the app: none for English, and none for a
     /// language without one.
     static func notesFile(for language: String) -> String? {
-        Locale(identifier: language).language.languageCode?.identifier == "zh" ? "CHANGELOG.zh-Hans" : nil
+        let localeLanguage = Locale.Language(identifier: language)
+        guard localeLanguage.languageCode?.identifier == "zh" else { return nil }
+        return localeLanguage.script?.identifier == "Hant" ? "CHANGELOG.zh-Hant" : "CHANGELOG.zh-Hans"
     }
 
     /// The notes in the app's language when its changelog has this version, in English when it doesn't, so a
@@ -62,7 +63,7 @@ enum WhatsNew {
     static func heading(_ title: String) -> String {
         switch title {
         case "New", "新功能": String(localized: "New", comment: "Heading in What’s New: the new things in this version.")
-        case "Fixed", "修复": String(localized: "Fixed", comment: "Heading in What’s New: what this version fixes.")
+        case "Fixed", "修复", "修正": String(localized: "Fixed", comment: "Heading in What’s New: what this version fixes.")
         default: title
         }
     }
