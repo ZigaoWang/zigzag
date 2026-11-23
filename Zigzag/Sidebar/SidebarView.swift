@@ -562,6 +562,8 @@ final class AddressView: InteractiveView {
     private var wantsCapture = false
     /// The buttons drawn in the field, those leaving aside.
     private var drawn = Set<ObjectIdentifier>()
+    /// The host's text at the last reflow.
+    private var reflowedText: String?
 
     /// Works out what fits and puts everything in its place. The one place the field is laid out, so a button and the
     /// text beside it never disagree; when nothing changed it does nothing, as it runs throughout a page load.
@@ -570,6 +572,9 @@ final class AddressView: InteractiveView {
         if buttonsOnly, abs(buttonsWidth - bounds.width) > 0.5 { superview?.needsLayout = true }
         // While a pin is carried the places are held still; the drop catches up.
         guard bounds.width > 0, pinDrag == nil else { return }
+        // A new page's host is placed at once; it glides only on the page it was on.
+        let textChanged = label.stringValue != reflowedText
+        reflowedText = label.stringValue
         let animated = requested && window != nil && !Tokens.Motion.isFromKey
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         // Unframed, the buttons reach the ends, like the bar's other buttons.
@@ -616,16 +621,32 @@ final class AddressView: InteractiveView {
         // A mark appearing starts in its place rather than flying in from the corner.
         if lock.frame.width == 0 { lock.frame = lockFrame }
         guard label.frame != labelFrame || lock.frame != lockFrame else { return }
-        if animated && label.frame.width > 0 {
+        if animated, let start = Self.labelGlideStart(from: label.frame, to: labelFrame, sameText: !textChanged) {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0
+                label.animator().frame = start
+            }
             Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) {
                 self.label.animator().frame = labelFrame
                 self.lock.animator().frame = lockFrame
             }
         } else {
-            label.frame = labelFrame
-            lock.frame = lockFrame
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0
+                label.animator().frame = labelFrame
+                lock.animator().frame = lockFrame
+            }
         }
     }
+
+    /// Start of a glide to `new`, nil to place it at once: same text moving right, its end already at `new`'s.
+    static func labelGlideStart(from old: NSRect, to new: NSRect, sameText: Bool) -> NSRect? {
+        guard sameText, old.width > 0, new.minX > old.minX + 0.5 else { return nil }
+        return NSRect(x: old.minX, y: new.minY, width: new.maxX - old.minX, height: new.height)
+    }
+
+    /// The host's frame as laid out.
+    var labelFrame: NSRect { label.frame }
 
     private func place(_ button: IconButton, at frame: NSRect, animated: Bool) {
         guard drawn.insert(ObjectIdentifier(button)).inserted else {
