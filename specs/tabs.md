@@ -111,7 +111,21 @@
   Test: TouchMovesTests.aFingerAcrossTheSidebarSwitchesSpaces
 - Pinch in on a page at its usual size → Show All Tabs; zoomed in, or pinching out, the page zooms. Pinch out on a card → it opens.
   Test: TouchMovesTests.pinchingInAtTheUsualSizeOpensTheOverview
-- A finger in from a page's left edge → Back; from its right edge → Forward, when the Mac's touch setting and Zigzag's allow swiping.
-  Test: TouchMovesTests.theEdgesGoBackAndForward
+- Two fingers sideways on a page → Back or Forward with the trackpad swipe's arrow, when the Mac's touch setting and Zigzag's allow swiping.
+  Test: TouchMovesTests.twoFingersOnAPageGoBackAndForward
+- One finger on a page is the page's, two go back or forward, three switch spaces; each decides only after the fingers have moved ten points.
+  Test: TouchMovesTests.fingersOnAPageRouteByCount
+- Three fingers sideways on a page → the previous or next space, sliding with the fingers as across the sidebar, with the sidebar hidden too.
+  Test: TouchMovesTests.threeFingersOnAPageSwitchSpaces
+- Two fingers sideways across the sidebar → the previous or next space, as one does.
+  Test: TouchMovesTests.theSwipesAreTouchOnly
+- Sidebar hidden, a finger in from the page's edge → the sidebar slides out under it; let go a third of the way out or with a flick and it stays, otherwise it slides back.
+  Test: TouchMovesTests.aFingerFromTheEdgePullsOutTheSidebar
+- Out by a finger, the sidebar stays until a tap on the page, a tab is picked, a finger on the page swipes it back, or the pointer moves.
+  Test: TouchMovesTests.theEdgeRules
+- Tap just beside the sidebar toggle in the bar above the page → it shows the sidebar; a mouse click there is still the bar's.
+  Test: TouchMovesTests.theBarsToggleTakesAFingerBesideIt
 - A finger dragging a page sideways → it scrolls, never Back or Forward.
   Test: TouchMovesTests.aFingerDraggingThePageIsNotATrackpadSwipe
+- The trackpad's swipes, the pointer at the window's edge and the sidebar toggles work as before alongside all of it.
+  Test: TouchMovesTests.theTrackpadsScrollsAreNotClaimed
