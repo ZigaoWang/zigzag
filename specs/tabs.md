@@ -129,9 +129,9 @@
   Test: TouchMovesTests.aFingerFromTheEdgePullsOutTheSidebar
 - A finger landing on the window's outer 12 points is left to macOS, which resizes the window there; the pull starts from 12 to 40 points in from the page's edge.
   Test: TouchMovesTests.theEdgeRules
-- Sidebar hidden and a finger used in the window in the last 15 minutes → a small grabber shows at the window's edge on the sidebar's side, 8 points in, centered on the page; the pointer moving, or the sidebar shown, hides it.
+- Sidebar hidden and a finger used in the window in the last 15 minutes → a small grabber shows at the window's edge on the sidebar's side, 14 points in, centered on the page; the pointer moving, or the sidebar shown, hides it.
   Test: TouchMovesTests.theGrabberShowsForARecentFinger
-- The grabber sits on the sidebar's side, left or right, and takes a finger in a 44 by 88 point box.
+- The grabber sits on the sidebar's side, left or right, and takes a finger in a 44 by 100 point box, clear of the window's outer 12 points.
   Test: TouchMovesTests.theGrabberSitsInsetOnTheSidebarsSide
 - Tap the grabber → the sidebar slides out and stays, as after a finger's pull; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
   Test: TouchMovesTests.aTapOnTheGrabberBringsTheSidebarOutToStay
