@@ -1711,8 +1711,8 @@ final class SeparatorRowView: NSView {
     }
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
-    /// Shown under the pointer, or while Tab has brought keyboard focus to it.
-    private var clearShown: Bool { (showsClear || clearButton.hasKeyboardFocus) && hasTabs }
+    /// Shown under the pointer, after a tap on the label's row, or while Tab has brought keyboard focus to it.
+    private var clearShown: Bool { (showsClear || touchRevealed || clearButton.hasKeyboardFocus) && hasTabs }
     /// When Clear last came into view. A click right as it appears was meant for whatever was under the pointer
     /// a moment before (New Tab, just below), so it counts only once Clear has been there a beat.
     private var clearShownAt = Date.distantPast
@@ -1738,6 +1738,26 @@ final class SeparatorRowView: NSView {
         }
         clearButton.hoverChanged = { [weak self] _ in self?.previewChanged() }
         addSubview(clearButton)
+        if TouchGestures.isAvailable { addTouchWatch() }
+    }
+
+    // MARK: Touch
+
+    /// Shown by a tap as hovering the list shows it (`TouchReveal`).
+    private(set) var touchRevealed = false { didSet { if touchRevealed != oldValue { refreshClear() } } }
+
+    /// A tap on the row, once AppKit's click from it has gone through: Clear shows, as over the list.
+    func touchTapped() {
+        touchRevealed = true
+        var area: NSView? = superview
+        while let current = area, !(current is SidebarView) { area = current.superview }
+        TouchReveal.reveal(self, keptWithin: area) { [weak self] in self?.touchRevealed = false }
+    }
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onTap = { [weak self] _ in self?.touchTapped() }
+        addGestureRecognizer(watch)
     }
 
     required init?(coder: NSCoder) { fatalError() }

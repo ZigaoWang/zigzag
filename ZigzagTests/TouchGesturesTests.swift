@@ -223,6 +223,37 @@ struct TouchGesturesTests {
         TouchReveal.finish()
     }
 
+    @Test func aTapShowsAnOpenFavoritesClose() {
+        #expect(FavoriteTile.showsClose(open: true, hovered: true, numbered: false, placeholder: false))
+        #expect(!FavoriteTile.showsClose(open: false, hovered: true, numbered: false, placeholder: false))
+        #expect(!FavoriteTile.showsClose(open: true, hovered: false, numbered: false, placeholder: false))
+        #expect(!FavoriteTile.showsClose(open: true, hovered: true, numbered: true, placeholder: false))
+        let tile = FavoriteTile(bookmark: Bookmark(url: URL(string: "https://example.com/")!, title: "E"))
+        tile.frame = NSRect(x: 0, y: 0, width: 60, height: Tokens.Sidebar.favoriteHeight)
+        tile.touchTapped()
+        #expect(tile.touchRevealed && TouchReveal.isRevealed(tile))
+        // A finger landing elsewhere puts it away, as for a row.
+        TouchReveal.touchLanded(mouse(.leftMouseDown, at: NSPoint(x: 400, y: 400)))
+        #expect(!tile.touchRevealed)
+        // The pointer coming over it: hover takes over.
+        tile.touchTapped()
+        tile.mouseEntered(with: NSEvent.enterExitEvent(with: .mouseEntered, location: NSPoint(x: 10, y: 10), modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, trackingNumber: 0, userData: nil)!)
+        #expect(!tile.touchRevealed)
+        TouchReveal.finish()
+    }
+
+    @Test func aTapShowsClearAboveTheTabs() {
+        let separator = SeparatorRowView(frame: NSRect(x: 0, y: 0, width: 240, height: 34))
+        separator.hasTabs = true
+        separator.layoutSubtreeIfNeeded()
+        #expect(separator.clearButton.isHidden)
+        separator.touchTapped()
+        #expect(separator.touchRevealed && !separator.clearButton.isHidden)
+        TouchReveal.touchLanded(mouse(.leftMouseDown, at: NSPoint(x: 400, y: 400)))
+        #expect(!separator.touchRevealed)
+        TouchReveal.finish()
+    }
+
     @Test func theRevealRules() {
         #expect(TouchReveal.keeps(touchInArea: true, sameWindow: true))
         #expect(!TouchReveal.keeps(touchInArea: false, sameWindow: true))

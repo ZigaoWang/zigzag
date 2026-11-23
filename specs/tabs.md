@@ -95,6 +95,10 @@
   Test: TouchGesturesTests.aTapShowsARowsButtonsUntilThePointerOrAFingerElsewhere
 - Tap just beside a row's showing × → the tab closes; a mouse click there is still the row's.
   Test: TouchGesturesTests.aFingerNearTheCloseButtonCloses
+- Tap an open favorite → its × shows, as hovering shows it, until a finger lands outside the sidebar, something else is tapped, or the pointer moves over it.
+  Test: TouchGesturesTests.aTapShowsAnOpenFavoritesClose
+- Tap the Tabs label above today's tabs → Clear shows, as hovering the list shows it, until a finger lands outside the sidebar or the pointer comes over the list.
+  Test: TouchGesturesTests.aTapShowsClearAboveTheTabs
 - Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.
   Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
 - Touch and hold a row, slide onto its menu without lifting → the item under the finger lights; lift on it → it runs.

@@ -915,7 +915,11 @@ final class SidebarListView: NSView {
         hoverArea = area
     }
 
-    override func mouseEntered(with event: NSEvent) { isPointerInside = true }
+    override func mouseEntered(with event: NSEvent) {
+        isPointerInside = true
+        // Clear shown by a tap: hover takes over.
+        if let separator = rows[.separator] { TouchReveal.pointerMoved(over: separator) }
+    }
     #if DEBUG
     func debugHover(_ on: Bool) { isPointerInside = on }
     /// Hover on or off Clear dims the rows it would close. Returns the tooltip.
