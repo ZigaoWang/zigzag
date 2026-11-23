@@ -16298,7 +16298,7 @@
         }
       }
     },
-    "Point your phone's camera at the code to open this page there." : {
+    "Point your phone’s camera at the code to open this page there." : {
       "comment" : "Under the title of the Open on Your Phone sheet of the developer tools.",
       "localizations" : {
         "zh-Hans" : {
@@ -26417,7 +26417,7 @@
         }
       }
     },
-    "Where It's Pinned" : {
+    "Where It’s Pinned" : {
       "comment" : "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to.",
       "localizations" : {
         "zh-Hans" : {

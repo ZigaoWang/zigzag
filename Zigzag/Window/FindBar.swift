@@ -1128,7 +1128,7 @@ enum Toast {
             // chevron, for someone who never learnt that ⇧ asks first.
             toast.actionButton.title = ""
             toast.actionButton.symbol = "chevron.down"
-            toast.actionButton.setAccessibilityLabel(String(localized: "Where It's Pinned", comment: "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to."))
+            toast.actionButton.setAccessibilityLabel(String(localized: "Where It’s Pinned", comment: "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to."))
             toast.actionButton.onClick = { [weak toast] _ in
                 guard let toast, let menu = actionMenu() else { return }
                 // The toast stays until a place is chosen or the menu is put away; the menu is over the page, where
