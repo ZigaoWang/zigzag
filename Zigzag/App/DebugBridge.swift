@@ -2757,6 +2757,8 @@ enum DebugBridge {
         case "copylink": controller.copyPageURL(nil)
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        // touchlog <path>: the last 50 touch decisions on pages.
+        case "touchlog": try? TouchLog.lines.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsPage.open(in: controller)
         // settingsprivacy: Settings › Privacy. flipblocking: its Block ads and trackers switch, as a click does.
         case "settingsprivacy": SettingsPage.open(.privacy, in: controller)

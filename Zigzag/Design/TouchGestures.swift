@@ -1139,3 +1139,33 @@ enum TouchSidebarGrabber {
     /// `sidebarMinX` in, has its toggle (`toggle`, in the sidebar).
     nonisolated static func frame(toggle: NSRect, sidebarMinX: CGFloat) -> NSRect { toggle.offsetBy(dx: sidebarMinX, dy: 0) }
 }
+
+/// Debug builds: the last touch decisions on pages, for `touchlog` and debug.log.
+@MainActor
+enum TouchLog {
+    private(set) static var lines: [String] = []
+
+    static func note(_ line: @autoclosure () -> String) {
+        #if DEBUG
+        let text = String(format: "%.3f ", ProcessInfo.processInfo.systemUptime) + line()
+        lines.append(text)
+        if lines.count > 50 { lines.removeFirst(lines.count - 50) }
+        debugLog("touch " + text)
+        #endif
+    }
+
+    /// The touch recognizers on `view` and its ancestors that are under way or done, and every pan and swipe, with
+    /// their states (0 possible, 1 began, 2 changed, 3 ended, 4 cancelled, 5 failed).
+    static func recognizers(from view: NSView?) -> String {
+        sequence(first: view, next: { $0?.superview }).compactMap { $0 }.flatMap { view in
+            view.gestureRecognizers.filter {
+                $0.allowedTouchTypes.contains(.direct) && ($0.state != .possible || $0 is NSPanGestureRecognizer || $0 is TouchSwipeRecognizer)
+            }.map { "\(type(of: view)).\(label($0))=\($0.state.rawValue)" }
+        }.joined(separator: " ")
+    }
+
+    private static func label(_ recognizer: NSGestureRecognizer) -> String {
+        if #available(macOS 26, *), let name = recognizer.name { return name }
+        return String(describing: type(of: recognizer))
+    }
+}
