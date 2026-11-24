@@ -307,6 +307,32 @@ import WebKit
         #expect(PageState.sleepReader.contains("__darkreader__"))
     }
 
+    /// A session with one item too big to carry still keeps the rest: a site's sign-in sits beside a big cache.
+    @Test func aBigItemDoesntCostTheRestOfTheSession() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.load(URLRequest(url: page))
+        #expect(await until { webView.title == "v1" && !webView.isLoading })
+        _ = try await webView.evaluateJavaScript("""
+        sessionStorage.setItem('big', 'x'.repeat(300000));
+        sessionStorage.setItem('half', 'y'.repeat(150000));
+        sessionStorage.setItem('more', 'z'.repeat(150000));
+        sessionStorage.setItem('token', 't');
+        true
+        """)
+        let read = try await webView.evaluateJavaScript(PageState.sleepReader, in: nil, contentWorld: .defaultClient)
+        let session = try #require(PageState(try #require(read as? [String: Any]), url: page)?.session)
+        let keys = Set(session.items.map { $0[0] })
+        #expect(keys.isSuperset(of: ["k", "token"]))
+        #expect(!keys.contains("big"))
+        #expect(keys.intersection(["half", "more"]).count == 1, "the two halves don't both fit")
+        #expect(session.items.reduce(0) { $0 + $1[0].count + $1[1].count } <= 250000)
+    }
+
     private final class Heard: NSObject, WKScriptMessageHandler {
         var count = 0
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) { count += 1 }

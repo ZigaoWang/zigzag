@@ -141,7 +141,8 @@ nonisolated struct PageState: Equatable, Sendable {
     """
 
     /// `reader`, and the page's sessionStorage too, for a tab going to sleep. Not Zigzag's own Dark Reader cache,
-    /// which builds itself again, and nothing when the rest is more than one page script should carry (#178).
+    /// which builds itself again, and not an item that would take the rest past what one page script should carry
+    /// (#178): the items that fit still go, so one big entry doesn't cost a site the rest of its session.
     static let sleepReader = """
     Object.assign(\(reader), { session: (() => {
       try {
@@ -152,8 +153,9 @@ nonisolated struct PageState: Equatable, Sendable {
           const key = sessionStorage.key(i);
           if (key.startsWith('__darkreader__')) continue;
           const value = sessionStorage.getItem(key) ?? '';
-          stored += key.length + value.length;
-          if (stored > 250000) return null;
+          const size = key.length + value.length;
+          if (stored + size > 250000) continue;
+          stored += size;
           items.push([key, value]);
         }
         return items.length ? { origin: location.origin, items } : null;
