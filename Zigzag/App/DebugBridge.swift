@@ -924,6 +924,8 @@ enum DebugBridge {
             }
         // touchrecent: as if a finger had just landed in the window, so the touch grabber shows.
         case "touchrecent": controller.root.debugTouchedRecently()
+        // touchreveal: as if a finger had tapped where the hidden lights and sidebar toggle sit, so they show.
+        case "touchreveal": controller.root.debugRevealTap()
         case "edgestate": debugLog("edgestate \(controller.root.isSidebarFloatingVisible ? "out" : controller.root.sidebarVisible ? "docked" : "hidden")")
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
         // holding ⌃ shows them), even with the window not in front. off hides both.

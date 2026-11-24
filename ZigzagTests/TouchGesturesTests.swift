@@ -941,14 +941,18 @@ struct TouchMovesTests {
         let root = hiddenRoot()
         #expect(!root.isGrabberShown)
         let now = ProcessInfo.processInfo.systemUptime
+        // Nothing over the page by default, a finger in use or not.
         root.noteTouch(at: now - 2)
+        #expect(!root.isGrabberShown && root.grabber.isHidden)
+        root.revealTap()
         #expect(root.isGrabberShown && !root.grabber.isHidden)
         // The mouse or trackpad moving: gone until a finger lands again.
         root.notePointerMoved(at: now - 1)
-        #expect(!root.isGrabberShown)
+        #expect(!root.isGrabberShown && !root.isGrabberRevealed)
         root.noteTouch(at: now)
-        #expect(root.isGrabberShown)
-        // The sidebar shown: gone.
+        #expect(!root.isGrabberShown)
+        // The sidebar shown: gone. Hidden again with a finger in use: shown a moment as a hint.
+        root.revealTap()
         root.setSidebarVisible(true, animated: false)
         #expect(!root.isGrabberShown)
         root.setSidebarVisible(false, animated: false)
@@ -957,7 +961,63 @@ struct TouchMovesTests {
         root.showsTopBar = true
         #expect(!root.isGrabberShown)
         root.showsTopBar = false
+        #expect(!root.isGrabberShown)
+    }
+
+    @Test func aTapWhereTheGroupSitsShowsItAWhile() {
+        for onRight in [false, true] {
+            let root = hiddenRoot(onRight: onRight)
+            root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
+            let zone = root.grabberRevealZone
+            // From the window's edge on the sidebar's side to past the toggle, along the top.
+            let toggle = root.convert(root.grabber.toggleFrame, from: root.grabber)
+            #expect(onRight ? zone.maxX == root.bounds.maxX : zone.minX == 0)
+            #expect(onRight ? abs(zone.minX - (root.grabber.frame.minX - TouchSidebarGrabber.zonePadding)) < 0.5
+                            : abs(zone.maxX - (root.grabber.frame.maxX + TouchSidebarGrabber.zonePadding)) < 0.5)
+            #expect(zone.contains(NSPoint(x: toggle.midX, y: toggle.midY)) && zone.height >= TouchSidebarGrabber.zoneHeight)
+            #expect(abs((root.isFlipped ? zone.minY : root.bounds.maxY - zone.maxY)) < 0.5)
+            // Elsewhere on the page: nothing.
+            root.fingerLanded(at: NSPoint(x: 500, y: 350))
+            #expect(!root.isGrabberShown)
+            // In the zone: it shows, and that tap doesn't press the toggle.
+            let point = NSPoint(x: toggle.midX, y: toggle.midY)
+            root.fingerLanded(at: point)
+            #expect(root.isGrabberRevealed && root.grabberPlace == .lights)
+            #expect(!root.grabberTapTakes(point))
+            // A second tap on it while shown presses it.
+            root.fingerLanded(at: point)
+            #expect(root.isGrabberRevealed && root.grabberTapTakes(point))
+            // A finger elsewhere: gone at once.
+            root.fingerLanded(at: NSPoint(x: 500, y: 350))
+            #expect(!root.isGrabberRevealed && root.grabberPlace == nil)
+            // Its time up: gone.
+            root.fingerLanded(at: point)
+            root.concealGrabber()
+            #expect(root.grabberPlace == nil)
+        }
+    }
+
+    @Test func theGroupGoesAfterItsTime() async throws {
+        let root = hiddenRoot()
+        root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
+        root.revealGrabber(for: 0.05)
         #expect(root.isGrabberShown)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(!root.isGrabberShown && !root.isGrabberRevealed)
+        #expect(TouchSidebarGrabber.revealFor == 3 && TouchSidebarGrabber.hintFor == 2)
+    }
+
+    @Test func theGrabbersLandings() {
+        #expect(TouchSidebarGrabber.landing(inZone: true, revealed: false, available: true) == .reveal)
+        #expect(TouchSidebarGrabber.landing(inZone: true, revealed: true, available: true) == .keep)
+        #expect(TouchSidebarGrabber.landing(inZone: false, revealed: true, available: true) == .hide)
+        #expect(TouchSidebarGrabber.landing(inZone: false, revealed: false, available: true) == .none)
+        #expect(TouchSidebarGrabber.landing(inZone: true, revealed: false, available: false) == .none)
+        #expect(TouchSidebarGrabber.landing(inZone: true, revealed: true, available: false) == .hide)
+        let group = NSRect(x: 7, y: 6, width: 113, height: 32)
+        #expect(TouchSidebarGrabber.revealZone(group: group, width: 1000, onRight: false) == NSRect(x: 0, y: 0, width: 136, height: 52))
+        let right = NSRect(x: 880, y: 6, width: 113, height: 32)
+        #expect(TouchSidebarGrabber.revealZone(group: right, width: 1000, onRight: true) == NSRect(x: 864, y: 0, width: 136, height: 52))
     }
 
     /// The docked sidebar's toggle, in the root's coordinates.
@@ -988,6 +1048,8 @@ struct TouchMovesTests {
             let window = controller.browserWindow
             #expect(window.standardWindowButton(.closeButton)?.isHidden == true)
             root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
+            #expect(root.grabberPlace == nil && window.standardWindowButton(.closeButton)?.isHidden == true)
+            root.revealTap()
             #expect(root.isGrabberShown && root.grabberPlace == .lights && root.grabberStrip == nil)
             // Same place, size and symbol as the sidebar's own toggle, in the title bar beside the lights.
             let shown = root.convert(root.grabber.toggleFrame, from: root.grabber)
@@ -1060,11 +1122,14 @@ struct TouchMovesTests {
                 #expect(root.sidebarRevealed && root.isTouchHeld && root.grabberPlace == nil && !strip.showsSidebarButton)
                 root.endTouchHold()
             }
-            // Out of split view: back with the lights.
+            // Out of split view: hidden until a tap where the lights sit shows it with them.
             root.setTiles(nil, animated: false)
             root.card.showsHeader = false
             root.layoutSubtreeIfNeeded()
-            #expect(root.grabberPlace == .lights && root.paneCards.allSatisfy { !$0.header.showsSidebarButton })
+            root.concealGrabber()
+            #expect(root.grabberPlace == nil && root.paneCards.allSatisfy { !$0.header.showsSidebarButton })
+            root.revealTap()
+            #expect(root.grabberPlace == .lights)
         }
     }
 
@@ -1093,6 +1158,7 @@ struct TouchMovesTests {
     @Test func aTapOnTheGrabberBringsTheSidebarOutToStay() {
         let root = hiddenRoot()
         root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
+        root.revealTap()
         #expect(root.grabber.button.accessibilityLabel() == String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
         #expect(root.grabber.button.accessibilityPerformPress())
         #expect(root.sidebarRevealed && root.isTouchHeld)
@@ -1179,6 +1245,35 @@ struct TouchMovesTests {
         #expect(root.sidebarVisible)
     }
 
+    @Test func theTapThatShowsTheGroupClicksNothing() {
+        let manager = TabManager(spaceID: Library.shared.spaces[0].id)
+        defer { manager.invalidate() }
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root, window = controller.browserWindow
+        root.showsTopBar = false
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        controller.layoutTrafficLights()
+        let now = ProcessInfo.processInfo.systemUptime
+        root.noteTouch(at: now)
+        let landed = TouchPress.landedAt
+        TouchPress.landedAt = now
+        defer { TouchPress.landedAt = landed }
+        let zone = root.grabberRevealZone
+        let toggle = root.convert(root.grabber.toggleFrame, from: root.grabber)
+        #expect(zone.contains(NSPoint(x: toggle.midX, y: toggle.midY)))
+        let point = NSPoint(x: toggle.midX, y: toggle.midY), inWindow = root.convert(point, to: nil)
+        root.fingerLanded(at: point)
+        controller.layoutTrafficLights()
+        #expect(root.grabberPlace == .lights)
+        // Its click, now over the toggle, and the window's tap go nowhere.
+        click(at: inWindow, in: window, time: now)
+        if let event = TouchPress.mouseDown(at: inWindow, in: window) { window.touchTapped(event, downAt: now) }
+        #expect(!root.sidebarRevealed && !root.sidebarVisible && root.grabberPlace == .lights)
+        root.concealGrabber()
+    }
+
     @Test func aSpentTouchDropsOnlyItsOwnClick() {
         var swallow = TouchSwallow()
         swallow.arm(at: [NSPoint(x: 20, y: 300)], now: 10)
@@ -1234,5 +1329,13 @@ struct TouchMovesTests {
         // A pop-up's page: no overview to open, and the pinch is only the page's.
         holder.touchPinchedIn()
         #expect(window.windowController == nil)
+    }
+}
+
+extension BrowserRootView {
+    /// A finger's tap in the middle of the zone that shows the group with the lights.
+    func revealTap() {
+        let zone = grabberRevealZone
+        fingerLanded(at: NSPoint(x: zone.midX, y: zone.midY))
     }
 }

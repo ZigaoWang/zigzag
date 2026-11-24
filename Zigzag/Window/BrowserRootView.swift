@@ -975,7 +975,7 @@ final class BrowserRootView: SpaceFrameView {
         swipe.failed = { [weak self, weak swipe] in
             guard let self, let swipe, TouchSidebarPull.isTap(fingers: swipe.fingers, translation: swipe.translation) else { return }
             let start = self.pullStart(swipe)
-            if self.grabberTakes(start) {
+            if self.grabberTapTakes(start) {
                 self.grabberTapped(at: start)
             } else if self.isTouchHeld {
                 self.endTouchHold()
@@ -1097,6 +1097,12 @@ final class BrowserRootView: SpaceFrameView {
     private(set) var pointerMovedAt: TimeInterval?
     private var grabberHideWork: DispatchWorkItem?
     private(set) var isGrabberShown = false
+    /// Shown with the lights by a tap in its zone or as a hint, until `grabberRevealWork` runs.
+    private(set) var isGrabberRevealed = false
+    private var grabberRevealWork: DispatchWorkItem?
+    /// Where the tap that showed it landed, own coordinates: that tap doesn't press it.
+    private var revealTapPoint: NSPoint?
+    private var hadSidebarShown: Bool?
 
     /// Hidden in the window: not docked, not out, not under a finger.
     private var sidebarShown: Bool { sidebarVisible || sidebarRevealed || touchReach != nil }
@@ -1104,6 +1110,68 @@ final class BrowserRootView: SpaceFrameView {
     private func touchLanded(_ event: NSEvent) {
         guard let window, event.windowNumber == window.windowNumber else { return }
         noteTouch(at: event.timestamp)
+        fingerLanded(at: convert(event.locationInWindow, from: nil))
+    }
+
+    /// The zone a tap shows the group with the lights from, own coordinates.
+    var grabberRevealZone: NSRect {
+        if !isGrabberShown { placeGrabber() }
+        var group = grabber.frame
+        if !isFlipped { group.origin.y = bounds.height - group.maxY }
+        var zone = TouchSidebarGrabber.revealZone(group: group, width: bounds.width, onRight: sidebarOnRight)
+        if !isFlipped { zone.origin.y = bounds.height - zone.maxY }
+        return zone
+    }
+
+    /// Whether the group can show with the lights now: the sidebar hidden, no bar, no strip on top, a finger in use.
+    private var grabberCanReveal: Bool {
+        TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
+                                  now: ProcessInfo.processInfo.systemUptime) && topStrip == nil && window?.styleMask.contains(.fullScreen) != true
+    }
+
+    /// A finger landed at `point` (own coordinates): in the zone it shows the group, swallowing the tap; elsewhere
+    /// it hides it, and the tap is the page's.
+    func fingerLanded(at point: NSPoint) {
+        revealTapPoint = nil
+        switch TouchSidebarGrabber.landing(inZone: grabberRevealZone.contains(point), revealed: isGrabberRevealed, available: grabberCanReveal) {
+        case .reveal:
+            revealTapPoint = point
+            revealGrabber(for: TouchSidebarGrabber.revealFor)
+            spendTouch(at: [point])
+        case .keep: revealGrabber(for: TouchSidebarGrabber.revealFor)
+        case .hide: concealGrabber()
+        case .none: break
+        }
+    }
+
+    /// Shows the group with the lights for `duration`, then fades it.
+    func revealGrabber(for duration: TimeInterval) {
+        grabberRevealWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.concealGrabber() } }
+        grabberRevealWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+        isGrabberRevealed = true
+        refreshGrabber()
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil { concealGrabber() }
+    }
+
+    /// Hides the group with the lights now.
+    func concealGrabber() {
+        grabberRevealWork?.cancel()
+        grabberRevealWork = nil
+        guard isGrabberRevealed else { return }
+        isGrabberRevealed = false
+        refreshGrabber()
+    }
+
+    /// Whether a tap at `start` presses the toggle: not the tap that showed it.
+    func grabberTapTakes(_ start: NSPoint) -> Bool {
+        if let tap = revealTapPoint, hypot(tap.x - start.x, tap.y - start.y) <= TouchGestures.target { return false }
+        return grabberTakes(start)
     }
 
     /// A finger landed at `time`: the grabber shows, until `TouchSidebarGrabber.recent` has passed.
@@ -1119,6 +1187,9 @@ final class BrowserRootView: SpaceFrameView {
     /// The pointer moved at `time`: the mouse or trackpad is in use, so the grabber goes.
     func notePointerMoved(at time: TimeInterval) {
         pointerMovedAt = time
+        grabberRevealWork?.cancel()
+        grabberRevealWork = nil
+        isGrabberRevealed = false
         refreshGrabber()
     }
 
@@ -1173,10 +1244,23 @@ final class BrowserRootView: SpaceFrameView {
         grabber.appearance = PageBar.inkAppearance(on: pageColor).flatMap(NSAppearance.init(named:))
     }
 
-    /// Shows or hides the grabber as `TouchSidebarGrabber.shows` says: in the top strip, or with the lights, fading.
+    /// Shows or hides the grabber as `TouchSidebarGrabber.shows` says: in the top strip, or with the lights while
+    /// revealed, fading.
     func refreshGrabber() {
         let show = TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
                                              now: ProcessInfo.processInfo.systemUptime)
+        // Just hidden with a finger in use: shown a moment so it can be found.
+        let hadShown = hadSidebarShown
+        hadSidebarShown = sidebarShown
+        if hadShown == true, !sidebarShown, show, !isGrabberRevealed {
+            revealGrabber(for: TouchSidebarGrabber.hintFor)
+            return
+        }
+        if !show, isGrabberRevealed {
+            isGrabberRevealed = false
+            grabberRevealWork?.cancel()
+            grabberRevealWork = nil
+        }
         let strip = show ? topStrip : nil
         if strip !== grabberStrip {
             grabberStrip?.showsSidebarButton = false
@@ -1184,8 +1268,10 @@ final class BrowserRootView: SpaceFrameView {
             grabberStrip = strip
         }
         grabberStrip?.sidebarOnRight = sidebarOnRight
-        isGrabberShown = show
-        let place = show ? TouchSidebarGrabber.place(stripOnTop: strip != nil) : nil
+        // In full screen it stays as the lights do there, down with the menu bar.
+        let withLights = isGrabberRevealed || window?.styleMask.contains(.fullScreen) == true
+        let place: TouchSidebarGrabber.Place? = !show ? nil : strip != nil ? .strip : withLights ? .lights : nil
+        isGrabberShown = place != nil
         guard place != grabberPlace else { return }
         let lights = place == .lights, hadLights = grabberPlace == .lights
         grabberPlace = place
@@ -1227,6 +1313,13 @@ final class BrowserRootView: SpaceFrameView {
     func debugTouchedRecently() {
         pointerMovedAt = nil
         noteTouch(at: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// As if a finger had just tapped the middle of the zone that shows the group with the lights.
+    func debugRevealTap() {
+        debugTouchedRecently()
+        let zone = grabberRevealZone
+        fingerLanded(at: NSPoint(x: zone.midX, y: zone.midY))
     }
     #endif
 
@@ -2230,6 +2323,7 @@ final class BrowserRootView: SpaceFrameView {
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
         if let touchListener { TouchPress.stopListening(touchListener) }
         grabberHideWork?.cancel()
+        grabberRevealWork?.cancel()
     }
 
     private func followPointer() {

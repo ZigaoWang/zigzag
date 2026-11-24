@@ -1045,8 +1045,9 @@ enum TouchSidebarPull {
 }
 
 /// A sidebar toggle while the sidebar is hidden and a finger has been used in the window lately: in the top pane's
-/// strip while the strips run along the page's top, otherwise beside the traffic lights, shown with them. A tap brings
-/// the sidebar out, a finger dragged from it pulls it out.
+/// strip while the strips run along the page's top, otherwise with the traffic lights, hidden until a tap where they
+/// sit shows them (HIG, touch support for hidden controls). A tap brings the sidebar out, a finger dragged from it
+/// pulls it out.
 enum TouchSidebarGrabber {
     /// Where it shows.
     enum Place: Equatable {
@@ -1098,6 +1099,40 @@ enum TouchSidebarGrabber {
                                   now: TimeInterval) -> Bool {
         guard !sidebarShown, !barShown, let touchedAt, now >= touchedAt, now - touchedAt < recent else { return false }
         return pointerMovedAt.map { $0 < touchedAt } ?? true
+    }
+
+    /// Shown by a tap with the lights, it goes this long after the last finger in its zone.
+    nonisolated static let revealFor: TimeInterval = 3
+    /// Shown this long right after the sidebar hides while a finger is in use, so it can be found.
+    nonisolated static let hintFor: TimeInterval = 2
+    /// How far the zone that shows it reaches past the group, toward the page, and down from the window's top.
+    static let zonePadding: CGFloat = 16
+    static let zoneHeight: CGFloat = 52
+
+    /// The zone a tap shows it from, top-down: from the window's edge on the sidebar's side to past the group at `group`.
+    static func revealZone(group: NSRect, width: CGFloat, onRight: Bool) -> NSRect {
+        let height = max(zoneHeight, group.maxY)
+        guard onRight else { return NSRect(x: 0, y: 0, width: group.maxX + zonePadding, height: height) }
+        let minX = group.minX - zonePadding
+        return NSRect(x: minX, y: 0, width: width - minX, height: height)
+    }
+
+    /// What a finger landing does to it with the lights.
+    enum Landing: Equatable {
+        /// Hidden, in its zone: it shows, and the tap does nothing else.
+        case reveal
+        /// Shown, in its zone: it stays a while longer.
+        case keep
+        /// Shown, elsewhere: it goes, and the tap is the page's.
+        case hide
+        case none
+    }
+
+    /// For a finger landing in its zone (`inZone`) or not, while it can show with the lights (`available`).
+    nonisolated static func landing(inZone: Bool, revealed: Bool, available: Bool) -> Landing {
+        guard available else { return revealed ? .hide : .none }
+        if revealed { return inZone ? .keep : .hide }
+        return inZone ? .reveal : .none
     }
 
     /// Where its toggle goes with the lights, top-down from the window's top left: where the docked sidebar, starting

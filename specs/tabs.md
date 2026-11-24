@@ -135,8 +135,12 @@
   Test: TouchMovesTests.aFingerFromTheEdgePullsOutTheSidebar
 - A finger landing on the window's outer 12 points is left to macOS, which resizes the window there; the pull starts from 12 to 40 points in from the page's edge.
   Test: TouchMovesTests.theEdgeRules
-- Sidebar hidden, no bar above the page, and a finger used in the window in the last 15 minutes → a sidebar toggle shows; the pointer moving, the sidebar shown or the bar above the page shown hides it.
+- Sidebar hidden, no bar above the page, and a finger used in the window in the last 15 minutes → a sidebar toggle can show; the pointer moving, the sidebar shown or the bar above the page shown hides it. Over a page nothing shows by default; right after the sidebar hides with a finger in use it shows for 2 seconds, then fades.
   Test: TouchMovesTests.theGrabberShowsForARecentFinger
+- Over a page, a finger's tap along the window's top from its edge on the sidebar's side to 16 points past the toggle (52 points down) shows the toggle with the traffic lights, and that tap does nothing else. Shown, it goes 3 seconds after the last finger there, at once when a finger lands elsewhere (that tap is the page's), or when the pointer moves.
+  Test: TouchMovesTests.aTapWhereTheGroupSitsShowsItAWhile
+  Test: TouchMovesTests.theTapThatShowsTheGroupClicksNothing
+  Test: TouchMovesTests.theGroupGoesAfterItsTime
 - Over a page, that toggle shows with the traffic lights as one group on the title bar's material, light or dark as the page's top, where the docked sidebar has its lights and toggle, left or right. In full screen, where the lights come down with the menu bar, it shows there on its own. A finger takes it anywhere in 44 points around it, clear of the lights.
   Test: TouchMovesTests.theGrabberSitsWhereTheSidebarsToggleDoes
 - In split view with the panes' strips along the top of the page, it is a button in the top pane's strip on the sidebar's side instead, like the strip's own: before Back on the left, after the close button on the right.
