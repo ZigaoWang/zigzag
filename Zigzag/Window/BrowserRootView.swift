@@ -384,6 +384,13 @@ final class BrowserRootView: SpaceFrameView {
     static let minimumPaneHeight: CGFloat = 160
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
+    /// The one in-page Mini this window owns, and the dim under it. Owner-checked so a closing Mini cannot remove a
+    /// newer one opened during its fade.
+    weak var inPageMiniDim: NSView?
+    weak var inPageMini: NSView?
+    private weak var inPageMiniOwner: AnyObject?
+    /// Called when the page area moves or resizes, so the docked Mini keeps its place.
+    var onInPageMiniLayout: ((NSRect) -> Void)?
     /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
     /// it (#210): the window still reads as a sidebar and a page, as it does with a page open.
     let emptyHint = EmptySpaceMark()
@@ -1423,6 +1430,37 @@ final class BrowserRootView: SpaceFrameView {
         return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - paneGap, height: whole.height)
     }
 
+    /// Puts the docked Mini and its dim over the page. The sidebar stays above both, so its rows still take the pointer.
+    func showInPageMini(_ view: NSView, dim: NSView, frame: NSRect, owner: AnyObject) {
+        if inPageMini === view, inPageMiniOwner === owner {
+            view.frame = frame
+            dim.frame = cardFrame
+            return
+        }
+        inPageMini?.removeFromSuperview()
+        inPageMiniDim?.removeFromSuperview()
+        inPageMiniOwner = owner
+        inPageMini = view
+        inPageMiniDim = dim
+        dim.frame = cardFrame
+        addSubview(dim, positioned: .below, relativeTo: sidebarContainer)
+        addSubview(view, positioned: .above, relativeTo: dim)
+        addSubview(sidebarContainer, positioned: .above, relativeTo: view)
+        view.frame = frame
+        needsLayout = true
+    }
+
+    /// Takes the Mini away only if `owner` is still the one in the slot.
+    func hideInPageMini(owner: AnyObject) {
+        guard inPageMiniOwner === owner else { return }
+        inPageMini?.removeFromSuperview()
+        inPageMiniDim?.removeFromSuperview()
+        inPageMini = nil
+        inPageMiniDim = nil
+        inPageMiniOwner = nil
+        needsLayout = true
+    }
+
     /// Where the side panel sits: beside the page, a gap away, over the same height, reaching as far right as the page
     /// would have. It reads as a second pane, like a split's.
     var sidePanelFrame: NSRect {
@@ -1929,6 +1967,10 @@ final class BrowserRootView: SpaceFrameView {
         if isGrabberShown { placeGrabber() }
         refreshGrabber()
         overlay.frame = bounds
+        if inPageMini != nil {
+            inPageMiniDim?.frame = cardFrame
+            onInPageMiniLayout?(cardFrame)
+        }
         onLayoutChange?()
     }
 

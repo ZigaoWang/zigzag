@@ -7,6 +7,43 @@ import WebKit
 /// history, blocking, autofill and extensions work as they do anywhere; Open in moves that same live page into a
 /// browser window, in the space chosen on the strip. Quitting lets it go, as Arc did; an update's restart brings it
 /// back (`UpdateRelaunch`).
+/// Where the docked Mini sits in the page, and how its frame follows a resized page.
+enum MiniDockLayout {
+    /// The frame the old Peek used: 8% of the page card in from each side, 4.8% above and below.
+    static func frame(in pane: NSRect) -> NSRect {
+        let dx = min(max(Tokens.Space.x8, Tokens.Space.snap(pane.width * Tokens.Metric.miniPeekInsetRatio)),
+                     max(0, (pane.width - 1) / 2))
+        let dy = min(max(Tokens.Space.x6, Tokens.Space.snap(pane.height * Tokens.Metric.miniPeekInsetRatio * 0.6)),
+                     max(0, (pane.height - 1) / 2))
+        return pane.insetBy(dx: dx, dy: dy).integral
+    }
+}
+
+/// The dim under a Mini docked in a page. A click puts the Mini away and never reaches the page behind it.
+final class MiniPeekDimView: ColorView {
+    var onClick: (() -> Void)?
+    /// The Mini has gone and the dim is only fading: the page behind is live again, so clicks pass through.
+    var passesClicks = false
+
+    override init(color: NSColor? = nil) {
+        super.init(color: color)
+        layer?.cornerRadius = Tokens.Radius.card
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        passesClicks ? nil : super.hitTest(point)
+    }
+
+    override func mouseDown(with event: NSEvent) { onClick?() }
+}
+
 final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The last to be asked about a key: one nothing took goes by quietly (`QuietKeys`).
     override func noResponder(for eventSelector: Selector) {
@@ -23,8 +60,17 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     static var name: String { String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.") }
 
     let tab: Tab
-    private let root = MiniRootView()
+    let root = MiniRootView()
     private var strip: MiniStripView { root.strip }
+    /// The Mini is presented in the page: dimmed page, click-out and Esc, the same root and page.
+    private(set) var isDockedInPage = false
+    /// The browser whose page this Mini is docked in, while it is.
+    private weak var dockedBrowser: BrowserWindowController?
+    /// The dim under the docked Mini.
+    private var inPageMiniDim: MiniPeekDimView?
+    /// The host clears its record when the docked Mini closes or is promoted.
+    var onInPageMiniClosed: (() -> Void)?
+    var onInPageMiniDetached: (() -> Void)?
     /// Where floating things go over the page: the link under the pointer, a site's question, a toast.
     var overlay: PassthroughView { root.overlay }
     private lazy var linkStatus = LinkStatusController(overlay: overlay)
@@ -218,7 +264,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// opener and the returned controller's web view is the one WebKit asked for.
     @discardableResult
     static func open(fromPage url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, in browser: BrowserWindowController,
-                     by sender: Tab.LoadSender = .page) -> MiniWindowController {
+                     by sender: Tab.LoadSender = .page, dockedIn: BrowserWindowController? = nil) -> MiniWindowController {
         let window = browser.window
         let root = browser.root
         let page = window.map { $0.convertToScreen(root.convert(root.cardFrame, to: nil)) }
@@ -237,10 +283,99 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         controller.sourceTab = opener
         all.append(controller)
         Diagnostics.note("Zigzag Mini opened", site: url?.host(), "from a page", isPrivate: tab.isPrivate)
+        if let host = dockedIn {
+            controller.attachDocked(in: host)
+            return controller
+        }
         if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
         controller.appear(from: nil)
         if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
         return controller
+    }
+
+    // MARK: - In the page
+
+    /// Presents this Mini in `browser`'s page, over the page card, with a dim. The same root, tab and web view stay.
+    func attachDocked(in browser: BrowserWindowController) {
+        guard let window else { return }
+        isDockedInPage = true
+        dockedBrowser = browser
+        let dim = MiniPeekDimView(color: Tokens.Color.peekScrim)
+        dim.onClick = { [weak self] in self?.closeInPage() }
+        inPageMiniDim = dim
+        window.contentView = NSView()
+        strip.expandButton.isHidden = false
+        embed(in: browser, pane: browser.root.cardFrame)
+        window.orderOut(nil)
+        browser.window?.makeFirstResponder(tab.webView)
+    }
+
+    private func embed(in browser: BrowserWindowController, pane: NSRect) {
+        guard let dim = inPageMiniDim else { return }
+        let card = MiniDockLayout.frame(in: pane)
+        if root.superview !== browser.root { root.removeFromSuperview() }
+        root.frame = card
+        browser.root.showInPageMini(root, dim: dim, frame: card, owner: self)
+    }
+
+    /// The browser page moved or resized: keep the same share of it.
+    func layoutInDock(pane: NSRect) {
+        guard isDockedInPage, let browser = dockedBrowser else { return }
+        embed(in: browser, pane: pane)
+    }
+
+    /// Takes the Mini out of the page only if `owner` still owns the slot.
+    func unembed(owner: AnyObject) {
+        dockedBrowser?.root.hideInPageMini(owner: owner)
+        inPageMiniDim = nil
+    }
+
+    /// Expands the docked Mini into its own window, with the same root, tab and web view.
+    func promoteFromPage() {
+        guard isDockedInPage, let browser = dockedBrowser, let window else { return }
+        let card = root.frame
+        let paneScreen = browser.window.map { $0.convertToScreen(browser.root.convert(card, to: nil)) }
+        isDockedInPage = false
+        browser.root.hideInPageMini(owner: self)
+        root.removeFromSuperview()
+        inPageMiniDim = nil
+        dockedBrowser = nil
+        strip.expandButton.isHidden = true
+        window.contentView = root
+        root.frame = NSRect(origin: .zero, size: card.size)
+        if let paneScreen { window.setFrame(window.frameRect(forContentRect: paneScreen), display: true) }
+        onInPageMiniDetached?()
+        window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(tab.webView)
+    }
+
+    /// Closes the docked Mini and its page, and gives the keyboard back to the browser's page.
+    func closeInPage(focusBack: Bool = true, animated: Bool = true) {
+        guard isDockedInPage, let browser = dockedBrowser else { return }
+        isDockedInPage = false
+        onInPageMiniClosed?()
+        let finish = { [weak self] in
+            guard let self else { return }
+            browser.root.hideInPageMini(owner: self)
+            self.inPageMiniDim = nil
+            self.dockedBrowser = nil
+            self.strip.expandButton.isHidden = true
+            if focusBack, let page = browser.tabManager.selectedTab?.webView {
+                browser.window?.makeFirstResponder(page)
+            }
+            self.tab.close()
+            self.window?.close()
+        }
+        guard animated, let dim = inPageMiniDim else {
+            finish()
+            return
+        }
+        dim.passesClicks = true
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = Tokens.Motion.exit
+            root.animator().alphaValue = 0
+            dim.animator().alphaValue = 0
+        }, completionHandler: finish)
     }
 
     /// Whether a tab's page can go into Zigzag Mini: an ordinary tab's web page or file. Not a pinned page's or a
@@ -307,6 +442,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             return true
         }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
+        strip.expandButton.onClick = { [weak self] _ in self?.promoteFromPage() }
         strip.siteButton.onClick = { [weak self] _ in self?.showSiteControls() }
         strip.pinButton.onClick = { [weak self] _ in
             guard let window = self?.window else { return }
@@ -552,10 +688,17 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     override func cancelOperation(_ sender: Any?) { escape() }
 
+    private var presentationWindow: NSWindow? { isDockedInPage ? dockedBrowser?.window : window }
+
+    private func closeFromEscape() {
+        if isDockedInPage { closeInPage() } else { window?.performClose(nil) }
+    }
+
     private func escape() {
         guard !isLeaving, !commandBar.isVisible, !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) else { return }
-        guard let webView = tab.webView, let focused = window?.firstResponder as? NSView, focused.isDescendant(of: webView) else {
-            window?.performClose(nil)
+        guard let webView = tab.webView, let focused = presentationWindow?.firstResponder as? NSView,
+              focused.isDescendant(of: webView) else {
+            closeFromEscape()
             return
         }
         // What the page was doing as Esc arrived (noted before the page saw it, in `noteEscape`), since by now its
@@ -576,7 +719,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         webView.evaluateJavaScript(decide, in: nil, in: .defaultClient) { [weak self] result in
             MainActor.assumeIsolated {
                 guard (try? result.get()) as? String == "" else { return }
-                self?.window?.performClose(nil)
+                self?.closeFromEscape()
             }
         }
     }
@@ -604,18 +747,18 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// Called as Esc comes in, before the page gets it: WebKit runs this script ahead of the key, so the note says
     /// what the page looked like before its own Esc handler ran.
-    private func noteEscape(_ event: NSEvent) -> Bool {
+    func noteEscape(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown, event.keyCode == 53, !event.isARepeat else { return false }
         // Esc twice in a row always closes it, whatever the page did with the first (some take it for themselves).
         let now = event.timestamp
         defer { lastEscape = now }
         if now - lastEscape < Self.doubleEscape, !isLeaving, !commandBar.isVisible,
            !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) {
-            window?.performClose(nil)
+            closeFromEscape()
             return true
         }
         guard !commandBar.isVisible, !isLeaving, let webView = tab.webView,
-              let focused = window?.firstResponder as? NSView, focused.isDescendant(of: webView),
+              let focused = presentationWindow?.firstResponder as? NSView, focused.isDescendant(of: webView),
               !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) else { return false }
         // Asked before the page gets the key, as some sites keep Esc for themselves (Bing's search box): just a page,
         // and Esc closes Zigzag Mini; typing in a box with text, or a dialog of the site's showing, it goes to the page.
@@ -624,7 +767,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
                 guard let self, let webView else { return }
                 let state = (try? result.get()) as? String ?? ""
                 if state.isEmpty {
-                    self.window?.performClose(nil)
+                    self.closeFromEscape()
                 } else {
                     // Noted for the Esc the page leaves alone, which comes back to `escape`: typing, the field lets go.
                     webView.evaluateJavaScript("window.__zigzagEsc = '\(state)'", in: nil, in: .defaultClient)
@@ -1257,6 +1400,9 @@ final class MiniStripView: NSView {
     let spaceChip = MiniSpaceChip()
     let title = MiniTitleView()
     let copyButton = MiniStripView.button("link", toolTip: MiniStripView.copyTip)
+    /// Expand a docked Mini into a window of its own; hidden in a standalone Mini.
+    let expandButton = MiniStripView.button("arrow.up.left.and.arrow.down.right",
+                                            toolTip: String(localized: "Open in Window", comment: "Tooltip on the button that turns the Mini docked in a page into a window of its own."))
 
     private static var backTip: String { Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))) }
     private static var forwardTip: String { Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))) }
@@ -1288,7 +1434,8 @@ final class MiniStripView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         anchor.isHidden = true
-        [anchor, backButton, forwardButton, reloadButton, spaceChip, title, siteButton, pinButton, copyButton, openButton].forEach(addSubview)
+        expandButton.isHidden = true
+        [anchor, expandButton, backButton, forwardButton, reloadButton, spaceChip, title, siteButton, pinButton, copyButton, openButton].forEach(addSubview)
         setAccessibilityElement(false)
     }
 
@@ -1326,6 +1473,10 @@ final class MiniStripView: NSView {
         let y = round((bounds.height - h) / 2)
         // Back, forward and reload right after the lights, as in an installed app's strip.
         var x = Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Space.x2
+        if !expandButton.isHidden {
+            expandButton.frame = NSRect(x: x, y: y, width: b, height: b)
+            x += b + gap
+        }
         for button in [backButton, forwardButton, reloadButton] {
             button.frame = NSRect(x: x, y: y, width: b, height: b)
             x += b + gap

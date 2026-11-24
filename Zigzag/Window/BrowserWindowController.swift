@@ -23,6 +23,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     let tabManager: TabManager
     let sidebar = SidebarView()
     let root: BrowserRootView
+    let inPageMini = InPageMiniHost()
+    private var inPageMiniEscMonitor: Any?
     var browserWindow: BrowserWindow { window as! BrowserWindow }
 
     private var tokens: [SignalToken] = []
@@ -69,6 +71,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
+        inPageMini.browser = self
         // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
         // view keeps the width dragged out last time, which every window shares (#431).
         if let sidebarWidth {
@@ -92,6 +95,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             self.placeFloatingUpdate()
         }
+        root.onInPageMiniLayout = { [weak self] _ in self?.inPageMini.browserLayoutChanged() }
+        installInPageMiniEscMonitor()
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onTouchPull = { [weak self] pulling in
             guard let self else { return }
@@ -422,6 +427,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .structure:
             // Many at once (`TabManager.together`): once, when they're all done.
             if tabManager.isBatching { break }
+            inPageMini.tabsChanged()
             sidebar.list.reload(animated: window?.isVisible == true)
             // Pinned or unpinned from a row, a drag or ⌘Z, or its opener closed: the star and Back follow.
             refreshAddress(for: tabManager.selectedTab)
@@ -453,6 +459,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private(set) var handoff: NSUserActivity?
 
     private func spaceChanged() {
+        inPageMini.closeShown()
         let spaces = Library.shared.spaces
         let old = lastSpaceID
         let oldIndex = old.flatMap { id in spaces.firstIndex { $0.id == id } } ?? 0
@@ -750,6 +757,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSelectedTab() {
+        inPageMini.willSelect(tabManager.selectedTab)
         previews.hide()
         let tab = tabManager.selectedTab
         // The site panel describes one page; another tab coming forward takes it away.
@@ -2632,6 +2640,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// is done moving them.
     private func fullScreenChanged(_ event: FullScreenPhase.Event) {
         let phase = browserWindow.fullScreenPhase.after(event)
+        inPageMini.fullScreenChanged(phase)
         browserWindow.fullScreenPhase = phase
         if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
             browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
@@ -2658,8 +2667,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Set as the window closes, for what holds on to this controller past that (Zigzag Mini's source).
     private(set) var windowClosed = false
 
+    private func installInPageMiniEscMonitor() {
+        inPageMiniEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.keyCode == 53, !event.isARepeat,
+                  self.window?.isKeyWindow == true, self.inPageMini.record != nil else { return event }
+            return self.inPageMini.escapePressed(event) ? nil : event
+        }
+    }
+
     func windowWillClose(_ notification: Notification) {
         windowClosed = true
+        inPageMini.windowClosing()
+        if let monitor = inPageMiniEscMonitor { NSEvent.removeMonitor(monitor) }
+        inPageMiniEscMonitor = nil
         fadeTimer?.invalidate()
         numberHints?.stop()
         Autofill.shared.forget(windowOf: window)
@@ -2734,6 +2754,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return MiniWindowController.open(fromPage: url, configuration: configuration, opener: opener, in: self, by: sender).tab.webView
     }
 
+    /// A shift-click that should appear in the page, if the setting is on and this window can hold it.
+    @discardableResult
+    func openInPageMini(_ url: URL, configuration: WKWebViewConfiguration?, opener: Tab,
+                        by sender: Tab.LoadSender = .page) -> Bool {
+        commandBar.dismiss(restoringFocus: false)
+        return inPageMini.openURL(url: url, configuration: configuration, opener: opener, by: sender)
+    }
+
     private func sidebarContains(_ event: NSEvent) -> Bool {
         let container = root.sidebarContainer
         guard root.sidebarVisible || root.isSidebarFloatingVisible,
@@ -2803,6 +2831,11 @@ extension BrowserWindowController: TabHost {
 
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool {
         openRouted(url, arrival: arrival, from: tab, inBackground: inBackground, by: .page)
+    }
+
+    @discardableResult
+    func tab(_ tab: Tab, openInPageMini url: URL, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender) -> Bool {
+        openInPageMini(url, configuration: configuration, opener: tab, by: sender)
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {

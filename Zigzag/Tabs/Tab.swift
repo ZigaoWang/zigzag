@@ -5,6 +5,9 @@ import WebKit
 protocol TabHost: AnyObject {
     var hostWindow: NSWindow? { get }
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender)
+    /// Offers a shift-click to the host's in-page Mini. False falls back to the standalone Mini.
+    @discardableResult
+    func tab(_ tab: Tab, openInPageMini url: URL, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender) -> Bool
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView?
     func tabDidRequestClose(_ tab: Tab)
     /// Back from a tab a link opened, with no page before this one in it.
@@ -20,6 +23,7 @@ protocol TabHost: AnyObject {
 
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
+    func tab(_ tab: Tab, openInPageMini url: URL, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender) -> Bool { false }
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
     /// Loads an address with no sender: page links and every caller except a rule.
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
@@ -1975,6 +1979,7 @@ extension Tab: WKNavigationDelegate {
                 host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
             case .mini:
+                if host?.tab(self, openInPageMini: url, configuration: nil, by: .page) == true { return (.cancel, preferences) }
                 host?.tab(self, openURL: url, disposition: .mini)
                 return (.cancel, preferences)
             case .download:
@@ -2657,6 +2662,7 @@ extension Tab: WKUIDelegate {
                                                  modifiers: navigationAction.modifierFlags,
                                                  buttonNumber: navigationAction.buttonNumber)
             if activation == .mini, let url = navigationAction.request.url {
+                if host?.tab(self, openInPageMini: url, configuration: configuration, by: .page) == true { return nil }
                 host?.tab(self, openURL: url, disposition: .mini)
                 return nil
             }

@@ -1174,6 +1174,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let shareTabsToggle = Toggle()
     private let swipeToggle = Toggle()
     private let miniToggle = Toggle()
+    private let inPageMiniToggle = Toggle()
     private let energyToggle = Toggle()
     private let languagePicker = DropdownButton()
     private let launchChoice = DropdownButton()
@@ -1839,6 +1840,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         miniGroup.add(FormRow(title: String(localized: "Open links from other apps in Zigzag Mini", comment: "A setting in Settings › Zigzag Mini."),
                               detail: String(localized: "Sign-in pages and links from scripts and other apps open in a small window instead of a new tab.", comment: "Explanation under “Open links from other apps in Zigzag Mini” in Settings › Zigzag Mini."),
                               control: miniToggle))
+        inPageMiniToggle.onChange = { on in InPageMiniSettings.isEnabled = on }
+        miniGroup.add(FormRow(title: String(localized: "Open shift-clicked links in the page", comment: "A setting in Settings › Zigzag Mini."),
+                              detail: String(localized: "The Mini stays over the page you clicked from. When off, shift-clicked links open in a separate Mini window instead. Expand turns the inline one into a window.", comment: "Explanation under “Open shift-clicked links in the page” in Settings › Zigzag Mini."),
+                              control: inPageMiniToggle))
 
         // Privacy
         blockingToggle.onChange = { [weak self] on in
@@ -4095,6 +4100,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         ownProfileToggle.isOn = Library.newSpacesGetOwnProfile
         swipeToggle.isOn = SwipeNavigator.isOn
         miniToggle.isOn = MiniWindowController.opensExternalLinks
+        inPageMiniToggle.isOn = InPageMiniSettings.isEnabled
         miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []
         energyToggle.isOn = EnergyWatch.sleepsBusyTabs
         motionToggle.isOn = Tokens.Motion.reducesMotionHere

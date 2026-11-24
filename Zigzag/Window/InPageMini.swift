@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import WebKit
 
 /// Settings for showing a shift-clicked link in the page instead of a separate Mini window.
 enum InPageMiniSettings {
@@ -24,5 +26,86 @@ enum InPageMiniPolicy {
     static func shouldDock(enabled: Bool, windowIsKey: Bool, windowIsVisible: Bool,
                            windowIsMiniaturized: Bool, windowIsOnActiveSpace: Bool) -> Bool {
         enabled && windowIsKey && windowIsVisible && !windowIsMiniaturized && windowIsOnActiveSpace
+    }
+}
+
+/// One docked Mini per browser window. The Mini is the existing Zigzag Mini, shown over the page it came from.
+@MainActor
+final class InPageMiniHost {
+    struct Record {
+        let hostTabID: UUID
+        weak var hostTab: Tab?
+        let tab: Tab
+        let controller: MiniWindowController
+    }
+
+    weak var browser: BrowserWindowController?
+    var enabledProvider: () -> Bool = { InPageMiniSettings.isEnabled }
+    var shouldDock: @MainActor (Bool, Bool, Bool, Bool, Bool) -> Bool = InPageMiniPolicy.shouldDock
+    private(set) var record: Record?
+
+    /// Opens `url` in the page if the setting is on and this window can hold it. Returns false to fall back to the
+    /// standalone Mini.
+    func openURL(url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender) -> Bool {
+        guard enabledProvider(), let browser, let window = browser.window,
+              let host = opener ?? browser.tabManager.selectedTab else { return false }
+        guard shouldDock(true, window.isKeyWindow, window.isVisible,
+                         window.isMiniaturized, window.isOnActiveSpace) else { return false }
+        closeShown(animated: false)
+        let controller = MiniWindowController.open(fromPage: url, configuration: configuration, opener: host,
+                                                   in: browser, by: sender, dockedIn: browser)
+        guard controller.isDockedInPage else { return false }
+        record = Record(hostTabID: host.id, hostTab: host, tab: controller.tab, controller: controller)
+        controller.onInPageMiniClosed = { [weak self] in
+            if self?.record?.controller === controller { self?.record = nil }
+        }
+        controller.onInPageMiniDetached = { [weak self] in
+            if self?.record?.controller === controller { self?.record = nil }
+        }
+        return true
+    }
+
+    /// Closes the docked Mini, if one is up. Returns false when there was none.
+    @discardableResult
+    func closeShown(animated: Bool = true) -> Bool {
+        guard let record else { return false }
+        self.record = nil
+        record.controller.onInPageMiniClosed = nil
+        record.controller.onInPageMiniDetached = nil
+        if record.controller.isDockedInPage { record.controller.closeInPage(animated: animated) }
+        return true
+    }
+
+    /// Esc over the docked Mini: the page keeps typed text or a dialog, otherwise the Mini closes.
+    func escapePressed(_ event: NSEvent) -> Bool {
+        guard let record else { return false }
+        if record.controller.noteEscape(event) { return true }
+        if record.controller.isDockedInPage {
+            closeShown()
+            return true
+        }
+        return false
+    }
+
+    func willSelect(_ tab: Tab?) {
+        guard let record, tab?.id != record.hostTabID else { return }
+        closeShown()
+    }
+
+    func tabsChanged() {
+        guard let record, record.hostTab?.isClosed != false || record.tab.isClosed else { return }
+        closeShown(animated: false)
+    }
+
+    func windowClosing() { closeShown(animated: false) }
+
+    func fullScreenChanged(_ phase: FullScreenPhase) {
+        guard record != nil, !phase.isMoving else { return }
+        browserLayoutChanged()
+    }
+
+    func browserLayoutChanged() {
+        guard let record, let browser else { return }
+        record.controller.layoutInDock(pane: browser.root.cardFrame)
     }
 }
