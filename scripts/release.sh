@@ -200,14 +200,14 @@ fi
 # opens without a warning on a Mac that has never seen Zigzag. (Updates use the zip above.)
 # The window it opens to: Zigzag on the left, Applications on the right, an arrow between, a welcome above, on the
 # site's sky (scripts/dmg/background.html, drawn by scripts/dmg/render.swift).
-# 500 tall: Finder's tab and status bars take ~100 of it, leaving the 400 the background is drawn for.
+# 432 tall: the 400 the background is drawn for plus the 32-point title bar; Finder shows no tab or status bar there.
 DMG="$OUT/Zigzag-$VERSION.dmg"
 STAGE=$(mktemp -d)
 ditto "$APP" "$STAGE/Zigzag.app"
 SetFile -a E "$STAGE/Zigzag.app"
 rm -f "$DMG"
 create-dmg --volname "Zigzag" --volicon "$APP/Contents/Resources/AppIcon.icns" \
-  --background scripts/dmg-background.tiff --window-pos 200 160 --window-size 640 500 --text-size 13 \
+  --background scripts/dmg-background.tiff --window-pos 200 160 --window-size 640 432 --text-size 13 \
   --icon-size 112 --icon "Zigzag.app" 180 200 --hide-extension "Zigzag.app" --app-drop-link 460 200 \
   --no-internet-enable --format UDZO "$DMG" "$STAGE" >/dev/null
 rm -rf "$STAGE"
