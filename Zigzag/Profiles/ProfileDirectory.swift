@@ -213,8 +213,10 @@ nonisolated enum ProfileKey: String, CaseIterable {
     case fillsPasswords = "PasswordsAutofill"
     /// Zigzag or iCloud Passwords (PasswordFiller); unset until chosen.
     case passwordFiller = "PasswordsFiller"
-    /// Zigzag's saving and filling before iCloud took over, restored when switching back.
+    /// Zigzag's saving and filling before iCloud or another password manager took over, restored when switching back.
     case passwordsBeforeICloud = "PasswordsBeforeICloud"
+    /// The password manager extension chosen in Settings, by ID; unset until one is.
+    case passwordManager = "PasswordsManager"
     /// The one-time iCloud Passwords offer, after its extension was installed by hand, was shown.
     case iCloudPasswordsOffered = "PasswordsICloudOffered"
     /// Sites whose cookies clearing leaves alone (#334).

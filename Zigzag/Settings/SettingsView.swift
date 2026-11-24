@@ -1264,8 +1264,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
     private var downloadPlaceToken: SignalToken?
-    /// Zigzag or iCloud Passwords for the shown profile (#248).
+    /// Zigzag, iCloud Passwords or a password manager extension for the shown profile (#248).
     private let passwordFiller = DropdownButton()
+    private var passwordChoices: [PasswordManagerChoice] = []
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
     private let cardToggle = Toggle()
@@ -1315,7 +1316,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self.reloadExtensions()
                 // An ad blocker turned on or off takes YouTube over from Zigzag, or hands it back.
                 self.reloadBlocking()
-                // iCloud Passwords added, disabled or removed changes the filler.
+                // A password manager added, disabled or removed changes the choice.
                 self.reloadPasswords()
                 if self.pane == .privacy || self.pane == .passwords || self.isSearching { self.layoutDocument() }
                 // One turned on or off may give a search engine, or take yours with it.
@@ -1862,9 +1863,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         reloadBlocking()
 
         // Passwords
-        passwordFiller.options = [DropdownButton.Option(title: "Zigzag"),
-                                  DropdownButton.Option(title: Self.iCloudPasswordsName)]
-        passwordFiller.onSelect = { [weak self] index in self?.choosePasswordFiller(index == 1 ? .iCloud : .zigzag) }
+        passwordFiller.onSelect = { [weak self] index in
+            guard let self, self.passwordChoices.indices.contains(index) else { return }
+            self.choosePassword(self.passwordChoices[index])
+        }
         saveToggle.onChange = { [weak self] on in
             guard let self else { return }
             PasswordCapture.setOffersToSave(on, in: self.profile)
@@ -2872,9 +2874,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         saveToggle.isOn = saves
         fillToggle.isOn = fills
         let filler = ICloudPasswords.filler(in: profile)
-        passwordFiller.selectedIndex = filler == .iCloud ? 1 : 0
+        let choice = ICloudPasswords.choice(in: profile)
+        passwordChoices = PasswordManagerChoice.all(listed: PasswordManagers.listed(in: profile))
+        passwordFiller.options = passwordChoices.map { choice in
+            switch choice {
+            case .zigzag: DropdownButton.Option(title: "Zigzag")
+            case .iCloud: DropdownButton.Option(title: Self.iCloudPasswordsName)
+            case .manager(let id): DropdownButton.Option(title: PasswordManagers.known[id] ?? id)
+            }
+        }
+        passwordFiller.selectedIndex = passwordChoices.firstIndex(of: choice) ?? 0
         let installs = profile.installs
-        let fillerNote: String? = switch filler {
+        let fillerNote: String? = switch choice {
+        case .manager: nil
         case .iCloud: String(localized: "Passwords are filled by the iCloud Passwords extension. Click its icon by the address and enter the code from macOS to connect.",
                              comment: "Under “Password manager” in Settings › Passwords, with iCloud Passwords chosen. iCloud Passwords is Apple's extension, by the name Apple gives it; the code is the one the Passwords app on the Mac shows when the extension connects.")
         case .zigzag: installs.hasRecord(ICloudPasswords.id)
@@ -2899,7 +2911,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                            control: button))
             }
         }
-        let manager = PasswordManagers.active(in: profile)
+        // The one chosen, when several are on.
+        let manager = if case .manager(let id) = choice { PasswordManagers.known[id] } else { PasswordManagers.active(in: profile) }
         let managerNote = manager.map {
             String(localized: "Off while \($0) handles passwords. Turn on to use both.",
                    comment: "Under a password setting in Settings › Passwords, while a password manager extension (its name, like 1Password) is on.")
@@ -2933,6 +2946,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private static var iCloudPasswordsName: String {
         String(localized: "iCloud Passwords", comment: "A choice for “Password manager” in Settings › Passwords: Apple's iCloud Passwords extension, by the name Apple gives it.")
+    }
+
+    /// Hands the profile's passwords to the choice from the Password manager menu.
+    private func choosePassword(_ choice: PasswordManagerChoice) {
+        switch choice {
+        case .zigzag: choosePasswordFiller(.zigzag)
+        case .iCloud: choosePasswordFiller(.iCloud)
+        case .manager(let id):
+            ICloudPasswords.useManager(id, in: profile)
+            reloadPasswords()
+            layoutDocument()
+        }
     }
 
     /// Switches the profile to iCloud Passwords, installing (the usual sheet) or re-enabling its extension, or back to
@@ -3221,9 +3246,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Chooses the password filler, as the menu does.
+    /// Chooses the password filler, or a password manager extension by ID, as the menu does.
     func debugChoosePasswordFiller(_ name: String) {
         if let filler = PasswordFiller(rawValue: name) { choosePasswordFiller(filler) }
+        else if PasswordManagers.listed(in: profile).contains(name) { choosePassword(.manager(name)) }
     }
 
     func debugFind(_ text: String) {

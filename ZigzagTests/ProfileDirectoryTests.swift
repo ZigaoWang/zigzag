@@ -291,6 +291,76 @@ struct ProfileChoiceTests {
         // Several on: always the same one.
         #expect(PasswordManagers.active(among: ["nngceckbapebfimnlniiiahkandclblb", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"]) == "1Password")
     }
+
+    @Test func passwordManagerExtensionsAreListedAfterICloudByName() {
+        let bitwarden = "nngceckbapebfimnlniiiahkandclblb", onePassword = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+        // Unknown ones and iCloud (its own choice) aren't listed again.
+        let listed = PasswordManagers.listed(among: ["not-a-password-manager", bitwarden, PasswordFiller.iCloudExtensionID, onePassword])
+        #expect(listed == [onePassword, bitwarden])
+        #expect(PasswordManagerChoice.all(listed: listed) == [.zigzag, .iCloud, .manager(onePassword), .manager(bitwarden)])
+        #expect(PasswordManagerChoice.all(listed: []) == [.zigzag, .iCloud])
+    }
+
+    @Test func aPasswordManagerShowsCheckedWhileZigzagStepsAside() {
+        let bitwarden = "nngceckbapebfimnlniiiahkandclblb", onePassword = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+        func current(_ filler: PasswordFiller = .zigzag, chosen: String? = nil, listed: [String], saves: Bool, fills: Bool) -> PasswordManagerChoice {
+            PasswordManagerChoice.current(filler: filler, chosenManager: chosen, listed: listed, zigzagSaves: saves, zigzagFills: fills)
+        }
+        // None on: Zigzag.
+        #expect(current(listed: [], saves: false, fills: false) == .zigzag)
+        #expect(current(listed: [], saves: true, fills: true) == .zigzag)
+        // Bitwarden on and Zigzag off: Bitwarden, not Zigzag.
+        #expect(current(listed: [bitwarden], saves: false, fills: false) == .manager(bitwarden))
+        // Zigzag saving or filling too: Zigzag.
+        #expect(current(listed: [bitwarden], saves: true, fills: false) == .zigzag)
+        #expect(current(listed: [bitwarden], saves: false, fills: true) == .zigzag)
+        // Several on: the one chosen, else the first listed.
+        #expect(current(listed: [onePassword, bitwarden], saves: false, fills: false) == .manager(onePassword))
+        #expect(current(chosen: bitwarden, listed: [onePassword, bitwarden], saves: false, fills: false) == .manager(bitwarden))
+        // Chosen, then turned off or removed: not checked.
+        #expect(current(chosen: bitwarden, listed: [], saves: false, fills: false) == .zigzag)
+        #expect(current(chosen: bitwarden, listed: [onePassword], saves: false, fills: false) == .manager(onePassword))
+        // iCloud chosen: iCloud.
+        #expect(current(.iCloud, listed: [bitwarden], saves: false, fills: false) == .iCloud)
+    }
+
+    @Test func choosingAPasswordManagerTurnsZigzagOffAndZigzagComesBackOn() throws {
+        let suite = "ProfileChoiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let bitwarden = "nngceckbapebfimnlniiiahkandclblb", onePassword = "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+        let work = UUID()
+        func saves() -> Bool? { ProfileKey.offersToSavePasswords.choice(in: work, defaults: defaults) }
+        func fills() -> Bool? { ProfileKey.fillsPasswords.choice(in: work, defaults: defaults) }
+        // Zigzag saved but didn't fill.
+        PasswordFiller.useManager(bitwarden, in: work, saves: true, fills: false, defaults: defaults)
+        #expect(PasswordFiller.chosenManager(in: work, defaults: defaults) == bitwarden)
+        #expect(PasswordFiller.chosen(in: work, defaults: defaults) == .zigzag)
+        #expect(saves() == false && fills() == false)
+        // Another one after it keeps what Zigzag did before the first.
+        PasswordFiller.useManager(onePassword, in: work, saves: false, fills: false, defaults: defaults)
+        #expect(PasswordFiller.chosenManager(in: work, defaults: defaults) == onePassword)
+        PasswordFiller.useZigzag(in: work, defaults: defaults)
+        #expect(PasswordFiller.chosenManager(in: work, defaults: defaults) == nil)
+        #expect(saves() == true && fills() == false)
+        // Stepped aside before anything was chosen: both come back on.
+        PasswordFiller.useManager(bitwarden, in: work, saves: false, fills: false, defaults: defaults)
+        PasswordFiller.useZigzag(in: work, defaults: defaults)
+        #expect(saves() == true && fills() == true)
+        // To iCloud from one: iCloud, and Zigzag comes back as it was before either.
+        PasswordFiller.useManager(bitwarden, in: work, saves: false, fills: true, defaults: defaults)
+        PasswordFiller.useICloud(in: work, saves: false, fills: false, defaults: defaults)
+        #expect(PasswordFiller.chosen(in: work, defaults: defaults) == .iCloud)
+        #expect(PasswordFiller.chosenManager(in: work, defaults: defaults) == nil)
+        PasswordFiller.useManager(bitwarden, in: work, saves: false, fills: false, defaults: defaults)
+        #expect(PasswordFiller.chosen(in: work, defaults: defaults) == .zigzag)
+        PasswordFiller.useZigzag(in: work, defaults: defaults)
+        #expect(saves() == false && fills() == true)
+        // Removing a profile removes its choice.
+        PasswordFiller.useManager(bitwarden, in: work, saves: true, fills: true, defaults: defaults)
+        ProfileKey.forget(work, in: defaults)
+        #expect(PasswordFiller.chosenManager(in: work, defaults: defaults) == nil)
+    }
 }
 
 /// Which profiles may be removed.

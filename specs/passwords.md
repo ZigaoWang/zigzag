@@ -55,6 +55,12 @@
   Test: ProfileChoiceTests.zigzagStepsAsideForAPasswordManagerUntilYouChoose
 - Choose iCloud Passwords → Zigzag's filling and saving turn off; choosing Zigzag again brings back what was on before.
   Test: ProfileChoiceTests.iCloudPasswordsTurnsZigzagOffAndZigzagComesBackAsItWas
+- Password manager in Settings › Passwords → Zigzag, iCloud Passwords, then each password manager extension installed and on, by name; one turned off or removed isn't listed.
+  Test: ProfileChoiceTests.passwordManagerExtensionsAreListedAfterICloudByName
+- A password manager extension on while Zigzag neither saves nor fills → it shows checked, not Zigzag; with several, the one you chose.
+  Test: ProfileChoiceTests.aPasswordManagerShowsCheckedWhileZigzagStepsAside
+- Choose a password manager extension → Zigzag's saving and filling turn off; choosing Zigzag again brings them back on.
+  Test: ProfileChoiceTests.choosingAPasswordManagerTurnsZigzagOffAndZigzagComesBackOn
 - 1Password waiting on its app → "1Password is waiting for you" only after you used it or a field just before; a background connect never shows it.
   Test: CompanionAppNoticeTests.aBackgroundConnectWithNoUseNeverShowsIt
 
