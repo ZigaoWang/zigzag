@@ -367,6 +367,8 @@ final class BrowserWindow: NSWindow {
 
     /// The PDF under the pointer, when one is: its scrolls go to its swipe before the pages' scroll view.
     private func pdfView(at point: NSPoint) -> ZigzagPDFView? {
+        // No viewer in this window: no hit test for every scroll.
+        guard ZigzagPDFView.isShown(in: self) else { return nil }
         var view = contentView?.hitTest(contentView?.convert(point, from: nil) ?? .zero)
         while let current = view, !(current is ZigzagPDFView) { view = current.superview }
         return view as? ZigzagPDFView

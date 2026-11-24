@@ -557,8 +557,18 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if window == nil { Self.inWindows.remove(self) } else { Self.inWindows.add(self) }
         // A tab in the back keeps only a little of what it drew; back in front, it asks again.
         if window == nil { trimChunks(to: Self.chunkLimitAway) } else { refreshLayers(); refresh() }
+    }
+
+    /// Viewers in a window now, so a window without one skips looking for one under each scroll.
+    private static let inWindows = NSHashTable<ZigzagPDFView>.weakObjects()
+
+    /// Whether a viewer is in `window`.
+    static func isShown(in window: NSWindow) -> Bool {
+        guard inWindows.count > 0 else { return false }
+        return inWindows.allObjects.contains { $0.window === window }
     }
 
     private func darkChanged() {
