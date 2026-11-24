@@ -18,23 +18,28 @@ struct PasswordMenuTests {
     private final class Heard: NSObject, WKScriptMessageHandler {
         var kinds: [String] = []
         var focuses: [[String: Any]] = []
+        var moves: [[String: Any]] = []
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let body = message.body as? [String: Any], let kind = body["kind"] as? String else { return }
             kinds.append(kind)
             if kind == "focus" { focuses.append(body) }
+            if kind == "move" { moves.append(body) }
         }
     }
 
     /// A made-up page on https://example.com with the password watcher, in a window that's never shown.
-    private func page(_ html: String) async -> (WKWebView, NSWindow, Heard, Loading) {
+    /// `drawn`: the window drawn off screen, so the page gets its frames and layout callbacks.
+    private func page(_ html: String, drawn: Bool = false) async -> (WKWebView, NSWindow, Heard, Loading) {
         let heard = Heard()
         let configuration = WKWebViewConfiguration()
+        if drawn { configuration.preferences.inactiveSchedulingPolicy = .none }
         configuration.userContentController.addUserScript(Autofill.script)
         configuration.userContentController.add(heard, contentWorld: .defaultClient, name: Autofill.messageName)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
         window.contentView = webView
+        if drawn { drawOffscreen(webView, window) }
         let loading = Loading()
         webView.navigationDelegate = loading
         await withCheckedContinuation { done in
@@ -190,6 +195,60 @@ struct PasswordMenuTests {
     }
 
     // MARK: The menu on screen
+
+    private func drawOffscreen(_ webView: WKWebView, _ window: NSWindow) {
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        if webView.responds(to: occlusion) {
+            typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+            unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, false)
+        }
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        window.orderFrontRegardless()
+    }
+
+    private func y(of rect: Any?) -> Double? { (rect as? [String: Any])?["y"] as? Double }
+
+    /// Before, the menu stayed where it opened when the page zoomed or the field moved, covering the field, and a click
+    /// meant for the field picked a login (#378).
+    @Test func theMenuFollowsAFieldThatMoves() async throws {
+        let (webView, window, heard, _) = await page("""
+        <form><input id="u" name="email" autocomplete="username"><input id="p" type="password"></form>
+        """, drawn: true)
+        defer { window.orderOut(nil) }
+        let (x, y) = try await spot("#u", in: webView)
+        try await click(webView, x: x, y: y)
+        let opened = try #require(self.y(of: heard.focuses.last?["rect"]))
+        // No menu up: nothing is followed.
+        _ = try await webView.evaluateJavaScript("document.body.style.paddingTop = '40px'")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.moves.isEmpty)
+        _ = try await webView.evaluateJavaScript("document.body.style.paddingTop = ''")
+        try await Task.sleep(for: .milliseconds(300))
+        // The menu up: the page's layout moving the field down reports where it is now.
+        // Set where Zigzag sets it, in the watcher's own world.
+        _ = try await webView.callAsyncJavaScript("window.__zigzagSuggesting = true", arguments: [:], in: nil, contentWorld: .defaultClient)
+        _ = try await webView.evaluateJavaScript("document.body.style.paddingTop = '120px'")
+        try await Task.sleep(for: .milliseconds(400))
+        _ = try await webView.callAsyncJavaScript("return 1", arguments: [:], in: nil, contentWorld: .defaultClient)
+        let moved = try #require(self.y(of: heard.moves.last?["rect"]))
+        #expect(abs(moved - opened - 120) < 1)
+        // So does the page zooming.
+        let count = heard.moves.count
+        webView.pageZoom = 1.5
+        try await Task.sleep(for: .milliseconds(500))
+        _ = try await webView.callAsyncJavaScript("return 1", arguments: [:], in: nil, contentWorld: .defaultClient)
+        #expect(heard.moves.count > count)
+    }
+
+    /// Pinched in, the page's CSS pixels are bigger on screen: the menu still goes under the field (#378).
+    @Test func aPinchedPageStillPutsTheMenuUnderItsField() {
+        let css = NSRect(x: 40, y: 90, width: 320, height: 30)
+        #expect(Autofill.fieldRect(css: css, viewportOffset: .zero, pageZoom: 1, magnification: 1) == css)
+        #expect(Autofill.fieldRect(css: css, viewportOffset: .zero, pageZoom: 1, magnification: 1.5) == NSRect(x: 60, y: 135, width: 480, height: 45))
+        #expect(Autofill.fieldRect(css: css, viewportOffset: .zero, pageZoom: 1.25, magnification: 1) == NSRect(x: 50, y: 112.5, width: 400, height: 37.5))
+        // Panned across a pinched page: counted from the part in view.
+        #expect(Autofill.fieldRect(css: css, viewportOffset: NSPoint(x: 20, y: 10), pageZoom: 1, magnification: 2) == NSRect(x: 40, y: 160, width: 640, height: 60))
+    }
 
     @Test func theMenuStaysInsideTheWindow() {
         let bounds = NSRect(x: 0, y: 0, width: 800, height: 600)
