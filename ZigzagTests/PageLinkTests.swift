@@ -94,6 +94,26 @@ struct PageLinkTests {
         #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == nil)
     }
 
+    /// A page-handled ⇧-click opens Zigzag Mini; Command-Shift still opens a foreground tab.
+    @Test func aPageHandledShiftClickIsMiniAndCommandShiftIsNot() {
+        let tab = Tab(url: URL(string: "https://example.com/")!, spaceID: UUID())
+        let clicked = URL(string: "https://example.com/watch?v=1")!
+        tab.modifiedClickFollowed(clicked, mini: true, download: false)
+        #expect(tab.newWindowActivation(for: clicked, type: .other, isMainFrame: true,
+                                        modifiers: [], buttonNumber: 0) == .mini)
+        // Taken once.
+        #expect(tab.newWindowActivation(for: clicked, type: .other, isMainFrame: true,
+                                        modifiers: [], buttonNumber: 0) == .page)
+        // Native clicks use the existing precedence.
+        #expect(tab.newWindowActivation(for: clicked, type: .linkActivated, isMainFrame: true,
+                                        modifiers: [.shift], buttonNumber: 0) == .mini)
+        #expect(tab.newWindowActivation(for: clicked, type: .linkActivated, isMainFrame: true,
+                                        modifiers: [.command, .shift], buttonNumber: 0) == .newTab(inFront: true))
+        // A frame's Shift-click stays the frame's.
+        #expect(tab.newWindowActivation(for: clicked, type: .linkActivated, isMainFrame: false,
+                                        modifiers: [.shift], buttonNumber: 0) == .page)
+    }
+
     @Test func blockAlwaysHolds() {
         // Block holds even for an address you typed: being yours only spares the question.
         #expect(ExternalLinks.verdict(byYou: true, clickedHere: true, scheme: "zoommtg", stored: "deny") == .block)

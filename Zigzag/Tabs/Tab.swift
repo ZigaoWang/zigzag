@@ -2043,6 +2043,17 @@ extension Tab: WKNavigationDelegate {
         return followed ?? .page
     }
 
+    /// Where a request for a new window opens. A real link click uses `linkActivation`'s precedence (⌘ wins, ⇧ alone is
+    /// Zigzag Mini); a page that handled the click itself (`window.open`, YouTube and parts of Google) is known by the
+    /// URL-scoped click record, taken once.
+    func newWindowActivation(for url: URL?, type: WKNavigationType, isMainFrame: Bool,
+                             modifiers: NSEvent.ModifierFlags, buttonNumber: Int) -> LinkActivation {
+        if type == .linkActivated {
+            return Self.linkActivation(type: type, isMainFrame: isMainFrame, modifiers: modifiers, buttonNumber: buttonNumber)
+        }
+        return followedActivation(for: url) ?? .page
+    }
+
     /// How long after a ⇧ or ⌥ click the page's navigation still counts as that click's.
     static let followedClickWindow: TimeInterval = 2
 
@@ -2635,6 +2646,21 @@ extension Tab: WKUIDelegate {
 
     private func newWebView(for webView: WKWebView, configuration: WKWebViewConfiguration, navigationAction: WKNavigationAction,
                             windowFeatures: WKWindowFeatures) -> WKWebView? {
+        // An explicit menu choice wins over a click record.
+        if BrowserWebView.pendingDisposition(for: webView) == nil {
+            // A ⇧-click the page handles itself arrives as its own `window.open`, whose request carries no modifiers:
+            // the click record is what says Zigzag Mini. Native clicks use the same precedence, so Command-Shift stays
+            // a tab.
+            let activation = newWindowActivation(for: navigationAction.request.url,
+                                                 type: navigationAction.navigationType,
+                                                 isMainFrame: navigationAction.sourceFrame.isMainFrame,
+                                                 modifiers: navigationAction.modifierFlags,
+                                                 buttonNumber: navigationAction.buttonNumber)
+            if activation == .mini, let url = navigationAction.request.url {
+                host?.tab(self, openURL: url, disposition: .mini)
+                return nil
+            }
+        }
         // Zigzag's own Open in New Tab, New Window or Zigzag Mini always opens; a page's own request needs a click or your say.
         if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isClicked(navigationAction, in: webView, isPrivate: isPrivate) {
             // Page pop-up: a saved destination for the site opens without asking, else the banner asks and nothing
