@@ -18,12 +18,13 @@ Zigzag 使用 `zh-Hant` 提供繁體中文介面。請以英文原文和字串�
 | Settings / General / Language | 設定／一般／語言 |
 | Privacy & Security | 隱私權與安全性 |
 | Keychain / AutoFill | 鑰匙圈／自動填寫 |
-| Sign-ins / Certificate | 登入狀態／憑證 |
+| Account / Sign-ins / Certificate | 帳號／登入狀態／憑證 |
 | Local Network / Port | 區域網路／連接埠 |
 | File / Folder / File Extension | 檔案／資料夾／副檔名 |
 | Shortcut / Space bar | 鍵盤快速鍵／空白鍵 |
 | Reload / Share / Copy / Save | 重新載入／分享／複製／儲存 |
 | Ask / Allow / Block | 詢問／允許／阻擋 |
+| Ad blocking / Block ads and trackers | 廣告阻擋／阻擋廣告和追蹤器 |
 | Undo / Restore / Reset | 復原／還原／重設 |
 | What’s New / Fixed | 新功能／修正 |
 

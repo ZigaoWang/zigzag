@@ -60,6 +60,12 @@
             "state" : "translated",
             "value" : "Zigzag 默认关闭。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag 中預設關閉。"
+          }
         }
       }
     },
@@ -70,6 +76,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 默认打开。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag 中預設開啟。"
           }
         }
       }
@@ -82,6 +94,12 @@
             "state" : "translated",
             "value" : "还原"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重設"
+          }
         }
       }
     },
@@ -92,6 +110,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还原“%@”"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重設「%@」"
           }
         }
       }
@@ -1246,7 +1270,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 正在攔截 YouTube 上的廣告。"
+            "value" : "%@ 正在阻擋 YouTube 上的廣告。"
           }
         }
       }
@@ -4453,7 +4477,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "廣告攔截"
+            "value" : "廣告阻擋"
           }
         }
       }
@@ -5122,7 +5146,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已攔截廣告和追蹤器"
+            "value" : "已阻擋廣告和追蹤器"
           }
         }
       }
@@ -5139,7 +5163,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "廣告會在所有網站上重新攔截，延伸功能會在每個網站上執行，網站會重新詢問是否使用你的相機、麥克風、位置、通知和憑證，縮放、JavaScript、深色網頁、全螢幕和 Cookie 彈出式視窗會重新跟隨你的設定，所有網站的分頁也會在背景照常休眠，清除 Cookie 時也不再保留任何網站，隱藏的元素、網站樣式和網站圖示也會被移除。"
+            "value" : "所有網站都會重新阻擋廣告，延伸功能會在每個網站上執行，網站會重新詢問是否使用你的相機、麥克風、位置、通知和憑證，縮放、JavaScript、深色網頁、全螢幕和 Cookie 彈出式視窗會重新跟隨你的設定，所有網站的分頁也會在背景照常休眠，清除 Cookie 時也不再保留任何網站，隱藏的元素、網站樣式和網站圖示也會被移除。"
           }
         }
       }
@@ -6743,7 +6767,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "攔截廣告"
+            "value" : "阻擋廣告"
           }
         }
       }
@@ -6777,7 +6801,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "攔截廣告和追蹤器"
+            "value" : "阻擋廣告和追蹤器"
           }
         }
       }
@@ -6794,7 +6818,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要攔截廣告嗎？"
+            "value" : "要阻擋廣告嗎？"
           }
         }
       }
@@ -6811,7 +6835,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "攔截網頁上的內容"
+            "value" : "阻擋網頁上的內容"
           }
         }
       }
@@ -6845,7 +6869,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已攔截網頁自行開始的下載"
+            "value" : "已阻擋網頁自行開始的下載"
           }
         }
       }
@@ -8809,7 +8833,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "擷取區域、元素或整個網頁（⇧⌘2）"
+            "value" : "擷取區域、元素或整個網頁"
           }
         }
       }
@@ -12380,7 +12404,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "攔截規則"
+            "value" : "阻擋規則"
           }
         }
       }
@@ -13148,7 +13172,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用你的賬戶登入"
+            "value" : "使用你的帳號登入"
           }
         }
       }
@@ -13172,7 +13196,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "對靜態攔截規則的變更"
+            "value" : "變更靜態阻擋規則"
           }
         }
       }
@@ -16675,6 +16699,12 @@
             "state" : "translated",
             "value" : "看完就能回去。\n想留下这个网页，点这个按钮或按 %@。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看完就能回去。\n想留下這個網頁，點一下這個按鈕或按 %@。"
+          }
         }
       }
     },
@@ -16690,7 +16720,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "看完就能回去。\n想留下這個網頁，點這個按鈕或按 ⌘O。"
+            "value" : "看完就能回去。\n想留下這個網頁，點一下這個按鈕。"
           }
         }
       }
@@ -32604,7 +32634,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這個密碼在其他網站上也在使用。只要其中一個洩漏，這個賬戶也會有風險。請在網站上變更它，然後在這裡更新。"
+            "value" : "這個密碼在其他網站上也在使用。只要其中一個洩漏，這個帳號也會有風險。請在網站上變更它，然後在這裡更新。"
           }
         }
       }
@@ -36720,6 +36750,12 @@
             "state" : "translated",
             "value" : "Zigzag 未能读取 Dia 的已固定标签页。请再试一次。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 無法讀取 Dia 的已固定分頁。請再試一次。"
+          }
         }
       }
     },
@@ -36905,7 +36941,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這是 Zigzag 為此網站上的表單產生的強密碼。網站接受後，它會替換此賬戶已儲存的密碼；在此之前，舊密碼也會繼續保留。"
+            "value" : "這是 Zigzag 為此網站上的表單產生的強密碼。網站接受後，它會替換此帳號已儲存的密碼；在此之前，舊密碼也會繼續保留。"
           }
         }
       }
@@ -38241,6 +38277,12 @@
             "state" : "translated",
             "value" : "个人资料 %lld"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個人資料 %lld"
+          }
         }
       }
     },
@@ -38350,6 +38392,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 不允许 Zigzag 读取 Dia 的已固定标签页。请在“系统设置 › 隐私与安全性 › 文件与文件夹”中找到 Zigzag，打开 Dia，然后再试一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 不允許 Zigzag 讀取 Dia 的已固定分頁。請在「系統設定 › 隱私權與安全性 › 檔案與資料夾」中找到 Zigzag，開啟 Dia，然後再試一次。"
           }
         }
       }

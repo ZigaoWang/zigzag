@@ -5,9 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Zigzag now speaks Traditional Chinese. Choose it in Settings › General › Language and restart Zigzag.
-
 ### Fixed
 - A feature flag you changed in Settings › Developer has a Reset button beside its switch, in place of a plain “Changed”, and a flag Zigzag starts other than WebKit, like Prefer Page Rendering Updates near 60fps, says so under its name.
 - Letting go of a swipe that goes back or forward no longer springs the page back before it leaves. The page slides on a little and dims, then the next page shows in its place, so you can tell the swipe took without looking at the arrow. A swipe called off still springs back, and with Reduce Motion the page stays put. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
@@ -19,6 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 Pages at your display's full 120 Hz like Chrome, touch that feels native on a touch display with every tap counted, iPad-style dragging and two-finger back and forward, Dia's pinned tabs on import, press and hold Back or Forward for history, a smoother Show All Tabs, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
 
 ### New
+- Zigzag now speaks Traditional Chinese. Choose it in Settings › General › Language and restart Zigzag.
 - Importing from Dia brings its sidebar too, as from Arc. Each Dia profile's pinned tabs are pinned in the space its bookmarks go in, split views stay side by side, Dia's favorites become favorites, and with Open Tabs on, the tabs open there come over and wait to load until clicked. Importing again adds only what's new. ([#511](https://github.com/ZigaoWang/zigzag/issues/511))
 - Press and hold Back or Forward to see the pages that way and pick one, as in Safari and Chrome. Slide onto a page and let go to go there, or let go and click one. It works in the sidebar, the bar above the page, split view, Zigzag Mini and web apps, and a finger held on a touch display opens the same list. A right-click still opens it too, now in Zigzag's own menu. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
 

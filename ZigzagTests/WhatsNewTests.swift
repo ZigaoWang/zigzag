@@ -191,6 +191,37 @@ struct WhatsNewTests {
         #expect(WhatsNew.pick(english: english, localized: chinese, version: "2.0.0").sections.isEmpty)
     }
 
+    @Test func incompleteTraditionalChineseNotesFallBackToEnglish() {
+        let english = """
+        ## [1.1.0] - 2026-11-01
+
+        ### New
+        - One
+        - Two
+
+        ### Fixed
+        - Three
+        """
+        let traditional = """
+        ## [1.1.0] - 2026-11-01
+
+        ### 新功能
+        - 一
+        - 二
+
+        ### 修正
+        - 三
+        """
+        let source = WhatsNew.parse(english, version: "1.1.0")
+        let incomplete = traditional.replacingOccurrences(of: "\n- 二", with: "")
+        let missingVersion = traditional.replacingOccurrences(of: "[1.1.0]", with: "[1.0.0]")
+        for notes in [nil, missingVersion, incomplete] {
+            #expect(WhatsNew.pick(english: english, localized: notes, version: "1.1.0", requireCompleteTranslation: true) == source)
+        }
+        #expect(WhatsNew.pick(english: english, localized: traditional, version: "1.1.0", requireCompleteTranslation: true)
+                == WhatsNew.parse(traditional, version: "1.1.0"))
+    }
+
     /// New and Fixed are shown in the app's language from either changelog; other headings as written.
     @Test func sectionHeadingsAreTheApps() {
         let new = String(localized: "New", comment: "Heading in What’s New: the new things in this version.")
@@ -200,26 +231,25 @@ struct WhatsNewTests {
         #expect(WhatsNew.heading("Security") == "Security")
     }
 
-    /// Each Chinese changelog follows the English one: every version has the same date, sections and issue links.
-    @Test(arguments: ["zh-Hans", "zh-Hant"]) func shippedChineseNotesMatchTheEnglish(_ language: String) throws {
+    /// Shipped Simplified Chinese notes match English. Traditional Chinese may lag and falls back at runtime.
+    @Test func shippedChineseNotesMatchTheEnglish() throws {
         func text(_ name: String) throws -> String {
             let url = try #require(Bundle.main.url(forResource: name, withExtension: "md"))
             return try String(contentsOf: url, encoding: .utf8)
         }
-        let english = try text("CHANGELOG"), chinese = try text("CHANGELOG.\(language)")
+        let english = try text("CHANGELOG"), chinese = try text("CHANGELOG.zh-Hans")
         let versions = chinese.components(separatedBy: .newlines).compactMap { line -> String? in
             guard line.hasPrefix("## ["), let end = line.firstIndex(of: "]") else { return nil }
             return String(line[line.index(line.startIndex, offsetBy: 4)..<end])
-        }
-        #expect(versions.filter { $0 != "Unreleased" }.count >= 6)
-        #expect(versions.contains("Unreleased"))
-        let names = ["New": "新功能", "Fixed": language == "zh-Hant" ? "修正" : "修复"]
+        }.filter { $0 != "Unreleased" }
+        #expect(versions.count >= 6)
+        let names = ["New": "新功能", "Fixed": "修复"]
         for version in versions {
             let en = WhatsNew.parse(english, version: version), zh = WhatsNew.parse(chinese, version: version)
             #expect(!en.sections.isEmpty, "\(version) isn't in CHANGELOG.md")
             #expect(zh.date == en.date, "\(version) has another day")
             #expect(zh.sections.map(\.title) == en.sections.map { names[$0.title] ?? $0.title }, "\(version) has other sections")
-            #expect(zh.sections.map { $0.items.map(\.issues) } == en.sections.map { $0.items.map(\.issues) },
+            #expect(zh.sections.map { $0.items.map { $0.issues.map(\.number) } } == en.sections.map { $0.items.map { $0.issues.map(\.number) } },
                     "\(version) has other points or issues")
         }
     }

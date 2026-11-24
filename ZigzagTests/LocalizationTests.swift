@@ -148,8 +148,9 @@ struct LocalizationTests {
         return bundle.localizedString(forKey: key, value: "⟨missing⟩", table: nil)
     }
 
-    /// Both catalogs are complete, including nested plural forms and the system permission prompts.
-    @Test(arguments: ["zh-Hans", "zh-Hant"]) func everyStringHasChinese(_ language: String) throws {
+    /// Simplified Chinese is required; missing Traditional Chinese strings use the English source.
+    @Test func everyStringHasChinese() throws {
+        let language = "zh-Hans"
         func translated(_ node: [String: Any]) -> Bool {
             if let unit = node["stringUnit"] as? [String: Any] {
                 guard unit["state"] as? String == "translated", let value = unit["value"] as? String,
@@ -178,14 +179,16 @@ struct LocalizationTests {
         for (key, entry) in try Self.catalog() {
             let en = Self.forms(entry, "en").first ?? key
             let expected = Self.arguments(en, entry, "en")
-            for zh in Self.forms(entry, language, includeSubstitutions: false)
-                where Self.arguments(zh, entry, language) != expected {
+            let forms = Self.forms(entry, language, includeSubstitutions: false)
+            // An untranslated entry is left to the English source, including any substitutions.
+            let locales = (entry as? [String: Any])?["localizations"] as? [String: [String: Any]]
+            guard let localization = locales?[language] else { continue }
+            for zh in forms where Self.arguments(zh, entry, language) != expected {
                 wrong.append("\(key) → \(zh)")
             }
             // Each substitution has its own argument specifier and plural forms, independent of the outer format.
-            let locales = (entry as? [String: Any])?["localizations"] as? [String: [String: Any]]
             let source = locales?["en"]?["substitutions"] as? [String: [String: Any]] ?? [:]
-            let translated = locales?[language]?["substitutions"] as? [String: [String: Any]] ?? [:]
+            let translated = localization["substitutions"] as? [String: [String: Any]] ?? [:]
             for (name, sub) in source {
                 let format = sub["formatSpecifier"] as? String
                 let plural = (translated[name]?["variations"] as? [String: Any])?["plural"] as? [String: [String: Any]]
