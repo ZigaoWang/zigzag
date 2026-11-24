@@ -318,9 +318,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.spaceChip.onClick = { [weak self] _ in self?.showSpaceMenu() }
         strip.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         strip.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
-        // Right-click Back or Forward: the pages that way, to jump several at once, as in a browser window.
-        strip.backButton.onRightClick = { [weak self] _ in BrowserWindowController.historyMenu(of: self?.tab.webView, back: true) }
-        strip.forwardButton.onRightClick = { [weak self] _ in BrowserWindowController.historyMenu(of: self?.tab.webView, back: false) }
+        // Right-click or hold Back or Forward: the pages that way, to jump several at once, as in a browser window.
+        BrowserWindowController.showsHistory(strip.backButton, back: true) { [weak self] in self?.tab.webView }
+        BrowserWindowController.showsHistory(strip.forwardButton, back: false) { [weak self] in self?.tab.webView }
         strip.reloadButton.onClick = { [weak self] _ in
             guard let self, !self.isLeaving else { return }
             self.tab.isLoading ? self.tab.stopLoading() : self.tab.reload()

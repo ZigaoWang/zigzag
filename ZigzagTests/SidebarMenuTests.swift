@@ -804,4 +804,115 @@ struct SidebarRowMenuTests {
             #expect(menu.itemTitles.last == "Close Other Tabs")
         }
     }
+
+    // MARK: Holding Back or Forward (#509)
+
+    /// A Back button in a window, listing three pages the way `showsHistory` does.
+    private func heldBack(_ chosen: @escaping (String) -> Void) -> (NSWindow, IconButton) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let button = IconButton(symbol: "chevron.left", toolTip: "Back")
+        button.frame = NSRect(x: 40, y: 500, width: 28, height: 28)
+        window.contentView?.addSubview(button)
+        BrowserWindowController.showsHistory(button, back: true) { nil }
+        button.onRightClick = { _ in
+            let menu = NSMenu()
+            for title in ["One", "Two", "Three"] { menu.addItem(SidebarMenus.Item(title) { chosen(title) }) }
+            return menu
+        }
+        return (window, button)
+    }
+
+    private func mouse(_ type: NSEvent.EventType, at point: NSPoint, in window: NSWindow) -> NSEvent {
+        NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                           windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+    }
+
+    private func middle(of view: NSView) -> NSPoint { view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil) }
+
+    @Test func holdingBackOpensItsListUnderItAfterTheDelay() async throws {
+        var chosen: [String] = []
+        let (window, button) = heldBack { chosen.append($0) }
+        button.mouseDown(with: mouse(.leftMouseDown, at: middle(of: button), in: window))
+        #expect(MenuPanel.current == nil)
+        try await Task.sleep(for: .seconds(InteractiveView.holdMenuDelay + 0.2))
+        let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
+        #expect(menu.anchor === button)
+        #expect(menu.itemTitles == ["One", "Two", "Three"])
+        // Under the button.
+        #expect(menu.convert(menu.bounds, to: nil).maxY <= button.convert(button.bounds, to: nil).minY)
+        // Let go on the button: it stays open to click, and doesn't go back a step.
+        var clicked = false
+        button.onClick = { _ in clicked = true }
+        button.mouseUp(with: mouse(.leftMouseUp, at: middle(of: button), in: window))
+        #expect(MenuPanel.current === menu)
+        #expect(!clicked && chosen.isEmpty)
+    }
+
+    @Test func aQuickClickOnBackGoesOneStepWithNoList() {
+        let (window, button) = heldBack { _ in }
+        var clicks = 0
+        button.onClick = { _ in clicks += 1 }
+        button.mouseDown(with: mouse(.leftMouseDown, at: middle(of: button), in: window))
+        button.mouseUp(with: mouse(.leftMouseUp, at: middle(of: button), in: window))
+        #expect(clicks == 1)
+        // The hold that never came stays away.
+        button.holdElapsed()
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func pressDragAndReleaseOnAPageGoesThere() throws {
+        var chosen: [String] = []
+        var clicks = 0
+        let (window, button) = heldBack { chosen.append($0) }
+        button.onClick = { _ in clicks += 1 }
+        button.mouseDown(with: mouse(.leftMouseDown, at: middle(of: button), in: window))
+        button.holdElapsed()
+        let menu = try #require(MenuPanel.current)
+        button.mouseDragged(with: mouse(.leftMouseDragged, at: menu.debugItemPoint(1), in: window))
+        #expect(menu.highlightedIndex == 1)
+        button.mouseUp(with: mouse(.leftMouseUp, at: menu.debugItemPoint(1), in: window))
+        #expect(chosen == ["Two"])
+        #expect(clicks == 0)
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func aDisabledBackOpensNothing() {
+        let (window, button) = heldBack { _ in }
+        button.isEnabled = false
+        button.mouseDown(with: mouse(.leftMouseDown, at: middle(of: button), in: window))
+        button.holdElapsed()
+        #expect(MenuPanel.current == nil)
+        // With no pages that way there's no list either.
+        BrowserWindowController.showsHistory(button, back: false) { nil }
+        button.isEnabled = true
+        button.mouseDown(with: mouse(.leftMouseDown, at: middle(of: button), in: window))
+        button.holdElapsed()
+        #expect(MenuPanel.current == nil)
+        button.mouseUp(with: mouse(.leftMouseUp, at: middle(of: button), in: window))
+    }
+
+    @Test func aFingerHeldOnBackOpensTheSameList() throws {
+        var chosen: [String] = []
+        let (_, button) = heldBack { chosen.append($0) }
+        let hold = try #require(button.beginTouchHold(at: middle(of: button)))
+        hold.showMenu()
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === button && menu.itemTitles == ["One", "Two", "Three"])
+        hold.moved(to: menu.debugItemPoint(2))
+        hold.lifted(at: menu.debugItemPoint(2))
+        #expect(chosen == ["Three"])
+    }
+
+    @Test func everyBackAndForwardInAWindowListsItsPages() {
+        inWindow(["A"]) { controller, _, _ in
+            for button in [controller.sidebar.backButton, controller.sidebar.forwardButton] {
+                #expect(button.drawsMenu && button.holdOpensMenu && button.offersMenu)
+            }
+            for card in controller.root.paneCards {
+                #expect(card.header.back.holdOpensMenu && card.header.forward.holdOpensMenu)
+            }
+        }
+    }
 }

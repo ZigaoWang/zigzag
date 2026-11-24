@@ -176,9 +176,17 @@ class InteractiveView: NSView {
     /// The mouse-down behind the click being handled; nil when the click came from the keyboard or VoiceOver.
     var currentPress: NSEvent? { mouseDownEvent }
 
+    /// Held down, it opens its right-click menu under itself, as Safari's Back and Forward do (#509).
+    var holdOpensMenu = false
+    /// How long a press is held before that menu opens.
+    nonisolated static let holdMenuDelay: TimeInterval = 0.5
+
     private var trackingArea: NSTrackingArea?
     private var mouseDownEvent: NSEvent?
     private var dragging = false
+    private var holdTimer: Timer?
+    /// The menu a held press opened, while that press is still down.
+    private weak var heldMenu: MenuPanel?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -257,10 +265,37 @@ class InteractiveView: NSView {
         isPressed = true
         mouseDownEvent = event
         dragging = false
+        heldMenu = nil
+        // A finger's hold has its own menu (`TouchHold`).
+        if holdOpensMenu, onRightClick != nil, !TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) {
+            startHoldTimer()
+        }
         if clicksOnMouseDown { onClick?(event) }
     }
 
+    private func startHoldTimer() {
+        holdTimer?.invalidate()
+        let timer = Timer(timeInterval: Self.holdMenuDelay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.holdElapsed() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        holdTimer = timer
+    }
+
+    /// Still pressed on it once the hold is up: its menu opens under it, to choose from by letting go over an item.
+    func holdElapsed() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        guard isEnabled, isPressed, !dragging, let press = mouseDownEvent, let onRightClick, window != nil,
+              MenuPanel.current == nil, let menu = onRightClick(press) else { return }
+        let entries = MenuPanel.entries(from: menu)
+        guard !entries.isEmpty else { return }
+        isPressed = false
+        heldMenu = MenuPanel.show(entries, from: self, placement: .below)
+    }
+
     override func mouseDragged(with event: NSEvent) {
+        if let heldMenu, MenuPanel.current === heldMenu { heldMenu.track(windowPoint: event.locationInWindow); return }
         guard isEnabled, let start = mouseDownEvent, !dragging else { return }
         let dx = event.locationInWindow.x - start.locationInWindow.x, dy = event.locationInWindow.y - start.locationInWindow.y
         let distance = dragsHorizontally ? abs(dx) : hypot(dx, dy)
@@ -280,7 +315,13 @@ class InteractiveView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { mouseDownEvent = nil; dragging = false }
+        defer { mouseDownEvent = nil; dragging = false; holdTimer?.invalidate(); holdTimer = nil; heldMenu = nil }
+        if let heldMenu {
+            isPressed = false
+            // Let go over an item, it's chosen; anywhere else the menu stays open to click.
+            if MenuPanel.current === heldMenu { heldMenu.chooseTracked(windowPoint: event.locationInWindow) }
+            return
+        }
         guard isEnabled, mouseDownEvent != nil else { isPressed = false; return }
         let inside = pressArea.contains(convert(event.locationInWindow, from: nil))
         isPressed = false

@@ -95,6 +95,8 @@ final class PaneHeaderView: NSView {
         more.onClick = { [weak self] _ in self?.showMore() }
         back.onClick = { [weak self] _ in self?.tab?.goBack() }
         forward.onClick = { [weak self] _ in self?.tab?.goForward() }
+        BrowserWindowController.showsHistory(back, back: true) { [weak self] in self?.tab?.webView }
+        BrowserWindowController.showsHistory(forward, back: false) { [weak self] in self?.tab?.webView }
         reload.onClick = { [weak self] _ in
             guard let tab = self?.tab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()

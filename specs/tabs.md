@@ -194,3 +194,16 @@
   Test: TouchMovesTests.aFingerDraggingThePageIsNotATrackpadSwipe
 - The trackpad's swipes, the pointer at the window's edge and the sidebar toggles work as before alongside all of it.
   Test: TouchMovesTests.theTrackpadsScrollsAreNotClaimed
+
+## Back and Forward
+- Press and hold Back or Forward for half a second → the pages that way, nearest first, in Zigzag's menu under the button; let go on the button and it stays open to click, Esc closes it. The sidebar's, the bar above the page's, a split pane's strip, Zigzag Mini's and a web app's.
+  Test: SidebarRowMenuTests.holdingBackOpensItsListUnderItAfterTheDelay
+  Test: SidebarRowMenuTests.everyBackAndForwardInAWindowListsItsPages
+- A quick click on Back or Forward → one page that way, no list.
+  Test: SidebarRowMenuTests.aQuickClickOnBackGoesOneStepWithNoList
+- Hold, slide onto a page in the list and let go → that page.
+  Test: SidebarRowMenuTests.pressDragAndReleaseOnAPageGoesThere
+- Back or Forward dimmed, with no pages that way → holding it opens nothing.
+  Test: SidebarRowMenuTests.aDisabledBackOpensNothing
+- A finger held on Back or Forward → the same list; slide onto a page and lift to go there.
+  Test: SidebarRowMenuTests.aFingerHeldOnBackOpensTheSameList

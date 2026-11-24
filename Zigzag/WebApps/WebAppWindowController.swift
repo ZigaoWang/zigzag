@@ -94,6 +94,8 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         strip.title.stringValue = app.name
         strip.back.onClick = { [weak self] _ in self?.tab.goBack() }
         strip.forward.onClick = { [weak self] _ in self?.tab.goForward() }
+        BrowserWindowController.showsHistory(strip.back, back: true) { [weak self] in self?.tab.webView }
+        BrowserWindowController.showsHistory(strip.forward, back: false) { [weak self] in self?.tab.webView }
         strip.reload.onClick = { [weak self] _ in
             guard let tab = self?.tab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()

@@ -145,9 +145,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
-        // Right-click Back or Forward: the pages that way, to jump several at once.
-        sidebar.backButton.onRightClick = { [weak self] _ in self?.historyMenu(back: true) }
-        sidebar.forwardButton.onRightClick = { [weak self] _ in self?.historyMenu(back: false) }
+        // Right-click or hold Back or Forward: the pages that way, to jump several at once.
+        Self.showsHistory(sidebar.backButton, back: true) { [weak self] in self?.selectedWebView }
+        Self.showsHistory(sidebar.forwardButton, back: false) { [weak self] in self?.selectedWebView }
         // A finger's tap toggles once: the other toggle, now under it, doesn't take its tap.
         sidebar.sidebarButton.onClick = { [weak self] event in
             self?.toggleBrowserSidebar(nil)
@@ -592,7 +592,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
     }
 
-    private func historyMenu(back: Bool) -> NSMenu? { Self.historyMenu(of: selectedWebView, back: back) }
+    /// Back or Forward lists the pages that way in Zigzag's menu: on a right-click, a press held down, or a finger held.
+    static func showsHistory(_ button: InteractiveView, back: Bool, of webView: @escaping () -> WKWebView?) {
+        button.drawsMenu = true
+        button.holdOpensMenu = true
+        button.onRightClick = { _ in historyMenu(of: webView(), back: back) }
+    }
 
     /// The pages behind or ahead of `webView`'s page, nearest first, for a right-click on Back or Forward.
     static func historyMenu(of webView: WKWebView?, back: Bool) -> NSMenu? {
