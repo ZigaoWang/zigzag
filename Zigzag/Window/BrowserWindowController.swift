@@ -107,6 +107,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.placeFloatingUpdate()
         }
         root.onInPageMiniLayout = { [weak self] _ in self?.inPageMini.browserLayoutChanged() }
+        root.onInPageMiniSlide = { [weak self] show, duration in
+            self?.inPageMini.sidebarSlid(show: show, duration: duration)
+        }
         installInPageMiniEscMonitor()
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onTouchPull = { [weak self] pulling in

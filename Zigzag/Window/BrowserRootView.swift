@@ -426,6 +426,9 @@ final class BrowserRootView: SpaceFrameView {
     var coversInPageMini: Bool { (sidebarRevealed && !chromeSidebarShown) || topBarRevealed }
     /// Called when the page area moves or resizes, so the docked Mini keeps its place.
     var onInPageMiniLayout: ((NSRect) -> Void)?
+    /// Called as the edge sidebar starts to slide over the page or back (`show`, duration): the docked Mini has to be
+    /// out of its way for the whole slide, and come back only after it has tucked away.
+    var onInPageMiniSlide: ((Bool, TimeInterval) -> Void)?
     /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
     /// it (#210): the window still reads as a sidebar and a page, as it does with a page open.
     let emptyHint = EmptySpaceMark()
@@ -2716,6 +2719,7 @@ final class BrowserRootView: SpaceFrameView {
         let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
         // Out, it slides all the way before the pointer can send it back: one slide, never cut short and begun again.
         let slide = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown : curve.duration
+        onInPageMiniSlide?(show, slide)
         edgeReveal.shown(show, at: ProcessInfo.processInfo.systemUptime, settling: slide)
         watchPointer(show)
         let target = sidebarFrame

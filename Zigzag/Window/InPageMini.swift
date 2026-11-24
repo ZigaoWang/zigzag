@@ -103,4 +103,10 @@ final class InPageMiniHost {
         guard let record, let browser else { return }
         record.controller.layoutInDock(pane: browser.root.cardFrame)
     }
+
+    /// The edge sidebar starts to slide over the page, or back: the docked Mini gets out of its way for the whole
+    /// slide, rather than sitting over it while it moves.
+    func sidebarSlid(show: Bool, duration: TimeInterval) {
+        record?.controller.sidebarSlid(show: show, duration: duration)
+    }
 }

@@ -19,6 +19,19 @@ struct InPageMiniHostTests {
         try body(controller, tab)
     }
 
+    private func inWindowAsync(_ body: (BrowserWindowController, Tab) async throws -> Void) async rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = manager.newTab(url: URL(string: "about:blank"), spaceID: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        try await body(controller, tab)
+    }
+
     @Test func aDockedMiniIsABorderlessChildOfTheBrowserWindow() throws {
         try inWindow { browser, tab in
             let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
@@ -73,6 +86,22 @@ struct InPageMiniHostTests {
             browser.root.reveal(false)
             #expect(!browser.root.coversInPageMini)
             mini.layoutInDock(pane: browser.root.cardFrame)
+            #expect(!mini.isCoveredInDock)
+            mini.closeInPage(animated: false)
+        }
+    }
+
+    @Test func thePeekWaitsForTheSidebarToTuckAway() async throws {
+        try await inWindowAsync { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            // Out it goes before the slide's first frame; back only after the tuck has finished.
+            mini.sidebarSlid(show: true, duration: 0.02)
+            #expect(mini.isCoveredInDock)
+            mini.sidebarSlid(show: false, duration: 0.02)
+            mini.layoutInDock(pane: browser.root.cardFrame)
+            #expect(mini.isCoveredInDock)
+            try await Task.sleep(for: .milliseconds(150))
             #expect(!mini.isCoveredInDock)
             mini.closeInPage(animated: false)
         }

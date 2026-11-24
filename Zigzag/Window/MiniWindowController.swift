@@ -88,6 +88,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var inPageMiniDim: MiniPeekDimView?
     /// The browser's chrome covers the page card (revealed sidebar, The Whole Screen's bar): the child is out.
     private(set) var isCoveredInDock = false
+    /// The edge sidebar is tucking back in: the child stays out until it has finished.
+    private var isSidebarTucking = false
+    private var sidebarTuckWork: DispatchWorkItem?
     /// The browser window is going in or out of full screen: the child waits until it has landed.
     private var isTransitioningWithParent = false
     private var dockedParentObservers: [NSObjectProtocol] = []
@@ -371,7 +374,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         dockedScreenFrame = screen
         guard !isTransitioningWithParent else { return }
         if force || window.frame != screen { window.setFrame(screen, display: false) }
-        let covered = browser.root.coversInPageMini
+        let covered = browser.root.coversInPageMini || isSidebarTucking
         guard covered != isCoveredInDock || force else { return }
         isCoveredInDock = covered
         if covered { window.orderOut(nil) } else { window.orderFront(nil) }
@@ -437,6 +440,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         isCoveredInDock = false
         isTransitioningWithParent = false
         dockedScreenFrame = nil
+        sidebarTuckWork?.cancel()
+        sidebarTuckWork = nil
+        isSidebarTucking = false
         root.isPageOverlay = false
     }
 
@@ -518,6 +524,30 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func relayoutAfterParent() {
         guard isDockedInPage, let browser = dockedBrowser else { return }
         layoutInDock(pane: browser.root.cardFrame, force: true)
+    }
+
+    /// The edge sidebar started out or back. Out, the child goes at once, before the slide's first frame; back, it
+    /// waits until the tuck has finished, so it never sits over the sidebar while it moves.
+    func sidebarSlid(show: Bool, duration: TimeInterval) {
+        guard isDockedInPage else { return }
+        sidebarTuckWork?.cancel()
+        sidebarTuckWork = nil
+        if show {
+            isSidebarTucking = false
+            guard !isCoveredInDock else { return }
+            isCoveredInDock = true
+            window?.orderOut(nil)
+            return
+        }
+        isSidebarTucking = true
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.isSidebarTucking = false
+            self.sidebarTuckWork = nil
+            self.relayoutAfterParent()
+        }
+        sidebarTuckWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, duration) + 0.02, execute: work)
     }
 
     /// The pointer over the browser or the docked Mini: near the top the strip comes down; away from it, it goes back up.
