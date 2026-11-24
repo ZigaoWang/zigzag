@@ -2,8 +2,7 @@ import AppKit
 import WebKit
 
 /// After an update: a note that Zigzag updated, and this version's notes on a sheet. The notes are this version's
-/// section of CHANGELOG.md, the same section the update window, the GitHub release and the website show, or of
-/// CHANGELOG.zh-Hans.md when the app speaks Chinese.
+/// section of CHANGELOG.md, or of the matching localized changelog when the app speaks Chinese.
 enum WhatsNew {
     /// A GitHub issue or pull request a note is about: "#32" at its end, linked.
     struct Issue: Equatable {
@@ -32,37 +31,52 @@ enum WhatsNew {
     static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
 
     /// This version's notes, read once from the copies of the changelog in the app: in the app's language when
-    /// that has notes for it (CHANGELOG.zh-Hans.md), in English otherwise.
+    /// that has notes for it, in English otherwise.
     static let release: Release = {
         func text(_ name: String) -> String? {
             Bundle.main.url(forResource: name, withExtension: "md").flatMap { try? String(contentsOf: $0, encoding: .utf8) }
         }
-        let localized = notesFile(for: Bundle.main.preferredLocalizations.first ?? "en").flatMap(text)
-        return pick(english: text("CHANGELOG") ?? "", localized: localized, version: notesVersion)
+        let file = notesFile(for: Bundle.main.preferredLocalizations.first ?? "en")
+        return pick(english: text("CHANGELOG") ?? "", localized: file.flatMap(text), version: notesVersion,
+                    requireCompleteTranslation: file == "CHANGELOG.zh-Hant")
     }()
 
     /// The changelog in the app's language, next to CHANGELOG.md in the app: none for English, and none for a
     /// language without one.
     static func notesFile(for language: String) -> String? {
-        Locale(identifier: language).language.languageCode?.identifier == "zh" ? "CHANGELOG.zh-Hans" : nil
+        let localeLanguage = Locale.Language(identifier: language)
+        guard localeLanguage.languageCode?.identifier == "zh" else { return nil }
+        return localeLanguage.script?.identifier == "Hant" ? "CHANGELOG.zh-Hant" : "CHANGELOG.zh-Hans"
     }
 
-    /// The notes in the app's language when its changelog has this version, in English when it doesn't, so a
-    /// release whose translation isn't in yet still shows its notes.
-    static func pick(english: String, localized: String?, version: String) -> Release {
-        if let localized {
-            let release = parse(localized, version: version)
-            if !release.sections.isEmpty { return release }
+    /// Traditional Chinese can lag behind the English notes. Fall back for the whole release: without IDs on
+    /// the bullets, there is no reliable way to tell which English bullet a partial translation is missing.
+    static func pick(english: String, localized: String?, version: String, requireCompleteTranslation: Bool = false) -> Release {
+        let source = parse(english, version: version)
+        guard let localized else { return source }
+        let translation = parse(localized, version: version)
+        guard !translation.sections.isEmpty else { return source }
+        if requireCompleteTranslation {
+            guard translation.sections.map({ sectionKind($0.title) }) == source.sections.map({ sectionKind($0.title) }),
+                  translation.sections.map({ $0.items.count }) == source.sections.map({ $0.items.count }) else { return source }
         }
-        return parse(english, version: version)
+        return translation
+    }
+
+    private static func sectionKind(_ title: String) -> String {
+        switch title {
+        case "新功能": "New"
+        case "修复", "修正": "Fixed"
+        default: title
+        }
     }
 
     /// A section's heading as the sheet shows it: New and Fixed in the app's language, whichever changelog they came
     /// from, and any other heading as it's written.
     static func heading(_ title: String) -> String {
-        switch title {
-        case "New", "新功能": String(localized: "New", comment: "Heading in What’s New: the new things in this version.")
-        case "Fixed", "修复": String(localized: "Fixed", comment: "Heading in What’s New: what this version fixes.")
+        switch sectionKind(title) {
+        case "New": String(localized: "New", comment: "Heading in What’s New: the new things in this version.")
+        case "Fixed": String(localized: "Fixed", comment: "Heading in What’s New: what this version fixes.")
         default: title
         }
     }

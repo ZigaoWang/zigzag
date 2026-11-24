@@ -5449,6 +5449,7 @@ enum AppLanguage {
         switch code {
         case "en": "English"
         case "zh-Hans": "简体中文"
+        case "zh-Hant": "繁體中文"
         default: Locale(identifier: code).localizedString(forIdentifier: code) ?? code
         }
     }

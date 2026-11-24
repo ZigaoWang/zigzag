@@ -93,7 +93,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Downloads** | Send files of a type to a folder of their own, or open safe ones like PDFs once they're saved. Rules hand a link or a download to an app, a script or a download manager like aria2, asking you first. See [docs/download-rules.md](docs/download-rules.md). |
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
-| **Languages** | English and Simplified Chinese. |
+| **Languages** | English, Simplified Chinese, and Traditional Chinese. |
 | **And** | Reader, PDF viewer, Handoff to your iPhone, iPad or other Mac, Capture of an area, a part of the page or the whole page (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
 
 ## What's missing
