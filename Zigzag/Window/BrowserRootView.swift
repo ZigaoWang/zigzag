@@ -1294,9 +1294,15 @@ final class BrowserRootView: SpaceFrameView {
 
     /// A tap on the grabber: the sidebar comes out and stays, as after a finger's pull.
     func openFromGrabber() {
-        guard !sidebarVisible, !sidebarRevealed else { return }
-        reveal(true)
-        isTouchHeld = true
+        guard !sidebarVisible else { return }
+        // The same button as the docked sidebar's toggle: it shows the sidebar in the window, as a click does.
+        if let controller = window?.windowController as? BrowserWindowController {
+            controller.toggleBrowserSidebar(nil)
+        } else {
+            setSidebarVisible(true, animated: true)
+        }
+        // Gone at once, not left over the sliding sidebar.
+        refreshGrabber()
     }
 
     /// A finger's tap on the grabber at `point`: the sidebar comes out, and what slides under the finger takes

@@ -145,7 +145,7 @@
   Test: TouchMovesTests.theGrabberSitsWhereTheSidebarsToggleDoes
 - In split view with the panes' strips along the top of the page, it is a button in the top pane's strip on the sidebar's side instead, like the strip's own: before Back on the left, after the close button on the right.
   Test: TouchMovesTests.theGrabberJoinsTheTopPanesStrip
-- Tap it → the sidebar slides out and stays, as after a finger's pull; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
+- Tap it → the sidebar shows in the window, as a click on the sidebar toggle does; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
   Test: TouchMovesTests.aTapOnTheGrabberBringsTheSidebarOutToStay
 - A finger's tap or pull that brings the sidebar out does only that: the sidebar now under the finger takes neither its click nor its tap; a mouse click there after is the sidebar's.
   Test: TouchMovesTests.aTapThatOpensTheSidebarDoesNothingElse

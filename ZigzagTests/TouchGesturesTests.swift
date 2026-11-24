@@ -1117,10 +1117,13 @@ struct TouchMovesTests {
                 #expect(target.width >= 44 && target.height >= 44)
                 #expect(strip.fingerTakesSidebarButton(at: NSPoint(x: button.frame.midX, y: button.frame.midY)))
                 #expect(!strip.fingerTakesSidebarButton(at: NSPoint(x: strip.back.frame.midX, y: strip.back.frame.midY)))
-                // A tap brings the sidebar out to stay, and the strip gives the button back.
+                // A tap shows the sidebar in the window, as the toggle's click does, and the strip gives the button back.
                 #expect(button.accessibilityPerformPress())
-                #expect(root.sidebarRevealed && root.isTouchHeld && root.grabberPlace == nil && !strip.showsSidebarButton)
-                root.endTouchHold()
+                #expect(root.sidebarVisible)
+                #expect(!root.sidebarRevealed)
+                #expect(root.grabberPlace == nil)
+                #expect(!strip.showsSidebarButton)
+                root.setSidebarVisible(false, animated: false)
             }
             // Out of split view: hidden until a tap where the lights sit shows it with them.
             root.setTiles(nil, animated: false)
@@ -1161,12 +1164,11 @@ struct TouchMovesTests {
         root.revealTap()
         #expect(root.grabber.button.accessibilityLabel() == String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
         #expect(root.grabber.button.accessibilityPerformPress())
-        #expect(root.sidebarRevealed && root.isTouchHeld)
+        // Shown in the window, as the toggle's click does.
+        #expect(root.sidebarVisible && !root.sidebarRevealed)
         #expect(!root.isGrabberShown)
-        // Out as after a finger's pull: a tap on the page or a picked tab sends it back, and the grabber returns.
-        root.endTouchHold()
-        #expect(!root.sidebarRevealed)
-        #expect(root.isGrabberShown)
+        root.setSidebarVisible(false, animated: false)
+        #expect(!root.sidebarVisible)
         // Dragged from the grabber, the sidebar follows the finger and keeps the pull's thresholds.
         let width = root.sidebarWidth, inset = Tokens.Metric.cardInset
         root.touchPullBegan(.pull, base: 10)
@@ -1190,9 +1192,7 @@ struct TouchMovesTests {
         root.setSidebarVisible(false, animated: false)
         root.noteTouch(at: ProcessInfo.processInfo.systemUptime)
         root.openFromGrabber()
-        #expect(root.sidebarRevealed && root.isTouchHeld)
-        // The toggle's click, a finger's tap or the mouse's: docked, as always.
-        controller.toggleBrowserSidebar(nil)
+        // The same button as the docked toggle: a tap shows the sidebar in the window, as a click does.
         #expect(root.sidebarVisible && !root.sidebarRevealed && !root.isTouchHeld)
         controller.toggleBrowserSidebar(nil)
         #expect(!root.sidebarVisible)
@@ -1231,18 +1231,18 @@ struct TouchMovesTests {
         root.grabberTapped(at: point)
         root.layoutSubtreeIfNeeded()
         controller.layoutTrafficLights()
-        #expect(root.sidebarRevealed && root.isTouchHeld)
-        // The same tap's click, now over the sidebar's own toggle, then the window's tap: both go nowhere.
+        #expect(root.sidebarVisible)
+        // The same tap's click, now over the docked sidebar's own toggle, then the window's tap: both go nowhere.
         click(at: inWindow, in: window, time: now)
         if let event = TouchPress.mouseDown(at: inWindow, in: window) { window.touchTapped(event, downAt: now) }
-        #expect(root.sidebarRevealed && root.isTouchHeld && !root.sidebarVisible)
+        #expect(root.sidebarVisible)
         #expect(!controller.commandBar.isVisible)
-        // A mouse's click there a moment later is the toggle's, as always.
+        // A mouse's click on the toggle a moment later is the toggle's, as always: it hides the sidebar.
         TouchPress.landedAt = nil
         let toggle = root.sidebarContainer.sidebar.sidebarButton
         let onToggle = toggle.convert(NSPoint(x: toggle.bounds.midX, y: toggle.bounds.midY), to: nil)
         click(at: onToggle, in: window, time: ProcessInfo.processInfo.systemUptime)
-        #expect(root.sidebarVisible)
+        #expect(!root.sidebarVisible)
     }
 
     @Test func theTapThatShowsTheGroupClicksNothing() {
