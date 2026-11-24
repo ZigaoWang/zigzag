@@ -849,6 +849,27 @@ struct TopBarTests {
         #expect(root.autohideOffset(at: 0) == 20)
     }
 
+    /// ⌘L brings the bar back to edit the address there, and the next scroll down can take it again.
+    @Test func openLocationBringsTheBarBack() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let (controller, manager, _) = autohideWindow("open-location")
+        defer { controller.commandBar.dismiss(); controller.window?.close(); manager.invalidate() }
+        let root = controller.root
+        let travel = root.autohideTravel(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel)
+        controller.openLocation(nil)
+        #expect(root.autohideOffset(at: 0) == 0)
+        // While the address is being edited the bar stays.
+        controller.pageScrolled(to: travel * 3, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == 0)
+        controller.commandBar.dismiss()
+        controller.pageScrolled(to: travel * 3 + 10, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == 10)
+    }
+
     /// With the page already at its top, a scroll up has nothing to report: the wheel itself brings the bar back.
     @Test func aScrollUpAtThePagesTopBringsTheBarBack() throws {
         let before = Library.shared.snapshot
