@@ -18,6 +18,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 网站或扩展为了让普通点按打开自己的查看器而特意去掉的链接，比如 Old Twitter Layout 里的引用推文，⌘-点按或中键点按照样在标签页里打开，现在由 Zigzag 里统一的一条规则处理，任何网站或扩展都能用：把地址放在 `data-zigzag-href` 里就行（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。普通点按照样打开查看器。感谢 [Lakeland97](https://github.com/Lakeland97) 的设计方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
 - 把下载交给 App、脚本或服务的规则，现在可以按文件本身的类型（例如 torrent 或 pdf）来匹配，而不只看地址。下载站的下载地址往往看不出文件名，所以 .torrent 文件现在无论地址长什么样都能交给下载器。
+- 因为 Zigzag Mini 链接、已安装的网站或后台的 AI App 单独打开 Zigzag 时，不会再丢掉上次会话的登录状态：之后打开浏览器窗口、会话恢复时，会话 Cookie 和 sessionStorage 也一起恢复，Microsoft 365 这类网站会保持登录。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.5] - 2026-11-24
 

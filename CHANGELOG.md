@@ -10,7 +10,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A link a site or extension takes off on purpose so a plain click opens its own viewer, like a quoted tweet in Old Twitter Layout, still opens in a tab on ⌘-click or middle-click, now through one rule in Zigzag that any site or extension can use: keep the address in `data-zigzag-href` ([docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)). A plain click still opens the viewer. Thanks to [Lakeland97](https://github.com/Lakeland97) for the design. ([#517](https://github.com/ZigaoWang/zigzag/issues/517))
-- A rule that hands downloads to an app, a script or a service can now match the file's own type, like torrent or pdf, not only its address. A tracker's download address often names no file, so its .torrent downloads can now reach the downloader whatever the address looks like.
+- A rule that hands downloads to an app, a script or a service can now match the file's own type, like torrent or pdf, not only its address. A tracker's download address often names no file, so its .torrent downloads can now reach the downloader whatever the address looks like. ([#524](https://github.com/ZigaoWang/zigzag/issues/524))
+- Opened for a Zigzag Mini link, an installed site or AI apps alone, Zigzag no longer drops the last session's sign-ins: when you open a browser window and the session comes back, its session cookies and sessionStorage come back with it, so Microsoft 365 and similar sites keep you signed in. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.5] - 2026-11-24
 
