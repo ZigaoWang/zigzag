@@ -1319,11 +1319,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func isSidebarSliding() -> Bool { Date() < sidebarMovingUntil }
 
     private func autohidePointerMoved(_ event: NSEvent) {
-        guard event.window === window, root.autohidesBar, root.barHoldsAddress, root.showsTopBar else { return }
-        guard Self.topPointerRevealsBar(fullScreen: window?.styleMask.contains(.fullScreen) == true) else { return }
-        guard (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
-        let point = root.convert(event.locationInWindow, from: nil)
-        guard point.y <= Tokens.Space.x2 else { return }
+        guard event.window === window else { return }
+        pointerMoved(to: root.convert(event.locationInWindow, from: nil))
+    }
+
+    /// The pointer at the window's top, in the root's coordinates, brings an Autohide bar back.
+    func pointerMoved(to point: NSPoint) {
+        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar, point.y <= Tokens.Space.x2,
+              Self.topPointerRevealsBar(fullScreen: window?.styleMask.contains(.fullScreen) == true),
+              (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
         revealAutohide()
     }
 

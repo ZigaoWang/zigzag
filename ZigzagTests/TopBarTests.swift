@@ -849,6 +849,40 @@ struct TopBarTests {
         #expect(root.autohideOffset(at: 0) == 20)
     }
 
+    /// The pointer at the window's top brings the bar back; lower down it leaves it away.
+    @Test func thePointerAtTheTopBringsTheBarBack() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let (controller, manager, _) = autohideWindow("pointer-top")
+        defer { controller.window?.close(); manager.invalidate() }
+        let root = controller.root
+        let travel = root.autohideTravel(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
+        controller.pointerMoved(to: NSPoint(x: 450, y: 40))
+        #expect(root.autohideOffset(at: 0) == travel)
+        controller.pointerMoved(to: NSPoint(x: 450, y: 2))
+        #expect(root.autohideOffset(at: 0) == 0)
+    }
+
+    /// Another tab is shown with its bar there, whatever the last one's scroll did.
+    @Test func switchingTabsBringsTheBarBack() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let (controller, manager, tab) = autohideWindow("switch-a")
+        defer { controller.window?.close(); manager.invalidate() }
+        let other = Tab(url: URL(string: "https://example.com/switch-b")!, title: "B", spaceID: tab.spaceID)
+        manager.adopt([other], in: tab.spaceID)
+        manager.select(tab)
+        let root = controller.root
+        let travel = root.autohideTravel(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false, tab: tab)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false, tab: tab)
+        #expect(root.autohideOffset(at: 0) == travel)
+        manager.select(other)
+        #expect(root.autohideOffset(at: 0) == 0)
+    }
+
     /// ⌘L brings the bar back to edit the address there, and the next scroll down can take it again.
     @Test func openLocationBringsTheBarBack() {
         let before = Library.shared.snapshot
