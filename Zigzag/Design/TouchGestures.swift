@@ -1025,8 +1025,18 @@ enum TouchSwipe {
     /// For `fingers` on a page that moved by `translation` and spread apart by `spread`: two go back or forward as on
     /// the trackpad unless they pinch. One is the page's own (it scrolls); macOS takes three for switching desktops.
     nonisolated static func goesBackOrForward(fingers: Int, translation: NSPoint, spread: CGFloat) -> Bool {
-        fingers == 2 && verdict(translation, forgiving: false) == .sideways && abs(spread) < abs(translation.x) / 2
+        fingers == 2 && isAcrossPage(translation) && abs(spread) < abs(translation.x) / 2
     }
+
+    /// Two fingers on a page: up to 50° off level counts as sideways, as a swipe starts with drift; a scroll up or
+    /// down is steeper than 65°.
+    nonisolated static func isAcrossPage(_ translation: NSPoint) -> Bool {
+        hypot(translation.x, translation.y) >= decision && abs(translation.x) >= SpaceSwipe.axisLock
+            && abs(translation.y) <= abs(translation.x) * pageSlope
+    }
+
+    /// tan 50°.
+    nonisolated static let pageSlope: CGFloat = 1.19
 
     /// How far off level fingers that moved by `translation` go, in degrees.
     nonisolated static func degreesOffLevel(_ translation: NSPoint) -> Int {
@@ -1035,8 +1045,9 @@ enum TouchSwipe {
 
     /// A lone finger is let go once it has moved this far, so one-finger scrolling starts at once.
     nonisolated static let loneFingerMove: CGFloat = 3
-    /// Or this long after it landed: a second finger of a two-finger swipe lands within a few milliseconds.
-    nonisolated static let loneFingerWait: TimeInterval = 0.04
+    /// Or once it has waited this long for a second finger, which lands up to about 100 ms after the first. A still
+    /// finger costs nothing meanwhile: the page's scrolling only starts once it moves.
+    nonisolated static let loneFingerWait: TimeInterval = 0.12
 
     /// Whether a single finger, `moved` points from where it landed `sinceLanding` seconds ago, is a scroll and not
     /// the start of a two-finger swipe.
