@@ -63,6 +63,22 @@
   No test yet.
 - Reset All… → after asking, every choice made for single sites goes, permissions and the rest.
   Test: SitePermissionsPolicyTests.forgetAllClearsBothStores
+- Each site → a box headed by its name, how many choices it has and Forget, its choices inside; folded when more than three sites are listed, open otherwise.
+  Test: SettingsFoldingTests.eachSiteIsABoxHeadedByItsNameAndHowManyChoices
+- A box opened or folded → stays that way while Settings stays open, also when a choice in it changes.
+  Test: SettingsFoldingTests.aFoldIsKeptWhileSettingsStaysOpen
+- Find a setting matching a choice → that site's box opens to the rows that match.
+  Test: SettingsFoldingTests.findASettingOpensTheBoxAMatchIsIn
+- Eight or more sites → a search beside the heading narrows the list to the sites that match.
+  Test: SettingsFoldingTests.manySitesGetASearchOfTheirOwn
+- A box's header → a click, Space, → or ← opens or folds it, ↑ and ↓ move to the box above or below; VoiceOver reads it as a disclosure triangle.
+  Test: FoldBoxTests.keysOpenFoldAndMoveBetweenBoxes
+
+## Settings › Privacy › Stored by Websites
+- A site → a box with its cookies and its cache inside, each with Clear… that asks first; the trash still removes everything the site keeps.
+  Test: SiteDataListTests.aBoxIsADisclosureTriangleWithItsKindsInside
+- Clearing one kind → the site stays listed with what's left, and goes once nothing is.
+  Test: SiteDataListTests.clearingOneKindLeavesTheRestListed
 
 ## Apps on This Mac
 - Out of the box → off; no site can reach programs listening on this Mac.

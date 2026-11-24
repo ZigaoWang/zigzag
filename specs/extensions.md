@@ -22,6 +22,10 @@
 - A .xpi that asks for the proxy permission → its sheet and its row in Settings say Firefox's proxy API won't work in Zigzag.
   Test: FirefoxLimitTests.aFirefoxProxyExtensionSaysItsProxyWontWork
 
+## Settings › Extensions
+- Each extension → a box headed by its name, version and switch, with Apps on This Mac, Site access and Allow in private windows inside; folded when more than three are installed.
+  Test: SettingsFoldingTests.eachExtensionIsABoxWithItsSettingsInside
+
 ## Updates
 - Extensions from the Chrome Web Store → checked once a day; ones from a .xpi or a folder aren't.
   Test: FirefoxInstallTests.onlyTheStoresOwnPackagesAreAskedForUpdates
