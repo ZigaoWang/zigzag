@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -115,13 +116,123 @@ struct NestedTabsTests {
         // Between two of a's tabs: under a.
         #expect(TabTree.dropParent(before: c, after: d, in: tree, setIn: notSetIn) == a)
         // After a's last tab, before e: set in, it stays in a's group; out at the edge, it's a tab of its own.
-        #expect(TabTree.dropParent(before: d, after: e, in: tree, setIn: setIn) == a)
+        #expect(TabTree.dropParent(before: d, after: e, in: tree) { $0 <= 1 } == a)
         #expect(TabTree.dropParent(before: d, after: e, in: tree, setIn: notSetIn) == nil)
         // After c, deepest: set in only as far as b's tabs.
         #expect(TabTree.dropParent(before: c, after: d, in: tree) { $0 >= 2 } == b)
         // Below a tab with nothing under it: never nested by the gap alone.
-        #expect(TabTree.dropParent(before: e, after: nil, in: tree, setIn: setIn) == nil)
+        #expect(TabTree.dropParent(before: e, after: nil, in: tree, setIn: notSetIn) == nil)
         #expect(TabTree.dropParent(before: nil, after: a, in: tree, setIn: setIn) == nil)
+    }
+
+    @Test func setInPastTheRowAboveADropGoesUnderIt() {
+        // e has nothing under it: set in a level past it, the drop goes under it (#523); not set in, beside it.
+        #expect(TabTree.dropParent(before: e, after: nil, in: tree) { $0 >= 1 } == e)
+        #expect(TabTree.dropParent(before: e, after: nil, in: tree) { $0 < 1 } == nil)
+        // d, under a: set in a level past it, under d; only as far as d, under a.
+        #expect(TabTree.dropParent(before: d, after: e, in: tree) { $0 >= 2 } == d)
+        #expect(TabTree.dropParent(before: d, after: e, in: tree) { $0 == 1 } == a)
+        // c is as deep as tabs are set in: nothing goes under it by a drop.
+        #expect(TabTree.dropParent(before: c, after: d, in: tree) { _ in true } == b)
+        #expect(!TabTree.canNestUnder(level: 2) && TabTree.canNestUnder(level: 1))
+        // Asked not to nest (from another window): as before.
+        #expect(TabTree.dropParent(before: e, after: nil, in: tree, nests: false) { _ in true } == nil)
+        // Dropped there, e's run stays whole and the tab is e's last.
+        let moved = TabTree.moving(f, to: 5, parent: e, in: tree + [node(f)])
+        #expect(moved.last == node(f, e))
+        #expect(TabTree.repaired(moved) == moved)
+    }
+
+    @Test func movingAcrossSetsTheCarriedRowInAndOut() {
+        let step = SidebarListView.folderIndent
+        // A top-level row picked up at x 100: where it was, it sets in no further than its own level.
+        let still = SidebarListView.nestX(pointer: 100, grabbedAt: 100, depth: 0)
+        #expect(SidebarListView.setsIn(still, depth: 0) && !SidebarListView.setsIn(still, depth: 1))
+        // Past half a step right, a level in; a step and a half, two.
+        let half = SidebarListView.nestX(pointer: 100 + step / 2 + 1, grabbedAt: 100, depth: 0)
+        #expect(SidebarListView.setsIn(half, depth: 1) && !SidebarListView.setsIn(half, depth: 2))
+        let more = SidebarListView.nestX(pointer: 100 + step * 1.5 + 1, grabbedAt: 100, depth: 0)
+        #expect(SidebarListView.setsIn(more, depth: 2))
+        // Less than half a step, a slip, not a move.
+        #expect(!SidebarListView.setsIn(SidebarListView.nestX(pointer: 100 + step / 2 - 1, grabbedAt: 100, depth: 0), depth: 1))
+        // A nested row (a level in) stays at its level where it was, and goes out past half a step left.
+        let nested = SidebarListView.nestX(pointer: 60, grabbedAt: 60, depth: 1)
+        #expect(SidebarListView.setsIn(nested, depth: 1) && !SidebarListView.setsIn(nested, depth: 2))
+        #expect(!SidebarListView.setsIn(SidebarListView.nestX(pointer: 60 - step / 2 - 1, grabbedAt: 60, depth: 1), depth: 1))
+    }
+
+    @Test func nestTabGoesUnderTheTabAboveAtItsLevel() {
+        // e under a, after d: a's last tab, its place unchanged.
+        let e1 = TabTree.nesting(e, in: tree)
+        #expect(e1 == [node(a), node(b, a), node(c, b), node(d, a), node(e, a)])
+        // d under b, after c.
+        #expect(TabTree.nesting(d, in: tree) == [node(a), node(b, a), node(c, b), node(d, b), node(e)])
+        // Nothing above at its level, or the tab above as deep as tabs are set in: no change.
+        #expect(TabTree.nesting(a, in: tree) == nil)
+        #expect(TabTree.nesting(b, in: tree) == nil)
+        let deep = [node(a), node(b, a), node(c, b), node(d, b)]
+        #expect(TabTree.nesting(d, in: deep) == nil)
+        // It takes its own tabs along.
+        let withChild = tree + [node(f, e)]
+        #expect(TabTree.nesting(e, in: withChild) == [node(a), node(b, a), node(c, b), node(d, a), node(e, a), node(f, e)])
+    }
+
+    @Test func unnestTabGoesJustAfterItsTabsRun() {
+        // b out of a: after a's run, top level, with c under it; d stays under a.
+        let out = TabTree.unnesting(b, in: tree)
+        #expect(out == [node(a), node(d, a), node(b), node(c, b), node(e)])
+        #expect(out.map(TabTree.repaired) == out)
+        // c out of b: after b's run, under a.
+        #expect(TabTree.unnesting(c, in: tree) == [node(a), node(b, a), node(c, a), node(d, a), node(e)])
+        // At the top level: nowhere to go.
+        #expect(TabTree.unnesting(a, in: tree) == nil)
+        // Nest then unnest: back as it was.
+        #expect(TabTree.nesting(e, in: tree).flatMap { TabTree.unnesting(e, in: $0) } == tree)
+    }
+
+    @MainActor @Test func nestAndUnnestTabUndoAndAreSaved() throws {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = (0..<4).map { Tab(url: URL(string: "https://example.com/nest/\($0)"), title: "T\($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        manager.select(tabs[1])
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        // ⌃⇧→ on the second tab: under the first. The first tab has nothing above it.
+        #expect(controller.tabManager.nestedArrangement(of: tabs[0], deeper: true) == nil)
+        controller.nestTab(nil)
+        #expect(tabs[1].parentID == tabs[0].id)
+        // ⌘Z puts it back at the top level; ⌃⇧← does too.
+        controller.sidebarUndo.undo()
+        #expect(tabs[1].parentID == nil)
+        manager.nest(tabs[1], deeper: true)
+        controller.unnestTab(nil)
+        #expect(tabs[1].parentID == nil)
+        controller.sidebarUndo.undo()
+        #expect(tabs[1].parentID == tabs[0].id)
+        // Under a folded tab, it unfolds so the tab stays in sight.
+        manager.select(tabs[2])
+        tabs[0].isCollapsed = true
+        controller.nestTab(nil)
+        #expect(tabs[2].parentID == tabs[0].id && !tabs[0].isCollapsed)
+        // A split goes under no tab.
+        manager.restoreSplit(TabManager.SplitPair(left: tabs[2].id, right: tabs[3].id))
+        #expect(manager.nestedArrangement(of: tabs[2], deeper: true) == nil)
+        // The session keeps the nesting: saved, read back and put in a new window as it was.
+        let states = manager.tabs(in: space).map { SessionState.TabState($0, parent: $0.parentID) }
+        let back = try JSONDecoder().decode([SessionState.TabState].self, from: JSONEncoder().encode(states))
+        let restored = back.map { state -> Tab in
+            let tab = Tab(id: state.id, url: state.url, title: state.title, spaceID: space)
+            state.apply(to: tab)
+            return tab
+        }
+        let again = TabManager(spaceID: space)
+        defer { again.invalidate() }
+        again.adopt(restored, in: space)
+        #expect(again.treeNodes(in: space) == manager.treeNodes(in: space))
+        manager.tabs(in: space).forEach { $0.close() }
+        restored.forEach { $0.close() }
     }
 
     @Test func repairDropsParentsThatBreakTheRule() {

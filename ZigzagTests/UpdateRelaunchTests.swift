@@ -112,6 +112,21 @@ struct RelaunchIgnoresLaunchChoiceTests {
         #expect(UpdateRelaunch.resumes(plan: plan, relaunch: saved, choice: .fresh))
     }
 
+    @Test func aSessionLeftWaitingKeepsItsSignIns() {
+        let now = Date()
+        for (mini, webApp, background) in [(true, false, false), (false, true, false), (false, false, true)] {
+            let plan = UpdateRelaunch.plan(relaunch: nil, now: now, needsOnboarding: false, miniOnly: mini, webAppOnly: webApp,
+                                           backgroundOnly: background)
+            #expect(!UpdateRelaunch.resumes(plan: plan, relaunch: nil, choice: .resume))
+            #expect(UpdateRelaunch.keepsSignIns(plan: plan, relaunch: nil, choice: .resume))
+            // A fresh start drops them, as it would with the session.
+            #expect(!UpdateRelaunch.keepsSignIns(plan: plan, relaunch: nil, choice: .fresh))
+        }
+        let plain = UpdateRelaunch.plan(relaunch: nil, now: now, needsOnboarding: false, miniOnly: false, webAppOnly: false)
+        #expect(UpdateRelaunch.keepsSignIns(plan: plain, relaunch: nil, choice: .resume))
+        #expect(!UpdateRelaunch.keepsSignIns(plan: plain, relaunch: nil, choice: .fresh))
+    }
+
     @Test func aLaunchForZigzagMiniStillStartsFresh() {
         let plan = UpdateRelaunch.plan(relaunch: nil, now: Date(), needsOnboarding: false, miniOnly: true, webAppOnly: false)
         #expect(plan.sessionWaiting)

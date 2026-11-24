@@ -321,7 +321,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
         // Fading is slow; checking once a minute is plenty.
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.bothSidebars { $0.list.refreshRows() } }
+            MainActor.assumeIsolated {
+                Freezes.mark("sidebar refresh")
+                self?.bothSidebars { $0.list.refreshRows() }
+            }
         }
         fadeTimer?.tolerance = 10
 

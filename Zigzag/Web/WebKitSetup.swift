@@ -217,7 +217,8 @@ enum PageScripts {
     """, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient)
 
     /// ⌘-click on a web link is stopped before the page (#317); ⇧ and ⌥ reach the page and are reported, so the
-    /// page's navigation right after becomes Zigzag Mini or a download (#322).
+    /// page's navigation right after becomes Zigzag Mini or a download (#322). A ⌘ or middle press on an anchor whose
+    /// href was taken off on purpose puts back its `data-zigzag-href` for WebKit to follow (#517, docs/extensions.md).
     static let modifiedLinkClicks = WKUserScript(source: """
     (() => {
       if (!/^https?:$/.test(location.protocol)) return;
@@ -241,6 +242,23 @@ enum PageScripts {
         if (!url) return;
         if (e.metaKey) { e.stopImmediatePropagation(); return; }
         if (e.shiftKey || e.altKey) tell(url, e);
+      }, true);
+      const restored = new WeakMap();
+      addEventListener('mousedown', (e) => {
+        if (!e.isTrusted || !(e.button === 1 || (e.button === 0 && e.metaKey))) return;
+        const link = e.composedPath().find((n) => n instanceof Element && n.localName === 'a' && n.hasAttribute('data-zigzag-href'));
+        if (!link || !link.isConnected) return;
+        const href = link.getAttribute('data-zigzag-href');
+        try { if (!/^https?:$/.test(new URL(href, document.baseURI).protocol)) return; } catch (error) { return; }
+        // The mark tells the page's own click handlers this press is the browser's.
+        link.setAttribute('data-zigzag-modified', '');
+        link.setAttribute('href', href);
+        clearTimeout(restored.get(link));
+        restored.set(link, setTimeout(() => {
+          restored.delete(link);
+          link.removeAttribute('data-zigzag-modified');
+          if (link.getAttribute('href') === href && link.getAttribute('data-zigzag-href') === href) link.removeAttribute('href');
+        }, 2000));
       }, true);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)

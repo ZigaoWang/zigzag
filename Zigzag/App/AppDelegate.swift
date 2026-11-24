@@ -195,9 +195,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let resumes = UpdateRelaunch.resumes(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
         WindowManager.shared.startingFresh = UpdateRelaunch.startsFresh(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
         if WindowManager.shared.startingFresh { WindowManager.shared.keepSessionForReopening() }
-        // Session cookies come back with the session, before any of its pages loads; otherwise they're dropped.
-        SessionCookies.start(resumes: resumes)
+        // Session cookies come back with the session, before any of its pages loads, a session left waiting for a
+        // browser window included; otherwise they're dropped.
+        let keepsSignIns = UpdateRelaunch.keepsSignIns(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
+        SessionCookies.start(resumes: keepsSignIns)
+        // So does the sessionStorage tabs kept, onto the tabs it was read from, whenever those are made.
+        SavedSessionStorage.start(resumes: keepsSignIns)
         let restored = resumes ? WindowManager.shared.restoreSession() : false
+        if plan.sessionWaiting, keepsSignIns { SavedSessionStorage.waitForSession() } else { SavedSessionStorage.started() }
         if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()
@@ -322,7 +327,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let downloading = DownloadManager.shared.activeCount
         // Going for good: downloads still coming in pause first, so they go on from Downloads after the next launch.
         func quitNow() -> NSApplication.TerminateReply {
-            guard downloading > 0 || !KeptCookies.profilesClearingOnQuit().isEmpty || SessionCookies.isOn else { return .terminateNow }
+            guard downloading > 0 || !KeptCookies.profilesClearingOnQuit().isEmpty || SessionCookies.isOn || SavedSessionStorage.isOn else { return .terminateNow }
             Self.finishBeforeQuitting(downloading: downloading)
             return .terminateLater
         }
@@ -368,11 +373,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
-    /// Pauses downloads and clears the cookies chosen to go at quit (#334), then saves session cookies, side by side,
-    /// each bounded, then quits.
+    /// Pauses downloads and clears the cookies chosen to go at quit (#334), then saves session cookies, and saves tabs'
+    /// sessionStorage, side by side, each bounded, then quits.
     private static func finishBeforeQuitting(downloading: Int) {
         let cookieJobs = KeptCookies.clearJobs(KeptCookies.profilesClearingOnQuit()) + SessionCookies.quitJobs()
-        var left = (downloading > 0 ? 1 : 0) + (cookieJobs.isEmpty ? 0 : 1)
+        let savesSessions = SavedSessionStorage.isOn
+        var left = (downloading > 0 ? 1 : 0) + (cookieJobs.isEmpty ? 0 : 1) + (savesSessions ? 1 : 0)
         guard left > 0 else { NSApp.reply(toApplicationShouldTerminate: true); return }
         let finish = {
             left -= 1
@@ -380,6 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if downloading > 0 { DownloadManager.shared.pauseAllForQuit(then: finish) }
         if !cookieJobs.isEmpty { KeptCookies.whenDone(cookieJobs, within: KeptCookies.quitWait, done: finish) }
+        if savesSessions { SavedSessionStorage.saveForQuit(within: 1, done: finish) }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

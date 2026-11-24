@@ -196,8 +196,10 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// Settings › Downloads row text, e.g. "Files ending in .torrent go to rTorrent". Ends with the target, not the
     /// rule's name, which the row already shows.
     var summarySentence: String {
-        if match == .fileType { return destinationSentence }
         let goes = action.summary
+        // A destination names the folder it saves into. A file-type handoff is sent somewhere, so it reads like every
+        // other handoff, by the files it catches.
+        if match == .fileType, action.kind.isDestination { return destinationSentence }
         if match == .any {
             return applies == .downloads
                 ? String(localized: "Everything you download goes to \(goes)",
@@ -218,7 +220,11 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             catches = String(localized: "\(files) ending in \(pattern)", comment: "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the end of the address, such as .torrent.")
         case .regex:
             catches = String(localized: "\(files) matching \(pattern)", comment: "Part of a download rule's sentence: what it catches by regular expression. The first placeholder is “Files” or “Files and links”, the second the expression.")
-        case .fileType, .any:
+        case .fileType:
+            // Links have no name, so a type rule catches downloads whatever “Applies to” says; it reads as Files.
+            let types = Match.extensions(in: pattern).joined(separator: ", ")
+            catches = String(localized: "Files of type \(types)", comment: "Part of a download rule's sentence: it catches files by their own extension, whatever their address. The placeholder lists the extensions, like torrent or pdf.")
+        case .any:
             catches = files
         }
         switch action.kind {

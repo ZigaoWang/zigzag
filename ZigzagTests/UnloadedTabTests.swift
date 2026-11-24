@@ -251,6 +251,100 @@ import WebKit
             && sleeper.webView?.title != "v1" })
     }
 
+    /// Zigzag quit and opened again on the last session (an update's restart): the tab's page gets the sessionStorage
+    /// it had back before its own scripts first run, with or without its history, and no other page does (#502).
+    @Test func aRestoredTabGetsItsSessionStorageBackBeforeItsFirstLoad() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("restored-session-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = SavedSessionStorage.file(in: folder)
+        let (manager, open, other, controller) = try sessionTabs(on: page)
+        #expect(await until { open.webView?.title == "v1" && open.webView?.isLoading == false })
+        // As Zigzag quits: the open page is read and written down, with a tab saved without its history beside it.
+        var read: [UUID: SavedSessionStorage.Saved]?
+        SavedSessionStorage.capture([open, other], within: 2) { read = $0 }
+        #expect(await until { read != nil })
+        let saved = try #require(read?[open.id])
+        #expect(read?[other.id] == nil)
+        #expect(saved.items == [["k", "v1"]])
+        let bare = SavedSessionStorage.Saved(tab: UUID(), url: saved.url, origin: saved.origin, items: [["k", "bare"]])
+        SavedSessionStorage.write([saved, bare], to: file)
+        let history = open.interactionStateForSaving
+        manager.invalidate()
+        controller.window?.close()
+        open.close()
+
+        // The next launch.
+        SavedSessionStorage.prepare(file, resumes: true, profile: open.profile.id)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        let space = Library.shared.spaces[0].id
+        let restored = Tab(id: open.id, url: page, title: "Session", spaceID: space, interactionState: history)
+        let withoutHistory = Tab(id: bare.tab, url: page, title: "Session", spaceID: space)
+        let unrelated = Tab(url: page, title: "Session", spaceID: space)
+        for tab in [restored, withoutHistory, unrelated] { SavedSessionStorage.restore(into: tab) }
+        SavedSessionStorage.dropWaiting()
+        #expect(restored.pageState?.session?.items == [["k", "v1"]])
+        #expect(unrelated.pageState == nil)
+        let next = TabManager(spaceID: space)
+        next.adopt([restored, withoutHistory, unrelated], in: space)
+        next.select(restored)
+        let window = BrowserWindowController(tabManager: next, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { next.invalidate(); window.window?.close() }
+        let served = server.served
+        // Asked of the server again, the page's own script found what it had kept on its first run.
+        #expect(await until { server.served > served && restored.webView?.isLoading == false && restored.webView?.title == "v1" })
+        #expect(restored.pageState?.session == nil)
+        next.select(withoutHistory)
+        #expect(await until { withoutHistory.webView?.isLoading == false && withoutHistory.webView?.title == "bare" })
+        next.select(unrelated)
+        #expect(await until { unrelated.webView?.isLoading == false && unrelated.webView?.title?.hasPrefix("v") == true
+            && unrelated.webView?.title != "v1" })
+    }
+
+    /// A site's data cleared, or the tab closed: what a sleeping tab keeps for the next launch goes too.
+    @Test func clearingASitesDataDropsWhatTheNextLaunchWouldGetBack() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let (manager, sleeper, other, controller) = try sessionTabs(on: page)
+        defer { manager.invalidate(); controller.window?.close() }
+        #expect(await until { sleeper.webView?.title == "v1" && sleeper.webView?.isLoading == false })
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep && sleeper.pageState?.session != nil })
+        #expect(SavedSessionStorage.entry(for: sleeper)?.items == [["k", "v1"]])
+        let store = try #require(sleeper.profile.storeIfMade)
+        sleeper.forgetSession(in: store, site: "127.0.0.1")
+        #expect(SavedSessionStorage.entry(for: sleeper) == nil)
+        // Closed, it keeps nothing either.
+        sleeper.close()
+        #expect(SavedSessionStorage.entry(for: sleeper) == nil)
+    }
+
+    /// Clearing history isn't clearing a site's data: a sleeping tab keeps its sessionStorage, and the saved file stays.
+    @Test func clearingHistoryKeepsWhatASleepingTabKept() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let (manager, sleeper, other, controller) = try sessionTabs(on: page)
+        defer { manager.invalidate(); controller.window?.close() }
+        #expect(await until { sleeper.webView?.title == "v1" && sleeper.webView?.isLoading == false })
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep && sleeper.pageState?.session != nil })
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("history-session-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = SavedSessionStorage.file(in: folder)
+        let saved = try #require(SavedSessionStorage.entry(for: sleeper))
+        SavedSessionStorage.write([saved], to: file)
+        let before = try Data(contentsOf: file)
+        _ = HistoryStore(path: ":memory:", profile: sleeper.profile.id).remove()
+        #expect(sleeper.pageState?.session?.items == [["k", "v1"]])
+        #expect(try Data(contentsOf: file) == before)
+    }
+
     /// The script puts the items back before the page's own scripts run, on its own origin only, and never over a key
     /// the page has.
     @Test func theSessionRestorerKeepsToItsOriginAndTheKeysThere() async throws {
