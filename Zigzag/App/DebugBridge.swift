@@ -2038,6 +2038,15 @@ enum DebugBridge {
             // newfolder <n>: a folder holding the space's first n pinned pages.
             let ids = Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).prefix(Int(arg) ?? 0).map(\.id)
             controller.newFolder(with: Array(ids))
+        case "livefolder":
+            // livefolder <address>: a live folder of that feed at the top of the pins, fetched now.
+            if let url = LiveFolderSheet.address(from: arg),
+               let made = Library.shared.addLiveFolder(named: url.host() ?? "Live", source: .feed(url), limit: 25, namedByFeed: true, in: controller.tabManager.currentSpaceID) {
+                LiveFolders.shared.refreshNow(made.id)
+            }
+        case "livesheet":
+            // livesheet: the New Live Folder sheet.
+            controller.newLiveFolder()
         case "spacegrain":
             // spacegrain <0-1>: the current space's grain.
             if let grain = Double(arg) { Library.shared.setGrain(grain, for: controller.tabManager.currentSpaceID) }

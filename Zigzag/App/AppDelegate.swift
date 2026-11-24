@@ -136,6 +136,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Diagnostics.start()
         // HTTP/3 kept from another network can go around a VPN or proxy: forgotten now and whenever the network changes.
         NetworkChanges.start()
+        // Live folders fetch their feeds in the background; the test host fetches nothing.
+        if !Self.isHostingTests { LiveFolders.shared.start() }
         // The app you were in, for Zigzag Mini to go back to.
         AppSwitching.start()
         // New lists or settings reach open pages on their next load.
@@ -375,6 +377,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HistoryStore.finishWriting()
         FaviconStore.finishWriting()
         StrictTransport.finishWriting()
+        LiveFolders.shared.saveNow()
         // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Clears a copied password from the clipboard on quit.
