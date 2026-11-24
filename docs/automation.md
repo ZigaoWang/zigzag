@@ -273,8 +273,8 @@ While AI apps work in the background:
 
 - **Their window is on the AI Apps profile**, which Zigzag makes the first time it's needed, with a space of its
   own. It's listed in Settings › Profiles, but its name can't be changed, and its space stays out of your windows:
-  it's not among your spaces in the sidebar, the command bar, Settings › Spaces or a space's Profile menu. Its sign-ins, history and extensions are its own: an app is signed in to
-  nothing of yours there.
+  it's not among your spaces in the sidebar, the command bar, Settings › Spaces or a space's Profile menu. Its
+  sign-ins, history and extensions are its own: an app is signed in to nothing of yours there.
 - **Nothing of yours is given to its pages**: no sign-in or certificate from your Keychain, no password saved or
   filled and no form filled from your card, no passkeys, none of the answers you gave sites (camera, microphone,
   location, notifications and screen sharing are asked again, and with no one there, refused), none of your
@@ -282,8 +282,8 @@ While AI apps work in the background:
   This Mac doesn't apply there). Its tabs never go to your Archive. Extensions you install in it yourself are its
   own.
 - **An item in the menu bar** shows while their window is open or Zigzag runs for them alone, with **Show AI Apps
-  Window** (to watch them), **Stop AI Apps** (the same as Stop on a tab's bar: every app is cut off and the key replaced), and, when Zigzag runs for
-  them alone, **Quit Zigzag**.
+  Window** (to watch them), **Stop AI Apps** (the same as Stop on a tab's bar: every app is cut off and the key
+  replaced), and, when Zigzag runs for them alone, **Quit Zigzag**.
 - **Show AI Apps Window**, in the Window menu and the command bar too, brings their window on screen. They go on
   where they were, with the same refs, and the bar with Stop shows over the tab in use. Closing it hides it again
   while they work. It's a window to watch them in: it shows only the AI Apps profile's spaces, and can't be
@@ -307,9 +307,8 @@ While AI apps work in the background:
   stays out of your downloads list and the Dock. Deleting the profile deletes them.
 
 You can delete the AI Apps profile in Settings › Profiles once AI apps have stopped running in the background (it's
-refused while their window is open). Its space goes with it, and Zigzag makes a new one, empty, the next time AI
-apps run in the background. Deleting only its space, or putting that space on another profile, closes their window
-and its tabs; the next `open_tab` makes the space again.
+refused while their window is open). Its space, routes to it and its downloads go with it, and Zigzag makes a new
+one, empty, the next time AI apps run in the background.
 
 Opened with `--headless` and nothing else, Zigzag quits on its own 30 minutes after an app last asked it anything
 (never while a download is still coming in), and as soon as either switch is turned off. Opening it with
