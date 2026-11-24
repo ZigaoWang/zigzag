@@ -16,11 +16,17 @@ protocol TabHost: AnyObject {
     func tabWantsFocus(_ tab: Tab)
     /// True when a route (#286) opened the link in another space. Only browser windows route.
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool
+    /// Its page went in or out of full screen in the window (#462).
+    func tab(_ tab: Tab, pageFullScreenChanged on: Bool)
+    /// The expand button over a page-filled page: the one explicit hand-off to WebKit's own full screen.
+    func tabDidAskToExpandFullScreen(_ tab: Tab)
 }
 
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
+    func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {}
+    func tabDidAskToExpandFullScreen(_ tab: Tab) { PageFullScreen.expand(tab) }
     /// Loads an address with no sender: page links and every caller except a rule.
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
         self.tab(tab, openURL: url, disposition: disposition, by: .page)
@@ -237,14 +243,21 @@ final class Tab: NSObject {
     }
     /// Its video is playing in the window's mini player, its page with it.
     var isInMiniPlayer = false
-    /// Its page fills the page's area with something in full screen, as Settings › Tabs › Full screen videos fill
-    /// The Page has it (PageFullScreen), so Esc in the window leaves it.
+    /// Its page fills the page's area with something in full screen (PageFullScreen): The Page with the chrome, or
+    /// The Whole Screen with the browser in its own space. Esc in the window leaves it.
     var isInPageFullScreen = false {
         didSet {
             guard isInPageFullScreen != oldValue else { return }
-            pageHolder?.onExpand = { [weak self] in self.map(PageFullScreen.expand) }
+            pageHolder?.onExpand = { [weak self] in self?.expandPageFullScreen() }
             pageHolder?.showsExpand = isInPageFullScreen
+            host?.tab(self, pageFullScreenChanged: isInPageFullScreen)
         }
+    }
+
+    /// The expand button over a page-filled element: the window decides whether it goes straight to WebKit's own
+    /// full screen or gives the browser's space back first.
+    private func expandPageFullScreen() {
+        host?.tabDidAskToExpandFullScreen(self)
     }
     /// What you answered the page's questions (camera, location, notifications) while it's open: asked again once
     /// it loads another page or reloads, as a site set to Ask is.
