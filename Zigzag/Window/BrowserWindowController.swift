@@ -2622,17 +2622,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The page has The Whole Screen: a windowed browser enters its full-screen space for the duration. The chrome
     /// gets out of the way and comes back from the top. A browser already in a space stays in it.
     private func beginWholeScreen(_ tab: Tab) {
-        guard pageFullScreenTab == nil, tab.isInPageFullScreen else { return }
+        // On its way out of full screen: the page fills the window, as The Page.
+        guard pageFullScreenTab == nil, tab.isInPageFullScreen, browserWindow.fullScreenPhase != .exiting else { return }
         pageFullScreenTab = tab
         root.isImmersive = true
         placeAddress()
         showTopBar()
         // The browser's own space, not a second one for the page. The system gives the windowed frame back.
-        if !browserWindow.styleMask.contains(.fullScreen), browserWindow.fullScreenPhase == .windowed {
+        if Self.wholeScreenTakesSpace(phase: browserWindow.fullScreenPhase, inFullScreen: browserWindow.styleMask.contains(.fullScreen)) {
             pageFullScreenAskedForSpace = true
             browserWindow.toggleFullScreen(nil)
         }
         layoutTrafficLights()
+    }
+
+    /// Whether The Whole Screen enters the browser's space: only from a window that isn't in one or on its way.
+    static func wholeScreenTakesSpace(phase: FullScreenPhase, inFullScreen: Bool) -> Bool {
+        phase == .windowed && !inFullScreen
     }
 
     /// Leaving puts the chrome back. If the page took the browser into its space, leaving the page leaves the space,
@@ -2672,7 +2678,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The split ended (or began), the tab changed, or the setting did: a page that was in The Whole Screen and is
-    /// no longer alone leaves the space; a page that is alone and follows The Whole Screen takes it.
+    /// no longer alone leaves the space. Only the page's own request takes it.
     private func updatePageFullScreenForLayout() {
         guard let tab = tabManager.selectedTab else { return }
         if let full = pageFullScreenTab,
@@ -2685,9 +2691,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // The setting or the site changed under the page: The Whole Screen becomes The Page.
             endWholeScreen()
         }
-        guard pageFullScreenTab == nil, tab.isInPageFullScreen,
-              Self.wholeScreenFor(fill: PageFullScreen.fills(for: tab.url), inSplit: tabManager.split(for: tab) != nil) else { return }
-        beginWholeScreen(tab)
     }
 
     /// The bar behind the traffic lights when the page is under them in full screen (#462). AppKit's title bar is
@@ -2782,6 +2785,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidFailToExitFullScreen(_ window: NSWindow) {
         Diagnostics.note("Full screen didn't end")
+        pageFullScreenNativeAfterSpace = nil
         fullScreenChanged(.didFailToExit)
     }
 

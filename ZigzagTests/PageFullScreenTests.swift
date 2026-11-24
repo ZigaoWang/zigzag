@@ -389,6 +389,14 @@ struct WholeScreenLayoutTests {
         #expect(!BrowserRootView.topBarRevealed(at: below, bar: bar, revealed: false, kept: { true }))
     }
 
+    /// Only a window that is windowed, and not on its way anywhere, enters the browser's space for the page.
+    @Test func theSpaceIsTakenOnlyFromAWindowedWindow() {
+        #expect(BrowserWindowController.wholeScreenTakesSpace(phase: .windowed, inFullScreen: false))
+        #expect(!BrowserWindowController.wholeScreenTakesSpace(phase: .fullScreen, inFullScreen: true))
+        #expect(!BrowserWindowController.wholeScreenTakesSpace(phase: .entering, inFullScreen: false))
+        #expect(!BrowserWindowController.wholeScreenTakesSpace(phase: .windowed, inFullScreen: true))
+    }
+
     /// The window is told when a page fills and when it leaves: without that, The Whole Screen would never start and
     /// the page would keep the chrome (#462).
     @Test func theWindowHearsWhenAPageFillsAndLeaves() {
