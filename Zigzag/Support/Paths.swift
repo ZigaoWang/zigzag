@@ -8,6 +8,8 @@ nonisolated enum Paths {
         let isDev = Bundle.main.bundleIdentifier?.hasSuffix(".dev") ?? false
         var dir = base.appendingPathComponent(isDev ? "Zigzag Dev" : "Zigzag", isDirectory: true)
         #if DEBUG
+        // The test host keeps its data apart too, one folder per test process.
+        if let tests = DevDefaults.testsData { dir = tests }
         // A second debug copy (for staged screenshots) keeps its own data, apart from the dev build's.
         if let custom = ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"], !custom.isEmpty { dir = URL(fileURLWithPath: custom, isDirectory: true) }
         #endif
