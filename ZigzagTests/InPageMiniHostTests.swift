@@ -90,6 +90,46 @@ struct InPageMiniHostTests {
         }
     }
 
+    @Test func automaticNewWindowLinksStayInThePeek() {
+        #expect(MiniWindowController.keepsDockedLink(navigationType: .linkActivated, opensInBackground: false,
+                                                     hasWindowFeatures: false, hasPendingCommand: false, loads: true))
+        #expect(MiniWindowController.keepsDockedLink(navigationType: .other, opensInBackground: false,
+                                                     hasWindowFeatures: false, hasPendingCommand: false, loads: true))
+        // Not ours to keep: a background tab, another window, a menu command, a sized popup, or an address a page may
+        // not open.
+        #expect(!MiniWindowController.keepsDockedLink(navigationType: .linkActivated, opensInBackground: true,
+                                                      hasWindowFeatures: false, hasPendingCommand: false, loads: true))
+        #expect(!MiniWindowController.keepsDockedLink(navigationType: .linkActivated, opensInBackground: false,
+                                                      hasWindowFeatures: false, hasPendingCommand: true, loads: true))
+        #expect(!MiniWindowController.keepsDockedLink(navigationType: .linkActivated, opensInBackground: false,
+                                                      hasWindowFeatures: true, hasPendingCommand: false, loads: true))
+        #expect(!MiniWindowController.keepsDockedLink(navigationType: .linkActivated, opensInBackground: false,
+                                                      hasWindowFeatures: false, hasPendingCommand: false, loads: false))
+    }
+
+    @Test func backgroundTabRequestsStillOpenATab() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let before = browser.tabManager.tabs(in: browser.tabManager.currentSpaceID).count
+            mini.tab(mini.tab, openURL: URL(string: "about:blank#next")!, disposition: .backgroundTab, by: .page)
+            #expect(browser.tabManager.tabs(in: browser.tabManager.currentSpaceID).count == before + 1)
+            mini.closeInPage(animated: false)
+        }
+    }
+
+    @Test func aForegroundTabRequestStaysInThePeek() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let before = browser.tabManager.tabs(in: browser.tabManager.currentSpaceID).count
+            mini.tab(mini.tab, openURL: URL(string: "about:blank#next")!, disposition: .foregroundTab, by: .page)
+            #expect(browser.tabManager.tabs(in: browser.tabManager.currentSpaceID).count == before)
+            #expect(mini.holdsPage)
+            mini.closeInPage(animated: false)
+        }
+    }
+
     @Test func promotingTakesTheMiniOutIntoAWindowOfItsOwn() throws {
         try inWindow { browser, tab in
             let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,

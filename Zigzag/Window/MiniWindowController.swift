@@ -1459,16 +1459,44 @@ extension MiniWindowController: TabHost {
         case .newWindow, .privateWindow:
             WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: isPrivate || disposition == .privateWindow, by: sender)
         case .foregroundTab, .backgroundTab:
+            // Docked, a tab that comes to the front takes this window's focus and closes the peek. It stays here; a
+            // background tab does not take the focus, so it is still a tab.
+            if isDockedInPage, disposition == .foregroundTab {
+                tab.load(url, by: sender)
+                return
+            }
             let target = browserTarget
             target.open(url, disposition: disposition, allowSwitch: false, by: sender)
             if disposition == .foregroundTab { target.window?.makeKeyAndOrderFront(nil) }
         }
     }
 
+    /// Whether a link that asks for a window of its own stays in the docked peek instead. The line is focus: anything
+    /// that would select a tab in the same browser window closes the peek, so it goes where the click did. A background
+    /// tab, another window, a menu command (`pending`) or a sized popup does not take this window's focus, and needs no
+    /// reroute.
+    nonisolated static func keepsDockedLink(navigationType: WKNavigationType, opensInBackground: Bool,
+                                            hasWindowFeatures: Bool, hasPendingCommand: Bool, loads: Bool) -> Bool {
+        guard !opensInBackground, !hasPendingCommand, !hasWindowFeatures, loads else { return false }
+        return navigationType == .linkActivated || navigationType == .other
+    }
+
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
         let pending = BrowserWebView.takePendingDisposition(for: tab.webView)
         // Open Link in Zigzag Mini, in Zigzag Mini: the link opens right here, as a ⇧-click on it does.
         if pending == .mini, let url = action.request.url {
+            tab.load(url, by: .page)
+            return nil
+        }
+        // Docked: only a request that would take this window's focus is rerouted into the peek. A background tab,
+        // another window, a menu command or a sized popup is left to do what it says.
+        let hasFeatures = features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false
+        let opensInBackground = (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
+            || (action.buttonNumber == 4 && !action.modifierFlags.contains(.shift))
+        if isDockedInPage, let url = action.request.url,
+           Self.keepsDockedLink(navigationType: action.navigationType, opensInBackground: opensInBackground,
+                                hasWindowFeatures: hasFeatures, hasPendingCommand: pending != nil,
+                                loads: Tab.route(forPageLink: url, from: tab.url) == .load) {
             tab.load(url, by: .page)
             return nil
         }
@@ -1484,9 +1512,11 @@ extension MiniWindowController: TabHost {
         if pending == nil, features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
             return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
-        // A link for a new tab (target=_blank, ⌘-click, Open Link in New Tab) opens in the browser window; ⌘-click
-        // and the menu's own items leave you here, a plain click takes you there.
+        // A link for a new tab (target=_blank, ⌘-click, Open Link in New Tab) opens in the browser window; ⌘ and the
+        // menu's own items leave you here. Docked, the middle button opens it behind too, and a plain click was
+        // handled above.
         let background = pending != nil || (action.modifierFlags.contains(.command) && !action.modifierFlags.contains(.shift))
+            || (isDockedInPage && action.buttonNumber == 4 && !action.modifierFlags.contains(.shift))
         let target = browserTarget
         let newTab = target.tabManager.newTab(url: nil, select: !background, configuration: configuration, site: action.request.url)
         if !background { target.window?.makeKeyAndOrderFront(nil) }
