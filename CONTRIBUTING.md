@@ -75,24 +75,26 @@ happens when a tab closes should work the way those users expect, unless an issu
 
 ## Localization
 
-Zigzag speaks English and Simplified Chinese. Every word people read goes through
+Zigzag speaks English, Simplified Chinese, and Traditional Chinese. Every word people read goes through
 `String(localized: "…", comment: "…")`, with a comment that says where it appears. After adding or changing
-strings, build, bring the catalog in step and add the Chinese in `Zigzag/Resources/Localizable.xcstrings`:
+strings, build, bring the catalog in step and add Simplified Chinese in `Zigzag/Resources/Localizable.xcstrings`:
 
 ```sh
 xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -derivedDataPath build/dev build
 scripts/sync-strings.sh build/dev
 ```
 
-`LocalizationTests` fails while any string has no Chinese. [docs/i18n/glossary.md](docs/i18n/glossary.md) has
-the words to use and the typography rules. If you can't write the Chinese, say so in the pull request.
+`LocalizationTests` requires Simplified Chinese and checks the formatting of both translations where present.
+Traditional Chinese is welcome but optional: leave untranslated entries out so they use the English source.
+See the [Simplified Chinese](docs/i18n/glossary.md) and [Traditional Chinese](docs/i18n/glossary.zh-Hant.md)
+glossaries for wording and typography. If you can't write the Simplified Chinese, say so in the pull request.
 
-Release notes are localized too. Each release adds its section to [CHANGELOG.md](CHANGELOG.md) and the same
-section in Chinese to [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md), with the same version heading and date,
-`### 新功能` and `### 修复` for New and Fixed, the same number of points in each, in the same order, and the issue
-links and credited names left as they are. `WhatsNewTests` fails when the two don't match. What's New
-and the update window show the Chinese notes when Zigzag is in Chinese, and the English ones for a version that
-has none; `scripts/release.sh` warns when the version it releases has no Chinese section.
+Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
+[CHANGELOG.zh-Hant.md](CHANGELOG.zh-Hant.md) can follow later. Keep the same version, date, order, issue links
+and credited names. Use `### 新功能` for New, `### 修复` for Fixed in Simplified Chinese, and `### 修正` in Traditional Chinese.
+`WhatsNewTests` compares shipped Simplified Chinese notes with English and skips Unreleased. If the Traditional
+Chinese notes for a version are incomplete or missing, the in-app What's New sheet shows its English notes.
+Sparkle's pre-install notes still use Simplified Chinese for its single Chinese release-notes link.
 
 ## Commits and pull requests
 
@@ -107,9 +109,9 @@ has none; `scripts/release.sh` warns when the version it releases has no Chinese
 - Don't add CI workflows or other files under `.github/workflows`.
 - Write `Fixes #N` in the pull request so the issue closes with it.
 - Every change people will notice gets a line under `## [Unreleased]`, in `### New` or `### Fixed`, in
-  [CHANGELOG.md](CHANGELOG.md), and the same line under `### 新功能` or `### 修复` in
-  [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md). Write the Chinese as a person would say it, not word for word. End
-  the line with the issue link, and separate several with ", ": `([#311](…), [#312](…))`.
+  [CHANGELOG.md](CHANGELOG.md) and under the matching heading in [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
+  Add a Traditional Chinese line if you can. Write the Chinese as a person would say it, not word for word.
+  End the line with the issue link, and separate several with ", ": `([#311](…), [#312](…))`.
 - Make sure the app builds and the tests pass, and say in the pull request how you checked your change. For UI,
   add before and after screenshots in light and dark.
 - Draft pull requests aren't reviewed for merge. Mark yours ready when it is.
