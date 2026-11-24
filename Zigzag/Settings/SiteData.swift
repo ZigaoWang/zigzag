@@ -121,6 +121,8 @@ protocol SiteDataSource: AnyObject {
     func remove(_ names: [String]) async
     /// Everything every site keeps.
     func removeAll() async
+    /// One kind of what a site keeps: its cache, or its cookies with the storage that signs it in (#368).
+    func clear(_ kind: WebsiteData.Kind, site: String) async
 }
 
 /// A profile's website data, read from WebKit. Records are fetched with every type, so a site's row says all
@@ -176,6 +178,8 @@ final class WebKitSiteData: SiteDataSource {
             Tab.forgetSessions(in: store, site: name)
         }
     }
+
+    func clear(_ kind: WebsiteData.Kind, site: String) async { await WebsiteData.clear(kind, site: site, in: store) }
 
     func removeAll() async {
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
@@ -281,6 +285,23 @@ final class SiteDataModel {
         removing += 1
         await source.remove(sites.flatMap(\.names))
         removing -= 1
+    }
+
+    /// Clears one kind of a site's data: what's left of it stays listed, the site goes once nothing is, and the
+    /// list is read again for its size.
+    func clear(_ kind: WebsiteData.Kind, of entry: SiteDataEntry) async {
+        let left = entry.kinds.subtracting(kind == .cache ? .cache : [.cookies, .saved])
+        if left.isEmpty {
+            removed.insert(entry.site)
+            entries.removeAll { $0.site == entry.site }
+        } else if let index = entries.firstIndex(where: { $0.site == entry.site }) {
+            entries[index] = SiteDataEntry(site: entry.site, kinds: left, size: nil, names: entry.names)
+        }
+        refilter()
+        removing += 1
+        await source.clear(kind, site: entry.site)
+        removing -= 1
+        refresh()
     }
 
     /// Removes every site's data, or only those shown while searching.

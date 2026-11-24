@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// Settings as a tab: its address names the section, and the section comes back from the address.
@@ -385,5 +386,269 @@ struct SettingsSitePermissionsTests {
             #expect(SitePermissions.choice(.camera, origin: origin) == .allow)
             #expect(settings.debugSiteRows.contains("Camera: Allow"))
         }
+    }
+}
+
+/// A box that folds (#368): one per site, extension or site's stored data, headed by its row with a chevron.
+@MainActor
+struct FoldBoxTests {
+    private func row(_ title: String, keywords: String = "") -> FormRow {
+        let row = FormRow(title: title, control: Toggle(isOn: true))
+        row.keywords = keywords
+        return row
+    }
+
+    private func box(_ name: String = "example.com", open: Bool = false) -> FoldBox {
+        let header = FormRow(title: name, detail: FoldStyle.settingsSummary(2), icon: SettingsIcon.symbol("globe"), control: PillButton(title: "Forget"))
+        let box = FoldBox(key: "site \(name)", header: header, rows: [row("Camera", keywords: name), row("Zoom", keywords: name)], isOpen: open)
+        box.frame = NSRect(x: 0, y: 0, width: 600, height: box.height(for: 600))
+        box.onToggle = { box, open in box.isOpen = open }
+        return box
+    }
+
+    @Test func shortListsOpenAndLongOnesStartFolded() {
+        #expect(FoldStyle.opensByDefault(count: 1))
+        #expect(FoldStyle.opensByDefault(count: FoldStyle.openUpTo))
+        #expect(!FoldStyle.opensByDefault(count: FoldStyle.openUpTo + 1))
+    }
+
+    @Test func aBoxOpensToItsRowsAndFoldsToItsHeader() throws {
+        let box = box()
+        let header = box.height(for: 600)
+        #expect(header == box.headerRow.height(for: 600 - FoldStyle.chevronRoom))
+        #expect(box.shownRows.isEmpty)
+        // A click on the header, as VoiceOver's press does.
+        #expect(box.header.accessibilityPerformPress())
+        #expect(box.isOpen)
+        #expect(box.height(for: 600) == header + box.rows.map { $0.height(for: 600 - FoldStyle.chevronRoom) }.reduce(0, +))
+        #expect(box.shownRows.map(\.debugTitle) == ["Camera", "Zoom"])
+        // Its rows' text starts where the name's does, past the picture.
+        #expect(box.rows.allSatisfy { $0.textInset == box.headerRow.textInset })
+    }
+
+    @Test func voiceOverReadsADisclosureTriangleOpenOrNot() {
+        let box = box()
+        #expect(box.header.accessibilityRole() == .disclosureTriangle)
+        #expect(box.header.accessibilityLabel() == "example.com")
+        #expect(box.header.isAccessibilityExpanded() == false)
+        #expect(box.header.accessibilityValue() as? Int == 0)
+        box.isOpen = true
+        #expect(box.header.isAccessibilityExpanded())
+        #expect(box.header.accessibilityValue() as? Int == 1)
+        box.layoutSubtreeIfNeeded()
+        // The box lists the triangle, the header's button, then its rows.
+        let children = box.accessibilityChildren() ?? []
+        #expect((children.first as? NSView) === box.header)
+        #expect(children.contains { ($0 as? PillButton)?.title == "Forget" })
+    }
+
+    @Test func foldingKeepsItsRowsUntilTheBoxHasClosed() {
+        let box = box(open: true)
+        box.layoutSubtreeIfNeeded()
+        #expect(box.rows.allSatisfy { !$0.isHidden })
+        box.isOpen = false
+        box.layoutSubtreeIfNeeded()
+        // Still there while the box closes over them, then gone from Tab and VoiceOver.
+        #expect(box.rows.allSatisfy { !$0.isHidden })
+        box.settle()
+        box.layoutSubtreeIfNeeded()
+        #expect(box.rows.allSatisfy { $0.isHidden })
+    }
+
+    @Test func aSearchOpensTheBoxToTheRowsThatMatch() {
+        let box = box()
+        #expect(box.find(["camera"]))
+        #expect(box.showsOpen && !box.isOpen)
+        #expect(box.shownRows.map(\.debugTitle) == ["Camera"])
+        // Its own name found: the whole box, folded as it was.
+        #expect(box.find(["example"]))
+        #expect(!box.showsOpen)
+        #expect(!box.find(["microphone"]))
+        // The search gone, it's as you left it.
+        #expect(box.find([]))
+        #expect(!box.showsOpen)
+    }
+
+    @Test func keysOpenFoldAndMoveBetweenBoxes() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 400), styleMask: [.titled], backing: .buffered, defer: true)
+        let group = FormGroup(frame: NSRect(x: 0, y: 0, width: 600, height: 300))
+        let first = box("a.example"), second = box("b.example")
+        group.add(first)
+        group.add(second)
+        window.contentView = group
+        group.layoutSubtreeIfNeeded()
+        InteractiveView.debugKeyboardAccess = true
+        defer { InteractiveView.debugKeyboardAccess = false }
+        func key(_ code: UInt16) -> NSEvent {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                             characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
+        }
+        #expect(window.makeFirstResponder(first.header))
+        first.header.keyDown(with: key(124))
+        #expect(first.isOpen)
+        first.header.keyDown(with: key(123))
+        #expect(!first.isOpen)
+        // Space presses it, as every drawn control.
+        first.header.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                    characters: " ", charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49)!)
+        #expect(first.isOpen)
+        group.layoutSubtreeIfNeeded()
+        first.header.keyDown(with: key(125))
+        #expect(window.firstResponder === second.header)
+        second.header.keyDown(with: key(126))
+        #expect(window.firstResponder === first.header)
+    }
+
+    @Test func boxesKeepAGapWhereRowsHaveAHairline() {
+        let group = FormGroup(frame: NSRect(x: 0, y: 0, width: 600, height: 0))
+        let plain = row("Ask before a site downloads files")
+        let first = box("a.example"), second = box("b.example")
+        [plain, first, second].forEach(group.add)
+        let rows = plain.height(for: 600) + first.height(for: 600) + second.height(for: 600)
+        #expect(group.fittingHeight(for: 600) == rows + FoldStyle.gap * 2)
+        group.frame.size.height = group.fittingHeight(for: 600)
+        group.layoutSubtreeIfNeeded()
+        #expect(second.frame.minY == first.frame.maxY + FoldStyle.gap)
+        // No hairline beside a box: its edge does that.
+        let lines = group.subviews.compactMap { $0 as? ColorView }.filter { !$0.isHidden && $0.frame.height == Tokens.Metric.hairline }
+        #expect(lines.isEmpty)
+    }
+
+    @Test func aListsOwnSearchNarrowsOnlyItsBoxes() {
+        let group = FormGroup(frame: NSRect(x: 0, y: 0, width: 600, height: 0))
+        let plain = row("Ask before a site downloads files")
+        let alpha = box("alpha.example"), beta = box("beta.example")
+        [plain, alpha, beta].forEach(group.add)
+        group.boxFilter = ["alpha"]
+        #expect(group.filter([]) == 2)
+        #expect(!plain.isHidden && !alpha.isHidden && beta.isHidden)
+        // A choice inside a box finds it too, opened to that row.
+        group.boxFilter = ["beta", "zoom"]
+        group.filter([])
+        #expect(alpha.isHidden && !beta.isHidden)
+        #expect(beta.shownRows.map(\.debugTitle) == ["Zoom"])
+        group.boxFilter = []
+        #expect(group.filter([]) == 3)
+    }
+}
+
+/// Settings' long lists as boxes that fold (#368): Site Permissions' sites and Installed's extensions.
+@MainActor
+struct SettingsFoldingTests {
+    private func withSites(_ count: Int, _ body: ([String]) throws -> Void) rethrows {
+        let name = "SettingsFoldingTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let sites = (0..<count).map { "fold-\($0).example" }
+        for site in sites { SitePermissions.setChoice(.allow, for: .camera, origin: "https://\(site)") }
+        SitePermissions.setChoice(.block, for: .notifications, origin: "https://\(sites[0])")
+        try body(sites)
+    }
+
+    private func privacy() -> SettingsView {
+        let settings = SettingsView(pane: .privacy)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        settings.debugReadNow()
+        return settings
+    }
+
+    private func box(_ site: String, in settings: SettingsView) throws -> FoldBox {
+        try #require(settings.debugSiteBoxes.first { $0.headerRow.debugTitle == site })
+    }
+
+    @Test func eachSiteIsABoxHeadedByItsNameAndHowManyChoices() throws {
+        try withSites(5) { sites in
+            let settings = privacy()
+            let first = try box(sites[0], in: settings)
+            #expect(first.headerRow.debugDetail.stringValue == FoldStyle.settingsSummary(2))
+            let second = try box(sites[1], in: settings)
+            #expect(second.headerRow.debugDetail.stringValue == FoldStyle.settingsSummary(1))
+            #expect(first.rows.map(\.debugTitle) == ["Camera", "Notifications"])
+            // Forget stays on the header.
+            #expect((first.headerRow.control as? PillButton)?.title == "Forget")
+            // A long list starts folded.
+            #expect(settings.debugSiteBoxes.count >= 5)
+            #expect(settings.debugSiteBoxes.allSatisfy { !$0.isOpen })
+        }
+    }
+
+    @Test func aFoldIsKeptWhileSettingsStaysOpen() throws {
+        try withSites(5) { sites in
+            let settings = privacy()
+            let first = try box(sites[0], in: settings)
+            #expect(first.header.accessibilityPerformPress())
+            #expect(first.isOpen)
+            // A choice changed rebuilds the list: the box stays open.
+            settings.debugChooseSitePermission("Notifications", "Allow")
+            let rebuilt = try box(sites[0], in: settings), second = try box(sites[1], in: settings)
+            #expect(rebuilt !== first && rebuilt.isOpen)
+            #expect(!second.isOpen)
+            // Settings opened again starts as long lists do.
+            let again = try box(sites[0], in: privacy())
+            #expect(!again.isOpen)
+        }
+    }
+
+    @Test func findASettingOpensTheBoxAMatchIsIn() throws {
+        try withSites(5) { sites in
+            let settings = privacy()
+            settings.debugFind("notifications \(sites[0])")
+            let first = try box(sites[0], in: settings)
+            #expect(!first.isHidden && first.showsOpen)
+            #expect(first.shownRows.map(\.debugTitle) == ["Notifications"])
+            #expect(settings.debugFound.contains("Notifications"))
+            settings.debugFind("")
+            #expect(!first.showsOpen)
+        }
+    }
+
+    @Test func manySitesGetASearchOfTheirOwn() throws {
+        try withSites(FoldStyle.searchFrom) { sites in
+            let settings = privacy()
+            #expect(settings.debugSitesSearchShows)
+            settings.debugSearchSites("fold-3")
+            let shown = settings.debugSiteBoxes.filter { !$0.isHidden }.map(\.headerRow.debugTitle)
+            #expect(shown == ["fold-3.example"])
+            settings.debugSearchSites("")
+            #expect(settings.debugSiteBoxes.filter { !$0.isHidden }.count >= sites.count)
+        }
+    }
+
+    @available(macOS 15.4, *)
+    private func fixture(_ name: String) async throws -> WKWebExtension {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("fold-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let manifest = #"{"manifest_version": 3, "name": "\#(name)", "version": "1.2", "host_permissions": ["<all_urls>"]}"#
+        try manifest.write(to: folder.appendingPathComponent("manifest.json"), atomically: true, encoding: .utf8)
+        return try await WKWebExtension(resourceBaseURL: folder)
+    }
+
+    @Test func eachExtensionIsABoxWithItsSettingsInside() async throws {
+        guard #available(macOS 15.4, *) else { return }
+        let ext = try await fixture("Fold Test")
+        let settings = SettingsView(pane: .extensions)
+        let box = settings.debugExtensionFold(id: "fold-test", ext: ext, in: 5)
+        #expect(box.headerRow.debugTitle == "Fold Test")
+        #expect(box.headerRow.debugDetail.stringValue.contains("1.2"))
+        #expect(box.rows.map(\.debugTitle).contains("Site access"))
+        #expect(box.rows.last?.debugTitle == "Allow in private windows")
+        #expect(!box.isOpen)
+        // A short list opens.
+        #expect(settings.debugExtensionFold(id: "fold-test", ext: ext, in: 2).isOpen)
+        // Find a setting opens it to what matches.
+        #expect(box.find(["private"]))
+        #expect(box.shownRows.map(\.debugTitle) == ["Allow in private windows"])
+        // Its own search narrows to the extensions named.
+        let group = FormGroup()
+        let other = settings.debugExtensionFold(id: "other", ext: try await fixture("Another"), in: 5)
+        [box, other].forEach(group.add)
+        group.boxFilter = ["another"]
+        group.filter([])
+        #expect(box.isHidden && !other.isHidden)
     }
 }

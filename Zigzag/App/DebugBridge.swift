@@ -2797,6 +2797,8 @@ enum DebugBridge {
         case "settingsprivacy": SettingsPage.open(.privacy, in: controller)
         // settingspane <name>: that pane of Settings (tabs, appearance…).
         case "settingspane": if let pane = SettingsPane(rawValue: arg) { SettingsPage.open(pane, in: controller) }
+        // settingsfold open <name> | top <heading>: a box in Settings opened as a click does, or the page scrolled to a heading.
+        case "settingsfold": controller.tabManager.selectedTab?.settingsView?.debugFold(arg)
         case "flipblocking": controller.tabManager.selectedTab?.settingsView?.debugFlipBlocking()
         // getextensions: Settings › Extensions' Get Extensions menu, open.
         case "getextensions": controller.tabManager.selectedTab?.settingsView?.debugShowGetExtensionsMenu()

@@ -41674,6 +41674,179 @@
           }
         }
       }
+    },
+    "Clear Cache for %@…" : {
+      "comment" : "VoiceOver name of Clear… on the cache row in a site's box in Settings › Privacy › Stored by Websites; the site, like apple.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 %@ 的缓存…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 %@ 的快取…"
+          }
+        }
+      }
+    },
+    "Clear Cookies for %@…" : {
+      "comment" : "VoiceOver name of Clear… on the cookies row in a site's box in Settings › Privacy › Stored by Websites; the site, like apple.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 %@ 的 Cookie…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除 %@ 的 Cookie…"
+          }
+        }
+      }
+    },
+    "Clear…" : {
+      "comment" : "Button on a kind of data in a site's box in Settings › Privacy › Stored by Websites: clears it for that site, after asking.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除…"
+          }
+        }
+      }
+    },
+    "Find an extension" : {
+      "comment" : "Placeholder of the search beside Installed in Settings › Extensions, there when many extensions are installed: finds one by its name or a setting.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找扩展"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋延伸功能"
+          }
+        }
+      }
+    },
+    "Its pages load a little slower the first time you open them again. You stay signed in." : {
+      "comment" : "Message of the sheet that clears one site's cache, from its box in Settings › Privacy › Stored by Websites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次打开它的页面时，第一次会稍慢一些。你会保持登录状态。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次開啟它的網頁時，第一次會稍慢一些。你會保持登入狀態。"
+          }
+        }
+      }
+    },
+    "You’ll be signed out of %@. Its cache stays, and your passwords, pinned tabs and history stay too." : {
+      "comment" : "Message of the sheet that clears one site's cookies and saved data, from its box in Settings › Privacy › Stored by Websites; the site, like apple.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你将退出 %@ 的登录。它的缓存会保留，你的密码、固定标签页和历史记录也都会保留。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你將結束 %@ 的登入。它的快取會保留，你的密碼、已固定分頁和瀏覽記錄也都會保留。"
+          }
+        }
+      }
+    },
+    "%lld settings" : {
+      "comment" : "Under a site's name in Settings › Privacy › Site Permissions: how many choices are kept for it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld setting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld settings"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 项设置"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 項設定"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sites.find" : {
+      "comment" : "Placeholder of the search beside Site Permissions in Settings › Privacy, there when many sites are listed: finds a site by its name or a choice made for it.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Find a site"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找网站"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尋找網站"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
