@@ -163,6 +163,15 @@ struct LiveFeedTests {
         #expect(!FeedDiscovery.looksLikeFeed(Data("<!doctype html><html>".utf8)))
     }
 
+    @Test func aGitHubListFromANewerZigzagStillLoads() throws {
+        let data = Data(#"{"gitHub":"somethingNewer","user":"octocat"}"#.utf8)
+        let source = try JSONDecoder().decode(LiveSource.self, from: data)
+        #expect(source.gitHub == nil)
+        #expect(!source.isComplete)
+        let known = try JSONDecoder().decode(LiveSource.self, from: JSONEncoder().encode(LiveSource.gitHub(.repositoryIssues, user: "octocat")))
+        #expect(known == .gitHub(.repositoryIssues, user: "octocat"))
+    }
+
     @Test func asksGitHubForTheListsOfAUser() throws {
         func query(_ list: GitHubList) throws -> String {
             let parts = try #require(URLComponents(url: list.url(for: "octocat", count: 25), resolvingAgainstBaseURL: false))
@@ -174,6 +183,8 @@ struct LiveFeedTests {
         #expect(try query(.pullRequests) == "is:pr is:open archived:false author:octocat")
         #expect(try query(.issues) == "is:issue is:open archived:false assignee:octocat")
         #expect(try query(.reviewRequests) == "is:pr is:open archived:false review-requested:octocat")
+        #expect(try query(.repositoryIssues) == "is:issue is:open archived:false user:octocat")
+        #expect(try query(.repositoryPullRequests) == "is:pr is:open archived:false user:octocat")
         #expect(GitHubList.isUsername("octo-cat9"))
         #expect(!GitHubList.isUsername("-octo"))
         #expect(!GitHubList.isUsername("oc--to"))

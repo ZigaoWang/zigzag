@@ -27,9 +27,11 @@ enum LiveFolderSheet {
 
     static func listTitle(_ list: GitHubList) -> String {
         switch list {
-        case .pullRequests: String(localized: "Pull Requests", comment: "A GitHub list a live folder can follow: the open pull requests someone made.")
-        case .issues: String(localized: "Issues", comment: "A GitHub list a live folder can follow: the open issues assigned to someone.")
+        case .pullRequests: String(localized: "Pull Requests Opened", comment: "A GitHub list a live folder can follow: the open pull requests someone made.")
+        case .issues: String(localized: "Issues Assigned", comment: "A GitHub list a live folder can follow: the open issues assigned to someone.")
         case .reviewRequests: String(localized: "Review Requests", comment: "A GitHub list a live folder can follow: the open pull requests someone is asked to review.")
+        case .repositoryIssues: String(localized: "Issues in Owned Repositories", comment: "A GitHub list a live folder can follow: the open issues in the repositories someone owns, whoever opened them.")
+        case .repositoryPullRequests: String(localized: "Pull Requests in Owned Repositories", comment: "A GitHub list a live folder can follow: the open pull requests in the repositories someone owns, whoever opened them.")
         }
     }
 

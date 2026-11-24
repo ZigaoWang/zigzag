@@ -41352,19 +41352,19 @@
         }
       }
     },
-    "Issues" : {
+    "Issues Assigned" : {
       "comment" : "A GitHub list a live folder can follow: the open issues assigned to someone.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "议题"
+            "value" : "分配的议题"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "議題"
+            "value" : "指派的議題"
           }
         }
       }
@@ -41539,19 +41539,19 @@
         }
       }
     },
-    "Pull Requests" : {
+    "Pull Requests Opened" : {
       "comment" : "A GitHub list a live folder can follow: the open pull requests someone made.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拉取请求"
+            "value" : "发起的拉取请求"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提取要求"
+            "value" : "發起的提取要求"
           }
         }
       }
@@ -41569,6 +41569,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "立即更新"
+          }
+        }
+      }
+    },
+    "Issues in Owned Repositories" : {
+      "comment" : "A GitHub list a live folder can follow: the open issues in the repositories someone owns, whoever opened them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自有仓库的议题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自有儲存庫的議題"
+          }
+        }
+      }
+    },
+    "Pull Requests in Owned Repositories" : {
+      "comment" : "A GitHub list a live folder can follow: the open pull requests in the repositories someone owns, whoever opened them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自有仓库的拉取请求"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自有儲存庫的提取要求"
           }
         }
       }
