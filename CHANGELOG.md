@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
-- Sites you let use your location get it. Before, macOS never asked whether Zigzag could use your location and Zigzag wasn't listed in System Settings › Privacy & Security › Location Services, so a site you allowed, like Google Maps, never found where you are. Now the first site you allow makes macOS ask once.
+- Sites you let use your location get it. Before, macOS never asked whether Zigzag could use your location and Zigzag wasn't listed in System Settings › Privacy & Security › Location Services, so a site you allowed, like Google Maps, never found where you are. Now the first site you allow makes macOS ask once. With Location Services off for the whole Mac, or refused for Zigzag, the site is told no at once instead of waiting.
 - View › Separate Tabs is now ⌃⌘\\, so it no longer clashes with 1Password, which uses ⌥⌘\\ everywhere. A key you set yourself in Settings › Shortcuts stays as it is.
 - Every tab's, pinned page's and space's menu in the sidebar shows its keyboard shortcuts, not only the menu of the one you're on.
 - Wording is the same across the app: Site Controls keeps its capitals in every sentence, the getting-started guide says choose for menu items, and the last straight apostrophes are curly. In Chinese, Choose, Custom, App and Site Controls read the same everywhere.

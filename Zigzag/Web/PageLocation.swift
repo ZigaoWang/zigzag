@@ -101,15 +101,33 @@ final class PageLocation: NSObject, CLLocationManagerDelegate {
         api.setProvider(manager, Self.provider)
     }
 
+    /// What a page's ask gets, as Core Location stands: macOS asks you, the page gets an error, or it gets positions.
+    enum Answer: Equatable { case ask, fail, update }
+
+    /// Location Services off for the whole Mac (System Settings › Privacy & Security) → an error at once: macOS would
+    /// never ask, and the page would otherwise wait forever. Not asked yet → macOS asks. Refused → an error.
+    static func answer(servicesOn: Bool, status: CLAuthorizationStatus) -> Answer {
+        guard servicesOn else { return .fail }
+        switch status {
+        case .notDetermined: return .ask
+        case .denied, .restricted: return .fail
+        default: return .update
+        }
+    }
+
+    private var answer: Answer {
+        Self.answer(servicesOn: CLLocationManager.locationServicesEnabled(), status: locationManager.authorizationStatus)
+    }
+
     private func start(_ manager: Manager) {
         watching[manager] = watching[manager] ?? false
-        switch locationManager.authorizationStatus {
-        case .notDetermined:
+        switch answer {
+        case .ask:
             // macOS asks you now; the answer comes back in locationManagerDidChangeAuthorization.
             locationManager.requestWhenInUseAuthorization()
-        case .denied, .restricted:
+        case .fail:
             fail(manager)
-        default:
+        case .update:
             if let last = locationManager.location, -last.timestamp.timeIntervalSinceNow < 60 { send(last, to: [manager]) }
             updateAccuracy()
             locationManager.startUpdatingLocation()
@@ -152,13 +170,13 @@ final class PageLocation: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         MainActor.assumeIsolated {
             guard !watching.isEmpty else { return }
-            switch locationManager.authorizationStatus {
-            case .notDetermined:
+            switch answer {
+            case .ask:
                 break
-            case .denied, .restricted:
+            case .fail:
                 for page in watching.keys { fail(page) }
                 locationManager.stopUpdatingLocation()
-            default:
+            case .update:
                 updateAccuracy()
                 locationManager.startUpdatingLocation()
             }

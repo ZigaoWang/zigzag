@@ -19,4 +19,14 @@ import WebKit
         let samePool = (first.value(forKey: "processPool") as AnyObject) === (second.value(forKey: "processPool") as AnyObject)
         #expect(PageLocation.attachedPools == attached + (samePool ? 0 : 1))
     }
+
+    /// Location Services off for the whole Mac: macOS would never ask, so the page gets an error rather than waiting.
+    @Test func locationServicesOffForTheMacAnswersWithAnError() {
+        #expect(PageLocation.answer(servicesOn: false, status: .notDetermined) == .fail)
+        #expect(PageLocation.answer(servicesOn: false, status: .authorizedAlways) == .fail)
+        #expect(PageLocation.answer(servicesOn: true, status: .notDetermined) == .ask)
+        #expect(PageLocation.answer(servicesOn: true, status: .denied) == .fail)
+        #expect(PageLocation.answer(servicesOn: true, status: .restricted) == .fail)
+        #expect(PageLocation.answer(servicesOn: true, status: .authorizedAlways) == .update)
+    }
 }
