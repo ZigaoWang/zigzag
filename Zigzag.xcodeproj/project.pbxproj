@@ -393,6 +393,7 @@
 		A071E6A36E3CEF8A3CA1D201 /* DeveloperTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = D88CA508C5606C98329015FB /* DeveloperTools.swift */; };
 		A08F33F5B078BBE5F98A6003 /* TileLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192E65AD41512C6227E9A03C /* TileLayoutTests.swift */; };
 		A09C2F4CA62DE77E8D73B853 /* FavoriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111BB58676C39406F3B81A0E /* FavoriteTests.swift */; };
+		F89713BB4F9E4FCD967A34E1 /* ExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB135AC52784EF0AE698534 /* ExportTests.swift */; };
 		A0A0EF24BC36F7C73F38E37A /* NetworkChangesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF592955291CE8F4D81FCBD /* NetworkChangesTests.swift */; };
 		A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C4AD0F5E55B24044483033 /* MaterialsShowcase.swift */; };
 		A1B187BBCB414BDCB56CB3D0 /* SharedSoundGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E0C32893C3D5F6AEF17C46 /* SharedSoundGate.swift */; };
@@ -457,6 +458,10 @@
 		C0C41FEE6C185FBC845F1D51 /* ZigzagWebApp in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */ = {isa = PBXBuildFile; fileRef = B030A4C0601F5AE1232B9288 /* chrome-runtime.js */; };
 		C112D693BD5356EEB54939C1 /* BookmarksHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44538995DDF31F54687ED10E /* BookmarksHTML.swift */; };
+		DDE7BA7629E044B2B08650E0 /* DataExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84521737A7B142C793AA0E69 /* DataExport.swift */; };
+		E8C62F56809B421FB4D7974D /* ZigzagBackupRestore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E509A1D5354C94AD80CF0C /* ZigzagBackupRestore.swift */; };
+		8B4E65625CEF4DFAB97EDE09 /* ZigzagBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83AD4B8DDEF74D8D8C16E396 /* ZigzagBackup.swift */; };
+		60338E64406E4E549F21E8CB /* BookmarksExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A01A6D4DA8944B48A840A9C /* BookmarksExport.swift */; };
 		C11913DEEFC7AD66CBC10F50 /* PromptHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */; };
 		C2866E2B3C6D2530C1B61098 /* autoconsent-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = A65F87DB450F7C340B1F045C /* autoconsent-LICENSE.txt */; };
 		C2C05749A76907433E6BEC4D /* reading_list.plist in Resources */ = {isa = PBXBuildFile; fileRef = E37F1CA561517AA2505B9E24 /* reading_list.plist */; };
@@ -706,6 +711,7 @@
 		106F8B8ED9266890F76DEBB5 /* BrowserActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserActions.swift; sourceTree = "<group>"; };
 		107AB21E7CCBB0D7E7C8676F /* DeveloperToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolTests.swift; sourceTree = "<group>"; };
 		111BB58676C39406F3B81A0E /* FavoriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTests.swift; sourceTree = "<group>"; };
+		DBB135AC52784EF0AE698534 /* ExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportTests.swift; sourceTree = "<group>"; };
 		118460E2A057D11B6C1946F1 /* ExtensionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStore.swift; sourceTree = "<group>"; };
 		B22CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OldTwitterSolver.swift; sourceTree = "<group>"; };
 		11A4EB98BE921B92AA85CBF4 /* PhoneLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLink.swift; sourceTree = "<group>"; };
@@ -813,6 +819,10 @@
 		4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesTests.swift; sourceTree = "<group>"; };
 		4363A8C97194CFB82618511C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		44538995DDF31F54687ED10E /* BookmarksHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksHTML.swift; sourceTree = "<group>"; };
+		84521737A7B142C793AA0E69 /* DataExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataExport.swift; sourceTree = "<group>"; };
+		B9E509A1D5354C94AD80CF0C /* ZigzagBackupRestore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagBackupRestore.swift; sourceTree = "<group>"; };
+		83AD4B8DDEF74D8D8C16E396 /* ZigzagBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagBackup.swift; sourceTree = "<group>"; };
+		4A01A6D4DA8944B48A840A9C /* BookmarksExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksExport.swift; sourceTree = "<group>"; };
 		445BFF7EFE1744F510AC8334 /* BridgeWebRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeWebRequest.swift; sourceTree = "<group>"; };
 		0B2D7E4A1C6F0002A0B1C2D3 /* BridgeOmnibox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeOmnibox.swift; sourceTree = "<group>"; };
 		0D9E4A2C7B1F000100000002 /* BridgePageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgePageCapture.swift; sourceTree = "<group>"; };
@@ -1676,6 +1686,10 @@
 			children = (
 				EDF5DDEF3F10D52662345203 /* ArcImporter.swift */,
 				44538995DDF31F54687ED10E /* BookmarksHTML.swift */,
+				84521737A7B142C793AA0E69 /* DataExport.swift */,
+				B9E509A1D5354C94AD80CF0C /* ZigzagBackupRestore.swift */,
+				83AD4B8DDEF74D8D8C16E396 /* ZigzagBackup.swift */,
+				4A01A6D4DA8944B48A840A9C /* BookmarksExport.swift */,
 				D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */,
 				59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */,
 				D1A051100000000000000002 /* DiaImporter.swift */,
@@ -1884,6 +1898,7 @@
 				F587E3B7274596BDE02E2F4F /* ExtensionStormTests.swift */,
 				888D287756137DE5F88678F5 /* FaviconRankTests.swift */,
 				111BB58676C39406F3B81A0E /* FavoriteTests.swift */,
+				DBB135AC52784EF0AE698534 /* ExportTests.swift */,
 				90E2676D1635794C7B91868A /* FeatureFlagsTests.swift */,
 				6FCB792604C01E2E8F11B27E /* FindCountTests.swift */,
 				DDDEAD8D5639DB397CB99CB5 /* FindMarksTests.swift */,
@@ -2417,6 +2432,10 @@
 				087468A86D6129B66892F5D9 /* Autofill.swift in Sources */,
 				1F82CB240DACE01165343BA3 /* BlockedScriptStandIns.swift in Sources */,
 				C112D693BD5356EEB54939C1 /* BookmarksHTML.swift in Sources */,
+				DDE7BA7629E044B2B08650E0 /* DataExport.swift in Sources */,
+				E8C62F56809B421FB4D7974D /* ZigzagBackupRestore.swift in Sources */,
+				8B4E65625CEF4DFAB97EDE09 /* ZigzagBackup.swift in Sources */,
+				60338E64406E4E549F21E8CB /* BookmarksExport.swift in Sources */,
 				2E8C9DF367FE32D045315D1C /* Brand.swift in Sources */,
 				A25128EAA13B9A069E8A0598 /* BridgeBookmarks.swift in Sources */,
 				CEB795609E384041951E4190 /* BridgeDownloads.swift in Sources */,
@@ -2791,6 +2810,7 @@
 				ED5EDC5FE5F5456CBE42A728 /* ExtensionStormTests.swift in Sources */,
 				95A0A278C6E484155212F812 /* FaviconRankTests.swift in Sources */,
 				A09C2F4CA62DE77E8D73B853 /* FavoriteTests.swift in Sources */,
+				F89713BB4F9E4FCD967A34E1 /* ExportTests.swift in Sources */,
 				B0A9891F04D0F9370624DAAD /* FeatureFlagsTests.swift in Sources */,
 				E3DB108E2FCB680F0EF592AC /* FindCountTests.swift in Sources */,
 				BC5CC5CE3A1E300D17C62198 /* FindMarksTests.swift in Sources */,

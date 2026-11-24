@@ -1907,6 +1907,30 @@ final class Library {
         commit()
     }
 
+    /// Spaces, favorites, site rules and profiles together, for a backup to be made from or merged into.
+    struct Contents {
+        var spaces: [SpaceInfo]
+        var favorites: [Bookmark]
+        var favoriteSplits: [PinnedSplit]
+        var siteRoutes: [SiteRoutes.Route]
+        var directory: ProfileDirectory
+    }
+
+    var contents: Contents {
+        Contents(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits, siteRoutes: siteRoutes, directory: directory)
+    }
+
+    /// Puts in what a restored backup merged into `contents`, saved and shown once.
+    func replaceContents(_ new: Contents) {
+        spaces = new.spaces
+        favorites = new.favorites
+        favoriteSplits = new.favoriteSplits
+        siteRoutes = new.siteRoutes
+        directory = new.directory
+        tidyFavorites()
+        commit()
+    }
+
     // MARK: Profiles
 
     /// Every profile, the first one first.

@@ -232,6 +232,9 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         window.makeFirstResponder(stops[next])
     }
 
+    /// Closes it as Cancel does: for a button in a row that goes somewhere else.
+    func close() { finish(false) }
+
     #if DEBUG
     /// Answers the form as its buttons would, for scripted checks. Confirming one that can't be confirmed does nothing.
     func debugAnswer(_ confirmed: Bool) {
@@ -293,6 +296,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
 
     private func height(of row: Row, width: CGFloat) -> CGFloat {
         if row.height > 0 { return row.height }
+        if let sized = row.view as? FormSheetSizing { return sized.height(for: width) }
         return (row.view as? NSTextField)?.wrappedHeight(width) ?? Tokens.Metric.controlHeight
     }
 
@@ -357,6 +361,11 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         }
         buttons.frame = NSRect(x: pad, y: buttonsTop, width: inner, height: DialogButtons.height)
     }
+}
+
+/// A full-width row whose height follows the form's width (wrapped words under a choice).
+protocol FormSheetSizing: NSView {
+    func height(for width: CGFloat) -> CGFloat
 }
 
 private extension NSView {

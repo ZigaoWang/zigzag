@@ -1281,6 +1281,7 @@ extension CommandBarController {
         guard let controller else { return }
         switch id {
         case "import": ImportWindowController.show()
+        case "export": DataExport.show(in: controller)
         case "passwords": PasswordsWindowController.show()
         case "clear-cache": controller.confirmClearCache()
         case "clear-cookies": controller.confirmClearCookies()

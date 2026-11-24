@@ -2525,6 +2525,7 @@ enum DebugBridge {
             if let view = WelcomeWindowController.shared?.window?.contentView as? OnboardingView,
                let step = Int(arg.prefix(1)).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: arg.hasSuffix("a")) }
         case "importwindow": ImportWindowController.show()
+        case "exportsheet": (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first).map { DataExport.show(in: $0) }
         case "importfile":
             // importfile <profile name> <path>: brings a chosen file (a Safari export, a passwords CSV) into that
             // profile, as the Import window does. Only in a test copy, with made-up data.
