@@ -1226,7 +1226,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// AppKit's phases tell a new scroll gesture from the rest of one.
-    private func noteScrollGesture(_ event: NSEvent, inPane index: Int) {
+    func noteScrollGesture(_ event: NSEvent, inPane index: Int) {
         var state = autohidePanes[index] ?? AutohidePaneState()
         if event.phase == .began {
             beginAutohideGesture(state: &state)
@@ -1244,10 +1244,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             state.lastWheelAt = event.timestamp
         }
         autohidePanes[index] = state
+        // A scroll up with the page already at its top: no scroll is left to report, so the bar comes back here.
+        if event.scrollingDeltaY > 0, state.reported, state.lastScrollY <= 0.5, root.autohidesBar, root.barHoldsAddress,
+           root.autohideOffset(at: index) > 0, !autohideHeld(inPane: index) {
+            reveal(pane: index)
+        }
     }
 
-    /// Autohide follows the person's own page scrolls; a locked close waits for a new gesture.
-    func pageScrolled(to y: CGFloat, trusted: Bool, editing: Bool, dragging: Bool = false, key: Bool = false,
+    /// Autohide follows the person's own page scrolls; a locked close waits for a new gesture. `delta`, when the page
+    /// sends it, is its own movement since the last report.
+    func pageScrolled(to y: CGFloat, by delta: CGFloat? = nil, trusted: Bool, editing: Bool, dragging: Bool = false, key: Bool = false,
                       inPane index: Int = 0, tab: Tab? = nil) {
         let pane = max(0, min(index, root.autohidePaneCount - 1))
         var state = autohidePanes[pane] ?? AutohidePaneState()
@@ -1256,7 +1262,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             state = AutohidePaneState(tab: ObjectIdentifier(tab))
             root.setAutohideOffset(0, at: pane)
         }
-        let delta = state.reported ? y - state.lastScrollY : 0
+        let delta = state.reported ? delta ?? y - state.lastScrollY : 0
         state.lastScrollY = y
         state.reported = true
         // A scroll-bar drag is one gesture from press to release, as a trackpad swipe is.
@@ -1264,40 +1270,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             beginAutohideGesture(state: &state)
         }
         state.dragging = dragging
-        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar else {
-            autohidePanes[pane] = state
-            return
-        }
-        if editing {
-            autohidePanes[pane] = state
-            return
-        }
-        guard trusted, !autohideHeld(inPane: pane) else {
-            autohidePanes[pane] = state
-            return
-        }
-        // A key scroll is its own gesture, and the page's very top is always the bar's place.
+        autohidePanes[pane] = state
+        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar, !editing, trusted, !autohideHeld(inPane: pane) else { return }
+        // A key scroll is its own gesture.
         if key { state.locked = false }
-        if y <= 0.5 {
+        // Up to the very top: the bar's place, however it went.
+        if y <= 0.5, delta < 0 {
             state.locked = false
             autohidePanes[pane] = state
             root.setAutohideOffset(0, at: pane)
             return
         }
         let was = root.autohideOffset(at: pane)
-        let step = AddressBarAutohide.step(offset: was, pageDelta: delta,
-                                           travel: root.autohideTravel(at: pane), locked: state.locked)
+        let step = AddressBarAutohide.step(offset: was, pageDelta: delta, travel: root.autohideTravel(at: pane), locked: state.locked)
         state.locked = step.locked
         autohidePanes[pane] = state
         root.setAutohideOffset(step.offset, at: pane)
-        // The bar's travel is the scroll for that part of the gesture: take it out of the page, so the content
-        // doesn't also move by the part the bar just covered.
+        // The bar's travel takes that much of the scroll: the page scrolls back by it, so the content moves once.
         let consumed = step.offset - was
-        if abs(consumed) > 0.5, let tab, let webView = tab.webView {
-            let target = Self.pageScrollAfterBarTravel(y, consumed: consumed)
-            state.lastScrollY = target
-            autohidePanes[pane] = state
-            webView.evaluateJavaScript("window.scrollTo(0, \(Double(target)))", completionHandler: nil)
+        if abs(consumed) > 0.5, let webView = tab?.webView {
+            webView.evaluateJavaScript("window.__zigzagScrollBy?.(\(Double(-consumed)))", in: nil, in: .defaultClient, completionHandler: nil)
         }
     }
 
@@ -1338,9 +1330,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// In full screen the screen's top belongs to the menu bar, not the address bar.
     nonisolated static func topPointerRevealsBar(fullScreen: Bool) -> Bool { !fullScreen }
 
-    /// The page keeps only the scroll the bar did not take: the bar's travel is the rest, so the content moves once.
-    nonisolated static func pageScrollAfterBarTravel(_ y: CGFloat, consumed: CGFloat) -> CGFloat { max(0, y - consumed) }
-
     /// A finger where the bar went brings it back, with no pointer on a touch display to reach the top.
     private func fingerLanded(where point: NSPoint) -> Bool {
         guard root.autohidesBar, root.barHoldsAddress, root.isWhereBarWent(point) else { return false }
@@ -1349,14 +1338,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The bar back in every pane that put its own away, so reaching for one doesn't leave another out of sight.
-    private func revealAutohide() {
-        for index in 0..<root.autohidePaneCount {
-            autohidePanes[index]?.locked = false
-            if root.tiles == nil {
-                root.setBarOffset(0, animated: true)
-            } else {
-                root.setAutohideOffset(0, at: index)
-            }
+    func revealAutohide() {
+        for index in 0..<root.autohidePaneCount { reveal(pane: index) }
+    }
+
+    /// One pane's bar back, sliding in for one page, free to go again with the next scroll down.
+    private func reveal(pane index: Int) {
+        autohidePanes[index]?.locked = false
+        if root.tiles == nil {
+            root.setBarOffset(0, animated: true)
+        } else {
+            root.setAutohideOffset(0, at: index)
         }
     }
 

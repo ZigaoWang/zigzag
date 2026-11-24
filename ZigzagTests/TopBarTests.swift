@@ -814,11 +814,63 @@ struct TopBarTests {
         #expect(script.contains("pending = null"))
     }
 
-    /// The bar's travel is taken out of the page's scroll: the content moves once, by the part the bar did not take.
-    @Test func theBarsTravelTakesItsPartOfThePageScroll() {
-        #expect(BrowserWindowController.pageScrollAfterBarTravel(100, consumed: 40) == 60)
-        #expect(BrowserWindowController.pageScrollAfterBarTravel(40, consumed: -20) == 60)
-        #expect(BrowserWindowController.pageScrollAfterBarTravel(10, consumed: 40) == 0)
+    /// A window with one page and an Autohide bar, for the scroll rules.
+    private func autohideWindow(_ path: String) -> (BrowserWindowController, TabManager, Tab) {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        let tab = Tab(url: URL(string: "https://example.com/\(path)")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.layoutSubtreeIfNeeded()
+        return (controller, manager, tab)
+    }
+
+    /// The bar's travel takes its part of the scroll: the page scrolls back by it, and that scroll back is not the
+    /// person's, so the page's own movement is what moves the bar.
+    @Test func thePagesOwnMovementMovesTheBar() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let (controller, manager, _) = autohideWindow("own-movement")
+        defer { controller.window?.close(); manager.invalidate() }
+        let root = controller.root
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: 10, by: 10, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == 10)
+        // The scroll back to the top that the travel took: no movement of the person's, and not a trip to the top.
+        controller.pageScrolled(to: 0, by: 0, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == 10)
+        controller.pageScrolled(to: 10, by: 10, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == 20)
+    }
+
+    /// With the page already at its top, a scroll up has nothing to report: the wheel itself brings the bar back.
+    @Test func aScrollUpAtThePagesTopBringsTheBarBack() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let (controller, manager, _) = autohideWindow("top-wheel")
+        defer { controller.window?.close(); manager.invalidate() }
+        let root = controller.root
+        let travel = root.autohideTravel(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel)
+        // The page takes itself to the top: the bar stays away.
+        controller.pageScrolled(to: 0, trusted: false, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel)
+        func wheel(_ dy: Int32) throws -> NSEvent {
+            let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: dy, wheel2: 0, wheel3: 0))
+            return try #require(NSEvent(cgEvent: cg))
+        }
+        controller.noteScrollGesture(try wheel(-4), inPane: 0)
+        #expect(root.autohideOffset(at: 0) == travel, "a scroll down there leaves it")
+        controller.noteScrollGesture(try wheel(4), inPane: 0)
+        #expect(root.autohideOffset(at: 0) == 0)
     }
 
     /// In full screen the pointer at the screen's top brings down the menu bar only; the address bar does not follow.
@@ -973,6 +1025,8 @@ struct TopBarTests {
         #expect(root.autohideOffset(at: 0) == travel)
         controller.pageScrolled(to: 0, trusted: false, editing: false)
         #expect(root.autohideOffset(at: 0) == travel, "the page's own scroll to the top is not the person's")
+        controller.pageScrolled(to: travel, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel, "the same gesture leaves it away")
         controller.pageScrolled(to: 0, trusted: true, editing: false)
         #expect(root.autohideOffset(at: 0) == 0, "the top always brings the bar back")
     }

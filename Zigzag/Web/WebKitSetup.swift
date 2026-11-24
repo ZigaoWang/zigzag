@@ -327,9 +327,7 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
     (() => {
       if (window.__zigzagScroll) return;
       window.__zigzagScroll = true;
-      // When the person last scrolled with their own hand: a wheel or trackpad (momentum keeps sending these) or a
-      // scrolling key; and whether the scroll bar is held. A scroll event is trusted even when the page's own script
-      // scrolled, so only a scroll this close to the person's input counts.
+      // The person's own input: a wheel, trackpad or finger, a scrolling key, or the scroll bar held.
       let input = 0, keyInput = 0, pressed = false;
       const mark = () => { input = Date.now(); };
       const markKey = () => { input = keyInput = Date.now(); };
@@ -354,11 +352,15 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
         const tag = el.localName;
         return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
       };
-      let pending = null, frame = 0;
+      // `dy` is the page's own movement since the last report, without the browser's scrolls back (`__zigzagScrollBy`).
+      let pending = null, frame = 0, last = null;
       const report = (trusted) => {
-        const next = { y: y(), trusted, key: Date.now() - keyInput < 400, editing: editing(), dragging: pressed };
+        const now = y();
+        const next = { y: now, dy: last == null ? 0 : now - last, trusted, key: Date.now() - keyInput < 400, editing: editing(), dragging: pressed };
+        last = now;
         if (pending) {
           // The last place is the one that counts; a real gesture anywhere in the frame still marks it.
+          next.dy += pending.dy;
           next.trusted = next.trusted || pending.trusted;
           next.key = next.key || pending.key;
         }
@@ -371,6 +373,11 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
           if (!out) return;
           try { window.webkit.messageHandlers.\(messageName).postMessage(out); } catch (e) {}
         });
+      };
+      window.__zigzagScrollBy = (dy) => {
+        const before = y();
+        window.scrollBy({ top: dy, behavior: 'instant' });
+        if (last != null) last += y() - before;
       };
       window.addEventListener('scroll', (event) => {
         const target = event.target;
@@ -388,7 +395,8 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
               let body = message.body as? [String: Any], let y = (body["y"] as? NSNumber)?.doubleValue,
               let controller = webView.window?.windowController as? BrowserWindowController,
               let pane = controller.paneIndex(of: tab) else { return }
-        controller.pageScrolled(to: CGFloat(y), trusted: (body["trusted"] as? Bool) ?? false,
+        controller.pageScrolled(to: CGFloat(y), by: (body["dy"] as? NSNumber).map { CGFloat($0.doubleValue) },
+                                trusted: (body["trusted"] as? Bool) ?? false,
                                 editing: (body["editing"] as? Bool) ?? false,
                                 dragging: (body["dragging"] as? Bool) ?? false,
                                 key: (body["key"] as? Bool) ?? false,
