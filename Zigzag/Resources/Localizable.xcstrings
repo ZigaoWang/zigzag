@@ -40818,6 +40818,573 @@
           }
         }
       }
+    },
+    "%@, live folder" : {
+      "comment" : "Accessibility label of a live folder in the sidebar with nothing new in it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，实时文件夹"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，即時資料夾"
+          }
+        }
+      }
+    },
+    "%@, live folder, %lld unread" : {
+      "comment" : "Accessibility label of a live folder in the sidebar: its name, then how many of its pages are new.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, live folder, %2$lld unread"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，实时文件夹，%2$lld 个未读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，即時資料夾，%2$lld 個未讀"
+          }
+        }
+      }
+    },
+    "Couldn’t Refresh" : {
+      "comment" : "Heading in a live folder's menu in the sidebar, over why its feed couldn't be fetched.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法更新"
+          }
+        }
+      }
+    },
+    "Delete Live Folder" : {
+      "comment" : "Item in a live folder's menu in the sidebar: the folder and its pages go.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除实时文件夹"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除即時資料夾"
+          }
+        }
+      }
+    },
+    "Edit Live Folder" : {
+      "comment" : "Title of the sheet that changes a live folder.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑实时文件夹"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯即時資料夾"
+          }
+        }
+      }
+    },
+    "Feed" : {
+      "comment" : "Choice in the New Live Folder sheet: the folder follows a feed (RSS or Atom).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "订阅源"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "訂閱來源"
+          }
+        }
+      }
+    },
+    "Feed or site address" : {
+      "comment" : "Placeholder of the address field in the New Live Folder sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "订阅源或网站地址"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "訂閱來源或網站網址"
+          }
+        }
+      }
+    },
+    "Found “%@”." : {
+      "comment" : "Under the address in the New Live Folder sheet: the feed found there, by its name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到了“%@”。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到了「%@」。"
+          }
+        }
+      }
+    },
+    "GitHub asked Zigzag to wait. It tries again later." : {
+      "comment" : "Why a live folder of GitHub pull requests or issues couldn't refresh, in its menu in the sidebar: too many requests.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 要求 Zigzag 稍等，稍后会再试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 要求 Zigzag 稍候，稍後會再試一次。"
+          }
+        }
+      }
+    },
+    "GitHub doesn’t know this username." : {
+      "comment" : "Why a live folder of GitHub pull requests or issues couldn't refresh, in its menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 上没有这个用户名。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 上沒有這個使用者名稱。"
+          }
+        }
+      }
+    },
+    "GitHub username" : {
+      "comment" : "Placeholder of the username field in the New Live Folder sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 用户名"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 使用者名稱"
+          }
+        }
+      }
+    },
+    "Issues" : {
+      "comment" : "A GitHub list a live folder can follow: the open issues assigned to someone.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "议题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "議題"
+          }
+        }
+      }
+    },
+    "Latest %lld" : {
+      "comment" : "Choice of how many pages a live folder shows, in its sheet: the newest 10, 25 or 50.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新 %lld 个"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新 %lld 個"
+          }
+        }
+      }
+    },
+    "List" : {
+      "comment" : "Label of the GitHub list menu in the New Live Folder sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表"
+          }
+        }
+      }
+    },
+    "Live Folder" : {
+      "comment" : "Name of a new live folder whose feed has no name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时文件夹"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即時資料夾"
+          }
+        }
+      }
+    },
+    "Looking for a feed…" : {
+      "comment" : "Under the address in the New Live Folder sheet, while Zigzag looks for the feed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在查找订阅源…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在尋找訂閱來源…"
+          }
+        }
+      }
+    },
+    "Mark All as Read" : {
+      "comment" : "Item in a live folder's menu in the sidebar: takes the dot off every new page in it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部标记为已读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部標示為已讀"
+          }
+        }
+      }
+    },
+    "Mark as Read" : {
+      "comment" : "Item in the menu of a live folder's page in the sidebar: takes its dot off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標示為已讀"
+          }
+        }
+      }
+    },
+    "Mark as Unread" : {
+      "comment" : "Item in the menu of a live folder's page in the sidebar: gives it the dot of a new page again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为未读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標示為未讀"
+          }
+        }
+      }
+    },
+    "New Live Folder" : {
+      "comment" : "Title of the sheet that makes a live folder.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建实时文件夹"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增即時資料夾"
+          }
+        }
+      }
+    },
+    "New Live Folder…" : {
+      "comment" : "Item in the menu of the sidebar's +, its empty space, a space's menu and a folder's menu: a folder that fills itself from a feed or GitHub.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建实时文件夹…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增即時資料夾…"
+          }
+        }
+      }
+    },
+    "Open ones in public repositories, newest activity first." : {
+      "comment" : "Under the fields of the New Live Folder sheet, for a GitHub list.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开仓库中未关闭的项目，最近有动态的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開儲存庫中未關閉的項目，最近有動態的排在前面。"
+          }
+        }
+      }
+    },
+    "Pull Requests" : {
+      "comment" : "A GitHub list a live folder can follow: the open pull requests someone made.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拉取请求"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提取要求"
+          }
+        }
+      }
+    },
+    "Refresh Now" : {
+      "comment" : "Item in a live folder's menu in the sidebar: fetches its feed now instead of at the next half hour.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即更新"
+          }
+        }
+      }
+    },
+    "Review Requests" : {
+      "comment" : "A GitHub list a live folder can follow: the open pull requests someone is asked to review.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "审查请求"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "審查要求"
+          }
+        }
+      }
+    },
+    "Source" : {
+      "comment" : "Accessibility label of the Feed or GitHub switch in the New Live Folder sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来源"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來源"
+          }
+        }
+      }
+    },
+    "The feed is too large." : {
+      "comment" : "Why a live folder couldn't refresh, in its menu in the sidebar: the feed is over 5 MB.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "订阅源太大了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "訂閱來源太大了。"
+          }
+        }
+      }
+    },
+    "The feed isn’t there any more." : {
+      "comment" : "Why a live folder couldn't refresh, in its menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个订阅源已经不在了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個訂閱來源已經不在了。"
+          }
+        }
+      }
+    },
+    "The site answered with error %lld." : {
+      "comment" : "Why a live folder couldn't refresh, in its menu in the sidebar. The number is the HTTP status, like 500.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站返回了错误 %lld。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "網站傳回了錯誤 %lld。"
+          }
+        }
+      }
+    },
+    "The site can’t be reached." : {
+      "comment" : "Why a live folder couldn't refresh, in its menu in the sidebar, and under the address in the New Live Folder sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接到网站。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法連線到網站。"
+          }
+        }
+      }
+    },
+    "This address isn’t a feed." : {
+      "comment" : "Why a live folder couldn't refresh, in its menu in the sidebar, and under the address in the New Live Folder sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个地址不是订阅源。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個網址不是訂閱來源。"
+          }
+        }
+      }
+    },
+    "This page doesn’t link to a feed." : {
+      "comment" : "Why a live folder couldn't refresh, in its menu in the sidebar, and under the address in the New Live Folder sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个页面没有链接到订阅源。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個網頁沒有連結到訂閱來源。"
+          }
+        }
+      }
+    },
+    "unread" : {
+      "comment" : "Spoken by VoiceOver after the name of a live folder's page in the sidebar: it hasn't been opened yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未讀"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
