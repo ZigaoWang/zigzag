@@ -50,6 +50,8 @@ final class SwipeNavigator {
     private var early: (point: NSPoint, time: TimeInterval, answer: [Bool]?)?
     /// The page that cancelled sideways scrolls with its own code (a canvas): its swipes wait for its answer again.
     private var keptOn: URL?
+    /// The page was asked to listen to this gesture's scrolls (`SwipeAnswers.listen`) and hasn't been told to stop.
+    private(set) var pageListens = false
     private var arming = SwipeArming()
     /// Recent finger movement, to tell a quick flick from a slow drag.
     private var samples: [(time: TimeInterval, dx: CGFloat)] = []
@@ -85,6 +87,7 @@ final class SwipeNavigator {
         stopWatchingRest()
         if state == .tracking || state == .leaning { cancel() }
         state = .idle
+        stopPageListening()
     }
 
     /// Returns true when it took the event, so the page doesn't also scroll with it. `room`, from something
@@ -92,6 +95,7 @@ final class SwipeNavigator {
     func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
         // Fingers touching down: the page is asked about the spot now, so it has answered by the time they move.
         if event.phase == .mayBegin, room == nil, state != .tracking, state != .leaning { probeEarly(event); return false }
+        if event.phase == .ended || event.phase == .cancelled { stopPageListening() }
         // Mid-scroll with no swipe under way: nothing to decide, so no settings are read for it.
         if state == .idle || state == .ignoring, Self.isMidGesture(event.phase) { return false }
         // A video in full screen keeps every swipe: going back there would leave the page from under it.
@@ -109,9 +113,9 @@ final class SwipeNavigator {
             pageArrived()
             watchdog?.cancel()
             stopWatchingRest()
-            guard webView.window != nil else { state = .idle; return false }
+            guard webView.window != nil else { state = .idle; stopPageListening(); return false }
             // Fingers dragging the page on the screen scroll it; their own swipe goes back (PageHolder).
-            if TouchPress.isTouchScroll(at: event.timestamp) { state = .ignoring; return false }
+            if TouchPress.isTouchScroll(at: event.timestamp) { state = .ignoring; stopPageListening(); return false }
             state = .deciding
             // The first step's movement counts toward deciding.
             dx = event.scrollingDeltaX; dy = event.scrollingDeltaY
@@ -131,6 +135,7 @@ final class SwipeNavigator {
                     heard(answer, early: true)
                 }
                 probe(at: beganPoint)
+                listenIfSideways()
             }
             return false
         case .changed:
@@ -144,6 +149,7 @@ final class SwipeNavigator {
             if samples.count > 8 { samples.removeFirst(samples.count - 8) }
             switch state {
             case .deciding, .leaning:
+                if room == nil { listenIfSideways() }
                 let decision = SwipeDecision.decide(dx: dx, dy: dy, canGoBack: webView.owner?.canGoBackOrReturn ?? webView.canGoBack,
                                                     canGoForward: webView.canGoForward, pageScrolls: pageScrolls, page: page,
                                                     waited: event.timestamp - began, overFrame: overFrame,
@@ -156,6 +162,7 @@ final class SwipeNavigator {
                     if state == .leaning { cancel() }
                     log(at: event.timestamp, "ignored dx=\(Int(dx)) dy=\(Int(dy)) page=\(page) scrolls=\(String(describing: pageScrolls))")
                     state = .ignoring
+                    stopPageListening()
                     return false
                 case .lean(let wanted), .track(let wanted):
                     // Already leaning the same way: the arrow carries on from where it is.
@@ -169,6 +176,8 @@ final class SwipeNavigator {
                         log(at: event.timestamp, "\(tracks ? "tracking" : "leaning") dx=\(Int(dx)) dy=\(Int(dy)) page=\(page) probed=\(pageScrolls != nil)")
                     }
                     state = tracks ? .tracking : .leaning
+                    // Tracking, the page gets no more of the gesture to answer about.
+                    if tracks { stopPageListening() }
                     update()
                     armWatchdog()
                     // Leaning, the page still gets the scroll, so it can answer that it keeps it.
@@ -221,6 +230,8 @@ final class SwipeNavigator {
         if page == .took, at.isFinite, state == .leaning || pageScrolls.map({ !$0.left && !$0.right }) == true { keptOn = webView?.url }
         // It took it after all, answering after the swipe had started: the arrow goes and the page has the rest.
         if page == .took, state == .tracking || state == .leaning { cancel(); state = .ignoring }
+        // Kept, it's the page's for the rest of the gesture: nothing more to hear.
+        if page == .took { stopPageListening() }
     }
 
     // MARK: Two fingers on the screen
@@ -362,6 +373,24 @@ final class SwipeNavigator {
         log(at: ProcessInfo.processInfo.systemUptime, "probe\(early ? " (touch-down)" : "") left=\(answer[0]) right=\(answer[1]) frame=\(answer[2]) still=\(answer[3])")
         // The page asked for no overscroll: like a page that cancels the scrolls, it keeps the gesture.
         if answer[3] { pageAnswered(kept: true, at: .infinity) }
+    }
+
+    /// The gesture so far is more sideways than up and down: the page starts listening to its scrolls, to say whether
+    /// it keeps them. A page that cancels them has wheel listeners of its own, so it hears the next step at once.
+    /// Up and down never starts it: a listener coming and going costs the page a slow frame.
+    private func listenIfSideways() {
+        guard !pageListens, dx != 0, abs(dx) >= abs(dy), let webView else { return }
+        pageListens = true
+        webView.evaluateJavaScript("if (typeof window.\(SwipeAnswers.listen) === 'function') window.\(SwipeAnswers.listen)(true);",
+                                   in: nil, in: .defaultClient) { _ in }
+    }
+
+    /// The gesture is decided, or over: the page stops listening to its scrolls.
+    private func stopPageListening() {
+        guard pageListens else { return }
+        pageListens = false
+        webView?.evaluateJavaScript("if (typeof window.\(SwipeAnswers.listen) === 'function') window.\(SwipeAnswers.listen)(false);",
+                                    in: nil, in: .defaultClient) { _ in }
     }
 
     /// Two-finger scrolls leave the pointer where it is, so a touch-down and the gesture after it share a spot.
@@ -812,11 +841,16 @@ final class SwipeAnswers: NSObject, WKScriptMessageHandler {
     (room, deltaX, prevented) => prevented || !!room && (room.still || (deltaX < 0 ? room.left : room.right))
     """
 
+    /// The page's function, in Zigzag's world, that starts (true) or stops (false) listening to its scrolls and
+    /// returns whether it listens. A wheel listener makes WebKit hand every scroll step to the page, so the page
+    /// listens only while a gesture may be a swipe: from its first sideways step until Zigzag has decided.
+    static let listen = "__zigzagSwipeListen"
+
     static let script = WKUserScript(source: """
     (() => {
       const sideways = \(sideways), keeps = \(keeps);
-      let sent = null, sentAt = -1e9, lastAt = -1e9;
-      window.addEventListener('wheel', (e) => {
+      let sent = null, sentAt = -1e9, lastAt = -1e9, on = false, off = 0;
+      const heard = (e) => {
         if (!e.isTrusted || e.ctrlKey || e.deltaX === 0 || Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
         const now = performance.now(), fresh = now - lastAt > 80;
         lastAt = now;
@@ -833,7 +867,23 @@ final class SwipeAnswers: NSObject, WKScriptMessageHandler {
           sent = kept; sentAt = later;
           try { window.webkit.messageHandlers.\(messageName).postMessage({ kept, at }); } catch (_) {}
         }, 0);
-      }, { capture: true, passive: true });
+      };
+      const set = (yes) => {
+        if (yes === on) return;
+        on = yes;
+        if (yes) addEventListener('wheel', heard, { capture: true, passive: true }); else removeEventListener('wheel', heard, true);
+      };
+      // Should Zigzag never say the gesture is decided, it stops by itself.
+      window.\(listen) = (yes) => {
+        if (yes !== undefined) { clearTimeout(off); set(yes); if (yes) off = setTimeout(() => set(false), 10000); }
+        return on;
+      };
+      // A frame, which Zigzag can't reach: it listens while the pointer is in it.
+      if (window !== window.top) {
+        set(true);
+        addEventListener('mouseover', () => set(true), { capture: true, passive: true });
+        addEventListener('mouseout', (e) => { if (!e.relatedTarget) set(false); }, { capture: true, passive: true });
+      }
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
 
