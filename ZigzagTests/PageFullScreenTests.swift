@@ -376,6 +376,19 @@ struct WholeScreenLayoutTests {
         #expect(BrowserWindowController.addressBelongsInBar(abovePage: true, wholeScreen: false))
     }
 
+    /// The bar comes down at the top edge, stays while the pointer is on it, and goes once it's past, unless a panel
+    /// or the keyboard keeps it.
+    @Test func theBarComesDownFromTheTop() {
+        let bar = NSRect(x: 0, y: 0, width: 1000, height: TopBarView.height)
+        let below = NSPoint(x: 500, y: bar.maxY + 40)
+        #expect(BrowserRootView.topBarRevealed(at: NSPoint(x: 500, y: 0), bar: bar, revealed: false, kept: { false }))
+        #expect(!BrowserRootView.topBarRevealed(at: NSPoint(x: 500, y: bar.midY), bar: bar, revealed: false, kept: { false }))
+        #expect(BrowserRootView.topBarRevealed(at: NSPoint(x: 500, y: bar.midY), bar: bar, revealed: true, kept: { false }))
+        #expect(!BrowserRootView.topBarRevealed(at: below, bar: bar, revealed: true, kept: { false }))
+        #expect(BrowserRootView.topBarRevealed(at: below, bar: bar, revealed: true, kept: { true }))
+        #expect(!BrowserRootView.topBarRevealed(at: below, bar: bar, revealed: false, kept: { true }))
+    }
+
     /// The window is told when a page fills and when it leaves: without that, The Whole Screen would never start and
     /// the page would keep the chrome (#462).
     @Test func theWindowHearsWhenAPageFillsAndLeaves() {

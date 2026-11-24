@@ -124,6 +124,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
                 || self?.popupHoldsSidebar == true
         }
+        // The Whole Screen's bar stays down while a panel hangs from it or the keyboard is in it.
+        root.keepsTopBar = { [weak self] in
+            guard let self else { return false }
+            if self.hasFloatingPanel { return true }
+            guard let responder = self.window?.firstResponder as? NSView else { return false }
+            return responder.isDescendant(of: self.root.topBar)
+        }
         // One floating thing at a time, the sidebar that slides out included: while the command bar is up, or a panel
         // opened from the bar above the page, the pointer at the window's edge leaves it hidden. It would slide in
         // under them, and under a panel it would then be held there.
@@ -1435,7 +1442,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return (root.overlay, NSRect(x: pane.minX + Tokens.Space.x3, y: pane.minY + Tokens.Space.x2, width: 1, height: 1))
         }
         // Above the page, from the address's end, where the Site Controls and the extensions are.
-        if root.showsTopBar {
+        if root.chromeBarShown {
             let button = sidebar.address.siteControlsButton
             return (button, button.bounds)
         }
@@ -3935,9 +3942,9 @@ extension BrowserWindowController: CommandBarHost {
         // that pane's page.
         if root.stripsInBar { return focusedPaneAddress.isHidden ? nil : focusedPaneAddress }
         // With the top bar, the site pill opens in place, as in panes.
-        if root.showsTopBar, root.topBar.holdsAddress { return root.topBar.pill.isHidden ? nil : root.topBar.pill }
-        if root.showsTopBar { return sidebar.address }
-        return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
+        if root.chromeBarShown, root.topBar.holdsAddress { return root.topBar.pill.isHidden ? nil : root.topBar.pill }
+        if root.chromeBarShown { return sidebar.address }
+        return root.chromeSidebarShown && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }
     var commandBarTabs: TabManager? { tabManager }
     var commandBarIsMovable: Bool { true }

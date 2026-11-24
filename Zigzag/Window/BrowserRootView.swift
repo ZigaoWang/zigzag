@@ -667,11 +667,26 @@ final class BrowserRootView: SpaceFrameView {
             needsLayout = true
             refreshGlassFrame()
             refreshGlassOcclusion()
+            if topBarRevealed { slideTopBarDown() }
         }
     }
+    /// Keeps the bar down while something hangs from it or has the keyboard (a panel, the address).
+    var keepsTopBar: (() -> Bool)?
+
     /// Puts the bar away again, as leaving the window does while it's down in full screen.
     func hideTopBar() {
-        topBarRevealed = false
+        if keepsTopBar?() != true { topBarRevealed = false }
+    }
+
+    /// The bar comes down from above the window's top; with Reduce Motion it fades in where it is.
+    private func slideTopBarDown() {
+        guard let layer = topBar.layer else { return }
+        let reduce = Tokens.Motion.reduceMotion
+        let animation = Tokens.Motion.easeAnimation(keyPath: reduce ? "opacity" : "transform.translation.y", duration: Tokens.Motion.Role.present.duration())
+        animation.fromValue = reduce ? 0 : -topBarFrame.maxY
+        animation.toValue = reduce ? 1 : 0
+        animation.fillMode = .backwards
+        layer.add(animation, forKey: "reveal")
     }
 
     /// The sidebar as the window shows it: hidden in The Whole Screen's full screen.
@@ -2259,12 +2274,16 @@ final class BrowserRootView: SpaceFrameView {
     /// leaving the bar puts it away again (#462).
     private func revealTopBar(near point: NSPoint) {
         guard isImmersive else { return }
-        let bar = topBarFrame
-        if point.y <= Tokens.Space.x2 || (topBarRevealed && bar.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(point)) {
-            if !topBarRevealed { topBarRevealed = true }
-        } else if topBarRevealed, point.y > bar.maxY + Tokens.Space.x2 {
-            topBarRevealed = false
-        }
+        let revealed = Self.topBarRevealed(at: point, bar: topBarFrame, revealed: topBarRevealed, kept: { self.keepsTopBar?() == true })
+        if revealed != topBarRevealed { topBarRevealed = revealed }
+    }
+
+    /// Whether the bar is down after the pointer moves to `point`: it comes at the window's top edge and goes once
+    /// the pointer is past it, unless something keeps it.
+    static func topBarRevealed(at point: NSPoint, bar: NSRect, revealed: Bool, kept: () -> Bool) -> Bool {
+        if point.y <= Tokens.Space.x2 { return true }
+        guard revealed, point.y > bar.maxY + Tokens.Space.x2 else { return revealed }
+        return kept()
     }
 
     /// The speed of the last moved event, if it came just now: entering and leaving carry none of their own.
