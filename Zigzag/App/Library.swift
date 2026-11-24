@@ -2010,20 +2010,19 @@ final class Library {
     @discardableResult
     func removeProfile(_ id: UUID) -> Bool {
         guard let profile = directory.profile(id), !profile.isDefault else { return false }
-        let before = (directory, favorites, favoriteSplits, spaces)
+        let before = (directory, favorites, favoriteSplits, spaces, siteRoutes)
         let gone = Set(favorites(in: id).map(\.id))
         favorites.removeAll { gone.contains($0.id) }
         tidyFavorites()
-        // The AI Apps profile's spaces were made for AI apps, not by you: they go with it instead of moving to your
-        // first profile, and come back with it when AI apps next run in the background. One space is always left.
-        if profile.isHeadless {
-            let own = Set(spaces(in: id).map(\.id))
-            if spaces.count > own.count { spaces.removeAll { own.contains($0.id) } }
+        // The AI Apps profile's spaces go with it, with routes to them, as removeSpace takes them.
+        if profile.isHeadless, case let own = Set(spaces(in: id).map(\.id)), spaces.contains(where: { !own.contains($0.id) }) {
+            spaces.removeAll { own.contains($0.id) }
+            siteRoutes.removeAll { own.contains($0.spaceID) }
         }
         directory.remove(id)
         saveNow()
         guard savedDirectory == directory else {
-            (directory, favorites, favoriteSplits, spaces) = before
+            (directory, favorites, favoriteSplits, spaces, siteRoutes) = before
             return false
         }
         changed.send()

@@ -593,8 +593,13 @@ struct HeadlessSpaceTests {
         token.cancel()
         library.renameProfile(profile.id, after: "Mine now")
         #expect(library.directory.headless?.name == "AI Apps")
+        // A route to its space goes with the space, as removeSpace takes one.
+        let route = SiteRoutes.Route(site: "zz-\(UUID().uuidString.lowercased()).example", spaceID: space.id)
+        library.saveRoute(route)
+        #expect(library.siteRoutes.contains { $0.id == route.id })
         #expect(library.removeProfile(profile.id))
         #expect(library.space(space.id) == nil && library.spaces.count == before)
+        #expect(!library.siteRoutes.contains { $0.id == route.id })
         library.finishedRemovingProfile(profile.id)
     }
 }
