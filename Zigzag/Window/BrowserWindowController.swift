@@ -100,6 +100,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.layoutTrafficLights()
         }
         root.onGrabberMoved = { [weak self] in self?.layoutTrafficLights() }
+        root.onFingerWhereBarWent = { [weak self] point in self?.fingerLanded(where: point) ?? false }
         root.onSlide = { [weak self] duration, timing in
             guard let self else { return }
             self.sidebarSliding(duration)
@@ -380,15 +381,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showSelectedTab()
         downloadsChanged()
         window.eventInterceptor = { [weak self] event in self?.intercept(event) ?? false }
-        touchListener = TouchPress.listen { [weak self] event in self?.touchLanded(event) }
         numberHints = NumberHints(controller: self)
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    isolated deinit {
-        if let touchListener { TouchPress.stopListening(touchListener) }
-    }
 
     /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435).
     func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?) {
@@ -1213,8 +1209,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var lastWheelAt: TimeInterval = 0
     }
     private var autohidePanes: [Int: AutohidePaneState] = [:]
-    /// Fingers landing anywhere in the window (`TouchPress`), for the top band's reveal.
-    private var touchListener: Int?
     /// The pointer monitor that brings an Autohide bar back near the window's top.
     private var autohidePointerMonitor: Any?
     /// While the sidebar is sliding: the bar stays as it is, so the lights don't have to cross it.
@@ -1347,19 +1341,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The page keeps only the scroll the bar did not take: the bar's travel is the rest, so the content moves once.
     nonisolated static func pageScrollAfterBarTravel(_ y: CGFloat, consumed: CGFloat) -> CGFloat { max(0, y - consumed) }
 
-    /// A finger in the top band asks for the bar back.
-    private func touchLanded(_ event: NSEvent) {
-        guard event.window === window else { return }
-        touchLanded(at: event.locationInWindow)
-    }
-
-    /// The top band, in window coordinates, from a finger or a test.
-    func touchLanded(at point: NSPoint) {
-        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar else { return }
-        let point = root.convert(point, from: nil)
-        guard point.y <= Tokens.Space.x2 else { return }
-        guard (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
+    /// A finger where the bar went brings it back, with no pointer on a touch display to reach the top.
+    private func fingerLanded(where point: NSPoint) -> Bool {
+        guard root.autohidesBar, root.barHoldsAddress, root.isWhereBarWent(point) else { return false }
         revealAutohide()
+        return true
     }
 
     /// The bar back in every pane that put its own away, so reaching for one doesn't leave another out of sight.

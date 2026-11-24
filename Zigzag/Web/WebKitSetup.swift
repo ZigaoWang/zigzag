@@ -330,27 +330,12 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
       // When the person last scrolled with their own hand: a wheel or trackpad (momentum keeps sending these) or a
       // scrolling key; and whether the scroll bar is held. A scroll event is trusted even when the page's own script
       // scrolled, so only a scroll this close to the person's input counts.
-      let input = 0, keyInput = 0, pressed = false, touchY = null;
+      let input = 0, keyInput = 0, pressed = false;
       const mark = () => { input = Date.now(); };
       const markKey = () => { input = keyInput = Date.now(); };
       const keys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
       const options = { capture: true, passive: true };
       window.addEventListener('wheel', (event) => { if (event.isTrusted) mark(); }, options);
-      window.addEventListener('touchstart', (event) => {
-        if (event.isTrusted) { touchY = event.touches[0]?.clientY ?? null; }
-      }, options);
-      window.addEventListener('touchmove', (event) => {
-        if (!event.isTrusted) return;
-        mark();
-        const touch = event.touches[0];
-        if (touch) {
-          // A pull down at the page's top is the touch way back to the bar (the report lands on the top rule).
-          if (touchY != null && touch.clientY > touchY + 2 && y() <= 0.5) report(true);
-          touchY = touch.clientY;
-        }
-      }, options);
-      window.addEventListener('touchend', () => { touchY = null; }, options);
-      window.addEventListener('touchcancel', () => { touchY = null; }, options);
       window.addEventListener('keydown', (event) => { if (event.isTrusted && keys.has(event.key)) markKey(); }, options);
       // On the scroll bar, not a click on the page: a link that jumps somewhere is the page scrolling.
       window.addEventListener('mousedown', (event) => {

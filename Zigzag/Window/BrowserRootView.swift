@@ -1201,6 +1201,11 @@ final class BrowserRootView: SpaceFrameView {
     /// it hides it, and the tap is the page's.
     func fingerLanded(at point: NSPoint) {
         revealTapPoint = nil
+        // Where an Autohide bar went, a finger brings it back and does nothing else (#359).
+        if onFingerWhereBarWent?(point) == true {
+            spendTouch(at: [point])
+            return
+        }
         switch TouchSidebarGrabber.landing(inZone: grabberRevealZone.contains(point), revealed: isGrabberRevealed, available: grabberCanReveal) {
         case .reveal:
             revealTapPoint = point
@@ -1269,6 +1274,8 @@ final class BrowserRootView: SpaceFrameView {
     private var grabberLightsMaxX: CGFloat?
     /// The group with the lights moved or came or went: the window puts the lights with it.
     var onGrabberMoved: (() -> Void)?
+    /// A finger landed at a point (own coordinates); true when it brought an Autohide bar back.
+    var onFingerWhereBarWent: ((NSPoint) -> Bool)?
 
     /// The strip at the top of the page area on the sidebar's side: in split view, with the strips on the cards.
     private var topStrip: PaneHeaderView? {
@@ -2167,6 +2174,14 @@ final class BrowserRootView: SpaceFrameView {
         guard tiles != nil else { return bounds.contains(point) ? 0 : nil }
         let targets = tileTargets
         return targets.firstIndex { $0.contains(point) }
+    }
+
+    /// Whether `point` is in the band at the window's top that a pane's Autohide bar has left.
+    func isWhereBarWent(_ point: NSPoint) -> Bool {
+        guard showsTopBar, let index = paneIndex(at: point) else { return false }
+        let offset = autohideOffset(at: index)
+        guard offset > 0.5, autohideTravel(at: index) == topBarFrame.maxY else { return false }
+        return point.y >= topBarFrame.maxY - offset && point.y < topBarFrame.maxY
     }
 
     /// Whether the pointer is on one pane's own bar: its strip in the row, or the strip on its card.

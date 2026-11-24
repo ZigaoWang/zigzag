@@ -827,9 +827,8 @@ struct TopBarTests {
         #expect(BrowserWindowController.topPointerRevealsBar(fullScreen: false))
     }
 
-    /// A finger in the top band asks for the bar back, and so does a pull down at the page's top; a touch in the
-    /// page away from the band does not.
-    @Test func aTouchInTheTopBandOrAPullAtThePageTopBringsTheBarBack() {
+    /// A finger where the bar went brings it back and does nothing else; one in the page, or on the bar, is theirs.
+    @Test func aFingerWhereTheBarWentBringsItBack() {
         let before = Library.shared.snapshot
         defer { Library.shared.restore(before) }
         let space = Library.shared.spaces[0].id
@@ -840,10 +839,6 @@ struct TopBarTests {
         manager.select(tab)
         let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
         defer { controller.window?.close() }
-        guard let window = controller.window else { return }
-        window.alphaValue = 0
-        window.orderFrontRegardless()
-        defer { window.orderOut(nil) }
         let root = controller.root
         root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
         root.showsTopBar = true
@@ -855,15 +850,14 @@ struct TopBarTests {
         controller.pageScrolled(to: 0, trusted: true, editing: false)
         controller.pageScrolled(to: travel * 2, trusted: true, editing: false)
         #expect(root.autohideOffset(at: 0) == travel)
-        controller.touchLanded(at: NSPoint(x: 450, y: 300))
-        #expect(root.autohideOffset(at: 0) == travel, "a touch in the page is not a request for the bar")
-        controller.touchLanded(at: NSPoint(x: 450, y: 596))
-        #expect(root.autohideOffset(at: 0) == 0, "a touch in the top band brings it back")
-        controller.pageScrolled(to: travel * 4, trusted: true, editing: false)
-        #expect(root.autohideOffset(at: 0) == travel)
-        // The pull posts a trusted report at the page's top; the top rule brings the bar back.
-        controller.pageScrolled(to: 0, trusted: true, editing: false)
-        #expect(root.autohideOffset(at: 0) == 0, "a pull down at the top brings it back")
+        root.fingerLanded(at: NSPoint(x: 450, y: 300))
+        #expect(root.autohideOffset(at: 0) == travel, "a finger in the page is the page's")
+        root.fingerLanded(at: NSPoint(x: 450, y: travel - 4))
+        #expect(root.autohideOffset(at: 0) == 0, "a finger where the bar was brings it back")
+        // Partly out, a finger on what's left of the bar is the bar's.
+        root.setBarOffset(travel / 2, animated: false)
+        #expect(!root.isWhereBarWent(NSPoint(x: 450, y: travel / 2 - 4)))
+        #expect(root.isWhereBarWent(NSPoint(x: 450, y: travel - 4)))
     }
 
     /// Typing in a field holds the bar where it is, including away; it must not pop back to the top on every report.
