@@ -142,7 +142,10 @@ final class TabManager {
             Brand.libraryChanged()
         }
         suspendTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.sleepIdleTabs() }
+            MainActor.assumeIsolated {
+                Freezes.mark("tab sleep check")
+                self?.sleepIdleTabs()
+            }
         }
         // Slack, so the system can fold it into other wake-ups instead of waking the Mac for it.
         suspendTimer?.tolerance = 10
