@@ -61,6 +61,15 @@
   Test: ProfileChoiceTests.aPasswordManagerShowsCheckedWhileZigzagStepsAside
 - Choose a password manager extension → Zigzag's saving and filling turn off; choosing Zigzag again brings them back on.
   Test: ProfileChoiceTests.choosingAPasswordManagerTurnsZigzagOffAndZigzagComesBackOn
+- A password manager extension you chose, one Zigzag doesn't know by name → counts as on, while it's on: Zigzag stops filling and offering to save, shows no key icon and leaves passkeys to it.
+  Test: ProfileChoiceTests.aChosenExtensionZigzagDoesntKnowCountsAsOn
+- An extension that turns the browser's own password saving off, the Chrome way (chrome.privacy) → listed under Password manager and counted as one, in that profile; once it clears that, or is turned off or removed, it isn't.
+  Test: ProfileChoiceTests.anExtensionThatTurnsSavingOffIsAPasswordManager
+  Test: ProfileChoiceTests.turningOffOrRemovingAnExtensionForgetsWhatItSet
+- Extensions that read that setting → as in Chrome: the one that set it controls it, the others see another does.
+  Test: ProfileChoiceTests.passwordSavingReadsWhoControlsIt
+  Test: ExtensionScriptTests.passwordSavingIsKeptByZigzag
+  Test: ExtensionScriptTests.theBridgeSendsPasswordSavingToZigzag
 - 1Password waiting on its app → "1Password is waiting for you" only after you used it or a field just before; a background connect never shows it.
   Test: CompanionAppNoticeTests.aBackgroundConnectWithNoUseNeverShowsIt
 

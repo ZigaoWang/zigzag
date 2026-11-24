@@ -84,6 +84,7 @@ final class ExtensionInstalls {
 
     /// The profile no longer has it. Its package stays for the profiles that do.
     func remove(_ id: String) {
+        forgetPasswordSaving(id)
         if profile.isDefault {
             // Its file is the package's too.
             ExtensionStore.remove(keys: State.keys, from: stateFile(for: id))
@@ -190,8 +191,16 @@ final class ExtensionInstalls {
         } else {
             // Its search engine goes with it, if it was yours.
             ExtensionSearchProvider.reconcile()
+            forgetPasswordSaving(id)
             profile.extensions.unload(id)
         }
+    }
+
+    /// Turned off or removed: what it set the browser's password saving to goes too (#513).
+    private func forgetPasswordSaving(_ id: String) {
+        guard PasswordSavingClaims.clear(by: id, in: profile.id) else { return }
+        guard #available(macOS 15.4, *), let host = profile.startedExtensions else { return }
+        Task { @MainActor in host.bridge.passwordSaving.changed() }
     }
 
     /// Installed since Zigzag started, until the extension's background has heard so (BridgeRuntime).

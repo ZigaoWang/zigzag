@@ -36,6 +36,8 @@ final class ExtensionBridge {
     let userScripts: BridgeUserScripts
     /// Address bar keywords, which the command bar hands what's typed after them.
     let omnibox: BridgeOmnibox
+    /// The browser's password saving, as password managers set it.
+    let passwordSaving: BridgePasswordSaving
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
@@ -52,7 +54,7 @@ final class ExtensionBridge {
         BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
         BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self,
         BridgeOffscreen.self, BridgeSidePanel.self, BridgeTabCapture.self, BridgeProxy.self,
-        BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self,
+        BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self, BridgePasswordSaving.self,
     ]
 
     init(host: ExtensionHost) {
@@ -64,7 +66,8 @@ final class ExtensionBridge {
         webRequest = BridgeWebRequest(host: host)
         userScripts = BridgeUserScripts(host: host)
         omnibox = BridgeOmnibox(host: host)
-        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts, omnibox]
+        passwordSaving = BridgePasswordSaving(host: host)
+        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts, omnibox, passwordSaving]
         let directNames = Set(direct.map { type(of: $0).name })
         let others = Self.handlerTypes.filter { !directNames.contains($0.name) }.map { $0.init(host: host) }
         let all: [any BridgeNamespace] = others + direct

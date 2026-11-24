@@ -2880,7 +2880,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             switch choice {
             case .zigzag: DropdownButton.Option(title: "Zigzag")
             case .iCloud: DropdownButton.Option(title: Self.iCloudPasswordsName)
-            case .manager(let id): DropdownButton.Option(title: PasswordManagers.known[id] ?? id)
+            case .manager(let id): DropdownButton.Option(title: PasswordManagers.name(of: id, in: profile))
             }
         }
         passwordFiller.selectedIndex = passwordChoices.firstIndex(of: choice) ?? 0
@@ -2912,7 +2912,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         }
         // The one chosen, when several are on.
-        let manager = if case .manager(let id) = choice { PasswordManagers.known[id] } else { PasswordManagers.active(in: profile) }
+        let manager = if case .manager(let id) = choice { PasswordManagers.name(of: id, in: profile) } else { PasswordManagers.active(in: profile) }
         let managerNote = manager.map {
             String(localized: "Off while \($0) handles passwords. Turn on to use both.",
                    comment: "Under a password setting in Settings › Passwords, while a password manager extension (its name, like 1Password) is on.")

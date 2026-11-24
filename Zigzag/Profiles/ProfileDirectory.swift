@@ -217,6 +217,8 @@ nonisolated enum ProfileKey: String, CaseIterable {
     case passwordsBeforeICloud = "PasswordsBeforeICloud"
     /// The password manager extension chosen in Settings, by ID; unset until one is.
     case passwordManager = "PasswordsManager"
+    /// What extensions set the browser's password saving to (PasswordSavingClaims), by ID.
+    case passwordSavingClaims = "PasswordsSavingClaims"
     /// The one-time iCloud Passwords offer, after its extension was installed by hand, was shown.
     case iCloudPasswordsOffered = "PasswordsICloudOffered"
     /// Sites whose cookies clearing leaves alone (#334).

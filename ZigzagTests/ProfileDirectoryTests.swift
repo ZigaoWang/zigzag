@@ -361,6 +361,100 @@ struct ProfileChoiceTests {
         ProfileKey.forget(work, in: defaults)
         #expect(PasswordFiller.chosenManager(in: work, defaults: defaults) == nil)
     }
+
+    @Test func aChosenExtensionZigzagDoesntKnowCountsAsOn() {
+        let litewarden = "ieaiaclmomgdnlelnfnhonjajpofjomn", bitwarden = "nngceckbapebfimnlniiiahkandclblb"
+        var on: Set<String> = [litewarden]
+        func active(_ chosen: String?) -> String? {
+            PasswordManagers.active(chosen: chosen, claimed: [], isOn: { on.contains($0) }, name: { $0 == litewarden ? "Litewarden" : $0 })
+        }
+        // Not chosen: an extension Zigzag doesn't know is nothing to step aside for.
+        #expect(active(nil) == nil)
+        // Chosen and on: it's the one, by its own name.
+        #expect(active(litewarden) == "Litewarden")
+        let managerOn = active(litewarden) != nil
+        #expect(!PasswordManagers.zigzagHandles(chosen: nil, managerOn: managerOn))
+        if #available(macOS 27, *) { #expect(!AutofillKeyIcon.shows(fills: true, managerOn: managerOn, panelAvailable: true)) }
+        // Chosen over a known one that's on too.
+        on.insert(bitwarden)
+        #expect(active(litewarden) == "Litewarden")
+        // Turned off: the known ones as before.
+        on.remove(litewarden)
+        #expect(active(litewarden) == "Bitwarden")
+        #expect(active(nil) == "Bitwarden")
+        on.remove(bitwarden)
+        #expect(active(litewarden) == nil)
+    }
+
+    @Test func anExtensionThatTurnsSavingOffIsAPasswordManager() throws {
+        let suite = "ProfileChoiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let work = UUID(), vault = "vault-extension", other = "some-extension", bitwarden = "nngceckbapebfimnlniiiahkandclblb"
+        let names = [vault: "Vault", other: "Other"]
+        func claimed() -> [String] { PasswordSavingClaims.claimants(in: work, defaults: defaults) }
+        func listed() -> [String] { PasswordManagers.listed(among: [vault, other, bitwarden], claimed: claimed(), chosen: nil, name: { names[$0] ?? $0 }) }
+        func active() -> String? { PasswordManagers.active(chosen: nil, claimed: claimed(), isOn: { [vault, bitwarden].contains($0) }, name: { names[$0] ?? $0 }) }
+        // Nothing set: only the known one.
+        #expect(listed() == [bitwarden])
+        PasswordSavingClaims.set(false, by: vault, in: work, defaults: defaults)
+        #expect(claimed() == [vault])
+        #expect(listed() == [bitwarden, vault])
+        #expect(active() == "Bitwarden")
+        #expect(PasswordManagers.active(chosen: nil, claimed: claimed(), isOn: { $0 == vault }, name: { names[$0] ?? $0 }) == "Vault")
+        // Only in the profile it was set in.
+        #expect(PasswordSavingClaims.claimants(in: UUID(), defaults: defaults).isEmpty)
+        // Turned back on: not a claim.
+        PasswordSavingClaims.set(true, by: vault, in: work, defaults: defaults)
+        #expect(claimed().isEmpty)
+        #expect(listed() == [bitwarden])
+        // clear() undoes it.
+        PasswordSavingClaims.set(false, by: vault, in: work, defaults: defaults)
+        #expect(PasswordSavingClaims.clear(by: vault, in: work, defaults: defaults))
+        #expect(!PasswordSavingClaims.clear(by: vault, in: work, defaults: defaults))
+        #expect(claimed().isEmpty)
+        #expect(PasswordSavingClaims.all(in: work, defaults: defaults).isEmpty)
+        // The one chosen stays listed.
+        #expect(PasswordManagers.listed(among: [vault, other], claimed: [], chosen: other, name: { names[$0] ?? $0 }) == [other])
+        // A removed profile leaves none behind.
+        PasswordSavingClaims.set(false, by: vault, in: work, defaults: defaults)
+        ProfileKey.forget(work, in: defaults)
+        #expect(claimed().isEmpty)
+    }
+
+    @Test func passwordSavingReadsWhoControlsIt() throws {
+        let suite = "ProfileChoiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let work = UUID()
+        func answer(_ id: String) -> PasswordSavingClaims.Answer { PasswordSavingClaims.answer(for: id, in: work, defaults: defaults) }
+        #expect(answer("a") == .init(value: true, levelOfControl: "controllable_by_this_extension"))
+        PasswordSavingClaims.set(false, by: "a", in: work, defaults: defaults)
+        #expect(answer("a") == .init(value: false, levelOfControl: "controlled_by_this_extension"))
+        #expect(answer("b") == .init(value: false, levelOfControl: "controlled_by_other_extensions"))
+        #expect(answer("a").dictionary["levelOfControl"] as? String == "controlled_by_this_extension")
+        PasswordSavingClaims.clear(by: "a", in: work, defaults: defaults)
+        #expect(answer("b") == .init(value: true, levelOfControl: "controllable_by_this_extension"))
+    }
+
+    @Test func turningOffOrRemovingAnExtensionForgetsWhatItSet() {
+        let library = Library.shared
+        let info = library.addProfile(name: "Password saving test")
+        let profile = Profiles.shared.profile(info.id), id = "password-saving-test"
+        defer {
+            profile.installs.remove(id)
+            library.removeProfile(info.id)
+            library.finishedRemovingProfile(info.id)
+        }
+        profile.installs.save(ExtensionInstalls.State(), for: id)
+        PasswordSavingClaims.set(false, by: id, in: profile.id)
+        #expect(PasswordSavingClaims.claimants(in: profile.id) == [id])
+        profile.installs.setEnabled(id, false)
+        #expect(PasswordSavingClaims.claimants(in: profile.id).isEmpty)
+        PasswordSavingClaims.set(false, by: id, in: profile.id)
+        profile.installs.remove(id)
+        #expect(PasswordSavingClaims.claimants(in: profile.id).isEmpty)
+    }
 }
 
 /// Which profiles may be removed.

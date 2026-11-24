@@ -471,6 +471,13 @@
     hasListeners() { const set = listeners.get(name); return !!set && set.size > 0; },
   });
 
+  // privacy.services.passwordSavingEnabled, kept by Zigzag for the password manager that sets it (webkit-differences.js).
+  Object.defineProperty(globalThis, '__zigzagPasswordSaving', {
+    value: { get: () => send('passwordSaving', 'get', []), set: (details) => send('passwordSaving', 'set', [details]),
+             clear: () => send('passwordSaving', 'clear', []), onChange: event('passwordSaving.onChange') },
+    configurable: true,
+  });
+
   // Messages from websites: Chrome says which site sent each (sender.origin) and extensions check it before answering
   // (Claude answers only claude.ai). WebKit gives the address; the origin comes from it.
   const external = api.runtime.onMessageExternal;

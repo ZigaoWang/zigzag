@@ -485,6 +485,46 @@ final class BridgeRuntime: BridgeNamespace {
     }
 }
 
+// MARK: - privacy.services.passwordSavingEnabled
+
+/// The browser's own password saving, which a password manager turns off the Chrome way (#513): what each extension
+/// set is kept per profile (PasswordSavingClaims), and one that turned it off counts as a password manager.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgePasswordSaving: BridgeNamespace {
+    static let name = "passwordSaving"
+    static let permission = "privacy"
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        let profile = host.profile.id
+        switch fn {
+        case "get":
+            return PasswordSavingClaims.answer(for: extensionID, in: profile).dictionary
+        case "set":
+            guard let value = (args.first as? [String: Any])?["value"] as? Bool else { throw BridgeError("passwordSavingEnabled takes a true or false value") }
+            PasswordSavingClaims.set(value, by: extensionID, in: profile)
+        case "clear":
+            guard PasswordSavingClaims.clear(by: extensionID, in: profile) else { return nil }
+        default:
+            throw BridgeError.unsupported("privacy.services.passwordSavingEnabled", fn)
+        }
+        changed()
+        return nil
+    }
+
+    /// Each listener hears what it now reads, and Zigzag's passkeys step aside or come back.
+    func changed() {
+        let profile = host.profile.id
+        for id in Set(host.contexts.map(\.uniqueIdentifier)) {
+            host.bridge.emit("passwordSaving.onChange", [PasswordSavingClaims.answer(for: id, in: profile).dictionary], to: id)
+        }
+        Passkeys.refresh()
+    }
+}
+
 // MARK: - Context menu items kept
 
 /// Extension context menu items, persisted across relaunches like Chrome. WebKit drops them on quit, and an

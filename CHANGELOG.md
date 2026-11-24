@@ -8,6 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - A feature flag you changed in Settings › Developer has a Reset button beside its switch, in place of a plain “Changed”, and a flag Zigzag starts other than WebKit, like Prefer Page Rendering Updates near 60fps, says so under its name.
 - Letting go of a swipe that goes back or forward no longer springs the page back before it leaves. The page slides on a little and dims, then the next page shows in its place, so you can tell the swipe took without looking at the arrow. A swipe called off still springs back, and with Reduce Motion the page stays put. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
+- A password manager extension you choose in Settings › Passwords › Password manager now counts even when Zigzag doesn't know it by name, like Litewarden: Zigzag stops offering to save and fill, shows no key icon in sign-in fields and leaves passkeys to it. An extension that turns the browser's own password saving off, as Bitwarden and 1Password can in Chrome, is listed there and counted the same way, until it turns that back, or you turn it off or remove it. ([#513](https://github.com/ZigaoWang/zigzag/issues/513))
 
 ## [0.9.5] - 2026-11-24
 

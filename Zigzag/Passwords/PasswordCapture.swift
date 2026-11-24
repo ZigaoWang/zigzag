@@ -629,7 +629,16 @@ enum PasswordManagers {
     /// launch, before extensions finish loading, already get it right.
     static func active(in profile: Profile) -> String? {
         guard #available(macOS 15.4, *) else { return nil }
-        return active(among: known.keys.filter { profile.installs.isEnabled($0) && profile.installs.isInstalled($0) })
+        let installs = profile.installs
+        return active(chosen: PasswordFiller.chosenManager(in: profile.id), claimed: PasswordSavingClaims.claimants(in: profile.id),
+                      isOn: { installs.isEnabled($0) && installs.isInstalled($0) }, name: { name(of: $0, in: profile) })
+    }
+
+    /// The one chosen in Settings while it's on (#513); else, of the known ones and those that turned the browser's
+    /// saving off, the first by name.
+    static func active(chosen: String?, claimed: [String], isOn: (String) -> Bool, name: (String) -> String) -> String? {
+        if let chosen, isOn(chosen) { return known[chosen] ?? name(chosen) }
+        return Set(known.keys).union(claimed).filter(isOn).map { known[$0] ?? name($0) }.sorted().first
     }
 
     /// With several on, the first by name, so the answer doesn't change from one time to the next.
@@ -640,10 +649,31 @@ enum PasswordManagers {
         ids.filter { known[$0] != nil && $0 != PasswordFiller.iCloudExtensionID }.sorted { known[$0]! < known[$1]! }
     }
 
+    /// The same, with those that turned the browser's saving off and the one chosen listed too, by their own names.
+    static func listed(among ids: [String], claimed: [String], chosen: String?, name: (String) -> String) -> [String] {
+        let named = ids.filter { (known[$0] != nil || claimed.contains($0) || $0 == chosen) && $0 != PasswordFiller.iCloudExtensionID }
+            .map { (id: $0, name: known[$0] ?? name($0)) }
+        return named.sorted { ($0.name, $0.id) < ($1.name, $1.id) }.map(\.id)
+    }
+
     /// Installed and turned on in a profile, as listed.
     static func listed(in profile: Profile) -> [String] {
         guard #available(macOS 15.4, *) else { return [] }
-        return listed(among: known.keys.filter { profile.installs.isEnabled($0) && profile.installs.isInstalled($0) })
+        let installs = profile.installs, claimed = PasswordSavingClaims.claimants(in: profile.id), chosen = PasswordFiller.chosenManager(in: profile.id)
+        let ids = Set(known.keys).union(claimed).union([chosen].compactMap { $0 }).filter { installs.isEnabled($0) && installs.isInstalled($0) }
+        return listed(among: Array(ids), claimed: claimed, chosen: chosen, name: { name(of: $0, in: profile) })
+    }
+
+    /// The name people know it by: the known one, else what its manifest says.
+    static func name(of id: String, in profile: Profile) -> String {
+        if let name = known[id] { return name }
+        if #available(macOS 15.4, *), let name = profile.startedExtensions?.installed[id]?.displayName ?? profile.startedExtensions?.context(for: id)?.webExtension.displayName {
+            return name
+        }
+        if #available(macOS 15.4, *), let manifest = ExtensionStore.manifest(for: id), let name = ChromiumExtensions.name(manifest, in: ExtensionStore.packageDirectory(for: id)) {
+            return name
+        }
+        return id
     }
 
     /// Whether Zigzag itself saves or fills in a profile: what you chose there; until you choose, yes, unless a
@@ -651,6 +681,52 @@ enum PasswordManagers {
     /// there to be filled even so.
     static func zigzagHandles(chosen: Bool?, managerOn: Bool, imported: Bool = false) -> Bool {
         chosen ?? (!managerOn || imported)
+    }
+}
+
+/// Extensions that set the browser's own password saving through chrome.privacy.services.passwordSavingEnabled, by
+/// profile: Chrome's way for a password manager (Bitwarden, 1Password) to turn it off. One that turned it off counts as
+/// a password manager (#513).
+nonisolated enum PasswordSavingClaims {
+    /// What `get` answers, as Chrome does.
+    struct Answer: Equatable {
+        var value: Bool
+        var levelOfControl: String
+        var dictionary: [String: Any] { ["value": value, "levelOfControl": levelOfControl] }
+    }
+
+    /// What each extension set, by ID.
+    static func all(in profile: UUID, defaults: UserDefaults = .standard) -> [String: Bool] {
+        defaults.dictionary(forKey: ProfileKey.passwordSavingClaims.name(in: profile)) as? [String: Bool] ?? [:]
+    }
+
+    static func set(_ value: Bool, by id: String, in profile: UUID, defaults: UserDefaults = .standard) {
+        var claims = all(in: profile, defaults: defaults)
+        claims[id] = value
+        defaults.set(claims, forKey: ProfileKey.passwordSavingClaims.name(in: profile))
+    }
+
+    /// `clear`, or the extension turned off or removed. Whether it had set anything.
+    @discardableResult
+    static func clear(by id: String, in profile: UUID, defaults: UserDefaults = .standard) -> Bool {
+        var claims = all(in: profile, defaults: defaults)
+        guard claims.removeValue(forKey: id) != nil else { return false }
+        if claims.isEmpty { defaults.removeObject(forKey: ProfileKey.passwordSavingClaims.name(in: profile)) }
+        else { defaults.set(claims, forKey: ProfileKey.passwordSavingClaims.name(in: profile)) }
+        return true
+    }
+
+    /// Those that turned saving off.
+    static func claimants(in profile: UUID, defaults: UserDefaults = .standard) -> [String] {
+        all(in: profile, defaults: defaults).filter { !$0.value }.keys.sorted()
+    }
+
+    /// The setter's own value controlled by it; another's, controlled by others; else on and free to change.
+    static func answer(for id: String, in profile: UUID, defaults: UserDefaults = .standard) -> Answer {
+        let claims = all(in: profile, defaults: defaults)
+        if let mine = claims[id] { return Answer(value: mine, levelOfControl: "controlled_by_this_extension") }
+        if let other = claims.sorted(by: { $0.key < $1.key }).first { return Answer(value: other.value, levelOfControl: "controlled_by_other_extensions") }
+        return Answer(value: true, levelOfControl: "controllable_by_this_extension")
     }
 }
 
@@ -769,7 +845,10 @@ enum ICloudPasswords {
         if installs.isEnabled(id) && !installs.pins.contains(id) { installs.togglePin(id) }
     }
 
-    static func useZigzag(in profile: Profile) { PasswordFiller.useZigzag(in: profile.id) }
+    static func useZigzag(in profile: Profile) {
+        PasswordFiller.useZigzag(in: profile.id)
+        Passkeys.refresh()
+    }
 
     /// What the Password manager choice shows checked in the profile.
     static func choice(in profile: Profile) -> PasswordManagerChoice {
@@ -781,5 +860,7 @@ enum ICloudPasswords {
     static func useManager(_ id: String, in profile: Profile) {
         PasswordFiller.useManager(id, in: profile.id, saves: PasswordCapture.offersToSave(in: profile), fills: Autofill.isOn(in: profile))
         Autofill.shared.hide()
+        // A chosen extension Zigzag doesn't know steps in for passkeys too.
+        Passkeys.refresh()
     }
 }

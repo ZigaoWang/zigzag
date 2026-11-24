@@ -350,13 +350,15 @@ struct ExtensionCompatibilityTests {
             #expect(universe.contains(namespace), "\(namespace) is not in chrome-api.json")
             #expect(overlay.claims[namespace] != nil, "\(namespace) is reachable but unclaimed")
         }
-        // Every bridge handler for an extension namespace has a claim. `contexts` is runtime.getContexts, `contextMenusKept` is contextMenus; favicon and fetch are internal.
+        // Every bridge handler for an extension namespace has a claim. `contexts` is runtime.getContexts, `contextMenusKept` is contextMenus, `passwordSaving` is one privacy setting; favicon and fetch are internal.
         for handler in ExtensionBridge.handlerNames {
             switch handler {
             case "contexts":
                 #expect(overlay.claims["runtime"]?.members?["getContexts"]?.status == .bridged)
             case "contextMenusKept":
                 #expect(overlay.claims["contextMenus"] != nil)
+            case "passwordSaving":
+                #expect(overlay.claims["privacy"] != nil)
             case "favicons", "extensionFetch":
                 continue
             default:

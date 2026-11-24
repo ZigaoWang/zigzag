@@ -1190,12 +1190,30 @@
     // MV2 never had runtime.getContexts; WebKit, the bridge and the API surface all omit it.
     if (!manifestV3) removeMember(['runtime'], 'getContexts');
     if (api.privacy) {
+      // Password saving is Zigzag's to keep: a password manager turns it off, as in Chrome (bridge.js). Where Zigzag
+      // can't answer (no privacy permission), it answers as for the other settings.
+      const saving = globalThis.__zigzagPasswordSaving;
+      const asked = (call, answers, otherwise) => (...args) => {
+        const callback = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
+        const result = Promise.resolve().then(() => call(args[0])).then((value) => (answers ? value : undefined), () => otherwise);
+        if (!callback) return result;
+        result.then((value) => callback(value));
+        return undefined;
+      };
       for (const group of Object.keys(api.privacy)) {
         const settings = api.privacy[group];
         if (!settings || typeof settings !== 'object') continue;
         for (const name of Object.keys(settings)) {
           const setting = settings[name];
           if (!setting || typeof setting !== 'object') continue;
+          if (saving && group === 'services' && name === 'passwordSavingEnabled') {
+            const path = ['privacy', group, name];
+            setMember(path, 'get', asked(() => saving.get(), true, { value: false, levelOfControl: 'not_controllable' }));
+            setMember(path, 'set', asked((details) => saving.set(details), false));
+            setMember(path, 'clear', asked(() => saving.clear(), false));
+            setMember(path, 'onChange', saving.onChange);
+            continue;
+          }
           const value = name in defaults ? defaults[name] : false;
           if (typeof setting.get !== 'function' || /isn't available/.test(String(setting.get))) setMember(['privacy', group, name], 'get', settled({ value, levelOfControl: 'not_controllable' }));
           for (const fn of ['set', 'clear']) setMember(['privacy', group, name], fn, settled(undefined));

@@ -1439,6 +1439,53 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
     }
 
+    /// privacy.services.passwordSavingEnabled goes to Zigzag (#513); the other settings answer as before.
+    @Test func passwordSavingIsKeptByZigzag() {
+        let page = Self.workerWorld(worker: false, setup: """
+        const __setting = () => ({ get: () => Promise.reject(new Error("isn't available")), set: () => {}, clear: () => {}, onChange: {} });
+        chrome.privacy = { services: { passwordSavingEnabled: __setting(), autofillEnabled: __setting() } };
+        var __sent = [], __claim = null, __heard = { addListener: () => {} };
+        var __zigzagPasswordSaving = {
+          get: () => { __sent.push('get'); return Promise.resolve(__claim === null ? { value: true, levelOfControl: 'controllable_by_this_extension' } : { value: __claim, levelOfControl: 'controlled_by_this_extension' }); },
+          set: (details) => { __sent.push('set'); __claim = details.value; return Promise.resolve(null); },
+          clear: () => { __sent.push('clear'); __claim = null; return Promise.resolve(null); },
+          onChange: __heard,
+        };
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        let saving = "chrome.privacy.services.passwordSavingEnabled"
+        page.evaluateScript("var __set = 'no'; \(saving).set({ value: false }, (r) => { __set = r === undefined ? 'done' : 'value'; });")
+        #expect(page.evaluateScript("__set").toString() == "done")
+        page.evaluateScript("\(saving).get({}, (d) => { globalThis.__got = d.levelOfControl + ' ' + d.value; });")
+        #expect(page.evaluateScript("__got").toString() == "controlled_by_this_extension false")
+        page.evaluateScript("\(saving).clear({}).then(() => \(saving).get({})).then((d) => { globalThis.__after = d.levelOfControl; });")
+        #expect(page.evaluateScript("__after").toString() == "controllable_by_this_extension")
+        #expect(page.evaluateScript("\(saving).onChange === __heard").toBool())
+        #expect(page.evaluateScript("__sent.join()").toString() == "set,get,clear,get")
+        // Not Zigzag's to keep: as before.
+        page.evaluateScript("chrome.privacy.services.autofillEnabled.get({}, (d) => { globalThis.__other = d.levelOfControl; });")
+        page.evaluateScript("__flush()")
+        #expect(page.evaluateScript("__other").toString() == "not_controllable")
+        // Zigzag can't answer (no privacy permission): as for the others, never an error.
+        page.evaluateScript("__zigzagPasswordSaving.get = () => Promise.reject(new Error('passwordSaving needs the privacy permission'));")
+        page.evaluateScript("\(saving).get({}).then((d) => { globalThis.__refused = d.levelOfControl + ' ' + d.value; });")
+        #expect(page.evaluateScript("__refused").toString() == "not_controllable false")
+    }
+
+    /// The bridge sends what a password manager sets to Zigzag, with Chrome's details.
+    @Test func theBridgeSendsPasswordSavingToZigzag() {
+        let context = Self.bridgeWorld(permissions: ["privacy"])
+        context.evaluateScript("""
+        var __messages = [];
+        chrome.runtime.sendNativeMessage = (host, message) => { __messages.push(host + ' ' + JSON.stringify(message)); return Promise.resolve({ value: null }); };
+        __zigzagPasswordSaving.set({ value: false });
+        __zigzagPasswordSaving.clear();
+        """)
+        #expect(context.evaluateScript("__messages.join('|')").toString()
+                == #"zigzag.bridge {"ns":"passwordSaving","fn":"set","args":[{"value":false}]}|zigzag.bridge {"ns":"passwordSaving","fn":"clear","args":[]}"#)
+        #expect(context.evaluateScript("typeof __zigzagPasswordSaving.onChange.addListener").toString() == "function")
+    }
+
     /// WebKit's own `runtime.lastError` is restored after the failing callback.
     @Test func theBackgroundPageErrorPutsWebKitsLastErrorBack() {
         let page = Self.workerWorld(worker: false, setup: """
