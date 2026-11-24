@@ -114,6 +114,11 @@ enum FramePacing {
     /// Sites held this session, outside private windows: their next pages start held.
     private(set) static var heldSites: Set<String> = []
 
+    #if DEBUG
+    /// perfsuite: pages are judged but never held, so every run scrolls at the same rate.
+    static var keepsRate = false
+    #endif
+
     /// Whether this web view is held near 60 fps for its site.
     static func holds(_ webView: WKWebView) -> Bool { pages.object(forKey: webView)?.judge.held == true }
 
@@ -149,6 +154,9 @@ enum FramePacing {
             debugLog("framepacing \(site) missed \(Int((last * 100).rounded()))% of \(fps) Hz frames while scrolling")
         }
         guard held else { return true }
+        #if DEBUG
+        if keepsRate { page.judge = Judge(site: site); return true }
+        #endif
         if webView.configuration.websiteDataStore.isPersistent { heldSites.insert(site) }
         hold(webView, page, wasHeld: false)
         let shares = page.judge.windows.map { "\(Int(($0 * 100).rounded()))%" }.joined(separator: " ")
