@@ -527,24 +527,51 @@ final class ImportView: NSView {
         }
     }
 
-    /// A password CSV, a bookmarks HTML file, or Safari's browsing data zip.
+    /// A password CSV, a bookmarks HTML file, Safari's browsing data zip, or a Zigzag backup.
     private func pickFile() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html]
-        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s browsing data export (a .zip file).", comment: "Message of the open panel from the Import window's Choose File… button.")
+        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html, ZigzagBackup.contentType]
+        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file), Safari’s browsing data export (a .zip file) or a Zigzag backup.", comment: "Message of the open panel from the Import window's Choose File… button.")
         panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            let row = SourceRow(source: ImportCoordinator.fileSource(url))
-            row.isChosen = true
-            self.rowList.addSubview(row)
-            self.rows.append(row)
+            guard !ZigzagBackup.isBackup(url) else {
+                self.askAboutSettings(in: url) { [weak self] settings in
+                    self?.importFile(url, data: settings ? [.bookmarks, .history, .tabs, .openTabs, .settings] : [.bookmarks, .history, .tabs, .openTabs])
+                }
+                return
+            }
             // A file you picked brings everything in it, whatever was ticked (and the ticks are hidden after an
             // import, so reading them would bring nothing).
-            self.startImport([row], data: [.passwords, .bookmarks, .history])
-            row.exportFile = url
+            self.importFile(url, data: [.passwords, .bookmarks, .history])
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: handle) } else { handle(panel.runModal()) }
+    }
+
+    private func importFile(_ url: URL, data: ImportCoordinator.Choice) {
+        let row = SourceRow(source: ImportCoordinator.fileSource(url))
+        row.isChosen = true
+        rowList.addSubview(row)
+        rows.append(row)
+        startImport([row], data: data)
+        row.exportFile = url
+    }
+
+    /// A backup whose settings differ from these asks first whether to use them; Cancel imports nothing.
+    private func askAboutSettings(in url: URL, then go: @escaping (Bool) -> Void) {
+        guard case .success(let backup) = ZigzagBackup.read(url), backup.settingsDiffer(from: .standard, searchEngine: Library.shared.searchEngine),
+              let host = window?.contentView else { go(false); return }
+        ConfirmSheet.choose(in: host, title: String(localized: "Use the backup’s settings?", comment: "Title of the question in the Import window before a Zigzag backup is restored."),
+                            message: String(localized: "Its spaces, pinned tabs and favorites are added to yours either way. Its settings and site settings can replace the ones here.",
+                                            comment: "Message of the question in the Import window before a Zigzag backup is restored."),
+                            confirmTitle: String(localized: "Use Backup’s Settings", comment: "Button in the Import window's question before a Zigzag backup is restored."),
+                            alternateTitle: String(localized: "Keep Mine", comment: "Button in the Import window's question before a Zigzag backup is restored: keep the settings here.")) { answer in
+            switch answer {
+            case .confirm: go(true)
+            case .alternate: go(false)
+            case .cancel: break
+            }
+        }
     }
 
     // MARK: Layout
