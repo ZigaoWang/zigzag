@@ -146,10 +146,12 @@ struct WhatsNewTests {
         #expect(!WhatsNew.sections.isEmpty)
     }
 
-    /// Chinese reads the Chinese changelog; English and any other language read CHANGELOG.md alone.
+    /// The two Chinese scripts use their own notes; other languages read CHANGELOG.md alone.
     @Test func chineseReadsItsOwnChangelog() {
         #expect(WhatsNew.notesFile(for: "zh-Hans") == "CHANGELOG.zh-Hans")
         #expect(WhatsNew.notesFile(for: "zh-Hans-CN") == "CHANGELOG.zh-Hans")
+        #expect(WhatsNew.notesFile(for: "zh-Hant") == "CHANGELOG.zh-Hant")
+        #expect(WhatsNew.notesFile(for: "zh-Hant-HK") == "CHANGELOG.zh-Hant")
         #expect(WhatsNew.notesFile(for: "en") == nil)
         #expect(WhatsNew.notesFile(for: "en-GB") == nil)
         #expect(WhatsNew.notesFile(for: "ja") == nil)
@@ -189,17 +191,47 @@ struct WhatsNewTests {
         #expect(WhatsNew.pick(english: english, localized: chinese, version: "2.0.0").sections.isEmpty)
     }
 
+    @Test func incompleteTraditionalChineseNotesFallBackToEnglish() {
+        let english = """
+        ## [1.1.0] - 2026-11-01
+
+        ### New
+        - One
+        - Two
+
+        ### Fixed
+        - Three
+        """
+        let traditional = """
+        ## [1.1.0] - 2026-11-01
+
+        ### 新功能
+        - 一
+        - 二
+
+        ### 修正
+        - 三
+        """
+        let source = WhatsNew.parse(english, version: "1.1.0")
+        let incomplete = traditional.replacingOccurrences(of: "\n- 二", with: "")
+        let missingVersion = traditional.replacingOccurrences(of: "[1.1.0]", with: "[1.0.0]")
+        for notes in [nil, missingVersion, incomplete] {
+            #expect(WhatsNew.pick(english: english, localized: notes, version: "1.1.0", requireCompleteTranslation: true) == source)
+        }
+        #expect(WhatsNew.pick(english: english, localized: traditional, version: "1.1.0", requireCompleteTranslation: true)
+                == WhatsNew.parse(traditional, version: "1.1.0"))
+    }
+
     /// New and Fixed are shown in the app's language from either changelog; other headings as written.
     @Test func sectionHeadingsAreTheApps() {
         let new = String(localized: "New", comment: "Heading in What’s New: the new things in this version.")
         let fixed = String(localized: "Fixed", comment: "Heading in What’s New: what this version fixes.")
         #expect(WhatsNew.heading("New") == new && WhatsNew.heading("新功能") == new)
-        #expect(WhatsNew.heading("Fixed") == fixed && WhatsNew.heading("修复") == fixed)
+        #expect(WhatsNew.heading("Fixed") == fixed && WhatsNew.heading("修复") == fixed && WhatsNew.heading("修正") == fixed)
         #expect(WhatsNew.heading("Security") == "Security")
     }
 
-    /// The Chinese changelog in the app follows the English one: every version it has is a real one with the same day,
-    /// its sections are 新功能 and 修复 in the same order, and each point is there with the same issues.
+    /// Shipped Simplified Chinese notes match English. Traditional Chinese may lag and falls back at runtime.
     @Test func shippedChineseNotesMatchTheEnglish() throws {
         func text(_ name: String) throws -> String {
             let url = try #require(Bundle.main.url(forResource: name, withExtension: "md"))

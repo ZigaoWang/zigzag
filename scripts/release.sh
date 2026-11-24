@@ -12,8 +12,7 @@
 #                                      General › Beta updates), tag the commit vX.Y.Z-beta.N and make it a
 #                                      GitHub pre-release; no DMG, website or Homebrew
 # Before releasing: add the version's section to CHANGELOG.md (New and Fixed); every place notes appear reads it.
-# Add it in Chinese to CHANGELOG.zh-Hans.md too (新功能 and 修复), for the app and the update window on a Mac in
-# Chinese; without it they show the English, and this script warns.
+# Add Simplified Chinese for What's New and the update feed. Traditional Chinese is optional for What's New.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -36,8 +35,8 @@ TEAM=$(/usr/libexec/PlistBuddy -c "Print :teamID" scripts/ExportOptions.plist)
 # The notes come first: CHANGELOG.md needs a section for the version being released, or nothing is built.
 PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
 grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $PLANNED. Add one, then release."; exit 1; }
-# The Chinese notes should come with them. Without, a Mac in Chinese shows the English ones, so it's only a warning.
-grep -q "^## \[$PLANNED\]" CHANGELOG.zh-Hans.md || echo "Warning: CHANGELOG.zh-Hans.md has no section for $PLANNED, so Chinese readers get the English notes."
+# The Simplified Chinese notes should come with them. Traditional Chinese can follow later without a warning.
+grep -q "^## \[$PLANNED\]" CHANGELOG.zh-Hans.md || echo "Warning: CHANGELOG.zh-Hans.md has no section for $PLANNED. Simplified Chinese readers get the English notes."
 
 # The ad blocking scriptlets a release accepts are pinned by hash in the app: one older than Ghostery's newest keeps
 # working, but misses its fixes. Pinning is a code change, so it's for before the release, not here.

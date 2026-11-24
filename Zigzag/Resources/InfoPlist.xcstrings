@@ -16,6 +16,12 @@
             "state" : "translated",
             "value" : "你使用的扩展（比如 Shazam）可以听到标签页播放的声音，但只在它们收听时。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shazam 等延伸功能可以擷取分頁播放的音訊，但僅限你使用它們收聽時。"
+          }
         }
       }
     },
@@ -33,6 +39,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你访问的网站可以请求使用你的摄像头。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你造訪的網站可以要求使用你的相機。"
           }
         }
       }
@@ -52,6 +64,12 @@
             "state" : "translated",
             "value" : "Zigzag 会用你在“通讯录”中自己的名片，在表单中填写你的姓名、电子邮件、电话和地址。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 會使用「聯絡人」中你的名片，在表單填入姓名、電子郵件、電話號碼和地址。"
+          }
         }
       }
     },
@@ -69,6 +87,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 会把你下载的文件存储在这里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 會將你下載的檔案儲存在這裡。"
           }
         }
       }
@@ -88,6 +112,12 @@
             "state" : "translated",
             "value" : "你访问的网站可以请求连接到你本地网络上的设备。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你造訪的網站可以要求連線到區域網路上的裝置。"
+          }
         }
       }
     },
@@ -105,6 +135,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你访问的网站可以请求获取你的位置。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你造訪的網站可以要求取得你的所在位置。"
           }
         }
       }
@@ -124,6 +160,12 @@
             "state" : "translated",
             "value" : "你访问的网站可以请求获取你的位置。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你造訪的網站可以要求取得你的所在位置。"
+          }
         }
       }
     },
@@ -141,6 +183,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你访问的网站可以请求使用你的麦克风。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你造訪的網站可以要求使用你的麥克風。"
           }
         }
       }
