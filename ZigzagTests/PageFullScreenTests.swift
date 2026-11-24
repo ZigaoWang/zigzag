@@ -357,10 +357,16 @@ struct PageFullScreenTests {
 @MainActor
 struct WholeScreenLayoutTests {
     @Test func theWholeScreenTakesTheBrowserSpaceOnlyAlone() {
-        #expect(BrowserWindowController.wholeScreenFor(fill: .screen, inSplit: false))
-        #expect(!BrowserWindowController.wholeScreenFor(fill: .screen, inSplit: true))
-        #expect(!BrowserWindowController.wholeScreenFor(fill: .page, inSplit: false))
-        #expect(!BrowserWindowController.wholeScreenFor(fill: .page, inSplit: true))
+        #expect(BrowserWindowController.pageFullScreenGoes(fill: .screen, onScreen: true, inSplit: false) == .browserSpace)
+        #expect(BrowserWindowController.pageFullScreenGoes(fill: .screen, onScreen: true, inSplit: true) == .page)
+        #expect(BrowserWindowController.pageFullScreenGoes(fill: .page, onScreen: true, inSplit: false) == .page)
+        #expect(BrowserWindowController.pageFullScreenGoes(fill: .page, onScreen: true, inSplit: true) == .page)
+    }
+
+    /// A page off screen here (the mini player has it) keeps WebKit's own full screen for The Whole Screen.
+    @Test func aPageOffScreenGoesToWebKit() {
+        #expect(BrowserWindowController.pageFullScreenGoes(fill: .screen, onScreen: false, inSplit: false) == .webKit)
+        #expect(BrowserWindowController.pageFullScreenGoes(fill: .page, onScreen: false, inSplit: false) == .page)
     }
 
     @Test func theWholeScreenEndsWhenThePageIsNoLongerAlone() {

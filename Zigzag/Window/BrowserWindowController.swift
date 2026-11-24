@@ -2592,19 +2592,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Screen fills that and takes the browser into its own space, with the chrome out of the way. The page never
     /// takes the screen by itself; only the expand button hands it to WebKit's own full screen.
     func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {
-        guard tab === tabManager.selectedTab else { return }
-        if on {
-            guard Self.wholeScreenFor(fill: PageFullScreen.fills(for: tab.url), inSplit: tabManager.split(for: tab) != nil) else { return }
-            beginWholeScreen(tab)
-        } else if tab === pageFullScreenTab {
-            endWholeScreen()
+        guard on else {
+            if tab === pageFullScreenTab { endWholeScreen() }
+            return
+        }
+        let onScreen = tabManager.selectedTab.map { tabManager.panes(of: $0).contains { $0 === tab } } ?? false
+        switch Self.pageFullScreenGoes(fill: PageFullScreen.fills(for: tab.url), onScreen: onScreen, inSplit: tabManager.split(for: tab) != nil) {
+        case .page: break
+        case .browserSpace: beginWholeScreen(tab)
+        case .webKit: PageFullScreen.handToWebKit(tab)
         }
     }
 
-    /// Whether a page's request takes the browser's own space: The Whole Screen, with the page alone. A page in a
-    /// split fills its pane instead.
-    nonisolated static func wholeScreenFor(fill: PageFullScreen.Fill, inSplit: Bool) -> Bool {
-        fill == .screen && !inSplit
+    enum PageFullScreenPlace: Equatable { case page, browserSpace, webKit }
+
+    /// Where a page's request goes. The Whole Screen takes the browser's space for a page on its own; a page in a
+    /// split fills its pane; one not on screen here (in the mini player) gets WebKit's own full screen, as before.
+    nonisolated static func pageFullScreenGoes(fill: PageFullScreen.Fill, onScreen: Bool, inSplit: Bool) -> PageFullScreenPlace {
+        guard fill == .screen else { return .page }
+        guard onScreen else { return .webKit }
+        return inSplit ? .page : .browserSpace
     }
 
     /// Whether The Whole Screen has to give the browser's space back: the page is no longer the one on screen, or it

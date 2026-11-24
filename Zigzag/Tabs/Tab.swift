@@ -25,7 +25,10 @@ protocol TabHost: AnyObject {
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
-    func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {}
+    /// No space of the window's own for the page here (a web app, Zigzag Mini): The Whole Screen is WebKit's, as before.
+    func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {
+        if on, PageFullScreen.fills(for: tab.url) == .screen { PageFullScreen.handToWebKit(tab) }
+    }
     func tabDidAskToExpandFullScreen(_ tab: Tab) { PageFullScreen.expand(tab) }
     /// Loads an address with no sender: page links and every caller except a rule.
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
@@ -254,16 +257,13 @@ final class Tab: NSObject {
     var isInPageFullScreen = false {
         didSet {
             guard isInPageFullScreen != oldValue else { return }
-            pageHolder?.onExpand = { [weak self] in self?.expandPageFullScreen() }
+            pageHolder?.onExpand = { [weak self] in
+                guard let self else { return }
+                self.host?.tabDidAskToExpandFullScreen(self)
+            }
             pageHolder?.showsExpand = isInPageFullScreen
             host?.tab(self, pageFullScreenChanged: isInPageFullScreen)
         }
-    }
-
-    /// The expand button over a page-filled element: the window decides whether it goes straight to WebKit's own
-    /// full screen or gives the browser's space back first.
-    private func expandPageFullScreen() {
-        host?.tabDidAskToExpandFullScreen(self)
     }
     /// What you answered the page's questions (camera, location, notifications) while it's open: asked again once
     /// it loads another page or reloads, as a site set to Ask is.

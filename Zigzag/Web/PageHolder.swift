@@ -234,8 +234,8 @@ final class PageHolder: NSView {
 
     // MARK: Into real full screen
 
-    /// On a page-filled video (Full screen videos fill: The Page), a top-corner button that sends it to real full
-    /// screen (#257). Shows on pointer movement and hides after a moment, like player controls.
+    /// On a page-filled video, The Page or The Whole Screen, a top-corner button that sends it to WebKit's own full
+    /// screen (#257, #462). Shows on pointer movement and hides after a moment, like player controls.
     var showsExpand = false {
         didSet {
             guard showsExpand != oldValue else { return }

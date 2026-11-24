@@ -171,6 +171,11 @@ enum PageFullScreen {
         webView.evaluateJavaScript(expandCall, in: nil, in: .page) { _ in }
     }
 
+    /// The same, from where the page has only just started to fill: once that change is through.
+    static func handToWebKit(_ tab: Tab) {
+        DispatchQueue.main.async { [weak tab] in tab.map(expand) }
+    }
+
     private final class Messages: NSObject, WKScriptMessageHandler {
         static let shared = Messages()
 
