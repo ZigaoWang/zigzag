@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
-- On a touch display, the sidebar toggle that shows while the sidebar is hidden no longer floats over the page as a dark tile. On a page it shows with the traffic lights, in one title bar piece that's light or dark like the top of the page; in a split view it's a button in the top pane's strip, next to Back. A finger now hits it anywhere close by.
+- On a touch display, the sidebar toggle no longer sits over the page while the sidebar is hidden. Tap the top corner where the traffic lights live and they show with the toggle, in one title bar piece that's light or dark like the top of the page, then fade after a few seconds or when you tap the page. That first tap only shows them, so it never clicks a link underneath. They also show for a moment right after you hide the sidebar by touch. In a split view the toggle is a button in the top pane's strip, next to Back. A finger now hits it anywhere close by.
 
 ## [0.9.4] - 2026-11-24
 
