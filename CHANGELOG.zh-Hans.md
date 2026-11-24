@@ -16,6 +16,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “设置 › 标签页 › 全屏视频铺满”选“整个屏幕”时，视频全屏现在留在浏览器窗口里。窗口进入自己的全屏空间，和“显示 › 进入全屏幕”一样，侧边栏和顶栏让开；把指针移到顶部，顶栏就会滑下来。分屏时视频只铺满自己那一格。按 Esc 窗口恢复原样，原本就在全屏的窗口保持全屏。视频右上角的按钮照旧可以让视频单独全屏。网页 App、Zigzag Mini 和迷你播放器的全屏和以前一样。感谢 [Lakeland97](https://github.com/Lakeland97)。([#462](https://github.com/ZigaoWang/zigzag/issues/462))
 - Zigzag 新增繁体中文界面。在“设置 › 通用 › 语言”中选取，重新启动 Zigzag 即可切换。感谢 [aliceric27](https://github.com/aliceric27)。([#505](https://github.com/ZigaoWang/zigzag/issues/505))
 - 打开“设置 › 外观”里的“从屏幕边缘拉出边栏”后，边栏可以在你正在用的 App 上面拉出来，就像隐藏的程序坞那样。把指针推到边栏那一侧的屏幕边缘停一下，空间、收藏、标签页和正在播放的内容就会出现在那个 App 上面。点按标签页、收藏或新标签页，Zigzag 会像从程序坞点开一样来到前面并打开它；把指针移开，边栏就收回去，原来的 App 仍在前面。屏幕角落、程序坞或台前调度所在的那一侧，以及通往另一块显示器的边缘都不会拉出边栏。默认关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#363](https://github.com/ZigaoWang/zigzag/issues/363))
+- 存储网页的扩展（`chrome.pageCapture`）现在能用了：可以像在 Chrome 里一样，把标签页存储为一个 MHTML 文件，连同它的样式、图片和框架，Chrome 等浏览器能把它当作网页打开。只适用于扩展可访问的网站上的网页。网页载入的内容中，只有图片、样式表和字体会存进去，和 Chrome 一样；来自扩展不能访问的网站的框架不会存进文件。感谢 [OnurrUgur](https://github.com/OnurrUgur)。([#488](https://github.com/ZigaoWang/zigzag/issues/488))
 
 ### 修复
 - 从 Dia 导入时，每个 Dia 个人资料都会变成一个空间，名字和 Dia 里一样，没有书签或固定标签页的也会建；Dia 没标明侧边栏标签页属于哪个个人资料时，会放进你在 Dia 里最后用的那个。([#511](https://github.com/ZigaoWang/zigzag/issues/511))

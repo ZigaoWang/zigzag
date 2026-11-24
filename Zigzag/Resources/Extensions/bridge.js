@@ -1105,6 +1105,34 @@
   };
   try { Object.defineProperty(globalThis, '__zigzagWithLastError', { value: withLastError, configurable: true }); } catch (e) {}
 
+  // pageCapture: WebKit names a tab by an ID only this extension's tabs API knows, so what tabs.get and windows.get
+  // say of it goes along and Zigzag finds the tab by that (BridgePageCapture). The page comes back as MHTML, in a
+  // Blob as in Chrome; a callback hears a failure through runtime.lastError.
+  install('pageCapture', {
+    saveAsMHTML: (details, callback) => {
+      const result = (async () => {
+        const tabId = details && details.tabId;
+        if (typeof tabId !== 'number') throw new Error('Cannot find the tab for this request.');
+        const tab = await api.tabs.get(tabId);
+        if (!tab) throw new Error('Cannot find the tab for this request.');
+        // A tab on a site the extension can't access has no address it's told ("" in WebKit).
+        const known = (url) => (typeof url === 'string' && url ? url : null);
+        let urls = null;
+        try {
+          const window = await api.windows.get(tab.windowId, { populate: true });
+          if (window && Array.isArray(window.tabs)) urls = window.tabs.map((each) => known(each.url));
+        } catch (e) {}
+        const hint = { url: known(tab.url), index: tab.index, active: !!tab.active, urls };
+        const binary = atob(await send('pageCapture', 'saveAsMHTML', [hint]));
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new Blob([bytes], { type: 'multipart/related' });
+      })();
+      if (typeof callback !== 'function') return result;
+      result.then((blob) => callback(blob), (error) => withLastError(() => callback(undefined), error));
+    },
+  });
+
   // tabs.sendMessage to a tab or frame where nothing listens: Chrome fails it with NO_RECEIVER, WebKit answers
   // undefined, the same as when a listener gives no answer. Extensions take the error to mean their content script
   // isn't there yet, inject it and send again; given undefined, they waited. So an undefined answer is checked: the

@@ -10,6 +10,7 @@
 ## [Unreleased]
 
 ### 新功能
+- 儲存網頁的延伸功能（`chrome.pageCapture`）現在可以用了：可以像在 Chrome 裡一樣，把分頁儲存為一個 MHTML 檔案，連同它的樣式、圖片和框架，Chrome 等瀏覽器能把它當作網頁開啟。只適用於延伸功能可存取的網站上的網頁；網頁載入的內容中，只有圖片、樣式表和字型會存進去，和 Chrome 一樣。感謝 [OnurrUgur](https://github.com/OnurrUgur)。([#488](https://github.com/ZigaoWang/zigzag/issues/488))
 - 新增繁體中文介面。在「設定 › 一般 › 語言」選取「繁體中文」後，重新啟動 Zigzag 即可套用。感謝 [aliceric27](https://github.com/aliceric27)。([#505](https://github.com/ZigaoWang/zigzag/issues/505))
 - 開啟「設定 › 外觀」中的「從螢幕邊緣拉出側邊欄」後，側邊欄可以在你正在使用的 App 上方拉出來，就像隱藏的 Dock 一樣。把指標推到側邊欄那一側的螢幕邊緣停一下，空間、收藏、分頁和正在播放的內容就會出現在那個 App 上方。點一下分頁、收藏或新增分頁，Zigzag 會像從 Dock 打開一樣來到前面並顯示它；把指標移開，側邊欄就會收回，原本的 App 仍在前面。螢幕角落、Dock 或幕前調度所在的那一側，以及通往另一台顯示器的邊緣都不會拉出側邊欄。預設關閉。感謝 [Lakeland97](https://github.com/Lakeland97)。([#363](https://github.com/ZigaoWang/zigzag/issues/363))
 
