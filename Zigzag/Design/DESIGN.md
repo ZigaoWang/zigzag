@@ -382,6 +382,21 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   toggle at its outer end where the bar keeps it while the sidebar is hidden, so it stays put as the sidebar comes
   and goes. The command bar stays centered on the window. Changing sides, the sidebar slides across
   while the pages glide the other way (`gentle`).
+- **Sidebar at the screen edge** (#363, Settings › Appearance, off until turned on): with the switch on, pushing the
+  pointer against the screen's edge on the sidebar's side brings the whole sidebar out over whatever app is in front,
+  the way the hidden sidebar comes out of a window's edge (`SidebarEdgeZone`, `SidebarEdgeReveal`, the screen's
+  visible frame standing in for the window's bounds). It is the last browser window's sidebar, on the space it is on:
+  the window builds a second `SidebarView` wired to itself (`BrowserWindowController.wireEdgeSidebar`), so the window's
+  own sidebar is never moved, hidden or frozen. The panel is borderless and non-activating, at `.statusBar` level on
+  every space and over full-screen apps, and never becomes key: it holds a floating `SidebarContainer` with the
+  window's tint, gradient, grain and glass copied when it comes out, its card set off the screen's edge by
+  `Metric.cardInset` and flush at the page's side. Clicking a tab borrows it into Zigzag Mini beside the panel, a
+  floating `MiniPanel` over the app you're in: the same row puts it back, another row switches, and Return to [space]
+  reattaches it to its tab and brings the window forward. A favorite, or a page Mini can't take, brings the window
+  forward on it. Switching spaces keeps the panel out; the address, menus and the space editor bring Zigzag forward,
+  since typing is the point. Moving the pointer away puts it back with the app you were in still in front. Only the
+  screen under the pointer counts, so a display beside this one doesn't trigger the wrong edge. No drags leave the
+  panel, its edge doesn't resize, and an edge the Dock already has is left to the Dock.
 - **Developer tools in the bar** (`DeveloperBarTools`, #141): for a tab on a site in Developer Mode and shown on
   its own, with Tools above the page on (`TopBarView.accessory`), the bar's own kind of button (`Tokens.Sidebar`:
   26pt targets, 14pt glyphs) wearing its ink and its fills. With the address kept in the sidebar the bar is there

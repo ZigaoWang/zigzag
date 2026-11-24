@@ -65,6 +65,7 @@ struct TrafficLightTests {
         for phase in [FullScreenPhase.windowed, .entering, .fullScreen, .exiting] {
             #expect(phase.titlebarAppearsTransparent, "\(phase)")
         }
+
         #expect(FullScreenPhase.fullScreen.after(.willExit).dropsTrafficLightBacking)
         for phase in [FullScreenPhase.windowed, .entering, .fullScreen] { #expect(!phase.dropsTrafficLightBacking, "\(phase)") }
     }

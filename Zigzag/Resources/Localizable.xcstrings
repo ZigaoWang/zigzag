@@ -19457,6 +19457,17 @@
         }
       }
     },
+    "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to keep its page open." : {
+      "comment" : "Explanation under “Sidebar from the screen edge” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将指针移到屏幕边缘，即可在其他应用上方拉出边栏。点按标签页即可让它的页面留在面板中。"
+          }
+        }
+      }
+    },
     "Side by Side" : {
       "comment" : "Menu bar item: lays the split view's two pages side by side.\nTooltip of a button in the strip on top of each page of a split view: lays the two pages side by side.",
       "localizations" : {
@@ -19464,6 +19475,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "左右并排"
+          }
+        }
+      }
+    },
+    "Sidebar from the screen edge" : {
+      "comment" : "A setting in Settings › Appearance: moving the pointer to the screen's edge shows the sidebar over other apps, as the Dock does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从屏幕边缘拉出边栏"
+          }
+        }
+      }
+    },
+    "Sidebar on the right" : {
+      "comment" : "A setting in Settings › Appearance: puts the sidebar along the window's right edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏放在右侧"
           }
         }
       }
@@ -24834,6 +24867,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "双击 新建 标签页 空白 缩放"
+          }
+        }
+      }
+    },
+    "edge dock hover peek reveal hidden sidebar over apps corner" : {
+      "comment" : "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边缘 拉出 悬停 显示 隐藏 边栏 角落 edge dock hover peek reveal hidden sidebar over apps corner"
           }
         }
       }

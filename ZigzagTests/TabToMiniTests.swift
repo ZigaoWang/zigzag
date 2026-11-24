@@ -18,19 +18,17 @@ import Testing
 
     // MARK: Which tabs
 
-    @Test func onlyAnOrdinaryTabsWebPageOrFile() {
+    @Test func anyTabsPageCanGoIntoMini() {
         let web = URL(string: "https://example.com/a")!
-        #expect(MiniWindowController.canTake(web, isPinned: false, isPrivate: false))
-        #expect(MiniWindowController.canTake(URL(string: "http://example.com")!, isPinned: false, isPrivate: false))
-        #expect(MiniWindowController.canTake(URL(fileURLWithPath: "/tmp/a.pdf"), isPinned: false, isPrivate: false))
-        // Pinned pages and favorites belong to the sidebar.
-        #expect(!MiniWindowController.canTake(web, isPinned: true, isPrivate: false))
-        // Zigzag Mini isn't private: a private window's page stays there.
-        #expect(!MiniWindowController.canTake(web, isPinned: false, isPrivate: true))
-        // A tab with no page yet, and Zigzag's own pages, stay tabs.
-        #expect(!MiniWindowController.canTake(nil, isPinned: false, isPrivate: false))
-        #expect(!MiniWindowController.canTake(URL(string: "zigzag://settings")!, isPinned: false, isPrivate: false))
-        #expect(!MiniWindowController.canTake(URL(string: "about:blank")!, isPinned: false, isPrivate: false))
+        #expect(MiniWindowController.canTake(web))
+        #expect(MiniWindowController.canTake(URL(string: "http://example.com")!))
+        #expect(MiniWindowController.canTake(URL(fileURLWithPath: "/tmp/a.pdf")))
+        // A pinned page, a favorite, a private window's tab and Zigzag's own pages all go as they are: the page is
+        // the tab's own live one, moved out and moved back, so Mini is not a second, private-less browser for them.
+        #expect(MiniWindowController.canTake(URL(string: "zigzag://settings")!))
+        #expect(MiniWindowController.canTake(URL(string: "about:blank")!))
+        // A tab with no page at all has nothing to show.
+        #expect(!MiniWindowController.canTake(nil))
     }
 
     // MARK: Leaving the list

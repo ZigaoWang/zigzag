@@ -1,6 +1,20 @@
 import AppKit
 import WebKit
 
+/// The edge sidebar's floating Mini: a panel, not a browser window, so it can sit over other apps and full-screen
+/// Spaces without switching desktops. The browser window's own Mini keeps its traffic lights and title bar.
+final class MiniPanel: NSPanel {
+    var eventInterceptor: ((NSEvent) -> Bool)?
+
+    override func sendEvent(_ event: NSEvent) {
+        if eventInterceptor?(event) == true { return }
+        super.sendEvent(event)
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 /// Zigzag Mini: one page in a small, quiet window of its own, with no sidebar, for a link from another app or a
 /// quick look-up. A slim strip on top in the page's own color (`PageBar`), the page under it edge to edge: the space
 /// it goes to, the page's site, Keep on Top, Copy Link and Open in. Its page is a real tab, so
@@ -23,6 +37,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     static var name: String { String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.") }
 
     let tab: Tab
+    /// The floating popout the edge sidebar borrows a tab into: it closes with the panel and when the person clicks
+    /// away, and it joins another app's Space without bringing Zigzag forward.
+    let isEdgePopout: Bool
     private let root = MiniRootView()
     private var strip: MiniStripView { root.strip }
     /// Where floating things go over the page: the link under the pointer, a site's question, a toast.
@@ -42,6 +59,24 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var tokens: [SignalToken] = []
     /// The page went into a browser window: closing this one must leave it alone.
     private var movedOut = false
+    /// A tab borrowed from a browser window: it stays in the sidebar, and Return puts its page back where it was.
+    private struct BorrowedOrigin {
+        weak var browser: BrowserWindowController?
+        weak var pane: NSView?
+        var frame: NSRect
+        var wasSelected: Bool
+    }
+    private var borrowedOrigin: BorrowedOrigin?
+    /// Called when a borrowed Mini closes, however it closes: the edge sidebar lets its row go.
+    var onBorrowedClose: (() -> Void)?
+    /// The edge popout's outside-click and focus watchers, gone with the window.
+    private var outsideGlobal: Any?
+    private var outsideLocal: Any?
+    private var outsideSpace: NSObjectProtocol?
+    private var outsideApp: NSObjectProtocol?
+    private var outsideBrowser: NSObjectProtocol?
+    /// Whether this Mini is showing a tab borrowed from a browser, not a page it owns.
+    private var isBorrowed: Bool { borrowedOrigin != nil }
     /// Sent once the page has left (into a browser window, or closed with the window), so questions over it go too.
     private let pageGone = Signal<Void>()
     /// Sent when the window becomes or stops being key, which shows or holds its page's queued question.
@@ -213,6 +248,49 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
+    /// Borrows a tab that stays in the sidebar: the page is shown live in Mini, and Return puts it back in the tab
+    /// and window it came from. The tab is not released or reinserted.
+    @discardableResult
+    static func open(borrowing tab: Tab, from browser: BrowserWindowController, origin: NSRect? = nil,
+                     frame: NSRect? = nil, overFullScreen: Bool? = nil,
+                     floating: Bool = false) -> MiniWindowController {
+        let screen = origin.flatMap { rect in NSScreen.screens.first { $0.frame.intersects(rect) } }
+            ?? browser.window?.screen ?? NSScreen.main
+        let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
+        let size = openingSize
+        let taken = all.compactMap { $0.window?.frame }
+        let targetFrame = frame ?? origin.map { Self.frame(size: size, under: $0, in: area) }
+            ?? Self.frame(size: size, in: area, taken: taken,
+                          around: browser.window.map { NSPoint(x: $0.frame.midX, y: $0.frame.midY) })
+        let pane = tab.pageHolder?.superview
+        let originFrame = tab.pageHolder?.frame ?? .zero
+        let borrowed = BorrowedOrigin(browser: browser, pane: pane, frame: originFrame,
+                                      wasSelected: browser.tabManager.selectedTab === tab)
+        tab.pageHolder?.removeFromSuperview()
+        let controller = MiniWindowController(tab: tab, frame: targetFrame,
+                                              overFullScreen: overFullScreen ?? (browser.window?.styleMask.contains(.fullScreen) == true),
+                                              borrowedOrigin: borrowed, floating: floating)
+        all.append(controller)
+        Diagnostics.note("Zigzag Mini borrowed a tab", site: tab.url?.host())
+        // The page has the keyboard before the window comes forward, as when a tab moves into Mini.
+        if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
+        // The edge sidebar's Mini swells out of the sidebar card and over to the page's side.
+        if floating, let window = controller.window, let origin, origin != targetFrame, !Tokens.Motion.reduceMotion {
+            window.setFrame(origin, display: false)
+        }
+        controller.appear(from: origin)
+        if floating { controller.watchOutside() }
+        if floating, let window = controller.window, let origin, origin != targetFrame, !Tokens.Motion.reduceMotion {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.28
+                context.timingFunction = Tokens.Motion.easeOut
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        }
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+        return controller
+    }
+
     /// Opens one for a link on a page (⇧-click, Open Link in Zigzag Mini), over the middle of that window's page, in the
     /// page's profile and space, private from a private window. With a configuration (from WebKit), the page keeps its
     /// opener and the returned controller's web view is the one WebKit asked for.
@@ -251,6 +329,16 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "")
     }
 
+    /// Whether a tab's page can go into Zigzag Mini. Any tab's page can, as in a browser's picture-in-picture or a
+    /// second window: the page is the tab's own live one, moved and moved back, so a pinned page, a private window's
+    /// tab and even Zigzag's own pages go as they are. Modern pages draw with their own scripts, so split view's
+    /// wait is skipped.
+    nonisolated static func canTake(_ url: URL?) -> Bool { url != nil }
+
+    /// Whether the tab's page has to be made first: one just opened, or a picked pinned page never looked at in this
+    /// session, has no web view until it is shown. Made beside the panel, in the tab's own profile and window rules.
+    static func needsPage(_ tab: Tab) -> Bool { !tab.isClosed && tab.pageHolder == nil }
+
     /// The app a link came from, to go back to when this closes, if you're still only here. Using a browser window
     /// in between means you're in Zigzag now, so closing this stays in Zigzag.
     private var returnTo: NSRunningApplication? {
@@ -271,27 +359,65 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var browserKeyToken: NSObjectProtocol?
     private var keepOnTopToken: NSObjectProtocol?
 
-    private init(tab: Tab, frame: NSRect, overFullScreen: Bool) {
+    private init(tab: Tab, frame: NSRect, overFullScreen: Bool, borrowedOrigin: BorrowedOrigin? = nil,
+                 floating: Bool = false) {
         self.tab = tab
-        // Zigzag's own PDF viewer and Back to the page that opened it belong to a browser window's tabs; here the page
-        // is shown outside a tab list, and becomes a full tab once it moves.
-        tab.isOutsideTabList = true
+        self.isEdgePopout = floating
+        self.borrowedOrigin = borrowedOrigin
+        // A borrowed tab is already a real tab in the sidebar; it must stay one. A page opened here is shown outside a
+        // tab list, and becomes a full tab once it moves into a browser window.
+        if borrowedOrigin == nil { tab.isOutsideTabList = true }
 
-        let window = BrowserWindow(contentRect: frame)
+        let window: NSWindow
+        if floating {
+            let panel = MiniPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
+                                  backing: .buffered, defer: false)
+            panel.level = .statusBar
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
+            panel.hasShadow = true
+            panel.isMovableByWindowBackground = true
+            panel.hidesOnDeactivate = false
+            panel.isReleasedWhenClosed = false
+            panel.animationBehavior = .none
+            panel.becomesKeyOnlyIfNeeded = false
+            window = panel
+        } else {
+            let browserWindow = BrowserWindow(contentRect: frame)
+            browserWindow.collectionBehavior.remove(.fullScreenPrimary)
+            // Opened over a full-screen window, it stays there in the same Space instead of opening off in another one.
+            if overFullScreen { browserWindow.collectionBehavior.insert(.fullScreenAuxiliary) }
+            window = browserWindow
+        }
         window.minSize = Tokens.Metric.miniWindowMinSize
-        window.collectionBehavior.remove(.fullScreenPrimary)
-        // Opened over a full-screen window, it stays there in the same Space instead of opening off in another one.
-        if overFullScreen { window.collectionBehavior.insert(.fullScreenAuxiliary) }
         window.setFrame(frame, display: false)
         super.init(window: window)
         window.delegate = self
         window.contentView = root
-        window.eventInterceptor = { [weak self] event in
+        let eventInterceptor: (NSEvent) -> Bool = { [weak self] event in
             guard let self else { return false }
             if self.linksNote?.takes(event) == true { return true }
+            // A status-bar panel gets no menu key equivalents while another app is in front: ⌘O, the Return
+            // button's shortcut, is read here.
+            if self.isEdgePopout, event.type == .keyDown, !event.isARepeat,
+               EdgePopoutPolicy.isReturnKey(command: event.modifierFlags.contains(.command),
+                                             key: event.charactersIgnoringModifiers) {
+                self.openInZigzag()
+                return true
+            }
             return self.noteEscape(event)
         }
+        if let browserWindow = window as? BrowserWindow {
+            browserWindow.eventInterceptor = eventInterceptor
+        } else if let panel = window as? MiniPanel {
+            panel.eventInterceptor = eventInterceptor
+        }
         window.setAccessibilityTitle(Self.name)
+        if floating {
+            strip.trafficLightsWidth = 0
+            strip.needsLayout = true
+        }
         // A waiting question while the window isn't key: the edge glows, and clicking it brings the window forward.
         root.attentionWaiting = { [weak self] in self?.questionsWaitingForPage ?? 0 }
         root.attentionClicked = { [weak self] in
@@ -341,8 +467,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         showPage()
         refreshStrip()
         refreshBar(animated: false)
-        window.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - window.trafficLightHeight) / 2))
-        strip.trafficLightsWidth = window.trafficLightsWidth
+        if let browserWindow = window as? BrowserWindow {
+            browserWindow.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - browserWindow.trafficLightHeight) / 2))
+            strip.trafficLightsWidth = browserWindow.trafficLightsWidth
+        } else {
+            strip.trafficLightsWidth = 0
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -388,8 +518,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// The spaces, from the strip's space: the one chosen is where Open in takes the page, and the window wears it.
     private func showSpaceMenu() {
-        // A private page keeps to its private window's space.
-        guard !isLeaving, !isPrivate else { return }
+        guard !isLeaving, !isBorrowed, !isPrivate else { return }
         let current = space.id
         func entry(_ other: SpaceInfo) -> MenuPanel.Entry {
             let symbol = other.icon.flatMap { IconChoice.isSymbol($0) ? $0 : nil }
@@ -437,8 +566,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func appear(from origin: NSRect?) {
         guard let window else { return }
         window.alphaValue = 0
-        showWindow(nil)
-        window.makeKeyAndOrderFront(nil)
+        if EdgePopoutPolicy.ordersFrontRegardless(floating: isEdgePopout) {
+            // Over another app, full-screen or not: come out in the Space the person is on, without bringing
+            // Zigzag's own Space forward.
+            window.orderFrontRegardless()
+            window.makeKey()
+        } else {
+            showWindow(nil)
+            window.makeKeyAndOrderFront(nil)
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.enter * Tokens.Motion.debugSlowdown
             context.timingFunction = Tokens.Motion.easeOut
@@ -451,6 +587,65 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         grow.duration = Tokens.Motion.enter * Tokens.Motion.debugSlowdown
         grow.timingFunction = Tokens.Motion.easeOut
         layer.add(grow, forKey: "appear")
+    }
+
+    /// The edge popout closes when a click lands outside it and the panel, or the keyboard goes somewhere that is
+    /// not the panel that opened it, as the Peek does. Picking another page in the sidebar is not outside.
+    func watchOutside() {
+        guard isEdgePopout, outsideGlobal == nil else { return }
+        outsideGlobal = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let window = self.window, !self.isLeaving else { return }
+                guard MenuPanel.current == nil else { return }
+                if !window.frame.contains(NSEvent.mouseLocation) { self.closeBorrowed() }
+            }
+        }
+        outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let window = self.window, self.isEdgePopout, !self.isLeaving else { return event }
+            if MenuPanel.current != nil || RunLoop.current.currentMode == .eventTracking { return event }
+            if event.window is EdgeCommandBarPopup || event.window is NSSavePanel || event.window?.sheetParent != nil { return event }
+            if EdgePopoutPolicy.closesOnOutsideClick(eventWindow: event.window, mini: window,
+                                                      panel: EdgeSidebar.shared.panelWindow) {
+                self.closeBorrowed()
+            }
+            return event
+        }
+        outsideSpace = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
+                                                                        object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.closeBorrowed() }
+        }
+        outsideApp = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+                                                                      object: nil, queue: .main) { [weak self] note in
+            // The pid, not the application: the note is not sendable, and the main actor only needs to know whose it was.
+            let pid = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
+            MainActor.assumeIsolated {
+                guard let self, self.isEdgePopout, !self.isLeaving else { return }
+                if pid != NSRunningApplication.current.processIdentifier { self.closeBorrowed() }
+            }
+        }
+        // The browser window coming forward is the person using the browser: the popout and the panel go with it.
+        if let browser = borrowedOrigin?.browser?.window {
+            outsideBrowser = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
+                                                                    object: browser, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.isEdgePopout, !self.isLeaving else { return }
+                    EdgeSidebar.shared.hide(animated: false)
+                }
+            }
+        }
+    }
+
+    private func stopWatchingOutside() {
+        if let outsideGlobal { NSEvent.removeMonitor(outsideGlobal) }
+        outsideGlobal = nil
+        if let outsideLocal { NSEvent.removeMonitor(outsideLocal) }
+        outsideLocal = nil
+        if let outsideSpace { NSWorkspace.shared.notificationCenter.removeObserver(outsideSpace) }
+        outsideSpace = nil
+        if let outsideApp { NSWorkspace.shared.notificationCenter.removeObserver(outsideApp) }
+        outsideApp = nil
+        if let outsideBrowser { NotificationCenter.default.removeObserver(outsideBrowser) }
+        outsideBrowser = nil
     }
 
     /// The one way it leaves, closing or moving into Zigzag: a quick fade as it eases a touch smaller, quieter than
@@ -503,9 +698,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.refreshColors()
     }
 
-    /// "Open in Work": what the button and ⌘O's menu item say, with the space the page goes to.
+    /// "Open in Work" for a page opened here, or "Return to Work" for a tab borrowed from a browser: what the button
+    /// and ⌘O's menu item say, with the space the page goes back to.
     private var openTitle: String {
-        String(localized: "Open in \(placeName)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
+        if isBorrowed {
+            return String(localized: "Return to \(space.name)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: puts a borrowed tab's live page back in the tab and browser window it came from.")
+        }
+        return String(localized: "Open in \(placeName)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
     }
 
     /// Where Open in takes the page: its space, or Private as a private window's sidebar heads itself.
@@ -516,8 +715,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func refreshStrip() {
         strip.title.show(tab)
         strip.spaceChip.show(space, name: isPrivate ? placeName : nil)
-        // A private page keeps to its window's space: nothing to choose.
-        strip.spaceChip.isEnabled = !isPrivate
+        // A private page keeps to its window's space: nothing to choose. A borrowed tab's space is the one it returns to.
+        strip.spaceChip.isEnabled = !isBorrowed && !isPrivate
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
         strip.refreshTips()
         strip.openButton.isEnabled = tab.url != nil
@@ -606,12 +805,21 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// what the page looked like before its own Esc handler ran.
     private func noteEscape(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown, event.keyCode == 53, !event.isARepeat else { return false }
+        // Zigzag's own pages (Settings, History, Archive) have no field or dialog of a site's to back out of
+        // first: one Esc closes the popout, as it closes a page in the browser.
+        if EdgePopoutPolicy.closesOnFirstEscape(isInternalPage: HistoryPage.isInternal(tab.url),
+                                                isLeaving: isLeaving,
+                                                commandBarVisible: commandBar.isVisible),
+           !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) {
+            closeWindow()
+            return true
+        }
         // Esc twice in a row always closes it, whatever the page did with the first (some take it for themselves).
         let now = event.timestamp
         defer { lastEscape = now }
         if now - lastEscape < Self.doubleEscape, !isLeaving, !commandBar.isVisible,
            !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) {
-            window?.performClose(nil)
+            closeWindow()
             return true
         }
         guard !commandBar.isVisible, !isLeaving, let webView = tab.webView,
@@ -624,7 +832,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
                 guard let self, let webView else { return }
                 let state = (try? result.get()) as? String ?? ""
                 if state.isEmpty {
-                    self.window?.performClose(nil)
+                    self.closeWindow()
                 } else {
                     // Noted for the Esc the page leaves alone, which comes back to `escape`: typing, the field lets go.
                     webView.evaluateJavaScript("window.__zigzagEsc = '\(state)'", in: nil, in: .defaultClient)
@@ -737,7 +945,61 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window
     /// fades away first, then the page is there.
-    @objc func openInZigzag(_ sender: Any? = nil) { moveOut() }
+    @objc func openInZigzag(_ sender: Any? = nil) {
+        if isBorrowed { returnToBrowser() } else { moveOut() }
+    }
+
+    /// A borrowed tab's page goes back into the tab and window it came from, and that window comes forward. No new
+    /// tab, no space routing, no reload.
+    private func returnToBrowser() {
+        guard let origin = borrowedOrigin, !movedOut, !isLeaving, !tab.isClosed else { return }
+        commandBar.dismiss(restoringFocus: false)
+        linkStatus.hide()
+        restoreBorrowed(origin, bringForward: true)
+        movedOut = true
+        window?.close()
+        // From the edge overlay, Return accepts the browser for this display: the panel goes, the browser takes the
+        // screen, and the app that was underneath keeps its own Space beside it.
+        if isEdgePopout {
+            EdgeSidebar.shared.hide(animated: false)
+            origin.browser?.takeOverFromEdgeOverlay()
+        }
+    }
+
+    /// Closes a borrowed Mini from the edge sidebar. A borderless panel has no close button for `performClose`, so this
+    /// takes the same fade-out path directly.
+    func closeBorrowed() {
+        guard isBorrowed, !isLeaving else { return }
+        fadeAway { [weak self] in self?.window?.close() }
+    }
+
+    /// Esc and ⌘W in a borrowed Mini take the same path as its close button would.
+    private func closeWindow() {
+        if isBorrowed { closeBorrowed() } else { window?.performClose(nil) }
+    }
+
+    /// Puts the page back in its own pane. `bringForward` also selects the tab and brings its browser window forward;
+    /// closing the Mini silently leaves the browser where it was unless the tab was the one on screen.
+    private func restoreBorrowed(_ origin: BorrowedOrigin, bringForward: Bool) {
+        guard !tab.isClosed else { borrowedOrigin = nil; return }
+        tab.pageHolder?.removeFromSuperview()
+        if let pane = origin.pane, pane.window != nil, let holder = tab.pageHolder {
+            holder.frame = origin.frame
+            pane.addSubview(holder)
+            pane.needsLayout = true
+        }
+        borrowedOrigin = nil
+        if let browser = origin.browser, browser.window != nil {
+            if bringForward || origin.wasSelected {
+                browser.tabManager.select(tab)
+            }
+            if bringForward {
+                // The person is looking at this Space now, which may not be the one the browser was left on: the
+                // window comes to it rather than the screen going back to the window.
+                browser.bringForwardHere()
+            }
+        }
+    }
 
     /// `then`: runs in the browser window the page went to.
     private func moveOut(then: ((BrowserWindowController) -> Void)? = nil) {
@@ -832,7 +1094,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Menu commands while it's in front
 
     /// ⌘W closes the page, and with it the window: it holds nothing else.
-    @objc func closeTab(_ sender: Any?) { window?.performClose(sender) }
+    @objc func closeTab(_ sender: Any?) { closeWindow() }
     @objc func goBack(_ sender: Any?) { tab.goBack() }
     @objc func goForward(_ sender: Any?) { tab.goForward() }
     @objc func reloadPage(_ sender: Any?) { tab.reload() }
@@ -933,10 +1195,17 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         if !movedOut {
             tokens.removeAll()
-            if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
-            tab.close()
+            if let origin = borrowedOrigin {
+                restoreBorrowed(origin, bringForward: false)
+            } else {
+                if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
+                tab.close()
+            }
         }
         if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
+        stopWatchingOutside()
+        onBorrowedClose?()
+        onBorrowedClose = nil
         // Getting started's ⇧-click step is done once a Mini from a page closes or moves into a tab.
         if fromPage { Tutorial.complete("peek") }
         keepOnTopToken.map(NotificationCenter.default.removeObserver)
@@ -953,6 +1222,19 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) {
         // No longer key: the question waits and the edge glows.
         promptFrontChanged.send()
+        guard isEdgePopout, !isLeaving else { return }
+        DispatchQueue.main.async { MainActor.assumeIsolated { self.edgePopoutLostKey() } }
+    }
+
+    /// The popout lost the keyboard: the panel that opened it and our own menus keep it out; anything else closes
+    /// it, as with the Peek.
+    private func edgePopoutLostKey() {
+        guard isEdgePopout, !isLeaving, window?.isVisible == true else { return }
+        if MenuPanel.current != nil { return }
+        let key = NSApp.keyWindow
+        if key === EdgeSidebar.shared.panelWindow { return }
+        if key is EdgeCommandBarPopup || key is NSSavePanel || key?.sheetParent != nil { return }
+        closeBorrowed()
     }
 
     /// Remember the manual size for the next one.
@@ -987,7 +1269,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 extension MiniWindowController {
     /// This window as an update's restart brings it back: its page, back/forward list, space, place and Keep on Top.
     var savedForRelaunch: UpdateRelaunch.Mini? {
-        guard !isLeaving, !isPrivate, let window, let url = tab.url else { return nil }
+        // The edge popout is a page borrowed from a tab that the session already keeps: it must not come back as
+        // a second window for the same page. A private Mini is not restored, as before.
+        guard !isEdgePopout, !isLeaving, !isPrivate, let window, let url = tab.url else { return nil }
         let frame = window.frame
         return UpdateRelaunch.Mini(url: url, title: tab.title, spaceID: tab.spaceID,
                                    frame: [frame.origin.x, frame.origin.y, frame.width, frame.height],
@@ -1156,7 +1440,7 @@ extension MiniWindowController: TabHost {
         return newTab.ensureWebView()
     }
 
-    func tabDidRequestClose(_ tab: Tab) { window?.performClose(nil) }
+    func tabDidRequestClose(_ tab: Tab) { closeWindow() }
     func tabWantsToReturnToOpener(_ tab: Tab) {}
     func tabWantsToBeShown(_ tab: Tab) {
         NSApp.activate()

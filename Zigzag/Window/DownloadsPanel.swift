@@ -262,6 +262,20 @@ enum DownloadsPanel {
         panel.closeWhenDone(item)
     }
 
+    /// From the edge panel: the browser's controller for the downloads, the panel's window for the panel.
+    static func show(from anchor: NSView, in controller: BrowserWindowController, host: NSView, lane: NSRect,
+                     receding: [NSView]) {
+        if let current {
+            let here = current.window === host.window
+            current.close()
+            if here { return }
+        }
+        controller.closeFloatingPanels()
+        let panel = DownloadsPanelView(controller: controller)
+        current = panel
+        panel.show(from: anchor, in: host, lane: lane, receding: receding)
+    }
+
     static func show(from anchor: NSView, in controller: BrowserWindowController, arrival: FloatingPanelView.Arrival = .pop) {
         // Open here: the click closes it. Left open in another window, it goes, and this window's opens.
         if let current {
@@ -305,6 +319,9 @@ final class DownloadsPanelView: FloatingPanelView {
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
+    /// In the edge panel: the view it sits in and the lane it takes there.
+    private weak var host: NSView?
+    private var hostLane: NSRect?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
     private let rowGap = Tokens.Metric.rowGap
     /// The title's strip, the rows inset `Space.x1` from the panel's sides so their corners run with its corners.
@@ -425,6 +442,25 @@ final class DownloadsPanelView: FloatingPanelView {
         let standIn = !(controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible)
         growsFrom = CGPoint(x: standIn && controller.root.sidebarOnRight ? 0.9 : 0.1, y: 1)
         present(arrival: arrival)
+        installDismissMonitor()
+    }
+
+    /// From the edge panel: the same panel in the panel's window, over the mirror's lane, out of the same button.
+    func show(from anchor: NSView, in host: NSView, lane: NSRect, receding: [NSView]) {
+        guard let controller else { return }
+        self.anchor = anchor
+        self.host = host
+        self.hostLane = lane
+        recedes = receding
+        host.addSubview(self)
+        reload()
+        growsFrom = CGPoint(x: 0.1, y: 1)
+        present(arrival: .pop)
+        installDismissMonitor()
+    }
+
+    private func installDismissMonitor() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             // Only its own window: keys and clicks in Settings or another window are theirs. A menu open over it
             // takes Esc and the click that closes it.
@@ -532,6 +568,12 @@ final class DownloadsPanelView: FloatingPanelView {
         guard let controller, let anchor else { return }
         let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * (rowHeight + rowGap) - rowGap
         let height = header + body + footer
+        if let host, let hostLane {
+            let button = anchor.convert(anchor.bounds, to: host)
+            frame = NSRect(x: hostLane.minX, y: button.minY - Tokens.Space.x2 - height,
+                           width: hostLane.width, height: height)
+            return
+        }
         // Sidebar hidden: above the stand-in Downloads button in the same corner, at the sidebar's usual width.
         guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else {
             let button = anchor.convert(anchor.bounds, to: controller.root.overlay)

@@ -1154,6 +1154,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let favoritesPerRow = DropdownButton()
     private let pageZoom = DropdownButton()
     private let sidebarSize = DropdownButton()
+    private let edgeSidebarToggle = Toggle()
     /// The size of your own beside Sidebar size, there while Custom is chosen (#361).
     private let sidebarSizeStepper = ZoomStepper()
     private var sidebarSizeRow: FormRow?
@@ -1646,6 +1647,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sizeRow.keywords = String(localized: "text size font bigger larger smaller scale zoom interface ui", comment: "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sizeRow)
+        edgeSidebarToggle.onChange = { on in EdgeSidebar.isOn = on }
+        let edgeRow = FormRow(title: String(localized: "Sidebar from the screen edge", comment: "A setting in Settings › Appearance: moving the pointer to the screen's edge shows the sidebar over other apps, as the Dock does."),
+                              detail: String(localized: "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to keep its page open.",
+                                             comment: "Explanation under “Sidebar from the screen edge” in Settings › Appearance."),
+                              control: edgeSidebarToggle)
+        edgeRow.keywords = String(localized: "edge dock hover peek reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.") + " 边缘 拉出 悬停"
+        appearanceGroup.add(edgeRow)
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
@@ -4101,6 +4109,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
+        edgeSidebarToggle.isOn = EdgeSidebar.isOn
         // Sidebar size's dropdown, and whether the percentage beside it shows.
         refreshSidebarSize()
         pageZoom.selectedIndex = ZoomLevels.steps.firstIndex { abs($0 - ZoomLevels.defaultZoom) < 0.001 } ?? ZoomLevels.steps.firstIndex(of: 1) ?? 0

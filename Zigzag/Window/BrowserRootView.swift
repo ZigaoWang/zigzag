@@ -686,7 +686,8 @@ final class BrowserRootView: SpaceFrameView {
         return stored > 0 ? min(max(CGFloat(stored), Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth) : Tokens.Metric.sidebarWidth
     }
 
-    private func saveSidebarWidth() {
+    /// Saves the width the sidebar was dragged to, for every window and the edge panel to keep (#431).
+    func saveSidebarWidth() {
         Self.defaults.set(Double(sidebarWidth), forKey: Self.sidebarWidthKey)
     }
     private(set) var sidebarRevealed = false
@@ -2483,6 +2484,9 @@ struct SidebarEdgeZone: Equatable {
     /// A strip along the top, measured from the window's top, where the edge doesn't open the sidebar: the bar above
     /// the page keeps the traffic lights there.
     var reservedTop: CGFloat = 0
+    /// A strip along the bottom, measured from the window's bottom, where the edge doesn't open it: a screen's hot
+    /// corner already belongs to the system there.
+    var reservedBottom: CGFloat = 0
     /// How far out past the window's edge the pointer still counts as at it. Further out it's somewhere else: on
     /// the desktop, or on the display beside this one.
     var reach: CGFloat = Tokens.Metric.edgeRevealReach
@@ -2504,7 +2508,8 @@ struct SidebarEdgeZone: Equatable {
     /// At the sidebar's edge of the window: in the strip just inside it, or just out past it.
     func opens(at point: NSPoint) -> Bool {
         let point = turned(point)
-        return isBeside(point) && point.x <= stripEnd && point.y >= bounds.minY + reservedTop
+        return isBeside(point) && point.x <= stripEnd
+            && point.y >= bounds.minY + reservedTop && point.y <= bounds.maxY - reservedBottom
     }
 
     /// On the sidebar, a little around it, or past it toward the window's edge as far as the edge reaches: that's
@@ -2525,7 +2530,8 @@ struct SidebarEdgeZone: Equatable {
     /// Leaving the window here meets the edge: through the strip, or out past the reach already, as a quick move
     /// leaves it, the window hearing nothing of it between one moved event inside and the next one far out.
     func meetsLeaving(at point: NSPoint) -> Bool {
-        opens(at: point) || (isPast(point) && point.y >= bounds.minY + reservedTop)
+        opens(at: point)
+            || (isPast(point) && point.y >= bounds.minY + reservedTop && point.y <= bounds.maxY - reservedBottom)
     }
 }
 
@@ -2597,7 +2603,8 @@ struct SidebarEdgeReveal: Equatable {
     /// menu from it, a button pressed). Off toward the page it goes back at once; out past the edge it waits as long
     /// as a quick move has to come back (`comeBack`), since the move that brought it out may still be running on out
     /// there when the slide ends, and the hand on its way back.
-    mutating func follow(at point: NSPoint, time: TimeInterval, in zone: SidebarEdgeZone, held: Bool) -> Bool {
+    mutating func follow(at point: NSPoint, time: TimeInterval, in zone: SidebarEdgeZone, held: Bool,
+                         leaveDelay: TimeInterval = Tokens.Motion.edgeHideDelay) -> Bool {
         guard case let .out(settles, leftAt) = phase else { return false }
         if time < settles || held || zone.keeps(at: point) {
             phase = .out(settles: settles, leftAt: nil)
@@ -2607,7 +2614,7 @@ struct SidebarEdgeReveal: Equatable {
             phase = .out(settles: settles, leftAt: time)
             return false
         }
-        return time - leftAt > (zone.isPast(point) ? Self.comeBack : Tokens.Motion.edgeHideDelay)
+        return time - leftAt > (zone.isPast(point) ? Self.comeBack : leaveDelay)
     }
 }
 
