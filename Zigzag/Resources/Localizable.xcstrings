@@ -6518,12 +6518,18 @@
       }
     },
     "Autohide" : {
-      "comment" : "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up.",
+      "comment" : "Address bar above the page: the bar hides as you scroll down and comes back as you scroll up.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动隐藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動隱藏"
           }
         }
       }
@@ -31314,6 +31320,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "后退、前进、重新载入和地址放在页面上方的栏里，不放在边栏中。选“自动隐藏”时，向下滚动会收起这一栏，向上滚动或把指针移到窗口顶部时会重新出现。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一頁、下一頁、重新載入和網址會放在網頁上方的一列，而不是側邊欄。選擇「自動隱藏」時，向下捲動會收起這一列，向上捲動或將指標移到視窗頂端時會再次出現。"
           }
         }
       }

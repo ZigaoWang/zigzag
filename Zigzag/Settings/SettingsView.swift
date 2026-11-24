@@ -1585,7 +1585,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         addressPlaceMenu.options = AddressBarPlace.allCases.map { place in
             switch place {
             case .off: DropdownButton.Option(title: String(localized: "Off", comment: "Address bar above the page: the address stays in the sidebar."))
-            case .autohide: DropdownButton.Option(title: String(localized: "Autohide", comment: "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up."))
+            case .autohide: DropdownButton.Option(title: String(localized: "Autohide", comment: "Address bar above the page: the bar hides as you scroll down and comes back as you scroll up."))
             case .always: DropdownButton.Option(title: String(localized: "Always", comment: "Address bar above the page: the bar stays above the page."))
             }
         }
