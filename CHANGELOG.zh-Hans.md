@@ -15,6 +15,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 按住 ⇧ 点按由网站自己打开的链接（比如 YouTube 和部分 Google 页面）时，也会和其他按住 ⇧ 点按的链接一样在 Zigzag Mini 里打开，不再变成弹出的标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#522](https://github.com/ZigaoWang/zigzag/pull/522))
 - 像 Property Mate 这样在后台打开一个最小化窗口来载入网页的扩展，不会再把窗口弹到最前面。和 Chrome 一样，窗口直接进入程序坞；不要求聚焦的窗口会在你的窗口后面打开，你的窗口仍在前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
+- 把登录状态存在标签页会话存储（sessionStorage）里的网站，比如 Microsoft 365，在 Zigzag 退出后重新打开上次的会话，或者为更新而重启后，你仍然是登录状态。睡眠中的标签页，或者退出时开着的标签页，会在网页载入前拿回它的会话存储，和 Chrome 一样。它保存在你的个人资料文件夹里，只有你能读取，私密窗口从不保存；清除这个网站的数据或关闭标签页时，它也会一起删除。“启动时”设为“打开新窗口”时会直接丢弃。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.5] - 2026-11-24
 

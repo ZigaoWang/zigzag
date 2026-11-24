@@ -8,6 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - ⇧-clicking a link that the site opens by itself, as on YouTube and parts of Google, opens it in Zigzag Mini like any other ⇧-clicked link, instead of as a pop-up tab. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#522](https://github.com/ZigaoWang/zigzag/pull/522))
 - Extensions that open a minimized window to load a page in the background, like Property Mate, no longer bring a window to the front. As in Chrome, it goes straight to the Dock, and one opened unfocused opens behind your window, which keeps focus. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#521](https://github.com/ZigaoWang/zigzag/issues/521))
+- Sites that keep your sign-in in a tab's session storage, like Microsoft 365, keep you signed in after Zigzag quits and opens again on your last session, or restarts for an update. A tab that was asleep, or open as Zigzag quit, gets its page's session storage back before the page loads, as in Chrome. It's kept in your profile's folder, readable only by you, never for a private window, and it goes when you clear the site's data or close the tab. With On launch set to Open a new window it's dropped. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.5] - 2026-11-24
 
