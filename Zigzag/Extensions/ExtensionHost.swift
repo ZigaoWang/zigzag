@@ -1633,9 +1633,15 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             completionHandler(nil, Self.noSpace)
             return
         }
-        let window = WindowManager.shared.newWindow(url: configuration.tabURLs.first, spaceID: space, showCommandBar: false)
+        let placement = Self.placement(minimized: configuration.windowState == .minimized, focused: configuration.shouldBeFocused)
+        let window = WindowManager.shared.newWindow(url: configuration.tabURLs.first, spaceID: space, showCommandBar: false, placement: placement)
         for url in configuration.tabURLs.dropFirst() { window.tabManager.newTab(url: url, spaceID: space, select: false) }
         completionHandler(window, nil)
+    }
+
+    /// Where `windows.create` puts a window, as Chrome does: `state: 'minimized'` in the Dock, `focused: false` behind.
+    static func placement(minimized: Bool, focused: Bool) -> WindowManager.Placement {
+        minimized ? .minimized : focused ? .front : .behind
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, openOptionsPageFor extensionContext: WKWebExtensionContext,

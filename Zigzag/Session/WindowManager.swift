@@ -223,9 +223,12 @@ final class WindowManager {
         return tabs || !Library.shared.allBookmarkIDs.isEmpty
     }()
 
+    /// How a new window comes on screen: in front and key, behind the front window, or straight into the Dock.
+    enum Placement { case front, behind, minimized }
+
     @discardableResult
     func newWindow(url: URL? = nil, spaceID: UUID? = nil, showCommandBar: Bool = true, isPrivate: Bool = false,
-                   by sender: Tab.LoadSender = .zigzag) -> BrowserWindowController {
+                   by sender: Tab.LoadSender = .zigzag, placement: Placement = .front) -> BrowserWindowController {
         // Opened for Zigzag Mini alone, the saved windows are still waiting: they come back first, so a new window never
         // saves over them, and a plain ⌘N is simply them.
         if sessionWaiting, !isPrivate, restoreSession(), url == nil, let restored = controllers.last(where: { !$0.tabManager.isPrivate }) {
@@ -239,6 +242,7 @@ final class WindowManager {
             manager.startSelection(from: front.tabManager)
         }
         var frame: NSRect?
+        let inFront = keyController?.window
         if let key = keyController, let window = key.window {
             // Cascade from the current window, like every Mac app. From full screen, from where it was before.
             let fullScreen = window.styleMask.contains(.fullScreen)
@@ -259,7 +263,7 @@ final class WindowManager {
             }
             return controller
         }
-        controller.showWindow(nil)
+        if placement == .front { controller.showWindow(nil) } else if let window = controller.window { Self.show(window, placement, front: inFront) }
         // Opened straight into a page (a link, the very first launch): onboarding is skipped for good, or the next
         // launch would show it instead of restoring this window and then save over it.
         if !isPrivate, Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
@@ -271,6 +275,16 @@ final class WindowManager {
             controller.commandBar.show(mode: .newTab)
         }
         return controller
+    }
+
+    /// Puts a new window on screen without taking focus from the window in front, or into the Dock.
+    static func show(_ window: NSWindow, _ placement: Placement, front: NSWindow?) {
+        switch placement {
+        case .front: window.makeKeyAndOrderFront(nil)
+        case .behind:
+            if let front, front.isVisible { window.order(.below, relativeTo: front.windowNumber) } else { window.orderBack(nil) }
+        case .minimized: window.miniaturize(nil)
+        }
     }
 
     /// Your windows plus AI apps' unseen one: for tabs wherever they are, never for your windows.

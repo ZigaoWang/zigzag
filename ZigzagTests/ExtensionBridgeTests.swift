@@ -1741,3 +1741,41 @@ struct BookmarkReorderTests {
         #expect(heard.allSatisfy { $0.profile == profile })
     }
 }
+
+/// Where a window an extension opens with `windows.create` goes (#521).
+@MainActor
+struct ExtensionWindowTests {
+    private func window(at x: CGFloat) -> NSWindow {
+        let window = NSWindow(contentRect: NSRect(x: x, y: 200, width: 400, height: 300),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        return window
+    }
+
+    @Test func aMinimizedOrUnfocusedWindowIsPlacedAsInChrome() {
+        #expect(ExtensionHost.placement(minimized: true, focused: false) == .minimized)
+        #expect(ExtensionHost.placement(minimized: true, focused: true) == .minimized)
+        #expect(ExtensionHost.placement(minimized: false, focused: false) == .behind)
+        #expect(ExtensionHost.placement(minimized: false, focused: true) == .front)
+    }
+
+    @Test func aWindowOpenedBehindNeverTakesFocusOrTheFront() {
+        let front = window(at: -6000), opened = window(at: -5000)
+        defer { front.close(); opened.close() }
+        front.orderFront(nil)
+        WindowManager.show(opened, .behind, front: front)
+        #expect(opened.isVisible)
+        #expect(!opened.isKeyWindow)
+        let order = NSApp.orderedWindows
+        #expect((order.firstIndex(of: front) ?? .max) < (order.firstIndex(of: opened) ?? .max))
+    }
+
+    @Test func aMinimizedWindowGoesToTheDockWithoutFocus() async {
+        let opened = window(at: -5000)
+        defer { opened.close() }
+        WindowManager.show(opened, .minimized, front: nil)
+        for _ in 0..<50 where !opened.isMiniaturized { try? await Task.sleep(for: .milliseconds(20)) }
+        #expect(opened.isMiniaturized)
+        #expect(!opened.isKeyWindow)
+    }
+}

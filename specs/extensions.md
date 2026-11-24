@@ -103,3 +103,11 @@
   Test: ExtensionScriptTests.aTabMessageNothingHearsFails
 - A content script's or page's message that none of the extension's pages listens for → fails the same way.
   Test: ExtensionScriptTests.aRuntimeMessageNothingHearsFails
+
+## Windows
+- An extension's `windows.create` with `state: 'minimized'` → the window goes straight to the Dock, never shown in front or focused, as in Chrome.
+  Test: ExtensionWindowTests.aMinimizedWindowGoesToTheDockWithoutFocus
+- One with `focused: false` → opens behind the window in front, which keeps focus.
+  Test: ExtensionWindowTests.aWindowOpenedBehindNeverTakesFocusOrTheFront
+- The window state and focus asked for → placed as Chrome places them; a minimized window stays minimized whatever `focused` says.
+  Test: ExtensionWindowTests.aMinimizedOrUnfocusedWindowIsPlacedAsInChrome
