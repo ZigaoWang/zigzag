@@ -1444,6 +1444,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
                                  control: importButton))
+        let exportButton = PillButton(title: String(localized: "Export…", comment: "Button in Settings › General that opens the Export Your Data sheet."))
+        exportButton.onClick = { [weak self] _ in
+            guard let controller = (self?.window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController else { return }
+            DataExport.show(in: controller)
+        }
+        let exportRow = FormRow(title: String(localized: "Export your data", comment: "A setting in Settings › General."),
+                                detail: String(localized: "Your spaces and pinned tabs as a bookmarks file for any browser, and a Zigzag backup.", comment: "Explanation under “Export your data” in Settings › General."),
+                                control: exportButton)
+        exportRow.keywords = String(localized: "export backup save bookmarks html restore move leave", comment: "Words that find the Export your data setting with Find a setting. Not shown.")
+        generalGroup.add(exportRow)
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                               control: quitToggle)

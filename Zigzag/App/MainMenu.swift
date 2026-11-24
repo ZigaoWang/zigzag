@@ -124,6 +124,7 @@ enum MainMenu {
             item(String(localized: "Open File…", comment: "File menu item."), #selector(C.openDocument(_:)), "o"),
             .separator(),
             item(String(localized: "Import from Another Browser…", comment: "File menu item."), #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
+            item(DataExport.title, #selector(AppDelegate.exportData(_:)), ""),
             .separator(),
             item(String(localized: "Suspend Page", comment: "File menu item: puts the tab's page to sleep; it loads again when you click the tab."), #selector(C.suspendPage(_:)), ""),
             // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.

@@ -572,6 +572,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func importFromBrowser(_ sender: Any?) { ImportWindowController.show() }
 
+    @objc func exportData(_ sender: Any?) { frontBrowserWindow().map { DataExport.show(in: $0) } }
+
     @objc func showPasswords(_ sender: Any?) { PasswordsWindowController.show() }
 
     /// Window › Keep on Top, for the window in front.
