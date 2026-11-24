@@ -70,6 +70,10 @@
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.
   Test: UnloadedTabTests.aSleepingTabClickedLoadsAgainWhereItWas
+- A sleeping tab woken → its page has its sessionStorage back, and only that first page.
+  Test: UnloadedTabTests.aWokenTabKeepsItsSessionStorage
+- A sleeping tab's sessionStorage with an item too big to carry → the rest of it is still kept.
+  Test: UnloadedTabTests.aBigItemDoesntCostTheRestOfTheSession
 - A sleeping tab woken, or one restored after a relaunch → its page plays nothing with sound until you use it.
   Test: UnloadedTabTests.aWokenOrRestoredPageStartsNoSoundOnItsOwn
 - A sleeping tab woken, or one restored after a relaunch → its page is the site's page now, not a copy kept from before.

@@ -165,6 +165,190 @@ import WebKit
         #expect(await until { sleeper.webView?.url == second && sleeper.canGoBack })
     }
 
+    /// A sleeping tab you click keeps its page's sessionStorage, where a site may keep you signed in (#502), and only
+    /// that first page gets it back: the script that puts it back is gone once it has committed.
+    @Test func aWokenTabKeepsItsSessionStorage() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let (manager, sleeper, other, controller) = try sessionTabs(on: page)
+        defer { manager.invalidate(); controller.window?.close() }
+        #expect(await until { sleeper.webView?.title == "v1" && sleeper.webView?.isLoading == false })
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep })
+        #expect(sleeper.pageState?.session?.items == [["k", "v1"]])
+        manager.select(sleeper)
+        // Asked for again (the server is on "v2" or later), it still has what the first load kept.
+        #expect(await until { server.served >= 2 && sleeper.webView?.isLoading == false && sleeper.webView?.title == "v1" })
+        let scripts = sleeper.webView?.configuration.userContentController.userScripts ?? []
+        #expect(!scripts.contains { $0.source.hasPrefix(PageState.sessionMark) })
+        #expect(sleeper.pageState?.session == nil)
+        // The next load starts as any page would: a cleared session stays cleared.
+        let before = server.served
+        sleeper.webView?.evaluateJavaScript("sessionStorage.clear(); location.reload()", completionHandler: nil)
+        #expect(await until { server.served > before && sleeper.webView?.isLoading == false
+            && sleeper.webView?.title?.hasPrefix("v") == true && sleeper.webView?.title != "v1" })
+    }
+
+    /// The same for a page that arrives after its headers: it's put back once the page runs, not lost at the commit.
+    @Test func aWokenSlowPageKeepsItsSessionStorage() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("slowsession")
+        let (manager, sleeper, other, controller) = try sessionTabs(on: page)
+        defer { manager.invalidate(); controller.window?.close() }
+        #expect(await until { sleeper.webView?.title == "v1" && sleeper.webView?.isLoading == false })
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep })
+        manager.select(sleeper)
+        #expect(await until { server.served >= 2 && sleeper.webView?.isLoading == false && sleeper.webView?.title?.isEmpty == false })
+        #expect(sleeper.webView?.title == "v1")
+        let scripts = sleeper.webView?.configuration.userContentController.userScripts ?? []
+        #expect(!scripts.contains { $0.source.hasPrefix(PageState.sessionMark) })
+    }
+
+    /// A tab that stays awake when asked to sleep (it's shown again) keeps none of its sessionStorage.
+    @Test func aTabThatStaysAwakeKeepsNoSession() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let (manager, sleeper, other, controller) = try sessionTabs(on: page)
+        defer { manager.invalidate(); controller.window?.close() }
+        #expect(await until { sleeper.webView?.title == "v1" && sleeper.webView?.isLoading == false })
+        manager.select(other)
+        var refused: [Tab.StaysAwake] = []
+        sleeper.suspend(because: "test", chosen: true) { refused.append($0) }
+        manager.select(sleeper)
+        try? await Task.sleep(for: .milliseconds(500))
+        #expect(!sleeper.isAsleep)
+        #expect(sleeper.pageState?.session == nil)
+    }
+
+    /// A site's data cleared while its tab sleeps: waking it doesn't bring the sessionStorage back.
+    @Test func clearingASitesDataForgetsWhatItsSleepingTabKept() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let (manager, sleeper, other, controller) = try sessionTabs(on: page)
+        defer { manager.invalidate(); controller.window?.close() }
+        #expect(await until { sleeper.webView?.title == "v1" && sleeper.webView?.isLoading == false })
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep && sleeper.pageState?.session != nil })
+        let store = try #require(sleeper.privateStore ?? sleeper.profile.storeIfMade)
+        sleeper.forgetSession(in: store, site: "example.com")
+        #expect(sleeper.pageState?.session != nil, "another site's data")
+        sleeper.forgetSession(in: store, site: "128.0.0.1")
+        #expect(sleeper.pageState?.session != nil, "another address")
+        sleeper.forgetSession(in: store, keeping: ["127.0.0.1"])
+        #expect(sleeper.pageState?.session != nil, "a site kept")
+        sleeper.forgetSession(in: store, site: "127.0.0.1")
+        #expect(sleeper.pageState?.session == nil)
+        manager.select(sleeper)
+        #expect(await until { sleeper.webView?.isLoading == false && sleeper.webView?.title?.hasPrefix("v") == true
+            && sleeper.webView?.title != "v1" })
+    }
+
+    /// The script puts the items back before the page's own scripts run, on its own origin only, and never over a key
+    /// the page has.
+    @Test func theSessionRestorerKeepsToItsOriginAndTheKeysThere() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let base = try await server.start()
+        let page = base.appendingPathComponent("session")
+        let origin = String(base.absoluteString.dropLast())
+        let quoted = "it's \"quoted\" </script> \u{2028}"
+        func title(restoring session: PageState.Session, presetting: String? = nil) async throws -> (String?, Any?) {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            if let presetting {
+                configuration.userContentController.addUserScript(WKUserScript(source: presetting, injectionTime: .atDocumentStart,
+                                                                               forMainFrameOnly: true, in: .page))
+            }
+            configuration.userContentController.addUserScript(try #require(PageState.sessionRestorer(session)))
+            let heard = Heard()
+            configuration.userContentController.add(heard, contentWorld: .defaultClient, name: PageState.sessionMessage)
+            let webView = WKWebView(frame: .zero, configuration: configuration)
+            webView.load(URLRequest(url: page))
+            #expect(await until { webView.title?.isEmpty == false && !webView.isLoading })
+            let q = try? await webView.evaluateJavaScript("sessionStorage.getItem('q')")
+            // It says it ran only on its own origin.
+            #expect(heard.count == (session.origin == origin ? 1 : 0))
+            return (webView.title, q)
+        }
+        let mine = PageState.Session(origin: origin, items: [["k", "kept"], ["q", quoted]])
+        let (restored, q) = try await title(restoring: mine)
+        #expect(restored == "kept")
+        #expect(q as? String == quoted)
+        let (elsewhere, _) = try await title(restoring: PageState.Session(origin: "https://a.example", items: [["k", "kept"]]))
+        #expect(elsewhere?.hasPrefix("v") == true)
+        let (own, _) = try await title(restoring: mine, presetting: "sessionStorage.setItem('k', 'the page')")
+        #expect(own == "the page")
+    }
+
+    /// Sites are matched by registrable domain, as WebKit keeps their data.
+    @Test func sitesAreMatchedAsWebKitKeepsTheirData() {
+        #expect(SiteDataListing.site(of: "accounts.example.com") == SiteDataListing.site(of: "app.example.com"))
+        #expect(SiteDataListing.site(of: "a.example.com") != SiteDataListing.site(of: "example.org"))
+    }
+
+    /// What a page's reader gives back: its sessionStorage only with an origin and something in it.
+    @Test func aPageStateReadsItsSession() {
+        let url = URL(string: "https://a.example/page")
+        let read = PageState(["x": 0.0, "y": 0.0, "session": ["origin": "https://a.example", "items": [["k", "v"], ["bad"]]]], url: url)
+        #expect(read?.session == PageState.Session(origin: "https://a.example", items: [["k", "v"]]))
+        #expect(read?.withoutSession.session == nil)
+        #expect(read?.withoutSession.url == read?.url)
+        let empty = PageState(["x": 0.0, "y": 0.0, "session": ["origin": "https://a.example", "items": [[String]]()]], url: url)
+        #expect(empty?.session == nil)
+        #expect(PageState.reader.contains("sessionStorage") == false, "read only as a tab goes to sleep")
+        #expect(PageState.sleepReader.contains("__darkreader__"))
+    }
+
+    /// A session with one item too big to carry still keeps the rest: a site's sign-in sits beside a big cache.
+    @Test func aBigItemDoesntCostTheRestOfTheSession() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("session")
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.load(URLRequest(url: page))
+        #expect(await until { webView.title == "v1" && !webView.isLoading })
+        _ = try await webView.evaluateJavaScript("""
+        sessionStorage.setItem('big', 'x'.repeat(300000));
+        sessionStorage.setItem('half', 'y'.repeat(150000));
+        sessionStorage.setItem('more', 'z'.repeat(150000));
+        sessionStorage.setItem('token', 't');
+        true
+        """)
+        let read = try await webView.evaluateJavaScript(PageState.sleepReader, in: nil, contentWorld: .defaultClient)
+        let session = try #require(PageState(try #require(read as? [String: Any]), url: page)?.session)
+        let keys = Set(session.items.map { $0[0] })
+        #expect(keys.isSuperset(of: ["k", "token"]))
+        #expect(!keys.contains("big"))
+        #expect(keys.intersection(["half", "more"]).count == 1, "the two halves don't both fit")
+        #expect(session.items.reduce(0) { $0 + $1[0].count + $1[1].count } <= 250000)
+    }
+
+    private final class Heard: NSObject, WKScriptMessageHandler {
+        var count = 0
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) { count += 1 }
+    }
+
+    private func sessionTabs(on page: URL) throws -> (TabManager, Tab, Tab, BrowserWindowController) {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        let other = Tab(url: nil, title: "Other", spaceID: space)
+        let sleeper = Tab(url: page, title: "Session", spaceID: space)
+        manager.adopt([other, sleeper], in: space)
+        manager.select(sleeper)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        return (manager, sleeper, other, controller)
+    }
+
     /// A page you open may start sound on its own; the same page woken from sleep, or restored after a relaunch,
     /// waits for you (#493). Like YouTube, the page tries again once it's shown. The sound is silence.
     @Test func aWokenOrRestoredPageStartsNoSoundOnItsOwn() async throws {
@@ -272,12 +456,14 @@ import WebKit
 /// `/page` is titled with how many times it was asked for ("v1", "v2"); WebKit keeps it in its cache, stale at once.
 nonisolated private final class VersionServer: @unchecked Sendable {
     let listener: NWListener
-    private let served = OSAllocatedUnfairLock(initialState: 0)
+    private let count = OSAllocatedUnfairLock(initialState: 0)
+    /// How many pages it has served.
+    var served: Int { count.withLock { $0 } }
     private let queue = DispatchQueue(label: "zigzag.tests.version-server")
 
     init() throws {
         listener = try NWListener(using: .tcp, on: .any)
-        let queue = queue, served = served
+        let queue = queue, served = count
         listener.newConnectionHandler = { connection in
             connection.start(queue: queue)
             Self.receive(connection, bytes: Data(), served: served)
@@ -319,9 +505,23 @@ nonisolated private final class VersionServer: @unchecked Sendable {
                 let n = served.withLock { $0 += 1; return $0 }
                 body = Data("<title>v\(n)</title><p>v\(n)".utf8)
                 head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: max-age=0\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            case "/session", "/slowsession":
+                // Titled with what its sessionStorage kept: the version first served into it.
+                let n = served.withLock { $0 += 1; return $0 }
+                body = Data("<title></title><script>sessionStorage.k ||= 'v\(n)'; document.title = sessionStorage.k;</script>".utf8)
+                head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: no-store\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
             default:
                 body = Data("not found".utf8)
                 head = "HTTP/1.1 404 Not Found\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            }
+            if path == "/slowsession" {
+                // Headers first, the page later, as a page streamed from a busy site comes: WebKit commits before it runs.
+                connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) {
+                        connection.send(content: body, completion: .contentProcessed { _ in connection.cancel() })
+                    }
+                })
+                return
             }
             connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
         }

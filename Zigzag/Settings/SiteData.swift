@@ -172,6 +172,7 @@ final class WebKitSiteData: SiteDataSource {
         for name in Set(names.map(SiteDataListing.site(of:))) {
             DarkSeen.forget(in: store, site: name)
             WebsiteData.forgetConnections(in: store, site: name)
+            Tab.forgetSessions(in: store, site: name)
         }
     }
 
@@ -181,6 +182,7 @@ final class WebKitSiteData: SiteDataSource {
         SessionCookies.cleared(site: nil, in: store)
         DarkSeen.forget(in: store)
         WebsiteData.forgetConnections(in: store)
+        Tab.forgetSessions(in: store)
     }
 }
 

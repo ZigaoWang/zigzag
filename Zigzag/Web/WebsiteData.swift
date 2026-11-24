@@ -30,6 +30,7 @@ enum WebsiteData {
     private static func clearStore(_ kind: Kind, site: String?, keeping kept: Set<String>, in store: WKWebsiteDataStore) async {
         if kind == .cookies, site == nil, !kept.isEmpty {
             let removed = await KeptCookies.clear(kind.types, keeping: kept, in: store) ?? []
+            Tab.forgetSessions(in: store, keeping: kept)
             for name in Set(removed.compactMap(KeptCookies.site(ofHost:))) {
                 DarkSeen.forget(in: store, site: name)
                 forgetConnections(in: store, site: name)
@@ -38,8 +39,12 @@ enum WebsiteData {
         }
         // Dark pages' sites seen dark name the sites they were seen on: they go with either.
         DarkSeen.forget(in: store, site: site)
-        // Clearing cookies also clears its trusted certificate exceptions and HSTS state.
-        if kind == .cookies { forgetConnections(in: store, site: site) }
+        // Clearing cookies also clears its trusted certificate exceptions and HSTS state, and what sleeping tabs keep
+        // of its sessionStorage.
+        if kind == .cookies {
+            forgetConnections(in: store, site: site)
+            Tab.forgetSessions(in: store, site: site)
+        }
         guard let site else {
             await store.removeData(ofTypes: kind.types, modifiedSince: .distantPast)
             return
