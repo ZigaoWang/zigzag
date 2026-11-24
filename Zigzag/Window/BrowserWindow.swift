@@ -217,7 +217,10 @@ final class BrowserWindow: NSWindow {
             sidebarHasTheClick = false
         }
         if dropsSpentClick(event) { return }
-        if event.type == .leftMouseDown { notePress(at: event.locationInWindow) }
+        if event.type == .leftMouseDown {
+            lastLeftMouseDown = ProcessInfo.processInfo.systemUptime
+            notePress(at: event.locationInWindow)
+        }
         if let eventInterceptor, eventInterceptor(event) { return }
         if let side = SideButton(event.type, button: event.buttonNumber) {
             if let action = side.action { windowController?.tryToPerform(action, with: nil) }
@@ -380,6 +383,8 @@ final class BrowserWindow: NSWindow {
     private weak var pressTarget: NSView?
     /// When a press last went to one of them that way, so a tap there isn't clicked twice.
     private var lastTitlebarPress: TimeInterval = 0
+    /// When the window last got a left mouse-down, so a finger's tap can tell whether AppKit's click came.
+    private var lastLeftMouseDown: TimeInterval = 0
     /// A finger's last tap on the strip's empty space, for a double tap.
     private var lastTitlebarTap: (time: TimeInterval, point: NSPoint)?
 
@@ -715,10 +720,28 @@ extension BrowserWindow: TouchPress.Handling {
             }
             return
         }
+        if lastLeftMouseDown < time, clickWithoutItsClick(event) { return }
         guard lastTitlebarPress < time, let target = control(at: point) as? InteractiveView, target.isEnabled,
               let frame = contentView?.superview, let hit = frame.hitTest(point), !hit.isDescendant(of: target) else { return }
         target.onClick?(event)
         // Clicked from here, there's no click of its own to come.
         spentTap.disarm()
+    }
+
+    /// A tap AppKit made no click from: the drawn control under it gets its click all the same, and a late click is dropped.
+    private func clickWithoutItsClick(_ event: NSEvent) -> Bool {
+        let point = event.locationInWindow
+        guard let content = contentView, var view = content.hitTest(content.superview?.convert(point, from: nil) ?? point) else { return false }
+        while !(view is InteractiveView) {
+            guard !(view is WKWebView), let parent = view.superview, parent !== content else { return false }
+            view = parent
+        }
+        guard let target = view as? InteractiveView, target.isEnabled, let onClick = target.onClick else { return false }
+        TouchLog.note("tap with no click: clicked \(type(of: target))")
+        // Only a late click is dropped: the next tap, even on the row next to it, still counts.
+        spentAt = ProcessInfo.processInfo.systemUptime
+        spentClick.arm(at: [point])
+        onClick(event)
+        return true
     }
 }

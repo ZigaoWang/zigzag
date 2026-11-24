@@ -191,6 +191,8 @@ final class TouchWatch: NSGestureRecognizer {
     var onDown: ((NSPoint) -> Void)?
     /// A tap, in window coordinates, once it lifted and the click AppKit makes from it has gone through.
     var onTap: ((NSPoint) -> Void)?
+    /// Debug builds note why a finger wasn't a tap: the window's own watch only.
+    var logsMisses = false
     private var start: (point: NSPoint, time: TimeInterval)?
     private var last = NSPoint.zero
 
@@ -220,10 +222,16 @@ final class TouchWatch: NSGestureRecognizer {
     override func touchesMoved(with event: NSEvent) {
         guard let start, let point = windowPoint(event, .moved) else { return }
         last = point
-        if !TouchGestures.isTap(from: start.point, to: point, duration: 0) { state = .failed }
+        if !TouchGestures.isTap(from: start.point, to: point, duration: 0), state == .possible {
+            if logsMisses { TouchLog.note("not a tap: moved \(Int(hypot(point.x - start.point.x, point.y - start.point.y))) pt") }
+            state = .failed
+        }
     }
 
     override func touchesEnded(with event: NSEvent) {
+        if let start, logsMisses, event.timestamp - start.time >= TouchGestures.tapDuration {
+            TouchLog.note("not a tap: held \(Int((event.timestamp - start.time) * 1000)) ms")
+        }
         if let start, TouchGestures.isTap(from: start.point, to: windowPoint(event, .ended) ?? last, duration: event.timestamp - start.time) {
             let point = start.point
             DispatchQueue.main.asyncAfter(deadline: .now() + TouchGestures.afterClick) { [weak self] in
@@ -233,7 +241,10 @@ final class TouchWatch: NSGestureRecognizer {
         state = .failed
     }
 
-    override func touchesCancelled(with event: NSEvent) { state = .failed }
+    override func touchesCancelled(with event: NSEvent) {
+        if start != nil, logsMisses { TouchLog.note("not a tap: cancelled") }
+        state = .failed
+    }
 
     override func reset() {
         super.reset()
@@ -279,6 +290,7 @@ enum TouchPress {
         guard TouchGestures.isAvailable, !watched.contains(view) else { return }
         watched.add(view)
         let watch = TouchWatch()
+        watch.logsMisses = true
         var downAt: TimeInterval = 0
         watch.onDown = { [weak view] point in
             downAt = ProcessInfo.processInfo.systemUptime
