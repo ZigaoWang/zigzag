@@ -12,11 +12,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-### 修复
-- 按住 ⇧ 点按由网站自己打开的链接（比如 YouTube 和部分 Google 页面）时，也会和其他按住 ⇧ 点按的链接一样在 Zigzag Mini 里打开，不再变成弹出的标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#522](https://github.com/ZigaoWang/zigzag/pull/522))
-- 像 Property Mate 这样在后台打开一个最小化窗口来载入网页的扩展，不会再把窗口弹到最前面。和 Chrome 一样，窗口直接进入程序坞；不要求聚焦的窗口会在你的窗口后面打开，你的窗口仍在前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
-- 把登录状态存在标签页会话存储（sessionStorage）里的网站，比如 Microsoft 365，在 Zigzag 退出后重新打开上次的会话，或者为更新而重启后，你仍然是登录状态。睡眠中的标签页，或者退出时开着的标签页，会在网页载入前拿回它的会话存储，和 Chrome 一样。它保存在你的个人资料文件夹里，只有你能读取，私密窗口从不保存；清除这个网站的数据或关闭标签页时，它也会一起删除。“启动时”设为“打开新窗口”时会直接丢弃。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-
 ## [0.9.5] - 2026-11-24
 
 可以导出你的数据，随时带走一切；实时文件夹；繁体中文界面；视频全屏留在浏览器里；地址栏可以自动隐藏；从屏幕边缘拉出边栏；Zigzag 在每个网页里做的事更少，滚动更流畅；网页按屏幕完整的 120 Hz 绘制；触控屏用起来更顺手；导入 Dia 时带上固定标签页；按住后退或前进可以选历史网页；重启后登录和 YouTube 影院模式都还在；设置里可以选密码管理器扩展。
@@ -56,6 +51,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 滑动后退或前进松手时，网页不会再先弹回原位才离开，而是顺着滑动方向再走一点、稍微变暗，然后下一个网页直接出现在原处，不用看箭头也知道滑动生效了。没滑够的话网页照样弹回去；开了“减弱动态效果”时网页不动。([#508](https://github.com/ZigaoWang/zigzag/issues/508))
 - 在“设置 › 密码 › 密码管理器”里选中的密码管理器扩展，就算 Zigzag 不认识它的名字（比如 Litewarden），现在也算数：Zigzag 不再提示保存和填充密码，登录栏里不显示钥匙图标，通行密钥也交给它。像 Bitwarden、1Password 在 Chrome 里那样关掉浏览器自带密码保存的扩展，也会列在那里并同样算数，直到它把设置改回去，或者你停用、移除它。([#513](https://github.com/ZigaoWang/zigzag/issues/513))
 - 你允许使用位置的网站现在能拿到你的位置。以前 macOS 从不询问 Zigzag 能否使用你的位置，“系统设置 › 隐私与安全性 › 定位服务”里也没有 Zigzag，所以你允许的网站（比如 Google 地图）始终找不到你在哪里。现在你第一次允许网站时，macOS 会询问一次。如果整台 Mac 的定位服务已关闭，或你拒绝了 Zigzag，网站会马上收到拒绝，而不是一直等下去。
+- 按住 ⇧ 点按由网站自己打开的链接（比如 YouTube 和部分 Google 页面）时，也会和其他按住 ⇧ 点按的链接一样在 Zigzag Mini 里打开，不再变成弹出的标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#522](https://github.com/ZigaoWang/zigzag/pull/522))
+- 像 Property Mate 这样在后台打开一个最小化窗口来载入网页的扩展，不会再把窗口弹到最前面。和 Chrome 一样，窗口直接进入程序坞；不要求聚焦的窗口会在你的窗口后面打开，你的窗口仍在前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
+- 把登录状态存在标签页会话存储（sessionStorage）里的网站，比如 Microsoft 365，在 Zigzag 退出后重新打开上次的会话，或者为更新而重启后，你仍然是登录状态。睡眠中的标签页，或者退出时开着的标签页，会在网页载入前拿回它的会话存储，和 Chrome 一样。它保存在你的个人资料文件夹里，只有你能读取，私密窗口从不保存；清除这个网站的数据或关闭标签页时，它也会一起删除。“启动时”设为“打开新窗口”时会直接丢弃。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.4] - 2026-11-24
 
