@@ -1,41 +1,53 @@
 # Address bar above the page
 
-## The three choices
-- Settings › Appearance › Address bar above the page › Off → the address stays in the sidebar; there is no bar above the page.
+## The choices
+- Settings › Appearance › Address bar above the page › Off → back, forward, reload and the address stay in the sidebar, with no bar above the page.
   Test: TopBarTests.theThreeAddressBarChoicesPlaceTheBar
-- Settings › Appearance › Address bar above the page › Autohide → the bar above the page follows the page and can go away.
+- Address bar above the page › Always → they're in a bar above the page that's always there.
   Test: TopBarTests.theThreeAddressBarChoicesPlaceTheBar
-- Settings › Appearance › Address bar above the page › Always → the bar stays above the page.
+- Address bar above the page › Autohide → the same bar, there when a page opens, that goes away as you read down.
   Test: TopBarTests.theThreeAddressBarChoicesPlaceTheBar
-- An older Zigzag's "Address bar above the page" switch turned on → Always; the switch is still written for an older Zigzag.
+- The old Address bar above the page switch turned on → Always; the switch is still written, so an older Zigzag keeps the bar.
   Test: TopBarTests.theOldSwitchIsAlwaysAndStillWrittenForAnOlderZigzag
+- Autohide turned off with the bar away → it comes straight back.
+  Test: TopBarTests.turningAutohideOffBringsTheBarBack
 
-## Following the page
-- A scroll down moves the bar from the page's first point, with no dead zone, and takes its room out of the page.
+## Autohide
+- Scroll down → the bar moves up with the page from its first point and the page takes its room; once it's out, the page scrolls as usual.
   Test: TopBarTests.autohideIsBoundToThePagesPosition
-- Once a gesture has taken the bar fully out, that gesture cannot bring it back; a new gesture can.
+- While the bar moves, the content moves with your fingers once, not twice.
+  Test: TopBarTests.thePagesOwnMovementMovesTheBar
+- Scroll back up in the same swipe, wheel burst or scroll bar drag that took the bar fully out → it stays out; the next one brings it back as you scroll up.
   Test: TopBarTests.aGestureThatClosedTheBarDoesNotReopenIt
-- The page at its very top brings the bar back, even after a locked close; a page scrolling by itself does not move it.
-  Test: TopBarTests.theVeryTopAlwaysBringsTheBarBack
-- A scrolling key after a trackpad close is a new gesture and brings the bar back.
+  Test: TopBarTests.aScrollBarDragThatClosedTheBarDoesNotReopenIt
+- Scroll with the arrow keys, Space, Page Up or Down after a swipe took it out → a new gesture: scrolling up brings the bar back.
   Test: TopBarTests.aKeyScrollAfterATrackpadCloseBringsTheBarBack
-- A new main-frame document starts with the bar down; a same-document history change does not reset it.
-  Test: TopBarTests.aNewDocumentResetsTheBarButANavigationChangeDoesNot
-- Typing in a field holds the bar where it is, away or shown.
+- Scroll up to the page's very top, or scroll up with the page already there → the bar is back.
+  Test: TopBarTests.theVeryTopAlwaysBringsTheBarBack
+  Test: TopBarTests.aScrollUpAtThePagesTopBringsTheBarBack
+- The page scrolls by itself (a chat, a feed) → the bar stays where it is.
+  Test: TopBarTests.theVeryTopAlwaysBringsTheBarBack
+- Type in a field on the page → the bar stays where it is, there or away.
   Test: TopBarTests.typingInAFieldHoldsTheBarWhereItIs
-- A touch in the top band, or a pull down at the page's top, brings the bar back.
-  Test: TopBarTests.aTouchInTheTopBandOrAPullAtThePageTopBringsTheBarBack
-
-## The window around it
-- With the sidebar docked on the left, the window buttons stay in its row while the bar travels.
-  Test: TopBarTests.aDockedSidebarKeepsTheLightsInItsRowWhileTheBarTravels
-- In full screen with the sidebar hidden and the bar away, the lights get a backing.
-  Test: TrafficLightTests.fullScreenBacksTheLightsWhenTheBarIsAway
-- In full screen the pointer at the screen's top brings down the menu bar, not the address bar too.
+- Move the pointer to the window's top → the bar slides back. In full screen the screen's top is the menu bar's, so the bar stays away.
+  Test: TopBarTests.thePointerAtTheTopBringsTheBarBack
   Test: TopBarTests.fullScreenGivesTheScreenTopToTheMenuBar
+- ⌘L → the bar is back with the address to edit, and stays while you do.
+  Test: TopBarTests.openLocationBringsTheBarBack
+- A finger on a touch display where the bar was → it slides back, and that tap does nothing else.
+  Test: TopBarTests.aFingerWhereTheBarWentBringsItBack
+- Open a new page → the bar is there; a page changing its address in place doesn't bring it back.
+  Test: TopBarTests.aNewDocumentResetsTheBarButANavigationChangeDoesNot
+- Switch tabs → the bar is there.
+  Test: TopBarTests.switchingTabsBringsTheBarBack
+- In split view → each page's bar or strip goes with that page's own scroll, the others stay.
+  Test: TopBarTests.aSplitScrollHidesOnlyItsOwnBar
+  Test: TopBarTests.splitAutohideMovesOnlyItsOwnPane
 
-## Scrolling
-- The page's scroll reports are coalesced to one per display frame, keeping the last place.
-  Test: TopBarTests.theScrollScriptKeepsOneReportPerFrame
-- The bar's travel is taken out of the page's scroll, so the content moves once.
-  Test: TopBarTests.theBarsTravelTakesItsPartOfThePageScroll
+## The window buttons
+- Sidebar docked on the left → they stay in its top row while the bar goes and comes back.
+  Test: TopBarTests.aDockedSidebarKeepsTheLightsInItsRowWhileTheBarTravels
+- Sidebar hidden, or on the right → they ride in the bar as it goes, and go with it; nothing stays over the page.
+  Test: TopBarTests.theLightsGoWithAnAutohideBar
+- Full screen with the sidebar hidden and the bar away → they come down with the menu bar on their own backing.
+  Test: TrafficLightTests.fullScreenBacksTheLightsWhenTheBarIsAway
