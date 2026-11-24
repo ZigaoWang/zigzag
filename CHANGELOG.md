@@ -5,6 +5,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- On a touch display, the sidebar toggle no longer sits over the page while the sidebar is hidden. Tap the top corner where the traffic lights live and they show with the toggle, in one title bar piece that's light or dark like the top of the page, then fade after a few seconds or when you tap the page. That first tap only shows them, so it never clicks a link underneath. They also show for a moment right after you hide the sidebar by touch. In a split view the toggle is a button in the top pane's strip, next to Back. A finger now hits it anywhere close by.
+- An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate.
+
 ## [0.9.4] - 2026-11-24
 
 Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, an element or the page, Handoff to your iPhone, iPad and other Macs, ⌘Z for split changes, a sidebar width every window keeps, typed and held zoom, Zigzag Mini for shift-clicked links in place of Peek, a choice to start fresh on launch, new glass colors for spaces, Always and Never Translate, a calmer Settings, touch on a touch display, and Your Zigzag Card.
