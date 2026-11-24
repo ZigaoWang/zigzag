@@ -74,6 +74,8 @@ final class SwipeNavigator {
     /// Returns true when it took the event, so the page doesn't also scroll with it. `room`, from something
     /// covering the page (a zoomed-in PDF), is which way it can still scroll sideways, in place of asking the page.
     func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
+        // Mid-scroll with no swipe under way: nothing to decide, so no settings are read for it.
+        if state == .idle || state == .ignoring, Self.isMidGesture(event.phase) { return false }
         // A video in full screen keeps every swipe: going back there would leave the page from under it.
         guard let webView, event.hasPreciseScrollingDeltas, NSEvent.isSwipeTrackingFromScrollEventsEnabled, Self.isOn,
               webView.fullscreenState == .notInFullscreen else { return false }
@@ -153,6 +155,11 @@ final class SwipeNavigator {
         default:
             return state == .tracking
         }
+    }
+
+    /// A scroll that neither begins nor ends a gesture: a step, the glide after it, or a wheel's turn.
+    nonisolated static func isMidGesture(_ phase: NSEvent.Phase) -> Bool {
+        phase != .began && phase != .ended && phase != .cancelled
     }
 
     /// The page's answer for one of this gesture's sideways scrolls, from the frame it landed in: whether it keeps

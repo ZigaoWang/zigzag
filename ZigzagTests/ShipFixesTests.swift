@@ -250,6 +250,17 @@ struct BookmarkFolderTests {
                              waited: waited, overFrame: overFrame)
     }
 
+    @Test func onlyTheStartAndEndOfAScrollCanStartOrEndASwipe() {
+        #expect(!SwipeNavigator.isMidGesture(.began))
+        #expect(!SwipeNavigator.isMidGesture(.ended))
+        #expect(!SwipeNavigator.isMidGesture(.cancelled))
+        #expect(SwipeNavigator.isMidGesture(.changed))
+        #expect(SwipeNavigator.isMidGesture(.stationary))
+        #expect(SwipeNavigator.isMidGesture(.mayBegin))
+        // A wheel's turn and the glide after a gesture carry no phase.
+        #expect(SwipeNavigator.isMidGesture([]))
+    }
+
     @Test func swipeGoesBackOnAPlainPage() {
         // A scroll toward the left edge goes back (fingers to the right, with natural scrolling), once it has gone
         // far enough to tell.
