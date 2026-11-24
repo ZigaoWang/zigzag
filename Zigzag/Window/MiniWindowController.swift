@@ -92,8 +92,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var isTransitioningWithParent = false
     private var dockedParentObservers: [NSObjectProtocol] = []
     private var chromePointerToken: Any?
-    /// Where the pointer was as the docked strip was dragged out, for the rest of that same drag.
-    private var detachDragPointer: NSPoint?
     /// The host clears its record when the docked Mini closes or is promoted.
     var onInPageMiniClosed: (() -> Void)?
     var onInPageMiniDetached: (() -> Void)?
@@ -311,8 +309,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         Diagnostics.note("Zigzag Mini opened", site: url?.host(), "from a page", isPrivate: tab.isPrivate)
         if let host = dockedIn {
             controller.attachDocked(in: host)
+            if controller.isDockedInPage {
+                // The docked Mini is still a Mini window for extensions, as the standalone one is.
+                if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+                return controller
+            }
             // No browser window to be a child of after all: the standalone Mini, as if it had never been docked.
-            guard !controller.isDockedInPage else { return controller }
         }
         if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
         controller.appear(from: nil)
@@ -333,7 +335,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         root.chromeOverlay = true
         root.setChromeRevealed(false, animated: false)
         strip.trafficLightsWidth = 0
-        strip.docksForDrag = true
         refreshStrip()
         let dim = MiniPeekDimView(color: Tokens.Color.peekScrim)
         dim.onClick = { [weak self] in self?.closeInPage() }
@@ -383,38 +384,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Expands the docked Mini into its own window, with the same root, tab and web view.
-    func promoteFromPage() { promoteFromPage(growing: true) }
-
-    /// `growing`: the Expand button takes the strip's height along; dragging the strip out keeps the size it had.
-    private func promoteFromPage(growing: Bool) {
+    func promoteFromPage() {
         guard isDockedInPage, !isLeaving, let window else { return }
         let card = window.frame
         endDockPresentation()
-        let size = growing ? NSSize(width: card.width, height: card.height + Tokens.Metric.miniStripHeight) : card.size
+        let size = NSSize(width: card.width, height: card.height + Tokens.Metric.miniStripHeight)
         window.setFrame(window.frameRect(forContentRect: NSRect(origin: card.origin, size: size)), display: true)
         onInPageMiniDetached?()
-        detachDragPointer = growing ? nil : NSEvent.mouseLocation
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(tab.webView)
-    }
-
-    /// The docked strip was dragged far enough: the Mini comes out into a window of its own under the pointer, and the
-    /// rest of that same drag moves it.
-    private func detachByDrag() {
-        guard isDockedInPage else { return }
-        detachDragPointer = NSEvent.mouseLocation
-        promoteFromPage(growing: false)
-    }
-
-    private func continueDetachedDrag() {
-        guard let window, let last = detachDragPointer else { return }
-        let now = NSEvent.mouseLocation
-        guard now != last else { return }
-        var origin = window.frame.origin
-        origin.x += now.x - last.x
-        origin.y += now.y - last.y
-        window.setFrameOrigin(origin)
-        detachDragPointer = now
     }
 
     /// Closes the docked Mini and its page, and gives the keyboard back to the browser's page.
@@ -459,9 +437,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         isCoveredInDock = false
         isTransitioningWithParent = false
         dockedScreenFrame = nil
-        detachDragPointer = nil
         root.isPageOverlay = false
-        strip.docksForDrag = false
     }
 
     /// Back to a window of its own: a title bar, its traffic lights, a shadow and its place in the Window menu.
@@ -640,8 +616,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
         strip.expandButton.onClick = { [weak self] _ in self?.promoteFromPage() }
-        strip.onDetachDrag = { [weak self] in self?.detachByDrag() }
-        strip.onDetachedDrag = { [weak self] in self?.continueDetachedDrag() }
         strip.siteButton.onClick = { [weak self] _ in self?.showSiteControls() }
         strip.pinButton.onClick = { [weak self] _ in
             guard let self, !self.isDockedInPage, let window = self.window else { return }
@@ -1741,12 +1715,6 @@ final class MiniStripView: NSView {
     let anchor = NSView()
     /// The traffic lights' width, kept clear on the left.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
-    /// Docked in a page: the strip's own background is the handle that takes the Mini out into a window.
-    var docksForDrag = false
-    var onDetachDrag: (() -> Void)?
-    var onDetachedDrag: (() -> Void)?
-    private var dragStart: NSPoint?
-    private var isDetaching = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -1759,32 +1727,7 @@ final class MiniStripView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
-    override var mouseDownCanMoveWindow: Bool { !docksForDrag }
-
-    /// Docked, the strip does not move the child window with the pointer: past a short distance it takes the Mini out
-    /// into a window of its own, and that same drag keeps moving it.
-    override func mouseDown(with event: NSEvent) {
-        guard docksForDrag else { return super.mouseDown(with: event) }
-        dragStart = convert(event.locationInWindow, from: nil)
-        isDetaching = false
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard let start = dragStart else { return super.mouseDragged(with: event) }
-        let point = convert(event.locationInWindow, from: nil)
-        if !isDetaching {
-            guard hypot(point.x - start.x, point.y - start.y) >= 6 else { return }
-            isDetaching = true
-            onDetachDrag?()
-        }
-        onDetachedDrag?()
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        dragStart = nil
-        isDetaching = false
-        super.mouseUp(with: event)
-    }
+    override var mouseDownCanMoveWindow: Bool { true }
 
     func refreshColors() { [spaceChip, title, openButton].forEach { $0.stateDidChange(animated: false) } }
 
