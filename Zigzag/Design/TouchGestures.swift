@@ -981,22 +981,23 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
 /// from each tap comes as a single click.
 @MainActor
 enum TouchDoubleTap {
-    /// The last tap's click: when, and where in the window.
-    private static var last: (time: TimeInterval, point: NSPoint, window: Int)?
+    /// The last tap's click: when, where in the window, and the control it pressed.
+    private static var last: (time: TimeInterval, point: NSPoint, window: Int, target: ObjectIdentifier?)?
 
-    /// The click count for a press on such chrome: a mouse's own, or 2 for a finger's second tap close enough to its
-    /// first.
-    static func clickCount(for event: NSEvent) -> Int {
+    /// The click count for a press on `target` (nil: the chrome standing in for the title bar): a mouse's own, or 2
+    /// for a finger's second tap close enough to its first on the same target.
+    static func clickCount(for event: NSEvent, on target: AnyObject? = nil) -> Int {
         guard event.clickCount < 2, isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) else {
             last = nil
             return event.clickCount
         }
-        let previous = last.flatMap { $0.window == event.windowNumber ? ($0.time, $0.point) : nil }
+        let id = target.map(ObjectIdentifier.init)
+        let previous = last.flatMap { $0.window == event.windowNumber && $0.target == id ? ($0.time, $0.point) : nil }
         if isSecondTap(after: previous, at: event.timestamp, point: event.locationInWindow, interval: NSEvent.doubleClickInterval) {
             last = nil
             return 2
         }
-        last = (event.timestamp, event.locationInWindow, event.windowNumber)
+        last = (event.timestamp, event.locationInWindow, event.windowNumber, id)
         return 1
     }
 

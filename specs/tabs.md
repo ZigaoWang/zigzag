@@ -116,6 +116,8 @@
   Test: TouchGesturesTests.aTapShowsClearAboveTheTabs
 - Two taps on a tab, a space's dot or a resize edge → what a double-click there does (rename, edit the space, the usual width or even tiles).
   Test: TouchMovesTests.twoTapsOnAControlAreADoubleClick
+- Taps on different tabs one after another → each selects its tab; two taps count as a double-click only on the same tab.
+  Test: TouchMovesTests.tapsOnTabRowsSelectThem
 - Two taps with a finger on the title bar strip's empty space, beside the traffic lights or the sidebar's buttons → what a double-click there does, once.
   Test: TouchMovesTests.theTitlebarHearsADoubleTapAndZooms
 - Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.

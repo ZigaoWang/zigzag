@@ -1396,6 +1396,45 @@ struct TouchMovesTests {
         root.concealGrabber()
     }
 
+    /// A finger's taps on tab rows, one after another as fast as a hand goes, each select their row.
+    @Test func tapsOnTabRowsSelectThem() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = (0..<4).map { Tab(url: URL(string: "https://example.com/tap/\($0)")!, title: "Tap \($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        manager.select(tabs[0])
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let window = controller.browserWindow
+        controller.sidebar.list.reload(animated: false)
+        controller.root.layoutSubtreeIfNeeded()
+        let landed = TouchPress.landedAt
+        defer { TouchPress.landedAt = landed }
+        for tab in [tabs[1], tabs[2], tabs[3], tabs[2], tabs[1]] {
+            let row = try #require(controller.sidebar.list.row(for: tab) as? TabRowView)
+            let point = row.convert(NSPoint(x: row.bounds.midX - 30, y: row.bounds.midY), to: nil)
+            #expect(window.contentView?.superview?.hitTest(point) === row)
+            // The finger lands, then AppKit's click from it comes as it lifts.
+            TouchPress.landedAt = ProcessInfo.processInfo.systemUptime
+            row.mouseDown(with: mouse(.leftMouseDown, at: point, window: window))
+            row.mouseUp(with: mouse(.leftMouseUp, at: point, window: window))
+            #expect(manager.selectedTab === tab)
+            #expect(!row.subviews.contains { $0 is PlainTextField })
+        }
+        // Two taps on the same row are still its double-click: it renames.
+        let row = try #require(controller.sidebar.list.row(for: tabs[0]) as? TabRowView)
+        let point = row.convert(NSPoint(x: row.bounds.midX - 30, y: row.bounds.midY), to: nil)
+        for _ in 0..<2 {
+            TouchPress.landedAt = ProcessInfo.processInfo.systemUptime
+            row.mouseDown(with: mouse(.leftMouseDown, at: point, window: window))
+            row.mouseUp(with: mouse(.leftMouseUp, at: point, window: window))
+        }
+        #expect(row.subviews.contains { $0 is PlainTextField })
+    }
+
     @Test func aSpentTouchDropsOnlyItsOwnClick() {
         var swallow = TouchSwallow()
         swallow.arm(at: [NSPoint(x: 20, y: 300)], now: 10)

@@ -286,7 +286,7 @@ final class ResizeHandle: NSView {
         grab = (isVertical ? point.y : point.x) - line
         pressedAt = event.locationInWindow
         onBegin?()
-        if onDoubleClick != nil, TouchDoubleTap.clickCount(for: event) == 2 { onDoubleClick?() }
+        if onDoubleClick != nil, TouchDoubleTap.clickCount(for: event, on: self) == 2 { onDoubleClick?() }
     }
 
     override func mouseDragged(with event: NSEvent) {
