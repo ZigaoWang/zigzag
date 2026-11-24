@@ -586,9 +586,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             })
         }
         // Under their profiles' names once there's more than one: a space on another profile reloads the page there.
-        let entries: [MenuPanel.Entry] = Library.shared.hasManyProfiles
+        let entries: [MenuPanel.Entry] = Library.shared.hasManyOfYourProfiles
             ? Library.shared.spaceGroups().flatMap { group in [.header(group.profile.displayName)] + group.spaces.map(entry) }
-            : Library.shared.spaces.map(entry)
+            : Library.shared.yourSpaces.map(entry)
         strip.spaceChip.isSelected = true
         MenuPanel.show(entries, from: strip.spaceChip) { [weak self] in self?.strip.spaceChip.isSelected = false }
     }
@@ -851,7 +851,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// minispace [name]: the strip's space menu, or that space chosen from it.
     func debugSpace(_ name: String) {
-        if let id = Library.shared.spaces.first(where: { $0.name == name })?.id { choose(space: id) } else { showSpaceMenu() }
+        if let id = Library.shared.yourSpaces.first(where: { $0.name == name })?.id { choose(space: id) } else { showSpaceMenu() }
     }
 
     /// minifind [text]: opens the find bar with this text; minifind close closes it.

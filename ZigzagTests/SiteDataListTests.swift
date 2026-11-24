@@ -37,6 +37,18 @@ struct SiteDataListTests {
             stored = []
         }
 
+        var cleared: [String] = []
+
+        func clear(_ kind: WebsiteData.Kind, site: String) async {
+            cleared.append("\(kind) \(site)")
+            let gone: SiteDataKinds = kind == .cache ? .cache : [.cookies, .saved]
+            stored = stored.compactMap { record in
+                guard SiteDataListing.site(of: record.name) == site else { return record }
+                let left = record.kinds.subtracting(gone)
+                return left.isEmpty ? nil : SiteDataRecord(name: record.name, kinds: left, size: record.size)
+            }
+        }
+
         /// `count` sites, "site-0000.example" on, every seventh with a shop. subdomain too.
         static func many(_ count: Int) -> FakeSource {
             var records: [SiteDataRecord] = []
@@ -193,7 +205,8 @@ struct SiteDataListTests {
         list.showsAll = true
         #expect(list.debugListed == 2000)
         let height = list.height(for: 600)
-        #expect(height == SiteDataList.rowHeight * 2000)
+        // Every box folded in a list this long, a gap between each.
+        #expect(height == SiteDataList.rowHeight * 2000 + FoldStyle.gap * 1999)
         list.frame.size.height = height
         document.frame.size.height = height
         list.layoutSubtreeIfNeeded()
@@ -210,5 +223,83 @@ struct SiteDataListTests {
         model.query = "zzz"
         #expect(list.debugListed == 0)
         #expect(!list.find(["nothing-like-it"]))
+    }
+
+    // MARK: A site's box (#368)
+
+    private func twoSites() -> FakeSource {
+        FakeSource([SiteDataRecord(name: "a.example", kinds: [.cookies, .saved, .cache]), SiteDataRecord(name: "b.example", kinds: .cache),
+                    SiteDataRecord(name: "c.example", kinds: .cookies)])
+    }
+
+    @Test func aSiteOpensToItsCookiesAndItsCache() {
+        #expect(SiteDataList.kinds(of: SiteDataEntry(site: "a", kinds: [.cookies, .saved, .cache], size: nil, names: [])) == [.cookies, .cache])
+        #expect(SiteDataList.kinds(of: SiteDataEntry(site: "a", kinds: .saved, size: nil, names: [])) == [.cookies])
+        #expect(SiteDataList.kinds(of: SiteDataEntry(site: "a", kinds: .cache, size: nil, names: [])) == [.cache])
+    }
+
+    @Test func aShortListOpensAndAFoldIsKept() async {
+        let model = SiteDataModel(source: twoSites())
+        model.refresh()
+        await model.settle()
+        let list = SiteDataList(frame: NSRect(x: 0, y: 0, width: 600, height: 0))
+        list.model = model
+        // Three sites: open, each to its kinds.
+        #expect(list.isOpen("a.example"))
+        let open = list.height(for: 600)
+        #expect(open == SiteDataList.rowHeight * 3 + SiteDataList.kindHeight * 4 + FoldStyle.gap * 2)
+        list.setOpen("a.example", false)
+        #expect(!list.isOpen("a.example"))
+        #expect(list.height(for: 600) == open - SiteDataList.kindHeight * 2)
+        // Read again, the fold stays.
+        model.refresh()
+        await model.settle()
+        #expect(!list.isOpen("a.example"))
+    }
+
+    @Test func aBoxIsADisclosureTriangleWithItsKindsInside() async throws {
+        let model = SiteDataModel(source: twoSites())
+        model.refresh()
+        await model.settle()
+        let list = SiteDataList(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let document = FlippedView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        scroll.documentView = document
+        document.addSubview(list)
+        var cleared: [String] = []
+        list.onClear = { entry, kind in cleared.append("\(kind) \(entry.site)") }
+        list.model = model
+        list.frame.size.height = list.height(for: 600)
+        list.layoutSubtreeIfNeeded()
+        let row = try #require(list.debugRows.first)
+        #expect(row.site == "a.example")
+        #expect(row.header.accessibilityRole() == .disclosureTriangle)
+        #expect(row.header.isAccessibilityExpanded())
+        let clears = (row.accessibilityChildren() ?? []).compactMap { $0 as? PillButton }
+        #expect(clears.count == 2)
+        clears.last?.onClick?(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                 context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!)
+        #expect(cleared == ["cache a.example"])
+        // A click on the header folds it.
+        #expect(row.header.accessibilityPerformPress())
+        #expect(!list.isOpen("a.example"))
+    }
+
+    @Test func clearingOneKindLeavesTheRestListed() async {
+        let source = twoSites()
+        let model = SiteDataModel(source: source)
+        model.refresh()
+        await model.settle()
+        let a = model.entries.first { $0.site == "a.example" }!
+        await model.clear(.cache, of: a)
+        await model.settle()
+        #expect(source.cleared == ["cache a.example"])
+        #expect(model.entries.first { $0.site == "a.example" }?.kinds == [.cookies, .saved])
+        // Cookies take the saved data that signs a site in: nothing is left, and the site goes.
+        let c = model.entries.first { $0.site == "c.example" }!
+        await model.clear(.cookies, of: c)
+        await model.settle()
+        #expect(!model.entries.contains { $0.site == "c.example" })
+        #expect(model.entries.count == 2)
     }
 }

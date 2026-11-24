@@ -54,7 +54,7 @@ final class ExtensionBridge {
         BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
         BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self,
         BridgeOffscreen.self, BridgeSidePanel.self, BridgeTabCapture.self, BridgeProxy.self,
-        BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self, BridgePasswordSaving.self,
+        BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self, BridgePasswordSaving.self, BridgePageCapture.self,
     ]
 
     init(host: ExtensionHost) {
@@ -201,7 +201,7 @@ nonisolated struct BridgeError: Error {
 /// The script side of the bridge (Resources/Extensions/bridge.js), run before an extension's own code.
 enum ExtensionBridgeScript {
     /// The permissions whose APIs the bridge answers, so the install sheet doesn't list them as missing.
-    static let permissions: Set<String> = ["history", "topSites", "sessions", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display", "userScripts", "proxy", "webRequestAuthProvider"]
+    static let permissions: Set<String> = ["history", "topSites", "sessions", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display", "userScripts", "proxy", "webRequestAuthProvider", "pageCapture"]
     /// Permissions the bridge grants and records because WebKit drops them: its own, and MV2 webRequestBlocking, which
     /// sign-ins need (BridgeWebRequest) even though blocking doesn't work.
     static let granted: Set<String> = permissions.union(["webRequestBlocking"])

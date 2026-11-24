@@ -310,6 +310,13 @@ struct SiteRoutesTests {
         }
     }
 
+    /// AI apps' pages: your routes are yours, so none sends one out, as from a private window.
+    @Test func pagesNotGivenYourDataAreNeverRouted() {
+        for arrival: SiteRoutes.Arrival in [.otherApp, .typed, .linkClick, .linkNewTab, .fromMini] {
+            #expect(target("https://youtube.com/", arrival, place: .withoutYourData) == nil)
+        }
+    }
+
     @Test func miniAndAppsKeepTheirPages() {
         #expect(target("https://youtube.com/", .linkClick, place: .mini) == nil)
         #expect(target("https://youtube.com/", .typed, place: .mini) == nil)

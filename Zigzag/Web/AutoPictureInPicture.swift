@@ -163,7 +163,8 @@ final class AutoPictureInPicture {
             video: followed?.video,
             isInView: followed.map { MiniPlayerLayout.visibleArea($0.video.rect, viewport: $0.frame.viewport) > 0 } ?? false,
             isTabMuted: tab.isMuted,
-            isPresentingItself: PageVideos.shared.isPresentingItself(webView),
+            // A page with The Whole Screen stays in its space, as one in WebKit's full screen does.
+            isPresentingItself: PageVideos.shared.isPresentingItself(webView) || controller.hasWholeScreen(tab),
             isMiniPlayerBusy: controller.miniPlayer.isShowing)
         guard model.leaving(tab.id, page: page, isOn: Self.isOn) else {
             debugLog("autopip: not moving (video=\(followed != nil) inView=\(page.isInView) muted=\(page.video?.isMuted ?? false)/\(page.isTabMuted) presenting=\(page.isPresentingItself) busy=\(page.isMiniPlayerBusy))")

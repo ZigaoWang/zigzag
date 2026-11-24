@@ -105,11 +105,21 @@ struct FramePacingTests {
         FeatureFlags.defaults = defaults
         DeveloperTools.defaults = defaults
         FeatureFlags.engine = WebKitFeatures()
+        let (throttled, held) = (FramePacing.throttled, FramePacing.held)
+        FramePacing.throttled = { false }
+        FramePacing.held = FramePacing.HeldSites()
         defer {
             defaults.removePersistentDomain(forName: name)
             (FeatureFlags.defaults, FeatureFlags.engine, DeveloperTools.defaults) = saved
+            FramePacing.throttled = throttled
+            FramePacing.held = held
         }
         try body()
+    }
+
+    /// A page made as Zigzag makes a tab's.
+    private func page() -> WKWebView {
+        WKWebView(frame: .zero, configuration: WebKitSetup.makeConfiguration(for: Profiles.shared.profile(Profile.defaultID)))
     }
 
     private func near60(_ preferences: WKPreferences) throws -> Bool {
@@ -153,14 +163,107 @@ struct FramePacingTests {
         try with {
             let webView = WKWebView()
             // At the full rate a page measures; held near 60 in Settings, none does, and none is changed.
-            #expect(FramePacing.received([:], site: "example.com", from: webView))
+            #expect(FramePacing.received([:], site: "example.com", from: webView) == .measure)
             FeatureFlags.set(true, for: try sixtyFlag())
-            #expect(!FramePacing.received([:], site: "example.com", from: webView))
-            #expect(!FramePacing.received(["gaps": Self.heavy + Self.heavy], site: "example.com", from: webView))
+            #expect(FramePacing.received([:], site: "example.com", from: webView) == .stop)
+            #expect(FramePacing.received(["gaps": Self.heavy + Self.heavy], site: "example.com", from: webView, rate: 120) == .stop)
             #expect(!FramePacing.holds(webView))
             // A page with no site measures nothing.
             FeatureFlags.set(false, for: try sixtyFlag())
-            #expect(!FramePacing.received([:], site: "", from: webView))
+            #expect(FramePacing.received([:], site: "", from: webView) == .stop)
+        }
+    }
+
+    @Test func aHeldPageChangesRateOnlyOnceScrollingStops() throws {
+        guard WebKitFeatures().flags?.contains(where: { $0.key == Self.key }) == true else { return }
+        try with { () throws in
+            let webView = page()
+            #expect(FramePacing.received([:], site: "github.com", from: webView) == .measure)
+            #expect(FramePacing.received(["gaps": Self.heavy], site: "github.com", from: webView, rate: 120) == .measure)
+            // Judged too heavy mid-scroll: nothing changes yet, and the page is asked to say when it's still.
+            #expect(FramePacing.received(["gaps": Self.heavy], site: "github.com", from: webView, rate: 120) == .settle)
+            #expect(!FramePacing.holds(webView))
+            #expect(try !near60(webView.configuration.preferences))
+            #expect(FramePacing.received(["still": true], site: "github.com", from: webView) == .stop)
+            #expect(FramePacing.holds(webView))
+            #expect(try near60(webView.configuration.preferences))
+            // Or at its next page, should scrolling never be said to stop.
+            let other = page()
+            _ = FramePacing.received([:], site: "example.com", from: other)
+            _ = FramePacing.received(["gaps": Self.heavy], site: "example.com", from: other, rate: 120)
+            #expect(FramePacing.received(["gaps": Self.heavy], site: "example.com", from: other, rate: 120) == .settle)
+            #expect(FramePacing.received([:], site: "example.com", from: other) == .stop)
+            #expect(FramePacing.holds(other))
+        }
+    }
+
+    @Test func aSiteHeldBeforeStartsHeldWithNothingMeasured() throws {
+        guard WebKitFeatures().flags?.contains(where: { $0.key == Self.key }) == true else { return }
+        try with { () throws in
+            FramePacing.held.insert("github.com")
+            let webView = page()
+            // Held as the page starts, before any scroll, and nothing runs in it.
+            #expect(FramePacing.received([:], site: "github.com", from: webView) == .stop)
+            #expect(FramePacing.holds(webView))
+            #expect(try near60(webView.configuration.preferences))
+            #expect(FramePacing.received(["gaps": Self.heavy], site: "github.com", from: webView, rate: 120) == .stop)
+            // Another site goes back to the full rate and measures.
+            #expect(FramePacing.received([:], site: "example.com", from: webView) == .measure)
+            #expect(!FramePacing.holds(webView))
+        }
+    }
+
+    @Test func heldSitesAreKeptAcrossLaunchesForAMonth() throws {
+        try with { () throws in
+            let now = Date()
+            FramePacing.held.insert("github.com", now: now)
+            FramePacing.reloadHeld()
+            #expect(FramePacing.held.contains("github.com"))
+            #expect(!FramePacing.held.contains("example.com"))
+            // A month on, it's let go.
+            #expect(!FramePacing.held.contains("github.com", now: now.addingTimeInterval(FramePacing.HeldSites.keptFor + 1)))
+            // Clearing the site's data, or History since before it was held, forgets it.
+            FramePacing.forget(site: "github.com")
+            FramePacing.reloadHeld()
+            #expect(!FramePacing.held.contains("github.com"))
+            FramePacing.held.insert("github.com", now: now)
+            FramePacing.forget(since: now.addingTimeInterval(-60))
+            #expect(!FramePacing.held.contains("github.com"))
+        }
+    }
+
+    @Test func heldSitesKeepTheLatestFew() {
+        var held = FramePacing.HeldSites()
+        let start = Date()
+        for i in 0..<(FramePacing.HeldSites.maxSites + 5) { held.insert("site\(i).com", now: start.addingTimeInterval(Double(i))) }
+        #expect(held.sites.count == FramePacing.HeldSites.maxSites)
+        #expect(!held.contains("site0.com", now: start.addingTimeInterval(300)))
+        #expect(held.contains("site\(FramePacing.HeldSites.maxSites + 4).com", now: start.addingTimeInterval(300)))
+        // Ones held over a month ago go as another is held.
+        held.insert("new.com", now: start.addingTimeInterval(FramePacing.HeldSites.keptFor + 500))
+        #expect(held.sites.keys.sorted() == ["new.com"])
+    }
+
+    @Test func inLowPowerModePagesStartNear60AndAreStillJudged() throws {
+        guard WebKitFeatures().flags?.contains(where: { $0.key == Self.key }) == true else { return }
+        try with { () throws in
+            FramePacing.throttled = { true }
+            let configuration = WebKitSetup.makeConfiguration(for: Profiles.shared.profile(Profile.defaultID))
+            #expect(try near60(configuration.preferences))
+            let opened = WKWebViewConfiguration()
+            WebKitSetup.separatePreferences(of: opened)
+            #expect(try near60(opened.preferences))
+            let webView = WKWebView(frame: .zero, configuration: configuration)
+            #expect(FramePacing.received([:], site: "example.com", from: webView) == .measure)
+            #expect(FramePacing.holds(webView))
+            // Judged at the 60 it's held to: steady there is keeping up.
+            let sixty = frames(1000.0 / 60)
+            for _ in 0..<3 { #expect(FramePacing.received(["gaps": sixty], site: "example.com", from: webView, rate: 120) == .measure) }
+            // Out of Low Power Mode, its next page is at the full rate again.
+            FramePacing.throttled = { false }
+            #expect(FramePacing.received([:], site: "example.com", from: webView) == .measure)
+            #expect(!FramePacing.holds(webView))
+            #expect(try !near60(WebKitSetup.makeConfiguration(for: Profiles.shared.profile(Profile.defaultID)).preferences))
         }
     }
 }

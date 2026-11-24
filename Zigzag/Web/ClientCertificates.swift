@@ -212,6 +212,8 @@ enum ClientCertificates {
     /// the site can show its own page instead of failing.
     static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?, store: WKWebsiteDataStore,
                         page: WKWebView?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        // No certificate of yours for AI apps' pages: on without one, as after Cancel.
+        if Profiles.shared.profile(ofStore: store)?.getsYourData == false { return (.rejectProtectionSpace, nil) }
         let space = challenge.protectionSpace
         let host = space.host
         let key = "\(ObjectIdentifier(store).hashValue)|\(site(host))"

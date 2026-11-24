@@ -324,7 +324,7 @@ final class ExtensionStorms {
         byTab[tab.id, default: []].insert(id)
         // Drop closed tabs.
         if byTab.count > 200 {
-            let open = Set(WindowManager.shared.controllers.flatMap { $0.tabManager.allTabs.map(\.id) })
+            let open = Set(WindowManager.shared.everyOpenTab.map(\.id))
             byTab = byTab.filter { open.contains($0.key) }
         }
         let site = Self.loggedSite(tab.url, isPrivate: tab.isPrivate)

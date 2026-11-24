@@ -416,13 +416,13 @@ final class DownloadsPanelView: FloatingPanelView {
         guard let controller else { return }
         self.anchor = anchor
         // A glass panel over the sidebar's lane, with the tabs under it faded back so nothing shows around it.
-        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible {
+        if controller.root.chromeSidebarShown, !controller.root.isSidebarFloatingVisible {
             recedes = [controller.sidebar.list]
         }
         controller.root.overlay.addSubview(self)
         reload()
         // Out of its button: at the panel's bottom right from the stand-in in a right sidebar's corner.
-        let standIn = !(controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible)
+        let standIn = !(controller.root.chromeSidebarShown || controller.root.isSidebarFloatingVisible)
         growsFrom = CGPoint(x: standIn && controller.root.sidebarOnRight ? 0.9 : 0.1, y: 1)
         present(arrival: arrival)
         monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
@@ -533,7 +533,7 @@ final class DownloadsPanelView: FloatingPanelView {
         let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * (rowHeight + rowGap) - rowGap
         let height = header + body + footer
         // Sidebar hidden: above the stand-in Downloads button in the same corner, at the sidebar's usual width.
-        guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else {
+        guard controller.root.chromeSidebarShown || controller.root.isSidebarFloatingVisible else {
             let button = anchor.convert(anchor.bounds, to: controller.root.overlay)
             let onRight = controller.root.sidebarOnRight
             let overlay = controller.root.overlay.bounds.width, margin = Tokens.Metric.cardInset

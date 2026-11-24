@@ -231,6 +231,7 @@ field.
   is given only as filled, and how long it is, unless the app typed all of it itself (adding to what's there doesn't
   count).
 - See **text a page hides** from you, in `snapshot` and in the names tools give back.
+- Reach **your windows and tabs while they run in the background**: only their own window, on the AI Apps profile.
 - Use **Zigzag's own pages** (Settings, History) or **extension pages**. They're listed, so the app knows they're
   there, but every tool on them is refused.
 - Use Zigzag's **error or certificate warning page**. Only you can choose Visit anyway; the app has to go back or
@@ -249,6 +250,71 @@ the tab for five minutes, or its connection ends.
 **Stop** on the bar cuts off every AI app at once, not only the one on that tab: every session ends, the key is
 replaced, and Let AI apps use Zigzag turns off, so nothing listens. A toast says where to turn it back on. When you
 do, copy the setup again and give your apps the new key; the old one opens nothing.
+
+### Running in the background
+
+AI apps can work with nothing on screen, in a window of their own that no one sees, on a profile of their own. Your
+windows and tabs are then out of their reach: they can't list, read or use them.
+
+Turn on **Run AI apps in the background** in Settings › Automation, under Let AI apps use Zigzag. It's off until
+you turn it on, and it needs AI apps allowed too.
+
+With both on, you can also open Zigzag with **`--headless`**. With Zigzag closed, it opens with no Dock icon, no
+menu bar and no window, and your saved windows wait until you open Zigzag yourself:
+
+```sh
+open -g -a Zigzag --args --headless
+```
+
+With either switch off, `--headless` does nothing: Zigzag says why on standard error (shown when you run
+`Zigzag.app/Contents/MacOS/Zigzag --headless` itself) and in the system log, and exits with an error.
+
+While AI apps work in the background:
+
+- **Their window is on the AI Apps profile**, which Zigzag makes the first time it's needed, with a space of its
+  own. It's listed in Settings › Profiles, but its name can't be changed, and its space stays out of your windows:
+  it's not among your spaces in the sidebar, the command bar, Settings › Spaces or a space's Profile menu. Its
+  sign-ins, history and extensions are its own: an app is signed in to nothing of yours there.
+- **Nothing of yours is given to its pages**: no sign-in or certificate from your Keychain, no password saved or
+  filled and no form filled from your card, no passkeys, none of the answers you gave sites (camera, microphone,
+  location, notifications and screen sharing are asked again, and with no one there, refused), none of your
+  download and link rules, none of your site routes, and no reaching apps on this Mac (Settings › Privacy › Apps on
+  This Mac doesn't apply there). Its tabs never go to your Archive. Extensions you install in it yourself are its
+  own.
+- **An item in the menu bar** shows while their window is open or Zigzag runs for them alone, with **Show AI Apps
+  Window** (to watch them), **Stop AI Apps** (the same as Stop on a tab's bar: every app is cut off and the key
+  replaced), and, when Zigzag runs for them alone, **Quit Zigzag**.
+- **Show AI Apps Window**, in the Window menu and the command bar too, brings their window on screen. They go on
+  where they were, with the same refs, and the bar with Stop shows over the tab in use. Closing it hides it again
+  while they work. It's a window to watch them in: it shows only the AI Apps profile's spaces, and can't be
+  minimized or made full screen.
+- **Pages there run as if seen, and silent.** They keep running and drawing, `screenshot` works without
+  `activate_tab`, and their tabs start muted (unmute one in Show AI Apps Window to hear it). A
+  page whose process ended loads again the next time an app uses it. A tab an app is using stays awake, and
+  macOS is kept from slowing Zigzag down meanwhile; a few minutes after its last tool, a tab sleeps like any other
+  (the one in front there too, as no one is looking at it) and wakes when an app comes back to it.
+- **No one is there to answer a page.** What a page asks of a person is answered no at once, so an app never waits
+  on it: `alert`, `confirm` and `prompt` are dismissed, a file picker and a sign-in sheet cancelled, a site asking
+  for a certificate goes on without one, printing skipped, camera, microphone, location and screen sharing denied,
+  a link to another app (`mailto:`, a meeting app) not opened. A pop-up window opens as a tab, where the app can
+  find it. The app's next answer about that tab, whichever tool it is, lists what was dismissed and on which page,
+  as `dialogs`.
+- **Nothing of theirs reaches your screen or clipboard.** A page's full screen only ever fills its page, never
+  the screen, and a page can't copy to your clipboard (an app's clicks and keys count as someone being there, so
+  this is refused outright). You can still copy from their window yourself while you watch.
+- **Their downloads are their own.** A download goes, without asking where, into a Downloads folder in the AI Apps
+  profile's data (in Zigzag's folder in `~/Library/Application Support`, under `Profiles`), never into yours, and
+  stays out of your downloads list and the Dock. Deleting the profile deletes them.
+
+You can delete the AI Apps profile in Settings › Profiles once AI apps have stopped running in the background (it's
+refused while their window is open). Its space, routes to it and its downloads go with it, and Zigzag makes a new
+one, empty, the next time AI apps run in the background.
+
+Opened with `--headless` and nothing else, Zigzag quits on its own 30 minutes after an app last asked it anything
+(never while a download is still coming in), and as soon as either switch is turned off. Opening it with
+`--headless` again counts as asking, too. Open it yourself meanwhile (from the Dock, Finder or a link) and it's the Zigzag
+you know, your windows with it; AI apps stay in their window until it quits. macOS only runs it while you're logged
+in.
 
 ### Resetting the key
 
@@ -279,6 +345,12 @@ every app.
 - **The app can't connect at all.** Check that Let AI apps use Zigzag is on and Zigzag is open: the server runs only
   while it is. Check that the app uses the HTTP transport, not stdio or SSE.
 - **`screenshot` fails.** The tab has to be on screen. Ask the app to switch to it with `activate_tab` first.
+- **A tool says AI apps work in the background and the tab isn't theirs.** Run AI apps in the background is on: they
+  can use only their own window's tabs. Ask the app to use `list_tabs` and `open_tab`, or turn the setting off to
+  give them your windows again.
+- **A page's dialog never shows, or a click "did nothing".** In the background no one can answer a page, so its
+  `confirm` was dismissed, which a page takes as Cancel. The tool's answer says so under `dialogs`. For a step
+  that needs a yes, turn Run AI apps in the background off and let the app use a window you can see.
 - **A tool says a ref changed or isn't on the page.** The page changed since the app's snapshot, or loaded again.
   The app should take a new snapshot and use the refs in it.
 - **A click says something covers the element.** A banner or a dialog is on top of it, as it would be for you. The

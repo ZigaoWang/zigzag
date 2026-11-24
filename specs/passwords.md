@@ -15,6 +15,10 @@
   Test: SystemPasswordsTests.aScrollHidesTheMenuAsItStarts
 - Switch tabs → the menu goes, and the Mac's list with it.
   No test yet.
+- Zoom the page, resize the window or pane, or the page moves the field → the menu stays under the field, never over it.
+  Test: PasswordMenuTests.theMenuFollowsAFieldThatMoves
+- A pinched-in page → the menu opens under the field.
+  Test: PasswordMenuTests.aPinchedPageStillPutsTheMenuUnderItsField
 
 ## Filling
 - Pick a login → the username and password go into the fields you can see, under any placeholder; a field covered by something else stays empty.

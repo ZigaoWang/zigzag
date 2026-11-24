@@ -21,6 +21,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func openLocation(_ sender: Any?) {
         if commandBar.isVisible && commandBar.mode == .editCurrent { commandBar.dismiss(); return }
+        // Autohide's bar comes back first, so the address is edited where it is (#359).
+        revealAutohide()
         commandBar.show(mode: .editCurrent)
     }
     /// Select All after a sidebar click with no field or page to take it: select its tabs (#302).
@@ -53,7 +55,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func showDownloads(_ sender: Any?) {
         // From the sidebar's Downloads button; with the sidebar hidden, from its stand-in in the same corner, and the
         // sidebar stays hidden, as you left it.
-        if !(root.sidebarVisible || root.isSidebarFloatingVisible) {
+        if !(root.chromeSidebarShown || root.isSidebarFloatingVisible) {
             showFloatingDownloads()
             floatingDownloads.layoutSubtreeIfNeeded()
             DownloadsPanel.show(from: floatingDownloadsButton, in: self)
@@ -224,6 +226,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     // MARK: View
 
     @objc func toggleBrowserSidebar(_ sender: Any?) {
+        // The Whole Screen keeps the sidebar out of the way: it slides out over the page, and its setting stays.
+        if root.isImmersive { root.reveal(!root.isSidebarFloatingVisible); return }
         root.setSidebarVisible(!root.sidebarVisible, animated: true)
         // With the sidebar back, the update card returns there.
         if root.sidebarVisible { Updater.shared.stopFloating() }
@@ -862,7 +866,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// View › Switch Space…: the spaces in a list, to pick one with the keyboard.
     @objc func showSpaceSwitcher(_ sender: Any?) { spaceSwitcher.toggle() }
     @objc func selectSpaceByNumber(_ sender: NSMenuItem) {
-        let spaces = Library.shared.spaces
+        let spaces = tabManager.listedSpaces
         guard let index = SpaceNumbers.index(for: sender.tag, count: spaces.count) else { return }
         tabManager.switchToSpace(spaces[index].id)
     }
@@ -968,8 +972,9 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(reopenClosedTab(_:)): return WindowManager.shared.canReopenLastClosed(from: tabManager)
         case #selector(toggleBrowserSidebar(_:)):
-            item.title = root.sidebarVisible ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
-                                              : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")
+            let shown = root.chromeSidebarShown || (root.isImmersive && root.isSidebarFloatingVisible)
+            item.title = shown ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
+                               : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")
             return true
         case #selector(toggleDeveloperBar(_:)):
             item.title = Self.developerBarTitle(shown: DeveloperTools.showsInBar)
@@ -1038,9 +1043,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(closeOtherTabs(_:)): return !otherTabs.isEmpty
         case #selector(closeTabsBelow(_:)): return !tabsBelow.isEmpty
         case #selector(selectSpaceByNumber(_:)):
-            return SpaceNumbers.index(for: item.tag, count: Library.shared.spaces.count) != nil
-        case #selector(nextSpace(_:)), #selector(previousSpace(_:)): return Library.shared.spaces.count > 1
-        case #selector(showSpaceSwitcher(_:)): return Library.shared.spaces.count > 1 && !tabManager.isPrivate
+            return SpaceNumbers.index(for: item.tag, count: tabManager.listedSpaces.count) != nil
+        case #selector(nextSpace(_:)), #selector(previousSpace(_:)): return tabManager.listedSpaces.count > 1
+        case #selector(showSpaceSwitcher(_:)): return tabManager.listedSpaces.count > 1 && !tabManager.isPrivate
         default: return true
         }
     }
@@ -1089,7 +1094,7 @@ enum ZoomLevels {
             let old = defaultZoom
             if abs(newValue - 1) < 0.001 { UserDefaults.standard.removeObject(forKey: defaultKey) } else { UserDefaults.standard.set(Double(newValue), forKey: defaultKey) }
             // Open pages at the old default switch now. Manually zoomed pages keep their zoom.
-            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+            for tab in WindowManager.shared.everyOpenTab {
                 guard let webView = tab.webView, let url = tab.url, !hasOwnZoom(url),
                       abs(webView.pageZoom - old) < 0.001 else { continue }
                 webView.pageZoom = newValue

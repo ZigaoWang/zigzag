@@ -311,7 +311,7 @@ extension BrowserWindowController {
 
     /// Deletes a space; ⌘Z brings back the space, its bookmarks and its tabs, history and all.
     func removeSpaceWithUndo(_ id: UUID) {
-        guard Library.shared.spaces.count > 1, let index = Library.shared.index(of: id), let space = Library.shared.space(id) else { return }
+        guard Library.shared.yourSpaces.count > 1, let index = Library.shared.index(of: id), let space = Library.shared.space(id) else { return }
         struct Closed {
             weak var window: BrowserWindowController?
             let isPrivate: Bool

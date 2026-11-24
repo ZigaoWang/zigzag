@@ -175,7 +175,7 @@ struct ExtensionReport {
         if permissions.contains("topSites"), !permissions.contains("history") {
             lines.append(Line(symbol: "clock", text: String(localized: "See the sites you visit most", comment: "One thing an extension can do, in the sheet that asks before it gets more access.")))
         }
-        worded.formUnion(["tabCapture", "topSites", "webRequest", "webRequestBlocking", "webRequestAuthProvider", "clipboardRead",
+        worded.formUnion(["tabCapture", "pageCapture", "topSites", "webRequest", "webRequestBlocking", "webRequestAuthProvider", "clipboardRead",
                           "identity", "scripting", "offscreen"])
         if !permissions.subtracting(worded).isEmpty {
             lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "Use more of Zigzag’s features", comment: "One thing an extension can do, in the sheet that asks before it gets more access: stands in for permissions with no line of their own.")))
@@ -253,6 +253,9 @@ struct ExtensionReport {
         }
         if permissions.contains("tabCapture") {
             lines.append(Line(symbol: "waveform", text: String(localized: "Hear the sound of tabs you use it on", comment: "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access.")))
+        }
+        if permissions.contains("pageCapture") {
+            lines.append(Line(symbol: "square.and.arrow.down", text: String(localized: "Save pages on the sites it can access as files", comment: "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access: the pageCapture permission, which saves a tab as one MHTML file.")))
         }
         if !permissions.isDisjoint(with: ["webRequest", "webRequestBlocking", "webRequestAuthProvider"]) {
             lines.append(Line(symbol: "network", text: String(localized: "See what sites load as you browse", comment: "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access: watch the requests pages make.")))

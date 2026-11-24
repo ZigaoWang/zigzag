@@ -784,9 +784,8 @@
       }
     },
     "pageCapture": {
-      "status": "unsupported",
-      "reason": "webkitMissing",
-      "group": "pageCapture"
+      "status": "bridged",
+      "implementation": "swift:pageCapture"
     },
     "desktopCapture": {
       "status": "unsupported",
@@ -923,9 +922,7 @@
       "status": "supported"
     },
     "pageCapture": {
-      "status": "unsupported",
-      "reason": "webkitMissing",
-      "group": "pageCapture"
+      "status": "supported"
     },
     "power": {
       "status": "supported"

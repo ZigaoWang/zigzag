@@ -27,7 +27,7 @@ enum LocalReceiverShim {
         let controller = configuration.userContentController
         // The script is per page, not per tab: a page that navigates to another site is decided again.
         guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return nil }
-        guard !isPrivate, let origin, serves(origin: origin) else { return nil }
+        guard !isPrivate, tab.profile.getsYourData, let origin, serves(origin: origin) else { return nil }
         let messages = LocalReceiverMessages(tab: tab)
         controller.addScriptMessageHandler(messages, contentWorld: .page, name: name)
         controller.addUserScript(WKUserScript(source: source(for: origin), injectionTime: .atDocumentStart,
@@ -58,7 +58,8 @@ enum LocalReceiverShim {
     @discardableResult
     static func sync(controller: WKUserContentController, tab: Tab?, origin: String?, isPrivate: Bool,
                      current: LocalReceiverMessages? = nil) -> LocalReceiverMessages? {
-        guard !isPrivate, let origin, serves(origin: origin) else {
+        // Never in AI apps' pages: the switch is yours (`Profile.getsYourData`).
+        guard !isPrivate, tab?.profile.getsYourData != false, let origin, serves(origin: origin) else {
             // The page has left the site it was allowed on (or is private): the script and the handler go, so the
             // page it becomes keeps WebKit's own fetch, XHR and WebSocket, with nothing of this door in reach.
             current?.closeAllSockets()
@@ -536,7 +537,7 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
                                replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
         guard let tab, message.frameInfo.isMainFrame,
               let origin = SiteOrigin.of(message.frameInfo.securityOrigin),
-              !tab.isPrivate,
+              !tab.isPrivate, tab.profile.getsYourData,
               LocalReceivers.allowsSite(origin: origin) else {
             replyHandler(["error": "denied"], nil)
             return

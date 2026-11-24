@@ -404,7 +404,9 @@ enum AuthenticationPrompt {
         guard Self.mayAnswer(pageHost: pageHost, askingHost: challenge.protectionSpace.host) else {
             return (.cancelAuthenticationChallenge, nil)
         }
-        if challenge.previousFailureCount == 0, let saved = URLCredentialStorage.shared.defaultCredential(for: challenge.protectionSpace) {
+        // Your saved sign-ins are never offered to AI apps' pages; their own extensions still are.
+        let offersYours = await MainActor.run { Profiles.shared.profile(ofPage: page).getsYourData }
+        if offersYours, challenge.previousFailureCount == 0, let saved = URLCredentialStorage.shared.defaultCredential(for: challenge.protectionSpace) {
             return (.useCredential, saved)
         }
         guard let window else { return (.cancelAuthenticationChallenge, nil) }
@@ -436,7 +438,7 @@ enum AuthenticationPrompt {
             case .cancel:
                 return (.cancelAuthenticationChallenge, nil)
             case .none:
-                return await ask(challenge, window: window, page: page, tag: key) {
+                return await ask(challenge, window: window, page: page, tag: key, offersYours: offersYours) {
                     attempt.sheetShown = true
                     return attempt.early
                 }
@@ -480,8 +482,9 @@ enum AuthenticationPrompt {
     }
 
     @MainActor
+    /// `offersYours`: whether your saved passwords for the site are offered in the sheet.
     private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
-                            page: WKWebView?, tag: String, shown: () -> [String]?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+                            page: WKWebView?, tag: String, offersYours: Bool, shown: () -> [String]?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let isPrivate = page?.configuration.websiteDataStore.isPersistent != true
         Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
                          isPrivate: isPrivate)
@@ -490,7 +493,7 @@ enum AuthenticationPrompt {
         // Passwords you saved for the site: the one saved for this exact address comes filled in; others (several, or
         // saved for another part of the site) wait behind a quiet button. Filling asks for no Touch ID, as filling a
         // page's form doesn't. After a wrong password, nothing is filled in again by itself.
-        let saved = await savedLogins(for: challenge.protectionSpace)
+        let saved = offersYours ? await savedLogins(for: challenge.protectionSpace) : nil
         var prefilled: Credential?
         if let saved, challenge.previousFailureCount == 0, let login = Self.prefill(saved.logins, for: saved.origin),
            let values = await saved.fill(login) {

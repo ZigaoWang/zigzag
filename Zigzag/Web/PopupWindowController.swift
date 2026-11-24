@@ -796,7 +796,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // File-type rules match a download's name; links have none.
         let handoffName = appliesToLinks ? "" : (filename ?? DownloadTokens.filename(for: url, suggested: ""))
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
-                                                    isPrivate: isPrivate) else { return false }
+                                                    isPrivate: isPrivate, in: Profiles.shared.profile(ofPage: webView)) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? webView.url
         let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),

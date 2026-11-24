@@ -22,6 +22,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     let tabManager: TabManager
     let sidebar = SidebarView()
+    /// The sidebar the screen's edge brings out over other apps (#363), made the first time it comes out.
+    private(set) var edgeSidebar: SidebarView?
+    private var edgeContainer: SidebarContainer?
     let root: BrowserRootView
     let inPageMini = InPageMiniHost()
     private var inPageMiniEscMonitor: Any?
@@ -31,6 +34,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var selectedTabToken: SignalToken?
     private weak var shownTab: Tab?
     private var fadeTimer: Timer?
+    /// The page in The Whole Screen: the browser's own full-screen space, with the chrome out of the way.
+    private var pageFullScreenTab: Tab?
+    /// Whether the browser entered its space for that page, so leaving gives the window back.
+    private var pageFullScreenAskedForSpace = false
+    /// The space is still coming: leave it as soon as it arrives.
+    private var pageFullScreenExitAfterEnter = false
+    /// The expand button asked for WebKit's own full screen: taken once the browser's space is given back.
+    private var pageFullScreenNativeAfterSpace: Tab?
     var onClose: ((BrowserWindowController) -> Void)?
     var onStateChange: (() -> Void)?
 
@@ -91,7 +102,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
             if self.floatingDownloads.superview != nil {
-                if self.root.sidebarVisible { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
+                if self.root.chromeSidebarShown { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
             }
             self.placeFloatingUpdate()
         }
@@ -105,6 +116,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.layoutTrafficLights()
         }
         root.onGrabberMoved = { [weak self] in self?.layoutTrafficLights() }
+        root.onFingerWhereBarWent = { [weak self] point in self?.fingerLanded(where: point) ?? false }
         root.onSlide = { [weak self] duration, timing in
             guard let self else { return }
             self.sidebarSliding(duration)
@@ -120,6 +132,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.keepsRevealed = { [weak self] in
             SitePanel.isOpen(in: self?.window) || DownloadsPanel.isOpen(in: self?.window) || GuidedTour.holdsSidebar(in: self?.window)
                 || self?.popupHoldsSidebar == true
+        }
+        // The Whole Screen's bar stays down while a panel hangs from it or the keyboard is in it.
+        root.keepsTopBar = { [weak self] in
+            guard let self else { return false }
+            if self.hasFloatingPanel { return true }
+            guard let responder = self.window?.firstResponder as? NSView else { return false }
+            return responder.isDescendant(of: self.root.topBar)
         }
         // One floating thing at a time, the sidebar that slides out included: while the command bar is up, or a panel
         // opened from the bar above the page, the pointer at the window's edge leaves it hidden. It would slide in
@@ -245,7 +264,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             // Closed in this window: hide like a closed card; fade in others.
             let hiding = Updater.shared.readiness.isDismissed && self.window?.isKeyWindow == true
-            self.sidebar.setUpdateCard(Updater.shared.cardState, hiding: hiding)
+            self.bothSidebars { $0.setUpdateCard(Updater.shared.cardState, hiding: hiding) }
             self.placeFloatingUpdate(hiding: hiding)
         })
         sidebar.reloadButton.onClick = { [weak self] _ in
@@ -257,6 +276,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tabManager.host = self
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
+        // A live folder's pages read, or its refresh failing: their rows and menu follow.
+        tokens.append(LiveFolders.shared.changed.observe { [weak self] in self?.sidebar.list.refreshRows() })
         // Tools above the page turned on or off (Settings › Developer): the page you're on gains or loses them.
         tokens.append(DeveloperTools.changed.observe { [weak self] in self?.showDeveloperBarTools() })
         // Always or Never Translate chosen in another window or Settings: the translate button follows.
@@ -275,6 +296,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(placeAddress), name: BrowserRootView.addressPlaceChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(placeSidebarSide), name: BrowserRootView.sidebarSideChanged, object: nil)
         placeAddress()
+        // Autohide's pointer reveal: the person's pointer near the top brings the bar back, trusted input only.
+        autohidePointerMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            self?.autohidePointerMoved(event)
+            return event
+        }
+        // The setting or a site's choice changed: a page in full screen follows between The Page and The Whole Screen.
+        tokens.append(PageFullScreen.changed.observe { [weak self] in self?.updatePageFullScreenForLayout() })
         tokens.append(DownloadManager.shared.changed.observe { [weak self] _ in self?.downloadsChanged() })
         tokens.append(DownloadManager.shared.started.observe { [weak self] item, window in
             guard let self, window == nil || window === self.window else { return }
@@ -293,7 +321,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
         // Fading is slow; checking once a minute is plenty.
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.sidebar.list.refreshRows() }
+            MainActor.assumeIsolated { self?.bothSidebars { $0.list.refreshRows() } }
         }
         fadeTimer?.tolerance = 10
 
@@ -303,6 +331,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.privateLabel = true
             sidebar.isPrivate = true
         }
+        sidebar.listedSpaces = { [weak tabManager] in tabManager?.listedSpaces ?? Library.shared.yourSpaces }
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.onMoveSpace = { [weak self] id, index in
@@ -428,7 +457,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Many at once (`TabManager.together`): once, when they're all done.
             if tabManager.isBatching { break }
             inPageMini.tabsChanged()
-            sidebar.list.reload(animated: window?.isVisible == true)
+            bothSidebars { $0.list.reload(animated: window?.isVisible == true) }
             // Pinned or unpinned from a row, a drag or ⌘Z, or its opener closed: the star and Back follow.
             refreshAddress(for: tabManager.selectedTab)
             newTabNote.listChanged()
@@ -460,7 +489,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func spaceChanged() {
         inPageMini.closeShown()
-        let spaces = Library.shared.spaces
+        let spaces = tabManager.listedSpaces
         let old = lastSpaceID
         let oldIndex = old.flatMap { id in spaces.firstIndex { $0.id == id } } ?? 0
         let newIndex = spaces.firstIndex { $0.id == tabManager.currentSpaceID } ?? 0
@@ -470,6 +499,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.currentSpaceID = tabManager.currentSpaceID
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: old, snapshot: snapshot)
+        if let edgeSidebar {
+            edgeSidebar.currentSpaceID = tabManager.currentSpaceID
+            edgeSidebar.reloadSpaces(current: tabManager.currentSpaceID)
+            if EdgeSidebar.shared.isShowing {
+                edgeSidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: old, snapshot: nil)
+            } else {
+                edgeSidebar.list.reload(animated: false)
+            }
+        }
         // The slide goes to Core Animation first, so it carries on from the fingers at once: the new color (and with
         // it light or dark, which restyles everything) follows a moment later, and the page after that (tens of
         // milliseconds of WebKit work). From here they run on their own, so a swipe never catches on that work.
@@ -588,15 +626,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // The tiles are the profile's of the space you're in.
         let favorites = Library.shared.favorites(in: tabManager.profile.id)
         let tabs = Dictionary(uniqueKeysWithValues: favorites.compactMap { favorite in tabManager.bookmarkTab(for: favorite.id).map { (favorite.id, $0) } })
-        sidebar.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
-        sidebar.needsLayout = true
+        bothSidebars {
+            $0.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
+            $0.needsLayout = true
+        }
     }
 
     private func libraryChanged() {
         // The list and favorites reload once already: the tab manager hears the same change first and sends
         // `.structure` (`tabManagerChanged`).
         applySpaceColor(animated: true)
-        sidebar.reloadSpaces(current: tabManager.currentSpaceID)
+        bothSidebars { $0.reloadSpaces(current: tabManager.currentSpaceID) }
     }
 
     /// Back or Forward lists the pages that way in Zigzag's menu: on a right-click, a press held down, or a finger held.
@@ -630,7 +670,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens the space panel beside the sidebar (or closes it, if it's already showing that space).
     func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
-        if !root.sidebarVisible && !root.isSidebarFloatingVisible { root.reveal(true) }
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        if !root.chromeSidebarShown && !root.isSidebarFloatingVisible { root.reveal(true) }
         previews.hide()
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
@@ -648,20 +689,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
     /// from them is put away first. At once: a setting you change, not a layout you watch.
     @objc func placeAddress() {
-        let above = BrowserRootView.addressAbovePage
-        guard sidebar.holdsAddress == above else { return }
-        if window?.isVisible == true { closeFloatingPanels() }
-        sidebar.holdsAddress = !above
-        if above {
-            // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
-            sidebar.address.starInPill = true
-            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
-            let tab = tabManager.selectedTab
-            root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-            root.topBar.showPin(sidebar.address.canSave)
-        } else {
-            root.topBar.pin = nil
-            sidebar.address.starInPill = false
+        let place = BrowserRootView.addressBarPlace
+        // In The Whole Screen the address comes down with the bar, whatever Settings › Appearance says: back, forward,
+        // reload and the address are one place while the page has the screen.
+        let above = Self.addressBelongsInBar(abovePage: place != .off, wholeScreen: pageFullScreenTab != nil)
+        if sidebar.holdsAddress != !above {
+            if window?.isVisible == true { closeFloatingPanels() }
+            sidebar.holdsAddress = !above
+            if above {
+                // The star rides in the pill's end with the address above the page (#437), not beside the extensions.
+                sidebar.address.starInPill = true
+                root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address, pin: sidebar.address.saveButton)
+                let tab = tabManager.selectedTab
+                root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+                root.topBar.showPin(sidebar.address.canSave)
+            } else {
+                root.topBar.pin = nil
+                sidebar.address.starInPill = false
+            }
         }
         root.barHoldsAddress = above
         showTopBar()
@@ -717,10 +762,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let t = Double(min(share, 1))
         root.sidebarContainer.grain = (space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t
         root.sidebarContainer.texture = t < 0.5 ? space.texture : next.texture
+        copyEdgeLook()
         root.showEmptyPage(of: space, toward: next, share: share)
     }
 
     private func applySpaceColor(animated: Bool, crossFadesMode: Bool = true) {
+        Freezes.mark("space color")
         showsSwipeLook = false
         lastSpaceID = tabManager.currentSpaceID
         render(tabManager.currentSpace, animated: animated, crossFadesMode: crossFadesMode)
@@ -737,6 +784,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         #endif
         root.sidebarContainer.texture = space.texture
         root.sidebarContainer.windowGlass = root.windowGlass
+        copyEdgeLook()
         root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
     }
 
@@ -757,6 +805,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSelectedTab() {
+        Freezes.mark("tab switch")
         inPageMini.willSelect(tabManager.selectedTab)
         previews.hide()
         let tab = tabManager.selectedTab
@@ -766,16 +815,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if tab !== shownTab {
             // So is Capture.
             capture.cancel()
+            // Each tab shows with its bar there (#359).
+            resetAutohide(animated: false)
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && (tab.map { tabManager.partners(of: $0) } ?? []).contains { $0 === readerTab }
             if !readerStillShown { closeReader() }
+            // A page leaving the screen gives back the browser's space first, so its video can follow you.
+            if let full = pageFullScreenTab, full !== tab { PageFullScreen.exit(full) }
             // A video playing in a page you're leaving follows you in the mini player; coming back puts it in its page.
             let before = root.paneCards.enumerated().compactMap { i, card in i == 0 || !card.isHidden ? card.webView : nil }
                 .compactMap { ($0 as? BrowserWebView)?.owner }
-            miniPlayer.switched(from: before, to: tab.map { tabManager.panes(of: $0) } ?? [])
+            // Not from an unattended window: its video would come up on your screen from pages you never see.
+            if !isUnattended { miniPlayer.switched(from: before, to: tab.map { tabManager.panes(of: $0) } ?? []) }
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
-            if let tab, !tabManager.isShownElsewhere(tab), case let webView = tab.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
+            if let tab, !tabManager.isShownElsewhere(tab), let webView = pageView(of: tab), window?.isKeyWindow == true, !commandBar.isVisible {
                 DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(webView) }
             }
         }
@@ -790,9 +844,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // selection.
         let space = tabManager.currentSpaceID
         if SidebarListView.isCollapsed(space) || tabManager.groups(in: space).contains(where: { !$0.isOpen }) {
-            sidebar.list.reload(animated: true)
+            bothSidebars { $0.list.reload(animated: true) }
         } else {
-            sidebar.list.refreshRows()
+            bothSidebars { $0.list.refreshRows() }
         }
         reloadFavorites()
         newTabNote.listChanged()
@@ -1184,11 +1238,226 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The address and the sidebar's rows are where the setting puts them either way: nothing in the sidebar moves
     /// for a bar that's there for the tools alone.
     private func showTopBar() {
+        // The Whole Screen owns the bar while it lasts: Autohide stands down, and starts over after.
+        let autohides = root.barHoldsAddress && BrowserRootView.addressBarPlace == .autohide && !root.isImmersive
+        if autohides != root.autohidesBar { autohidePanes.removeAll() }
+        root.autohidesBar = autohides
+        syncScrollReports()
         root.showsTopBar = root.barHoldsAddress || root.topBar.accessory != nil
         root.needsLayout = true
         root.layoutSubtreeIfNeeded()
         layoutTrafficLights()
         paintTopBar()
+    }
+
+    /// One pane's Autohide state: each pane's bar follows its own page (#359).
+    private struct AutohidePaneState {
+        var tab: ObjectIdentifier?
+        var lastScrollY: CGFloat = 0
+        var reported = false
+        var locked = false
+        var dragging = false
+        var gestureActive = false
+        var lastWheelAt: TimeInterval = 0
+    }
+    private var autohidePanes: [Int: AutohidePaneState] = [:]
+    /// The pointer monitor that brings an Autohide bar back near the window's top.
+    private var autohidePointerMonitor: Any?
+    /// While the sidebar is sliding: the bar stays as it is, so the lights don't have to cross it.
+    private var sidebarMovingUntil = Date.distantPast
+    /// Settles a bar left part way out once the scroll stops.
+    private var autohideSettleWork: DispatchWorkItem?
+    /// How long a scroll has to stop before the bar settles.
+    static let autohideSettleDelay: TimeInterval = 0.2
+
+    /// The pane a page is in: its place in the selected tab's group, one page with index 0.
+    func paneIndex(of tab: Tab) -> Int? {
+        guard let selected = tabManager.selectedTab else { return nil }
+        return tabManager.panes(of: selected).firstIndex { $0 === tab }
+    }
+
+    /// A new gesture may move the bar again after one took it out.
+    private func beginAutohideGesture(state: inout AutohidePaneState) {
+        state.locked = false
+    }
+
+    /// AppKit's phases tell a new scroll gesture from the rest of one.
+    func noteScrollGesture(_ event: NSEvent, inPane index: Int) {
+        var state = autohidePanes[index] ?? AutohidePaneState()
+        if event.phase == .began {
+            beginAutohideGesture(state: &state)
+            state.gestureActive = true
+        } else if event.phase == .changed, !state.gestureActive {
+            // Some devices send a change without a began; treat it as the gesture's start.
+            beginAutohideGesture(state: &state)
+            state.gestureActive = true
+        } else if event.phase == .ended || event.phase == .cancelled {
+            // The gesture is over. The lock stays until the next gesture begins.
+            state.gestureActive = false
+            settleAutohideSoon()
+        } else if event.phase.isEmpty, event.momentumPhase.isEmpty {
+            // A wheel or a mouse's scroll: a new burst after a pause, one gesture while it keeps coming.
+            if event.timestamp - state.lastWheelAt > 0.25 { beginAutohideGesture(state: &state) }
+            state.lastWheelAt = event.timestamp
+        }
+        autohidePanes[index] = state
+        // A scroll up with the page already at its top: no scroll is left to report, so the bar comes back here.
+        if event.scrollingDeltaY > 0, state.reported, state.lastScrollY <= 0.5, root.autohidesBar, root.barHoldsAddress,
+           root.autohideOffset(at: index) > 0, !autohideHeld(inPane: index) {
+            reveal(pane: index)
+        }
+    }
+
+    /// A page's scroll report; `delta` is its own movement since the last one, when the page sends it.
+    func pageScrolled(to y: CGFloat, by delta: CGFloat? = nil, trusted: Bool, editing: Bool, dragging: Bool = false, key: Bool = false,
+                      inPane index: Int = 0, tab: Tab? = nil) {
+        let pane = max(0, min(index, root.autohidePaneCount - 1))
+        var state = autohidePanes[pane] ?? AutohidePaneState()
+        // A page put into this pane since the last report starts over: its first place is its own.
+        if let tab, state.tab != ObjectIdentifier(tab) {
+            state = AutohidePaneState(tab: ObjectIdentifier(tab))
+            root.setAutohideOffset(0, at: pane)
+        }
+        let delta = state.reported ? delta ?? y - state.lastScrollY : 0
+        state.lastScrollY = y
+        state.reported = true
+        // A scroll-bar drag is one gesture from press to release, as a trackpad swipe is.
+        if dragging, !state.dragging {
+            beginAutohideGesture(state: &state)
+        }
+        state.dragging = dragging
+        autohidePanes[pane] = state
+        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar, !editing, trusted, !autohideHeld(inPane: pane) else { return }
+        // A key scroll is its own gesture.
+        if key { state.locked = false }
+        // Up to the very top: the bar's place, however it went.
+        if y <= 0.5, delta < 0 {
+            state.locked = false
+            autohidePanes[pane] = state
+            root.setAutohideOffset(0, at: pane)
+            return
+        }
+        let was = root.autohideOffset(at: pane)
+        let step = AddressBarAutohide.step(offset: was, pageDelta: delta, travel: root.autohideTravel(at: pane), locked: state.locked)
+        state.locked = step.locked
+        autohidePanes[pane] = state
+        root.setAutohideOffset(step.offset, at: pane)
+        settleAutohideSoon()
+        // The bar's travel takes that much of the scroll: the page scrolls back by it, so the content moves once.
+        let consumed = step.offset - was
+        if abs(consumed) > 0.5, let webView = tab?.webView {
+            webView.evaluateJavaScript("window.__zigzagScrollBy?.(\(Double(-consumed)))", in: nil, in: .defaultClient, completionHandler: nil)
+        }
+    }
+
+    private func settleAutohideSoon() {
+        autohideSettleWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.settleAutohide() } }
+        autohideSettleWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.autohideSettleDelay, execute: work)
+    }
+
+    /// A bar left part way out slides to the nearer end, unless a finger, the scroll bar or the pointer still has it.
+    func settleAutohide() {
+        guard root.autohidesBar, root.barHoldsAddress else { return }
+        for index in 0..<root.autohidePaneCount {
+            let state = autohidePanes[index]
+            let offset = root.autohideOffset(at: index), travel = root.autohideTravel(at: index)
+            guard state?.gestureActive != true, state?.dragging != true, offset > 0.5, offset < travel - 0.5,
+                  !autohideHeld(inPane: index) else { continue }
+            let target = Self.settledOffset(offset, travel: travel)
+            if root.tiles == nil { root.setBarOffset(target, animated: true) } else { root.setAutohideOffset(target, at: index) }
+        }
+    }
+
+    /// The nearer end for a bar part way out.
+    nonisolated static func settledOffset(_ offset: CGFloat, travel: CGFloat) -> CGFloat { offset >= travel / 2 ? travel : 0 }
+
+    /// A new page starts at its top, with the bar there (#359).
+    private func resetAutohide(animated: Bool) {
+        autohidePanes.removeAll()
+        root.setBarPutAway(false, animated: animated)
+        syncScrollReports()
+    }
+
+    /// One page starts over; only its own pane's bar comes back.
+    private func resetAutohide(of tab: Tab, animated: Bool) {
+        guard root.tiles != nil, let pane = paneIndex(of: tab) else { resetAutohide(animated: animated); return }
+        autohidePanes[pane] = nil
+        root.setAutohideOffset(0, at: pane)
+        syncScrollReports()
+    }
+
+    /// The pages that send scroll reports: the shown panes', and only while Autohide is on.
+    private let scrollReporters = NSHashTable<WKWebView>.weakObjects()
+
+    /// Turns the page script's reports on for the shown panes with Autohide on, off everywhere else.
+    func syncScrollReports() {
+        let shown = tabManager.selectedTab.map { tabManager.panes(of: $0) } ?? []
+        let wanted: [WKWebView] = root.autohidesBar ? shown.compactMap(\.webView) : []
+        for webView in scrollReporters.allObjects where !wanted.contains(webView) {
+            ScrollMessages.setReporting(false, in: webView)
+            scrollReporters.remove(webView)
+        }
+        // Sent again each time: a new document starts with reports off.
+        for webView in wanted {
+            ScrollMessages.setReporting(true, in: webView)
+            scrollReporters.add(webView)
+        }
+    }
+
+    #if DEBUG
+    var debugScrollReporters: [WKWebView] { scrollReporters.allObjects }
+    #endif
+
+    /// What holds the bar: an editing field, a sheet or command bar, a sliding sidebar, or the pointer on it.
+    private func autohideHeld(inPane index: Int) -> Bool {
+        if root.isSidebarFloatingVisible || isSidebarSliding() { return true }
+        if window?.attachedSheet != nil || commandBar.isVisible { return true }
+        guard root.autohideOffset(at: index) < root.autohideTravel(at: index) - 0.5,
+              let window else { return false }
+        let point = root.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        return root.autohideBarContains(point, at: index)
+    }
+
+    private func isSidebarSliding() -> Bool { Date() < sidebarMovingUntil }
+
+    private func autohidePointerMoved(_ event: NSEvent) {
+        guard event.window === window else { return }
+        pointerMoved(to: root.convert(event.locationInWindow, from: nil))
+    }
+
+    /// The pointer at the window's top, in the root's coordinates, brings an Autohide bar back.
+    func pointerMoved(to point: NSPoint) {
+        guard root.autohidesBar, root.barHoldsAddress, root.showsTopBar, point.y <= Tokens.Space.x2,
+              Self.topPointerRevealsBar(fullScreen: window?.styleMask.contains(.fullScreen) == true),
+              (0..<root.autohidePaneCount).contains(where: { root.autohideOffset(at: $0) > 0 }) else { return }
+        revealAutohide()
+    }
+
+    /// In full screen the screen's top belongs to the menu bar, not the address bar.
+    nonisolated static func topPointerRevealsBar(fullScreen: Bool) -> Bool { !fullScreen }
+
+    /// A finger where the bar went brings it back, with no pointer on a touch display to reach the top.
+    private func fingerLanded(where point: NSPoint) -> Bool {
+        guard root.autohidesBar, root.barHoldsAddress, root.isWhereBarWent(point) else { return false }
+        revealAutohide()
+        return true
+    }
+
+    /// The bar back in every pane that put its own away, so reaching for one doesn't leave another out of sight.
+    func revealAutohide() {
+        for index in 0..<root.autohidePaneCount { reveal(pane: index) }
+    }
+
+    /// One pane's bar back, sliding in for one page, free to go again with the next scroll down.
+    private func reveal(pane index: Int) {
+        autohidePanes[index]?.locked = false
+        if root.tiles == nil {
+            root.setBarOffset(0, animated: true)
+        } else {
+            root.setAutohideOffset(0, at: index)
+        }
     }
 
     /// Gives the page you're on the size chosen for it with the developer tools, or its room back. A page's own
@@ -1230,6 +1499,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let layout = pages.count == pair?.count ? "\(pair?.ids ?? []) \(String(describing: pair?.shape)) \(zoomed ?? -1)" : ""
         if layout != shownPaneLayout {
             shownPaneLayout = layout
+            autohidePanes.removeAll()
+            syncScrollReports()
             if SitePanel.isOpen(in: window), SitePanel.shown?.isFromPane == true { SitePanel.closeCurrent() }
         }
         defer {
@@ -1253,7 +1524,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: first) }
                 // A page another sharing window shows stays there; the card says so (#162).
                 if tabManager.mayShow(page) {
-                    card.show(page.ensureWebView())
+                    card.show(pageView(of: page))
                 } else {
                     card.showElsewhere(page) { [weak self] in self?.showHere(page) }
                 }
@@ -1287,7 +1558,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 root.card.showElsewhere(tab) { [weak self] in self?.showHere(tab) }
             } else {
                 root.card.showElsewhere(nil)
-                root.card.show(tab?.ensureWebView())
+                root.card.show(tab.flatMap(pageView))
             }
             tab?.reloadIfItStopped()
             root.card.showLoading(of: tab)
@@ -1305,6 +1576,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             card.isUnfocusedPane = false
             card.showsHeader = false
         }
+        updatePageFullScreenForLayout()
     }
 
     /// Show Here (#162): moves the loaded page into this window; the other shows a placeholder.
@@ -1337,7 +1609,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Shows the stand-in Downloads button where the sidebar's would be, if the sidebar is hidden.
     func showFloatingDownloads() {
-        guard !(root.sidebarVisible || root.isSidebarFloatingVisible) else { return }
+        guard !(root.chromeSidebarShown || root.isSidebarFloatingVisible) else { return }
         let side = Tokens.Metric.floatingButton
         let inset = Tokens.Metric.sidebarPadding
         // In the sidebar's bottom corner, the left or the right one.
@@ -1385,7 +1657,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func placeFloatingUpdate(hiding: Bool = false) {
         let updater = Updater.shared
         let (panel, card) = floatingUpdate
-        guard let state = updater.cardState, updater.cardFloats, !root.sidebarVisible, !root.isSidebarFloatingVisible else {
+        guard let state = updater.cardState, updater.cardFloats, !root.chromeSidebarShown, !root.isSidebarFloatingVisible else {
             guard panel.superview != nil, !panel.dismissing else { return }
             panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
             panel.dismiss(instantly: hiding && Tokens.Motion.isFromKey)
@@ -1414,6 +1686,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The bar above the page in the shown page's color (`Tab.pageColor`). None over what covers the page (a PDF,
     /// Settings, Reader), which has a color of its own: the bar is the plain one then.
     private func paintTopBar() {
+        Freezes.mark("top bar color")
         let covered = reader != nil && readerCard === root.card
         // The card's own word on its page's color: a page at a size of its own stands on plain ground, bar included.
         root.paintTopBar(covered ? nil : root.card.pageColor)
@@ -1430,11 +1703,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return (root.overlay, NSRect(x: pane.minX + Tokens.Space.x3, y: pane.minY + Tokens.Space.x2, width: 1, height: 1))
         }
         // Above the page, from the address's end, where the Site Controls and the extensions are.
-        if root.showsTopBar {
+        if root.chromeBarShown {
             let button = sidebar.address.siteControlsButton
             return (button, button.bounds)
         }
-        if root.sidebarVisible || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
+        if root.chromeSidebarShown || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
         let card = root.cardFrame
         return (root.overlay, NSRect(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x2, width: 1, height: 1))
     }
@@ -1442,7 +1715,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Where a popup opens from: under its pinned button when it was opened from one still showing, otherwise
     /// `addressAnchor`. `id` nil for any other popup.
     func popupAnchor(forPin id: String?) -> (view: NSView, rect: NSRect) {
-        guard let id, root.sidebarVisible || root.isSidebarFloatingVisible, sidebar.address.visiblePinIDs.contains(id),
+        guard let id, root.chromeSidebarShown || root.isSidebarFloatingVisible, sidebar.address.visiblePinIDs.contains(id),
               let button = sidebar.address.pinButton(for: id) else { return addressAnchor }
         return (sidebar.address, button.frame)
     }
@@ -1513,7 +1786,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         let byID = Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let shown = nowPlayingChoice.pick(from: candidates).compactMap { byID[$0] }
-        sidebar.setNowPlaying(shown.map { (tab: $0, paused: isPausedForNowPlaying($0)) }, hiding: hiding)
+        bothSidebars { $0.setNowPlaying(shown.map { (tab: $0, paused: isPausedForNowPlaying($0)) }, hiding: hiding) }
     }
 
     /// Paused from its card, or a video stopped in the mini player.
@@ -1708,7 +1981,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 refreshExtensionActions()
                 updateHandoff()
                 // A pinned tab that moved on shows it right away.
-                if tab.bookmarkID != nil { sidebar.list.refreshRows() }
+                if tab.bookmarkID != nil { bothSidebars { $0.list.refreshRows() } }
                 // Remove the translation offer for the previous page.
                 withdrawStaleTranslationOffer()
             }
@@ -1734,6 +2007,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             updateTranslateButton()
             offerTranslation()
         case .document:
+            // A new main-frame document starts at its top; an SPA's pushState is not one (#359).
+            resetAutohide(of: tab, animated: true)
             updateTranslateButton()
         case .themeColor, .darkPage:
             paintTopBar()
@@ -2353,7 +2628,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let mine = manager.items(isPrivate: tabManager.isPrivate)
         let active = mine.filter { $0.state == .downloading }
         let progress = active.isEmpty ? 1 : active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
-        sidebar.updateDownloads(active: active.count, hasAny: !mine.isEmpty, progress: progress)
+        bothSidebars { $0.updateDownloads(active: active.count, hasAny: !mine.isEmpty, progress: progress) }
     }
 
     /// The file's own icon lifts off where you clicked and arcs into the Downloads button, which answers with a
@@ -2375,7 +2650,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let overlay = root.overlay
         guard let host = overlay.layer, let window else { return }
         let anchor = sidebar.downloadsAnchor
-        let sidebarShown = root.sidebarVisible || root.isSidebarFloatingVisible
+        let sidebarShown = root.chromeSidebarShown || root.isSidebarFloatingVisible
         // Sidebar hidden: its Downloads button stands in at the same corner, and the download flies there.
         if !sidebarShown { showFloatingDownloads() }
         let target = sidebarShown ? anchor : floatingDownloadsButton
@@ -2483,12 +2758,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Visibility is recomputed from the clock, so nothing can leave the buttons stuck hidden.
     private func sidebarSliding(_ duration: TimeInterval) {
         if !browserWindow.trafficLightsHidden, let image = browserWindow.trafficLightsImage() { trafficLightsPicture = image }
+        sidebarMovingUntil = duration > 0 ? Date().addingTimeInterval(duration) : .distantPast
         // Docked and in the bar above the page, the lights are in the same spot: they stay put while the sidebar
         // slides out from under them or back, and go straight back to it as the floating sidebar leaves.
         // Beside a sidebar on the right they're in the bar holding the address the whole time, slid out or not; with
         // only a page's tools there, they ride in the sidebar at the window's other edge, and go with it.
         let barKeepsLights = root.sidebarOnRight && root.barHoldsAddress
-        let stays = root.showsTopBar && (barKeepsLights || (!root.sidebarOnRight && !root.isSidebarFloatingVisible))
+        let stays = root.chromeBarShown && (barKeepsLights || (!root.sidebarOnRight && !root.isSidebarFloatingVisible))
         // On either side the bar's toggle is where the sidebar's lands (on the right, both at the window's right end).
         if stays, duration > 0 {
             toggleHeldUntil = Date().addingTimeInterval(duration)
@@ -2503,7 +2779,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func layoutTrafficLights() {
         let window = browserWindow
         let floating = root.isSidebarFloatingVisible
-        let docked = root.sidebarVisible
+        let docked = root.chromeSidebarShown
         let sliding = isSliding
         // The picture shows only mid-slide, and only when the sidebar is (or is becoming) visible.
         // Not in full screen: the lights live in the title bar that comes down with the menu bar there, so a picture of
@@ -2511,8 +2787,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let fullScreen = window.styleMask.contains(.fullScreen)
         // The page is under the lights only in full screen with neither the bar nor the sidebar there; then they
         // get a backing so they don't float over it (#462). The bar or sidebar is their backing otherwise.
-        let backing = Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.showsTopBar,
-                                                    sidebarVisible: docked, sidebarFloating: floating)
+        let backing = trafficLightBacking(fullScreen: fullScreen)
         if (fullScreenBar != nil) != backing, !window.fullScreenPhase.isMoving { showFullScreenBar(backing) }
         // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
         // Beside a sidebar on the right, the bar holding the address keeps them there always: the window's top left.
@@ -2520,14 +2795,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // (#166), and a bar there for a page's tools alone leaves them be, as on the left.
         let onRight = root.sidebarOnRight
         let barKeepsLights = onRight && root.barHoldsAddress
-        let inBar = root.showsTopBar && (barKeepsLights || (!docked && !floating))
+        // An Autohide bar takes them with it as it goes (#359).
+        let inBar = root.barOnScreen && (barKeepsLights || (!docked && !floating))
         let room = Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
         // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
         // nothing in the row moves while it's on screen; until then their picture rides in it.
         if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
         sidebar.showTrafficLightsPicture(sliding && !fullScreen && sidebar.trafficLightsWidth > 0 ? trafficLightsPicture : nil)
         // A finger in use with the sidebar hidden: they show with its toggle, where the docked sidebar has them.
-        let withGrabber = root.grabberPlace == .lights && !docked && !floating && !inBar
+        let withGrabber = !root.isImmersive && root.grabberPlace == .lights && !docked && !floating && !inBar
         window.trafficLightsHidden = sliding || !(docked || floating || inBar || withGrabber)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
@@ -2535,20 +2811,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // right edge.
         let dockedMinX = onRight ? root.bounds.width - root.sidebarWidth : 0
         let x = (inBar ? 0 : docked || withGrabber ? dockedMinX : container.minX) + SidebarView.trafficLightsX
-        // In the bar, on its middle line, wherever the bar starts: not the sidebar's line, which is still the docked
-        // one while it slides away.
-        let center = inBar ? root.topBarFrame.minY + Tokens.Sidebar.lightsCenter : (docked || withGrabber ? 0 : container.minY) + sidebar.trafficLightCenterY
+        // In the bar, on its middle line, wherever the bar starts or Autohide has it: not the sidebar's line, which is
+        // still the docked one while it slides away.
+        let center = inBar ? root.barTop + Tokens.Sidebar.lightsCenter : (docked || withGrabber ? 0 : container.minY) + sidebar.trafficLightCenterY
         let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
         // Full screen included: the lights come down with the menu bar, so the bar leaves their space
         // rather than drawing its controls under them.
-        root.topBar.trafficLightsWidth = root.showsTopBar && (!docked || barKeepsLights) ? window.trafficLightsWidth : 0
+        root.topBar.trafficLightsWidth = root.chromeBarShown && (!docked || barKeepsLights) ? window.trafficLightsWidth : 0
         // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
         // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
-        let held = root.showsTopBar && holdsToggle
-        root.topBar.showsSidebarButton = root.showsTopBar && !docked
+        let held = root.chromeBarShown && holdsToggle
+        root.topBar.showsSidebarButton = root.chromeBarShown && !docked && !root.isImmersive
         root.topBar.sidebarOnRight = onRight
         sidebar.isOnRight = onRight
         // The sidebar's own, where the docked sidebar puts it.
@@ -2574,6 +2850,130 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
+    // MARK: Full screen in the page (#462)
+
+    /// A page's full screen is the browser's: The Page fills the page's area and leaves the window alone; The Whole
+    /// Screen fills that and takes the browser into its own space, with the chrome out of the way. The page never
+    /// takes the screen by itself; only the expand button hands it to WebKit's own full screen.
+    func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {
+        guard on else {
+            if tab === pageFullScreenTab { endWholeScreen() }
+            return
+        }
+        // AI apps' pages only ever fill the page: nothing of theirs takes your screen.
+        guard !tab.profile.isHeadless else { return }
+        let onScreen = tabManager.selectedTab.map { tabManager.panes(of: $0).contains { $0 === tab } } ?? false
+        switch Self.pageFullScreenGoes(fill: PageFullScreen.fills(for: tab.url), onScreen: onScreen, inSplit: tabManager.split(for: tab) != nil) {
+        case .page: break
+        case .browserSpace: beginWholeScreen(tab)
+        case .webKit: PageFullScreen.handToWebKit(tab)
+        }
+    }
+
+    enum PageFullScreenPlace: Equatable { case page, browserSpace, webKit }
+
+    /// Where a page's request goes. The Whole Screen takes the browser's space for a page on its own; a page in a
+    /// split fills its pane; one not on screen here (in the mini player) gets WebKit's own full screen, as before.
+    nonisolated static func pageFullScreenGoes(fill: PageFullScreen.Fill, onScreen: Bool, inSplit: Bool) -> PageFullScreenPlace {
+        guard fill == .screen else { return .page }
+        guard onScreen else { return .webKit }
+        return inSplit ? .page : .browserSpace
+    }
+
+    /// Whether The Whole Screen has to give the browser's space back: the page is no longer the one on screen, or it
+    /// is in a split now. A split keeps the page's fill, in its pane; a page that leaves takes its full screen with it.
+    nonisolated static func wholeScreenEnds(selectedIsFull: Bool, inSplit: Bool) -> Bool {
+        !selectedIsFull || inSplit
+    }
+
+    /// Whether the address belongs in the bar above the page: when Settings › Appearance says so, and always while the
+    /// page has The Whole Screen (#462).
+    nonisolated static func addressBelongsInBar(abovePage: Bool, wholeScreen: Bool) -> Bool {
+        abovePage || wholeScreen
+    }
+
+    /// The page has The Whole Screen: a windowed browser enters its full-screen space for the duration. The chrome
+    /// gets out of the way and comes back from the top. A browser already in a space stays in it.
+    private func beginWholeScreen(_ tab: Tab) {
+        // On its way out of full screen: the page fills the window, as The Page.
+        guard pageFullScreenTab == nil, tab.isInPageFullScreen, browserWindow.fullScreenPhase != .exiting else { return }
+        pageFullScreenTab = tab
+        root.isImmersive = true
+        placeAddress()
+        showTopBar()
+        // The browser's own space, not a second one for the page. The system gives the windowed frame back.
+        if Self.wholeScreenTakesSpace(phase: browserWindow.fullScreenPhase, inFullScreen: browserWindow.styleMask.contains(.fullScreen)) {
+            pageFullScreenAskedForSpace = true
+            browserWindow.toggleFullScreen(nil)
+        }
+        layoutTrafficLights()
+    }
+
+    /// Whether The Whole Screen enters the browser's space: only from a window that isn't in one or on its way.
+    static func wholeScreenTakesSpace(phase: FullScreenPhase, inFullScreen: Bool) -> Bool {
+        phase == .windowed && !inFullScreen
+    }
+
+    /// The page holds the browser's space, as WebKit's full screen would.
+    func hasWholeScreen(_ tab: Tab) -> Bool { pageFullScreenTab === tab }
+
+    /// What a session keeps: a space the page took is the page's, not the window's.
+    var savesFullScreen: Bool { Self.savesFullScreen(inFullScreen: browserWindow.styleMask.contains(.fullScreen), pageTookSpace: pageFullScreenAskedForSpace) }
+
+    nonisolated static func savesFullScreen(inFullScreen: Bool, pageTookSpace: Bool) -> Bool { inFullScreen && !pageTookSpace }
+
+    /// Leaving puts the chrome back. If the page took the browser into its space, leaving the page leaves the space,
+    /// and macOS gives the window back; one already in a space stays there.
+    private func endWholeScreen() {
+        guard pageFullScreenTab != nil else { return }
+        pageFullScreenTab = nil
+        root.isImmersive = false
+        placeAddress()
+        showTopBar()
+        layoutTrafficLights()
+        guard pageFullScreenAskedForSpace else { return }
+        switch browserWindow.fullScreenPhase {
+        case .fullScreen:
+            pageFullScreenAskedForSpace = false
+            browserWindow.toggleFullScreen(nil)
+        case .entering:
+            // The space is still coming: leave it as soon as it has arrived.
+            pageFullScreenAskedForSpace = false
+            pageFullScreenExitAfterEnter = true
+        case .windowed, .exiting:
+            pageFullScreenAskedForSpace = false
+        }
+    }
+
+    /// The expand button: the one explicit hand-off to WebKit's own full screen. From The Page it goes straight
+    /// there; from The Whole Screen the browser's space is given back first, so WebKit does not open a window inside
+    /// a space the browser made for the page.
+    func tabDidAskToExpandFullScreen(_ tab: Tab) {
+        guard tab === tabManager.selectedTab, tab.isInPageFullScreen, !tab.profile.isHeadless else { return }
+        if tab === pageFullScreenTab, pageFullScreenAskedForSpace, browserWindow.fullScreenPhase != .windowed {
+            pageFullScreenNativeAfterSpace = tab
+            endWholeScreen()
+        } else {
+            PageFullScreen.expand(tab)
+        }
+    }
+
+    /// The split ended (or began), the tab changed, or the setting did: a page that was in The Whole Screen and is
+    /// no longer alone leaves the space. Only the page's own request takes it.
+    private func updatePageFullScreenForLayout() {
+        guard let tab = tabManager.selectedTab else { return }
+        if let full = pageFullScreenTab,
+           Self.wholeScreenEnds(selectedIsFull: tab === full, inSplit: tabManager.split(for: tab) != nil) {
+            // A page that leaves the screen takes its full screen with it; a split keeps the fill in its pane.
+            if tab !== full { PageFullScreen.exit(full) }
+            endWholeScreen()
+        }
+        if let full = pageFullScreenTab, full === tab, PageFullScreen.fills(for: tab.url) == .page {
+            // The setting or the site changed under the page: The Whole Screen becomes The Page.
+            endWholeScreen()
+        }
+    }
+
     /// The bar behind the traffic lights when the page is under them in full screen (#462). AppKit's title bar is
     /// transparent, so without it the lights float over the page. Uses the title bar material, as Safari's toolbar.
     private var fullScreenBar: NSVisualEffectView?
@@ -2589,6 +2989,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         bar.autoresizingMask = [.width, .height]
         titlebar.addSubview(bar, positioned: .below, relativeTo: nil)
         fullScreenBar = bar
+    }
+
+    /// The backing for this window now: an Autohide bar that's away is no backing (#462).
+    func trafficLightBacking(fullScreen: Bool) -> Bool {
+        Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.barOnScreen, sidebarVisible: root.chromeSidebarShown,
+                                      sidebarFloating: root.isSidebarFloatingVisible)
     }
 
     /// Whether the lights need a backing of their own: in full screen, when the page is under them because neither
@@ -2615,24 +3021,58 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fullScreenChanged(.willEnter)
     }
 
-    func windowDidEnterFullScreen(_ notification: Notification) { fullScreenChanged(.didEnter) }
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        fullScreenChanged(.didEnter)
+        // The page left while the space was coming: give the window back now that it has arrived, unless another
+        // page has taken it in the meantime, which then owns the space.
+        if pageFullScreenExitAfterEnter {
+            pageFullScreenExitAfterEnter = false
+            if pageFullScreenTab != nil {
+                pageFullScreenAskedForSpace = true
+            } else {
+                browserWindow.toggleFullScreen(nil)
+            }
+        }
+    }
 
     /// macOS gave up on full screen: the window is as it was, so its title bar and buttons are too (#401).
     func windowDidFailToEnterFullScreen(_ window: NSWindow) {
         Diagnostics.note("Full screen didn't start")
         windowedFrame = nil
+        pageFullScreenAskedForSpace = false
+        pageFullScreenExitAfterEnter = false
+        // The space never came: the chrome comes back and the page keeps its fill in the window.
+        endWholeScreen()
         fullScreenChanged(.didFailToEnter)
+        // The browser's space never came: the page can still go to WebKit's own full screen.
+        if let tab = pageFullScreenNativeAfterSpace {
+            pageFullScreenNativeAfterSpace = nil
+            if tab === tabManager.selectedTab { PageFullScreen.expand(tab) }
+        }
     }
 
     func windowWillExitFullScreen(_ notification: Notification) { fullScreenChanged(.willExit) }
 
     func windowDidExitFullScreen(_ notification: Notification) {
         windowedFrame = nil
+        // Leaving the space takes the page out of full screen too: the window is back, with its chrome.
+        pageFullScreenAskedForSpace = false
+        pageFullScreenExitAfterEnter = false
+        if let tab = pageFullScreenTab {
+            PageFullScreen.exit(tab)
+            endWholeScreen()
+        }
         fullScreenChanged(.didExit)
+        // The expand button asked for WebKit's own full screen: the browser's space is back, so the hand-off goes.
+        if let tab = pageFullScreenNativeAfterSpace {
+            pageFullScreenNativeAfterSpace = nil
+            if tab === tabManager.selectedTab { PageFullScreen.expand(tab) }
+        }
     }
 
     func windowDidFailToExitFullScreen(_ window: NSWindow) {
         Diagnostics.note("Full screen didn't end")
+        pageFullScreenNativeAfterSpace = nil
         fullScreenChanged(.didFailToExit)
     }
 
@@ -2653,6 +3093,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         updateHandoff()
         switcher.windowResignedKey()
         spaceSwitcher.windowResignedKey()
+        if root.isImmersive { root.hideTopBar() }
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
@@ -2661,6 +3102,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Brand.themeChanged.send(())
         layoutTrafficLights()
         WindowManager.shared.windowBecameKey(self)
+        EdgeSidebar.shared.noteFocused(self)
     }
 
     /// Set as the window closes, for what holds on to this controller past that (Zigzag Mini's source).
@@ -2674,7 +3116,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Closing the AI apps' window while they work hides it again instead (Headless).
+    func windowShouldClose(_ sender: NSWindow) -> Bool { !Headless.parksInsteadOfClosing(self) }
+
     func windowWillClose(_ notification: Notification) {
+        EdgeSidebar.shared.windowClosed(self)
         windowClosed = true
         inPageMini.windowClosing()
         if let monitor = inPageMiniEscMonitor { NSEvent.removeMonitor(monitor) }
@@ -2698,9 +3144,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         if DownloadsPanel.isOpen(in: window) { DownloadsPanel.closeCurrent() }
         if let editor = SpaceEditorPanel.current, editor.window === window { editor.close() }
-        // Nor the zoomed pane's Esc.
+        // Nor the zoomed pane's Esc, or Autohide's pointer reveal.
         if let monitor = zoomEscMonitor { NSEvent.removeMonitor(monitor) }
         zoomEscMonitor = nil
+        if let monitor = autohidePointerMonitor { NSEvent.removeMonitor(monitor) }
+        autohidePointerMonitor = nil
         // Its page is no longer on offer to your other devices.
         handoff = HandoffPage.update(handoff, to: nil)
         onClose?(self)
@@ -2772,7 +3220,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
         let container = root.sidebarContainer
-        guard root.sidebarVisible || root.isSidebarFloatingVisible,
+        guard root.chromeSidebarShown || root.isSidebarFloatingVisible,
               container.bounds.contains(container.convert(event.locationInWindow, from: nil)) else { return false }
         // Only where the sidebar is what's under the pointer: a panel over it (Site Controls, a menu) keeps its own
         // scrolls, which would otherwise switch spaces behind it (#216).
@@ -2806,6 +3254,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         #if DEBUG
         if event.type == .scrollWheel, sidebarContains(event) { DebugBridge.recordScroll(event) }
         #endif
+        // Autohide tells a new swipe from the rest of one by its phases.
+        if event.type == .scrollWheel, event.window === window,
+           root.cardFrame.contains(root.convert(event.locationInWindow, from: nil)), !sidebarContains(event) {
+            let point = root.convert(event.locationInWindow, from: nil)
+            noteScrollGesture(event, inPane: root.paneIndex(at: point) ?? 0)
+        }
         if event.type == .scrollWheel, !desk.isVisible, sidebarContains(event), sidebar.handleSwipe(event) { return true }
         if event.type == .keyDown, #available(macOS 15.4, *), !event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
            ExtensionCenter.performCommand(for: event) {
@@ -2823,6 +3277,13 @@ extension BrowserWindowController: SwipeArrowHost {
 
 extension BrowserWindowController: TabHost {
     var hostWindow: NSWindow? { window }
+    var isUnattended: Bool { Headless.window === self }
+    var isOutOfSight: Bool { (window as? BrowserWindow)?.isParked == true }
+
+    /// The page for a pane, woken if it slept; not in an unseen window, where only a tool wakes it.
+    private func pageView(of tab: Tab) -> BrowserWebView? {
+        isOutOfSight && tab.isAsleep ? nil : tab.ensureWebView()
+    }
 
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
@@ -2894,8 +3355,8 @@ extension BrowserWindowController: TabHost {
             tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
             return nil
         }
-        // Sized window.open() calls are sign-in and payment popups: give them a real small window.
-        if features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
+        // Sized window.open() calls get a small window; with no one there, a tab.
+        if !isUnattended, features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
             return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
         let flags = action.modifierFlags
@@ -2917,6 +3378,8 @@ extension BrowserWindowController: TabHost {
     }
 
     func tabWantsToBeShown(_ tab: Tab) {
+        // In AI apps' window only the app picks the tab in front, and the window never comes forward.
+        guard !isOutOfSight else { return }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
         if tabManager.selectedTab !== tab { tabManager.select(tab) }
@@ -2964,10 +3427,12 @@ extension BrowserWindowController: TabHost {
 extension BrowserWindowController: SidebarDelegate {
     // Picking one sends a sidebar held out by touch back, as the pointer leaving sends back a hovered one.
     func listSelect(_ tab: Tab) {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         tabManager.select(tab)
         root.endTouchHold()
     }
     func listOpenBookmark(_ bookmark: Bookmark) {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         tabManager.openBookmark(bookmark)
         root.endTouchHold()
     }
@@ -3129,7 +3594,10 @@ extension BrowserWindowController: SidebarDelegate {
             }
         }
     }
-    func listNewTab() { commandBar.show(mode: .newTab) }
+    func listNewTab() {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        commandBar.show(mode: .newTab)
+    }
 
     func listClearTabs() {
         // The tabs you've drifted away from, else every tab but yours (TabManager.tabsToClear).
@@ -3147,6 +3615,8 @@ extension BrowserWindowController: SidebarDelegate {
         }), duration: Toast.undoDuration, in: self)
     }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
+        // The edge panel's rows have no preview: the window's would show behind another app.
+        guard row?.window === window || tab == nil else { return }
         previews.hover(tab, row: row, bookmark: bookmark)
     }
     func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { sidebar.spaceDot(at: windowPoint) }
@@ -3763,13 +4233,23 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
 
-    func sidebarOpenCommandBar() { commandBar.show(mode: .editCurrent) }
+    func sidebarOpenCommandBar() {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        commandBar.show(mode: .editCurrent)
+    }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
     func sidebarAddMenu() -> [MenuPanel.Entry] { SidebarMenus.addPanel(controller: self) }
     func sidebarBlankMenu() -> [MenuPanel.Entry] { SidebarMenus.blankPanel(controller: self) }
     /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
-    func sidebarDoubleClickedBlank() { if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) } }
-    func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
+    func sidebarDoubleClickedBlank() {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) }
+    }
+    func sidebarShowDownloads(from view: NSView) {
+        guard EdgeSidebar.shared.isShowing else { return DownloadsPanel.show(from: view, in: self) }
+        bringForwardForEdge()
+        showDownloads(nil)
+    }
     /// A space dot's menu: Edit Space… opens at the dot.
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }
 
@@ -3812,6 +4292,119 @@ extension BrowserWindowController {
 }
 #endif
 
+// MARK: - The sidebar at the screen's edge (#363)
+
+extension BrowserWindowController {
+    /// Runs a change on the window's sidebar and, once the edge has made it, on the edge's.
+    fileprivate func bothSidebars(_ change: (SidebarView) -> Void) {
+        change(sidebar)
+        if let edgeSidebar { change(edgeSidebar) }
+    }
+
+    /// The sidebar's width now, which the edge's card takes.
+    var edgeSidebarWidth: CGFloat { max(root.sidebarWidth, Tokens.Metric.sidebarMinWidth) }
+    var edgeSidebarOnRight: Bool { root.sidebarOnRight }
+
+    /// The edge's sidebar, up to date with this window's, ready to show.
+    func prepareEdgeSidebar() -> SidebarContainer {
+        let (mirror, container) = edgeSidebarViews()
+        mirror.isPrivate = tabManager.isPrivate
+        mirror.isOnRight = root.sidebarOnRight
+        mirror.currentSpaceID = tabManager.currentSpaceID
+        mirror.reloadSpaces(current: tabManager.currentSpaceID)
+        mirror.list.reload(animated: false)
+        mirror.setUpdateCard(Updater.shared.cardState)
+        reloadFavorites()
+        downloadsChanged()
+        updateNowPlaying()
+        copyEdgeLook()
+        return container
+    }
+
+    /// The setting went off: the edge's sidebar goes rather than taking updates until restart.
+    func discardEdgeSidebar() {
+        edgeContainer?.removeFromSuperview()
+        edgeSidebar = nil
+        edgeContainer = nil
+    }
+
+    /// The edge's card wears the space's look, as the window's floating sidebar does.
+    fileprivate func copyEdgeLook() {
+        guard let edgeContainer else { return }
+        let own = root.sidebarContainer
+        edgeContainer.isFloating = true
+        edgeContainer.tint = own.tint
+        edgeContainer.gradient = own.gradient
+        edgeContainer.grain = own.grain
+        edgeContainer.texture = own.texture
+        edgeContainer.windowGlass = own.windowGlass
+        edgeContainer.appearance = window?.contentView?.effectiveAppearance
+    }
+
+    private func edgeSidebarViews() -> (SidebarView, SidebarContainer) {
+        if let edgeSidebar, let edgeContainer { return (edgeSidebar, edgeContainer) }
+        let mirror = SidebarView(frame: .zero)
+        mirror.delegate = self
+        // A list to pick from: the address row stays in the window, and rows don't drag out of the panel.
+        mirror.showsAddressRow = false
+        mirror.list.allowsDragging = false
+        mirror.hoversWhileInactive = true
+        mirror.onEditSpace = { [weak self] id in self?.openSpaceEditor(id, anchor: self?.sidebar.dot(for: id)) }
+        mirror.onSwipeSpace = { [weak self] offset in
+            guard let self else { return false }
+            let before = self.tabManager.currentSpaceID
+            self.tabManager.switchSpace(by: offset)
+            return before != self.tabManager.currentSpaceID
+        }
+        mirror.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
+        mirror.favorites.onOpen = { [weak self] favorite in
+            self?.bringForwardForEdge()
+            self?.tabManager.openBookmark(favorite)
+        }
+        mirror.favorites.onMenu = { [weak self] favorite in
+            guard let self else { return nil }
+            return SidebarMenus.favoriteMenu(for: favorite, controller: self)
+        }
+        mirror.onNowPlayingShow = { [weak self] tab in
+            self?.bringForwardForEdge()
+            self?.tabManager.select(tab)
+        }
+        // Play and pause stay over the app in front.
+        mirror.onNowPlayingToggle = { [weak self] tab in self?.toggleNowPlaying(tab) }
+        mirror.onNowPlayingHide = { [weak self] tab in self?.hideNowPlaying(tab) }
+        mirror.onNowPlayingMenu = { [weak self] tab in self?.nowPlayingMenu(for: tab) }
+        mirror.updateCard.onRestart = { Updater.shared.restartToUpdate() }
+        mirror.updateCard.onHide = { Updater.shared.dismissCard() }
+        mirror.updateCard.onUpdate = { Updater.shared.getUpdate() }
+        mirror.updateCard.onSkip = { Updater.shared.skipOffered() }
+        let container = SidebarContainer(sidebar: mirror)
+        edgeSidebar = mirror
+        edgeContainer = container
+        return (mirror, container)
+    }
+
+    /// Something picked in the edge's panel: the panel goes and this window comes forward, as from the Dock.
+    func bringForwardForEdge() {
+        EdgeSidebar.shared.hide(animated: false)
+        guard let window else { return }
+        if NSApp.isHidden { NSApp.unhide(nil) }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    /// A menu item from the edge's panel acts on this window's sidebar: rename, a new folder, the space editor.
+    func revealSidebarForEdge() {
+        if !root.chromeSidebarShown && !root.isSidebarFloatingVisible { root.reveal(true) }
+    }
+
+    /// ⌘T in the edge's panel.
+    func newTabFromEdge() {
+        bringForwardForEdge()
+        newTab(nil)
+    }
+}
+
 // MARK: - The command bar in a browser window
 
 extension BrowserWindowController: CommandBarHost {
@@ -3825,9 +4418,9 @@ extension BrowserWindowController: CommandBarHost {
         // that pane's page.
         if root.stripsInBar { return focusedPaneAddress.isHidden ? nil : focusedPaneAddress }
         // With the top bar, the site pill opens in place, as in panes.
-        if root.showsTopBar, root.topBar.holdsAddress { return root.topBar.pill.isHidden ? nil : root.topBar.pill }
-        if root.showsTopBar { return sidebar.address }
-        return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
+        if root.chromeBarShown, root.topBar.holdsAddress { return root.topBar.pill.isHidden ? nil : root.topBar.pill }
+        if root.chromeBarShown { return sidebar.address }
+        return root.chromeSidebarShown && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }
     var commandBarTabs: TabManager? { tabManager }
     var commandBarIsMovable: Bool { true }

@@ -112,6 +112,23 @@ extension CALayer {
     }
 }
 
+/// A view whose controls answer hover while Zigzag is inactive: the screen edge's sidebar over another app.
+protocol HoverTrackingWhileInactive: AnyObject {
+    var hoversWhileInactive: Bool { get }
+}
+
+extension NSView {
+    /// Whether this view is inside a `HoverTrackingWhileInactive` view that has it on.
+    var tracksHoverWhileInactive: Bool {
+        var view: NSView? = self
+        while let current = view {
+            if let host = current as? HoverTrackingWhileInactive, host.hoversWhileInactive { return true }
+            view = current.superview
+        }
+        return false
+    }
+}
+
 /// Base for everything clickable we draw ourselves: tracks hover, press, selection and enabled state.
 class InteractiveView: NSView {
     /// Hover shows and goes at once, both ways: a fade on something you sweep past a hundred times a day only reads
@@ -218,7 +235,8 @@ class InteractiveView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea { removeTrackingArea(trackingArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self)
+        let active: NSTrackingArea.Options = tracksHoverWhileInactive ? .activeAlways : .activeInActiveApp
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, active, .inVisibleRect], owner: self)
         addTrackingArea(area)
         trackingArea = area
         // Keep hover honest after scrolling or relayout.
@@ -725,7 +743,14 @@ class InteractiveView: NSView {
 /// default; inside a row or a field, `.compact` (`Metric.compactIconButton`, `Symbol.compactGlyph`).
 final class IconButton: InteractiveView {
     private let imageView = NSImageView()
-    var symbol: String { didSet { imageView.image = Tokens.Symbol.image(symbol, size: symbolSize); needsLayout = true } }
+    var symbol: String {
+        didSet {
+            // The same symbol again: the image it would make is the one showing.
+            if oldValue == symbol, image == nil, glyph == nil, imageView.image != nil { return }
+            imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
+            needsLayout = true
+        }
+    }
     /// A full-color image instead of a symbol (extension icons).
     var image: NSImage? {
         didSet {
@@ -2082,6 +2107,7 @@ final class MenuPanel: FloatingPanelView {
     static func show(_ entries: [Entry], from anchor: NSView, placement: Placement = .below, minWidth: CGFloat = 0,
                      appearance: NSAppearance? = nil, closed: (() -> Void)? = nil) -> MenuPanel? {
         current?.close(animated: false)
+        if EdgeSidebar.shared.isPanel(anchor.window) { EdgeSidebar.shared.makeRoomForMenu() }
         guard let window = anchor.window, let host = window.contentView else { closed?(); return nil }
         let menu = MenuPanel(entries: entries)
         menu.appearance = appearance
@@ -2259,7 +2285,10 @@ final class MenuPanel: FloatingPanelView {
             return
         }
         let action = rows[index].item.action
+        // From the screen edge's sidebar, the browser window comes forward to do it.
+        let fromEdge = EdgeSidebar.shared.isPanel(window)
         close()
+        if fromEdge { EdgeSidebar.shared.chose() }
         action()
     }
 

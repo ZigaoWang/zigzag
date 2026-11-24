@@ -52,14 +52,19 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private var scrollMonitor: Any?
 
     /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them
-    /// and Zigzag has no passwords brought over from another browser.
+    /// and Zigzag has no passwords brought over from another browser. Never where the profile isn't given your data (`Profile.getsYourData`).
     static func isOn(in profile: Profile) -> Bool {
-        PasswordManagers.zigzagHandles(chosen: ProfileKey.fillsPasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil,
+        profile.getsYourData && PasswordManagers.zigzagHandles(chosen: ProfileKey.fillsPasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil,
                                        imported: UserDefaults.standard.bool(forKey: importedKey))
     }
 
     static func setOn(_ on: Bool, in profile: Profile) {
         UserDefaults.standard.set(on, forKey: ProfileKey.fillsPasswords.name(in: profile.id))
+    }
+
+    /// Whether a form in `tab` is offered your card from Contacts: not in a private window, nor in AI apps' profile.
+    static func fillsForms(in tab: Tab?) -> Bool {
+        ContactCard.isOn && !(tab?.isPrivate ?? false) && (tab?.profile.getsYourData ?? true)
     }
 
     static var script: WKUserScript {
@@ -75,12 +80,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             debugLog("autofill focus main=\(message.frameInfo.isMainFrame) on=\(Self.isOn(in: Profiles.shared.profile(ofPage: webView))) form=\(body["isForm"] ?? "-") new=\(body["isNew"] ?? "-")")
             // Fields inside frames are positioned relative to the frame, which the page can't tell us reliably.
             guard message.frameInfo.isMainFrame, Self.isOn(in: Profiles.shared.profile(ofPage: webView)),
-                  let rect = body["rect"] as? [String: Double], let x = rect["x"], let y = rect["y"], let w = rect["w"], let h = rect["h"] else { hide(); return }
+                  let field = Self.fieldRect(body, in: webView) else { hide(); return }
             let security = message.frameInfo.securityOrigin
             let origin = Origin(scheme: security.protocol, host: security.host.lowercased(), port: security.port == 0 ? nil : security.port)
-            // The page measures in CSS pixels; at a site's zoom, each is pageZoom points.
-            let zoom = webView.pageZoom
-            let field = NSRect(x: x * zoom, y: y * zoom, width: w * zoom, height: h * zoom)
             // Only visible fields; never open the menu for one scrolled away or offscreen.
             guard Self.isInView(field, viewport: webView.bounds.size) else { hide(); return }
             // A click in the field its menu is open for leaves the menu as it is (#378).
@@ -93,7 +95,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let current = generation
             // A name, email, phone or address field: offer your card from Contacts. Read only once you pick it.
             if body["isForm"] as? Bool == true {
-                guard ContactCard.isOn, !(webView.owner?.isPrivate ?? false) else { hide(); return }
+                guard Self.fillsForms(in: webView.owner) else { hide(); return }
                 show([.contact], under: field, in: webView, frame: frame, origin: origin)
                 return
             }
@@ -138,6 +140,14 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 guard let self, current == self.generation, let menu = self.menu, !menu.isPointerInside else { return }
                 self.hide()
             }
+        case "move":
+            // The field moved under the menu (zoom, a resize, the page's own layout): the menu goes with it (#378).
+            guard let menu, let target, target.webView === webView, message.frameInfo.isMainFrame,
+                  let field = Self.fieldRect(body, in: webView) else { return }
+            guard Self.isInView(field, viewport: webView.bounds.size), let overlay = menu.superview else { hide(); return }
+            self.field = field
+            let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
+            menu.frame = Self.menuFrame(under: fieldInOverlay, in: overlay.bounds, height: menu.contentHeight)
         case "key":
             guard let menu, let key = body["key"] as? String else { return }
             if key == "Escape" { hide(); return }
@@ -183,6 +193,21 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private var field = NSRect.zero
     /// Focused by click or Tab, not by the page.
     private var focusedByUser = false
+
+    /// The field the page reported, in web view points from the top left.
+    private static func fieldRect(_ body: [String: Any], in webView: WKWebView) -> NSRect? {
+        guard let rect = body["rect"] as? [String: Double], let x = rect["x"], let y = rect["y"], let w = rect["w"], let h = rect["h"] else { return nil }
+        let view = body["view"] as? [String: Double]
+        return fieldRect(css: NSRect(x: x, y: y, width: w, height: h), viewportOffset: NSPoint(x: view?["x"] ?? 0, y: view?["y"] ?? 0),
+                         pageZoom: webView.pageZoom, magnification: webView.magnification)
+    }
+
+    /// A rect in the page's CSS pixels in points: each is pageZoom points, times the pinch magnification, counted from
+    /// the part of the page in view.
+    static func fieldRect(css: NSRect, viewportOffset: NSPoint, pageZoom: CGFloat, magnification: CGFloat) -> NSRect {
+        let scale = pageZoom * magnification
+        return NSRect(x: (css.minX - viewportOffset.x) * scale, y: (css.minY - viewportOffset.y) * scale, width: css.width * scale, height: css.height * scale)
+    }
 
     /// Whether the field's center (web view points, top left) is inside the view.
     static func isInView(_ field: NSRect, viewport: NSSize) -> Bool {
@@ -319,7 +344,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let rect = try? await webView.callAsyncJavaScript("const r = document.querySelector(s).getBoundingClientRect(); return [r.left, r.top, r.width, r.height]",
                                                               arguments: ["s": selector], in: nil, contentWorld: .defaultClient) as? [Double]
             guard let rect, rect.count == 4 else { debugLog("autofillclick: no \(selector)"); return }
-            let zoom = webView.pageZoom
+            let zoom = webView.pageZoom * webView.magnification
             // Page coordinates run down from the top; the web view is flipped the same way.
             var local = offset.count == 2 ? NSRect(x: (rect[0] + offset[0]) * zoom - 1, y: (rect[1] + offset[1]) * zoom - 1, width: 2, height: 2)
                 : NSRect(x: rect[0] * zoom, y: rect[1] * zoom, width: rect[2] * zoom, height: rect[3] * zoom)
@@ -714,6 +739,27 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const hint = (el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '');
         return /first.?name|last.?name|full.?name|your.?name|^name$|e-?mail|phone|mobile|address|street|city|zip|postal|postcode|company|organi[sz]ation/i.test(hint.trim());
       };
+      // Zoom changes the field's size on screen, not in CSS pixels, so it's kept with the rect.
+      const place = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height, zoom: devicePixelRatio, scale: window.visualViewport ? visualViewport.scale : 1 });
+      // The part of the page in view, when pinched in.
+      const view = () => ({ x: window.visualViewport ? visualViewport.offsetLeft : 0, y: window.visualViewport ? visualViewport.offsetTop : 0 });
+      let reported = null, watching = 0;
+      // Checks the field once a frame while the menu is up, so the menu follows it (#378).
+      const follow = (el) => {
+        const id = ++watching, since = performance.now();
+        const tick = () => {
+          if (id !== watching || !el.isConnected) return;
+          if (window.__zigzagSuggesting) {
+            const now = place(el.getBoundingClientRect());
+            if (!Object.keys(now).every((k) => Math.abs(now[k] - reported[k]) < 0.01)) {
+              reported = now;
+              post({ kind: 'move', rect: now, view: view() });
+            }
+          } else if (performance.now() - since > 2000) return;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      };
       // `byUser`: focused by click or Tab, not by the page.
       const report = (el, byUser) => {
         const r = el.getBoundingClientRect();
@@ -722,8 +768,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         if (!(r.width > 0 && r.height > 0 && x >= 0 && x <= innerWidth && y >= 0 && y <= innerHeight)) return;
         // The field the menu is for, should Passwords… open the Mac's panel on it (SystemAutoFillPanel).
         window.__zigzagField = new WeakRef(el);
+        reported = place(r);
+        follow(el);
         post({ kind: 'focus', isForm: formField(el), isNew: isNew(el) && !el.value, rules: el.getAttribute('passwordrules') || '',
-               minLength: el.minLength, maxLength: el.maxLength, rect: { x: r.left, y: r.top, w: r.width, h: r.height }, byUser: !!byUser });
+               minLength: el.minLength, maxLength: el.maxLength, rect: reported, view: view(), byUser: !!byUser });
       };
       const wanted = (el) => signIn(el) || isNew(el) || formField(el);
       // The menu opens only for something you did: a click on the field, or Tab to it. A page can put the cursor in a

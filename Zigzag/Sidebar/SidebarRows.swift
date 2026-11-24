@@ -811,7 +811,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let waiting = ([tab, partner] + extraPages).compactMap { $0 }.contains { PendingQuestions.hasPending(tabID: $0.id) }
             ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name: a question is waiting for that page.")
             : nil
-        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, waiting, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
+        let unread = isUnread ? String(localized: "unread", comment: "Spoken by VoiceOver after the name of a live folder's page in the sidebar: it hasn't been opened yet.") : nil
+        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unread, unloaded, development, waiting, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + zip(extraPages, extraTitles).map { sound($0, $1) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
@@ -960,6 +961,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     override var trailingAccessoryWidth: CGFloat {
         let close = closeOverlays ? 0 : reservesClose ? max(endSlot, closeButton.frame.width) : endSlot
         let nested = showsNested ? Tokens.Sidebar.rowButton + (close > 0 ? Self.buttonGap : 0) : 0
+        // Its title fades before the unread dot, as before the ×.
+        if close == 0, nested == 0, showsUnread { return Tokens.Sidebar.rowButton }
         // The speaker follows the title (`placeSpeaker`), so it takes no room at the end.
         return close + nested
     }
@@ -981,6 +984,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     var bookmarkIcon: NSImage?
+
+    /// A live folder's page not opened yet: a dot in the ×'s place, which steps aside for the × under the pointer.
+    var isUnread = false {
+        didSet {
+            guard oldValue != isUnread else { return }
+            refreshAccessories()
+            refreshAccessibilityLabel()
+        }
+    }
+    /// Made for the first page that's unread.
+    private var unreadDot: ColorView?
+    static let unreadSide: CGFloat = 6
+    private var showsUnread: Bool { isUnread && closeButton.isHidden && !showsNumber && renameField == nil && !isSplit }
 
     private func refreshTitleColor() {
         // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
@@ -1015,6 +1031,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         audioButton.isHidden = !showsAudio || renameField != nil
         refreshDeveloperMode()
         refreshAttention()
+        if isUnread, unreadDot == nil {
+            let dot = ColorView()
+            dot.layer?.cornerRadius = Self.unreadSide / 2
+            addSubview(dot)
+            unreadDot = dot
+        }
+        unreadDot?.isHidden = !showsUnread
+        unreadDot?.color = Brand.Theme.for(self).accent
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         for (i, views) in (extraViews ?? []).enumerated() {
             let page = extraPages.indices.contains(i) ? extraPages[i] : nil
@@ -1180,6 +1204,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let edge = Self.buttonEdge
         let y = (bounds.height - size.height) / 2
         closeButton.frame.origin = NSPoint(x: bounds.width - edge - size.width, y: y)
+        if let unreadDot {
+            let side = Self.unreadSide
+            unreadDot.frame = NSRect(x: round(closeButton.frame.midX - side / 2), y: round((bounds.height - side) / 2), width: side, height: side)
+        }
         if let hint = numberHint, showsNumber {
             let height = NumberHintView.height
             hint.frame = NSRect(x: bounds.width - edge - hint.width, y: (bounds.height - height) / 2, width: hint.width, height: height)
@@ -1438,13 +1466,31 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     /// A tab group, not a folder; affects VoiceOver and rename text.
     private var isTabGroup = false
 
-    func configure(name: String, open: Bool, count: Int, icon: String? = nil, tabGroup: Bool = false) {
+    /// A live folder's new pages while it's shut: a dot beside its chevron.
+    private var unreadDot: ColorView?
+
+    /// `live`: a live folder, with its live mark in the folder unless it has an icon of its own, and `unread` new pages.
+    func configure(name: String, open: Bool, count: Int, icon: String? = nil, tabGroup: Bool = false, live: Bool = false, unread: Int = 0) {
         title.stringValue = name
-        folderIcon.image = IconChoice.folder(icon, open: open, size: Tokens.Sidebar.favicon)
+        folderIcon.image = IconChoice.folder(icon ?? (live ? LiveFolderSheet.symbol : nil), open: open, size: Tokens.Sidebar.favicon)
         isOpen = open
         isTabGroup = tabGroup
-        setAccessibilityLabel(tabGroup ? String(localized: "\(name), group, \(count) tabs", comment: "Accessibility label of a group of tabs in the sidebar: its name, then how many tabs it holds.")
-                              : String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
+        if live {
+            setAccessibilityLabel(unread > 0 ? String(localized: "\(name), live folder, \(unread) unread", comment: "Accessibility label of a live folder in the sidebar: its name, then how many of its pages are new.")
+                                  : String(localized: "\(name), live folder", comment: "Accessibility label of a live folder in the sidebar with nothing new in it."))
+        } else {
+            setAccessibilityLabel(tabGroup ? String(localized: "\(name), group, \(count) tabs", comment: "Accessibility label of a group of tabs in the sidebar: its name, then how many tabs it holds.")
+                                  : String(localized: "\(name), folder, \(count) pinned", comment: "Accessibility label of a folder in the sidebar: its name, then how many pinned tabs it holds."))
+        }
+        let dotted = live && unread > 0 && !open
+        if dotted, unreadDot == nil {
+            let dot = ColorView()
+            dot.layer?.cornerRadius = TabRowView.unreadSide / 2
+            addSubview(dot)
+            unreadDot = dot
+        }
+        unreadDot?.isHidden = !dotted
+        unreadDot?.color = Brand.Theme.for(self).accent
         setAccessibilityValue(open ? 1 : 0)
         title.textColor = Brand.Theme.for(self).rowInk
         needsLayout = true
@@ -1479,7 +1525,13 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         let column = bounds.width - Self.buttonEdge - Tokens.Sidebar.rowButton / 2
         chevron.frame = NSRect(x: round(column - side / 2), y: (bounds.height - side) / 2, width: side, height: side)
         folderIcon.frame = icon.frame
-        title.frame.size.width = max(0, chevron.frame.minX - Tokens.Space.x1 - title.frame.minX)
+        var end = chevron.frame.minX
+        if let dot = unreadDot, !dot.isHidden {
+            let side = TabRowView.unreadSide
+            dot.frame = NSRect(x: round(chevron.frame.minX - Tokens.Space.x1 - side), y: round((bounds.height - side) / 2), width: side, height: side)
+            end = dot.frame.minX
+        }
+        title.frame.size.width = max(0, end - Tokens.Space.x1 - title.frame.minX)
         if let field = renameField {
             let height = ceil(field.intrinsicContentSize.height)
             // On the title's line, so the name doesn't move as editing starts.

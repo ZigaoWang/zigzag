@@ -44,18 +44,56 @@ final class PageCardView: NSView {
     var headerAlpha: CGFloat { isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1 }
     /// Whether the header takes the top of the card.
     private var headerOnCard: Bool { showsHeader && !liftsHeader }
-    /// Under the bar above the page, the card's top this tall is the bar's: the page starts under it, and the card's
-    /// ground shows there in the page's own color (`ground`), so the bar and the page read as one card: its
-    /// corners, edge and shadow are the card's, and it moves with it.
+    /// How far Autohide has slid this pane's strip up out of its card; the page starts that much higher.
+    var headerOffset: CGFloat = 0 { didSet { if headerOffset != oldValue { needsLayout = true } } }
+    /// The part of the strip that's still on the card, as it slides out.
+    private var shownHeaderOffset: CGFloat { min(max(headerOffset, 0), PaneHeaderView.height) }
+    /// The card's top under the bar, in the page's ground, so the bar and page read as one card.
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
+
+    /// Moves the band to `target`, the page and bar gliding together.
+    func moveBand(to target: CGFloat, with curve: Tokens.Motion.Curve) {
+        guard band != target else { return }
+        let fromFrame = frame
+        let oldBand = band
+        band = target
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        let toFrame = frame
+        frame = fromFrame
+        if fromFrame != toFrame {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = curve.duration
+                context.timingFunction = curve.timing
+                animator().frame = toFrame
+            }
+        }
+        // Laid out at the new band: the clip and header start where they were and slide on the bar's curve.
+        let shift = target - oldBand
+        guard abs(shift) > 0.5 else { return }
+        for view in [clip, header] {
+            let animation = CABasicAnimation(keyPath: "transform.translation.y")
+            animation.fromValue = shift
+            animation.toValue = 0
+            animation.duration = curve.duration
+            animation.timingFunction = curve.timing
+            view.layer?.add(animation, forKey: "autohideBand")
+        }
+    }
+    #if DEBUG
+    /// The card's own ground layer, for the bar's surface tests.
+    var debugSurface: NSView { surface }
+    #endif
     /// The page's own color (`Tab.pageColor`), for the card's ground and what lies on it. None for a page at a
     /// size of its own: it stands on plain ground, so its edges show.
     var pageColor: NSColor? { pageSize == nil ? (webView as? BrowserWebView)?.owner?.pageColor : nil }
-    /// The card's color wherever the page isn't: the page's own, so a split's two cards each have theirs; the plain
-    /// card's with no page, under what covers it, or around a page at a size of its own.
-    /// Around a page at a size of its own, the backdrop a PDF's pages lie on: the page reads as a sheet on it, as a
-    /// device's screen does in a responsive view, whatever color the page is.
-    private var ground: NSColor { pageColor ?? (pageSize != nil ? Tokens.Color.pdfBackdrop : Tokens.Color.cardBackground) }
+    /// The page's colour, unless clear: a card cannot be a hole for the page behind it.
+    private var solidPageColor: NSColor? {
+        guard let pageColor, pageColor.alphaComponent > 0.01 else { return nil }
+        return pageColor
+    }
+    /// The card's ground: the page's own colour, a PDF's backdrop, or the plain card.
+    private var ground: NSColor { solidPageColor ?? (pageSize != nil ? Tokens.Color.pdfBackdrop : Tokens.Color.cardBackground) }
     /// A hairline around a page at a size of its own, so its edges show on any backdrop, light page or dark.
     private let pageOutline = ColorView(color: Tokens.Color.cardEdge)
     /// The page's part of the card, in the superview's terms: under the band.
@@ -175,7 +213,9 @@ final class PageCardView: NSView {
     }
 
     /// How far down the card the page starts: under the bar's band and a split pane's header.
-    private var contentTop: CGFloat { band + (headerOnCard ? PaneHeaderView.height : 0) }
+    private var contentTop: CGFloat { band + (headerOnCard ? PaneHeaderView.height - shownHeaderOffset : 0) }
+    /// How far down the card the page starts, for what lays out against it.
+    var pageTop: CGFloat { contentTop }
     /// The page's own area as the card last laid it out, without what's docked beside it; whoever says the page's
     /// size hears when it changes.
     private(set) var pageArea = NSSize.zero { didSet { if pageArea != oldValue { onPageArea?(pageArea) } } }
@@ -512,7 +552,8 @@ final class PageCardView: NSView {
             clip.frame = bounds
             // The clip isn't flipped: the band and then the header are at its top edge, the page fills the rest below.
             if !liftsHeader {
-                header.frame = NSRect(x: 0, y: bounds.height - band - PaneHeaderView.height, width: bounds.width, height: PaneHeaderView.height)
+                header.frame = NSRect(x: 0, y: bounds.height - band - PaneHeaderView.height + shownHeaderOffset,
+                                      width: bounds.width, height: PaneHeaderView.height)
             }
             // The holder is sized, not the page (it fills the holder beside a docked Web Inspector, and in full screen
             // WebKit sizes it), and only while it's in this card: the mini player or another window may have borrowed it.
@@ -627,8 +668,8 @@ final class PageCardView: NSView {
         Tokens.Motion.withoutAnimation { surface.layer?.backgroundColor = cgColor(ground) }
         let pageColor = pageColor
         Self.paintGround(of: webView, pageColor)
-        // The pane's strip lies on that color: its ink follows it.
-        header.ground = pageColor
+        // The pane's strip lies on the card's ground: its ink follows that, not a clear color the card can't wear.
+        header.ground = ground
     }
 
     private static let setGround = NSSelectorFromString("_setBackgroundColor:")

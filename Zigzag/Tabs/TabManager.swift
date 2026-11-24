@@ -108,12 +108,32 @@ final class TabManager {
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
     var privateStore: WKWebsiteDataStore? { store.privateStore }
     var isPrivate: Bool { privateStore != nil }
+    /// The one profile whose spaces this window shows: AI apps' window keeps to theirs.
+    let keepsToProfile: UUID?
+
+    /// Whether the window may show a space: never from a private one, only those it keeps to.
+    func mayShowSpace(_ space: UUID) -> Bool { !isPrivate && keepsTo(space) }
+
+    /// Its profile's spaces when it keeps to one, else all but AI Apps'.
+    func keepsTo(_ space: UUID) -> Bool { Self.keeps(space, to: keepsToProfile) }
+
+    private static func keeps(_ space: UUID, to profile: UUID?) -> Bool {
+        guard let profile else { return !Library.shared.isAIAppsSpace(space) }
+        return Library.shared.profileID(ofSpace: space) == profile
+    }
+
+    /// The spaces the window lists to go to: yours, or its profile's when it keeps to one.
+    var listedSpaces: [SpaceInfo] {
+        guard let keepsToProfile else { return Library.shared.yourSpaces }
+        return Library.shared.spaces(in: keepsToProfile)
+    }
 
     /// `store`: a shared store (#162); nil creates one. Private windows always get their own.
-    init(spaceID: UUID? = nil, isPrivate: Bool = false, store: TabStore? = nil) {
+    init(spaceID: UUID? = nil, isPrivate: Bool = false, store: TabStore? = nil, keepsToProfile: UUID? = nil) {
+        self.keepsToProfile = keepsToProfile
         self.store = (isPrivate ? nil : store) ?? TabStore(isPrivate: isPrivate)
-        let requested = spaceID.flatMap { Library.shared.space($0)?.id }
-        currentSpaceID = requested ?? Library.shared.spaces[0].id
+        let requested = spaceID.flatMap { Library.shared.space($0)?.id }.flatMap { Self.keeps($0, to: keepsToProfile) ? $0 : nil }
+        currentSpaceID = requested ?? Self.firstSpace(keepingTo: keepsToProfile)
         self.store.attach(self)
         libraryToken = Library.shared.changed.observe { [weak self] in
             // Favorites and pinned pages count among the navigable tabs.
@@ -335,6 +355,12 @@ final class TabManager {
     @available(macOS 15.4, *)
     var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
     var currentSpace: SpaceInfo { Library.shared.space(currentSpaceID) ?? Library.shared.spaces[0] }
+
+    /// Where a window starts or goes when its space is gone: its first listed space.
+    static func firstSpace(keepingTo profile: UUID?) -> UUID {
+        let listed = profile.map { Library.shared.spaces(in: $0) } ?? Library.shared.yourSpaces
+        return listed.first?.id ?? Library.shared.spaces[0].id
+    }
     var currentTabs: [Tab] { tabs(in: currentSpaceID) }
     func tabs(in spaceID: UUID) -> [Tab] { tabsBySpace[spaceID] ?? [] }
 
@@ -474,7 +500,9 @@ final class TabManager {
         // One WebKit made for a page with no tab of its own here (a Zigzag Mini's, a sign-in window's) goes to a
         // space on that page's profile, not to whichever space this window happens to show.
         let made = configuration.flatMap { Profiles.shared.profile(ofStore: $0.websiteDataStore) }
-        let space = spaceID ?? (configuration != nil ? opener?.spaceID : nil) ?? made.flatMap { self.space(for: $0) } ?? currentSpaceID
+        let asked = spaceID ?? (configuration != nil ? opener?.spaceID : nil) ?? made.flatMap { self.space(for: $0) } ?? currentSpaceID
+        // A window that keeps to a profile makes its tabs in that profile's spaces, as it moves them (`moveTabToSpace`).
+        let space = keepsTo(asked) ? asked : currentSpaceID
         let tab = Tab(url: url, title: title, spaceID: space, configuration: configuration)
         // Whoever gave the address loads it: a page's link in a new tab is the page's doing, a typed one yours.
         tab.firstLoad = Tab.FirstLoad(sender: sender, httpFallback: httpFallback)
@@ -931,7 +959,7 @@ final class TabManager {
 
     func switchToSpace(_ id: UUID) {
         // A private window keeps to one space: a swipe or ⌃1 there would leave its tabs out of sight.
-        guard !isPrivate, id != currentSpaceID, Library.shared.space(id) != nil else { return }
+        guard mayShowSpace(id), id != currentSpaceID, Library.shared.space(id) != nil else { return }
         // Making a space switches to it on its own; going somewhere after that is the guide's last step.
         if !isPrivate, Tutorial.done.contains("space") { Tutorial.complete("switch") }
         let left = selectedTab
@@ -1073,13 +1101,13 @@ final class TabManager {
 
     /// Shows another space's list without leaving the page you're on (used while dragging a tab).
     func showSpaceKeepingPage(_ id: UUID) {
-        guard !isPrivate, id != currentSpaceID, Library.shared.space(id) != nil else { return }
+        guard mayShowSpace(id), id != currentSpaceID, Library.shared.space(id) != nil else { return }
         currentSpaceID = id
         changed.send(.space)
     }
 
     func switchSpace(by offset: Int) {
-        let spaces = Library.shared.spaces
+        let spaces = listedSpaces
         guard let index = spaces.firstIndex(where: { $0.id == currentSpaceID }) else { return }
         let next = index + offset
         guard spaces.indices.contains(next) else { return }
@@ -1137,8 +1165,8 @@ final class TabManager {
             if pair.isGroup { return !groupFits(pair.ids.compactMap { tab(with: $0) }) }
             return !canSplit(left, with: right) || left.spaceID != right.spaceID
         }
-        if !spaceIDs.contains(currentSpaceID) {
-            currentSpaceID = Library.shared.spaces[0].id
+        if !spaceIDs.contains(currentSpaceID) || !keepsTo(currentSpaceID) {
+            currentSpaceID = Self.firstSpace(keepingTo: keepsToProfile)
             changed.send(.space)
             selectionChanged()
         }
@@ -1180,6 +1208,8 @@ final class TabManager {
                 structureChanged()
             }
         }
+        // A live folder's new page, opened: read.
+        if !isPrivate { LiveFolders.shared.markRead(bookmark: bookmark.id) }
         select(tab)
     }
 
@@ -1877,6 +1907,8 @@ final class TabManager {
 
     /// Into another space: at `index` where it was dropped, else at the top.
     func moveTabToSpace(_ tab: Tab, spaceID: UUID, at index: Int = 0, grouping: Grouping = .fit) {
+        // A window that keeps to one profile keeps its tabs in its spaces: elsewhere they'd be out of sight.
+        guard keepsTo(spaceID) else { return }
         // Either half of a split moving together counts: the page you were on leaves with it.
         let wasSelected = panes(of: tab).contains { selectedTab === $0 }
         let oldIndex = tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
@@ -2683,7 +2715,8 @@ final class TabManager {
         guard windows.first === self else { return }
         var selectedIDs = Set<UUID>()
         for window in windows {
-            if let tab = window.selectedTab { selectedIDs.formUnion(window.panes(of: tab).map(\.id) + [tab.id]) }
+            // `shownTabs` is empty for the AI apps' unseen window, where only use keeps a tab awake.
+            selectedIDs.formUnion(window.shownTabs.map(\.id))
         }
         let live = allTabs.filter { !$0.isSuspended }
         let now = Date()
@@ -2797,20 +2830,33 @@ final class TabManager {
     /// show it, alone or beside another in a split, since it was chosen.
     static func mayStillSleep(_ tab: Tab) -> Bool {
         guard !tab.isClosed, !tab.isSuspended else { return false }
-        return !WindowManager.shared.controllers.contains { controller in
-            guard let selected = controller.tabManager.selectedTab else { return false }
-            return selected === tab || controller.tabManager.partners(of: selected).contains { $0 === tab }
-        }
+        return !WindowManager.shared.everyController.contains { $0.tabManager.shows(tab) }
+    }
+
+    /// Whether someone sees the tab here: selected or in its split, never in an unseen window.
+    func shows(_ tab: Tab) -> Bool { shownTabs.contains { $0 === tab } }
+
+    /// The tabs this window shows to someone, for a pass over many tabs to work out once.
+    var shownTabs: [Tab] {
+        guard host?.isOutOfSight != true, let selected = selectedTab else { return [] }
+        return panes(of: selected)
+    }
+
+    /// The tabs the Archive may take, by space: never a private window's or AI apps'.
+    var archivableTabs: [[Tab]] {
+        guard !isPrivate else { return [] }
+        return tabsBySpace.filter { Profiles.shared.profile(forSpace: $0.key).getsYourData }.map(\.value)
     }
 
     /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,
     /// what's on screen, a split, anything playing or in a call, a site that sends notifications, one with something you
-    /// typed still in it, or a private window's tabs.
+    /// typed still in it, or what `archivableTabs` leaves out.
     private func archiveStaleTabs(keeping onScreen: Set<UUID>) {
-        if !isPrivate { TabArchive.offerIfCrowded(tabCount: tabsBySpace.values.map(\.count).max() ?? 0) }
-        guard !isPrivate, let limit = TabArchive.after.interval else { return }
+        let lists = archivableTabs
+        TabArchive.offerIfCrowded(tabCount: lists.map(\.count).max() ?? 0)
+        guard let limit = TabArchive.after.interval else { return }
         let now = Date()
-        let stale = tabsBySpace.values.flatMap { $0 }.filter {
+        let stale = lists.flatMap { $0 }.filter {
             $0.bookmarkID == nil && !onScreen.contains($0.id) && split(for: $0) == nil && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser
                 && $0.pageState?.hasTypedText != true && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
         }

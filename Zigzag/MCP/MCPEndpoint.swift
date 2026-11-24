@@ -195,6 +195,8 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
     private let lock = NSLock()
     private var token: String
     private var sessions: [String: Session] = [:]
+    /// When an app last had a request accepted; refusals and goodbyes don't count.
+    private var lastRequestAt: Date?
     private let runner: MCPToolRunner
     private let serverVersion: String
     /// Told when a session ends (the app said goodbye, or a new key cut it off), with the session's client.
@@ -245,6 +247,12 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
     var sessionCount: Int {
         lock.lock(); defer { lock.unlock() }
         return sessions.count
+    }
+
+    /// When an app last asked anything, or nil: sessions never end on their own.
+    var lastRequest: Date? {
+        lock.lock(); defer { lock.unlock() }
+        return lastRequestAt
     }
 
     private var currentToken: String {
@@ -350,6 +358,8 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
                 return mismatch("Mcp-Name must be the tool's name.")
             }
         }
+        // Accepted: an app at work, as one asking in a session is.
+        lock.withLock { lastRequestAt = Date() }
         let info = params["_meta"]?["io.modelcontextprotocol/clientInfo"]
         let name = info?["name"]?.string
         let client = MCPClient(key: "app:" + (name ?? "unnamed"), name: name)
@@ -396,6 +406,7 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
             let client = MCPClient(key: sessionID, name: name)
             let dropped: [MCPClient] = lock.withLock {
                 sessions[sessionID] = Session(client: client, version: version, lastSeen: Date())
+                lastRequestAt = Date()
                 guard sessions.count > Self.maxSessions, let oldest = sessions.min(by: { $0.value.lastSeen < $1.value.lastSeen }) else { return [] }
                 sessions[oldest.key] = nil
                 return [oldest.value.client]
@@ -412,7 +423,10 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
         }
         let session: Session? = lock.withLock {
             let found = sessions[sessionID]
-            if found != nil { sessions[sessionID]?.lastSeen = Date() }
+            if found != nil {
+                sessions[sessionID]?.lastSeen = Date()
+                lastRequestAt = Date()
+            }
             return found
         }
         guard let session else {

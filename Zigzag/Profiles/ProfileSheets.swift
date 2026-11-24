@@ -3,7 +3,8 @@ import AppKit
 extension ProfileInfo {
     /// Its name as shown. The first profile is "Default" until it's given a name of its own.
     var displayName: String {
-        name ?? String(localized: "Default", comment: "The name of the first profile, which holds what Zigzag kept before there were profiles, until it's renamed.")
+        if isHeadless { return String(localized: "AI Apps", comment: "The name of the profile AI apps use in the background. It can't be changed.") }
+        return name ?? String(localized: "Default", comment: "The name of the first profile, which holds what Zigzag kept before there were profiles, until it's renamed.")
     }
 }
 
@@ -66,8 +67,9 @@ enum ProfileChoice {
     /// shown: the choice is read back from these, not from the list as it is later, which may have changed while
     /// the menu was open.
     @discardableResult
-    static func fill(_ button: DropdownButton, selected: UUID) -> [UUID] {
-        let profiles = Library.shared.profiles
+    static func fill(_ button: DropdownButton, selected: UUID, withAIApps: Bool = true) -> [UUID] {
+        // Your spaces and imports never go on the AI Apps profile.
+        let profiles = Library.shared.profiles.filter { withAIApps || !$0.isHeadless }
         button.options = options(profiles)
         button.selectedIndex = profiles.firstIndex { $0.id == selected } ?? 0
         return profiles.map(\.id)
@@ -188,14 +190,17 @@ enum ProfileSheets {
         let name = FilledField(placeholder: String(localized: "Name this profile", comment: "Placeholder of the name field in the sheet that makes or edits a profile."))
         name.stringValue = profile.displayName
         let dots = ColorDots(selected: library.color(of: profile))
-        let rows = [
-            FormSheet.Row(label: nil, view: name),
-            FormSheet.Row(label: String(localized: "Color", comment: "Label of the row of colors in the sheet that makes or edits a profile."), view: dots, height: ColorDots.side + Tokens.Space.x1),
-        ]
-        FormSheet.show(in: host, title: String(localized: "Edit Profile", comment: "Title of the sheet that renames a profile and changes its color."), symbol: "person",
+        let colors = FormSheet.Row(label: String(localized: "Color", comment: "Label of the row of colors in the sheet that makes or edits a profile."), view: dots, height: ColorDots.side + Tokens.Space.x1)
+        // AI apps' profile's name is Zigzag's: only its color is yours to change.
+        let locked = profile.isHeadless
+        let rows = locked
+            ? [.note(String(localized: "AI apps use this profile when they run in the background. Its name can’t be changed.", comment: "In the sheet that edits the profile AI apps use in the background (AI Apps), in place of its name field.")), colors]
+            : [FormSheet.Row(label: nil, view: name), colors]
+        FormSheet.show(in: host, title: locked ? profile.displayName : String(localized: "Edit Profile", comment: "Title of the sheet that renames a profile and changes its color."), symbol: "person",
                        rows: rows, confirmTitle: String(localized: "Save", comment: "Button that saves a profile's new name and color."),
-                       canConfirm: { [weak name] in !(name?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) }) { confirmed in
+                       canConfirm: { [weak name] in locked || !(name?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) }) { confirmed in
             guard confirmed else { return }
+            guard !locked else { library.updateProfile(id, name: profile.name, color: dots.selected); return }
             let typed = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             // The first profile left with the name it's shown by keeps following your language.
             library.updateProfile(id, name: profile.name == nil && typed == profile.displayName ? nil : typed, color: dots.selected)
@@ -212,15 +217,21 @@ enum ProfileSheets {
         // written.
         let tellInUse = { [weak host] in
             guard let host else { return }
+            // AI apps' profile is held while they work in it.
+            let message = profile.isHeadless
+                ? String(localized: "AI apps are using it in the background. Stop them first with Stop AI Apps, under the sparkles in the menu bar.", comment: "Message of the sheet shown instead of the one that deletes the profile AI apps use in the background, while they work in it. Stop AI Apps is the item's name in the menu of Zigzag's sparkles icon in the menu bar.")
+                : String(localized: "Something is still being added to it, such as an import or an extension. Try again when that’s done.", comment: "Message of the sheet shown instead of the one that deletes a profile, while an import or an extension is still going into that profile.")
             ConfirmSheet.notice(in: host, title: String(localized: "\(name) can’t be deleted yet", comment: "Title of the sheet shown instead of the one that deletes a profile, while an import or an extension is still going into that profile. The placeholder is the profile's name."),
-                                message: String(localized: "Something is still being added to it, such as an import or an extension. Try again when that’s done.", comment: "Message of the sheet shown instead of the one that deletes a profile, while an import or an extension is still going into that profile."))
+                                message: message)
         }
         if Profiles.shared.removalBlock(id) == .inUse { tellInUse(); return }
         let typed = FilledField(placeholder: name)
         // What goes, what moves, what stays, and last that it's for good.
         var message = String(localized: "Its sign-ins, history, favorites and extensions are deleted, with everything the extensions hold, wallets included.",
                              comment: "Message of the sheet that deletes a profile. More sentences may follow.")
-        if !library.spaces(in: id).isEmpty {
+        if profile.isHeadless {
+            message = Words.sentences(message, String(localized: "Its spaces go with it. Zigzag makes a new AI Apps profile the next time AI apps run in the background.", comment: "Added to the message of the sheet that deletes the profile AI apps use in the background (AI Apps)."))
+        } else if !library.spaces(in: id).isEmpty {
             let first = library.profiles[0].displayName
             message = Words.sentences(message, String(localized: "Its spaces move to \(first).", comment: "Added to the message of the sheet that deletes a profile, when the profile has spaces. The placeholder is the first profile's name."))
         }

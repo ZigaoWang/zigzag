@@ -399,6 +399,7 @@ final class DeskController {
     }
 
     private var manager: TabManager? { controller?.tabManager }
+    private var listedSpaces: [SpaceInfo] { manager?.listedSpaces ?? Library.shared.yourSpaces }
 
     #if DEBUG
     /// Times an open or close: each step's moment, and every frame's interval while it animates, to debug.log.
@@ -543,7 +544,7 @@ final class DeskController {
         let size = root.cardFrame.size
         // A snapshot from the other appearance is stale.
         let dark = root.effectiveAppearance.isDark
-        let pages = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }.filter {
+        let pages = listedSpaces.flatMap { manager.tabs(in: $0.id) }.filter {
             Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.window != nil, loaded: $0.hasLoadedOnce,
                                        hasPicture: $0.snapshot != nil && TabThumbnailView.knownBlank($0.snapshot) != true
                                            && !$0.snapshotIsStale(windowDark: dark))
@@ -861,7 +862,7 @@ final class DeskController {
         let width = max(scrollView.contentSize.width, minCardWidth + margin * 2)
         let visible = scrollView.contentSize.height
         var groups: [(space: UUID, ids: [UUID])] = []
-        for space in Library.shared.spaces {
+        for space in listedSpaces {
             var ids = cardTabs(in: space.id).map(\.id)
             if let dragging {
                 ids.removeAll { $0 == dragging.id }
@@ -1017,7 +1018,7 @@ final class DeskController {
 
     private func reload(animated: Bool = false) {
         guard manager != nil else { return }
-        let allTabs = Library.shared.spaces.flatMap { cardTabs(in: $0.id) }
+        let allTabs = listedSpaces.flatMap { cardTabs(in: $0.id) }
         let ids = Set(allTabs.map(\.id))
         for (id, view) in cards where !ids.contains(id) {
             cards[id] = nil
@@ -1061,7 +1062,7 @@ final class DeskController {
             canvas.addSubview(card)
             fresh.append(card)
         }
-        for space in Library.shared.spaces where headers[space.id] == nil {
+        for space in listedSpaces where headers[space.id] == nil {
             let header = DeskHeaderView()
             header.onClick = { [weak self] _ in self?.selectSpace(space.id) }
             header.duplicatesButton.onClick = { [weak self] _ in self?.previewClosing([]); self?.closeDuplicates(in: space.id) }
@@ -1074,7 +1075,7 @@ final class DeskController {
             canvas.addSubview(header)
         }
         for (id, header) in headers where Library.shared.space(id) == nil { header.removeFromSuperview(); headers[id] = nil }
-        for space in Library.shared.spaces where empties[space.id] == nil {
+        for space in listedSpaces where empties[space.id] == nil {
             let empty = DeskEmptySpaceView()
             empty.newTab.onClick = { [weak self] _ in self?.newTab(in: space.id) }
             empties[space.id] = empty
@@ -1337,7 +1338,7 @@ final class DeskController {
 
     /// Every card, space by space, in the order they read.
     private var orderedCardIDs: [UUID] {
-        Library.shared.spaces.flatMap { cardTabs(in: $0.id).map(\.id) }.filter { cards[$0] != nil }
+        listedSpaces.flatMap { cardTabs(in: $0.id).map(\.id) }.filter { cards[$0] != nil }
     }
 
     private func setFocus(_ id: UUID?, scroll: Bool = true) {

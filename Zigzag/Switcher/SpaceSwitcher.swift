@@ -214,7 +214,7 @@ final class SpaceSwitcher {
 
     private func begin() {
         guard let controller, !controller.tabManager.isPrivate else { return }
-        let all = Library.shared.spaces
+        let all = Library.shared.yourSpaces
         guard all.count > 1 else { return }
         if controller.commandBar.isVisible { controller.commandBar.dismiss(restoringFocus: false) }
         spaces = all.map(\.id)

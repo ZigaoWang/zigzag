@@ -383,6 +383,66 @@ struct BookmarkFolderTests {
         #expect(!SwipeNavigator.sameSpot(NSPoint(x: 100, y: 200), NSPoint(x: 140, y: 200)))
     }
 
+    /// A two-finger scroll at `phase` (1 began, 2 changed, 4 ended), `dx` and `dy` points.
+    private func scroll(phase: Int64, dx: Int32 = 0, dy: Int32 = 0) throws -> NSEvent {
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: dx, wheel3: 0))
+        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(dx))
+        return try #require(NSEvent(cgEvent: cg))
+    }
+
+    @MainActor @Test func aSwipesPageListensOnlyUntilItsGestureIsDecided() throws {
+        guard NSEvent.isSwipeTrackingFromScrollEventsEnabled, SwipeNavigator.isOn else { return }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: true)
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        window.contentView?.addSubview(page)
+        let swipe = page.swipeNavigator
+        // Up and down: the page never listens.
+        _ = swipe.handle(try scroll(phase: 1, dy: -6))
+        #expect(!swipe.pageListens)
+        _ = swipe.handle(try scroll(phase: 2, dy: -12))
+        #expect(!swipe.pageListens)
+        _ = swipe.handle(try scroll(phase: 4))
+        // Sideways, it listens; with nowhere to go it's decided as a scroll, and it stops.
+        _ = swipe.handle(try scroll(phase: 1, dx: 6))
+        #expect(swipe.pageListens)
+        _ = swipe.handle(try scroll(phase: 2, dx: 12))
+        #expect(!swipe.pageListens)
+        // Let go before deciding.
+        _ = swipe.handle(try scroll(phase: 1, dx: 2))
+        #expect(swipe.pageListens)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(!swipe.pageListens)
+    }
+
+    @MainActor @Test func theSwipeScriptListensOnlyWhenAsked() async throws {
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.addUserScript(SwipeAnswers.script)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        let window = NSWindow(contentRect: webView.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = webView
+        webView.loadHTMLString("<iframe srcdoc='<p>frame</p>'></iframe>", baseURL: URL(string: "https://example.com"))
+        for _ in 0..<100 where webView.isLoading { try await Task.sleep(for: .milliseconds(20)) }
+        try await Task.sleep(for: .milliseconds(100))
+        func run(_ js: String) async throws -> Bool? {
+            try await webView.callAsyncJavaScript("return \(js)", arguments: [:], in: nil, contentWorld: .defaultClient) as? Bool
+        }
+        let listen = "window.\(SwipeAnswers.listen)"
+        // The page itself: not until Zigzag asks, and no longer once told to stop.
+        #expect(try await run("\(listen)()") == false)
+        #expect(try await run("\(listen)(true)") == true)
+        #expect(try await run("\(listen)(false)") == false)
+        // A frame, which Zigzag can't ask: while the pointer is in it.
+        let frame = "document.querySelector('iframe').contentWindow"
+        #expect(try await run("\(frame).\(SwipeAnswers.listen)()") == true)
+        let left = "(\(frame).document.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: null })), \(frame).\(SwipeAnswers.listen)())"
+        #expect(try await run(left) == false)
+        let back = "(\(frame).document.body.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })), \(frame).\(SwipeAnswers.listen)())"
+        #expect(try await run(back) == true)
+    }
+
     @Test func swipeAnswersBelongToTheirGesture() {
         let began = 1_000_000.0
         // The first answer decides; one about the last gesture's momentum, answered late, doesn't count.

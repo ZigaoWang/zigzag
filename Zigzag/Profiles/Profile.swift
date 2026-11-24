@@ -9,6 +9,10 @@ final class Profile {
 
     let id: UUID
     var isDefault: Bool { id == Self.defaultID }
+    /// The AI Apps profile (`ProfileInfo.role`): for its role only, like muted tabs and its name.
+    let isHeadless: Bool
+    /// False for AI Apps: no Keychain, passwords, passkeys, permissions, rules, routes or Archive of yours.
+    var getsYourData: Bool { !isHeadless }
     /// Cookies and everything else websites keep. One object for as long as Zigzag runs: certificate exceptions,
     /// sign-in prompts and downloads tell stores apart by which object they are. Made the first time something in
     /// the profile needs it: WebKit creates a store on disk when it's asked for, and won't remove one this run has
@@ -52,8 +56,10 @@ final class Profile {
     /// Its extensions if they've been brought up, without bringing them up.
     var startedExtensions: ExtensionHost? { host }
 
+    /// Its role is read here, once: it never changes after the profile is made.
     init(id: UUID) {
         self.id = id
+        isHeadless = id != Self.defaultID && Library.shared.directory.profile(id)?.isHeadless == true
     }
 }
 

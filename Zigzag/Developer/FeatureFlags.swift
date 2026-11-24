@@ -132,6 +132,7 @@ enum FeatureFlags {
         // Zigzag's defaults first so Settings changes override them.
         let listed = Set((engine.flags ?? []).map(\.key))
         for (key, on) in ownDefaults.sorted(by: { $0.key < $1.key }) where listed.contains(key) { engine.set(on, key: key, in: preferences) }
+        defer { if listed.contains(sixtyFPSKey) { FramePacing.starting(preferences) } }
         guard DeveloperTools.isOn else { return }
         let all = overrides
         guard !all.isEmpty else { return }
@@ -145,6 +146,7 @@ enum FeatureFlags {
         for (key, on) in ownDefaults.sorted(by: { $0.key < $1.key }) where listed.contains(key) {
             engine.set(DeveloperTools.isOn ? overrides[key] ?? on : on, key: key, in: preferences)
         }
+        if listed.contains(sixtyFPSKey) { FramePacing.starting(preferences) }
     }
 
     /// Whether pages start held near 60 fps: WebKit's default, or Zigzag's, or what Settings changed it to.
@@ -167,7 +169,7 @@ enum FeatureFlags {
     /// Every open web view except sleeping tabs, which pick up settings on wake. Each has its own preferences
     /// (`WebKitSetup.separatePreferences`), so each is set: tabs, Mini, web apps, pop-ups.
     static var openWebViews: [WKWebView] {
-        let tabs: [Tab] = WindowManager.shared.controllers.flatMap(\.tabManager.allTabs)
+        let tabs: [Tab] = WindowManager.shared.everyOpenTab
             + MiniWindowController.all.map(\.tab) + WebAppWindowController.all.map(\.tab)
         let pages: [WKWebView] = tabs.compactMap { $0.webView }
         return pages + PopupWindowController.all.map(\.webView)
@@ -176,7 +178,7 @@ enum FeatureFlags {
     /// Reloads every page that's showing a website in a browser window, so a change takes effect. Zigzag's own pages
     /// (Settings, History) and sleeping tabs are left as they are.
     static func reloadAllTabs() {
-        for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+        for tab in WindowManager.shared.everyOpenTab {
             guard let webView = tab.webView, let scheme = webView.url?.scheme?.lowercased(), ["http", "https", "file"].contains(scheme) else { continue }
             webView.reload()
         }

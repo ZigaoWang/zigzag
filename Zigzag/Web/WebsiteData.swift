@@ -33,12 +33,15 @@ enum WebsiteData {
             Tab.forgetSessions(in: store, keeping: kept)
             for name in Set(removed.compactMap(KeptCookies.site(ofHost:))) {
                 DarkSeen.forget(in: store, site: name)
+                if store.isPersistent { FramePacing.forget(site: name) }
                 forgetConnections(in: store, site: name)
             }
             return
         }
         // Dark pages' sites seen dark name the sites they were seen on: they go with either.
         DarkSeen.forget(in: store, site: site)
+        // And the sites held near 60 fps.
+        if store.isPersistent { FramePacing.forget(site: site) }
         // Clearing cookies also clears its trusted certificate exceptions and HSTS state, and what sleeping tabs keep
         // of its sessionStorage.
         if kind == .cookies {

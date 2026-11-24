@@ -208,6 +208,8 @@ enum CommandRanker {
                keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key"),
         Action(id: "import", title: String(localized: "Import from Another Browser…", comment: "A command in the command bar, named as in the menu bar."),
                keywords: ["import", "bring", "move", "switch", "passwords", "bookmarks", "arc", "chrome", "safari", "firefox"], symbol: "square.and.arrow.down"),
+        Action(id: "export", title: DataExport.title,
+               keywords: ["export", "backup", "bookmarks", "html", "spaces", "data", "leave", "move"], symbol: "square.and.arrow.up"),
         Action(id: "feedback", title: String(localized: "Send Feedback…", comment: "A command in the command bar, named as in the menu bar."),
                keywords: ["feedback", "send", "suggest", "idea", "contact", "email", "help"], symbol: "bubble.left"),
         Action(id: "report", title: String(localized: "Report a Problem…", comment: "A command in the command bar, named as in the menu bar."),
@@ -245,6 +247,8 @@ enum CommandRanker {
         var pageSizes: [PageSizes.Size] = []
         /// The page can be captured (⇧⌘2).
         var canCapture = false
+        /// AI apps work in the background (Headless): their window can be shown.
+        var aiAppsInBackground = false
     }
 
     /// The commands about the page and window you're in, each named as in the menu bar, and only those that apply.
@@ -306,6 +310,9 @@ enum CommandRanker {
         guard !c.isPrivate else { return list }
         list.append(Action(id: "new-space", title: String(localized: "New Space", comment: "A command in the command bar, named as in the menu bar."),
                            keywords: ["new", "space", "create", "add"], symbol: "plus.square"))
+        if c.aiAppsInBackground {
+            list.append(Action(id: "show-headless", title: Headless.showTitle, keywords: ["show", "headless", "background", "ai", "agent", "window"], symbol: "sparkles"))
+        }
         for space in c.spaces where space.id != c.currentSpaceID {
             let name = space.name.lowercased().split(separator: " ").map(String.init)
             list.append(Action(id: "space:\(space.id.uuidString)", title: String(localized: "Switch to \(space.name)", comment: "A command in the command bar: goes to another space. The name is the space's."),
@@ -370,8 +377,9 @@ enum CommandRanker {
         var c = Context()
         c.isPrivate = manager.isPrivate
         c.canReopen = WindowManager.shared.canReopenLastClosed(from: manager)
-        c.spaces = Library.shared.spaces.map { Context.Space(id: $0.id, name: $0.name) }
+        c.spaces = manager.listedSpaces.map { Context.Space(id: $0.id, name: $0.name) }
         c.currentSpaceID = manager.currentSpaceID
+        c.aiAppsInBackground = Headless.isActive
         let tabs = manager.currentTabs
         guard let tab = manager.selectedTab else { return c }
         c.hasPage = tab.url != nil

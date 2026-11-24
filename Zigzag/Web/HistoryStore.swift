@@ -141,6 +141,8 @@ final class HistoryStore {
         Diagnostics.forget(since: date)
         // Dark pages' sites seen dark are a list of sites visited in the profile, so they go too.
         DarkSeen.forget(scope: DarkSeen.scope(ofProfile: profile), since: date)
+        // So are the sites held near 60 fps.
+        FramePacing.forget(since: date)
         onRemove?(date == nil ? nil : visits.map(\.url))
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(since: date, where: isOurs),
                               pdfPlaces: PDFViewerView.takePlaces(since: date), icons: FaviconStore.shared.setAsideVisited(since: date), profile: profile)

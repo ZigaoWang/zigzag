@@ -155,7 +155,7 @@ final class WindowManager {
         return controllers.first { $0.tabManager.tab(with: tab.id) === tab }
     }
 
-    /// Each open tab once, however many windows list it.
+    /// Each open tab of your windows once; `everyOpenTab` adds AI apps'.
     var openTabs: [Tab] {
         var seen = Set<ObjectIdentifier>()
         return controllers.flatMap { controller -> [Tab] in
@@ -187,12 +187,15 @@ final class WindowManager {
         #if DEBUG
         if let debugTarget, controllers.contains(where: { $0 === debugTarget }) { return debugTarget }
         #endif
-        if let controller = NSApp.keyWindow?.windowController as? BrowserWindowController { return controller }
-        if let controller = NSApp.mainWindow?.windowController as? BrowserWindowController { return controller }
+        // Only your windows: AI apps' window in the background (Headless) isn't one.
+        if let controller = NSApp.keyWindow?.windowController as? BrowserWindowController, controllers.contains(where: { $0 === controller }) { return controller }
+        if let controller = NSApp.mainWindow?.windowController as? BrowserWindowController, controllers.contains(where: { $0 === controller }) { return controller }
         return lastKey ?? controllers.last
     }
 
     func windowBecameKey(_ controller: BrowserWindowController) {
+        // AI apps' window in the background, shown to watch them: never taken for one of yours.
+        guard controllers.contains(where: { $0 === controller }) else { return }
         lastKey = controller
         if #available(macOS 15.4, *) { ExtensionCenter.windowFocused(controller) }
     }
@@ -268,6 +271,18 @@ final class WindowManager {
             controller.commandBar.show(mode: .newTab)
         }
         return controller
+    }
+
+    /// Your windows plus AI apps' unseen one: for tabs wherever they are, never for your windows.
+    var everyController: [BrowserWindowController] { controllers + [Headless.window].compactMap { $0 } }
+
+    /// Each open tab once, AI apps' included: for what reaches every running page.
+    var everyOpenTab: [Tab] { openTabs + (Headless.window?.tabManager.allTabs ?? []) }
+
+    /// AI apps' unseen window, kept out of `controllers`: never saved, scripted or taken for the front one.
+    func makeHeadless(spaceID: UUID) -> BrowserWindowController {
+        BrowserWindowController(tabManager: TabManager(spaceID: spaceID, isPrivate: false, keepsToProfile: Library.shared.profileID(ofSpace: spaceID)),
+                                frame: NSRect(origin: Headless.parkedOrigin, size: Headless.parkedSize))
     }
 
     private func makeController(manager: TabManager, frame: NSRect?, sidebarVisible: Bool, sidebarWidth: CGFloat?) -> BrowserWindowController {
@@ -373,6 +388,7 @@ final class WindowManager {
     }
 
     func saveNow(synchronously: Bool = false) {
+        Freezes.mark("session save")
         saveDebouncer.cancel()
         guard !controllers.isEmpty, !sessionWaiting else { return }
         // Started fresh and nothing done yet: the session from before is still the one to bring back.
@@ -457,7 +473,7 @@ final class WindowManager {
                                         sidebarWidth: Double(controller.root.sidebarWidth),
                                         currentSpaceID: manager.currentSpaceID,
                                         spaces: spaces, bookmarkTabs: bookmarkTabs,
-                                        isFullScreen: controller.window?.styleMask.contains(.fullScreen),
+                                        isFullScreen: controller.savesFullScreen,
                                         splits: withTabs ? manager.splits : nil,
                                         tabGroups: Self.savedGroups(spaces, in: manager))
     }

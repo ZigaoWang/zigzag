@@ -52,14 +52,15 @@ enum UpdateRelaunch {
 
     /// The launch's choice. Restarted for an update: what was open, whatever else would decide (onboarding not
     /// marked done, a link for Zigzag Mini). Otherwise the usual: the session, unless onboarding comes first or
-    /// Zigzag opened for Zigzag Mini or an installed site alone.
-    nonisolated static func plan(relaunch: Saved?, now: Date, needsOnboarding: Bool, miniOnly: Bool, webAppOnly: Bool) -> Plan {
+    /// Zigzag opened for Zigzag Mini, an installed site, or AI apps in the background (`backgroundOnly`) alone.
+    nonisolated static func plan(relaunch: Saved?, now: Date, needsOnboarding: Bool, miniOnly: Bool, webAppOnly: Bool,
+                                 backgroundOnly: Bool = false) -> Plan {
         if let relaunch, case let age = now.timeIntervalSince(relaunch.at), age > -60, age < freshFor {
             // Nothing open at all (every window closed): the browser windows, as any launch.
             let browsers = relaunch.browserWindowsOpen || relaunch.minis.isEmpty
             return Plan(restoresSession: browsers, sessionWaiting: !browsers, restoresMinis: !relaunch.minis.isEmpty)
         }
-        let waiting = miniOnly || webAppOnly
+        let waiting = miniOnly || webAppOnly || backgroundOnly
         return Plan(restoresSession: !needsOnboarding && !waiting, sessionWaiting: waiting, restoresMinis: false)
     }
 

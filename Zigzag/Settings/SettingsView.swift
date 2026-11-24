@@ -37,6 +37,7 @@ final class FormGroup: NSView {
             view.subviews.forEach(addMenus)
         }
         if let control = (row as? FormRow)?.control { addMenus(control) }
+        (row as? FoldBox)?.allRows.forEach { addMenus($0.control) }
         // A row added to a group already on the page takes the group's width at its next layout.
         needsLayout = true
     }
@@ -65,7 +66,16 @@ final class FormGroup: NSView {
         needsLayout = true
     }
 
-    func fittingHeight(for width: CGFloat) -> CGFloat { rows.filter { !$0.isHidden }.map { rowHeight($0, width) }.reduce(0, +) }
+    func fittingHeight(for width: CGFloat) -> CGFloat {
+        let shown = rows.filter { !$0.isHidden }
+        return shown.map { rowHeight($0, width) }.reduce(0, +) + zip(shown, shown.dropFirst()).map { Self.space($0, $1) }.reduce(0, +)
+    }
+
+    /// Words typed in a list's own search (Find a site): only its boxes narrow, alongside Find a setting.
+    var boxFilter: [String] = []
+
+    /// Between two rows: a box keeps a gap from what's beside it, plain rows only a hairline.
+    private static func space(_ above: NSView, _ below: NSView) -> CGFloat { above is FoldBox || below is FoldBox ? FoldStyle.gap : 0 }
 
     /// Shows only the rows that have every word of a search (all of them when `names`, its heading or its pane,
     /// has them, or there are no words). Returns how many show.
@@ -76,6 +86,11 @@ final class FormGroup: NSView {
         for row in rows {
             // A row that's off for now (the custom search address, until Custom is chosen) stays hidden whatever matches.
             let available = (row as? FormRow)?.isAvailable ?? true
+            // A box shows when its own name or one of its rows has every word, opened to the rows that do.
+            if let box = row as? FoldBox {
+                row.isHidden = !available || !box.find((all ? [] : words) + boxFilter)
+                continue
+            }
             let named = all || has((row as? SettingsSearchable)?.searchText ?? "")
             // A list searched inside (the sites keeping data): found by its own words, it shows whole; else it
             // shows what in it matches, if anything does.
@@ -102,12 +117,16 @@ final class FormGroup: NSView {
         let shown = rows.filter { !$0.isHidden }
         // A line between each two rows shown, the rest hidden. Each is only told when that changes: hidden and shown
         // again, it would fade out and in when the page changes size inside an animation.
-        for (i, line) in lines.enumerated() where line.isHidden != (i >= shown.count - 1) { line.isHidden.toggle() }
+        for (i, line) in lines.enumerated() {
+            let hidden = i >= shown.count - 1 || Self.space(shown[i], shown[i + 1]) > 0
+            if line.isHidden != hidden { line.isHidden.toggle() }
+        }
         for (i, row) in shown.enumerated() {
             let h = rowHeight(row, bounds.width)
             row.frame = NSRect(x: 0, y: y, width: bounds.width, height: h)
             y += h
-            if i < shown.count - 1 {
+            if i < shown.count - 1 { y += Self.space(row, shown[i + 1]) }
+            if i < shown.count - 1, !lines[i].isHidden {
                 // The hairline starts where the text does, past any picture, and runs to the group's edge.
                 let x = (row as? FormRow)?.textInset ?? (row as? SpaceSettingsRow)?.textInset ?? Tokens.Page.groupPad
                 lines[i].frame = NSRect(x: x, y: y, width: bounds.width - x - Tokens.Page.groupPad, height: Tokens.Metric.hairline)
@@ -320,6 +339,17 @@ final class FormRow: NSView, SettingsSearchable {
         }
     }
 
+    /// The line under the title in code type (a CSS selector).
+    var detailIsCode = false {
+        didSet {
+            detail.font = detailIsCode ? Tokens.Font.code(Tokens.TypeSize.label) : Tokens.Font.detail()
+            needsLayout = true
+        }
+    }
+
+    /// Whether a picture goes before its name.
+    var hasPicture: Bool { !icon.isHidden }
+
     /// Where the row's text starts.
     var textInset: CGFloat {
         (icon.isHidden && !isIndented && !isNested ? pad : pad + Self.iconSide + Tokens.Space.x3) + (isNested ? Tokens.Space.x4 : 0)
@@ -371,6 +401,337 @@ final class FormRow: NSView, SettingsSearchable {
         let top = stacked ? Tokens.Page.groupRowPad : detail.isHidden ? title.centeredY(in: bounds.height) : round((bounds.height - block) / 2)
         title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
         detail.frame = NSRect(x: x, y: top + titleAndGap, width: width, height: detailHeight)
+    }
+}
+
+// MARK: - Boxes that fold
+
+/// How a box that folds looks (#368): a site, an extension, what a site keeps. One card each, a gap between them,
+/// headed by what it is with a chevron at the end. Shared by `FoldBox` and Stored by Websites' rows.
+enum FoldStyle {
+    static let radius = Tokens.Radius.group
+    /// Between one box and the next.
+    static let gap = Tokens.Space.x2
+    static let chevronSide = Tokens.Space.x4
+    /// Between the header's controls and the chevron.
+    static let chevronGap = Tokens.Space.x2
+    /// The room a header gives its chevron at its trailing end, past its content.
+    static var chevronRoom: CGFloat { chevronSide + chevronGap }
+    /// A short list opens its boxes; a longer one starts folded.
+    static let openUpTo = 3
+    /// From this many boxes, the list gets a search of its own.
+    static let searchFrom = 8
+
+    static func opensByDefault(count: Int) -> Bool { count <= openUpTo }
+
+    /// The card: the group's fill, its hairline edge and corners.
+    static func paint(_ view: NSView) {
+        guard let layer = view.layer else { return }
+        layer.cornerRadius = radius
+        layer.cornerCurve = .continuous
+        layer.masksToBounds = true
+        layer.backgroundColor = view.cgColor(Tokens.Color.surfaceGroup)
+        layer.borderWidth = Tokens.Metric.hairline
+        layer.borderColor = view.cgColor(Tokens.Color.surfaceGroupEdge)
+    }
+
+    /// A fold opening or closing: what's under it moves to make room, with nothing sliding under Reduce Motion.
+    static func animate(in view: NSView?, _ changes: @escaping () -> Void, completion: (@MainActor () -> Void)? = nil) {
+        Tokens.Motion.animate(moves: true, {
+            changes()
+            view?.layoutSubtreeIfNeeded()
+        }, completion: completion)
+    }
+
+    /// A list's own search, as Stored by Websites has it: outlined and rounded.
+    static func searchField(_ placeholder: String) -> FilledField {
+        let field = FilledField.search(placeholder)
+        field.isOutlined = true
+        field.isPill = true
+        return field
+    }
+
+    /// The words of a list's own search.
+    static func words(_ text: String) -> [String] { text.split(whereSeparator: \.isWhitespace).map(String.init) }
+
+    /// "3 settings", under a site's name.
+    static func settingsSummary(_ count: Int) -> String {
+        String(localized: "\(count) settings", comment: "Under a site's name in Settings › Privacy › Site Permissions: how many choices are kept for it.")
+    }
+}
+
+/// The top of a box that folds: what's in it (a row, a site's name), then the chevron. A click anywhere but on a
+/// control in it opens or folds the box; so do Space and Return, → and ←, and ↑ ↓ move to the box above or below.
+/// VoiceOver reads it as a disclosure triangle, open or not.
+final class FoldHeader: InteractiveView {
+    let content: NSView
+    private let chevron = NSImageView()
+    /// Folded or open, as the chevron shows: right or down.
+    var isOpen = false { didSet { if oldValue != isOpen { refresh() } } }
+    /// Asked to open (true) or fold.
+    var onToggle: ((Bool) -> Void)?
+
+    init(content: NSView) {
+        self.content = content
+        super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Tokens.Page.groupRowHeight))
+        chevron.imageScaling = .scaleNone
+        addSubview(content)
+        addSubview(chevron)
+        onClick = { [weak self] _ in
+            guard let self else { return }
+            self.onToggle?(!self.isOpen)
+        }
+        setAccessibilityElement(true)
+        setAccessibilityRole(.disclosureTriangle)
+        refresh()
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        content.frame = NSRect(x: 0, y: 0, width: max(0, bounds.width - FoldStyle.chevronRoom), height: bounds.height)
+        // The glyph's own width, so its right edge sits the same pad in from the box as the picture does on the left.
+        let side = FoldStyle.chevronSide, glyph = min(side, ceil(chevron.image?.size.width ?? side))
+        chevron.frame = NSRect(x: bounds.width - Tokens.Page.groupPad - glyph, y: round((bounds.height - side) / 2), width: glyph, height: side)
+    }
+
+    private func refresh() {
+        chevron.image = Tokens.Symbol.image(isOpen ? "chevron.down" : "chevron.right", size: Tokens.Symbol.inline)
+        needsLayout = true
+        setAccessibilityValue(isOpen ? 1 : 0)
+        setAccessibilityExpanded(isOpen)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        layer?.backgroundColor = isHovered || isPressed ? cgColor(isPressed ? Tokens.Color.pressedFill : Tokens.Color.hoverFill) : nil
+        chevron.contentTintColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        stateDidChange(animated: false)
+    }
+
+    /// Its controls are the box's to list; the header itself is the disclosure triangle alone.
+    override func accessibilityChildren() -> [Any]? { [] }
+
+    override func keyDown(with event: NSEvent) {
+        let plain = event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty
+        if hasKeyboardFocus, plain {
+            switch event.keyCode {
+            case 124: if !isOpen { onToggle?(true) }; return
+            case 123: if isOpen { onToggle?(false) }; return
+            case 125: moveFocus(by: 1); return
+            case 126: moveFocus(by: -1); return
+            default: break
+            }
+        }
+        super.keyDown(with: event)
+    }
+
+    /// The headers under `root`, top to bottom.
+    static func headers(in root: NSView) -> [FoldHeader] {
+        var found: [FoldHeader] = []
+        func collect(_ view: NSView) {
+            if let header = view as? FoldHeader, !header.isHiddenOrHasHiddenAncestor { found.append(header) }
+            view.subviews.forEach(collect)
+        }
+        collect(root)
+        return found.sorted { $0.convert($0.bounds, to: nil).maxY > $1.convert($1.bounds, to: nil).maxY }
+    }
+
+    /// The keyboard to the box above or below.
+    func moveFocus(by step: Int) {
+        guard let window, let root = enclosingScrollView?.documentView ?? window.contentView else { return }
+        let all = Self.headers(in: root)
+        guard let index = all.firstIndex(where: { $0 === self }), all.indices.contains(index + step) else { return }
+        window.makeFirstResponder(all[index + step])
+    }
+}
+
+/// One thing in a list (a site with its choices, an extension with its settings) as a box: its row heads it, with
+/// a chevron, and its own rows are inside, folded away until it's opened. "Find a setting" and the list's own search
+/// open it to the rows that match. Every action its rows had stays on them.
+final class FoldBox: NSView, SettingsSizedRow, SettingsFilteredRow, SettingsSearchable {
+    /// What it is, as the list remembers its fold by: "site github.com".
+    let key: String
+    let headerRow: FormRow
+    let header: FoldHeader
+    private(set) var rows: [FormRow]
+    private var lines: [ColorView] = []
+    /// Open, as chosen or as the list starts it.
+    var isOpen: Bool {
+        didSet {
+            guard oldValue != isOpen else { return }
+            // Folding, its rows stay until the box has closed over them (`settle`).
+            if !isOpen { holdsRows = true }
+            header.isOpen = isOpen
+            needsLayout = true
+        }
+    }
+    /// Opened or folded by a click or a key: the list remembers it and lays the page out again.
+    var onToggle: ((FoldBox, Bool) -> Void)?
+    /// While a search shows it: the rows that match, the box open to them.
+    private var found: Set<ObjectIdentifier>?
+    private var holdsRows = false
+
+    /// The header row and the rows inside, each indented so its text lines up with the name.
+    init(key: String, header row: FormRow, rows: [FormRow], isOpen: Bool) {
+        self.key = key
+        headerRow = row
+        header = FoldHeader(content: row)
+        self.rows = rows
+        self.isOpen = isOpen
+        super.init(frame: NSRect(x: 0, y: 0, width: 492, height: Tokens.Page.groupRowHeight))
+        wantsLayer = true
+        addSubview(header)
+        for row in rows {
+            if !row.isNested { row.isIndented = headerRow.hasPicture }
+            let line = ColorView(color: Tokens.Color.separator)
+            lines.append(line)
+            addSubview(line)
+            addSubview(row)
+        }
+        header.isOpen = isOpen
+        header.setAccessibilityLabel(row.titleText)
+        header.onToggle = { [weak self] open in
+            guard let self else { return }
+            self.onToggle?(self, open)
+        }
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(row.titleText)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() { FoldStyle.paint(self) }
+
+    var allRows: [FormRow] { [headerRow] + rows }
+    /// Open now: as chosen, or by a search that found rows in it.
+    var showsOpen: Bool { found != nil || isOpen }
+    var searchText: String { headerRow.searchText }
+
+    /// The rows shown inside: every one open, those a search found, or none folded.
+    var shownRows: [FormRow] {
+        if let found { return rows.filter { found.contains(ObjectIdentifier($0)) } }
+        return isOpen || holdsRows ? rows : []
+    }
+
+    /// The box has closed over its rows: they go, so neither Tab nor VoiceOver lands on what's folded.
+    func settle() {
+        guard holdsRows else { return }
+        holdsRows = false
+        needsLayout = true
+    }
+
+    func height(for width: CGFloat) -> CGFloat {
+        let top = headerHeight(width)
+        guard showsOpen else { return top }
+        return top + shownRows.map { $0.height(for: rowWidth(width)) }.reduce(0, +)
+    }
+
+    private func headerHeight(_ width: CGFloat) -> CGFloat { headerRow.height(for: rowWidth(width)) }
+
+    /// Rows inside stop where the header's content does, so their controls line up with its own, clear of the chevron.
+    private func rowWidth(_ width: CGFloat) -> CGFloat { max(0, width - FoldStyle.chevronRoom) }
+
+    /// Shown when every word is in its name or in one of its rows; then open to just those rows. No words: as it
+    /// was, folded or open as chosen.
+    func find(_ words: [String]) -> Bool {
+        func has(_ text: String) -> Bool { words.allSatisfy { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil } }
+        let before = found
+        defer { if found != before { needsLayout = true } }
+        guard !words.isEmpty, !has(searchText) else { found = nil; return true }
+        let matching = rows.filter { has($0.searchText) }
+        found = matching.isEmpty ? nil : Set(matching.map(ObjectIdentifier.init))
+        return !matching.isEmpty
+    }
+
+    override func layout() {
+        super.layout()
+        let width = bounds.width
+        let top = headerHeight(width)
+        header.frame = NSRect(x: 0, y: 0, width: width, height: top)
+        let shown = shownRows
+        let showing = Set(shown.map(ObjectIdentifier.init))
+        var y = top
+        for (row, line) in zip(rows, lines) {
+            let visible = showing.contains(ObjectIdentifier(row))
+            let appearing = visible && row.isHidden
+            if row.isHidden == visible { row.isHidden = !visible }
+            if line.isHidden == visible { line.isHidden = !visible }
+            guard visible else { continue }
+            let h = row.height(for: rowWidth(width))
+            // The hairline over each row starts where its text does, as in every group.
+            let lineFrame = NSRect(x: row.textInset, y: y, width: max(0, width - row.textInset - Tokens.Page.groupPad), height: Tokens.Metric.hairline)
+            let rowFrame = NSRect(x: 0, y: y, width: rowWidth(width), height: h)
+            // A row coming out starts in its place, uncovered as the box grows, rather than flying in from the top.
+            if appearing {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0
+                    ctx.allowsImplicitAnimation = false
+                    line.frame = lineFrame
+                    row.frame = rowFrame
+                    row.layoutSubtreeIfNeeded()
+                }
+            } else {
+                line.frame = lineFrame
+                row.frame = rowFrame
+            }
+            y += h
+        }
+        // The disclosure triangle, the header's controls, then each row shown: the box reads as its name and what's in it.
+        var children: [Any] = [header]
+        func controls(_ view: NSView) {
+            if view.isAccessibilityElement() { children.append(view); return }
+            view.subviews.forEach(controls)
+        }
+        controls(headerRow.control)
+        setAccessibilityChildren(children + shown)
+    }
+}
+
+/// Buttons and a list's own search at the right of a heading, right to left from the rows' trailing edge, the
+/// search last, as Stored by Websites has its own.
+final class HeadingTools: NSView {
+    var views: [NSView] = [] {
+        didSet {
+            for view in oldValue where !views.contains(where: { $0 === view }) { view.removeFromSuperview() }
+            for view in views where view.superview !== self { addSubview(view) }
+            needsLayout = true
+        }
+    }
+    /// The search's width, narrower on a narrow page.
+    var searchWidth: CGFloat = 180 { didSet { needsLayout = true } }
+
+    override var isFlipped: Bool { true }
+
+    private var shown: [NSView] { views.filter { !$0.isHidden } }
+
+    private func width(of view: NSView) -> CGFloat {
+        if view is FilledField { return searchWidth }
+        if let button = view as? PillButton { return button.fittingWidth }
+        return view.fittingSize.width
+    }
+
+    override var fittingSize: NSSize {
+        let widths = shown.map(width(of:))
+        return NSSize(width: widths.reduce(0, +) + Tokens.Space.x2 * CGFloat(max(0, widths.count - 1)), height: Tokens.Page.controlHeight)
+    }
+
+    override func layout() {
+        super.layout()
+        var right = bounds.width
+        for view in shown.reversed() {
+            let w = width(of: view)
+            view.frame = NSRect(x: right - w, y: 0, width: w, height: Tokens.Page.controlHeight)
+            right -= w + Tokens.Space.x2
+        }
     }
 }
 
@@ -645,7 +1006,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         tile.image = Self.tile(for: space)
         detail.stringValue = Self.summary(of: space)
         RowDelete.apply(deleteButton, shows: false)
-        deleteButton.isEnabled = Library.shared.spaces.count > 1
+        deleteButton.isEnabled = Library.shared.yourSpaces.count > 1
         [tile, name, detail, deleteButton, editButton].forEach { addSubview($0) }
         // The row and its Edit button both open the same editor the sidebar uses.
         onClick = { [weak self] _ in self?.openEditor() }
@@ -766,7 +1127,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             self?.openEditor()
         })
         menu.addItem(SidebarMenus.useDefaultColorsItem(for: spaceID) { BrowserWindowController.changeLibrary($0, $1) })
-        if Library.shared.spaces.count > 1 {
+        if Library.shared.yourSpaces.count > 1 {
             menu.addItem(SidebarMenus.Item(String(localized: "Delete Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
                 guard let self, let host = self.host else { return }
                 SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
@@ -813,7 +1174,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     }
 
     static func confirmDelete(_ id: UUID, in host: NSView) {
-        guard let space = Library.shared.space(id), Library.shared.spaces.count > 1 else { return }
+        guard let space = Library.shared.space(id), Library.shared.yourSpaces.count > 1 else { return }
         // The sidebar deletes right away, ⌘Z being right there. Here Undo is in a browser window, or with none open
         // nowhere at all, so it asks first and says which.
         let undoable = BrowserWindowController.undoTarget != nil
@@ -1102,6 +1463,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var sitesShowAll = false
     /// Sites whose zapped elements are all listed, not just the newest few.
     private var zapsShowAll: Set<String> = []
+    /// Which boxes are open or folded, by key, while Settings stays open (#368).
+    private var folds: [String: Bool] = [:]
+    /// Site Permissions' and Installed's own searches, there once their lists are long.
+    private let sitesSearch = FoldStyle.searchField(String(localized: "sites.find", defaultValue: "Find a site",
+                                                           comment: "Placeholder of the search beside Site Permissions in Settings › Privacy, there when many sites are listed: finds a site by its name or a choice made for it."))
+    private let extensionsSearch = FoldStyle.searchField(String(localized: "Find an extension",
+                                                                comment: "Placeholder of the search beside Installed in Settings › Extensions, there when many extensions are installed: finds one by its name or a setting."))
+    private let sitesTools = HeadingTools()
+    private let extensionsTools = HeadingTools()
+    /// How many sites have boxes, shown or not, and how many extensions are installed.
+    private var sitesListed = 0
+    private var extensionCount = 0
     /// Permissions changed here while Settings is open ("origin|permission"): set back to Ask, a row stays, so the
     /// choice you just made doesn't vanish under the pointer.
     private var permissionsChangedHere: Set<String> = []
@@ -1154,6 +1527,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let favoritesPerRow = DropdownButton()
     private let pageZoom = DropdownButton()
     private let sidebarSize = DropdownButton()
+    private let edgeSidebarToggle = Toggle()
     /// The size of your own beside Sidebar size, there while Custom is chosen (#361).
     private let sidebarSizeStepper = ZoomStepper()
     private var sidebarSizeRow: FormRow?
@@ -1190,7 +1564,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let fullScreenFill = DropdownButton()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
-    private let addressAboveToggle = Toggle()
+    private let addressPlaceMenu = DropdownButton()
     private let sidebarSide = DropdownButton()
     /// Sidebar position's choices, Left then Right, as whether the sidebar is on the right (#360).
     static let sidebarSides = [false, true]
@@ -1201,6 +1575,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let scriptJavaScriptToggle = Toggle()
     private let aiAppsToggle = Toggle()
     private var aiAppsToken: SignalToken?
+    private let backgroundToggle = Toggle()
+    private var backgroundToken: SignalToken?
     /// The server's address and its key, there while AI apps may use Zigzag.
     private lazy var aiAddressRow: FormRow = {
         let copy = PillButton(title: String(localized: "Copy", comment: "Button that copies something to the clipboard."))
@@ -1444,6 +1820,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
                                  control: importButton))
+        let exportButton = PillButton(title: String(localized: "Export…", comment: "Button in Settings › General that opens the Export Your Data sheet."))
+        exportButton.onClick = { [weak self] _ in
+            guard let controller = (self?.window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController else { return }
+            DataExport.show(in: controller)
+        }
+        let exportRow = FormRow(title: String(localized: "Export your data", comment: "A setting in Settings › General."),
+                                detail: String(localized: "Your spaces and pinned tabs as a bookmarks file for any browser, and a Zigzag backup.", comment: "Explanation under “Export your data” in Settings › General."),
+                                control: exportButton)
+        exportRow.keywords = String(localized: "export backup save bookmarks html restore move leave", comment: "Words that find the Export your data setting with Find a setting. Not shown.")
+        generalGroup.add(exportRow)
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                               control: quitToggle)
@@ -1467,6 +1853,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                             control: aiAppsToggle)
         aiRow.keywords = Self.aiAppsKeywords
         aiGroup.add(aiRow)
+        backgroundToggle.onChange = { on in Headless.isOn = on }
+        let backgroundRow = FormRow(title: String(localized: "Run AI apps in the background", comment: "A setting in Settings › Automation: AI apps get a hidden window of their own, on a profile of their own (AI Apps), instead of your windows."),
+                                    detail: String(localized: "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. With this on, opening Zigzag with --headless runs it for them alone.",
+                                                   comment: "Explanation under “Run AI apps in the background” in Settings › Automation. --headless is how Zigzag is opened from Terminal for it: not translated."),
+                                    control: backgroundToggle)
+        backgroundRow.keywords = [Self.aiAppsKeywords, String(localized: "headless background hidden window", comment: "Words that find the Run AI apps in the background setting with Find a setting in Settings. Not shown.")].joined(separator: " ")
+        aiGroup.add(backgroundRow)
+        backgroundToken = Headless.changed.observe { [weak self] in self?.refreshAIApps() }
         aiGroup.add(aiAddressRow)
         aiGroup.add(aiKeyRow)
         connectGroup.add(aiSetupRow)
@@ -1554,6 +1948,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         flagSearch.isOutlined = true
         flagSearch.isPill = true
         flagSearch.field.delegate = self
+        sitesSearch.field.delegate = self
+        extensionsSearch.field.delegate = self
         flagsReset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset all feature flags?", comment: "Title of the sheet that puts every WebKit feature flag back to its default, in Settings › Developer."),
                           message: String(localized: "Every flag you changed goes back to WebKit’s default, for pages you open or reload.",
@@ -1583,10 +1979,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window.", comment: "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys."),
                                     control: borderlessToggle))
-        addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
+        addressPlaceMenu.options = AddressBarPlace.allCases.map { place in
+            switch place {
+            case .off: DropdownButton.Option(title: String(localized: "Off", comment: "Address bar above the page: the address stays in the sidebar."))
+            case .autohide: DropdownButton.Option(title: String(localized: "Autohide", comment: "Address bar above the page: the bar hides as you scroll down and comes back as you scroll up."))
+            case .always: DropdownButton.Option(title: String(localized: "Always", comment: "Address bar above the page: the bar stays above the page."))
+            }
+        }
+        addressPlaceMenu.onSelect = { index in
+            let places = AddressBarPlace.allCases
+            guard places.indices.contains(index) else { return }
+            BrowserRootView.addressBarPlace = places[index]
+        }
         let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
-                                 detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
-                                 control: addressAboveToggle)
+                                 detail: String(localized: "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top.",
+                                                      comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
+                                 control: addressPlaceMenu)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
         sidebarSide.options = [
@@ -1647,6 +2055,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sizeRow.keywords = String(localized: "text size font bigger larger smaller scale zoom interface ui", comment: "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sizeRow)
+        edgeSidebarToggle.onChange = { on in EdgeSidebar.shared.setOn(on) }
+        let edgeRow = FormRow(title: String(localized: "Sidebar from the screen edge", comment: "A setting in Settings › Appearance: moving the pointer to the screen's edge shows the sidebar over other apps, as the Dock does."),
+                              detail: String(localized: "Push the pointer against the edge of the screen on the sidebar’s side to bring the sidebar out over other apps, and click a tab to go to it. Not on a side the Dock or Stage Manager uses.",
+                                             comment: "Explanation under “Sidebar from the screen edge” in Settings › Appearance."),
+                              control: edgeSidebarToggle)
+        edgeRow.keywords = String(localized: "edge dock hover reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.")
+        appearanceGroup.add(edgeRow)
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
@@ -2349,20 +2764,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                         detail: String(localized: "Find one in the Chrome Web Store or Firefox Add-ons and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions. Firefox Add-ons is addons.mozilla.org."),
                                         control: get))
         }
-        for (id, ext) in installed {
-            extensionsGroup.add(extensionRow(id: id, ext: ext))
-            // Only while the feature is on: a switch under every extension is a lot of rows for a door most people
-            // never open, and the master switch in Privacy reads as the one place it starts.
-            if LocalReceivers.isEnabled { extensionsGroup.add(localReceiversRow(id: id)) }
-            let name = ext.displayName ?? id
-            // Only for one that asks to read and change sites.
-            if !ext.allRequestedMatchPatterns.isEmpty {
-                ExtensionSiteAccessRows.make(id: id, name: name, installs: profile.installs,
-                                             add: { [weak self] in if let self { ExtensionSiteAccessRows.addSite(id: id, name: name, installs: self.profile.installs, in: self) { self.siteAccessChanged($0) } } },
-                                             changed: { [weak self] in self?.siteAccessChanged($0) }).forEach(extensionsGroup.add)
-            }
-            extensionsGroup.add(ExtensionPrivateRow.make(id: id, name: name, installs: profile.installs))
-        }
+        extensionCount = installed.count
+        for (id, ext) in installed { extensionsGroup.add(extensionFold(id: id, ext: ext, in: installed.count)) }
+        extensionsGroup.boxFilter = FoldStyle.words(extensionsSearch.stringValue)
         // What your other profiles have that this one doesn't, to add without another trip to the store. Read from
         // each package, not from the other profile's running extensions: looking here starts none of them.
         let here = profile, has = Set(here.installs.installedIDs)
@@ -2398,6 +2802,33 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
         }
     }
+
+    /// An extension as a box in a list of `count`: its row heads it, its settings are inside (#368).
+    @available(macOS 15.4, *)
+    private func extensionFold(id: String, ext: WKWebExtension, in count: Int) -> FoldBox {
+        let name = ext.displayName ?? id
+        var rows: [FormRow] = []
+        // Only while the feature is on: a switch under every extension is a lot of rows for a door most people
+        // never open, and the master switch in Privacy reads as the one place it starts.
+        if LocalReceivers.isEnabled {
+            let row = localReceiversRow(id: id)
+            row.keywords = name
+            rows.append(row)
+        }
+        // Only for one that asks to read and change sites.
+        if !ext.allRequestedMatchPatterns.isEmpty {
+            rows += ExtensionSiteAccessRows.make(id: id, name: name, installs: profile.installs,
+                                                 add: { [weak self] in if let self { ExtensionSiteAccessRows.addSite(id: id, name: name, installs: self.profile.installs, in: self) { self.siteAccessChanged($0) } } },
+                                                 changed: { [weak self] in self?.siteAccessChanged($0) })
+        }
+        rows.append(ExtensionPrivateRow.make(id: id, name: name, installs: profile.installs))
+        return fold("extension \(id)", header: extensionRow(id: id, ext: ext), rows: rows, in: count)
+    }
+
+    #if DEBUG
+    @available(macOS 15.4, *)
+    func debugExtensionFold(id: String, ext: WKWebExtension, in count: Int) -> FoldBox { extensionFold(id: id, ext: ext, in: count) }
+    #endif
 
     /// An extension's site access changed here: the front page, if it's on a site that changed, loads again, as from
     /// the address menu. Nil is every site.
@@ -2559,7 +2990,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 summary = summary.isEmpty ? note : summary + "\n" + note
             }
         }
-        let row = FormRow(title: ext.displayName ?? id, detail: summary, icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
+        let row = FormRow(title: ext.displayName ?? id, detail: summary, icon: ext.icon(for: NSSize(width: 24, height: 24)) ?? SettingsIcon.symbol("puzzlepiece.extension"), control: stack)
         row.revealsOnHover(remove)
         return row
     }
@@ -2655,8 +3086,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let spaces = library.spaces(in: profile.id).count
             let extensions = Profiles.shared.profile(profile.id).installs.installedIDs.count
             // No "0 extensions": a profile without any lists only its spaces.
-            let detail = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it.")]
+            let counts = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it.")]
                                     + (extensions == 0 ? [] : [String(localized: "\(extensions) extensions", comment: "Under a profile's name in Settings › Profiles: how many extensions it has.")]))
+            let detail = profile.isHeadless
+                ? Words.sentences(String(localized: "For AI apps in the background.", comment: "Under the name of the profile AI apps use in the background (AI Apps) in Settings › Profiles: what it's for."), counts)
+                : counts
             let row = FormRow(title: profile.displayName, detail: detail, icon: ProfileSheets.tile(for: profile), control: stack)
             if let trash { row.revealsOnHover(trash) }
             profilesGroup.add(row)
@@ -2723,7 +3157,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let existing = Dictionary(uniqueKeysWithValues: routeRows.map { ($0.id, $0.row) })
         routeRows = rules.enumerated().map { index, rule in
             let row = existing[rule.id] ?? SiteRouteRow(rule)
-            row.refresh(rule, spaces: library.spaces, number: index + 1)
+            row.refresh(rule, spaces: library.yourSpaces, number: index + 1)
             row.onDraftChange = { [weak self] in
                 self?.updateRouteWarnings()
                 self?.layoutDocument()
@@ -2750,7 +3184,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let timing = SettingsTiming.begin("reloadSpaces"); defer { timing.end() }
         reloadRoutes()
         spacesGroup.removeAllRows()
-        spaceRows = Library.shared.spaces.map { space in
+        spaceRows = Library.shared.yourSpaces.map { space in
             let row = SpaceSettingsRow(space: space)
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
@@ -2875,6 +3309,30 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         passwordsWindowGroup.removeAllRows()
         // Saving and filling are chosen for each profile: a password manager is an extension, and those are a profile's.
         let profile = profile
+        // AI apps' profile is given nothing of yours (`Profile.getsYourData`): there's nothing to choose there.
+        if !profile.getsYourData {
+            passwordsGroup.add(FormRow(title: String(localized: "Not used in this profile", comment: "A row in Settings › Passwords, in place of the password settings, with the profile AI apps use in the background chosen."),
+                                       detail: String(localized: "AI apps work in it. Zigzag never saves or fills passwords here, nor fills forms from your card.", comment: "Explanation under “Not used in this profile” in Settings › Passwords, with the profile AI apps use in the background chosen."),
+                                       control: NSView()))
+        } else {
+            addSavingAndFilling(in: profile)
+        }
+        cardToggle.isOn = ContactCard.isOn
+        cardToggle.onChange = { on in ContactCard.isOn = on }
+        // Not a profile's: with more than one, it stands apart from the two that are.
+        (hasManyProfiles ? cardGroup : passwordsGroup).add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
+                                   detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
+                                   control: cardToggle))
+        let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
+        open.onClick = { _ in PasswordsWindowController.show() }
+        // Importing is in General and in the Passwords window itself; once here would be a third time.
+        passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
+                                         detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
+                                         control: open))
+    }
+
+    /// Who saves and fills passwords in `profile`, and whether Zigzag offers to save and fill them.
+    private func addSavingAndFilling(in profile: Profile) {
         let saves = PasswordCapture.offersToSave(in: profile), fills = Autofill.isOn(in: profile)
         saveToggle.isOn = saves
         fillToggle.isOn = fills
@@ -2935,18 +3393,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                        detail: fillNote,
                                        control: fillToggle))
         }
-        cardToggle.isOn = ContactCard.isOn
-        cardToggle.onChange = { on in ContactCard.isOn = on }
-        // Not a profile's: with more than one, it stands apart from the two that are.
-        (hasManyProfiles ? cardGroup : passwordsGroup).add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
-                                   detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
-                                   control: cardToggle))
-        let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
-        open.onClick = { _ in PasswordsWindowController.show() }
-        // Importing is in General and in the Passwords window itself; once here would be a third time.
-        passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
-                                         detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
-                                         control: open))
     }
 
     private static var iCloudPasswordsName: String {
@@ -3118,8 +3564,23 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === settingSearch.field { searchChanged() }
         if (obj.object as? NSTextField) === flagSearch.field { layoutDocument() }
+        if (obj.object as? NSTextField) === sitesSearch.field { sitesSearchChanged() }
+        if (obj.object as? NSTextField) === extensionsSearch.field { extensionsSearchChanged() }
         if (obj.object as? NSTextField) === siteDataToolbar.search.field { siteDataList.model?.query = siteDataToolbar.search.stringValue }
         if (obj.object as? NSTextField) === downloadRuleTest.field { updateDownloadRuleTest() }
+    }
+
+    /// Site Permissions' own search: its boxes narrow to the sites that match, past the first 30.
+    private func sitesSearchChanged() {
+        // The sites past the first 30 are listed only while it's searched.
+        if !sitesShowAll, sitesListed > 30 { reloadPrivacy() }
+        sitesGroup.boxFilter = FoldStyle.words(sitesSearch.stringValue)
+        layoutDocument()
+    }
+
+    private func extensionsSearchChanged() {
+        extensionsGroup.boxFilter = FoldStyle.words(extensionsSearch.stringValue)
+        layoutDocument()
     }
 
     // MARK: Finding a setting
@@ -3146,6 +3607,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             layoutDocument()
             return true
         }
+        if control === sitesSearch.field, selector == #selector(cancelOperation(_:)), !sitesSearch.stringValue.isEmpty {
+            sitesSearch.stringValue = ""
+            sitesSearchChanged()
+            return true
+        }
+        if control === extensionsSearch.field, selector == #selector(cancelOperation(_:)), !extensionsSearch.stringValue.isEmpty {
+            extensionsSearch.stringValue = ""
+            extensionsSearchChanged()
+            return true
+        }
         if control === siteDataToolbar.search.field, selector == #selector(cancelOperation(_:)), !siteDataToolbar.search.stringValue.isEmpty {
             siteDataToolbar.search.stringValue = ""
             siteDataList.model?.query = ""
@@ -3160,9 +3631,50 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     #if DEBUG
     /// The titles of the rows a search shows, from every section.
     var debugFound: [String] {
-        SettingsPane.allCases.flatMap { groups(of: $0) }.flatMap { $0.group.rows }
-            .compactMap { $0.isHidden ? nil : ($0 as? FormRow)?.debugTitle }
+        SettingsPane.allCases.flatMap { groups(of: $0) }.flatMap { $0.group.rows }.filter { !$0.isHidden }
+            .flatMap { row in (row as? FoldBox).map { [$0.headerRow] + ($0.showsOpen ? $0.shownRows : []) } ?? [row as? FormRow].compactMap { $0 } }
+            .map(\.debugTitle)
     }
+
+    /// A group's rows, a box's header and every row in it included, folded or not.
+    private func debugRows(_ group: FormGroup) -> [FormRow] {
+        group.rows.flatMap { row in (row as? FoldBox)?.allRows ?? [row as? FormRow].compactMap { $0 } }
+    }
+
+    /// Site Permissions' and Installed's boxes.
+    var debugSiteBoxes: [FoldBox] { sitesGroup.rows.compactMap { $0 as? FoldBox } }
+    var debugExtensionBoxes: [FoldBox] { extensionsGroup.rows.compactMap { $0 as? FoldBox } }
+    /// Types into Site Permissions' or Installed's own search.
+    func debugSearchSites(_ text: String) {
+        sitesSearch.stringValue = text
+        sitesSearchChanged()
+    }
+    func debugSearchExtensions(_ text: String) {
+        extensionsSearch.stringValue = text
+        extensionsSearchChanged()
+    }
+    /// open <name>: the box headed by that name opened, as a click does. top <heading>: the page scrolled to it.
+    func debugFold(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        let rest = f.count > 1 ? f[1] : ""
+        switch f.first ?? "" {
+        case "open":
+            if let box = SettingsPane.allCases.flatMap({ groups(of: $0) }).flatMap({ $0.group.rows }).compactMap({ $0 as? FoldBox }).first(where: { $0.headerRow.debugTitle == rest }) {
+                setFold(box, true)
+            } else {
+                siteDataList.setOpen(rest, true)
+            }
+        case "top":
+            if let heading = documentView.subviews.compactMap({ $0 as? Label }).first(where: { $0.stringValue == rest }) {
+                documentView.scroll(NSPoint(x: 0, y: max(0, heading.frame.minY - Tokens.Space.x4)))
+            }
+        default: break
+        }
+    }
+
+    /// Whether the list's own search shows beside its heading.
+    var debugSitesSearchShows: Bool { sitesSearch.superview != nil && sitesTools.superview != nil }
+    var debugExtensionsSearchShows: Bool { extensionsSearch.superview != nil && extensionsTools.superview != nil }
 
     /// The headings on the page, top to bottom.
     var debugHeadings: [String] {
@@ -3178,15 +3690,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Site Permissions' rows: a title, then ": " and the dropdown's choice where it has one.
     var debugSiteRows: [String] {
-        sitesGroup.rows.compactMap { $0 as? FormRow }.map { row in
+        debugRows(sitesGroup).map { row in
             let dropdown = (row.control as? NSStackView)?.arrangedSubviews.first as? DropdownButton
             return dropdown.map { "\(row.debugTitle): \($0.options[$0.selectedIndex].title)" } ?? row.debugTitle
         }
     }
 
+    /// Site Permissions' rows themselves.
+    var debugSiteFormRows: [FormRow] { debugRows(sitesGroup) }
+
     /// Picks a choice in a site's permission dropdown, as a click there does.
     func debugChooseSitePermission(_ title: String, _ choice: String) {
-        guard let row = sitesGroup.rows.compactMap({ $0 as? FormRow }).first(where: { $0.debugTitle == title }),
+        guard let row = debugRows(sitesGroup).first(where: { $0.debugTitle == title }),
               let dropdown = (row.control as? NSStackView)?.arrangedSubviews.first as? DropdownButton,
               let index = dropdown.options.firstIndex(where: { $0.title == choice }) else { return }
         dropdown.selectedIndex = index
@@ -3198,7 +3713,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     var debugSiteDataCount: Int { siteDataList.model?.entries.count ?? 0 }
     var debugSiteDataTop: CGFloat { siteDataGroup.frame.minY }
     var debugSiteDataHeight: CGFloat { siteDataGroup.frame.height }
-    var debugSiteDataExpanded: Bool { siteDataList.debugExpanded && siteDataGroup.frame.height > SiteDataList.rowHeight * CGFloat(SiteDataList.collapsedCount + 2) }
+    var debugSiteDataExpanded: Bool { siteDataList.debugExpanded && siteDataGroup.frame.height > (SiteDataList.rowHeight + FoldStyle.gap) * CGFloat(SiteDataList.collapsedCount + 2) }
     func debugSiteDataShowAll() { siteDataList.showsAll = true }
 
     /// sitedata find <text> | sort name|size | state <path>: the list's search typed, its order chosen, or what it
@@ -3376,7 +3891,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
         case .mini: [(nil, miniGroup)]
-        case .spaces: [(nil, newSpacesGroup), (Self.spacesHeading, spacesGroup)] + (Library.shared.spaces.count > 1 ? [(Self.routesHeading, routesGroup)] : [])
+        case .spaces: [(nil, newSpacesGroup), (Self.spacesHeading, spacesGroup)] + (Library.shared.yourSpaces.count > 1 ? [(Self.routesHeading, routesGroup)] : [])
         case .profiles: [(Self.profilesHeading, profilesGroup), (Self.unlistedHeading, unlistedGroup)]
         case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.formsHeading, cardGroup)] : [])
         case .privacy: [(nil, blockingGroup), (Self.localReceiversHeading, localReceiversGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])
@@ -3551,7 +4066,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             for (title, group) in groups(of: pane) { section(title, group) }
         case .privacy:
             // Each group once, in groups(of:) order: counting them here laid Site Permissions out twice (#420).
-            for (title, group) in groups(of: pane) { section(title, group, accessory: group === sitesGroup ? sitesReset : nil) }
+            // Reset All, and with many sites their own search.
+            sitesTools.views = [sitesReset, sitesListed >= FoldStyle.searchFrom ? sitesSearch : nil].compactMap { $0 }
+            sitesTools.searchWidth = min(180, max(120, round(contentWidth / 4)))
+            for (title, group) in groups(of: pane) {
+                section(title, group, accessory: group === sitesGroup && !sitesTools.views.isEmpty ? sitesTools : nil)
+            }
         case .translation:
             section(nil, translationGroup)
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
@@ -3635,12 +4155,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
             checkUpdatesButton.isHidden = !hasExtensions
-            let buttons: NSStackView = made("buttons") {
-                let buttons = NSStackView(views: [checkUpdatesButton, loadUnpackedButton, getExtensionsButton])
-                buttons.spacing = Tokens.Space.x2
-                return buttons
-            }
-            section(installedHeading, extensionsGroup, accessory: buttons)
+            extensionsTools.views = [checkUpdatesButton, loadUnpackedButton, getExtensionsButton] + (extensionCount >= FoldStyle.searchFrom ? [extensionsSearch] : [])
+            extensionsTools.searchWidth = min(180, max(120, round(contentWidth / 4)))
+            section(installedHeading, extensionsGroup, accessory: extensionsTools)
             if !appExtensionsGroup.rows.isEmpty { section(Self.appExtensionsHeading, appExtensionsGroup) }
             if !otherProfilesGroup.rows.isEmpty { section(Self.otherProfilesHeading, otherProfilesGroup) }
         case .shortcuts:
@@ -3998,6 +4515,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let shown = MCPService.isOn
         // Turned on or off elsewhere (another Settings tab): the switch follows.
         if aiAppsToggle.isOn != shown { aiAppsToggle.isOn = shown }
+        // Only for AI apps that may use Zigzag at all.
+        if backgroundToggle.isOn != Headless.isOn { backgroundToggle.isOn = Headless.isOn }
+        backgroundToggle.isEnabled = shown
         let detail = MCPService.problem == nil ? MCPService.address
             : MCPService.replacedKeyForBusyPort
             ? String(localized: "Couldn’t start. Port \(Int(MCPService.port)) is in use by another app, so Zigzag made a new key. Give your AI apps the new key.",
@@ -4080,7 +4600,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
-        addressAboveToggle.isOn = BrowserRootView.addressAbovePage
+        addressPlaceMenu.selectedIndex = BrowserRootView.addressBarPlace.menuIndex
         sidebarSide.selectedIndex = Self.sidebarSides.firstIndex(of: BrowserRootView.sidebarOnRight) ?? 0
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
@@ -4107,6 +4627,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
+        edgeSidebarToggle.isOn = EdgeSidebar.isOn
         // Sidebar size's dropdown, and whether the percentage beside it shows.
         refreshSidebarSize()
         pageZoom.selectedIndex = ZoomLevels.steps.firstIndex { abs($0 - ZoomLevels.defaultZoom) < 0.001 } ?? ZoomLevels.steps.firstIndex(of: 1) ?? 0
@@ -4479,6 +5000,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
             .union(SiteIcons.sites).union(SiteUserAgents.sites).union(kept)
         var listed = 0, more = 0
+        // Each site's header and rows, boxed once it's known how many there are.
+        var items: [(site: String, header: FormRow, rows: [FormRow])] = []
+        // Searching its own list, every match shows, past the first 30.
+        let showsAll = sitesShowAll || !FoldStyle.words(sitesSearch.stringValue).isEmpty
         for site in sites.sorted() {
             let origin = origins[site]
             let url = URL(string: origin ?? "https://\(site)")
@@ -4657,14 +5182,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 })
             }
 
-            if let zaps = SiteBoosts.all[site]?.zaps, !zaps.isEmpty {
+            if let boost = SiteBoosts.all[site], !boost.zaps.isEmpty {
+                let zaps = boost.zaps
                 rows.append(makeRow(String(localized: "Zapped elements", comment: "Row in Settings › Privacy › Sites: elements hidden on this site."),
                                     detail: String(localized: "\(zaps.count) hidden", comment: "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count."),
                                     control: NSView()) {
                     SiteBoosts.restoreZaps(forSite: site)
                     PageBoosts.refreshOpenTabs(site: site)
                 })
-                rows += zapRows(zaps, site: site)
+                rows += zapRows(boost, site: site)
             }
 
             if SiteBoosts.all[site]?.hasStyle == true {
@@ -4701,7 +5227,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
             guard !rows.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
-            guard sitesShowAll || listed < 30 else { more += 1; continue }
+            guard showsAll || listed < 30 else { more += 1; continue }
             listed += 1
             let forget = PillButton(title: String(localized: "Forget", comment: "Button on a site's row in Settings › Privacy › Sites: forgets every choice made for it."))
             forget.onClick = { [weak self] _ in
@@ -4736,9 +5262,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             let siteURL = URL(string: origin ?? "https://\(site)")
             let favicon = SiteIcons.all[site].map(IconChoice.pageIcon) ?? siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
-            sitesGroup.add(FormRow(title: site, icon: favicon, control: forget))
-            for row in rows { sitesGroup.add(row) }
+            // What's kept for it, counted as Site Controls lists it: zapped elements are one.
+            let header = FormRow(title: site, detail: FoldStyle.settingsSummary(rows.filter { !$0.isNested }.count), icon: favicon, control: forget)
+            header.keywords = site
+            items.append((site, header, rows))
         }
+        sitesListed = listed + more
+        for item in items { sitesGroup.add(fold("site \(item.site)", header: item.header, rows: item.rows, in: sitesListed)) }
+        sitesGroup.boxFilter = FoldStyle.words(sitesSearch.stringValue)
         if more > 0 {
             let all = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))
             all.onClick = { [weak self] _ in
@@ -4751,10 +5282,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     /// Each zapped element of `site`, newest first, with × to show it again: the newest five, then the rest on request.
-    private func zapRows(_ zaps: [String], site: String) -> [FormRow] {
+    private func zapRows(_ boost: SiteBoost, site: String) -> [FormRow] {
+        let zaps = boost.zaps
         let shown = zapsShowAll.contains(site) ? zaps.count : 5
         var rows: [FormRow] = zaps.reversed().prefix(shown).map { selector in
-            let name = SiteBoosts.label(forZap: selector)
+            let name = boost.name(forZap: selector)
             let x = IconButton(symbol: "xmark", size: .compact, toolTip: SiteBoosts.restoreTitle)
             x.setAccessibilityLabel(SiteBoosts.restoreLabel(name))
             x.onClick = { [weak self] _ in
@@ -4766,6 +5298,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let row = FormRow(title: name, detail: name == selector ? nil : selector, control: x)
             row.isNested = true
             row.detailTruncatesMiddle = true
+            row.detailIsCode = true
             row.toolTip = selector
             row.keywords = site
             return row
@@ -4784,6 +5317,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             rows.append(more)
         }
         return rows
+    }
+
+    /// A box in a list of `count`, open or folded as it was left while Settings stays open, else as long lists start.
+    private func fold(_ key: String, header: FormRow, rows: [FormRow], in count: Int) -> FoldBox {
+        let box = FoldBox(key: key, header: header, rows: rows, isOpen: folds[key] ?? FoldStyle.opensByDefault(count: count))
+        box.onToggle = { [weak self] box, open in self?.setFold(box, open) }
+        return box
+    }
+
+    /// A box opened or folded: remembered, and the page makes room for it.
+    private func setFold(_ box: FoldBox, _ open: Bool) {
+        folds[box.key] = open
+        FoldStyle.animate(in: documentView, { [weak self] in
+            box.isOpen = open
+            self?.layoutDocument()
+        }, completion: { box.settle() })
     }
 
     /// What websites keep, read again where it's listed (with more than one profile that's Website Data, and
@@ -4894,6 +5443,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         siteDataGroup.add(siteDataList)
         siteDataList.changed = { [weak self] grew in self?.siteDataChanged(grew) }
         siteDataList.onRemove = { [weak self] entry in self?.confirmRemove([entry]) }
+        siteDataList.onClear = { [weak self] entry, kind in self?.confirmClear(kind, of: entry) }
         siteDataToolbar.search.field.delegate = self
         siteDataToolbar.sort.onSelect = { [weak self] index in
             self?.siteDataList.model?.order = SiteDataSort(rawValue: index) ?? .name
@@ -4937,6 +5487,27 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let toolbarChanged = before != (siteDataToolbar.removeAll.title, siteDataToolbar.removeAll.isHidden, siteDataHadSizes)
         guard !isLayingOutDocument, grew || toolbarChanged, window != nil else { return }
         layoutDocument()
+    }
+
+    /// Asks before clearing one kind of a site's data, from its box in Stored by Websites (#368).
+    private func confirmClear(_ kind: WebsiteData.Kind, of entry: SiteDataEntry) {
+        guard let model = siteDataList.model else { return }
+        let site = entry.site
+        switch kind {
+        case .cache:
+            confirm(title: String(localized: "Clear the cache for \(site)?", comment: "Title of the sheet that clears one site's cache, from its box in Settings › Privacy › Stored by Websites; the site, like apple.com."),
+                    message: String(localized: "Its pages load a little slower the first time you open them again. You stay signed in.", comment: "Message of the sheet that clears one site's cache, from its box in Settings › Privacy › Stored by Websites."),
+                    action: String(localized: "Clear Cache", comment: "Button of the sheet that clears the cache."), destructive: false) {
+                Task { @MainActor in await model.clear(.cache, of: entry) }
+            }
+        case .cookies:
+            confirm(title: String(localized: "Clear cookies for \(site)?", comment: "Title of the sheet that clears one site's cookies and saved data, from its box in Settings › Privacy › Stored by Websites; the site, like apple.com."),
+                    message: String(localized: "You’ll be signed out of \(site). Its cache stays, and your passwords, pinned tabs and history stay too.",
+                                    comment: "Message of the sheet that clears one site's cookies and saved data, from its box in Settings › Privacy › Stored by Websites; the site, like apple.com."),
+                    action: String(localized: "Clear Cookies", comment: "Button of the sheet that clears cookies.")) {
+                Task { @MainActor in await model.clear(.cookies, of: entry) }
+            }
+        }
     }
 
     /// Asks before removing sites' data: one site by its name, the ones a search shows by how many, or all.

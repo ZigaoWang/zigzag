@@ -49,6 +49,7 @@ nonisolated final class Freezes: @unchecked Sendable {
         // Called at launch, on the main thread: it says which thread it is, for the looks at its stack.
         MainThreadStack.prepare()
         DispatchQueue.main.async { [self] in
+            MainActor.assumeIsolated { Stalls.shared.start() }
             if measuring { MainActor.assumeIsolated { resume() }; return }
             let center = NotificationCenter.default
             self.tokens = [
@@ -143,6 +144,15 @@ nonisolated final class Freezes: @unchecked Sendable {
         }
     }
 
+    // MARK: Short stalls
+
+    /// Short stalls too, in release builds as well: a run loop observer times each piece of work the main thread does
+    /// between two looks at its run loop, which costs two clock reads a turn and no wakeups of its own. Work that took
+    /// `Stalls.threshold` or longer is noted in Diagnostics with what was going on: the event being handled, the last
+    /// few things Zigzag noted doing (`mark`), and the front page's site. At most one note every few seconds; the
+    /// ones between are counted in the next.
+    @MainActor static func mark(_ what: StaticString) { Stalls.shared.mark(what) }
+
     /// The last few freezes' stacks.
     static var file: URL { CrashReports.folder.appendingPathComponent("Freezes.log") }
 
@@ -158,5 +168,110 @@ nonisolated final class Freezes: @unchecked Sendable {
         }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)
+    }
+}
+
+/// The main thread's work timed between two looks at its run loop (`Freezes.mark`). Its observer runs last of the run
+/// loop's, so Core Animation's drawing before a wait counts too.
+@MainActor
+final class Stalls {
+    static let shared = Stalls()
+    /// Work this long, in ms, is a stall you can feel: three frames at 60 Hz.
+    nonisolated static let threshold = 50.0
+    /// At most one note this often; the stalls between are counted in the next.
+    nonisolated static let noteEvery: TimeInterval = 10
+
+    /// When stalls may be noted, and how many waited.
+    nonisolated struct Pacing: Equatable {
+        private(set) var lastNote: TimeInterval = -.infinity
+        private(set) var waiting = 0
+        private(set) var longestWaiting = 0.0
+
+        /// A stall of `ms` at `now` (seconds): the count and longest of those held back since the last note, when this
+        /// one is to be noted; nil when it waits.
+        mutating func add(_ ms: Double, at now: TimeInterval) -> (more: Int, longest: Double)? {
+            guard now - lastNote >= Stalls.noteEvery else {
+                waiting += 1
+                longestWaiting = max(longestWaiting, ms)
+                return nil
+            }
+            defer { lastNote = now; waiting = 0; longestWaiting = 0 }
+            return (waiting, longestWaiting)
+        }
+    }
+
+    private var observer: CFRunLoopObserver?
+    private var last: UInt64 = 0
+    private var awake = false
+    private var pacing = Pacing()
+    /// What Zigzag noted doing lately, oldest first, at most `keptMarks`.
+    private var marks: [(what: StaticString, at: UInt64)] = []
+    private static let keptMarks = 8
+    private static let msPerTick: Double = {
+        var base = mach_timebase_info_data_t()
+        mach_timebase_info(&base)
+        return Double(base.numer) / Double(base.denom) / 1_000_000
+    }()
+
+    func start() {
+        guard observer == nil else { return }
+        // Once a turn before its sources, and around each wait: enough to time each turn's work, few calls.
+        let activities: CFRunLoopActivity = [.beforeSources, .beforeWaiting, .afterWaiting]
+        let observer = CFRunLoopObserverCreateWithHandler(nil, activities.rawValue, true, CFIndex.max) { _, activity in
+            MainActor.assumeIsolated { Stalls.shared.turned(activity) }
+        }
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+        self.observer = observer
+    }
+
+    func mark(_ what: StaticString) {
+        if marks.count >= Self.keptMarks { marks.removeFirst() }
+        marks.append((what, mach_absolute_time()))
+    }
+
+    private func turned(_ activity: CFRunLoopActivity) {
+        let now = mach_absolute_time()
+        if awake, last != 0, now > last {
+            let ms = Double(now - last) * Self.msPerTick
+            // Longer than a second in front is a freeze, which `Freezes` notes with its stack; far longer, the Mac slept.
+            if ms >= Self.threshold, ms < 30_000, ms < 1000 || !NSApp.isActive { stalled(ms, since: last) }
+        }
+        awake = activity != .beforeWaiting
+        last = now
+    }
+
+    private func stalled(_ ms: Double, since start: UInt64) {
+        guard let (more, longest) = pacing.add(ms, at: ProcessInfo.processInfo.systemUptime) else { return }
+        let during = marks.filter { $0.at >= start }.map { "\($0.what)" }
+        let startUptime = Double(start) * Self.msPerTick / 1000
+        let event = NSApp.currentEvent.flatMap { $0.timestamp >= startUptime - 0.005 ? Self.name(of: $0.type) : nil }
+        let front = WindowManager.shared.keyController
+        Diagnostics.note("Zigzag stalled", site: front?.tabManager.selectedTab?.url?.host(),
+                         Self.detail(ms: ms, event: event, marks: during, more: more, longest: longest),
+                         isPrivate: front?.tabManager.isPrivate ?? false)
+    }
+
+    /// "120 ms, handling a scroll, in session save, sidebar reload (3 more since, longest 80 ms)".
+    nonisolated static func detail(ms: Double, event: String?, marks: [String], more: Int, longest: Double) -> String {
+        var seen = Set<String>()
+        let named = marks.filter { seen.insert($0).inserted }.suffix(4)
+        var text = "\(Int(ms.rounded())) ms"
+        if let event { text += ", handling \(event)" }
+        if !named.isEmpty { text += ", in " + named.joined(separator: ", ") }
+        if more > 0 { text += " (\(more) more since, longest \(Int(longest.rounded())) ms)" }
+        return text
+    }
+
+    nonisolated static func name(of type: NSEvent.EventType) -> String {
+        switch type {
+        case .scrollWheel: "a scroll"
+        case .keyDown, .keyUp: "a key"
+        case .flagsChanged: "a modifier key"
+        case .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp: "a click"
+        case .leftMouseDragged, .rightMouseDragged, .otherMouseDragged: "a drag"
+        case .mouseMoved, .mouseEntered, .mouseExited: "the pointer moving"
+        case .magnify, .rotate, .swipe, .smartMagnify, .gesture, .beginGesture, .endGesture, .pressure: "a gesture"
+        default: "an event"
+        }
     }
 }

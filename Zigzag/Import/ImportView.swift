@@ -116,7 +116,7 @@ final class ImportView: NSView {
         emptyState.isHidden = true
         [title, subtitle, emptyState, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker].forEach { body.addSubview($0) }
         [bodyScroll, chooseFile, primary, secondary].forEach { addSubview($0) }
-        intoIDs = ProfileChoice.fill(intoPicker, selected: intoProfile)
+        intoIDs = ProfileChoice.fill(intoPicker, selected: intoProfile, withAIApps: false)
         intoPicker.setAccessibilityLabel(intoLabel.stringValue)
         intoPicker.onSelect = { [weak self] index in
             guard let self, self.intoIDs.indices.contains(index) else { return }
@@ -130,7 +130,7 @@ final class ImportView: NSView {
             guard let self else { return }
             let wasGone = Library.shared.directory.profile(self.intoProfile) == nil
             if wasGone { self.intoProfile = Profile.defaultID }
-            self.intoIDs = ProfileChoice.fill(self.intoPicker, selected: self.intoProfile)
+            self.intoIDs = ProfileChoice.fill(self.intoPicker, selected: self.intoProfile, withAIApps: false)
             if wasGone { self.rows.forEach { $0.loadPreview(in: self.target) } }
             self.needsLayout = true
         }
@@ -527,24 +527,68 @@ final class ImportView: NSView {
         }
     }
 
-    /// A password CSV, a bookmarks HTML file, or Safari's browsing data zip.
+    /// A password CSV, a bookmarks HTML file, Safari's browsing data zip, or a Zigzag backup.
     private func pickFile() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html]
-        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s browsing data export (a .zip file).", comment: "Message of the open panel from the Import window's Choose File… button.")
+        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html, ZigzagBackup.contentType]
+        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file), Safari’s browsing data export (a .zip file) or a Zigzag backup.", comment: "Message of the open panel from the Import window's Choose File… button.")
         panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            let row = SourceRow(source: ImportCoordinator.fileSource(url))
-            row.isChosen = true
-            self.rowList.addSubview(row)
-            self.rows.append(row)
+            guard !ZigzagBackup.isBackup(url) else {
+                self.askAboutSettings(in: url) { [weak self] settings in
+                    self?.importFile(url, data: settings ? [.bookmarks, .history, .tabs, .openTabs, .settings] : [.bookmarks, .history, .tabs, .openTabs])
+                }
+                return
+            }
             // A file you picked brings everything in it, whatever was ticked (and the ticks are hidden after an
             // import, so reading them would bring nothing).
-            self.startImport([row], data: [.passwords, .bookmarks, .history])
-            row.exportFile = url
+            self.importFile(url, data: [.passwords, .bookmarks, .history])
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: handle) } else { handle(panel.runModal()) }
+    }
+
+    /// A backup opened from Finder: asked about first, always. With settings that differ, the same question as
+    /// Choose File… asks; otherwise whether to restore it at all. Cancel restores nothing.
+    func offerBackup(_ url: URL) {
+        guard stage == .choose, let host = window?.contentView else { return }
+        let everything: ImportCoordinator.Choice = [.bookmarks, .history, .tabs, .openTabs]
+        guard case .success(let backup) = ZigzagBackup.read(url) else { importFile(url, data: everything); return }
+        if backup.settingsDiffer(from: .standard, searchEngine: Library.shared.searchEngine) {
+            askAboutSettings(in: url) { [weak self] settings in self?.importFile(url, data: settings ? everything.union(.settings) : everything) }
+            return
+        }
+        ConfirmSheet.show(in: host, title: String(localized: "Restore “\(url.deletingPathExtension().lastPathComponent)”?", comment: "Title of the question in the Import window when a Zigzag backup is opened from Finder. The placeholder is the file's name."),
+                          message: String(localized: "Its spaces, pinned tabs and favorites are added to yours. Nothing here is removed.", comment: "Message of the question in the Import window when a Zigzag backup is opened from Finder."),
+                          confirmTitle: String(localized: "Restore", comment: "Button in the Import window's question when a Zigzag backup is opened from Finder.")) { [weak self] restore in
+            if restore { self?.importFile(url, data: everything) }
+        }
+    }
+
+    private func importFile(_ url: URL, data: ImportCoordinator.Choice) {
+        let row = SourceRow(source: ImportCoordinator.fileSource(url))
+        row.isChosen = true
+        rowList.addSubview(row)
+        rows.append(row)
+        startImport([row], data: data)
+        row.exportFile = url
+    }
+
+    /// A backup whose settings differ from these asks first whether to use them; Cancel imports nothing.
+    private func askAboutSettings(in url: URL, then go: @escaping (Bool) -> Void) {
+        guard case .success(let backup) = ZigzagBackup.read(url), backup.settingsDiffer(from: .standard, searchEngine: Library.shared.searchEngine),
+              let host = window?.contentView else { go(false); return }
+        ConfirmSheet.choose(in: host, title: String(localized: "Use the backup’s settings?", comment: "Title of the question in the Import window before a Zigzag backup is restored."),
+                            message: String(localized: "Its spaces, pinned tabs and favorites are added to yours either way. Its settings and site settings can replace the ones here.",
+                                            comment: "Message of the question in the Import window before a Zigzag backup is restored."),
+                            confirmTitle: String(localized: "Use Backup’s Settings", comment: "Button in the Import window's question before a Zigzag backup is restored."),
+                            alternateTitle: String(localized: "Keep Mine", comment: "Button in the Import window's question before a Zigzag backup is restored: keep the settings here.")) { answer in
+            switch answer {
+            case .confirm: go(true)
+            case .alternate: go(false)
+            case .cancel: break
+            }
+        }
     }
 
     // MARK: Layout
@@ -569,7 +613,7 @@ final class ImportView: NSView {
         let signInsShown = showsChoices && !signInsNote.stringValue.isEmpty
         let noteHeight: CGFloat = signInsShown ? Tokens.Space.x2 + ceil(signInsNote.sizeThatFits(NSSize(width: width, height: 200)).height) : 0
         // Where it goes is asked only once there's a choice, and only before importing.
-        let showsInto = stage == .choose && Library.shared.hasManyProfiles
+        let showsInto = stage == .choose && Library.shared.hasManyOfYourProfiles
         let emptyHeight: CGFloat = choosesFileFirst ? emptyState.preferredHeight(for: width) + Tokens.Space.x4 : 0
         let titleHeight = ceil(title.intrinsicContentSize.height)
         var ry: CGFloat = 0
@@ -948,6 +992,14 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         window.center()
         shared = controller
         controller.showWindow(nil)
+    }
+
+    /// The Import window, for a backup opened from Finder. Nothing is restored until you answer its question.
+    static func restore(_ url: URL) {
+        show()
+        guard let view = shared?.window?.contentView as? ImportView else { return }
+        NSApp.activate()
+        view.offerBackup(url)
     }
 
     /// Whether the Import window, asked for again, opens afresh: once its import is done. Choosing or importing,

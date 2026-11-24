@@ -650,7 +650,10 @@ enum Tokens {
         /// A symbol's ink, in points from the middle of its image (x right, y up).
         @MainActor private static func inkBox(_ name: String, size: CGFloat) -> CGRect {
             let drawn = measuredAsDrawn.contains(name)
-            return inkBox(of: Self.image(name, size: size), key: "\(name) \(size)", scale: drawn ? 2 : 4, asDrawn: drawn)
+            let key = "\(name) \(size)", scale: CGFloat = drawn ? 2 : 4
+            // Measured once: the symbol's image is only made for the first look.
+            if let known = inkBoxes[boxKey(key, scale: scale, asDrawn: drawn)] { return known }
+            return inkBox(of: Self.image(name, size: size), key: key, scale: scale, asDrawn: drawn)
         }
 
         /// Measured as a 2x screen draws them, not scaled up: the screen draws xmark half a point lower than its image.
@@ -666,8 +669,12 @@ enum Tokens {
         /// The size of an image's ink; `key` names it for the cache.
         @MainActor static func inkSize(of image: NSImage, key: String, scale: CGFloat = 4) -> CGSize { inkBox(of: image, key: key, scale: scale).size }
 
+        private static func boxKey(_ key: String, scale: CGFloat, asDrawn: Bool) -> String {
+            scale == 4 ? key : "\(key) @\(scale)x\(asDrawn ? " drawn" : "")"
+        }
+
         @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4, asDrawn: Bool = false) -> CGRect {
-            let key = scale == 4 ? key : "\(key) @\(scale)x\(asDrawn ? " drawn" : "")"
+            let key = boxKey(key, scale: scale, asDrawn: asDrawn)
             if let known = inkBoxes[key] { return known }
             let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
             var box = CGRect.zero

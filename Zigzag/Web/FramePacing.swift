@@ -7,7 +7,8 @@ import WebKit
 /// uneven mix of 8, 17 and 25 ms steps; held near 60, scrolling keeps the display's rate on its own.
 ///
 /// The page's pace is read from its animation frames, in Zigzag's own script world, only while it scrolls. WebKit reads
-/// the setting when a page is made or shown, so a held page is hidden and shown again before the screen next updates.
+/// the setting when a page is made or shown, so a held page is hidden and shown again once scrolling stops, or at its
+/// next page. Held sites are kept across launches; in Low Power Mode or on a hot Mac, pages start near 60 (#519).
 @MainActor
 enum FramePacing {
     static let messageName = "zigzagFramePacing"
@@ -67,8 +68,79 @@ enum FramePacing {
         }
     }
 
+    /// Sites held near 60, so their pages start held after a relaunch too: the latest `maxSites`, each for `keptFor`
+    /// after it was last held. Never from a private window; cleared with History or the site's data.
+    struct HeldSites: Equatable, Codable {
+        static let maxSites = 200
+        static let keptFor: TimeInterval = 30 * 24 * 60 * 60
+
+        /// When each was last held.
+        private(set) var sites: [String: Date] = [:]
+
+        func contains(_ site: String, now: Date = Date()) -> Bool {
+            guard let date = sites[site] else { return false }
+            return now.timeIntervalSince(date) < Self.keptFor
+        }
+
+        mutating func insert(_ site: String, now: Date = Date()) {
+            sites[site] = now
+            sites = sites.filter { now.timeIntervalSince($0.value) < Self.keptFor }
+            if sites.count > Self.maxSites {
+                for old in sites.sorted(by: { $0.value < $1.value }).prefix(sites.count - Self.maxSites) { sites[old.key] = nil }
+            }
+        }
+
+        /// Lets go of one site (covering its subdomains, and the site it's under), the ones held since a time, or all.
+        mutating func forget(site: String? = nil, since: Date? = nil) {
+            if let site {
+                sites = sites.filter { key, _ in !(key == site || key.hasSuffix("." + site) || site.hasSuffix("." + key)) }
+            } else if let since {
+                sites = sites.filter { $0.value < since }
+            } else {
+                sites = [:]
+            }
+        }
+    }
+
+    static let heldFileName = "Held Near 60.plist"
+    private static var file: URL { Paths.file(heldFileName) }
+    private static var loadedHeld: HeldSites?
+    private static let disk = DispatchQueue(label: "app.zigzag.frame-pacing", qos: .utility)
+
+    /// The sites held, read from the data folder once.
+    static var held: HeldSites {
+        get {
+            if let loadedHeld { return loadedHeld }
+            let read = (try? Data(contentsOf: file)).flatMap { try? PropertyListDecoder().decode(HeldSites.self, from: $0) } ?? HeldSites()
+            loadedHeld = read
+            return read
+        }
+        set {
+            guard newValue != held else { return }
+            loadedHeld = newValue
+            let url = file
+            let data = newValue.sites.isEmpty ? nil : try? PropertyListEncoder().encode(newValue)
+            disk.async {
+                guard let data else { try? FileManager.default.removeItem(at: url); return }
+                try? data.write(to: url, options: .atomic)
+            }
+        }
+    }
+
+    /// History or a site's data cleared: the sites held go with it.
+    static func forget(site: String? = nil, since: Date? = nil) { held.forget(site: site, since: since) }
+
+    /// Waits for the list to be written, and forgets what was read (tests).
+    static func reloadHeld() {
+        disk.sync {}
+        loadedHeld = nil
+    }
+
     /// Main frame only. Asks once whether to measure; then, from a scroll until 200 ms after the last one, sends the
-    /// gaps between animation frames about once a second. Stops when told to.
+    /// gaps between animation frames about once a second. Nothing runs between scrolls. Told to settle, it says when
+    /// scrolling has been still for `stillFor` ms and stops; told to stop, it stops.
+    static let stillFor = 300
+
     static let script = WKUserScript(source: """
     (() => {
       if (window !== window.top || window.__zigzagPacing) return;
@@ -76,26 +148,30 @@ enum FramePacing {
       const post = (body) => window.webkit.messageHandlers.\(messageName).postMessage(body);
       post({}).then((measures) => {
         if (!measures) return;
-        let gaps = [], spent = 0, last = 0, until = 0, running = false, done = false;
+        let gaps = [], spent = 0, last = 0, until = 0, running = false, done = false, settling = false, still = 0;
         const send = () => {
-          if (!gaps.length) return;
+          if (!gaps.length || settling) return;
           const sent = gaps;
           gaps = []; spent = 0;
-          post({ gaps: sent }).then((more) => { if (!more) stop(); }, () => {});
+          post({ gaps: sent }).then((more) => { if (more === 'settle') settle(); else if (!more) stop(); }, () => {});
         };
         const frame = (t) => {
+          if (settling) { running = false; last = 0; return; }
           if (last) { const gap = Math.round((t - last) * 10) / 10; gaps.push(gap); spent += gap; }
           last = t;
           if (spent >= 1000) send();
           if (done || document.hidden || performance.now() > until) { running = false; last = 0; send(); return; }
           requestAnimationFrame(frame);
         };
+        const stop = () => { done = true; clearTimeout(still); removeEventListener('scroll', scrolled, true); };
+        const stilled = () => { stop(); post({ still: true }).catch(() => {}); };
+        const settle = () => { settling = true; gaps = []; clearTimeout(still); still = setTimeout(stilled, \(stillFor)); };
         const scrolled = () => {
           if (done || document.readyState !== 'complete') return;
+          if (settling) { clearTimeout(still); still = setTimeout(stilled, \(stillFor)); return; }
           until = performance.now() + 200;
           if (!running) { running = true; requestAnimationFrame(frame); }
         };
-        const stop = () => { done = true; removeEventListener('scroll', scrolled, true); };
         addEventListener('scroll', scrolled, { capture: true, passive: true });
       }, () => {});
     })();
@@ -104,61 +180,128 @@ enum FramePacing {
     static func attach(to controller: WKUserContentController) {
         controller.addUserScript(script)
         controller.addScriptMessageHandler(Messages.shared, contentWorld: .defaultClient, name: messageName)
+        watchPower()
     }
 
     private final class Page {
         var judge = Judge()
+        /// Whether the page's setting holds it near 60 now.
+        var near60: Bool
+        init(near60: Bool) { self.near60 = near60 }
     }
 
     private static let pages = NSMapTable<WKWebView, Page>.weakToStrongObjects()
-    /// Sites held this session, outside private windows: their next pages start held.
-    private(set) static var heldSites: Set<String> = []
+    /// Pages made near 60 because WebKit was slowing them (`throttled`).
+    private static let madeNear60 = NSHashTable<WKPreferences>.weakObjects()
 
-    /// Whether this web view is held near 60 fps for its site.
-    static func holds(_ webView: WKWebView) -> Bool { pages.object(forKey: webView)?.judge.held == true }
+    #if DEBUG
+    /// perfsuite: pages are judged but never held, so every run scrolls at the same rate.
+    static var keepsRate = false
+    #endif
 
-    /// Low Power Mode or a hot Mac: WebKit slows pages itself, so their pace says nothing about them.
-    private static var webKitThrottles: Bool {
+    /// Whether this web view is held near 60 fps, for its site or while WebKit slows pages.
+    static func holds(_ webView: WKWebView) -> Bool { pages.object(forKey: webView)?.near60 == true }
+
+    /// Low Power Mode or a hot Mac: WebKit slows pages itself, so they start near 60 and aren't lifted above it.
+    static var throttled: () -> Bool = {
         PowerSaving.lowPowerMode || ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
     }
 
-    /// What a page sent: `gaps`, or nothing as it starts. Answers whether it should keep measuring.
-    static func received(_ body: [String: Any], site: String, from webView: WKWebView) -> Bool {
-        // Held near 60 by choice (Settings › Developer › Feature Flags): nothing to measure, nothing to change.
-        guard !site.isEmpty, !FeatureFlags.pagesStartNear60FPS else { return false }
-        let page = pages.object(forKey: webView) ?? Page()
-        pages.setObject(page, forKey: webView)
-        let wasHeld = page.judge.held
-        if page.judge.visit(site) {
-            if heldSites.contains(site) {
-                hold(webView, page, wasHeld: wasHeld)
-                debugLog("framepacing \(site) held near 60 fps: held earlier this session")
-                return false
-            }
-            if wasHeld {
-                setNear60(false, webView)
-                debugLog("framepacing \(site) back to full rate: another site")
-            }
-        }
-        guard !page.judge.held else { return false }
-        guard let gaps = (body["gaps"] as? [Any])?.compactMap({ ($0 as? NSNumber)?.doubleValue }) else { return true }
-        guard !webKitThrottles, let fps = webView.window?.screen?.maximumFramesPerSecond, fps > 60 else { return true }
-        let before = page.judge.judged
-        let held = page.judge.add(gaps, interval: 1000 / Double(fps))
-        if page.judge.judged != before, let last = page.judge.windows.last {
-            debugLog("framepacing \(site) missed \(Int((last * 100).rounded()))% of \(fps) Hz frames while scrolling")
-        }
-        guard held else { return true }
-        if webView.configuration.websiteDataStore.isPersistent { heldSites.insert(site) }
-        hold(webView, page, wasHeld: false)
-        let shares = page.judge.windows.map { "\(Int(($0 * 100).rounded()))%" }.joined(separator: " ")
-        debugLog("framepacing \(site) held near 60 fps: missed \(shares) of frames in the last windows")
-        return false
+    /// A page being made (`FeatureFlags.apply`): near 60 while WebKit slows pages, unless every page already is.
+    static func starting(_ preferences: WKPreferences) {
+        guard !FeatureFlags.pagesStartNear60FPS, throttled() else { return }
+        FeatureFlags.engine.set(true, key: FeatureFlags.sixtyFPSKey, in: preferences)
+        madeNear60.add(preferences)
     }
 
-    private static func hold(_ webView: WKWebView, _ page: Page, wasHeld: Bool) {
-        page.judge.hold()
-        if !wasHeld { setNear60(true, webView) }
+    /// What the page script hears back.
+    enum Reply: Equatable {
+        case measure, stop
+        /// Held: say when scrolling has stopped, so the page's rate changes then.
+        case settle
+
+        var body: Any {
+            switch self {
+            case .measure: true
+            case .stop: false
+            case .settle: "settle"
+            }
+        }
+    }
+
+    private static func page(for webView: WKWebView) -> Page {
+        if let page = pages.object(forKey: webView) { return page }
+        let page = Page(near60: madeNear60.contains(webView.configuration.preferences))
+        pages.setObject(page, forKey: webView)
+        return page
+    }
+
+    /// What a page sent: nothing as it starts, `gaps`, or `still` once scrolling stopped after it was held.
+    /// `rate` stands in for the display's (tests).
+    static func received(_ body: [String: Any], site: String, from webView: WKWebView, rate: Int? = nil) -> Reply {
+        // Held near 60 by choice (Settings › Developer › Feature Flags): nothing to measure, nothing to change.
+        guard !site.isEmpty, !FeatureFlags.pagesStartNear60FPS else { return .stop }
+        let page = page(for: webView)
+        if body["still"] != nil {
+            apply(webView, page)
+            return .stop
+        }
+        guard let raw = body["gaps"] as? [Any] else {
+            // A page starting: another site starts over, and one held before starts held, before any scroll.
+            if page.judge.visit(site), held.contains(site) {
+                page.judge.hold()
+                debugLog("framepacing \(site) held near 60 fps: held before")
+            }
+            apply(webView, page)
+            return page.judge.held ? .stop : .measure
+        }
+        guard !page.judge.held else { return .stop }
+        let gaps = raw.compactMap { ($0 as? NSNumber)?.doubleValue }
+        guard let fps = rate ?? webView.window?.screen?.maximumFramesPerSecond, fps > 60 else { return .measure }
+        // Slowed by WebKit, the page is judged at the 60 it's held to.
+        let interval = 1000 / Double(throttled() ? 60 : fps)
+        let before = page.judge.judged
+        let holds = page.judge.add(gaps, interval: interval)
+        if page.judge.judged != before, let last = page.judge.windows.last {
+            debugLog("framepacing \(site) missed \(Int((last * 100).rounded()))% of \(Int(1000 / interval)) Hz frames while scrolling")
+        }
+        guard holds else { return .measure }
+        #if DEBUG
+        if keepsRate { page.judge = Judge(site: site); return .measure }
+        #endif
+        if webView.configuration.websiteDataStore.isPersistent { held.insert(site) }
+        debugLog("framepacing \(site) held near 60 fps once scrolling stops: missed \(page.judge.windows.map { "\(Int(($0 * 100).rounded()))%" }.joined(separator: " "))")
+        return .settle
+    }
+
+    /// The page's setting brought in line: near 60 when held or while WebKit slows pages, the full rate otherwise.
+    private static func apply(_ webView: WKWebView, _ page: Page) {
+        let wanted = page.judge.held || throttled()
+        guard wanted != page.near60 else { return }
+        page.near60 = wanted
+        setNear60(wanted, webView)
+    }
+
+    private static var watching = false
+
+    /// Low Power Mode or the Mac's heat changed: pages out of sight take the new rate when next shown; pages in
+    /// sight at their next page, never mid-scroll.
+    private static func watchPower() {
+        guard !watching else { return }
+        watching = true
+        for name in [Notification.Name.NSProcessInfoPowerStateDidChange, ProcessInfo.thermalStateDidChangeNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { powerChanged() }
+            }
+        }
+    }
+
+    static func powerChanged() {
+        guard !FeatureFlags.pagesStartNear60FPS else { return }
+        for webView in pages.keyEnumerator().allObjects.compactMap({ $0 as? WKWebView }) {
+            guard webView.window == nil || webView.isHidden, let page = pages.object(forKey: webView) else { continue }
+            apply(webView, page)
+        }
     }
 
     private static func setNear60(_ on: Bool, _ webView: WKWebView) {
@@ -209,7 +352,7 @@ enum FramePacing {
             guard message.frameInfo.isMainFrame, let webView = message.webView else { return replyHandler(false, nil) }
             let host = message.frameInfo.securityOrigin.host
             let site = host.isEmpty ? "" : PublicSuffix.registrableDomain(host) ?? host
-            replyHandler(FramePacing.received(message.body as? [String: Any] ?? [:], site: site, from: webView), nil)
+            replyHandler(FramePacing.received(message.body as? [String: Any] ?? [:], site: site, from: webView).body, nil)
         }
     }
 }

@@ -22,6 +22,10 @@
 - A .xpi that asks for the proxy permission → its sheet and its row in Settings say Firefox's proxy API won't work in Zigzag.
   Test: FirefoxLimitTests.aFirefoxProxyExtensionSaysItsProxyWontWork
 
+## Settings › Extensions
+- Each extension → a box headed by its name, version and switch, with Apps on This Mac, Site access and Allow in private windows inside; folded when more than three are installed.
+  Test: SettingsFoldingTests.eachExtensionIsABoxWithItsSettingsInside
+
 ## Updates
 - Extensions from the Chrome Web Store → checked once a day; ones from a .xpi or a folder aren't.
   Test: FirefoxInstallTests.onlyTheStoresOwnPackagesAreAskedForUpdates
@@ -73,6 +77,24 @@
   Test: ExtensionOmniboxTests.aSiteSearchKeepsItsKeyword
 - An extension whose background is asleep → it's started and hears what was typed meanwhile.
   Test: ExtensionOmniboxTests.anAsleepBackgroundIsWokenAndHearsWhatItMissed
+
+## Saving pages
+- An extension with pageCapture saves a tab (`chrome.pageCapture.saveAsMHTML`) → it gets a Blob of MHTML, as in Chrome: the page first, then its stylesheets, pictures and frames, each with the address it came from.
+  Test: PageCaptureTests.aRealPageComesOutWithItsStylesheetImageAndFrame
+- Scripts, and frames with no address of their own (about:blank, srcdoc) → left out of the file; Chrome's MHTML has no scripts either.
+  Test: PageCaptureTests.scriptsAndFramesWithNoAddressStayOut
+- The tab → found by what the extension's `tabs.get` and `windows.get` say of it, matched only by the addresses of tabs it may save, so it can't test a guess at another tab's; none, or two windows that read the same → not found.
+  Test: PageCaptureTests.theTabIsFoundByWhatTheExtensionWasToldOfIt
+- A page on a site the extension can't access or where extensions are off, a file, or one of Zigzag's own pages → refused.
+  Test: PageCaptureTests.onlyWebPagesOnSitesItHasAreSaved
+- A frame from a site the extension can't access → left out, with everything in it.
+  Test: PageCaptureTests.aFrameLeftOutTakesItsPartsWithIt
+- Something the page loaded → in the file only if it's a picture, a stylesheet or a font, from whichever site; so a tag or a redirect pointing at a private address brings nothing back.
+  Test: PageCaptureTests.onlyPicturesStylesAndFontsGoIn
+- A page's title or a part's address or type → can't add a header of its own to the file.
+  Test: PageCaptureTests.thePageCannotWriteHeadersOfItsOwn
+- A failure with a callback → the callback gets undefined and reads it in runtime.lastError, as in Chrome.
+  Test: PageCaptureTests.aFailureIsLastErrorForACallback
 
 ## Background
 - A page's message to an extension unanswered after 3 seconds → Zigzag starts that extension's background, at most once every 10 seconds.

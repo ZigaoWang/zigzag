@@ -6,10 +6,11 @@ protocol SettingsSizedRow: NSView { func height(for width: CGFloat) -> CGFloat }
 /// A group row that "Find a setting" searches inside: it shows what in it matches, and says whether anything does.
 protocol SettingsFilteredRow: NSView { func find(_ words: [String]) -> Bool }
 
-/// Settings' list of what websites keep (#207): every site, as tall as all its rows, inside the page's own scroll,
-/// with row views made only for the part in view and reused as it scrolls, so thousands of sites open at once and
-/// scroll at the display's rate. Each row looks as a `FormRow` with a picture does: the site's icon, its name (what
-/// a search matched marked), what it keeps, its size at the trailing end, and the trash on hover.
+/// Settings' list of what websites keep (#207): every site, as tall as all its boxes, inside the page's own scroll,
+/// with views made only for the part in view and reused as it scrolls, so thousands of sites open at once and
+/// scroll at the display's rate. Each site is a box that folds, as Site Permissions has them (#368): its icon, its
+/// name (what a search matched marked), what it keeps, its size and the trash on hover; opened, a row for its
+/// cookies and one for its cache, each cleared on its own.
 final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, SettingsSearchable {
     /// Before Show All, the first sites by the order chosen.
     static let collapsedCount = 30
@@ -25,23 +26,26 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
     }
     /// Show All: every site, not only the first.
     var showsAll = false { didSet { if showsAll != oldValue { modelChanged() } } }
-    /// Its height changed: the page lays out again.
     /// What's shown changed; true when its height did too, so the page lays out again.
     var changed: ((_ heightChanged: Bool) -> Void)?
-    /// The trash on a site's row.
+    /// The trash on a site's box.
     var onRemove: ((SiteDataEntry) -> Void)?
+    /// Clear… on one kind of what a site keeps.
+    var onClear: ((SiteDataEntry, WebsiteData.Kind) -> Void)?
 
     var searchText: String {
         String(localized: "website data cookies cache storage sites remove", comment: "Words that find the list of what websites keep with Find a setting in Settings. Not shown.")
     }
 
-    /// The row's height: a title and the line under it, as every row with a line under its name.
+    /// A box's header: a title and the line under it, as every row with a line under its name.
     static let rowHeight: CGFloat = {
         let title = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
         let detail = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
         return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + 2 + detail.lineHeight)
     }()
-    /// Rows made past each edge of what's in view, so a quick scroll finds them there.
+    /// A kind of data inside an open box: one line, as a plain row.
+    static let kindHeight = Tokens.Page.groupRowHeight
+    /// Views made past each edge of what's in view, so a quick scroll finds them there.
     private static let overscan: CGFloat = 240
 
     private var visible: [Int: SiteDataRow] = [:]
@@ -59,6 +63,11 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
     private var iconsMissing: Set<String> = []
     private var iconsReading: Set<String> = []
     private var lastHeight: CGFloat = 0
+    /// Sites opened or folded while Settings stays open; the rest as a list of their length starts.
+    private var opened: [String: Bool] = [:]
+    /// Where each box listed starts, and where the last one ends.
+    private var tops: [CGFloat] = []
+    private var boxesHeight: CGFloat = 0
 
     override init(frame: NSRect) {
         footer = FormRow(title: "", control: showAllButton)
@@ -80,7 +89,7 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
     // MARK: What's shown
 
     private var entries: [SiteDataEntry] { model?.shown ?? [] }
-    /// How many rows are listed: all matches while searching, else the first until Show All.
+    /// How many boxes are listed: all matches while searching, else the first until Show All.
     private var count: Int {
         let all = entries.count
         guard let model, !model.isFiltering, !showsAll else { return all }
@@ -96,9 +105,45 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
         return model.isFiltering ? .noMatch(model.words.joined(separator: " ")) : .empty
     }
 
+    /// Whether a site's box is open: as it was left, else open in a short list and folded in a long one.
+    func isOpen(_ site: String) -> Bool { opened[site] ?? FoldStyle.opensByDefault(count: entries.count) }
+
+    /// A site's box opened or folded, by a click or a key: the boxes under it move to make room.
+    func setOpen(_ site: String, _ open: Bool) {
+        guard isOpen(site) != open else { return }
+        opened[site] = open
+        let rows = visible.values.filter { $0.site == site }
+        FoldStyle.animate(in: enclosingScrollView?.documentView ?? self, { [weak self] in
+            rows.forEach { $0.isOpen = open }
+            self?.boxesChanged()
+        }, completion: { rows.forEach { $0.settle() } })
+    }
+
+    /// The kinds a box opens to: its cookies and saved data, cleared together as Clear Cookies… does, and its cache.
+    static func kinds(of entry: SiteDataEntry) -> [WebsiteData.Kind] {
+        (entry.kinds.isDisjoint(with: [.cookies, .saved]) ? [] : [.cookies]) + (entry.kinds.contains(.cache) ? [.cache] : [])
+    }
+
+    private func boxHeight(_ entry: SiteDataEntry) -> CGFloat {
+        Self.rowHeight + (isOpen(entry.site) ? CGFloat(Self.kinds(of: entry).count) * Self.kindHeight : 0)
+    }
+
+    /// Where each box goes, a gap between them.
+    private func measure() {
+        let shown = entries
+        var y: CGFloat = 0
+        tops = []
+        tops.reserveCapacity(count)
+        for index in 0..<count {
+            tops.append(y)
+            y += boxHeight(shown[index]) + (index < count - 1 ? FoldStyle.gap : 0)
+        }
+        boxesHeight = y
+    }
+
     func height(for width: CGFloat) -> CGFloat {
         if case .none = messageShown {
-            return CGFloat(count) * Self.rowHeight + (hasFooter ? footer.height(for: width) : 0)
+            return boxesHeight + (hasFooter ? FoldStyle.gap + footer.height(for: width) : 0)
         }
         return message.height(for: width)
     }
@@ -130,14 +175,22 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
         if hasFooter {
             footer.update(title: String(localized: "\(rest) more sites", comment: "Under the first 30 sites in Settings › Privacy, beside Show All."), detail: nil, quiet: false)
         }
+        boxesChanged()
+    }
+
+    /// The boxes moved or grew: measured again, and the page told if the list's height changed.
+    private func boxesChanged() {
+        measure()
         needsLayout = true
         let height = height(for: bounds.width > 0 ? bounds.width : 600)
         let grew = height != lastHeight
         lastHeight = height
         changed?(grew)
+        // Laid out now, inside a fold's animation, so the boxes glide to their places with the page.
+        layoutSubtreeIfNeeded()
     }
 
-    // MARK: Rows for what's in view
+    // MARK: Boxes for what's in view
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -159,23 +212,34 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
         super.layout()
         lastHeight = bounds.height
         message.frame = NSRect(x: 0, y: 0, width: bounds.width, height: message.height(for: bounds.width))
-        footer.frame = NSRect(x: 0, y: CGFloat(count) * Self.rowHeight, width: bounds.width, height: footer.height(for: bounds.width))
+        footer.frame = NSRect(x: 0, y: boxesHeight + FoldStyle.gap, width: bounds.width, height: footer.height(for: bounds.width))
         for (index, row) in visible { place(row, at: index) }
         tile()
     }
 
-    /// The rows in view (and a little past) made or reused; the rest put back for later.
+    /// The box at or after `y`: the first whose bottom is past it.
+    private func index(atOrAfter y: CGFloat) -> Int {
+        var low = 0, high = tops.count
+        while low < high {
+            let mid = (low + high) / 2
+            if tops[mid] + boxHeight(entries[mid]) < y { low = mid + 1 } else { high = mid }
+        }
+        return low
+    }
+
+    /// The boxes in view (and a little past) made or reused; the rest put back for later.
     private func tile() {
-        guard message.isHidden, count > 0 else {
+        guard message.isHidden, count > 0, tops.count == count else {
             visible.values.forEach(recycle)
             visible = [:]
             return
         }
         let area = visibleRect.insetBy(dx: 0, dy: -Self.overscan)
         guard !area.isEmpty else { return }
-        let first = max(0, Int(floor(area.minY / Self.rowHeight)))
-        let last = min(count - 1, Int(ceil(area.maxY / Self.rowHeight)))
-        guard first <= last else { visible.values.forEach(recycle); visible = [:]; return }
+        let first = index(atOrAfter: area.minY)
+        var last = first
+        while last + 1 < count, tops[last + 1] <= area.maxY { last += 1 }
+        guard first < count else { visible.values.forEach(recycle); visible = [:]; return }
         let wanted = first...last
         for (index, row) in visible where !wanted.contains(index) {
             recycle(row)
@@ -186,15 +250,29 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
             row.isHidden = false
             visible[index] = row
             configure(row, at: index)
-            place(row, at: index)
+            // A box taken from the pool starts in its place, not gliding there from where it was last.
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0
+                ctx.allowsImplicitAnimation = false
+                place(row, at: index)
+                row.layoutSubtreeIfNeeded()
+            }
         }
     }
 
     private func makeRow() -> SiteDataRow {
         let row = SiteDataRow(frame: NSRect(x: 0, y: 0, width: bounds.width, height: Self.rowHeight))
         row.onRemove = { [weak self, weak row] in
-            guard let self, let row, let site = row.site, let entry = self.entries.first(where: { $0.site == site }) else { return }
+            guard let self, let entry = row.flatMap({ row in self.entries.first { $0.site == row.site } }) else { return }
             self.onRemove?(entry)
+        }
+        row.onClear = { [weak self, weak row] kind in
+            guard let self, let entry = row.flatMap({ row in self.entries.first { $0.site == row.site } }) else { return }
+            self.onClear?(entry, kind)
+        }
+        row.onToggle = { [weak self, weak row] open in
+            guard let self, let site = row?.site else { return }
+            self.setOpen(site, open)
         }
         addSubview(row)
         return row
@@ -207,14 +285,14 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
     }
 
     private func place(_ row: SiteDataRow, at index: Int) {
-        let frame = NSRect(x: 0, y: CGFloat(index) * Self.rowHeight, width: bounds.width, height: Self.rowHeight)
+        guard tops.indices.contains(index) else { return }
+        let frame = NSRect(x: 0, y: tops[index], width: bounds.width, height: boxHeight(entries[index]))
         if row.frame != frame { row.frame = frame }
-        row.showsLine = index < count - 1 || hasFooter
     }
 
     private func configure(_ row: SiteDataRow, at index: Int) {
         let entry = entries[index]
-        row.show(entry, words: model?.words ?? [], icon: icon(for: entry.site))
+        row.show(entry, words: model?.words ?? [], icon: icon(for: entry.site), open: isOpen(entry.site))
         row.isHovered = index == hovered
     }
 
@@ -249,7 +327,7 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
     override func mouseEntered(with event: NSEvent) { hover(at: convert(event.locationInWindow, from: nil)) }
     override func mouseExited(with event: NSEvent) { hovered = nil }
 
-    /// The page scrolled under a still pointer: the row under it now is the hovered one.
+    /// The page scrolled under a still pointer: the box under it now is the hovered one.
     private func followPointer() {
         guard let window, window.isVisible else { return }
         let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
@@ -257,9 +335,9 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
     }
 
     private func hover(at point: NSPoint) {
-        guard message.isHidden, point.y >= 0, bounds.contains(point) else { hovered = nil; return }
-        let index = Int(point.y / Self.rowHeight)
-        hovered = index < count ? index : nil
+        guard message.isHidden, point.y >= 0, bounds.contains(point), !tops.isEmpty else { hovered = nil; return }
+        let index = index(atOrAfter: point.y)
+        hovered = index < count && tops[index] <= point.y ? index : nil
     }
 
     private func refreshHover(_ index: Int) { visible[index]?.isHovered = index == hovered }
@@ -270,17 +348,22 @@ final class SiteDataList: NSView, SettingsSizedRow, SettingsFilteredRow, Setting
     }
 
     #if DEBUG
-    /// How many row views exist, in view and kept for reuse.
+    /// How many box views exist, in view and kept for reuse.
     var debugRowViews: Int { visible.count + pool.count }
     var debugExpanded: Bool { showsAll }
     var debugListed: Int { count }
+    /// The box views in view, top to bottom.
+    var debugRows: [SiteDataRow] { visible.sorted { $0.key < $1.key }.map(\.value) }
     #endif
 }
 
-/// One site's row in `SiteDataList`, reused for another site as the list scrolls.
+/// One site's box in `SiteDataList`, reused for another site as the list scrolls: its header, and opened, a row
+/// for each kind of what it keeps with Clear… on it.
 final class SiteDataRow: NSView {
     var site: String?
     var onRemove: (() -> Void)?
+    var onClear: ((WebsiteData.Kind) -> Void)?
+    var onToggle: ((Bool) -> Void)?
     var icon: NSImage? {
         didSet {
             iconView.image = icon ?? SettingsIcon.symbol("globe")
@@ -288,22 +371,48 @@ final class SiteDataRow: NSView {
         }
     }
     var isHovered = false { didSet { if isHovered != oldValue { refreshDelete() } } }
-    var showsLine = true { didSet { line.isHidden = !showsLine } }
+    /// Open, its kinds showing; folding, they stay until the box has closed over them (`settle`).
+    var isOpen = false {
+        didSet {
+            guard oldValue != isOpen else { return }
+            if !isOpen { holdsKinds = true }
+            header.isOpen = isOpen
+            needsLayout = true
+        }
+    }
+    private var holdsKinds = false
 
+    private let headerContent = FlippedView()
+    private(set) lazy var header = FoldHeader(content: headerContent)
     private let iconView = NSImageView()
     private let title = Label("", font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
     private let detail = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
     private let size = Label("", font: Tokens.Font.figures(Tokens.Font.detail().pointSize), color: Tokens.Color.textSecondary)
     private let remove = IconButton(symbol: "trash", size: .compact)
-    private let line = ColorView(color: Tokens.Color.separator)
+    /// Cookies and cache, each a row with Clear… and the hairline over it.
+    private var kindRows: [(kind: WebsiteData.Kind, row: FormRow, clear: PillButton, line: ColorView)] = []
+    private var kinds: [WebsiteData.Kind] = []
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        wantsLayer = true
         iconView.contentTintColor = Tokens.Color.icon
         size.alignment = .right
         remove.onClick = { [weak self] _ in self?.onRemove?() }
         remove.keyboardFocusChanged = { [weak self] _ in self?.refreshDelete() }
-        [iconView, title, detail, size, remove, line].forEach(addSubview)
+        [iconView, title, detail, size, remove].forEach(headerContent.addSubview)
+        addSubview(header)
+        header.onToggle = { [weak self] open in self?.onToggle?(open) }
+        for kind in [WebsiteData.Kind.cookies, .cache] {
+            let clear = PillButton(title: String(localized: "Clear…", comment: "Button on a kind of data in a site's box in Settings › Privacy › Stored by Websites: clears it for that site, after asking."))
+            clear.onClick = { [weak self] _ in self?.onClear?(kind) }
+            let row = FormRow(title: "", control: clear)
+            row.isIndented = true
+            let line = ColorView(color: Tokens.Color.separator)
+            addSubview(line)
+            addSubview(row)
+            kindRows.append((kind, row, clear, line))
+        }
         setAccessibilityElement(true)
         setAccessibilityRole(.row)
         refreshDelete()
@@ -312,8 +421,10 @@ final class SiteDataRow: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() { FoldStyle.paint(self) }
 
-    func show(_ entry: SiteDataEntry, words: [String], icon: NSImage?) {
+    func show(_ entry: SiteDataEntry, words: [String], icon: NSImage?, open: Bool) {
         site = entry.site
         self.icon = icon
         let styled = NSMutableAttributedString(string: entry.site, attributes: [.font: Tokens.Font.row(), .foregroundColor: Tokens.Color.textPrimary])
@@ -323,7 +434,30 @@ final class SiteDataRow: NSView {
         detail.stringValue = Self.describe(entry.kinds)
         size.stringValue = entry.size.flatMap { $0 > 0 ? ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) : nil } ?? ""
         remove.toolTip = String(localized: "Remove Data for \(entry.site)…", comment: "Tooltip and VoiceOver name of the trash on a site's row in Settings › Privacy › Stored by Websites; the site, like apple.com.")
-        setAccessibilityLabel([entry.site, detail.stringValue, size.stringValue].filter { !$0.isEmpty }.joined(separator: ", "))
+        kinds = SiteDataList.kinds(of: entry)
+        for item in kindRows {
+            switch item.kind {
+            case .cookies:
+                item.row.titleText = Self.describe(entry.kinds.intersection([.cookies, .saved]))
+                item.clear.setAccessibilityLabel(String(localized: "Clear Cookies for \(entry.site)…", comment: "VoiceOver name of Clear… on the cookies row in a site's box in Settings › Privacy › Stored by Websites; the site, like apple.com."))
+            case .cache:
+                item.row.titleText = Self.describe(.cache)
+                item.clear.setAccessibilityLabel(String(localized: "Clear Cache for \(entry.site)…", comment: "VoiceOver name of Clear… on the cache row in a site's box in Settings › Privacy › Stored by Websites; the site, like apple.com."))
+            }
+        }
+        let label = [entry.site, detail.stringValue, size.stringValue].filter { !$0.isEmpty }.joined(separator: ", ")
+        header.setAccessibilityLabel(label)
+        setAccessibilityLabel(label)
+        holdsKinds = false
+        isOpen = open
+        header.isOpen = open
+        needsLayout = true
+    }
+
+    /// The box has closed over its kinds: they go, so neither Tab nor VoiceOver lands on what's folded.
+    func settle() {
+        guard holdsKinds else { return }
+        holdsKinds = false
         needsLayout = true
     }
 
@@ -334,18 +468,34 @@ final class SiteDataRow: NSView {
     override func layout() {
         super.layout()
         let pad = Tokens.Page.groupPad, side = Tokens.Metric.favicon
-        iconView.frame = NSRect(x: pad, y: round((bounds.height - side) / 2), width: side, height: side)
+        header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: SiteDataList.rowHeight)
+        let h = SiteDataList.rowHeight, w = max(0, bounds.width - FoldStyle.chevronRoom)
+        iconView.frame = NSRect(x: pad, y: round((h - side) / 2), width: side, height: side)
         let b = Tokens.Metric.compactIconButton
-        remove.frame = NSRect(x: bounds.width - pad - b + Tokens.Space.x1, y: round((bounds.height - b) / 2), width: b, height: b)
+        remove.frame = NSRect(x: w - pad - b + Tokens.Space.x1, y: round((h - b) / 2), width: b, height: b)
         let sizeWidth: CGFloat = size.stringValue.isEmpty ? 0 : size.textWidth
-        size.frame = NSRect(x: remove.frame.minX - Tokens.Space.x2 - sizeWidth, y: size.centeredY(in: bounds.height), width: sizeWidth, height: size.lineHeight)
+        size.frame = NSRect(x: remove.frame.minX - Tokens.Space.x2 - sizeWidth, y: size.centeredY(in: h), width: sizeWidth, height: size.lineHeight)
         let x = pad + side + Tokens.Space.x3
         let width = max(0, size.frame.minX - Tokens.Space.x4 - x) + Label.inset * 2
         let block = title.lineHeight + 2 + detail.lineHeight
-        let top = round((bounds.height - block) / 2)
+        let top = round((h - block) / 2)
         title.frame = NSRect(x: x - Label.inset, y: top, width: width, height: title.lineHeight)
         detail.frame = NSRect(x: x - Label.inset, y: title.frame.maxY + 2, width: width, height: detail.lineHeight)
-        line.frame = NSRect(x: x, y: bounds.height - Tokens.Metric.hairline, width: max(0, bounds.width - x - pad), height: Tokens.Metric.hairline)
+        // Its kinds under the header while open, each under a hairline that starts where the text does.
+        var y = h
+        let showing = isOpen || holdsKinds
+        var children: [Any] = [header, remove]
+        for item in kindRows {
+            let shown = showing && kinds.contains(item.kind)
+            item.row.isHidden = !shown
+            item.line.isHidden = !shown
+            guard shown else { continue }
+            item.line.frame = NSRect(x: x, y: y, width: max(0, bounds.width - x - pad), height: Tokens.Metric.hairline)
+            item.row.frame = NSRect(x: 0, y: y, width: max(0, bounds.width - FoldStyle.chevronRoom), height: SiteDataList.kindHeight)
+            y += SiteDataList.kindHeight
+            children.append(item.clear)
+        }
+        setAccessibilityChildren(children)
     }
 
     /// What a site keeps, in a few plain words, as a label under its name: "Cookies, saved data and cache".

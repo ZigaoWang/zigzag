@@ -141,6 +141,8 @@ final class AddressView: InteractiveView {
             pendingPins = (pins, animated)
             return
         }
+        // No extension pinned, before or after: nothing moves.
+        if pins.isEmpty, pinEntries.isEmpty { return }
         let kept = Set(pins.map(\.id))
         for gone in pinEntries where !kept.contains(gone.pin.id) { takeAway(gone.button, animated: animated, removing: true) }
         let existing = Dictionary(uniqueKeysWithValues: pinEntries.map { ($0.pin.id, $0) })
@@ -534,8 +536,15 @@ final class AddressView: InteractiveView {
         return CGFloat(count) * Self.pinStep - 2
     }
 
+    /// What `show` last put up: the site's name and whether it's marked not secure.
+    private var shown: (name: String, insecure: Bool)?
+
     func show(url: URL?, notSecure: Bool) {
-        label.stringValue = Self.name(of: url)
+        // The same site as it was: a page moving its address as you scroll it (a forum's post number) redraws nothing.
+        let now = (name: Self.name(of: url), insecure: notSecure && url != nil)
+        if let shown, shown == now { return }
+        shown = now
+        label.stringValue = now.name
         label.lineBreakMode = Self.lineBreak(forName: label.stringValue)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
@@ -943,6 +952,8 @@ final class SidebarView: NSView {
     }
     /// Whether the space keys are there to show numbers on: more than one space, in a window that switches them.
     var hasSpaceKeys: Bool { !isPrivate && dots.count > 1 }
+    /// The spaces its window lists (`TabManager.listedSpaces`): all, unless it keeps to one profile.
+    var listedSpaces: () -> [SpaceInfo] = { Library.shared.yourSpaces }
     /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
     var isPrivate = false {
         didSet {
@@ -976,6 +987,17 @@ final class SidebarView: NSView {
     /// Where the favorites start while the address is above the page: the page's top, so the two line up under the
     /// top row (set by the window as it lays out the page).
     var contentTop: CGFloat = TopBarView.height { didSet { if contentTop != oldValue { needsLayout = true } } }
+    /// Off in the screen edge's sidebar, a list to pick from: the address row stays in the window.
+    var showsAddressRow = true {
+        didSet {
+            guard showsAddressRow != oldValue else { return }
+            holdsAddress = showsAddressRow
+            (addressViews + [sidebarButton]).forEach { $0.isHidden = !showsAddressRow }
+            contentTop = showsAddressRow ? TopBarView.height : Tokens.Space.x2
+        }
+    }
+    /// The screen edge's sidebar answers hover while another app is in front.
+    var hoversWhileInactive = false
     /// What moves to the bar above the page: the three buttons in order, then the address.
     var addressButtons: [IconButton] { [backButton, forwardButton, reloadButton] }
     private var addressViews: [NSView] { addressButtons + [address] }
@@ -1304,12 +1326,20 @@ final class SidebarView: NSView {
 
     // MARK: Updating
 
+    /// Whether the reload button's tip says Stop (`update`).
+    private var tipLoading: Bool?
+
     func update(tab: Tab?) {
         backButton.isEnabled = tab?.canGoBackOrReturn ?? false
         forwardButton.isEnabled = tab?.canGoForward ?? false
         reloadButton.isEnabled = tab != nil
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
-        reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
+        // Worked out again only when it changes: the tip reads the menus for its shortcut.
+        let loading = tab?.isLoading ?? false
+        if loading != tipLoading {
+            tipLoading = loading
+            reloadButton.toolTip = Self.reloadTip(loading: loading)
+        }
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
     }
@@ -1323,7 +1353,7 @@ final class SidebarView: NSView {
     }
 
     func reloadSpaces(current: UUID) {
-        let spaces = Library.shared.spaces
+        let spaces = listedSpaces()
         if dots.map(\.spaceID) != spaces.map(\.id) {
             // The same spaces in a new order (a drag, its undo) keep their dots, which glide to their new places.
             var kept = Dictionary(dots.map { ($0.spaceID, $0) }, uniquingKeysWith: { first, _ in first })
@@ -2001,7 +2031,7 @@ final class SidebarView: NSView {
     /// One side per turn of the run loop, so neither holds up a scroll that has just started.
     private func prepareNeighbors(next index: Int) {
         guard index < 2, handOff == nil, swipeState != .tracking, let current = currentSpaceID else { return }
-        let spaces = Library.shared.spaces
+        let spaces = listedSpaces()
         guard let at = spaces.firstIndex(where: { $0.id == current }) else { return }
         let side: CGFloat = index == 0 ? 1 : -1
         let neighbor = at + Int(side)
@@ -2241,7 +2271,7 @@ final class SidebarView: NSView {
 
     /// The spaces either side of the one in front now.
     private func findNeighbors() {
-        let spaces = Library.shared.spaces
+        let spaces = listedSpaces()
         let index = spaces.firstIndex { $0.id == currentSpaceID }
         swipeNeighbors = (index.flatMap { $0 > 0 ? spaces[$0 - 1].id : nil },
                           index.flatMap { $0 + 1 < spaces.count ? spaces[$0 + 1].id : nil })
@@ -2712,3 +2742,5 @@ enum SpaceReorder {
         return to == from ? nil : to
     }
 }
+
+extension SidebarView: HoverTrackingWhileInactive {}

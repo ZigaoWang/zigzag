@@ -39,7 +39,7 @@ enum SidebarMenus {
     static func addSpaces(to menu: NSMenu, excluding current: UUID?, _ move: @escaping (SpaceInfo) -> Void) {
         let groups = Library.shared.spaceGroups(excluding: current)
         for group in groups {
-            if Library.shared.hasManyProfiles { menu.addItem(.sectionHeader(title: group.profile.displayName)) }
+            if Library.shared.hasManyOfYourProfiles { menu.addItem(.sectionHeader(title: group.profile.displayName)) }
             for space in group.spaces {
                 let item = Item(space.name, symbol: space.icon.flatMap { IconChoice.isSymbol($0) ? $0 : nil }) { move(space) }
                 if item.image == nil { item.image = space.icon.map { IconChoice.image($0, size: DropdownButton.iconSide) } ?? swatch(space.swatch) }
@@ -173,7 +173,7 @@ enum SidebarMenus {
                 controller.groupWithUndo(rows)
             })
         }
-        if Library.shared.spaces.count > 1, !(isPrivate && !pins.isEmpty) {
+        if Library.shared.yourSpaces.count > 1, !(isPrivate && !pins.isEmpty) {
             organize.append(Submenu(String(localized: "Move \(count) to Space", comment: "Menu item for several picked sidebar rows"), symbol: Symbol.moveTo,
                                     spaceItems(excluding: manager.currentSpaceID) { controller.moveMarked(items, to: $0.id) }))
         }
@@ -292,7 +292,7 @@ enum SidebarMenus {
         if controller.canOpenInMini(tab) {
             places.append(Item(String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name."), symbol: Symbol.mini) { controller.openInMini(tab) })
         }
-        let spaces = Library.shared.spaces.count > 1 ? spaceItems(excluding: tab.spaceID) { controller.moveToSpaceWithToast(tab, spaceID: $0.id) } : []
+        let spaces = Library.shared.yourSpaces.count > 1 ? spaceItems(excluding: tab.spaceID) { controller.moveToSpaceWithToast(tab, spaceID: $0.id) } : []
         if !places.isEmpty, !spaces.isEmpty { places.append(.separator()) }
         places += spaces
         if !places.isEmpty { view.append(Submenu(moveToTitle, symbol: Symbol.moveTo, places)) }
@@ -333,6 +333,7 @@ enum SidebarMenus {
         let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
         // Every page's menu shows the menu bar's keys, as a tab's does.
         func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
+        if Library.shared.isLivePage(bookmark.id) { return livePageMenu(for: bookmark, controller: controller) }
 
         var context: [NSMenuItem] = []
         if let live, let url = live.url, manager.isAway(bookmark.id) {
@@ -392,7 +393,7 @@ enum SidebarMenus {
             if folder != nil {
                 organize.append(Item(String(localized: "Remove from Folder", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.removeFromFolder) { controller.listSetFolder(of: bookmark.id, to: nil) })
             }
-            if Library.shared.spaces.count > 1 {
+            if Library.shared.yourSpaces.count > 1 {
                 organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces."), symbol: Symbol.moveTo,
                                         spaceItems(excluding: Library.shared.spaceID(ofBookmark: bookmark.id)) { space in
                     // Its open page goes with it: to another profile's space, that's asked first.
@@ -431,6 +432,7 @@ enum SidebarMenus {
     }
 
     static func folderMenu(for folder: BookmarkFolder, controller: BrowserWindowController) -> NSMenu {
+        if folder.live != nil { return liveFolderMenu(for: folder, controller: controller) }
         // First item, as in Safari's bookmark folders.
         var open: [NSMenuItem] = []
         if !Library.shared.allBookmarkIDs(inFolder: folder.id).isEmpty {
@@ -447,7 +449,8 @@ enum SidebarMenus {
                 view.append(Item(String(localized: "Collapse All", comment: "Item in a folder's context menu in the sidebar: shuts the folder and every folder inside it."), symbol: Symbol.collapse) { controller.setFolderTreeOpen(folder.id, false) })
             }
         }
-        var organize = [Item(String(localized: "New Folder Inside", comment: "Item in a folder's context menu in the sidebar."), symbol: Symbol.newFolder) { controller.newFolder(inside: folder.id) }]
+        var organize = [Item(String(localized: "New Folder Inside", comment: "Item in a folder's context menu in the sidebar."), symbol: Symbol.newFolder) { controller.newFolder(inside: folder.id) },
+                        Item(LiveFolderSheet.newTitle, symbol: LiveFolderSheet.symbol) { controller.newLiveFolder(inside: folder.id) }]
         // Out of the folder it's in, to the level above.
         if let parent = folder.parentID {
             organize.append(Item(String(localized: "Move Out of Folder", comment: "Item in a folder's context menu in the sidebar. Moves the folder up a level, out of the folder it's in."), symbol: Symbol.outOfFolder) {
@@ -506,7 +509,7 @@ enum SidebarMenus {
             controller.listSetGroupOpen(group.id, !group.isOpen)
         }]
         var organize = [Item(String(localized: "Ungroup", comment: "Item in a group of tabs' context menu in the sidebar. The group goes; its tabs stay where they are."), symbol: Symbol.ungroup) { controller.ungroupWithUndo(group.id) }]
-        if Library.shared.spaces.count > 1, let space = controller.tabManager.tabs(inGroup: group.id).first?.spaceID {
+        if Library.shared.yourSpaces.count > 1, let space = controller.tabManager.tabs(inGroup: group.id).first?.spaceID {
             organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces."), symbol: Symbol.moveTo,
                                     spaceItems(excluding: space) { controller.listMoveGroup(group.id, to: Int.max, in: $0.id) }))
         }
@@ -592,6 +595,7 @@ enum SidebarMenus {
         menu.addItem(useDefaultColorsItem(for: id, symbol: Symbol.defaultColors) { controller.libraryChange($0, $1) })
         if isCurrent {
             menu.addItem(Item(String(localized: "New Folder", comment: "Item in a space's context menu."), symbol: Symbol.newFolder) { controller.newFolder() })
+            menu.addItem(Item(LiveFolderSheet.newTitle, symbol: LiveFolderSheet.symbol) { controller.newLiveFolder() })
         }
         // Every pinned folder at once, each only when it would change something (#343).
         if BrowserWindowController.hasFolders(in: id, isOpen: true) {
@@ -608,7 +612,7 @@ enum SidebarMenus {
         menu.addItem(large)
         menu.addItem(.separator())
         menu.addItem(withShortcut(Item(String(localized: "New Space", comment: "Item in a space's context menu."), symbol: Symbol.newSpace) { controller.newSpace(anchor) }, of: #selector(C.newSpace(_:))))
-        menu.addItem(Item(String(localized: "Delete Space", comment: "Item in a space's context menu."), symbol: Symbol.remove, destructive: true, enabled: Library.shared.spaces.count > 1) {
+        menu.addItem(Item(String(localized: "Delete Space", comment: "Item in a space's context menu."), symbol: Symbol.remove, destructive: true, enabled: Library.shared.yourSpaces.count > 1) {
 
             SpaceEditor.confirmDelete(spaceID: id, in: controller)
         })
@@ -634,18 +638,18 @@ enum SidebarMenus {
 
     /// What the sidebar's own menus hold, in order, before they're made into items: the + at its bottom and the
     /// right-click on its empty space. Both are Zigzag's own drawn menu (`MenuPanel`), so they look and work alike.
-    enum Entry: Equatable { case newTab, newFolder, editSpace, newSpace, separator }
+    enum Entry: Equatable { case newTab, newFolder, newLiveFolder, editSpace, newSpace, separator }
 
     /// The + at the bottom of the sidebar: what you can add, smallest first. A private window keeps no pinned tabs
     /// or spaces, so only a tab.
     static func addEntries(isPrivate: Bool) -> [Entry] {
-        isPrivate ? [.newTab] : [.newTab, .newFolder, .newSpace]
+        isPrivate ? [.newTab] : [.newTab, .newFolder, .newLiveFolder, .newSpace]
     }
 
     /// Right-click on the sidebar where there's no row or button: the same as the +, with the space itself beside
     /// a new one.
     static func blankEntries(isPrivate: Bool) -> [Entry] {
-        isPrivate ? [.newTab] : [.newTab, .newFolder, .separator, .editSpace, .newSpace]
+        isPrivate ? [.newTab] : [.newTab, .newFolder, .newLiveFolder, .separator, .editSpace, .newSpace]
     }
 
     /// What an entry is called, its symbol and the shortcut the menu bar gives it now (none for a folder).
@@ -653,6 +657,7 @@ enum SidebarMenus {
         switch entry {
         case .newTab: String(localized: "New Tab", comment: "Item in the menu of the sidebar's + and its empty space.")
         case .newFolder: String(localized: "New Folder", comment: "Item in a space's context menu.")
+        case .newLiveFolder: LiveFolderSheet.newTitle
         case .editSpace: String(localized: "Edit Space…", comment: "Item in a space's context menu.")
         case .newSpace: String(localized: "New Space", comment: "Item in the menu of the sidebar's + and its empty space: adds a space and opens it to be named.")
         case .separator: ""
@@ -663,6 +668,7 @@ enum SidebarMenus {
         switch entry {
         case .newTab: "plus"
         case .newFolder: "folder.badge.plus"
+        case .newLiveFolder: LiveFolderSheet.symbol
         case .editSpace: "pencil"
         case .newSpace: "plus.square"
         case .separator: nil
@@ -674,7 +680,7 @@ enum SidebarMenus {
         case .newTab: #selector(BrowserWindowController.newTab(_:))
         case .newSpace: #selector(BrowserWindowController.newSpace(_:))
         case .editSpace: #selector(BrowserWindowController.renameSpace(_:))
-        case .newFolder, .separator: nil
+        case .newFolder, .newLiveFolder, .separator: nil
         }
     }
 
@@ -696,6 +702,7 @@ enum SidebarMenus {
                 switch entry {
                 case .newTab: controller.listNewTab()
                 case .newFolder: controller.newFolder()
+                case .newLiveFolder: controller.newLiveFolder()
                 // Beside the space's name, as the View menu's Edit Space… opens it.
                 case .editSpace: controller.openSpaceEditor(controller.tabManager.currentSpaceID, anchor: controller.sidebar.list.headerView)
                 case .newSpace: controller.newSpace(button)

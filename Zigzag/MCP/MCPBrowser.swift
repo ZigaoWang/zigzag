@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// The tools, run on your windows and tabs: the same windows and tab ids AppleScript sees (never a private window,
-/// nor Zigzag Mini), and only websites in them.
+/// nor Zigzag Mini), and only websites in them. In the background (Headless), only AI apps' own window, never yours.
 nonisolated struct MCPBrowserRunner: MCPToolRunner {
     var tools: [JSON] { MCPTools.definitions }
 
@@ -44,15 +44,26 @@ enum MCPBrowser {
         default: (needsPage, actsOnPage) = (true, true)
         }
         if let refusal = MCPSafety.refusal(url: tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id),
-                                           errorPage: actsOnPage && tab.showsErrorPage, needsPage: needsPage) {
+                                           errorPage: actsOnPage && tab.showsErrorPage, outsideHeadless: outsideHeadless(tab), needsPage: needsPage) {
             return .error(MCPSafety.message(refusal))
         }
         AgentControl.shared.touch(tab, by: client)
+        return told(await act(command, on: found, since: generation), about: tab)
+    }
+
+    /// What the page asked with no one there, reported once with the next answer.
+    private static func told(_ result: MCPToolResult, about tab: Tab) -> MCPToolResult {
+        telling(result, of: tab.takeUnanswered().map { ($0.kind.rawValue, $0.message, $0.page) })
+    }
+
+    /// Does what the tool asks on a tab it may use.
+    private static func act(_ command: MCPCommand, on found: Found, since generation: Int) async -> MCPToolResult {
+        let tab = found.tab
         switch command {
         case .activate:
             found.controller.tabManager.select(tab)
-            // In front of Zigzag's other windows, without taking the keyboard from the app you're in.
-            found.controller.window?.orderFront(nil)
+            // In front of Zigzag's other windows, keyboard left alone; their unseen window stays parked.
+            if found.controller !== Headless.window { found.controller.window?.orderFront(nil) }
             return .data(info(tab, in: found.controller))
         case .close:
             let closed = info(tab, in: found.controller)
@@ -109,7 +120,13 @@ enum MCPBrowser {
                 }
             }
         case .screenshot:
-            return await page(tab, since: generation) { webView in await screenshot(webView, tab: tab, in: found.controller) }
+            return await page(tab, since: generation) { webView in
+                // A background tab of their window is held out of sight for the picture.
+                guard webView.window == nil, found.controller === Headless.window else {
+                    return await screenshot(webView, tab: tab, in: found.controller)
+                }
+                return await screenshotOutOfSight(webView, tab: tab, in: found.controller)
+            }
         case .click(_, let target):
             return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
@@ -209,8 +226,20 @@ enum MCPBrowser {
         let controller: BrowserWindowController
     }
 
-    /// The windows apps may use, front first: your everyday ones, never a private one.
-    private static var windows: [BrowserWindowController] { Scripting.windows }
+    /// The windows apps may use, front first, never private; in the background only theirs.
+    private static var windows: [BrowserWindowController] {
+        guard Headless.isActive else { return Scripting.windows }
+        return Headless.window.map { [$0] } ?? []
+    }
+
+    /// AI apps work in the background, and the tab isn't one of theirs.
+    private static func outsideHeadless(_ tab: Tab) -> Bool { Headless.isActive && !Headless.owns(tab) }
+
+    /// A window's tabs as apps list them; in the background only their profile's.
+    private static func tabs(of controller: BrowserWindowController) -> [Tab] {
+        let all = Scripting.tabs(of: controller.tabManager)
+        return Headless.isActive ? all.filter(\.profile.isHeadless) : all
+    }
 
     /// A tab by its id, or with none, the one in front.
     static func locate(_ id: Int?) -> Result<Found, MCPArgumentError> {
@@ -219,21 +248,26 @@ enum MCPBrowser {
             return .success(Found(tab: tab, controller: controller))
         }
         for controller in windows {
-            if let tab = Scripting.tab(withID: id, in: Scripting.tabs(of: controller.tabManager), uuid: \.id) { return .success(Found(tab: tab, controller: controller)) }
+            if let tab = Scripting.tab(withID: id, in: tabs(of: controller), uuid: \.id) { return .success(Found(tab: tab, controller: controller)) }
+        }
+        // One of your tabs, while AI apps work in the background: said as such, not as gone.
+        if Headless.isActive, (Scripting.windows + [Headless.window].compactMap { $0 }).contains(where: { Scripting.tab(withID: id, in: Scripting.tabs(of: $0.tabManager), uuid: \.id) != nil }) {
+            return .failure(.init(MCPSafety.message(.notHeadless)))
         }
         return .failure(.init("No open tab has id \(id). Use list_tabs for the tabs there are now."))
     }
 
     /// list_tabs shows on the bar like other tools, over the front tab unless tools can't use it.
     static func noteListing(_ front: Tab, by client: MCPClient, control: AgentControl = .shared) {
-        guard MCPSafety.refusal(url: front.url, isPrivate: front.isPrivate, stopped: control.isStopped(front.id), needsPage: false) == nil else { return }
+        guard MCPSafety.refusal(url: front.url, isPrivate: front.isPrivate, stopped: control.isStopped(front.id), outsideHeadless: outsideHeadless(front),
+                                needsPage: false) == nil else { return }
         control.touch(front, by: client)
     }
 
     static func listTabs() -> [JSON] {
         var rows: [JSON] = []
         for (index, controller) in windows.enumerated() {
-            for tab in Scripting.tabs(of: controller.tabManager) {
+            for tab in tabs(of: controller) {
                 rows.append(info(tab, in: controller, window: index + 1))
             }
         }
@@ -254,7 +288,8 @@ enum MCPBrowser {
         ]
         if tab.isFavorite { row["favorite"] = true } else if tab.bookmarkID != nil { row["pinned"] = true }
         // Listed, but not to be used: Settings, History, an extension's page, a stopped tab.
-        if let refusal = MCPSafety.refusal(url: tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id), needsPage: false) {
+        if let refusal = MCPSafety.refusal(url: tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id),
+                                           outsideHeadless: outsideHeadless(tab), needsPage: false) {
             row["usable"] = false
             row["note"] = .string(MCPSafety.message(refusal))
         }
@@ -262,18 +297,50 @@ enum MCPBrowser {
     }
 
     private static func openTab(_ url: URL, background: Bool, client: MCPClient) async -> MCPToolResult {
-        let controller = windows.first ?? WindowManager.shared.newWindow(showCommandBar: false)
+        // While AI apps work in the background, in their own window, never one of yours.
+        let controller = Headless.isActive ? Headless.openWindow() : windows.first ?? WindowManager.shared.newWindow(showCommandBar: false)
         let tab = controller.tabManager.newTab(url: nil, select: !background)
         AgentControl.shared.touch(tab, by: client)
         tab.load(url)
         await waitForLoad(tab, from: nil, expectStart: true)
-        return .data(info(tab, in: controller))
+        return told(.data(info(tab, in: controller)), about: tab)
+    }
+
+    /// Holds pages pictured out of sight, one per window, under everything where the page is.
+    private static let pictureHostID = NSUserInterfaceItemIdentifier("zigzag.mcp.picture-host")
+
+    private static func pictureHost(in controller: BrowserWindowController) -> NSView {
+        let root = controller.root
+        if let host = root.subviews.first(where: { $0.identifier == pictureHostID }) {
+            host.frame = root.cardFrame
+            return host
+        }
+        let host = NSView(frame: root.cardFrame)
+        host.identifier = pictureHostID
+        root.addSubview(host, positioned: .below, relativeTo: nil)
+        return host
+    }
+
+    /// Pictures a tab that isn't in front by holding its page out of sight.
+    private static func screenshotOutOfSight(_ webView: WKWebView, tab: Tab, in controller: BrowserWindowController) async -> MCPToolResult {
+        let host = pictureHost(in: controller)
+        guard let letGo = tab.holdOutOfSight(in: host, size: host.bounds.size) else {
+            // Now in the window, or with no page yet: pictured as any tab.
+            guard webView.window != nil else { return .error("That tab's page hasn't loaded enough to take a picture of yet. Wait for it (wait_for), then try again.") }
+            return await screenshot(webView, tab: tab, in: controller)
+        }
+        defer { letGo() }
+        // A moment in the window first, for it to draw.
+        try? await Task.sleep(for: .milliseconds(250))
+        return await screenshot(webView, tab: tab, in: controller)
     }
 
     // MARK: Pages
 
     /// Runs `body` on the tab's page once it's awake and loaded, if it's still a page a tool may use by then.
     private static func page(_ tab: Tab, since generation: Int, _ body: @MainActor (WKWebView) async -> MCPToolResult) async -> MCPToolResult {
+        // A page whose process ended while out of sight reloads now, not when someone looks.
+        tab.reloadIfItStopped()
         let webView = await awake(tab)
         // Woken or done loading, it may be on another page now, or AI apps turned off meanwhile: checked again.
         if let refusal = refusal(for: tab, webView: webView, since: generation) {
@@ -282,11 +349,39 @@ enum MCPBrowser {
         return await body(webView)
     }
 
+    /// `result` with what was dismissed on which page, fenced as the page's own words.
+    nonisolated static func telling(_ result: MCPToolResult, of asked: [(kind: String, message: String, page: String)]) -> MCPToolResult {
+        guard !asked.isEmpty else { return result }
+        var told = result
+        told.fromPages = true
+        let page = { (address: String) in MCPSnapshot.clipped(MCPSnapshot.withoutFragment(plain(address))) }
+        let rows: [JSON] = asked.map { ["type": .string($0.kind), "message": .string(plain($0.message)), "page": .string(page($0.page)), "answer": "dismissed"] }
+        if var object = result.structured?.object {
+            object["dialogs"] = .array(rows)
+            told.structured = .object(object)
+        }
+        let lines = asked.map {
+            "- \($0.kind)" + ($0.message.isEmpty ? "" : " " + MCPSnapshot.quote(plain($0.message)))
+                + ($0.page.isEmpty ? "" : " on " + MCPSnapshot.quote(page($0.page))) + ": dismissed"
+        }
+        told.content.append(["type": "text", "text": .string("No one was there to answer, so what the page asked was dismissed:\n" + lines.joined(separator: "\n"))])
+        return told
+    }
+
+    /// A page's words for one line: no control characters, at most 200.
+    nonisolated static func plain(_ text: String) -> String {
+        let seen = String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
+            scalar.properties.generalCategory == .control || scalar.properties.generalCategory == .lineSeparator
+                || scalar.properties.generalCategory == .paragraphSeparator ? " " : scalar
+        }.filter { $0.properties.generalCategory != .format && !$0.properties.isDefaultIgnorableCodePoint }))
+        return MCPSnapshot.clipped(seen.split(whereSeparator: \.isWhitespace).joined(separator: " "))
+    }
+
     /// Why a tool can't go on with the tab's page now, after a wait: checked again each time one ends.
     private static func refusal(for tab: Tab, webView: WKWebView, since generation: Int) -> MCPSafety.Refusal? {
         MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate,
                           stopped: AgentControl.shared.isStopped(tab.id) || AgentControl.shared.stopped(since: generation),
-                          errorPage: tab.showsErrorPage, on: MCPService.isOn)
+                          errorPage: tab.showsErrorPage, on: MCPService.isOn, outsideHeadless: outsideHeadless(tab))
     }
 
     /// The tab's web view, woken if it slept, once its page is done loading (or after a while if it never is).
