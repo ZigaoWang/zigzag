@@ -355,6 +355,8 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
       // `dy` is the page's own movement since the last report, without the browser's scrolls back (`__zigzagScrollBy`).
       let pending = null, frame = 0, last = null;
       const report = (trusted) => {
+        // Off unless the window's address bar is on Autohide.
+        if (!window.__zigzagAutohide) { last = null; pending = null; return; }
         const now = y();
         const next = { y: now, dy: last == null ? 0 : now - last, trusted, key: Date.now() - keyInput < 400, editing: editing(), dragging: pressed };
         last = now;
@@ -388,6 +390,11 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
       }, options);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)
+
+    /// Turns a page's reports on or off; a new document starts with them off.
+    static func setReporting(_ on: Bool, in webView: WKWebView) {
+        webView.evaluateJavaScript("window.__zigzagAutohide = \(on)", in: nil, in: .defaultClient, completionHandler: nil)
+    }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == Self.messageName,

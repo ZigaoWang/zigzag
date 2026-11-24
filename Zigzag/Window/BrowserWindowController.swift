@@ -1211,6 +1211,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let autohides = root.barHoldsAddress && BrowserRootView.addressBarPlace == .autohide && !root.isImmersive
         if autohides != root.autohidesBar { autohidePanes.removeAll() }
         root.autohidesBar = autohides
+        syncScrollReports()
         root.showsTopBar = root.barHoldsAddress || root.topBar.accessory != nil
         root.needsLayout = true
         root.layoutSubtreeIfNeeded()
@@ -1345,6 +1346,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func resetAutohide(animated: Bool) {
         autohidePanes.removeAll()
         root.setBarPutAway(false, animated: animated)
+        syncScrollReports()
     }
 
     /// One page starts over; only its own pane's bar comes back.
@@ -1352,7 +1354,30 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard root.tiles != nil, let pane = paneIndex(of: tab) else { resetAutohide(animated: animated); return }
         autohidePanes[pane] = nil
         root.setAutohideOffset(0, at: pane)
+        syncScrollReports()
     }
+
+    /// The pages that send scroll reports: the shown panes', and only while Autohide is on.
+    private let scrollReporters = NSHashTable<WKWebView>.weakObjects()
+
+    /// Turns the page script's reports on for the shown panes with Autohide on, off everywhere else.
+    func syncScrollReports() {
+        let shown = tabManager.selectedTab.map { tabManager.panes(of: $0) } ?? []
+        let wanted: [WKWebView] = root.autohidesBar ? shown.compactMap(\.webView) : []
+        for webView in scrollReporters.allObjects where !wanted.contains(webView) {
+            ScrollMessages.setReporting(false, in: webView)
+            scrollReporters.remove(webView)
+        }
+        // Sent again each time: a new document starts with reports off.
+        for webView in wanted {
+            ScrollMessages.setReporting(true, in: webView)
+            scrollReporters.add(webView)
+        }
+    }
+
+    #if DEBUG
+    var debugScrollReporters: [WKWebView] { scrollReporters.allObjects }
+    #endif
 
     /// What holds the bar: an editing field, a sheet or command bar, a sliding sidebar, or the pointer on it.
     private func autohideHeld(inPane index: Int) -> Bool {
@@ -1444,6 +1469,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if layout != shownPaneLayout {
             shownPaneLayout = layout
             autohidePanes.removeAll()
+            syncScrollReports()
             if SitePanel.isOpen(in: window), SitePanel.shown?.isFromPane == true { SitePanel.closeCurrent() }
         }
         defer {
