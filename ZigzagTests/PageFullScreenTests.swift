@@ -403,6 +403,13 @@ struct WholeScreenLayoutTests {
         #expect(!BrowserWindowController.wholeScreenTakesSpace(phase: .windowed, inFullScreen: true))
     }
 
+    /// A space the page took isn't saved with the session: the window comes back windowed.
+    @Test func aSpaceThePageTookIsntSaved() {
+        #expect(!BrowserWindowController.savesFullScreen(inFullScreen: true, pageTookSpace: true))
+        #expect(BrowserWindowController.savesFullScreen(inFullScreen: true, pageTookSpace: false))
+        #expect(!BrowserWindowController.savesFullScreen(inFullScreen: false, pageTookSpace: false))
+    }
+
     /// The window is told when a page fills and when it leaves: without that, The Whole Screen would never start and
     /// the page would keep the chrome (#462).
     @Test func theWindowHearsWhenAPageFillsAndLeaves() {

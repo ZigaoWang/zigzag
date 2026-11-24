@@ -2653,6 +2653,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The page holds the browser's space, as WebKit's full screen would.
     func hasWholeScreen(_ tab: Tab) -> Bool { pageFullScreenTab === tab }
 
+    /// What a session keeps: a space the page took is the page's, not the window's.
+    var savesFullScreen: Bool { Self.savesFullScreen(inFullScreen: browserWindow.styleMask.contains(.fullScreen), pageTookSpace: pageFullScreenAskedForSpace) }
+
+    nonisolated static func savesFullScreen(inFullScreen: Bool, pageTookSpace: Bool) -> Bool { inFullScreen && !pageTookSpace }
+
     /// Leaving puts the chrome back. If the page took the browser into its space, leaving the page leaves the space,
     /// and macOS gives the window back; one already in a space stays there.
     private func endWholeScreen() {
