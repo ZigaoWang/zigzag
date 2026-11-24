@@ -645,7 +645,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
         tile.image = Self.tile(for: space)
         detail.stringValue = Self.summary(of: space)
         RowDelete.apply(deleteButton, shows: false)
-        deleteButton.isEnabled = Library.shared.spaces.count > 1
+        deleteButton.isEnabled = Library.shared.yourSpaces.count > 1
         [tile, name, detail, deleteButton, editButton].forEach { addSubview($0) }
         // The row and its Edit button both open the same editor the sidebar uses.
         onClick = { [weak self] _ in self?.openEditor() }
@@ -766,7 +766,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
             self?.openEditor()
         })
         menu.addItem(SidebarMenus.useDefaultColorsItem(for: spaceID) { BrowserWindowController.changeLibrary($0, $1) })
-        if Library.shared.spaces.count > 1 {
+        if Library.shared.yourSpaces.count > 1 {
             menu.addItem(SidebarMenus.Item(String(localized: "Delete Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
                 guard let self, let host = self.host else { return }
                 SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
@@ -813,7 +813,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     }
 
     static func confirmDelete(_ id: UUID, in host: NSView) {
-        guard let space = Library.shared.space(id), Library.shared.spaces.count > 1 else { return }
+        guard let space = Library.shared.space(id), Library.shared.yourSpaces.count > 1 else { return }
         // The sidebar deletes right away, ⌘Z being right there. Here Undo is in a browser window, or with none open
         // nowhere at all, so it asks first and says which.
         let undoable = BrowserWindowController.undoTarget != nil
@@ -2739,7 +2739,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let existing = Dictionary(uniqueKeysWithValues: routeRows.map { ($0.id, $0.row) })
         routeRows = rules.enumerated().map { index, rule in
             let row = existing[rule.id] ?? SiteRouteRow(rule)
-            row.refresh(rule, spaces: library.spaces, number: index + 1)
+            row.refresh(rule, spaces: library.yourSpaces, number: index + 1)
             row.onDraftChange = { [weak self] in
                 self?.updateRouteWarnings()
                 self?.layoutDocument()
@@ -2766,7 +2766,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let timing = SettingsTiming.begin("reloadSpaces"); defer { timing.end() }
         reloadRoutes()
         spacesGroup.removeAllRows()
-        spaceRows = Library.shared.spaces.map { space in
+        spaceRows = Library.shared.yourSpaces.map { space in
             let row = SpaceSettingsRow(space: space)
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
@@ -3404,7 +3404,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
         case .mini: [(nil, miniGroup)]
-        case .spaces: [(nil, newSpacesGroup), (Self.spacesHeading, spacesGroup)] + (Library.shared.spaces.count > 1 ? [(Self.routesHeading, routesGroup)] : [])
+        case .spaces: [(nil, newSpacesGroup), (Self.spacesHeading, spacesGroup)] + (Library.shared.yourSpaces.count > 1 ? [(Self.routesHeading, routesGroup)] : [])
         case .profiles: [(Self.profilesHeading, profilesGroup), (Self.unlistedHeading, unlistedGroup)]
         case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.formsHeading, cardGroup)] : [])
         case .privacy: [(nil, blockingGroup), (Self.localReceiversHeading, localReceiversGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])

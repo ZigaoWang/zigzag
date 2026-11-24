@@ -116,7 +116,7 @@ final class ImportView: NSView {
         emptyState.isHidden = true
         [title, subtitle, emptyState, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker].forEach { body.addSubview($0) }
         [bodyScroll, chooseFile, primary, secondary].forEach { addSubview($0) }
-        intoIDs = ProfileChoice.fill(intoPicker, selected: intoProfile)
+        intoIDs = ProfileChoice.fill(intoPicker, selected: intoProfile, withAIApps: false)
         intoPicker.setAccessibilityLabel(intoLabel.stringValue)
         intoPicker.onSelect = { [weak self] index in
             guard let self, self.intoIDs.indices.contains(index) else { return }
@@ -130,7 +130,7 @@ final class ImportView: NSView {
             guard let self else { return }
             let wasGone = Library.shared.directory.profile(self.intoProfile) == nil
             if wasGone { self.intoProfile = Profile.defaultID }
-            self.intoIDs = ProfileChoice.fill(self.intoPicker, selected: self.intoProfile)
+            self.intoIDs = ProfileChoice.fill(self.intoPicker, selected: self.intoProfile, withAIApps: false)
             if wasGone { self.rows.forEach { $0.loadPreview(in: self.target) } }
             self.needsLayout = true
         }
@@ -569,7 +569,7 @@ final class ImportView: NSView {
         let signInsShown = showsChoices && !signInsNote.stringValue.isEmpty
         let noteHeight: CGFloat = signInsShown ? Tokens.Space.x2 + ceil(signInsNote.sizeThatFits(NSSize(width: width, height: 200)).height) : 0
         // Where it goes is asked only once there's a choice, and only before importing.
-        let showsInto = stage == .choose && Library.shared.hasManyProfiles
+        let showsInto = stage == .choose && Library.shared.hasManyOfYourProfiles
         let emptyHeight: CGFloat = choosesFileFirst ? emptyState.preferredHeight(for: width) + Tokens.Space.x4 : 0
         let titleHeight = ceil(title.intrinsicContentSize.height)
         var ry: CGFloat = 0

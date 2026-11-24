@@ -272,8 +272,8 @@ With either switch off, `--headless` does nothing: Zigzag says why on standard e
 While AI apps work in the background:
 
 - **Their window is on the AI Apps profile**, which Zigzag makes the first time it's needed, with a space of its
-  own. It's listed in Settings › Profiles and in your spaces like any profile, so you can see it and open its
-  space, but its name can't be changed. Its sign-ins, history and extensions are its own: an app is signed in to
+  own. It's listed in Settings › Profiles, but its name can't be changed, and its space stays out of your windows:
+  it's not among your spaces in the sidebar, the command bar, Settings › Spaces or a space's Profile menu. Its sign-ins, history and extensions are its own: an app is signed in to
   nothing of yours there.
 - **Nothing of yours is given to its pages**, in their window or in one of yours: no sign-in or certificate from
   your Keychain, no password saved or filled and no form filled from your card, no passkeys, none of the answers

@@ -2209,7 +2209,7 @@ final class SidebarListView: NSView {
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.edgeDirection == direction, let manager = self.manager else { return }
-                let spaces = Library.shared.spaces
+                let spaces = manager.listedSpaces
                 guard let index = spaces.firstIndex(where: { $0.id == manager.currentSpaceID }), spaces.indices.contains(index + direction) else { return }
                 self.delegate?.listSwitchSpaceDuringDrag(spaces[index + direction].id)
                 self.scheduleEdgeFlip(direction)

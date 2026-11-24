@@ -2105,7 +2105,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private var profileIDs: [UUID] = []
 
     private func refreshProfiles() {
-        profileIDs = ProfileChoice.fill(profileButton, selected: Library.shared.profileID(ofSpace: spaceID))
+        profileIDs = ProfileChoice.fill(profileButton, selected: Library.shared.profileID(ofSpace: spaceID), withAIApps: false)
         needsLayout = true
     }
 

@@ -975,7 +975,7 @@ final class SitePanel: FloatingPanelView {
         // This site's own scripts may reach a program listening on this Mac, once Settings allows it at all.
         context.localApps = context.isWeb && !isPrivate && origin != nil && LocalReceivers.isEnabled
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
-        context.manySpaces = Library.shared.spaces.count > 1 && SiteRoutes.site(of: url) != nil
+        context.manySpaces = Library.shared.yourSpaces.count > 1 && SiteRoutes.site(of: url) != nil
         context.userAgent = Tab.addonsPage(url) == nil
         return context
     }
@@ -1240,7 +1240,7 @@ final class SitePanel: FloatingPanelView {
     /// Open in (#286): the space this site always opens in, or Any space. A subdomain of a listed site shows and
     /// changes that site's choice; otherwise the page's site is used.
     private func openInRow() -> PanelRow {
-        let spaces = Library.shared.spaces
+        let spaces = Library.shared.yourSpaces
         let route = Library.shared.siteRoute(for: url)
         let site = SiteRoutes.site(of: url) ?? self.site
         let selected = route.flatMap { route in spaces.firstIndex { $0.id == route.spaceID }.map { $0 + 1 } } ?? 0

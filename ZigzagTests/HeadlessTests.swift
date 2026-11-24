@@ -421,10 +421,34 @@ struct HeadlessWindowSpacesTests {
         // What it lists to go to, in the sidebar and the command bar, is its profile's.
         #expect(opened.tabManager.listedSpaces.map(\.id) == [theirs])
         #expect(CommandRanker.context(for: opened.tabManager).spaces.map(\.id) == [theirs])
-        // A window of yours lists and shows them all, as ever.
+        Headless.closeWindow()
+        #expect(library.removeProfile(profile.id))
+        library.finishedRemovingProfile(profile.id)
+    }
+
+    /// Your windows never list, show or take tabs into the AI Apps space.
+    @Test func yourWindowsLeaveTheirSpaceOut() throws {
+        let library = Library.shared
+        let yours = library.spaces[0].id
+        let opened = Headless.openWindow()
+        defer { Headless.closeWindow() }
+        let profile = try #require(library.directory.headless)
+        let theirs = opened.tabManager.currentSpaceID
         let own = TabManager(spaceID: yours)
-        #expect(own.keepsToProfile == nil && own.mayShowSpace(theirs) && own.listedSpaces.count == library.spaces.count)
-        own.invalidate()
+        defer { own.invalidate() }
+        #expect(!own.mayShowSpace(theirs) && !own.listedSpaces.contains { $0.id == theirs })
+        #expect(!CommandRanker.context(for: own).spaces.contains { $0.id == theirs })
+        #expect(!library.yourSpaces.contains { $0.id == theirs } && library.yourSpaces.count == library.spaces.count - 1)
+        #expect(!library.spaceGroups().contains { $0.profile.id == profile.id })
+        own.switchToSpace(theirs)
+        #expect(own.currentSpaceID == yours)
+        let tab = own.newTab(url: nil, select: true)
+        own.moveTabToSpace(tab, spaceID: theirs)
+        #expect(tab.spaceID == yours)
+        // Asked to start there, a window of yours starts in a space of yours.
+        let started = TabManager(spaceID: theirs)
+        defer { started.invalidate() }
+        #expect(started.currentSpaceID == TabManager.firstSpace(keepingTo: nil) && !library.isAIAppsSpace(started.currentSpaceID))
         Headless.closeWindow()
         #expect(library.removeProfile(profile.id))
         library.finishedRemovingProfile(profile.id)

@@ -863,7 +863,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// View › Switch Space…: the spaces in a list, to pick one with the keyboard.
     @objc func showSpaceSwitcher(_ sender: Any?) { spaceSwitcher.toggle() }
     @objc func selectSpaceByNumber(_ sender: NSMenuItem) {
-        let spaces = Library.shared.spaces
+        let spaces = tabManager.listedSpaces
         guard let index = SpaceNumbers.index(for: sender.tag, count: spaces.count) else { return }
         tabManager.switchToSpace(spaces[index].id)
     }
@@ -1040,9 +1040,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(closeOtherTabs(_:)): return !otherTabs.isEmpty
         case #selector(closeTabsBelow(_:)): return !tabsBelow.isEmpty
         case #selector(selectSpaceByNumber(_:)):
-            return SpaceNumbers.index(for: item.tag, count: Library.shared.spaces.count) != nil
-        case #selector(nextSpace(_:)), #selector(previousSpace(_:)): return Library.shared.spaces.count > 1
-        case #selector(showSpaceSwitcher(_:)): return Library.shared.spaces.count > 1 && !tabManager.isPrivate
+            return SpaceNumbers.index(for: item.tag, count: tabManager.listedSpaces.count) != nil
+        case #selector(nextSpace(_:)), #selector(previousSpace(_:)): return tabManager.listedSpaces.count > 1
+        case #selector(showSpaceSwitcher(_:)): return tabManager.listedSpaces.count > 1 && !tabManager.isPrivate
         default: return true
         }
     }

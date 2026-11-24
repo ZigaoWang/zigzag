@@ -314,7 +314,7 @@ final class GuidedTour: NSView {
                            count: count, isDone: false, isFinal: false, target: "split")
         }
         // A space made in Settings leaves you where you were: the last step is then to go to the new one.
-        if task.id == "switch", let index = Library.shared.spaces.firstIndex(where: { $0.id == controller.tabManager.currentSpaceID }),
+        if task.id == "switch", let index = Library.shared.yourSpaces.firstIndex(where: { $0.id == controller.tabManager.currentSpaceID }),
            !Tutorial.switchGoesBack(currentSpaceIndex: index) {
             return Display(keys: [], title: String(localized: "Switch to your new space", comment: "The last step's title in the getting-started guide, a card in the window, when you're still in the space you started in."),
                            note: task.note, count: count, isDone: false, isFinal: false, target: "switchNew")

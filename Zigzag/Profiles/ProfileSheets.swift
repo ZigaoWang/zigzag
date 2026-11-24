@@ -67,8 +67,9 @@ enum ProfileChoice {
     /// shown: the choice is read back from these, not from the list as it is later, which may have changed while
     /// the menu was open.
     @discardableResult
-    static func fill(_ button: DropdownButton, selected: UUID) -> [UUID] {
-        let profiles = Library.shared.profiles
+    static func fill(_ button: DropdownButton, selected: UUID, withAIApps: Bool = true) -> [UUID] {
+        // Your spaces and imports never go on the AI Apps profile.
+        let profiles = Library.shared.profiles.filter { withAIApps || !$0.isHeadless }
         button.options = options(profiles)
         button.selectedIndex = profiles.firstIndex { $0.id == selected } ?? 0
         return profiles.map(\.id)

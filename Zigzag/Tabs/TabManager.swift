@@ -118,11 +118,16 @@ final class TabManager {
 
     /// Whether a space is one the window keeps its tabs in: any, or its profile's when it keeps to one. Asked
     /// wherever a tab is put in a space, made or moved, so none of yours ends up in their window out of sight.
-    func keepsTo(_ space: UUID) -> Bool { keepsToProfile == nil || Library.shared.profileID(ofSpace: space) == keepsToProfile }
+    func keepsTo(_ space: UUID) -> Bool { Self.keeps(space, to: keepsToProfile) }
 
-    /// The spaces the window lists to go to: all of them, or its profile's when it keeps to one.
+    private static func keeps(_ space: UUID, to profile: UUID?) -> Bool {
+        guard let profile else { return !Library.shared.isAIAppsSpace(space) }
+        return Library.shared.profileID(ofSpace: space) == profile
+    }
+
+    /// The spaces the window lists to go to: yours, or its profile's when it keeps to one.
     var listedSpaces: [SpaceInfo] {
-        guard let keepsToProfile else { return Library.shared.spaces }
+        guard let keepsToProfile else { return Library.shared.yourSpaces }
         return Library.shared.spaces(in: keepsToProfile)
     }
 
@@ -130,8 +135,8 @@ final class TabManager {
     init(spaceID: UUID? = nil, isPrivate: Bool = false, store: TabStore? = nil, keepsToProfile: UUID? = nil) {
         self.keepsToProfile = keepsToProfile
         self.store = (isPrivate ? nil : store) ?? TabStore(isPrivate: isPrivate)
-        let requested = spaceID.flatMap { Library.shared.space($0)?.id }
-        currentSpaceID = requested ?? Library.shared.spaces[0].id
+        let requested = spaceID.flatMap { Library.shared.space($0)?.id }.flatMap { Self.keeps($0, to: keepsToProfile) ? $0 : nil }
+        currentSpaceID = requested ?? Self.firstSpace(keepingTo: keepsToProfile)
         self.store.attach(self)
         libraryToken = Library.shared.changed.observe { [weak self] in
             // Favorites and pinned pages count among the navigable tabs.
@@ -353,6 +358,12 @@ final class TabManager {
     @available(macOS 15.4, *)
     var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
     var currentSpace: SpaceInfo { Library.shared.space(currentSpaceID) ?? Library.shared.spaces[0] }
+
+    /// Where a window starts or goes when its space is gone: its first listed space.
+    static func firstSpace(keepingTo profile: UUID?) -> UUID {
+        let listed = profile.map { Library.shared.spaces(in: $0) } ?? Library.shared.yourSpaces
+        return listed.first?.id ?? Library.shared.spaces[0].id
+    }
     var currentTabs: [Tab] { tabs(in: currentSpaceID) }
     func tabs(in spaceID: UUID) -> [Tab] { tabsBySpace[spaceID] ?? [] }
 
@@ -1157,8 +1168,8 @@ final class TabManager {
             if pair.isGroup { return !groupFits(pair.ids.compactMap { tab(with: $0) }) }
             return !canSplit(left, with: right) || left.spaceID != right.spaceID
         }
-        if !spaceIDs.contains(currentSpaceID) {
-            currentSpaceID = Library.shared.spaces[0].id
+        if !spaceIDs.contains(currentSpaceID) || !keepsTo(currentSpaceID) {
+            currentSpaceID = Self.firstSpace(keepingTo: keepsToProfile)
             changed.send(.space)
             selectionChanged()
         }

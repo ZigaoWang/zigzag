@@ -318,7 +318,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.privateLabel = true
             sidebar.isPrivate = true
         }
-        sidebar.listedSpaces = { [weak tabManager] in tabManager?.listedSpaces ?? Library.shared.spaces }
+        sidebar.listedSpaces = { [weak tabManager] in tabManager?.listedSpaces ?? Library.shared.yourSpaces }
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.onMoveSpace = { [weak self] id, index in
@@ -474,7 +474,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private(set) var handoff: NSUserActivity?
 
     private func spaceChanged() {
-        let spaces = Library.shared.spaces
+        let spaces = tabManager.listedSpaces
         let old = lastSpaceID
         let oldIndex = old.flatMap { id in spaces.firstIndex { $0.id == id } } ?? 0
         let newIndex = spaces.firstIndex { $0.id == tabManager.currentSpaceID } ?? 0

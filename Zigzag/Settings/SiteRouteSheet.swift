@@ -5,7 +5,7 @@ enum SiteRouteSheet {
     @discardableResult
     static func edit(_ existing: SiteRoutes.Route, in host: NSView, isNew: Bool = false) -> FormSheet {
         let library = Library.shared
-        let spaces = library.spaces
+        let spaces = library.yourSpaces
         let field = FilledField(placeholder: "github.com")
         field.stringValue = existing.site
         let enabled = Toggle(isOn: existing.isEnabled)

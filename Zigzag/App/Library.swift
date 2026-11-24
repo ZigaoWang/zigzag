@@ -996,7 +996,8 @@ final class Library {
     }
 
     func removeSpace(_ id: UUID) {
-        guard spaces.count > 1, let i = index(of: id) else { return }
+        // One of your spaces is always left.
+        guard yourSpaces.contains(where: { $0.id != id }), let i = index(of: id) else { return }
         spaces.remove(at: i)
         siteRoutes.removeAll { $0.spaceID == id }
         commit()
@@ -1913,14 +1914,20 @@ final class Library {
     var profiles: [ProfileInfo] { directory.all }
     /// Whether there's more than the first profile: only then does anything in the window speak of profiles.
     var hasManyProfiles: Bool { directory.all.count > 1 }
+    /// More than one profile besides AI Apps: where your spaces are listed under their profiles.
+    var hasManyOfYourProfiles: Bool { directory.all.filter { !$0.isHeadless }.count > 1 }
 
     func profileID(ofSpace id: UUID) -> UUID { directory.profileID(ofSpace: id) }
     func spaces(in profile: UUID) -> [SpaceInfo] { spaces.filter { directory.profileID(ofSpace: $0.id) == profile } }
+    /// Whether a space is on the AI Apps profile (Headless), kept out of your windows.
+    func isAIAppsSpace(_ id: UUID) -> Bool { directory.headless.map { directory.profileID(ofSpace: id) == $0.id } ?? false }
+    /// The spaces your windows list: all but the AI Apps profile's.
+    var yourSpaces: [SpaceInfo] { directory.headless == nil ? spaces : spaces.filter { !isAIAppsSpace($0.id) } }
 
     /// The spaces under their profiles, in the profiles' order, for a list of places to go: a profile with none of
     /// them isn't there, and `excluding` (the space you're in) is left out.
     func spaceGroups(excluding: UUID? = nil) -> [(profile: ProfileInfo, spaces: [SpaceInfo])] {
-        profiles.map { profile in (profile, spaces(in: profile.id).filter { $0.id != excluding }) }.filter { !$0.spaces.isEmpty }
+        profiles.filter { !$0.isHeadless }.map { profile in (profile, spaces(in: profile.id).filter { $0.id != excluding }) }.filter { !$0.spaces.isEmpty }
     }
 
     @discardableResult

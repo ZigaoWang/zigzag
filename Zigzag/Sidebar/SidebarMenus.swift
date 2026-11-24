@@ -39,7 +39,7 @@ enum SidebarMenus {
     static func addSpaces(to menu: NSMenu, excluding current: UUID?, _ move: @escaping (SpaceInfo) -> Void) {
         let groups = Library.shared.spaceGroups(excluding: current)
         for group in groups {
-            if Library.shared.hasManyProfiles { menu.addItem(.sectionHeader(title: group.profile.displayName)) }
+            if Library.shared.hasManyOfYourProfiles { menu.addItem(.sectionHeader(title: group.profile.displayName)) }
             for space in group.spaces {
                 let item = Item(space.name, symbol: space.icon.flatMap { IconChoice.isSymbol($0) ? $0 : nil }) { move(space) }
                 if item.image == nil { item.image = space.icon.map { IconChoice.image($0, size: DropdownButton.iconSide) } ?? swatch(space.swatch) }
@@ -173,7 +173,7 @@ enum SidebarMenus {
                 controller.groupWithUndo(rows)
             })
         }
-        if Library.shared.spaces.count > 1, !(isPrivate && !pins.isEmpty) {
+        if Library.shared.yourSpaces.count > 1, !(isPrivate && !pins.isEmpty) {
             organize.append(Submenu(String(localized: "Move \(count) to Space", comment: "Menu item for several picked sidebar rows"), symbol: Symbol.moveTo,
                                     spaceItems(excluding: manager.currentSpaceID) { controller.moveMarked(items, to: $0.id) }))
         }
@@ -292,7 +292,7 @@ enum SidebarMenus {
         if controller.canOpenInMini(tab) {
             places.append(Item(String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name."), symbol: Symbol.mini) { controller.openInMini(tab) })
         }
-        let spaces = Library.shared.spaces.count > 1 ? spaceItems(excluding: tab.spaceID) { controller.moveToSpaceWithToast(tab, spaceID: $0.id) } : []
+        let spaces = Library.shared.yourSpaces.count > 1 ? spaceItems(excluding: tab.spaceID) { controller.moveToSpaceWithToast(tab, spaceID: $0.id) } : []
         if !places.isEmpty, !spaces.isEmpty { places.append(.separator()) }
         places += spaces
         if !places.isEmpty { view.append(Submenu(moveToTitle, symbol: Symbol.moveTo, places)) }
@@ -392,7 +392,7 @@ enum SidebarMenus {
             if folder != nil {
                 organize.append(Item(String(localized: "Remove from Folder", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.removeFromFolder) { controller.listSetFolder(of: bookmark.id, to: nil) })
             }
-            if Library.shared.spaces.count > 1 {
+            if Library.shared.yourSpaces.count > 1 {
                 organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces."), symbol: Symbol.moveTo,
                                         spaceItems(excluding: Library.shared.spaceID(ofBookmark: bookmark.id)) { space in
                     // Its open page goes with it: to another profile's space, that's asked first.
@@ -506,7 +506,7 @@ enum SidebarMenus {
             controller.listSetGroupOpen(group.id, !group.isOpen)
         }]
         var organize = [Item(String(localized: "Ungroup", comment: "Item in a group of tabs' context menu in the sidebar. The group goes; its tabs stay where they are."), symbol: Symbol.ungroup) { controller.ungroupWithUndo(group.id) }]
-        if Library.shared.spaces.count > 1, let space = controller.tabManager.tabs(inGroup: group.id).first?.spaceID {
+        if Library.shared.yourSpaces.count > 1, let space = controller.tabManager.tabs(inGroup: group.id).first?.spaceID {
             organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces."), symbol: Symbol.moveTo,
                                     spaceItems(excluding: space) { controller.listMoveGroup(group.id, to: Int.max, in: $0.id) }))
         }
@@ -608,7 +608,7 @@ enum SidebarMenus {
         menu.addItem(large)
         menu.addItem(.separator())
         menu.addItem(withShortcut(Item(String(localized: "New Space", comment: "Item in a space's context menu."), symbol: Symbol.newSpace) { controller.newSpace(anchor) }, of: #selector(C.newSpace(_:))))
-        menu.addItem(Item(String(localized: "Delete Space", comment: "Item in a space's context menu."), symbol: Symbol.remove, destructive: true, enabled: Library.shared.spaces.count > 1) {
+        menu.addItem(Item(String(localized: "Delete Space", comment: "Item in a space's context menu."), symbol: Symbol.remove, destructive: true, enabled: Library.shared.yourSpaces.count > 1) {
 
             SpaceEditor.confirmDelete(spaceID: id, in: controller)
         })
