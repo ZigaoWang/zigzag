@@ -2126,6 +2126,12 @@ final class SidebarView: NSView {
         let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.touchSwipeChanged(swipe) }
         // Two fingers too, as on the trackpad.
         swipe.maxFingers = 2
+        swipe.landed = { [weak self] swipe in
+            TouchLog.note("sidebar landed seen by \(TouchLog.recognizers(from: self?.hitTest(self?.superview?.convert(swipe.start, from: self) ?? .zero)))")
+        }
+        swipe.failed = { [weak swipe] in
+            TouchLog.note("sidebar swipe failed fingers=\(swipe?.fingers ?? 0) moved=\(Int(swipe?.translation.x ?? 0)),\(Int(swipe?.translation.y ?? 0))")
+        }
         swipe.decides = { swipe in
             TouchHold.current == nil && TouchSwipe.verdict(swipe.translation, forgiving: true) == .sideways
         }

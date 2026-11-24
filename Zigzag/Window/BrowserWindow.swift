@@ -260,6 +260,7 @@ final class BrowserWindow: NSWindow {
         switch event.type {
         case .leftMouseDown:
             dropsClick = isFingerClick(event) && spentClick.takes(at: event.locationInWindow)
+            if dropsClick { TouchLog.note("dropped a spent click at \(Int(event.locationInWindow.x)),\(Int(event.locationInWindow.y))") }
             return dropsClick
         case .leftMouseDragged:
             return dropsClick

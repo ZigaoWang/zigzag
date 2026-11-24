@@ -250,6 +250,7 @@ class InteractiveView: NSView {
         }
         // A finger's two taps count too: AppKit's click from each comes as a single click.
         if let onDoubleClick, TouchDoubleTap.clickCount(for: event, on: self) == 2 {
+            TouchLog.note("double click on \(type(of: self)) clicks=\(event.clickCount)")
             onDoubleClick()
             return
         }

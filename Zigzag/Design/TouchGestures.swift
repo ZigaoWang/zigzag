@@ -1176,7 +1176,7 @@ enum TouchSidebarGrabber {
     nonisolated static func frame(toggle: NSRect, sidebarMinX: CGFloat) -> NSRect { toggle.offsetBy(dx: sidebarMinX, dy: 0) }
 }
 
-/// Debug builds: the last touch decisions on pages, for `touchlog` and debug.log.
+/// Debug builds: the last touch decisions on pages and in the sidebar, for `touchlog` and debug.log.
 @MainActor
 enum TouchLog {
     private(set) static var lines: [String] = []

@@ -687,6 +687,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// A tap, in window coordinates, once AppKit's click from it has gone through.
     func touchTapped(at windowPoint: NSPoint) {
+        TouchLog.note("row tap \(tab?.displayTitle.prefix(20) ?? "") close=\(closeTouch) selected=\(isSelected) seen by \(TouchLog.recognizers(from: self))")
         switch closeTouch {
         case .armed:
             // No click came from it: the tap is the ×'s all the same.
@@ -710,7 +711,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if takesCloseTouch(event) { closePress = event; return }
+        let closes = takesCloseTouch(event)
+        if TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) {
+            TouchLog.note("row press \(tab?.displayTitle.prefix(20) ?? "") clicks=\(event.clickCount) to×=\(closes)")
+        }
+        if closes { closePress = event; return }
         super.mouseDown(with: event)
     }
 
