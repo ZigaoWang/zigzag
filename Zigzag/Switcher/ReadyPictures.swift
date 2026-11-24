@@ -33,7 +33,8 @@ enum ReadyPictures {
 
     /// Makes ready copies of `images` for showing in `window`, off the main thread, all at once, then calls
     /// `completion` on the main thread. Their blankness is noted on the way, so asking it later costs nothing.
-    static func prepare(_ images: [NSImage], for size: Size, in window: NSWindow?, completion: @escaping () -> Void) {
+    static func prepare(_ images: [NSImage], for size: Size, in window: NSWindow?, qos: DispatchQoS.QoSClass = .userInitiated,
+                        completion: @escaping () -> Void) {
         var seen = Set<ObjectIdentifier>()
         let wanted = images.filter { !isReady($0, for: size) && seen.insert(ObjectIdentifier($0)).inserted }
         let sources = wanted.map { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
@@ -42,7 +43,7 @@ enum ReadyPictures {
         let width = size == .full ? nil : Int(ceil(Tokens.Metric.deskCardMaxWidth * scale))
         let space = colorSpace(of: window)
         nonisolated(unsafe) let done = completion
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: qos).async {
             var made = [(CGImage, Bool)?](repeating: nil, count: sources.count)
             made.withUnsafeMutableBufferPointer { buffer in
                 nonisolated(unsafe) let out = buffer
@@ -65,6 +66,15 @@ enum ReadyPictures {
                 }
             }
         }
+    }
+
+    /// A tab's new picture, in place of one the tab overview has shown: its card's copy is made now, in the background,
+    /// so the overview doesn't wait for it as it opens. Pictures it never showed are left alone. True when it started.
+    @discardableResult
+    static func renew(_ picture: NSImage?, replacing old: NSImage?, in window: NSWindow?, completion: (() -> Void)? = nil) -> Bool {
+        guard let picture, let old, picture !== old, isReady(old, for: .card), !isReady(picture, for: .card) else { return false }
+        prepare([picture], for: .card, in: window, qos: .utility) { completion?() }
+        return true
     }
 
     /// The colors the window is drawn in, so Core Animation has nothing to convert; plain sRGB when it's another

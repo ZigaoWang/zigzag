@@ -59,4 +59,34 @@ import Testing
         #expect(ReadyPictures.isReady(image, for: .full))
         #expect(TabThumbnailView.knownBlank(image) == false)
     }
+
+    private func ready(_ image: NSImage) async {
+        await withCheckedContinuation { done in ReadyPictures.prepare([image], for: .card, in: nil) { done.resume() } }
+    }
+
+    @Test func aNewPictureOfACardTheOverviewShowedIsMadeReadyAhead() async {
+        let old = NSImage(cgImage: picture(width: 800, height: 600), size: NSSize(width: 400, height: 300))
+        await ready(old)
+        let new = NSImage(cgImage: picture(width: 800, height: 600), size: NSSize(width: 400, height: 300))
+        // The page changed: the old picture's copy is never the new one's.
+        #expect(!ReadyPictures.isReady(new, for: .card))
+        let started = await withCheckedContinuation { done in
+            if !ReadyPictures.renew(new, replacing: old, in: nil, completion: { done.resume(returning: true) }) { done.resume(returning: false) }
+        }
+        #expect(started)
+        #expect(ReadyPictures.isReady(new, for: .card))
+        #expect(ReadyPictures.copy(of: new, for: .card) !== ReadyPictures.copy(of: old, for: .card))
+    }
+
+    @Test func aPictureTheOverviewNeverShowedIsLeftAlone() async {
+        let old = NSImage(cgImage: picture(width: 800, height: 600), size: NSSize(width: 400, height: 300))
+        let new = NSImage(cgImage: picture(width: 800, height: 600), size: NSSize(width: 400, height: 300))
+        #expect(!ReadyPictures.renew(new, replacing: old, in: nil))
+        #expect(!ReadyPictures.renew(new, replacing: nil, in: nil))
+        #expect(!ReadyPictures.isReady(new, for: .card))
+        // The same picture set again, or none, has nothing to make.
+        await ready(old)
+        #expect(!ReadyPictures.renew(old, replacing: old, in: nil))
+        #expect(!ReadyPictures.renew(nil, replacing: old, in: nil))
+    }
 }

@@ -149,7 +149,11 @@ final class Tab: NSObject {
     private(set) var isMuted = false
     private(set) var hasLoadedOnce = false
     private(set) var snapshot: NSImage? {
-        didSet { snapshotIsDark = snapshot == nil ? nil : webView?.effectiveAppearance.isDark }
+        didSet {
+            snapshotIsDark = snapshot == nil ? nil : webView?.effectiveAppearance.isDark
+            // Its card in the tab overview gets the new picture ready ahead of the next open.
+            ReadyPictures.renew(snapshot, replacing: oldValue, in: webView?.window)
+        }
     }
     /// Whether the app was dark when the snapshot was taken; nil when unknown (read from disk). A mismatch makes it
     /// stale.
