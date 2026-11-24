@@ -1,6 +1,505 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Export Your Data…" : {
+      "comment" : "File menu item, Settings button and command bar command: opens the sheet that saves your bookmarks and a Zigzag backup to files.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出你的数据…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯出你的資料…"
+          }
+        }
+      }
+    },
+    "Bookmarks file (HTML)" : {
+      "comment" : "Choice in the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "书签文件（HTML）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書籤檔案（HTML）"
+          }
+        }
+      }
+    },
+    "Your spaces as folders of pinned tabs, with your favorites. Any browser can import it." : {
+      "comment" : "Under the Bookmarks file choice in the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的空间各是一个装着已固定标签页的文件夹，另有你的收藏。任何浏览器都能导入。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的空間各是一個裝著已固定分頁的資料夾，另有你的收藏。任何瀏覽器都能匯入。"
+          }
+        }
+      }
+    },
+    "Zigzag backup" : {
+      "comment" : "Choice in the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 備份"
+          }
+        }
+      }
+    },
+    "Spaces, pinned tabs, favorites and settings. Restore it from the Import window." : {
+      "comment" : "Under the Zigzag backup choice in the Export Your Data sheet. Choose File… is the Import window's button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间、已固定标签页、收藏和设置。可以在导入窗口中恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空間、已固定分頁、收藏和設定。可以在匯入視窗中還原。"
+          }
+        }
+      }
+    },
+    "Open tabs" : {
+      "comment" : "Choice in the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开的标签页"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟的分頁"
+          }
+        }
+      }
+    },
+    "The tabs open in each space, besides the pinned ones." : {
+      "comment" : "Under the Open tabs choice in the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个空间里已固定标签页以外打开的标签页。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每個空間中已固定分頁以外開啟的分頁。"
+          }
+        }
+      }
+    },
+    "Every page you’ve visited, in the backup only." : {
+      "comment" : "Under the History choice in the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你访问过的所有页面，只放进备份。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你造訪過的所有網頁，只放進備份。"
+          }
+        }
+      }
+    },
+    "Export Your Data" : {
+      "comment" : "Title of the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出你的数据"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯出你的資料"
+          }
+        }
+      }
+    },
+    "Save your spaces and pinned tabs to files you can keep or take to another browser." : {
+      "comment" : "Under the title of the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把你的空间和已固定标签页存成文件，可以留着，也可以带到另一个浏览器。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把你的空間和已固定分頁儲存成檔案，可以留著，也可以帶到另一個瀏覽器。"
+          }
+        }
+      }
+    },
+    "Export…" : {
+      "comment" : "Main button of the Export Your Data sheet.\nButton in Settings › General that opens the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯出…"
+          }
+        }
+      }
+    },
+    "Zigzag Bookmarks %@.html" : {
+      "comment" : "Name of the exported bookmarks file. The placeholder is the date, like 2026-11-24. Zigzag is a name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 书签 %@.html"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 書籤 %@.html"
+          }
+        }
+      }
+    },
+    "Zigzag Backup %@.%@" : {
+      "comment" : "Name of the exported Zigzag backup file. The first placeholder is the date, like 2026-11-24; the second the file's extension. Zigzag is a name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Zigzag Backup %1$@.%2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 备份 %1$@.%2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 備份 %1$@.%2$@"
+          }
+        }
+      }
+    },
+    "Choose a folder for your bookmarks file and your Zigzag backup." : {
+      "comment" : "Message of the folder panel from the Export Your Data sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为你的书签文件和 Zigzag 备份选取一个文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "為你的書籤檔案和 Zigzag 備份選取一個資料夾。"
+          }
+        }
+      }
+    },
+    "Your data is exported" : {
+      "comment" : "Toast after Export Your Data saved its files.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的数据已导出"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的資料已匯出"
+          }
+        }
+      }
+    },
+    "Couldn’t save the export. Try another folder." : {
+      "comment" : "Toast when Export Your Data couldn't write its files.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法存储导出的文件。请换一个文件夹试试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存匯出的檔案。請換一個資料夾試試。"
+          }
+        }
+      }
+    },
+    "Passwords export from the Passwords window." : {
+      "comment" : "Last line of the Export Your Data sheet, beside the Open Passwords button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码在“密码”窗口中导出。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密碼在「密碼」視窗中匯出。"
+          }
+        }
+      }
+    },
+    "Favorites" : {
+      "comment" : "Folder in an exported bookmarks file holding the favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏"
+          }
+        }
+      }
+    },
+    "%@ was made by a newer Zigzag. Update Zigzag, then import it again." : {
+      "comment" : "Problem in the Import window, for a Zigzag backup. The placeholder is the file's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 是由更新版本的 Zigzag 制作的。请更新 Zigzag，然后再导入一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 是由較新版本的 Zigzag 製作的。請更新 Zigzag，然後再匯入一次。"
+          }
+        }
+      }
+    },
+    "%@ isn’t a Zigzag backup Zigzag can read." : {
+      "comment" : "Problem in the Import window, for a Zigzag backup. The placeholder is the file's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不是 Zigzag 能读取的 Zigzag 备份。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不是 Zigzag 能讀取的 Zigzag 備份。"
+          }
+        }
+      }
+    },
+    "Your settings came over too. Some take effect the next time Zigzag opens." : {
+      "comment" : "Note in the Import window after a Zigzag backup's settings were restored.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的设置也一并带过来了。部分设置要在下次打开 Zigzag 时生效。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的設定也一併帶過來了。部分設定要在下次開啟 Zigzag 時生效。"
+          }
+        }
+      }
+    },
+    "Export your data" : {
+      "comment" : "A setting in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出你的数据"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯出你的資料"
+          }
+        }
+      }
+    },
+    "Your spaces and pinned tabs as a bookmarks file for any browser, and a Zigzag backup." : {
+      "comment" : "Explanation under “Export your data” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把你的空间和已固定标签页存成任何浏览器都能导入的书签文件，以及一份 Zigzag 备份。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把你的空間和已固定分頁儲存成任何瀏覽器都能匯入的書籤檔案，以及一份 Zigzag 備份。"
+          }
+        }
+      }
+    },
+    "export backup save bookmarks html restore move leave" : {
+      "comment" : "Words that find the Export your data setting with Find a setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出 备份 存储 书签 html 恢复 迁移 离开 export backup save bookmarks html restore move leave"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯出 備份 儲存 書籤 html 還原 搬移 離開 export backup save bookmarks html restore move leave"
+          }
+        }
+      }
+    },
+    "Choose a password export (a .csv file), a bookmarks export (an .html file), Safari’s browsing data export (a .zip file) or a Zigzag backup." : {
+      "comment" : "Message of the open panel from the Import window's Choose File… button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取一个密码导出文件（.csv 文件）、书签导出文件（.html 文件）、Safari 的浏览数据导出文件（.zip 文件）或 Zigzag 备份。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取一個密碼匯出檔案（.csv 檔案）、書籤匯出檔案（.html 檔案）、Safari 的瀏覽資料匯出檔案（.zip 檔案）或 Zigzag 備份。"
+          }
+        }
+      }
+    },
+    "Use the backup’s settings?" : {
+      "comment" : "Title of the question in the Import window before a Zigzag backup is restored.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用备份里的设置吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用備份中的設定嗎？"
+          }
+        }
+      }
+    },
+    "Its spaces, pinned tabs and favorites are added to yours either way. Its settings and site settings can replace the ones here." : {
+      "comment" : "Message of the question in the Import window before a Zigzag backup is restored.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无论如何，备份里的空间、已固定标签页和收藏都会加到你现有的里面。它的设置和网站设置可以替换这里的。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無論如何，備份中的空間、已固定分頁和收藏都會加到你現有的項目中。它的設定和網站設定可以取代這裡的設定。"
+          }
+        }
+      }
+    },
+    "Use Backup’s Settings" : {
+      "comment" : "Button in the Import window's question before a Zigzag backup is restored.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用备份的设置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用備份的設定"
+          }
+        }
+      }
+    },
+    "Keep Mine" : {
+      "comment" : "Button in the Import window's question before a Zigzag backup is restored: keep the settings here.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留我的"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留我的"
+          }
+        }
+      }
+    },
     "Always Translate %@" : {
       "comment" : "Item in the translate menu: pages in this language are translated as they open. The name is a language's, like French.",
       "localizations" : {
@@ -9416,23 +9915,6 @@
         }
       }
     },
-    "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s browsing data export (a .zip file)." : {
-      "comment" : "Message of the open panel from the Import window's Choose File… button.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选取一个密码导出文件（.csv 文件）、书签导出文件（.html 文件）或 Safari 的浏览数据导出文件（.zip 文件）。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選取一個密碼匯出檔案（.csv 檔案）、書籤匯出檔案（.html 檔案）或 Safari 的瀏覽資料匯出檔案（.zip 檔案）。"
-          }
-        }
-      }
-    },
     "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s exported browsing data (a .zip file)." : {
       "comment" : "Message of the open panel from the welcome window’s Import a password file… link.",
       "localizations" : {
@@ -15376,7 +15858,7 @@
       }
     },
     "Export" : {
-      "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords.",
+      "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords.\nButton of the folder panel from the Export Your Data sheet, when both files are saved.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17300,7 +17782,7 @@
       }
     },
     "History" : {
-      "comment" : "A menu in the menu bar.\nA setting in Settings › Privacy.\nChoice in the Import window: bring browsing history over.\nThe address bar's name for Zigzag's History page.\nThe name of the tab showing Zigzag's History.\nTitle of the History page.",
+      "comment" : "A menu in the menu bar.\nA setting in Settings › Privacy.\nChoice in the Export Your Data sheet.\nChoice in the Import window: bring browsing history over.\nThe address bar's name for Zigzag's History page.\nThe name of the tab showing Zigzag's History.\nTitle of the History page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -22569,7 +23051,7 @@
       }
     },
     "Open Passwords" : {
-      "comment" : "Button in Settings › Passwords that opens the Passwords window.\nButton under a note in the Import window: open Apple's Passwords app to export from it.",
+      "comment" : "Button in Settings › Passwords that opens the Passwords window.\nButton in the Export Your Data sheet: opens the Passwords window, where passwords are exported.\nButton under a note in the Import window: open Apple's Passwords app to export from it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -22637,7 +23119,7 @@
       }
     },
     "Open Tabs" : {
-      "comment" : "Choice in the Import window: bring the tabs open in each of Arc's spaces over, not pinned ones.",
+      "comment" : "Choice in the Import window: bring the tabs open in each of Arc's spaces over, not pinned ones.\nFolder in an exported bookmarks file holding a space's open tabs, not pinned ones.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -29290,7 +29772,7 @@
       }
     },
     "Show in Finder" : {
-      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
+      "comment" : "Button in the Import window: show the exported passwords file in Finder.\nButton in the toast after Export Your Data: shows the saved files in Finder.\nButton in the toast after Install as App: shows the new app in Finder.\nButton on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder.\nFile menu item of an installed app's window: shows the app itself, selected in its folder in Finder.\nTooltip of a download's button in the downloads panel: shows the file in Finder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
