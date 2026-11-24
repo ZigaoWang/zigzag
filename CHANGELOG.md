@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- ⇧-clicking a link that the site opens by itself, as on YouTube and parts of Google, opens it in Zigzag Mini like any other ⇧-clicked link, instead of as a pop-up tab. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#522](https://github.com/ZigaoWang/zigzag/pull/522))
 - Extensions that open a minimized window to load a page in the background, like Property Mate, no longer bring a window to the front. As in Chrome, it goes straight to the Dock, and one opened unfocused opens behind your window, which keeps focus. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#521](https://github.com/ZigaoWang/zigzag/issues/521))
 
 ## [0.9.5] - 2026-11-24

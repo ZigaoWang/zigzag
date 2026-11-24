@@ -13,6 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 修复
+- 按住 ⇧ 点按由网站自己打开的链接（比如 YouTube 和部分 Google 页面）时，也会和其他按住 ⇧ 点按的链接一样在 Zigzag Mini 里打开，不再变成弹出的标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#522](https://github.com/ZigaoWang/zigzag/pull/522))
 - 像 Property Mate 这样在后台打开一个最小化窗口来载入网页的扩展，不会再把窗口弹到最前面。和 Chrome 一样，窗口直接进入程序坞；不要求聚焦的窗口会在你的窗口后面打开，你的窗口仍在前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
 
 ## [0.9.5] - 2026-11-24
