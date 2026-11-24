@@ -5,6 +5,19 @@ import UniformTypeIdentifiers
 /// so only its fields show. Tokens apply to Open URL templates, script arguments and service parameters; paths,
 /// endpoints and methods are literal.
 enum DownloadRuleSheet {
+    /// Every way a rule can match. A destination is a file type only; any other rule may match an address or, since
+    /// links have no name, a download's own file type.
+    static func matchChoices(isDestination: Bool) -> [DownloadRule.Match] {
+        isDestination ? [.fileType] : DownloadRule.Match.allCases
+    }
+
+    /// What the pattern field asks for: extensions for a file-type rule, an address for the rest.
+    static func patternPlaceholder(for match: DownloadRule.Match) -> String {
+        match == .fileType
+            ? String(localized: "pdf, epub", comment: "Placeholder of the file-extension field in the sheet that makes a per-extension destination: the extensions to list, like pdf, epub.")
+            : String(localized: "example.com/files/", comment: "Placeholder of the pattern field in the sheet that makes a download rule.")
+    }
+
     /// Edits a new rule of `kind`, or `rule` if given.
     static func show(in host: NSView, kind: DownloadRuleAction.Kind, preset: DownloadPreset? = nil, rule existing: DownloadRule? = nil) {
         let source = existing ?? preset?.rule ?? DownloadRule(name: "", action: DownloadRuleAction(kind: kind))
@@ -20,9 +33,7 @@ enum DownloadRuleSheet {
 
         let name = FilledField(placeholder: String(localized: "Name", comment: "Placeholder of the name field in the sheet that makes a download rule."))
         name.stringValue = source.name
-        let pattern = FilledField(placeholder: isDestination
-            ? String(localized: "pdf, epub", comment: "Placeholder of the file-extension field in the sheet that makes a per-extension destination: the extensions to list, like pdf, epub.")
-            : String(localized: "example.com/files/", comment: "Placeholder of the pattern field in the sheet that makes a download rule."))
+        let pattern = FilledField(placeholder: Self.patternPlaceholder(for: isDestination ? .fileType : source.match))
         pattern.stringValue = source.pattern
         /// Pointer over the main button, which shows every field blocking Add.
         var addHovered = false
@@ -30,9 +41,9 @@ enum DownloadRuleSheet {
         let applies = DropdownButton()
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
         applies.selectedIndex = DownloadRule.Applies.allCases.firstIndex(of: source.applies) ?? 0
-        // Address matches only: file-type rules are edited from Save downloads to. An existing one keeps its match. For
-        // a destination, file type is the only match.
-        let matchChoices = isDestination ? [.fileType] : DownloadRule.Match.allCases.filter { $0 != .fileType }
+        // A destination is only a file type. Any other rule matches an address, or a download's own type whatever its
+        // address says, so a tracker's download.php address can still reach the downloader.
+        let matchChoices = Self.matchChoices(isDestination: isDestination)
         let match = DropdownButton()
         match.options = matchChoices.map { DropdownButton.Option(title: $0.title) }
         match.selectedIndex = matchChoices.firstIndex(of: source.match) ?? matchChoices.firstIndex(of: .contains) ?? 0
@@ -228,20 +239,31 @@ enum DownloadRuleSheet {
 
         let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
                                              comment: "The tokens a download rule's fields may use, listed in its sheet."))
-        /// Destinations only ask for file types; they drop the address rule rows (applies to, match, case, page
-        /// continues).
-        let matchRows: [FormSheet.Row] = isDestination ? [
-            FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
-            FormSheet.Row(label: String(localized: "File Extensions", comment: "Label of the extensions field in a per-extension destination's sheet, where the types of file are listed."), view: pattern),
-            FormSheet.Row(label: String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
-        ] : [
-            FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
-            FormSheet.Row(label: String(localized: "Applies to", comment: "Label of the choice of what a download rule catches, in its sheet."), view: applies),
-            FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
-            FormSheet.Row(label: String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet."), view: pattern),
-            FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
-            FormSheet.Row(label: String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
-        ]
+        // Destinations only ask for file types; they drop the address rule rows (applies to, match, case, page
+        // continues). A rule that matches a file's own type shows the same field as "File Extensions", not "Address".
+        let addressLabel = String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet.")
+        let extensionsLabel = String(localized: "File Extensions", comment: "Label of the extensions field in a per-extension destination's sheet, where the types of file are listed.")
+        let matchRows: [FormSheet.Row]
+        /// The pattern row, whose label follows the match.
+        let patternRow: Int
+        if isDestination {
+            matchRows = [
+                FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
+                FormSheet.Row(label: extensionsLabel, view: pattern),
+                FormSheet.Row(label: String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
+            ]
+            patternRow = 1
+        } else {
+            matchRows = [
+                FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
+                FormSheet.Row(label: String(localized: "Applies to", comment: "Label of the choice of what a download rule catches, in its sheet."), view: applies),
+                FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
+                FormSheet.Row(label: source.match == .fileType ? extensionsLabel : addressLabel, view: pattern),
+                FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
+                FormSheet.Row(label: String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
+            ]
+            patternRow = 3
+        }
         // Destinations add their action; address rules list tokens unless the path is literal (Open App).
         let rows = matchRows + actionRows + (isDestination ? [
             FormSheet.Row.note(String(localized: "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins.",
@@ -317,8 +339,17 @@ enum DownloadRuleSheet {
             markHeldUp(rule)
             return rule.map(isValid) ?? false
         }
-        for picker in [applies, match] + [stylePicker].compactMap({ $0 }) {
+        applies.onSelect = { _ in sheetRef?.revalidate() }
+        for picker in [stylePicker].compactMap({ $0 }) {
             picker.onSelect = { _ in sheetRef?.revalidate() }
+        }
+        // The match decides what the pattern field asks for and what its row is called.
+        match.onSelect = { index in
+            guard matchChoices.indices.contains(index) else { return }
+            let chosen = matchChoices[index]
+            pattern.placeholder = Self.patternPlaceholder(for: chosen)
+            sheetRef?.setLabel(chosen == .fileType ? extensionsLabel : addressLabel, forRow: patternRow)
+            sheetRef?.revalidate()
         }
         matchCase.onChange = { _ in sheetRef?.revalidate() }
 
@@ -334,7 +365,7 @@ enum DownloadRuleSheet {
         } else {
             sheetTitle = existing == nil ? String(localized: "Add Download Rule", comment: "Title of the sheet that makes a download rule.")
                                          : String(localized: "Edit Download Rule", comment: "Title of the sheet that changes a download rule.")
-            sheetMessage = String(localized: "The first rule that matches an address wins. Rules run from the top of the list.",
+            sheetMessage = String(localized: "The first rule that matches wins. Rules run from the top of the list.",
                                   comment: "Under the title of the sheet that makes a download rule.")
         }
 
@@ -410,7 +441,7 @@ enum DownloadRuleSheet {
             // Commas with nothing between aren't extensions.
             if DownloadRule.Match.extensions(in: rule.pattern).isEmpty {
                 if all || !rule.pattern.isEmpty {
-                    held.append((.pattern, String(localized: "List the file extensions this rule catches, like pdf, epub.", comment: "Tooltip on the extensions field of a per-extension destination that names none, so its Add button can't be pressed.")))
+                    held.append((.pattern, String(localized: "List the file extensions this rule catches, like pdf, epub.", comment: "Tooltip on the extensions field of a file-type rule that names none, so its Add button can't be pressed.")))
                 }
             } else if rule.action.kind == .openFile, DownloadOpening.isRefused(pattern: rule.pattern) {
                 held.append((.pattern, String(localized: "Apps, scripts, installers and archives are always saved, never opened.", comment: "Tooltip on the extensions field of a per-extension destination that Open refuses, so its Add button can't be pressed.")))

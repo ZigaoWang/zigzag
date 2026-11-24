@@ -14559,19 +14559,19 @@
         }
       }
     },
-    "The first rule that matches an address wins. Rules run from the top of the list." : {
-      "comment" : "Explanation in a download rule's sheet.",
+    "The first rule that matches wins. Rules run from the top of the list." : {
+      "comment" : "Under the title of the sheet that makes a download rule.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第一条匹配地址的规则生效。规则按列表从上到下运行。"
+            "value" : "第一条匹配的规则生效。规则按列表从上到下运行。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第一條符合網址的規則生效。規則按清單從上到下執行。"
+            "value" : "第一條符合的規則生效。規則按清單從上到下執行。"
           }
         }
       }
@@ -16525,6 +16525,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此類型的檔案會重新儲存到下載位置。"
+          }
+        }
+      }
+    },
+    "Files of type %@" : {
+      "comment" : "Part of a download rule's sentence: it catches files by their own extension, whatever their address. The placeholder lists the extensions, like torrent or pdf.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型为 %@ 的文件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "類型為 %@ 的檔案"
           }
         }
       }

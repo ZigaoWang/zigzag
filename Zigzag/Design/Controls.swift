@@ -1283,6 +1283,12 @@ final class FilledField: NSView {
         get { field.stringValue }
         set { field.stringValue = newValue }
     }
+    /// The grey hint shown while the field is empty. A rule's match changes whether it asks for an address or for
+    /// file extensions.
+    var placeholder: String {
+        get { field.placeholderString ?? "" }
+        set { field.placeholderString = newValue }
+    }
     /// The focus ring's color; nil takes its window's accent.
     var tint: NSColor? { didSet { updateColors() } }
 

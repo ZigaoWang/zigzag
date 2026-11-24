@@ -45,6 +45,8 @@
   Test: DownloadRuleTests.cookiesGoOnlyToThePagesOwnSiteOrAClick
 - A file type rule → saves those files to its folder, or saves them and opens them in the Mac's app.
   Test: DownloadRuleTests.aDestinationIsTheFirstThatMatches
+- A handoff rule by file type → sends every download whose own name ends in one of its extensions, whatever its address says; links have no name, so they never match.
+  Test: DownloadRuleTests.aFileTypeHandoffMatchesTheDownloadsNameAndNeverALink
 - Open for apps, scripts, installers, archives and web pages → never opens them; they're only saved.
   Test: DownloadRuleTests.anOpenNeverTakesAnAppScriptOrArchive
 
