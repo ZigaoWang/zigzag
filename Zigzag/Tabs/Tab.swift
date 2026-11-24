@@ -555,6 +555,7 @@ final class Tab: NSObject {
         pendingConfiguration = nil
         // Otherwise a page's new window shares its opener's preferences (WebRTC, styles).
         if fromWebKit { WebKitSetup.separatePreferences(of: configuration) }
+        PageLocation.attach(to: configuration)
         if extensionConfiguration != nil {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
             WebKitSetup.turnOffBackspaceNavigation(configuration.preferences)

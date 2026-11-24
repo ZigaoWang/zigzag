@@ -20,6 +20,12 @@
 - A download → no question by default; with asking turned on in Settings, a site's first download asks.
   Test: SitePermissionsPolicyTests.askingBeforeADownloadIsOffByDefault
 
+## Location
+- Allow on a location question → the first time, macOS asks once whether Zigzag may use your location and lists it under Location Services; the page then gets your position.
+  Test: PageLocationTests.eachPoolGetsTheSourceOnce
+- Location Services off for the whole Mac, or refused for Zigzag → the page gets an error at once, not a wait that never ends.
+  Test: PageLocationTests.locationServicesOffForTheMacAnswersWithAnError
+
 ## What's kept
 - Remember → starts checked for notifications, camera, microphone and location; unchecked for screen, downloads and pop-ups.
   Test: PermissionPromptTests.chromeKeptQuestionsStartWithRememberChecked

@@ -65,6 +65,7 @@
 		171525799F035128A918483B /* KeptCookiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C6B60D88D8E4126E09FA34 /* KeptCookiesTests.swift */; };
 		5E551C00C0FFEE0000000003 /* SessionCookiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E551C00C0FFEE0000000004 /* SessionCookiesTests.swift */; };
 		F2A3E9AC0FF5000000000003 /* FramePacingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF5000000000004 /* FramePacingTests.swift */; };
+		F2A3E9AC0FF6000000000003 /* PageLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */; };
 		1845DD30334A776382156546 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D0B754CF4F921CAA567C219B /* InfoPlist.xcstrings */; };
 		1A3C4EEF9AB9B8D6903AE06A /* ExtensionStorms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1401764DF9792E0E8F11146A /* ExtensionStorms.swift */; };
 		1A57A99E37C074DC8620FD87 /* Scripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1EE7853A66CE1029968DA5 /* Scripting.swift */; };
@@ -447,6 +448,7 @@
 		C06C21D717F28D4C90430680 /* KeptCookies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53812A3D2F9723418E0A8FB6 /* KeptCookies.swift */; };
 		5E551C00C0FFEE0000000001 /* SessionCookies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E551C00C0FFEE0000000002 /* SessionCookies.swift */; };
 		F2A3E9AC0FF5000000000001 /* FramePacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF5000000000002 /* FramePacing.swift */; };
+		F2A3E9AC0FF6000000000001 /* PageLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000002 /* PageLocation.swift */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
 		C0BAE33AABA9789FBBCB98B5 /* SiteControlsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9087E150435AD1151CE6852F /* SiteControlsTests.swift */; };
 		C0C41FEE6C185FBC845F1D51 /* ZigzagWebApp in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -758,6 +760,7 @@
 		27C6B60D88D8E4126E09FA34 /* KeptCookiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesTests.swift; sourceTree = "<group>"; };
 		5E551C00C0FFEE0000000004 /* SessionCookiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCookiesTests.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF5000000000004 /* FramePacingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FramePacingTests.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageLocationTests.swift; sourceTree = "<group>"; };
 		27F3073C0E2D268EC8C3B767 /* DockProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockProgress.swift; sourceTree = "<group>"; };
 		289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioOut.swift; sourceTree = "<group>"; };
 		2904F433A0EC465A91389CF8 /* MCPBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPBrowser.swift; sourceTree = "<group>"; };
@@ -837,6 +840,7 @@
 		53812A3D2F9723418E0A8FB6 /* KeptCookies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookies.swift; sourceTree = "<group>"; };
 		5E551C00C0FFEE0000000002 /* SessionCookies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCookies.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF5000000000002 /* FramePacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FramePacing.swift; sourceTree = "<group>"; };
+		F2A3E9AC0FF6000000000002 /* PageLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageLocation.swift; sourceTree = "<group>"; };
 		5444B96A257FE2312B3F2987 /* WebRTCProtectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCProtectionTests.swift; sourceTree = "<group>"; };
 		54C6B331BCC370A4B830EDE3 /* PageIconTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageIconTests.swift; sourceTree = "<group>"; };
 		565C64D8120ACF95067FFE91 /* DevDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevDefaults.swift; sourceTree = "<group>"; };
@@ -1609,6 +1613,7 @@
 				53812A3D2F9723418E0A8FB6 /* KeptCookies.swift */,
 				5E551C00C0FFEE0000000002 /* SessionCookies.swift */,
 				F2A3E9AC0FF5000000000002 /* FramePacing.swift */,
+				F2A3E9AC0FF6000000000002 /* PageLocation.swift */,
 				15EA5560944494B70EC2C454 /* LocalReceivers.swift */,
 				92C53B2FC177406F3C94CA9D /* LocalReceiverShim.swift */,
 				0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */,
@@ -1883,6 +1888,7 @@
 				27C6B60D88D8E4126E09FA34 /* KeptCookiesTests.swift */,
 				5E551C00C0FFEE0000000004 /* SessionCookiesTests.swift */,
 				F2A3E9AC0FF5000000000004 /* FramePacingTests.swift */,
+				F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */,
 				05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */,
 				6B89CCE006086C641D713AAB /* LocalizationTests.swift */,
 				9D02F02DFE20E463010E54EA /* LocalReceiversTests.swift */,
@@ -2500,6 +2506,7 @@
 				C06C21D717F28D4C90430680 /* KeptCookies.swift in Sources */,
 				5E551C00C0FFEE0000000001 /* SessionCookies.swift in Sources */,
 				F2A3E9AC0FF5000000000001 /* FramePacing.swift in Sources */,
+				F2A3E9AC0FF6000000000001 /* PageLocation.swift in Sources */,
 				DE827B38247BCF992C71E954 /* KeptCookiesSheet.swift in Sources */,
 				CF63705B985B423D3B9EC482 /* Library.swift in Sources */,
 				4CE83D681448A928D6D537D2 /* SavePath.swift in Sources */,
@@ -2781,6 +2788,7 @@
 				171525799F035128A918483B /* KeptCookiesTests.swift in Sources */,
 				5E551C00C0FFEE0000000003 /* SessionCookiesTests.swift in Sources */,
 				F2A3E9AC0FF5000000000003 /* FramePacingTests.swift in Sources */,
+				F2A3E9AC0FF6000000000003 /* PageLocationTests.swift in Sources */,
 				3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */,
 				E3A8ED15A7F4B1612C745407 /* LocalReceiversTests.swift in Sources */,
 				F93332479C4E8E444308AC31 /* LocalServerTrustTests.swift in Sources */,
