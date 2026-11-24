@@ -12,6 +12,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 新功能
+- 存储网页的扩展（`chrome.pageCapture`）现在能用了：可以像在 Chrome 里一样，把标签页存储为一个 MHTML 文件，连同它的样式、图片和框架，Chrome 等浏览器能把它当作网页打开。只适用于扩展可访问的网站上的网页。网页载入的内容中，只有图片、样式表和字体会存进去，和 Chrome 一样；来自扩展不能访问的网站的框架不会存进文件。([#488](https://github.com/ZigaoWang/zigzag/issues/488))
+
 ### 修复
 - “设置 › 开发者”里你改过的功能开关旁边有“还原”按钮，取代原来只显示的“已更改”；Zigzag 默认值和 WebKit 不同的开关（比如 Prefer Page Rendering Updates near 60fps）会在名字下面写明。
 - 滑动后退或前进松手时，网页不会再先弹回原位才离开，而是顺着滑动方向再走一点、稍微变暗，然后下一个网页直接出现在原处，不用看箭头也知道滑动生效了。没滑够的话网页照样弹回去；开了“减弱动态效果”时网页不动。([#508](https://github.com/ZigaoWang/zigzag/issues/508))

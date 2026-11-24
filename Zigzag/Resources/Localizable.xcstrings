@@ -18197,6 +18197,17 @@
         }
       }
     },
+    "Save pages on the sites it can access as files" : {
+      "comment" : "One thing an extension can do, listed in its install sheet and in Settings, and in the sheet that asks before it gets more access: the pageCapture permission, which saves a tab as one MHTML file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将它可访问网站上的网页存储为文件"
+          }
+        }
+      }
+    },
     "Save password?" : {
       "comment" : "Title of the save-password prompt.",
       "localizations" : {

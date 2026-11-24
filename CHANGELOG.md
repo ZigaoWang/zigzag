@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Extensions that save pages (`chrome.pageCapture`) work: they can save a tab as one MHTML file, as in Chrome, with its styles, pictures and frames, which Chrome and other browsers open as the page. It's only for web pages on sites the extension can access. Of what a page loaded, only its pictures, stylesheets and fonts go in, as in Chrome, and a frame from a site the extension can't access is left out. ([#488](https://github.com/ZigaoWang/zigzag/issues/488))
+
 ### Fixed
 - A feature flag you changed in Settings › Developer has a Reset button beside its switch, in place of a plain “Changed”, and a flag Zigzag starts other than WebKit, like Prefer Page Rendering Updates near 60fps, says so under its name.
 - Letting go of a swipe that goes back or forward no longer springs the page back before it leaves. The page slides on a little and dims, then the next page shows in its place, so you can tell the swipe took without looking at the arrow. A swipe called off still springs back, and with Reduce Motion the page stays put. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
