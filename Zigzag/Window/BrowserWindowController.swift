@@ -749,6 +749,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func applySpaceColor(animated: Bool, crossFadesMode: Bool = true) {
+        Freezes.mark("space color")
         showsSwipeLook = false
         lastSpaceID = tabManager.currentSpaceID
         render(tabManager.currentSpace, animated: animated, crossFadesMode: crossFadesMode)
@@ -786,6 +787,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSelectedTab() {
+        Freezes.mark("tab switch")
         previews.hide()
         let tab = tabManager.selectedTab
         // The site panel describes one page; another tab coming forward takes it away.
@@ -1445,6 +1447,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The bar above the page in the shown page's color (`Tab.pageColor`). None over what covers the page (a PDF,
     /// Settings, Reader), which has a color of its own: the bar is the plain one then.
     private func paintTopBar() {
+        Freezes.mark("top bar color")
         let covered = reader != nil && readerCard === root.card
         // The card's own word on its page's color: a page at a size of its own stands on plain ground, bar included.
         root.paintTopBar(covered ? nil : root.card.pageColor)

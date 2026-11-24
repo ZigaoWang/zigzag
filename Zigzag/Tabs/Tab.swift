@@ -1264,6 +1264,7 @@ final class Tab: NSObject {
 
     /// Takes the web view's address as the tab's: the page shown now, or one Zigzag itself is loading.
     private func followAddress(of wv: WKWebView) {
+        Freezes.mark("address change")
         guard let url = wv.url else { return }
         let siteChanged = FaviconStore.siteKey(for: url) != self.url.flatMap { FaviconStore.siteKey(for: $0) }
         if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
@@ -1395,6 +1396,7 @@ final class Tab: NSObject {
     /// Retakes the page's picture. `keep: false` only refreshes it in memory (a preview being watched, every second)
     /// and leaves the disk alone until `keepSnapshot()`.
     func captureSnapshot(keep: Bool = true, _ completion: (() -> Void)? = nil) {
+        Freezes.mark("tab picture")
         guard let webView, webView.window != nil, webView.bounds.width > 0, hasLoadedOnce else { completion?(); return }
         // A PDF's picture is of Zigzag's viewer, as you see it (dark pages and all), not WebKit's underneath.
         // Settings likewise: the picture is of what covers the page, not the empty page under it.
@@ -2357,6 +2359,7 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        Freezes.mark("page start")
         isLeavingPage = false
         // A page swiped away from is replaced: the new one shows in place.
         (webView as? BrowserWebView)?.swipeNavigator.pageArrived()
@@ -2459,6 +2462,7 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        Freezes.mark("page loaded")
         // Back, Forward and reload end here too, even where the address stays the same.
         navigatedSinceSave = true
         // The page is all here now: what the developer tools put into it is too.

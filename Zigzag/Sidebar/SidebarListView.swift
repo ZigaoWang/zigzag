@@ -430,6 +430,7 @@ final class SidebarListView: NSView {
     }
 
     func reload(animated: Bool) {
+        Freezes.mark("sidebar reload")
         // Re-place the space name after a reload, which may recreate its row at a new size.
         defer { followMarks(); pinHeader() }
         guard drag == nil else { return }

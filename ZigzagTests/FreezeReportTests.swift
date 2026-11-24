@@ -89,6 +89,28 @@ struct FreezeReportTests {
     }
 }
 
+/// Short stalls are noted with what was going on, at most one note every few seconds, the rest counted.
+struct StallNoteTests {
+    @Test func aStallSaysHowLongWhatItHandledAndWhatRan() {
+        #expect(Stalls.detail(ms: 119.6, event: "a scroll", marks: ["session save", "sidebar reload", "session save"], more: 0, longest: 0)
+                == "120 ms, handling a scroll, in session save, sidebar reload")
+        #expect(Stalls.detail(ms: 64, event: nil, marks: [], more: 3, longest: 210.2) == "64 ms (3 more since, longest 210 ms)")
+        #expect(Stalls.name(of: .scrollWheel) == "a scroll")
+        #expect(Stalls.name(of: .leftMouseUp) == "a click")
+    }
+
+    @Test func stallsCloseTogetherWaitForTheNextNote() {
+        var pacing = Stalls.Pacing()
+        let first = pacing.add(60, at: 100)
+        #expect(first?.more == 0)
+        #expect(pacing.add(80, at: 101) == nil)
+        #expect(pacing.add(200, at: 105) == nil)
+        let next = pacing.add(55, at: 100 + Stalls.noteEvery)
+        #expect(next?.more == 2 && next?.longest == 200)
+        #expect(pacing.add(70, at: 100 + Stalls.noteEvery + 1) == nil)
+    }
+}
+
 /// Hands the look's frames back from the thread that took it.
 nonisolated private final class FramesBox: @unchecked Sendable {
     private let lock = NSLock()

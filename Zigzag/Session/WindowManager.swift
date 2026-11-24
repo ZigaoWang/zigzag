@@ -373,6 +373,7 @@ final class WindowManager {
     }
 
     func saveNow(synchronously: Bool = false) {
+        Freezes.mark("session save")
         saveDebouncer.cancel()
         guard !controllers.isEmpty, !sessionWaiting else { return }
         // Started fresh and nothing done yet: the session from before is still the one to bring back.
