@@ -42,6 +42,9 @@
   Test: TopBarTests.aNewDocumentResetsTheBarButANavigationChangeDoesNot
 - Switch tabs → the bar is there.
   Test: TopBarTests.switchingTabsBringsTheBarBack
+- A page takes The Whole Screen → Autohide stands down and the bar comes down from the top as The Whole Screen has it; leaving gives Autohide back with the bar there.
+  Test: TopBarTests.theWholeScreenSuppressesAutohide
+  Test: TopBarTests.leavingTheWholeScreenRestoresAutohide
 - In split view → each page's bar or strip goes with that page's own scroll, the others stay.
   Test: TopBarTests.aSplitScrollHidesOnlyItsOwnBar
   Test: TopBarTests.splitAutohideMovesOnlyItsOwnPane

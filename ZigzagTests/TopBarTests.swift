@@ -1,4 +1,5 @@
 import AppKit
+import JavaScriptCore
 import Testing
 @testable import Zigzag
 
@@ -909,6 +910,96 @@ struct TopBarTests {
         controller.noteScrollGesture(try #require(NSEvent(cgEvent: cg)), inPane: 0)
         controller.settleAutohide()
         #expect(root.autohideOffset(at: 0) == travel)
+    }
+
+    /// The Whole Screen owns the bar: Autohide stands down while it lasts, with the bar's offset gone.
+    @Test func theWholeScreenSuppressesAutohide() {
+        let before = Library.shared.snapshot
+        let place = BrowserRootView.addressBarPlace
+        defer { Library.shared.restore(before); BrowserRootView.addressBarPlace = place }
+        BrowserRootView.addressBarPlace = .autohide
+        let (controller, manager, tab) = autohideWindow("immersive")
+        defer { controller.window?.close(); manager.invalidate() }
+        let root = controller.root
+        controller.placeAddress()
+        let travel = root.autohideTravel(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false, tab: tab)
+        controller.pageScrolled(to: travel / 2, trusted: true, editing: false, tab: tab)
+        #expect(root.autohideOffset(at: 0) == travel / 2)
+        root.isImmersive = true
+        controller.placeAddress()
+        #expect(!root.autohidesBar && root.autohideOffset(at: 0) == 0)
+        controller.pageScrolled(to: travel * 3, trusted: true, editing: false, tab: tab)
+        controller.pointerMoved(to: NSPoint(x: 450, y: 2))
+        controller.settleAutohide()
+        #expect(root.autohideOffset(at: 0) == 0, "no follow while the page has the screen")
+    }
+
+    /// Leaving The Whole Screen gives Autohide back from a clean start: the bar there, the next scroll down its own.
+    @Test func leavingTheWholeScreenRestoresAutohide() {
+        let before = Library.shared.snapshot
+        let place = BrowserRootView.addressBarPlace
+        defer { Library.shared.restore(before); BrowserRootView.addressBarPlace = place }
+        BrowserRootView.addressBarPlace = .autohide
+        let (controller, manager, tab) = autohideWindow("leave-immersive")
+        defer { controller.window?.close(); manager.invalidate() }
+        let root = controller.root
+        controller.placeAddress()
+        let travel = root.autohideTravel(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false, tab: tab)
+        controller.pageScrolled(to: travel * 2, trusted: true, editing: false, tab: tab)
+        #expect(root.autohideOffset(at: 0) == travel)
+        root.isImmersive = true
+        controller.placeAddress()
+        controller.pageScrolled(to: travel * 5, trusted: true, editing: false, tab: tab)
+        root.isImmersive = false
+        controller.placeAddress()
+        #expect(root.autohidesBar && root.autohideOffset(at: 0) == 0)
+        // The first report after is only a starting place; the next one moves the bar from there, unlocked.
+        controller.pageScrolled(to: travel * 5, trusted: true, editing: false, tab: tab)
+        #expect(root.autohideOffset(at: 0) == 0)
+        controller.pageScrolled(to: travel * 5 + 10, trusted: true, editing: false, tab: tab)
+        #expect(root.autohideOffset(at: 0) == 10)
+    }
+
+    /// Only the shown page reports its scrolls, and only with Autohide on; the page script sends nothing otherwise.
+    @Test func scrollReportsOnlyWithAutohide() throws {
+        let before = Library.shared.snapshot
+        let place = BrowserRootView.addressBarPlace
+        defer { Library.shared.restore(before); BrowserRootView.addressBarPlace = place }
+        BrowserRootView.addressBarPlace = .always
+        let (controller, manager, tab) = autohideWindow("reports")
+        defer { controller.window?.close(); manager.invalidate() }
+        controller.placeAddress()
+        #expect(controller.debugScrollReporters.isEmpty)
+        BrowserRootView.addressBarPlace = .autohide
+        controller.placeAddress()
+        if let webView = tab.webView { #expect(controller.debugScrollReporters == [webView]) }
+        BrowserRootView.addressBarPlace = .off
+        controller.placeAddress()
+        #expect(controller.debugScrollReporters.isEmpty)
+
+        // The script itself, run against a stand-in page: silent until the window turns it on.
+        let context = try #require(JSContext())
+        context.evaluateScript("""
+        var handlers = {}, posted = [], frames = [];
+        var window = this;
+        var document = { documentElement: { clientWidth: 800 }, activeElement: null };
+        document.scrollingElement = document.documentElement;
+        window.scrollY = 0;
+        window.addEventListener = function (type, f) { handlers[type] = f; };
+        var requestAnimationFrame = function (f) { frames.push(f); return frames.length; };
+        var flush = function () { var q = frames; frames = []; q.forEach(function (f) { f(); }); };
+        window.webkit = { messageHandlers: { \(ScrollMessages.messageName): { postMessage: function (m) { posted.push(m); } } } };
+        """)
+        context.evaluateScript(ScrollMessages.script.source)
+        context.evaluateScript("window.scrollY = 40; handlers.scroll({ target: document }); flush();")
+        #expect(context.evaluateScript("posted.length").toInt32() == 0)
+        context.evaluateScript("window.__zigzagAutohide = true; window.scrollY = 60; handlers.scroll({ target: document }); flush();")
+        #expect(context.evaluateScript("posted.length").toInt32() == 1)
+        #expect(context.evaluateScript("posted[0].dy").toInt32() == 0, "turned on, the first report is a starting place")
+        context.evaluateScript("window.scrollY = 75; handlers.scroll({ target: document }); flush();")
+        #expect(context.evaluateScript("posted[1].dy").toInt32() == 15)
     }
 
     /// ⌘L brings the bar back to edit the address there, and the next scroll down can take it again.
