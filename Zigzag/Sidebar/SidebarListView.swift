@@ -1974,6 +1974,8 @@ final class SidebarListView: NSView {
         (rows[.separator] as? SeparatorRowView)?.showsClear = false
         for item in faint { rows[item]?.alphaValue = CarriedCopy.faint }
         copy.lift()
+        // A finger held near the list's top or bottom scrolls it on.
+        TouchCarry.starting?.autoscrolls = enclosingScrollView
         CarriedCopy.carry(in: window, moved: { self.dragMoved(to: $0) }) { released in
             self.endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
         }

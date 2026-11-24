@@ -132,6 +132,9 @@ final class TouchOnly: NSObject, NSGestureRecognizerDelegate {
 final class TouchPressRecognizer: NSPressGestureRecognizer {
     let touchOnly = TouchOnly()
     var handler: ((TouchPressRecognizer) -> Void)?
+    /// AppKit's own hold time and slack for a finger, before `liftsSooner` changes them.
+    private(set) var standardDuration: TimeInterval = 0
+    private(set) var standardMovement: CGFloat = 0
 
     init(handler: ((TouchPressRecognizer) -> Void)? = nil) {
         self.handler = handler
@@ -139,11 +142,38 @@ final class TouchPressRecognizer: NSPressGestureRecognizer {
         target = self
         action = #selector(fire)
         TouchGestures.configure(self, touchOnly)
+        standardDuration = minimumPressDuration
+        standardMovement = allowableMovement
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    @objc private func fire() { handler?(self) }
+    /// For something a finger drags: it lifts after `TouchHold.pressDuration`, as on an iPad, and a finger's jitter
+    /// meanwhile doesn't fail it. Off: AppKit's own hold, for a control that only has a menu.
+    func liftsSooner(_ on: Bool) {
+        minimumPressDuration = on ? TouchHold.pressDuration : standardDuration
+        allowableMovement = on ? max(standardMovement, TouchGestures.tapSlop) : standardMovement
+    }
+
+    /// Recognized: from here the finger drags or opens the menu, so the list's scrolling can't cancel it.
+    private(set) var isHolding = false {
+        didSet { if #available(macOS 27, *) { isCancellableByScrollGesture = !isHolding } }
+    }
+
+    @objc private func fire() {
+        note(state)
+        handler?(self)
+    }
+
+    /// What its state turning to `state` changes here, before the handler hears it.
+    func note(_ state: NSGestureRecognizer.State) {
+        if state == .began { isHolding = true }
+    }
+
+    override func reset() {
+        super.reset()
+        isHolding = false
+    }
 }
 
 /// A finger dragged: `handler` runs on each state change.
@@ -231,6 +261,12 @@ final class TouchWatch: NSGestureRecognizer {
     override func touchesEnded(with event: NSEvent) {
         if let start, logsMisses, event.timestamp - start.time >= TouchGestures.tapDuration {
             TouchLog.note("not a tap: held \(Int((event.timestamp - start.time) * 1000)) ms")
+        }
+        // A hold recognized under this finger lifted the item or opened its menu: it isn't a tap as well.
+        if let start, TouchHold.began(since: start.time) {
+            if logsMisses { TouchLog.note("not a tap: held") }
+            state = .failed
+            return
         }
         if let start, TouchGestures.isTap(from: start.point, to: windowPoint(event, .ended) ?? last, duration: event.timestamp - start.time) {
             let point = start.point
@@ -474,7 +510,7 @@ final class TouchFollow: NSGestureRecognizer {
 
     override func touchesMoved(with event: NSEvent) {
         guard let point = windowPoint(event, .moved), let window = view?.window else { return }
-        TouchHold.current?.fingerMoved(to: point, in: window)
+        TouchHold.current?.fingerMoved(to: point, in: window, at: event.timestamp)
     }
 
     override func touchesEnded(with event: NSEvent) {
@@ -526,7 +562,18 @@ final class TouchCarry {
 
     private var escape: Any?
 
+    /// The list that scrolls while the finger holds the item near its top or bottom edge; set by the drag's owner.
+    weak var autoscrolls: NSScrollView? {
+        didSet { scroller = autoscrolls.map { TouchAutoscroll(scroll: $0) { [weak self] point in self?.step(at: point) } } }
+    }
+    private var scroller: TouchAutoscroll?
+
     func move(to windowPoint: NSPoint) {
+        step(at: windowPoint)
+        scroller?.follow(windowPoint)
+    }
+
+    private func step(at windowPoint: NSPoint) {
         guard let event = event(.leftMouseDragged, at: windowPoint) else { return }
         moved?(event)
     }
@@ -545,6 +592,8 @@ final class TouchCarry {
         let ended = self.ended
         moved = nil
         self.ended = nil
+        scroller?.stop()
+        scroller = nil
         if let escape { NSEvent.removeMonitor(escape) }
         escape = nil
         ended?(event)
@@ -557,28 +606,160 @@ final class TouchCarry {
     }
 }
 
+/// A list scrolled while a finger holds what it carries near the list's top or bottom edge, as on an iPad: every
+/// frame, faster the nearer the edge, and the drag hears the finger again after each step.
+@MainActor
+final class TouchAutoscroll: NSObject {
+    /// How far in from the top or bottom edge it starts.
+    nonisolated static let zone: CGFloat = 44
+    /// Points a second at the very edge.
+    nonisolated static let topSpeed: CGFloat = 1000
+
+    /// Points a second for a finger `inset` points in from an edge: none past the zone, rising to `topSpeed` at it.
+    nonisolated static func speed(inset: CGFloat) -> CGFloat {
+        guard inset < zone else { return 0 }
+        return topSpeed * (zone - max(0, inset)) / zone
+    }
+
+    /// For a finger at height `y` in a list from `bottom` to `top` (window coordinates, y up): positive scrolls toward
+    /// the list's top, negative toward its bottom; outside the list, none.
+    nonisolated static func velocity(y: CGFloat, bottom: CGFloat, top: CGFloat) -> CGFloat {
+        guard y >= bottom, y <= top else { return 0 }
+        let fromTop = top - y, fromBottom = y - bottom
+        return fromTop <= fromBottom ? speed(inset: fromTop) : -speed(inset: fromBottom)
+    }
+
+    /// Scrolls `scroll` by `distance` points toward its top (positive) or bottom, within its content. Whether it moved.
+    @discardableResult
+    static func scroll(_ scroll: NSScrollView, by distance: CGFloat) -> Bool {
+        let clip = scroll.contentView
+        var bounds = clip.bounds
+        bounds.origin.y += clip.isFlipped ? -distance : distance
+        let target = clip.constrainBoundsRect(bounds).origin
+        guard abs(target.y - clip.bounds.origin.y) > 0.01 else { return false }
+        clip.scroll(to: target)
+        scroll.reflectScrolledClipView(clip)
+        return true
+    }
+
+    private weak var scroll: NSScrollView?
+    private let step: (NSPoint) -> Void
+    private var point = NSPoint.zero
+    private var link: CADisplayLink?
+    private var lastFrame: CFTimeInterval?
+
+    init(scroll: NSScrollView, step: @escaping (NSPoint) -> Void) {
+        self.scroll = scroll
+        self.step = step
+    }
+
+    /// The finger is at `windowPoint`: scrolls while it's in a zone.
+    func follow(_ windowPoint: NSPoint) {
+        point = windowPoint
+        if velocity() == 0 { stop(); return }
+        guard link == nil, let scroll else { return }
+        let link = scroll.displayLink(target: self, selector: #selector(frame(_:)))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+        lastFrame = nil
+    }
+
+    func stop() {
+        link?.invalidate()
+        link = nil
+        lastFrame = nil
+    }
+
+    private func velocity() -> CGFloat {
+        guard let scroll, scroll.window != nil, !scroll.isHiddenOrHasHiddenAncestor else { return 0 }
+        let frame = scroll.convert(scroll.bounds, to: nil)
+        guard point.x >= frame.minX, point.x <= frame.maxX else { return 0 }
+        return Self.velocity(y: point.y, bottom: frame.minY, top: frame.maxY)
+    }
+
+    @objc private func frame(_ link: CADisplayLink) {
+        // A late frame moves no further than a few frames would.
+        let elapsed = lastFrame.map { min(link.timestamp - $0, 0.05) } ?? link.duration
+        lastFrame = link.timestamp
+        let speed = velocity()
+        guard speed != 0, let scroll, Self.scroll(scroll, by: speed * CGFloat(elapsed)) else { stop(); return }
+        step(point)
+    }
+}
+
+/// How quickly a carried item answered the finger, for the touch log: how old each move was when it was handled, and
+/// how long the drag took over it.
+struct TouchMoveStats: Equatable {
+    private(set) var count = 0
+    private(set) var aged = 0
+    private(set) var ageTotal: TimeInterval = 0
+    private(set) var ageMax: TimeInterval = 0
+    private(set) var workTotal: TimeInterval = 0
+    private(set) var workMax: TimeInterval = 0
+
+    mutating func add(age: TimeInterval?, work: TimeInterval) {
+        count += 1
+        workTotal += work
+        workMax = max(workMax, work)
+        guard let age else { return }
+        aged += 1
+        ageTotal += age
+        ageMax = max(ageMax, age)
+    }
+
+    var summary: String {
+        func ms(_ t: TimeInterval) -> String { String(format: "%.1f", t * 1000) }
+        let age = aged > 0 ? "age avg \(ms(ageTotal / Double(aged))) max \(ms(ageMax)) ms" : "age n/a"
+        let work = count > 0 ? "work avg \(ms(workTotal / Double(count))) max \(ms(workMax)) ms" : "work n/a"
+        return "\(count) moves, \(age), \(work)"
+    }
+}
+
 /// Touch and hold, as an iPhone's menus work, in one motion: the drawn menu opens at the finger; sliding onto it lights
 /// the item under the finger and lifting there chooses it; lifting anywhere else leaves it open, to be tapped. Moving
 /// away from the menu instead, or before it shows, picks the item up and drags it as the mouse does.
 @MainActor
 final class TouchHold {
-    /// How far from where it was held the finger moves, off the menu, before the item is picked up.
+    /// How far from where it was held the finger moves, off the open menu, before the item is picked up.
     nonisolated static let dragDistance: CGFloat = 16
-    /// Held this much longer after the hold is recognized, the menu opens; moving before then drags straight away.
+    /// How far a lifted item's finger moves, with no menu up, before it's picked up.
+    nonisolated static let pickUpDistance: CGFloat = 7
+    /// Held this much longer after the hold is recognized, a control that only has a menu opens it.
     nonisolated static let menuDelay: TimeInterval = 0.15
+    /// How long a finger holds something it can drag before it lifts.
+    nonisolated static let pressDuration: TimeInterval = 0.3
+    /// Lifted and still this much longer, its menu opens.
+    nonisolated static let stillDelay: TimeInterval = 0.35
+    /// Still means within this of where it lifted.
+    nonisolated static let stillSlop: CGFloat = 5
 
     enum Step: Equatable { case wait, highlight, drag }
     enum Lift: Equatable { case choose, keepOpen, drop, nothing }
 
     /// What a finger at `point`, held at `start` (window coordinates), does: on the menu it lights an item; once it has
     /// been on the menu it doesn't drag, unless it has gone on out of the list it was held in (`leftHome`: onto the
-    /// page, past a menu that lay in the way); otherwise, far enough off, it picks the item up.
+    /// page, past a menu that lay in the way); otherwise, far enough off, it picks the item up: `pickUpDistance`
+    /// with no menu up, `dragDistance` with one.
     nonisolated static func step(from start: NSPoint, to point: NSPoint, onMenu: Bool, wasOnMenu: Bool, canDrag: Bool,
-                                 leftHome: Bool = false) -> Step {
+                                 leftHome: Bool = false, menuShown: Bool = true) -> Step {
         if onMenu { return .highlight }
-        guard canDrag, !wasOnMenu || leftHome, hypot(point.x - start.x, point.y - start.y) >= dragDistance else { return .wait }
+        let distance = menuShown ? dragDistance : pickUpDistance
+        guard canDrag, !wasOnMenu || leftHome, hypot(point.x - start.x, point.y - start.y) >= distance else { return .wait }
         return .drag
     }
+
+    /// How long after the hold is recognized its menu opens: something that drags waits for the finger to keep still.
+    nonisolated static func menuWait(canDrag: Bool) -> TimeInterval { canDrag ? stillDelay : menuDelay }
+
+    /// Whether the menu opens when its wait is up, the finger having strayed `moved` points at most: a finger that
+    /// moved is dragging, and the menu would be in its way.
+    nonisolated static func menuOpensOnTime(canDrag: Bool, moved: CGFloat) -> Bool { !canDrag || moved < stillSlop }
+
+    /// When the last hold was recognized.
+    private(set) static var lastBegan: TimeInterval?
+
+    /// Whether a hold was recognized after a finger landed at `time`: that finger's lift is no tap.
+    static func began(since time: TimeInterval) -> Bool { lastBegan.map { $0 >= time } ?? false }
 
     /// What lifting does: drops what's carried, chooses the item under the finger, or leaves the menu open.
     nonisolated static func lift(menuShown: Bool, onMenu: Bool, dragging: Bool) -> Lift {
@@ -614,6 +795,12 @@ final class TouchHold {
     private weak var home: NSView?
     /// The view the hold was recognized on.
     private weak var source: NSView?
+    /// The control lifted under the finger until it's picked up or let go.
+    private weak var lifted: InteractiveView?
+    /// When it was recognized, and the farthest the finger has strayed since.
+    private var beganAt: TimeInterval = 0
+    private var strayed: CGFloat = 0
+    private var moves = TouchMoveStats()
 
     init(at windowPoint: NSPoint, in window: NSWindow?, followed: Bool, scroll: NSScrollView?,
          openMenu: (() -> MenuPanel?)?, startDrag: ((NSPoint) -> Bool)?, ended: (() -> Void)? = nil) {
@@ -640,12 +827,35 @@ final class TouchHold {
                              openMenu: openMenu, startDrag: startDrag, ended: ended)
         hold.source = view
         current = hold
+        let now = ProcessInfo.processInfo.systemUptime
+        hold.beganAt = now
+        lastBegan = now
+        let canDrag = startDrag != nil
+        let landed = TouchPress.landedAt.map { " after \(Int((now - $0) * 1000)) ms" } ?? ""
+        TouchLog.note("hold on \(type(of: view))\(landed)\(canDrag ? ", lifted" : "")")
+        // Something that drags rises under the finger at once, as on an iPad.
+        if canDrag, let control = view as? InteractiveView {
+            hold.lifted = control
+            control.setTouchLifted(true)
+            Haptics.lift()
+        }
         if openMenu != nil {
-            let work = DispatchWorkItem { [weak hold] in MainActor.assumeIsolated { hold?.showMenu() } }
+            let work = DispatchWorkItem { [weak hold] in MainActor.assumeIsolated { hold?.menuWaitEnded() } }
             hold.menuWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + menuDelay, execute: work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + menuWait(canDrag: canDrag), execute: work)
         }
         return hold
+    }
+
+    /// The menu's moment: it opens if the finger kept still, else the finger is dragging and it stays away.
+    func menuWaitEnded() {
+        guard !isFinished, carry == nil, menu == nil else { return }
+        guard Self.menuOpensOnTime(canDrag: startDrag != nil && !dragFailed, moved: strayed) else {
+            TouchLog.note("menu skipped: moved \(Int(strayed)) pt")
+            menuWork = nil
+            return
+        }
+        showMenu()
     }
 
     /// Opens the menu where the finger was held, unless the item is already carried.
@@ -655,25 +865,38 @@ final class TouchHold {
         guard !isFinished, carry == nil, menu == nil, let openMenu else { return }
         menu = openMenu()
         menu?.isHeldByTouch = true
+        if menu != nil { TouchLog.note("menu opened \(elapsed) ms after the hold") }
         // Opened under the finger (slid up for room): the item there lights at once.
         if let menu, menu.touchContains(point) { moved(to: point) }
     }
+
+    /// Milliseconds since the hold was recognized, for the touch log.
+    private var elapsed: Int { Int((ProcessInfo.processInfo.systemUptime - beganAt) * 1000) }
 
     // MARK: The finger
 
     /// From the recognizer that saw the hold, until the window's `TouchFollow` has reported the finger.
     func pressMoved(to windowPoint: NSPoint) { if !followSeen { moved(to: windowPoint) } }
     func pressLifted(at windowPoint: NSPoint) { if !followSeen { lifted(at: windowPoint) } }
-    func pressCancelled() { if !followSeen { cancelled() } }
+    func pressCancelled() {
+        guard !followSeen, !isFinished else { return }
+        TouchLog.note("hold cancelled by its recognizer \(elapsed) ms in: \(TouchLog.recognizers(from: source))")
+        cancelled()
+    }
 
-    /// From the window's `TouchFollow`, which hears the finger anywhere in the window, over the page too.
-    func fingerMoved(to windowPoint: NSPoint, in window: NSWindow) {
+    /// From the window's `TouchFollow`, which hears the finger anywhere in the window, over the page too. `time`: the
+    /// touch event's, to log how old a move is when the drag gets it.
+    func fingerMoved(to windowPoint: NSPoint, in window: NSWindow, at time: TimeInterval? = nil) {
         guard followed, window === self.window else { return }
         followSeen = true
-        moved(to: windowPoint)
+        moved(to: windowPoint, at: time)
     }
     func fingerLifted(at windowPoint: NSPoint, in window: NSWindow) { if takesFollower(in: window) { lifted(at: windowPoint) } }
-    func fingerCancelled(in window: NSWindow) { if takesFollower(in: window) { cancelled() } }
+    func fingerCancelled(in window: NSWindow) {
+        guard takesFollower(in: window), !isFinished else { return }
+        TouchLog.note("hold cancelled: the finger was")
+        cancelled()
+    }
 
     /// The follower's lift ends the hold once it has reported the finger, or once the view held has gone, whose
     /// recognizer then never hears the lift.
@@ -681,13 +904,19 @@ final class TouchHold {
         followed && window === self.window && (followSeen || source?.window == nil)
     }
 
-    func moved(to windowPoint: NSPoint) {
+    func moved(to windowPoint: NSPoint, at time: TimeInterval? = nil) {
         guard !isFinished else { return }
         point = windowPoint
-        if let carry { carry.move(to: windowPoint); return }
+        if let carry {
+            let now = ProcessInfo.processInfo.systemUptime
+            carry.move(to: windowPoint)
+            moves.add(age: time.map { now - $0 }, work: ProcessInfo.processInfo.systemUptime - now)
+            return
+        }
+        strayed = max(strayed, hypot(windowPoint.x - start.x, windowPoint.y - start.y))
         let onMenu = menu?.touchContains(windowPoint) ?? false
         switch Self.step(from: start, to: windowPoint, onMenu: onMenu, wasOnMenu: wasOnMenu, canDrag: startDrag != nil && !dragFailed,
-                         leftHome: hasLeftHome(windowPoint)) {
+                         leftHome: hasLeftHome(windowPoint), menuShown: menu != nil) {
         case .highlight:
             menu?.touchTrack(windowPoint: windowPoint)
             // On an item, not just the menu's corner the finger opened it at.
@@ -696,6 +925,8 @@ final class TouchHold {
             beginDrag()
         case .wait:
             menu?.touchTrack(windowPoint: windowPoint)
+            // Lifted, it follows the finger until it's picked up, so the copy then starts right where it is.
+            lifted?.followTouchLift(from: start, to: windowPoint)
         }
     }
 
@@ -711,7 +942,9 @@ final class TouchHold {
         // Held and let go before the menu came: it opens now and stays, as a held finger's menu does.
         if menu == nil, carry == nil { showMenu() }
         let onMenu = menu?.touchContains(windowPoint) ?? false
-        switch Self.lift(menuShown: menu != nil, onMenu: onMenu, dragging: carry != nil) {
+        let lift = Self.lift(menuShown: menu != nil, onMenu: onMenu, dragging: carry != nil)
+        if lift == .drop { TouchLog.note("dropped \(elapsed) ms after the hold: \(moves.summary)") }
+        switch lift {
         case .drop: carry?.release(at: windowPoint)
         case .choose: menu?.touchChoose(windowPoint: windowPoint)
         case .keepOpen, .nothing: break
@@ -721,6 +954,7 @@ final class TouchHold {
 
     func cancelled() {
         guard !isFinished else { return }
+        if carry != nil { TouchLog.note("drag called off \(elapsed) ms after the hold: \(moves.summary)") }
         carry?.cancel()
         finish()
     }
@@ -731,11 +965,19 @@ final class TouchHold {
         menu?.close()
         menu = nil
         guard let startDrag else { return }
+        // The carried copy takes over from the lifted control, where it is now.
+        lifted?.setTouchLifted(false, animated: false)
+        lifted = nil
         let carry = TouchCarry()
         TouchCarry.starting = carry
         let started = startDrag(start)
         TouchCarry.starting = nil
-        guard started, carry.isAttached else { dragFailed = true; return }
+        guard started, carry.isAttached else {
+            dragFailed = true
+            TouchLog.note("pick-up refused \(elapsed) ms after the hold")
+            return
+        }
+        TouchLog.note("picked up \(elapsed) ms after the hold, \(Int(hypot(point.x - start.x, point.y - start.y))) pt from it")
         self.carry = carry
         carry.move(to: point)
     }
@@ -745,6 +987,8 @@ final class TouchHold {
         menuWork?.cancel()
         menuWork = nil
         menu?.touchLifted()
+        lifted?.setTouchLifted(false)
+        lifted = nil
         if #available(macOS 27, *) { frozen?.isTouchScrollingEnabled = true }
         frozen = nil
         if Self.current === self { Self.current = nil }

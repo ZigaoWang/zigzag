@@ -8,6 +8,7 @@ class SidebarRowView: InteractiveView {
     var freshness: CGFloat = 1 { didSet { if oldValue != freshness { applyFreshness() } } }
     /// While lifted for dragging, the row draws as selected-ish with a shadow.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
+    override func touchLiftChanged() { isLifted = isTouchLifted }
     /// On its way out of the list: it takes no more clicks while it folds away.
     var isLeaving = false
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }

@@ -128,6 +128,14 @@
   Test: TouchMovesTests.liftingOffTheMenuLeavesItOpen
 - Touch and hold a row, then move away from its menu, or before it shows → the row is picked up and drags as with the mouse.
   Test: TouchMovesTests.movingAwayFromTheMenuPicksItUp
+- Touch and hold a row, a favorite or a space's dot for about a third of a second → it lifts under the finger at once; move a few points → it's picked up and drags, and its menu doesn't open in the way.
+  Test: TouchMovesTests.aHeldRowLiftsAndAMovingFingerKeepsTheMenuAway
+- Touch and hold a row and keep still a moment after it lifts → its menu opens; let go → the row settles back.
+  Test: TouchMovesTests.aStillLiftedRowOpensItsMenu
+- Once a row has lifted under a finger, the list's scrolling can't take the finger; before that, moving scrolls the list at once.
+  Test: TouchMovesTests.scrollingCantCancelAHoldOnceRecognized
+- A row carried by a finger near the top or bottom of the list → the list scrolls that way, faster nearer the edge.
+  Test: TouchMovesTests.theListScrollsNearItsEdgesFasterNearer
 - A finger and the mouse drag a row the same way: reorder, into a folder, a split, another space.
   Test: TouchMovesTests.theMouseAndAFingerDriveTheSameDrag
 - A row carried by a finger out over the page → it keeps following the finger there until it lifts.

@@ -587,6 +587,140 @@ struct TouchMovesTests {
         #expect(a.alphaValue == 1)
     }
 
+    // MARK: Lift, as on an iPad
+
+    @Test func theLiftRules() {
+        let start = NSPoint(x: 100, y: 100)
+        #expect(TouchHold.pressDuration >= 0.3 && TouchHold.pressDuration <= 0.35)
+        // Lifted with no menu up: a few points picks it up.
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 100, y: 100 - TouchHold.pickUpDistance), onMenu: false, wasOnMenu: false,
+                               canDrag: true, menuShown: false) == .drag)
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 104, y: 104), onMenu: false, wasOnMenu: false, canDrag: true, menuShown: false) == .wait)
+        // With the menu up it takes the longer way off it, as before.
+        #expect(TouchHold.step(from: start, to: NSPoint(x: 100, y: 100 - TouchHold.pickUpDistance), onMenu: false, wasOnMenu: false,
+                               canDrag: true, menuShown: true) == .wait)
+        #expect(TouchHold.pickUpDistance >= 6 && TouchHold.pickUpDistance <= 8 && TouchHold.stillSlop < TouchHold.pickUpDistance)
+        // Something that drags waits for a still finger before its menu; one with only a menu opens it soon.
+        #expect(TouchHold.menuWait(canDrag: true) == TouchHold.stillDelay)
+        #expect(TouchHold.menuWait(canDrag: false) == TouchHold.menuDelay)
+        #expect(TouchHold.menuOpensOnTime(canDrag: true, moved: 2))
+        #expect(!TouchHold.menuOpensOnTime(canDrag: true, moved: TouchHold.stillSlop))
+        #expect(TouchHold.menuOpensOnTime(canDrag: false, moved: 40))
+    }
+
+    @Test func aDraggableControlLiftsSooner() throws {
+        let window = window()
+        let view = control(in: window) { _ in }
+        let press = try #require(view.touchMenuRecognizer)
+        // Only a menu: AppKit's own hold.
+        #expect(press.minimumPressDuration == press.standardDuration)
+        draggable(view, in: window, starts: { _ in }, steps: { _ in }, ended: { _ in })
+        #expect(press.minimumPressDuration == TouchHold.pressDuration)
+        #expect(press.allowableMovement >= TouchGestures.tapSlop)
+        view.dragsByTouch = false
+        #expect(press.minimumPressDuration == press.standardDuration && press.allowableMovement == press.standardMovement)
+    }
+
+    @Test func scrollingCantCancelAHoldOnceRecognized() throws {
+        guard #available(macOS 27, *) else { return }
+        let press = TouchPressRecognizer()
+        // Before it's recognized, the list's scrolling takes the finger.
+        #expect(press.isCancellableByScrollGesture)
+        press.note(.began)
+        #expect(press.isHolding && !press.isCancellableByScrollGesture)
+        press.reset()
+        #expect(!press.isHolding && press.isCancellableByScrollGesture)
+    }
+
+    @Test func aHeldRowLiftsAndAMovingFingerKeepsTheMenuAway() throws {
+        let window = window()
+        let view = control(in: window) { _ in }
+        var starts = 0
+        draggable(view, in: window, starts: { _ in starts += 1 }, steps: { _ in }, ended: { _ in })
+        let start = middle(of: view)
+        let hold = try #require(view.beginTouchHold(at: start))
+        // Lifted at once.
+        #expect(view.isTouchLifted)
+        #expect(TouchHold.began(since: ProcessInfo.processInfo.systemUptime - 1))
+        // Moving, not yet far enough to pick it up: the menu's moment passes without it.
+        hold.moved(to: NSPoint(x: start.x, y: start.y - TouchHold.stillSlop - 0.5))
+        if !Tokens.Motion.reduceMotion { #expect(view.touchLiftOffset.height != 0) }
+        hold.menuWaitEnded()
+        #expect(MenuPanel.current == nil && starts == 0)
+        // On a few points more it's picked up, the copy taking over from the lifted row.
+        hold.moved(to: NSPoint(x: start.x, y: start.y - TouchHold.pickUpDistance - 1))
+        #expect(starts == 1 && hold.carry != nil && !view.isTouchLifted)
+        hold.cancelled()
+        #expect(TouchHold.current == nil)
+    }
+
+    @Test func aStillLiftedRowOpensItsMenu() throws {
+        let window = window()
+        let view = control(in: window) { _ in }
+        draggable(view, in: window, starts: { _ in }, steps: { _ in }, ended: { _ in })
+        let start = middle(of: view)
+        let hold = try #require(view.beginTouchHold(at: start))
+        hold.moved(to: NSPoint(x: start.x + 2, y: start.y))
+        hold.menuWaitEnded()
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === view)
+        hold.lifted(at: NSPoint(x: start.x + 2, y: start.y))
+        // Let go: it settles back.
+        #expect(!view.isTouchLifted)
+        menu.close(animated: false)
+    }
+
+    @Test func aLiftedRowFollowsTheFingerTheWayItGoes() throws {
+        guard !Tokens.Motion.reduceMotion else { return }
+        let window = window()
+        let content = try #require(window.contentView)
+        content.wantsLayer = true
+        let list = FlippedView(frame: NSRect(x: 0, y: 0, width: 300, height: 300))
+        list.wantsLayer = true
+        content.addSubview(list)
+        let row = InteractiveView(frame: NSRect(x: 10, y: 40, width: 200, height: 30))
+        list.addSubview(row)
+        content.layoutSubtreeIfNeeded()
+        let start = row.convert(NSPoint(x: 100, y: 15), to: nil)
+        row.setTouchLifted(true, animated: false)
+        // Ten points down the screen.
+        row.followTouchLift(from: start, to: NSPoint(x: start.x, y: start.y - 10))
+        let shown = try #require(row.layer?.frame)
+        #expect(abs(shown.midY - (row.frame.midY + 10)) < 0.5)
+        #expect(abs(shown.midX - row.frame.midX) < 0.5)
+        #expect(shown.width > row.frame.width)
+        row.setTouchLifted(false, animated: false)
+        #expect(row.layer.map { CATransform3DIsIdentity($0.transform) } == true)
+    }
+
+    @Test func theListScrollsNearItsEdgesFasterNearer() throws {
+        // Within the zone, faster nearer the edge; outside the list, none.
+        #expect(TouchAutoscroll.velocity(y: 150, bottom: 0, top: 300) == 0)
+        #expect(TouchAutoscroll.velocity(y: 290, bottom: 0, top: 300) > 0)
+        #expect(TouchAutoscroll.velocity(y: 298, bottom: 0, top: 300) > TouchAutoscroll.velocity(y: 290, bottom: 0, top: 300))
+        #expect(TouchAutoscroll.velocity(y: 5, bottom: 0, top: 300) < 0)
+        #expect(TouchAutoscroll.velocity(y: 310, bottom: 0, top: 300) == 0)
+        #expect(TouchAutoscroll.speed(inset: 0) == TouchAutoscroll.topSpeed)
+        #expect(TouchAutoscroll.speed(inset: TouchAutoscroll.zone) == 0)
+
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
+        scroll.documentView = FlippedView(frame: NSRect(x: 0, y: 0, width: 200, height: 1000))
+        // Toward the bottom, then back to the top, and no further.
+        #expect(TouchAutoscroll.scroll(scroll, by: -50))
+        #expect(abs(scroll.contentView.bounds.minY - 50) < 0.5)
+        #expect(TouchAutoscroll.scroll(scroll, by: 100))
+        #expect(abs(scroll.contentView.bounds.minY) < 0.5)
+        #expect(!TouchAutoscroll.scroll(scroll, by: 10))
+    }
+
+    @Test func theMovesAreMeasured() {
+        var stats = TouchMoveStats()
+        stats.add(age: 0.004, work: 0.001)
+        stats.add(age: nil, work: 0.003)
+        #expect(stats.count == 2 && stats.aged == 1)
+        #expect(stats.summary == "2 moves, age avg 4.0 max 4.0 ms, work avg 2.0 max 3.0 ms")
+    }
+
     // MARK: Across the sidebar
 
     /// Two taps on a control with a double-click action run it, as two clicks do; a mouse's single clicks don't.

@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - YouTube's theater mode and sign-ins that use session cookies stay after a relaunch when Zigzag reopens your last session, as in Chrome. With On launch set to Open a new window they're dropped as before, and private windows keep none.
 - On a touch display, tapping one tab right after another selects each one. Before, a quick tap on the tab next to the one you just tapped renamed it, as two taps on the same tab do.
 - On a touch display, a tap on a tab, a favorite or a sidebar button always does what a click does, even when macOS sends no click for it, and quick taps one after another each count.
+- On a touch display, dragging tabs, pinned tabs, folders, favorites and space dots works like on an iPad. Hold for about a third of a second and the item lifts under your finger right away; move a few points and it drags, following your finger. Its menu only opens if you keep still a moment longer, so it no longer pops up in the way of a drag. Once lifted, the list doesn't scroll out from under the drag, and holding a tab near the top or bottom of the list scrolls it, faster nearer the edge.
 
 ## [0.9.4] - 2026-11-24
 

@@ -329,6 +329,7 @@ class InteractiveView: NSView {
             removeGestureRecognizer(touchMenu)
             self.touchMenu = nil
         }
+        touchMenu?.liftsSooner(dragsByTouch && onDragStart != nil)
     }
 
     /// The finger's on this control's menu, not a nested control's own.
@@ -350,7 +351,9 @@ class InteractiveView: NSView {
     private func touchHoldChanged(_ press: TouchPressRecognizer) {
         let point = press.location(in: nil)
         switch press.state {
-        case .began: beginTouchHold(at: point)
+        case .began:
+            TouchLog.note("hold recognized, needs \(Int(press.minimumPressDuration * 1000)) ms (AppKit's \(Int(press.standardDuration * 1000)))")
+            beginTouchHold(at: point)
         case .changed: TouchHold.current?.pressMoved(to: point)
         case .ended: TouchHold.current?.pressLifted(at: point)
         case .cancelled, .failed: TouchHold.current?.pressCancelled()
@@ -381,6 +384,58 @@ class InteractiveView: NSView {
     #if DEBUG
     var touchMenuRecognizer: TouchPressRecognizer? { touchMenu }
     #endif
+
+    // MARK: Lifted by a finger
+
+    /// Held by a finger to be dragged: it rises a little off what it's on and follows the finger until picked up.
+    private(set) var isTouchLifted = false
+    /// How far the finger has moved it meanwhile, in its superview's terms.
+    private(set) var touchLiftOffset = CGSize.zero
+
+    func setTouchLifted(_ lifted: Bool, animated: Bool = true) {
+        guard lifted != isTouchLifted else { return }
+        isTouchLifted = lifted
+        touchLiftOffset = .zero
+        touchLiftChanged()
+        applyTouchLift(animated: animated)
+    }
+
+    /// The finger went from `start` to `point` (window coordinates) while it's lifted.
+    func followTouchLift(from start: NSPoint, to point: NSPoint) {
+        guard isTouchLifted, !Tokens.Motion.reduceMotion, let superview else { return }
+        let a = superview.convert(start, from: nil), b = superview.convert(point, from: nil)
+        touchLiftOffset = CGSize(width: b.x - a.x, height: b.y - a.y)
+        applyTouchLift(animated: false)
+    }
+
+    /// What else lifting changes in its look, for a subclass.
+    func touchLiftChanged() {}
+
+    /// How much larger it grows lifted: about six points across, at most 8%.
+    nonisolated static func touchLiftScale(width: CGFloat) -> CGFloat { 1 + min(0.08, 6 / max(width, 1)) }
+
+    private func applyTouchLift(animated: Bool) {
+        guard let layer else { return }
+        var target = CATransform3DIdentity
+        if isTouchLifted, !Tokens.Motion.reduceMotion {
+            let scale = Self.touchLiftScale(width: bounds.width)
+            // Grown about its middle, wherever its anchor is.
+            let middle = CGPoint(x: bounds.width * (0.5 - layer.anchorPoint.x), y: bounds.height * (0.5 - layer.anchorPoint.y))
+            target = CATransform3DMakeTranslation(middle.x + touchLiftOffset.width, middle.y + touchLiftOffset.height, 0)
+            target = CATransform3DScale(target, scale, scale, 1)
+            target = CATransform3DTranslate(target, -middle.x, -middle.y, 0)
+        }
+        let from = layer.presentation()?.transform ?? layer.transform
+        layer.removeAnimation(forKey: "touchLift")
+        Tokens.Motion.withoutAnimation { layer.transform = target }
+        guard animated, !Tokens.Motion.reduceMotion else { return }
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = NSValue(caTransform3D: from)
+        animation.toValue = NSValue(caTransform3D: target)
+        animation.duration = Tokens.Motion.state
+        animation.timingFunction = Tokens.Motion.easeOut
+        layer.add(animation, forKey: "touchLift")
+    }
 
     private func showDrawnMenu(_ menu: NSMenu, at windowPoint: NSPoint) {
         let entries = MenuPanel.entries(from: menu)
