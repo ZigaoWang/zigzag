@@ -6,20 +6,26 @@ import WebKit
 nonisolated struct SiteBoost: Codable, Equatable, Sendable {
     /// One CSS selector per zapped element, in zap order.
     var zaps: [String] = []
+    /// A readable name per zap, read from the element when it was zapped; zaps from before have none (#498).
+    var names: [String: String] = [:]
     /// Custom CSS from Edit Style…; empty is off.
     var style = ""
 
     var hasStyle: Bool { !style.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     var isEmpty: Bool { zaps.isEmpty && !hasStyle }
+
+    /// The name kept for `selector`, else one made from the selector.
+    func name(forZap selector: String) -> String { names[selector] ?? SiteBoosts.label(forZap: selector) }
 }
 
 nonisolated extension SiteBoost {
-    private enum Keys: String, CodingKey { case zaps, style }
+    private enum Keys: String, CodingKey { case zaps, names, style }
 
-    /// Either may be missing (boosts saved before styles existed).
+    /// Any may be missing (boosts saved before styles or names existed).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         zaps = try c.decodeIfPresent([String].self, forKey: .zaps) ?? []
+        names = (try? c.decodeIfPresent([String: String].self, forKey: .names)) ?? [:]
         style = try c.decodeIfPresent(String.self, forKey: .style) ?? ""
     }
 }
@@ -101,23 +107,39 @@ enum SiteBoosts {
         self.all = all
     }
 
-    /// Returns false if the selector isn't plain.
+    /// Returns false if the selector isn't plain. `name` is what the element said about itself, if anything.
     @discardableResult
-    static func zap(_ selector: String, forSite site: String, privateStore: WKWebsiteDataStore? = nil) -> Bool {
+    static func zap(_ selector: String, name: String? = nil, forSite site: String, privateStore: WKWebsiteDataStore? = nil) -> Bool {
         let selector = selector.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isPlainSelector(selector) else { return false }
         var boost = boost(forSite: site, privateStore: privateStore)
         guard !boost.zaps.contains(selector) else { return true }
         boost.zaps.append(selector)
-        if boost.zaps.count > maxZaps { boost.zaps.removeFirst(boost.zaps.count - maxZaps) }
+        if let name = zapName(name) { boost.names[selector] = name }
+        if boost.zaps.count > maxZaps {
+            boost.zaps.removeFirst(boost.zaps.count - maxZaps)
+            let kept = Set(boost.zaps)
+            boost.names = boost.names.filter { kept.contains($0.key) }
+        }
         set(boost, forSite: site, privateStore: privateStore)
         return true
+    }
+
+    nonisolated static let maxZapName = 40
+
+    /// One line, trimmed, at most `maxZapName` characters; nil when nothing is left.
+    nonisolated static func zapName(_ name: String?) -> String? {
+        let words = (name ?? "").split(whereSeparator: { $0.isWhitespace || $0.isNewline }).joined(separator: " ")
+        guard !words.isEmpty else { return nil }
+        guard words.count > maxZapName else { return words }
+        return words.prefix(maxZapName - 1).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     /// Restore All: unhides every zapped element on the site.
     static func restoreZaps(forSite site: String, privateStore: WKWebsiteDataStore? = nil) {
         var boost = boost(forSite: site, privateStore: privateStore)
         boost.zaps = []
+        boost.names = [:]
         set(boost, forSite: site, privateStore: privateStore)
     }
 
@@ -126,6 +148,7 @@ enum SiteBoosts {
         var boost = boost(forSite: site, privateStore: privateStore)
         guard let index = boost.zaps.firstIndex(of: selector) else { return }
         boost.zaps.remove(at: index)
+        boost.names[selector] = nil
         set(boost, forSite: site, privateStore: privateStore)
     }
 
@@ -365,7 +388,8 @@ enum PageBoosts {
     // MARK: Picking
 
     /// Builds a stable selector: a stable id, else the tag with up to two non-generated classes and its nth-of-type,
-    /// up to `maxDepth` parents. Elements in an SVG resolve to the SVG. Never html or body.
+    /// up to `maxDepth` parents. Elements in an SVG resolve to the SVG. Never html or body. `ZigzagBoostName` reads
+    /// what the element says about itself: its aria-label, title or alt, else its heading's or its own first line.
     static let selectorSource = #"""
     window.ZigzagBoostSelector = (() => {
       const maxDepth = 10;
@@ -423,6 +447,16 @@ enum PageBoosts {
         return null;
       };
     })();
+    window.ZigzagBoostName = (picked) => {
+      if (!picked || picked.nodeType !== 1) return null;
+      const element = (picked.closest && picked.closest('svg')) || picked;
+      const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
+      const said = ['aria-label', 'title', 'alt'].map((name) => clean(element.getAttribute(name))).find(Boolean);
+      if (said) return said;
+      const line = (node) => (node.innerText || '').split('\n').map(clean).find(Boolean) || '';
+      const heading = element.matches('h1, h2, h3, h4, h5, h6') ? element : element.querySelector('h1, h2, h3, h4, h5, h6, [role="heading"]');
+      return (heading && line(heading)) || line(element) || null;
+    };
     """#
 
     /// Outlines the hovered element in `accent` with its tag and size; a click zaps it and the page never sees the
@@ -462,7 +496,7 @@ enum PageBoosts {
             if (event.button !== 0) return;
             const picked = document.elementFromPoint(event.clientX, event.clientY) || target;
             const selector = window.ZigzagBoostSelector(picked);
-            post(selector ? { zap: selector } : { failed: true });
+            post(selector ? { zap: selector, name: window.ZigzagBoostName(picked) } : { failed: true });
             show(null);
           };
           const key = (event) => { if (event.key === 'Escape') { swallow(event); post({ done: true }); } };
@@ -575,7 +609,7 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
         if body["done"] != nil { stop(); return }
         guard let tab, SiteBoosts.site(of: message.webView?.url) == site else { return }
         if let selector = body["zap"] as? String {
-            Self.zap(selector, site: site, in: tab)
+            Self.zap(selector, name: body["name"] as? String, site: site, in: tab)
         } else if body["failed"] != nil, let controller = self.controller {
             Toast.show(String(localized: "That can’t be zapped. Try something around it.", comment: "Toast when the element clicked with Zap Element can't be named well enough to hide on later visits."),
                        symbol: "scope", in: controller)
@@ -583,8 +617,8 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
     }
 
     /// Hides `selector` on the site now and on later visits (in a private window, only there).
-    static func zap(_ selector: String, site: String, in tab: Tab) {
-        guard SiteBoosts.zap(selector, forSite: site, privateStore: tab.privateStore) else { return }
+    static func zap(_ selector: String, name: String? = nil, site: String, in tab: Tab) {
+        guard SiteBoosts.zap(selector, name: name, forSite: site, privateStore: tab.privateStore) else { return }
         PageBoosts.refresh(tab)
     }
 
@@ -598,11 +632,12 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
     /// zap <css selector>: zaps the first match in the front page, as a click would.
     static func debugZap(_ query: String, in tab: Tab) {
         guard let webView = tab.webView, let site = SiteBoosts.site(of: webView.url) else { debugLog("zap: no site"); return }
-        let script = PageBoosts.selectorSource + "\nwindow.ZigzagBoostSelector(document.querySelector(\(PageFilters.jsString(query))))"
+        let picked = "document.querySelector(\(PageFilters.jsString(query)))"
+        let script = PageBoosts.selectorSource + "\n[window.ZigzagBoostSelector(\(picked)), window.ZigzagBoostName(\(picked))]"
         webView.runOwnScript(script, world: PageBoosts.world) { result in
-            guard case .success(let value) = result, let selector = value as? String else { debugLog("zap \(query): no selector"); return }
+            guard case .success(let value) = result, let pair = value as? [Any], let selector = pair.first as? String else { debugLog("zap \(query): no selector"); return }
             debugLog("zap \(query) => \(selector)")
-            zap(selector, site: site, in: tab)
+            zap(selector, name: pair.last as? String, site: site, in: tab)
         }
     }
 
