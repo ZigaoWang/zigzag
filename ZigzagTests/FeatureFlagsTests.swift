@@ -82,6 +82,19 @@ struct FeatureFlagsTests {
     private static let sixty = FeatureFlags.Flag(key: "PreferPageRenderingUpdatesNear60FPSEnabled", name: "Prefer Page Rendering Updates near 60fps",
                                                  details: "", status: .stable, defaultValue: true)
 
+    @Test func aFlagZigzagStartsOtherwiseSaysSoAndResetsToIt() throws {
+        try with([Self.anchors, Self.sixty]) { _ in
+            let sixty = try #require(FeatureFlags.flags?.first { $0.key == Self.sixty.key })
+            let anchors = try #require(FeatureFlags.flags?.first { $0.key == Self.anchors.key })
+            #expect(FeatureFlags.zigzagDefault(sixty) != nil && FeatureFlags.zigzagDefault(anchors) == nil)
+            // Turned on, then Reset: back to Zigzag's default, and no longer a change.
+            FeatureFlags.set(true, for: sixty)
+            #expect(FeatureFlags.isChanged(sixty))
+            FeatureFlags.set(sixty.defaultValue, for: sixty)
+            #expect(!FeatureFlags.isChanged(sixty) && !FeatureFlags.isOn(sixty))
+        }
+    }
+
     @Test func pagesDrawAtTheScreensRateUnlessChanged() throws {
         try with([Self.anchors, Self.sixty]) { engine in
             // Off on every page, Developer Mode or not, and listed as off by default. A page too heavy for the

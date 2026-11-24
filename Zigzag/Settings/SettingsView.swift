@@ -1048,8 +1048,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Settings › Developer › Feature Flags (#173): WebKit's flags, a group for each status, made the first time the
     /// group shows. There only while Developer Mode is on and WebKit lists them.
     private var flagGroups: [FeatureFlags.Status: FormGroup] = [:]
-    /// Each flag's row, switch and "Changed", by key, to follow a change made anywhere.
-    private var flagControls: [String: (flag: FeatureFlags.Flag, row: FormRow, toggle: Toggle, changed: Label)] = [:]
+    /// Each flag's row, switch and Reset, by key, to follow a change made anywhere.
+    private var flagControls: [String: (flag: FeatureFlags.Flag, row: FormRow, toggle: Toggle, changed: PillButton)] = [:]
     private let flagSearch = FilledField.search(String(localized: "Find a flag", comment: "Placeholder of the search field beside Feature Flags in Settings › Developer: finds a WebKit feature flag by its name or key."))
     private let flagsReset = PillButton(title: String(localized: "Reset to Defaults", comment: "Button beside Feature Flags in Settings › Developer: every WebKit feature flag you changed goes back to WebKit's default. Also the button of the sheet that asks first."))
     private let flagsReload = PillButton(title: String(localized: "Reload All Tabs", comment: "Button in Settings › Developer › Feature Flags: reloads every open web page, so changed flags take effect."))
@@ -4821,14 +4821,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let toggle = Toggle(isOn: FeatureFlags.isOn(flag))
             toggle.onChange = { on in FeatureFlags.set(on, for: flag) }
             toggle.setAccessibilityLabel(flag.name)
-            let changed = Label(String(localized: "Changed", comment: "Beside the switch of a WebKit feature flag in Settings › Developer that you changed from WebKit's default."),
-                                font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+            let changed = PillButton(title: String(localized: "Reset", comment: "Button beside the switch of a WebKit feature flag in Settings › Developer that you changed: puts it back to its default."))
+            changed.setAccessibilityLabel(String(localized: "Reset \(flag.name)", comment: "VoiceOver name of the Reset button beside a feature flag in Settings › Developer. The placeholder is the flag's name."))
+            changed.onClick = { _ in FeatureFlags.set(flag.defaultValue, for: flag) }
             changed.isHidden = !FeatureFlags.isChanged(flag)
             let control = NSStackView(views: [changed, toggle])
             control.spacing = Tokens.Space.x3
             control.alignment = .centerY
             // WebKit's own words, never translated. A line that only says the name again isn't shown.
-            let row = FormRow(title: flag.name, detail: flag.details == flag.name ? nil : flag.details, control: control)
+            let details = flag.details == flag.name ? nil : flag.details
+            let row = FormRow(title: flag.name, detail: FeatureFlags.zigzagDefault(flag).map { [details, $0].compactMap { $0 }.joined(separator: " ") } ?? details,
+                              control: control)
             row.keywords = flag.key
             flagControls[flag.key] = (flag, row, toggle, changed)
             group.add(row)

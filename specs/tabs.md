@@ -94,6 +94,8 @@
 ## Frame rate
 - A page on a 120 Hz display → it draws at the display's full rate, as in Chrome; Prefer Page Rendering Updates near 60fps in Settings › Developer › Feature Flags holds every page near 60 instead.
   Test: FeatureFlagsTests.pagesDrawAtTheScreensRateUnlessChanged
+- A feature flag you changed → a Reset button beside its switch puts it back to its default; a flag Zigzag starts other than WebKit says so under its name.
+  Test: FeatureFlagsTests.aFlagZigzagStartsOtherwiseSaysSoAndResetsToIt
 - Every page Zigzag shows (tab, Mini, web app, pop-up, extension page, Reader) → starts at that same rate.
   Test: FramePacingTests.everyPageStartsAtTheChosenRate
 - A page that misses more than a quarter of the display's frames in two of three one-second spells of scrolling → held near 60 fps, as in Safari, until its tab goes to another site; a page that keeps up stays at the full rate.

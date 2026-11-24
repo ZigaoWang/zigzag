@@ -34,6 +34,50 @@
         }
       }
     },
+    "Off by default in Zigzag." : {
+      "comment" : "Added to a feature flag's description in Settings › Developer, when Zigzag turns it off unlike WebKit.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 默认关闭。"
+          }
+        }
+      }
+    },
+    "On by default in Zigzag." : {
+      "comment" : "Added to a feature flag's description in Settings › Developer, when Zigzag turns it on unlike WebKit.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 默认打开。"
+          }
+        }
+      }
+    },
+    "Reset" : {
+      "comment" : "Button beside the switch of a WebKit feature flag in Settings › Developer that you changed: puts it back to its default.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还原"
+          }
+        }
+      }
+    },
+    "Reset %@" : {
+      "comment" : "VoiceOver name of the Reset button beside a feature flag in Settings › Developer. The placeholder is the flag's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还原“%@”"
+          }
+        }
+      }
+    },
     "site.user-agent" : {
       "comment" : "Row in the site panel's This Site group and in Settings › Privacy › Sites: the browser this site's pages are told they're in.",
       "extractionState" : "extracted_with_value",
@@ -4655,7 +4699,6 @@
         }
       }
     },
-
     "Clear %@" : {
       "comment" : "Tooltip of the × on a site's row in Settings › Privacy › Sites: forgets that one choice for the site.",
       "localizations" : {
@@ -4988,7 +5031,6 @@
         }
       }
     },
-
     "Each time you quit, every other site’s cookies and data are cleared, so you start signed out of them next time." : {
       "comment" : "Explanation under “Clear cookies when Zigzag quits” in Settings › Privacy: every site but the ones kept.",
       "localizations" : {
@@ -5018,7 +5060,6 @@
         }
       }
     },
-
     "extension.limit.contextualIdentities" : {
       "comment" : "A Firefox extension feature Zigzag cannot provide: containers, Firefox's separate identities for tabs.",
       "extractionState" : "extracted_with_value",
@@ -5037,7 +5078,6 @@
         }
       }
     },
-
     "extension.limit.dns" : {
       "comment" : "A Firefox extension feature Zigzag cannot provide: resolving host names itself.",
       "extractionState" : "extracted_with_value",
@@ -5056,7 +5096,6 @@
         }
       }
     },
-
     "extension.limit.pkcs11" : {
       "comment" : "A Firefox extension feature Zigzag cannot provide: PKCS#11 security modules.",
       "extractionState" : "extracted_with_value",
@@ -5075,7 +5114,6 @@
         }
       }
     },
-
     "extension.limit.sidebarAction" : {
       "comment" : "A Firefox extension feature Zigzag limits: the side panel from sidebar_action is shown, but nothing answers browser.sidebarAction's open, close, toggle and other controls.",
       "extractionState" : "extracted_with_value",
@@ -5094,7 +5132,6 @@
         }
       }
     },
-
     "extension.limit.theme" : {
       "comment" : "A Firefox extension feature Zigzag cannot provide: installing browser themes.",
       "extractionState" : "extracted_with_value",
@@ -5113,10 +5150,6 @@
         }
       }
     },
-
-
-
-
     "Firefox" : {
       "comment" : "Under an extension's name in Settings › Extensions: it is a Firefox extension (.xpi).",
       "localizations" : {
@@ -5128,7 +5161,6 @@
         }
       }
     },
-
     "Firefox extension, version %@" : {
       "comment" : "Under the title of the sheet that asks before adding a Firefox extension (.xpi).",
       "localizations" : {
@@ -5140,8 +5172,6 @@
         }
       }
     },
-
-
     "Follow Setting" : {
       "comment" : "A choice for JavaScript in Settings › Privacy › Sites, and for Dark page in the site panel: the site follows the matching setting.",
       "localizations" : {
@@ -5164,7 +5194,6 @@
         }
       }
     },
-
     "Keep cookies" : {
       "comment" : "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in.",
       "localizations" : {
@@ -6054,17 +6083,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更改此文件类型"
-          }
-        }
-      }
-    },
-    "Changed" : {
-      "comment" : "Beside the switch of a WebKit feature flag in Settings › Developer that you changed from WebKit's default.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已更改"
           }
         }
       }

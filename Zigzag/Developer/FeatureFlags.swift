@@ -96,6 +96,13 @@ enum FeatureFlags {
 
     static func isChanged(_ flag: Flag) -> Bool { overrides[flag.key] != nil }
 
+    /// A line saying Zigzag starts the flag other than WebKit does, for its row in Settings.
+    static func zigzagDefault(_ flag: Flag) -> String? {
+        guard let own = ownDefaults[flag.key] else { return nil }
+        return own ? String(localized: "On by default in Zigzag.", comment: "Added to a feature flag's description in Settings › Developer, when Zigzag turns it on unlike WebKit.")
+                   : String(localized: "Off by default in Zigzag.", comment: "Added to a feature flag's description in Settings › Developer, when Zigzag turns it off unlike WebKit.")
+    }
+
     /// Turns a flag on or off. Back to its default, it's forgotten, so a later WebKit's default holds for it again.
     static func set(_ on: Bool, for flag: Flag) {
         var all = overrides

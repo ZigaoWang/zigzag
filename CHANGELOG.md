@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A feature flag you changed in Settings › Developer has a Reset button beside its switch, in place of a plain “Changed”, and a flag Zigzag starts other than WebKit, like Prefer Page Rendering Updates near 60fps, says so under its name.
+
 ## [0.9.5] - 2026-11-24
 
 Pages at your display's full 120 Hz like Chrome, touch that feels native on a touch display with every tap counted, iPad-style dragging and two-finger back and forward, Dia's pinned tabs on import, press and hold Back or Forward for history, a smoother Show All Tabs, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
