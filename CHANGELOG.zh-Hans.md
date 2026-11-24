@@ -13,10 +13,12 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
+- “设置 › 标签页 › 全屏视频铺满”选“整个屏幕”时，视频全屏现在留在浏览器窗口里。窗口进入自己的全屏空间，和“显示 › 进入全屏幕”一样，侧边栏和顶栏让开；把指针移到顶部，顶栏就会滑下来。分屏时视频只铺满自己那一格。按 Esc 窗口恢复原样，原本就在全屏的窗口保持全屏。视频右上角的按钮照旧可以让视频单独全屏。网页 App、Zigzag Mini 和迷你播放器的全屏和以前一样。感谢 [Lakeland97](https://github.com/Lakeland97)。([#462](https://github.com/ZigaoWang/zigzag/issues/462))
 - Zigzag 新增繁体中文界面。在“设置 › 通用 › 语言”中选取，重新启动 Zigzag 即可切换。感谢 [aliceric27](https://github.com/aliceric27)。([#505](https://github.com/ZigaoWang/zigzag/issues/505))
 - 打开“设置 › 外观”里的“从屏幕边缘拉出边栏”后，边栏可以在你正在用的 App 上面拉出来，就像隐藏的程序坞那样。把指针推到边栏那一侧的屏幕边缘停一下，空间、收藏、标签页和正在播放的内容就会出现在那个 App 上面。点按标签页、收藏或新标签页，Zigzag 会像从程序坞点开一样来到前面并打开它；把指针移开，边栏就收回去，原来的 App 仍在前面。屏幕角落、程序坞或台前调度所在的那一侧，以及通往另一块显示器的边缘都不会拉出边栏。默认关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#363](https://github.com/ZigaoWang/zigzag/issues/363))
 
 ### 修复
+- 从 Dia 导入时，每个 Dia 个人资料都会变成一个空间，名字和 Dia 里一样，没有书签或固定标签页的也会建；Dia 没标明侧边栏标签页属于哪个个人资料时，会放进你在 Dia 里最后用的那个。([#511](https://github.com/ZigaoWang/zigzag/issues/511))
 - “设置 › 开发者”里你改过的功能开关旁边有“还原”按钮，取代原来只显示的“已更改”；Zigzag 默认值和 WebKit 不同的开关（比如 Prefer Page Rendering Updates near 60fps）会在名字下面写明。
 - 滑动后退或前进松手时，网页不会再先弹回原位才离开，而是顺着滑动方向再走一点、稍微变暗，然后下一个网页直接出现在原处，不用看箭头也知道滑动生效了。没滑够的话网页照样弹回去；开了“减弱动态效果”时网页不动。([#508](https://github.com/ZigaoWang/zigzag/issues/508))
 - 在“设置 › 密码 › 密码管理器”里选中的密码管理器扩展，就算 Zigzag 不认识它的名字（比如 Litewarden），现在也算数：Zigzag 不再提示保存和填充密码，登录栏里不显示钥匙图标，通行密钥也交给它。像 Bitwarden、1Password 在 Chrome 里那样关掉浏览器自带密码保存的扩展，也会列在那里并同样算数，直到它把设置改回去，或者你停用、移除它。([#513](https://github.com/ZigaoWang/zigzag/issues/513))
