@@ -457,6 +457,9 @@
 		C0C41FEE6C185FBC845F1D51 /* ZigzagWebApp in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = B3AD1C19026E47583E6DC0CD /* ZigzagWebApp */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */ = {isa = PBXBuildFile; fileRef = B030A4C0601F5AE1232B9288 /* chrome-runtime.js */; };
 		C112D693BD5356EEB54939C1 /* BookmarksHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44538995DDF31F54687ED10E /* BookmarksHTML.swift */; };
+		E8C62F56809B421FB4D7974D /* ZigzagBackupRestore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E509A1D5354C94AD80CF0C /* ZigzagBackupRestore.swift */; };
+		8B4E65625CEF4DFAB97EDE09 /* ZigzagBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83AD4B8DDEF74D8D8C16E396 /* ZigzagBackup.swift */; };
+		60338E64406E4E549F21E8CB /* BookmarksExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A01A6D4DA8944B48A840A9C /* BookmarksExport.swift */; };
 		C11913DEEFC7AD66CBC10F50 /* PromptHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236FBFCF8198AC862EEC0D2 /* PromptHost.swift */; };
 		C2866E2B3C6D2530C1B61098 /* autoconsent-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = A65F87DB450F7C340B1F045C /* autoconsent-LICENSE.txt */; };
 		C2C05749A76907433E6BEC4D /* reading_list.plist in Resources */ = {isa = PBXBuildFile; fileRef = E37F1CA561517AA2505B9E24 /* reading_list.plist */; };
@@ -813,6 +816,9 @@
 		4295D4E75FDD1157FE955EBF /* DarkPagesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkPagesTests.swift; sourceTree = "<group>"; };
 		4363A8C97194CFB82618511C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		44538995DDF31F54687ED10E /* BookmarksHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksHTML.swift; sourceTree = "<group>"; };
+		B9E509A1D5354C94AD80CF0C /* ZigzagBackupRestore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagBackupRestore.swift; sourceTree = "<group>"; };
+		83AD4B8DDEF74D8D8C16E396 /* ZigzagBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZigzagBackup.swift; sourceTree = "<group>"; };
+		4A01A6D4DA8944B48A840A9C /* BookmarksExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksExport.swift; sourceTree = "<group>"; };
 		445BFF7EFE1744F510AC8334 /* BridgeWebRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeWebRequest.swift; sourceTree = "<group>"; };
 		0B2D7E4A1C6F0002A0B1C2D3 /* BridgeOmnibox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeOmnibox.swift; sourceTree = "<group>"; };
 		0D9E4A2C7B1F000100000002 /* BridgePageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgePageCapture.swift; sourceTree = "<group>"; };
@@ -1676,6 +1682,9 @@
 			children = (
 				EDF5DDEF3F10D52662345203 /* ArcImporter.swift */,
 				44538995DDF31F54687ED10E /* BookmarksHTML.swift */,
+				B9E509A1D5354C94AD80CF0C /* ZigzagBackupRestore.swift */,
+				83AD4B8DDEF74D8D8C16E396 /* ZigzagBackup.swift */,
+				4A01A6D4DA8944B48A840A9C /* BookmarksExport.swift */,
 				D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */,
 				59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */,
 				D1A051100000000000000002 /* DiaImporter.swift */,
@@ -2417,6 +2426,9 @@
 				087468A86D6129B66892F5D9 /* Autofill.swift in Sources */,
 				1F82CB240DACE01165343BA3 /* BlockedScriptStandIns.swift in Sources */,
 				C112D693BD5356EEB54939C1 /* BookmarksHTML.swift in Sources */,
+				E8C62F56809B421FB4D7974D /* ZigzagBackupRestore.swift in Sources */,
+				8B4E65625CEF4DFAB97EDE09 /* ZigzagBackup.swift in Sources */,
+				60338E64406E4E549F21E8CB /* BookmarksExport.swift in Sources */,
 				2E8C9DF367FE32D045315D1C /* Brand.swift in Sources */,
 				A25128EAA13B9A069E8A0598 /* BridgeBookmarks.swift in Sources */,
 				CEB795609E384041951E4190 /* BridgeDownloads.swift in Sources */,

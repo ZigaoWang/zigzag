@@ -162,6 +162,13 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [com.adobe.pdf]
+        # File › Export Your Data…'s backup, which File › Import restores.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: wang.zigao.zigzag.backup
+            UTTypeDescription: Zigzag Backup
+            UTTypeConformsTo: [public.json]
+            UTTypeTagSpecification:
+              public.filename-extension: [zigzagbackup]
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Zigzag/Zigzag.entitlements

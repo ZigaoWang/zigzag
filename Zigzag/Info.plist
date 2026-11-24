@@ -147,6 +147,26 @@
 	<string>$(SPARKLE_PUBLIC_KEY)</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>14400</integer>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Zigzag Backup</string>
+			<key>UTTypeIdentifier</key>
+			<string>wang.zigao.zigzag.backup</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>zigzagbackup</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 	<key>ZigzagKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)app.zigzag.passwords</string>
 </dict>
