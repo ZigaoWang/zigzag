@@ -53,7 +53,7 @@
 - 像 Property Mate 這樣在背景開啟一個縮到最小的視窗來載入網頁的延伸功能，不會再把視窗帶到最前面。和 Chrome 一樣，視窗會直接進入 Dock；不要求聚焦的視窗會在你的視窗後面開啟，你的視窗仍在前面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
 - 把登入狀態存在分頁工作階段儲存空間（sessionStorage）中的網站，例如 Microsoft 365，在 Zigzag 結束後重新開啟上次的工作階段，或為了更新而重新啟動後，你仍會保持登入。休眠中的分頁，或結束時開著的分頁，會在網頁載入前拿回它的工作階段儲存空間，和 Chrome 一樣。它儲存在你的個人資料檔案夾中，只有你能讀取，私密視窗從不儲存；清除這個網站的資料或關閉分頁時，它也會一起刪除。「啟動時」設為「開啟新視窗」時會直接捨棄。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - 網站或擴充功能為了讓一般點按打開自己的檢視器而刻意拿掉的連結，例如 Old Twitter Layout 裡的引用推文，⌘-點按或中鍵點按照樣會在分頁中打開，現在由 Zigzag 裡統一的一條規則處理，任何網站或擴充功能都能使用：把位址放在 `data-zigzag-href` 裡即可（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。一般點按照樣打開檢視器。感謝 [Lakeland97](https://github.com/Lakeland97) 的設計方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
-- 把下載交給 App、指令碼或服務的規則，現在可以依檔案本身的類型（例如 torrent 或 pdf）來比對，而不只看網址。下載站的網址往往看不出檔案名稱，所以 .torrent 檔案現在無論網址長什麼樣子都能交給下載器。
+- 把下載交給 App、指令碼或服務的規則，現在可以依檔案本身的類型（例如 torrent 或 pdf）來比對，而不只看網址。下載站的網址往往看不出檔案名稱，所以 .torrent 檔案現在無論網址長什麼樣子都能交給下載器。([#524](https://github.com/ZigaoWang/zigzag/issues/524))
 - 因為 Zigzag Mini 連結、已安裝的網站或背景的 AI App 單獨打開 Zigzag 時，不會再丟掉上次工作階段的登入狀態：之後打開瀏覽器視窗、工作階段恢復時，工作階段 Cookie 和 sessionStorage 也會一起恢復，Microsoft 365 這類網站會保持登入。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.4] - 2026-11-24
