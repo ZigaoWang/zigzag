@@ -104,16 +104,15 @@ enum KeptCookies {
         Profiles.shared.opened.filter { clearsOnQuit(in: $0.id) }
     }
 
-    /// Clears the cookies of every site but the kept ones in each profile, then `done`, within `quitWait`.
-    static func clearForQuit(_ profiles: [Profile], done: @escaping () -> Void) {
-        let jobs: [@MainActor () async -> Void] = profiles.map { profile in
+    /// Clears the cookies of every site but the kept ones, one job per profile, for `whenDone` within `quitWait`.
+    static func clearJobs(_ profiles: [Profile]) -> [@MainActor () async -> Void] {
+        profiles.map { profile in
             let store = profile.store, kept = sites(in: profile.id)
             return {
                 await WebsiteData.clear(.cookies, keeping: kept, in: store)
                 await flushCookies(in: store)
             }
         }
-        whenDone(jobs, within: quitWait, done: done)
     }
 
     /// Writes the store's cookies to disk now (WebKit's private flush): otherwise a clearing made as Zigzag quits

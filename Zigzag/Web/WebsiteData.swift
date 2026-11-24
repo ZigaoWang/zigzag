@@ -22,6 +22,12 @@ enum WebsiteData {
     /// Clears `kind` for a site ("youtube.com", covering its subdomains), or for every site when `site` is nil, in
     /// one store: a profile's, or a private window's own. Every site's cookies leave the `kept` sites' alone (#334).
     static func clear(_ kind: Kind, site: String? = nil, keeping kept: Set<String> = [], in store: WKWebsiteDataStore) async {
+        await clearStore(kind, site: site, keeping: kept, in: store)
+        // Session cookies kept for the next launch go with them.
+        if kind == .cookies { SessionCookies.cleared(site: site, keeping: site == nil ? kept : [], in: store) }
+    }
+
+    private static func clearStore(_ kind: Kind, site: String?, keeping kept: Set<String>, in store: WKWebsiteDataStore) async {
         if kind == .cookies, site == nil, !kept.isEmpty {
             let removed = await KeptCookies.clear(kind.types, keeping: kept, in: store) ?? []
             for name in Set(removed.compactMap(KeptCookies.site(ofHost:))) {

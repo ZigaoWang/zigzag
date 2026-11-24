@@ -22,6 +22,17 @@
 - ⇧⌘T in an everyday window → never a private tab; private windows reopen only their own.
   Test: ReopenLastClosedTests.aPrivateTabNeverComesBackInAnEverydayWindow
 
+## Relaunching
+- Quit and open again with On launch set to Continue where you left off → sites' session cookies come back with the tabs, before any page asks for anything (YouTube's theater mode, sign-ins that use them).
+  Test: SessionCookiesTests.onlySessionCookiesComeBackAsTheyWere
+  Test: SessionCookiesTests.theyreBackBeforeThePageAsksForAnything
+- The same with Open a new window → they're gone, as before.
+  Test: SessionCookiesTests.openANewWindowDropsThemUnread
+- A private window → none are kept.
+  Test: SessionCookiesTests.privateWindowsKeepNone
+- Clear a site's cookies or website data, or every site's → its kept session cookies go too.
+  Test: SessionCookiesTests.clearingASiteTakesItsSavedCookies
+
 ## New tabs
 - ⌘T → the command bar opens centered on the window, near the top of the page.
   Test: CommandBarPlacementTests.defaultIsCenteredOnTheWindowAndHighOnThePage
