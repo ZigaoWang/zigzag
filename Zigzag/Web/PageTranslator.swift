@@ -151,10 +151,21 @@ enum PageTranslator {
         await foreign(await pageLanguage(of: webView))
     }
 
-    /// The language, when it isn't the reader's and Apple can translate it.
+    /// The language, when it isn't one the reader reads and Apple can translate it.
     static func foreign(_ language: Locale.Language?) async -> Locale.Language? {
-        guard let language, language.languageCode != readerLanguage.languageCode else { return nil }
+        guard let language, isForeign(language, readers: readerLanguages, always: alwaysLanguages) else { return nil }
         return await canTranslate(from: language, to: readerLanguage) ? language : nil
+    }
+
+    /// The language pages are translated into, then every language in the system's list.
+    static var readerLanguages: [Locale.Language] {
+        [readerLanguage] + Locale.preferredLanguages.map { Locale.Language(identifier: $0) }
+    }
+
+    /// Not one of `readers` by base language (en-IN is English), unless it's set to Always Translate.
+    nonisolated static func isForeign(_ language: Locale.Language, readers: [Locale.Language], always: Set<String>) -> Bool {
+        if always.contains(code(of: language)) { return true }
+        return !readers.contains { code(of: $0) == code(of: language) }
     }
 
     /// "Translate to English", for the page's right-click menu and a tab's in the sidebar; "Show Original" once
@@ -232,7 +243,8 @@ enum PageTranslator {
 
     private nonisolated static let legacyCodes = ["iw": "he", "in": "id", "ji": "yi", "no": "nb"]
 
-    /// Text amount per language, and in total; blocks too short or too uncertain are skipped.
+    /// Text amount per language, and in total; blocks too short, too uncertain or not in the language's script are
+    /// skipped.
     private nonisolated static func tally(_ blocks: [String]) -> (amounts: [NLLanguage: Int], total: Int) {
         var amounts: [NLLanguage: Int] = [:]
         var total = 0
@@ -243,11 +255,49 @@ enum PageTranslator {
             recognizer.reset()
             recognizer.processString(String(block.prefix(600)))
             guard let (code, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, code != .undetermined,
-                  confidence >= 0.5 else { continue }
+                  confidence >= neededConfidence(block), fits(Locale.Language(identifier: code.rawValue), block) else { continue }
             amounts[code, default: 0] += amount
             total += amount
         }
         return (amounts, total)
+    }
+
+    /// A short line of Latin letters (names, a menu) is often guessed at about half confidence, so it needs more.
+    private nonisolated static func neededConfidence(_ text: String) -> Double {
+        let letters = text.unicodeScalars.filter(\.properties.isAlphabetic)
+        return letters.count < 60 && letters.allSatisfy(isLatin) ? 0.8 : 0.5
+    }
+
+    /// Whether the text is mostly in the language's script: a list of language names in many scripts isn't Marathi.
+    nonisolated static func fits(_ language: Locale.Language, _ text: String) -> Bool {
+        guard let script = script(of: language) else { return true }
+        let letters = text.unicodeScalars.filter(\.properties.isAlphabetic)
+        if script == "Latn" { return letters.filter(isLatin).count * 2 >= letters.count }
+        let accepted = scriptsWriting[script] ?? [script]
+        guard !accepted.isDisjoint(with: scriptRanges.map(\.script) + ["Hani"]) else { return true }
+        let others = letters.compactMap(scriptName(of:)).filter { $0 != "Latn" }
+        return !others.isEmpty && others.filter(accepted.contains).count * 5 >= others.count * 4
+    }
+
+    private nonisolated static let scriptsWriting: [String: Set<String>] = ["Hans": ["Hani"], "Hant": ["Hani"], "Jpan": ["Hani", "Kana"], "Kore": ["Hang", "Hani"]]
+
+    /// ISO 15924 codes of the scripts told apart here, by code point.
+    private nonisolated static let scriptRanges: [(range: ClosedRange<UInt32>, script: String)] = [
+        (0x0370...0x03FF, "Grek"), (0x1F00...0x1FFF, "Grek"), (0x0400...0x052F, "Cyrl"), (0x1C80...0x1C8F, "Cyrl"),
+        (0x0530...0x058F, "Armn"), (0x0590...0x05FF, "Hebr"), (0xFB1D...0xFB4F, "Hebr"), (0x0600...0x06FF, "Arab"),
+        (0x0750...0x077F, "Arab"), (0x08A0...0x08FF, "Arab"), (0xFB50...0xFDFF, "Arab"), (0xFE70...0xFEFF, "Arab"),
+        (0x0900...0x097F, "Deva"), (0x0980...0x09FF, "Beng"), (0x0A00...0x0A7F, "Guru"), (0x0A80...0x0AFF, "Gujr"),
+        (0x0B00...0x0B7F, "Orya"), (0x0B80...0x0BFF, "Taml"), (0x0C00...0x0C7F, "Telu"), (0x0C80...0x0CFF, "Knda"),
+        (0x0D00...0x0D7F, "Mlym"), (0x0D80...0x0DFF, "Sinh"), (0x0E00...0x0E7F, "Thai"), (0x0E80...0x0EFF, "Laoo"),
+        (0x0F00...0x0FFF, "Tibt"), (0x1000...0x109F, "Mymr"), (0x10A0...0x10FF, "Geor"), (0x1200...0x139F, "Ethi"),
+        (0x1780...0x17FF, "Khmr"), (0x3040...0x30FF, "Kana"), (0x31F0...0x31FF, "Kana"), (0xFF66...0xFF9F, "Kana"),
+        (0x1100...0x11FF, "Hang"), (0x3130...0x318F, "Hang"), (0xA960...0xA97F, "Hang"), (0xAC00...0xD7AF, "Hang"),
+    ]
+
+    private nonisolated static func scriptName(of scalar: Unicode.Scalar) -> String? {
+        if isLatin(scalar) { return "Latn" }
+        if scalar.properties.isIdeographic { return "Hani" }
+        return scriptRanges.first { $0.range.contains(scalar.value) }?.script
     }
 
     /// How much text this is, an ideograph, kana or hangul syllable counting as a few letters (each is about a
@@ -275,7 +325,7 @@ enum PageTranslator {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(sample)
         guard let (code, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, confidence > 0.8,
-              code != .undetermined else { return nil }
+              code != .undetermined, fits(Locale.Language(identifier: code.rawValue), sample) else { return nil }
         return Locale.Language(identifier: code.rawValue)
     }
 

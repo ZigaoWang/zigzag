@@ -728,3 +728,96 @@ extension PageTranslatorTests {
         #expect(heard > 0)
     }
 }
+
+/// What a page is read as for the translate offer: English pages, however they're marked or whatever else they show,
+/// are English, and a language list or a few odd lines never make a page Hindi or Marathi.
+extension PageTranslatorTests {
+    private func language(_ html: String) async -> Locale.Language? {
+        let (webView, loading) = await page(html)
+        defer { _ = loading }
+        return await PageTranslator.pageLanguage(of: webView)
+    }
+
+    private static let article = """
+    <h1>Release notes for the spring update</h1>
+    <p>This update makes opening tabs faster and fixes a crash that could happen when a window was closed while a page was still loading.</p>
+    <p>Thanks to everyone who sent in reports. If something still looks wrong, open an issue and tell us what you were doing when it happened.</p>
+    """
+
+    /// A site's language picker, each language in its own script, in a plain div rather than a nav or footer.
+    private static let indicPicker = "<div>हिंदी मराठी বাংলা தமிழ் తెలుగు ಕನ್ನಡ മലയാളം ગુજરાતી ਪੰਜਾਬੀ ଓଡ଼ିଆ অসমীয়া नेपाली संस्कृतम्</div>"
+
+    @Test func anEnglishPageMarkedEnINIsEnglish() async {
+        #expect(await language("<html lang=\"en-IN\"><body>\(Self.article)</body></html>")?.languageCode == .english)
+        #expect(PageTranslator.language(declared: "en-IN")?.languageCode == .english)
+    }
+
+    @Test func anEnglishPageWithNoLangIsEnglish() async {
+        #expect(await language("<html><body>\(Self.article)</body></html>")?.languageCode == .english)
+    }
+
+    @Test func anEnglishPageWithAFewHindiAndChineseWordsIsEnglish() async {
+        let html = """
+        <html><body>\(Self.article)<p>Namaste and 你好 to our readers: <span>नमस्ते</span>, thanks for reading.</p>
+        <p>हिन्दी में पढ़ें</p><p>阅读中文版</p></body></html>
+        """
+        #expect(await language(html)?.languageCode == .english)
+    }
+
+    @Test func aWrongLangOnAnEnglishPageIsNotBelieved() async {
+        for lang in ["hi", "hi-IN", "IN", "in", "mr"] {
+            #expect(await language("<html lang=\"\(lang)\"><body>\(Self.article)</body></html>")?.languageCode == .english, "\(lang)")
+        }
+    }
+
+    @Test func aChinesePageOfEnglishPostsIsEnglish() async {
+        let html = """
+        <html lang="zh-CN"><body><nav>首页 最新 热门 类别</nav>
+        <div>回复</div><div>3 天前</div>\(Self.article)<div>分享</div><div>书签</div></body></html>
+        """
+        #expect(await language(html)?.languageCode == .english)
+    }
+
+    @Test func aLanguagePickerOnAShortEnglishPageIsNotHindi() async {
+        let html = "<html><body><h1>Sign in</h1><p>Use your account to keep reading.</p><p>Choose your language</p>\(Self.indicPicker)</body></html>"
+        let seen = await language(html)
+        #expect(seen == nil || seen?.languageCode == .english, "\(String(describing: seen))")
+    }
+
+    @Test func aLanguagePickerNamesNoLanguage() {
+        let picker = "हिंदी मराठी বাংলা தமிழ் తెలుగు ಕನ್ನಡ മലയാളം ગુજરાતી ਪੰਜਾਬੀ ଓଡ଼ିଆ অসমীয়া नेपाली संस्कृतम्"
+        #expect(PageTranslator.pageLanguage(blocks: [picker, picker], declared: nil) == nil)
+        let english = "Use your account to keep reading the articles you saved and the newsletters you follow, on any device."
+        #expect(PageTranslator.pageLanguage(blocks: [picker, picker, english], declared: nil)?.languageCode == .english)
+        #expect(PageTranslator.dominantLanguage(of: String(repeating: picker + " ", count: 3)) == nil)
+    }
+
+    @Test func shortLinesTheRecognizerGuessesAtDontDecide() {
+        // Place names read as Indonesian at about half confidence; the English around them is the page.
+        let blocks = ["Mumbai Delhi Bangalore Chennai Kolkata Hyderabad Pune",
+                      "Mumbai Delhi Bangalore Chennai Kolkata Hyderabad Pune",
+                      "ok ok ok lol lmao haha yes yes yes yes",
+                      "Our offices are open on weekdays."]
+        #expect(PageTranslator.pageLanguage(blocks: blocks, declared: nil)?.languageCode != .indonesian)
+    }
+
+    @Test func aPageInAnyOfYourLanguagesIsntForeign() {
+        let readers = ["zh-Hans-CN", "en-US"].map { Locale.Language(identifier: $0) }
+        #expect(!PageTranslator.isForeign(Locale.Language(identifier: "en"), readers: readers, always: []))
+        #expect(!PageTranslator.isForeign(Locale.Language(identifier: "en-IN"), readers: readers, always: []))
+        #expect(!PageTranslator.isForeign(Locale.Language(identifier: "zh-Hant"), readers: readers, always: []))
+        #expect(PageTranslator.isForeign(Locale.Language(identifier: "hi"), readers: readers, always: []))
+        #expect(PageTranslator.isForeign(Locale.Language(identifier: "en"), readers: [Locale.Language(identifier: "zh-Hans")], always: []))
+        // Always Translate English still translates it.
+        #expect(PageTranslator.isForeign(Locale.Language(identifier: "en"), readers: readers, always: ["en"]))
+    }
+
+    @Test func aLanguageMustBeWrittenInTheTextsScript() {
+        #expect(PageTranslator.fits(Locale.Language(identifier: "hi"), "हिन्दी में पढ़ें और सुनें"))
+        #expect(!PageTranslator.fits(Locale.Language(identifier: "mr"), "हिंदी मराठी বাংলা தமிழ் తెలుగు ಕನ್ನಡ മലയാളം"))
+        #expect(!PageTranslator.fits(Locale.Language(identifier: "hi"), "Read this page in Hindi"))
+        #expect(PageTranslator.fits(Locale.Language(identifier: "en"), "Read this in Hindi: हिन्दी"))
+        #expect(PageTranslator.fits(Locale.Language(identifier: "ja"), "東京の天気はとても良いです"))
+        #expect(PageTranslator.fits(Locale.Language(identifier: "zh-Hans"), "上海是一座城市"))
+    }
+}
