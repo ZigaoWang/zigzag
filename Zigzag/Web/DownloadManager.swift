@@ -45,12 +45,15 @@ final class DownloadItem {
     let isPrivate: Bool
     /// The profile it was downloaded in: only that profile's extensions see it (BridgeDownloads).
     let profile: UUID
+    /// From the AI Apps profile (Headless): kept out of your list and the Dock.
+    let isForAIApps: Bool
 
     init(filename: String, sourceURL: URL?, isPrivate: Bool, profile: UUID = Profile.defaultID) {
         self.filename = filename
         self.sourceURL = sourceURL
         self.isPrivate = isPrivate
         self.profile = profile
+        isForAIApps = Library.shared.directory.profile(profile)?.isHeadless == true
     }
 }
 
@@ -115,7 +118,7 @@ final class DownloadManager: NSObject {
     private var token: SignalToken?
 
     private func save() {
-        let kept = items.filter { !$0.isPrivate && [.finished, .paused].contains($0.state) }.prefix(50).compactMap { item in
+        let kept = items.filter { !$0.isPrivate && !$0.isForAIApps && [.finished, .paused].contains($0.state) }.prefix(50).compactMap { item in
             item.destination.map {
                 Saved(filename: item.filename, destination: $0, sourceURL: item.sourceURL, started: item.started, totalBytes: item.totalBytes,
                       completedBytes: item.completedBytes, paused: item.state == .paused ? true : nil, resumeData: item.state == .paused ? item.resumeData : nil,
@@ -127,9 +130,12 @@ final class DownloadManager: NSObject {
     }
 
     var activeCount: Int { items.filter { $0.state == .downloading }.count }
+    /// The downloads the Dock shows: all but AI apps'.
+    private var yourActive: [DownloadItem] { items.filter { $0.state == .downloading && !$0.isForAIApps } }
+    var yourActiveCount: Int { yourActive.count }
 
-    /// What a window lists: a private window its own downloads, a normal window everything else.
-    func items(isPrivate: Bool) -> [DownloadItem] { items.filter { $0.isPrivate == isPrivate } }
+    /// What a window lists: a private window its own downloads, a normal window everything else but AI apps'.
+    func items(isPrivate: Bool) -> [DownloadItem] { items.filter { $0.isPrivate == isPrivate && !$0.isForAIApps } }
 
     /// The last private window closed: its finished downloads leave the list (the files stay in Downloads).
     func forgetPrivate() {
@@ -139,7 +145,7 @@ final class DownloadManager: NSObject {
         if items.count != before { changed.send(nil) }
     }
     var overallProgress: Double {
-        let active = items.filter { $0.state == .downloading }
+        let active = yourActive
         guard !active.isEmpty else { return 1 }
         return active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
     }
@@ -179,8 +185,6 @@ final class DownloadManager: NSObject {
     private var ruleOpenedDownloads: Set<ObjectIdentifier> = []
     /// Downloads whose handoff question was put off; don't ask the same rule again.
     private var ruleDeclinedDownloads: Set<ObjectIdentifier> = []
-    /// Downloads from a page with no one there (`Tab.isUnattended`): never asked where to save.
-    private var unattended: Set<ObjectIdentifier> = []
 
     /// A Firefox package coming in from a page (the store's Add to Firefox): it is installed, not kept. The file is
     /// temporary, and the window and profile are the ones the page was in, for the install sheet.
@@ -210,7 +214,6 @@ final class DownloadManager: NSObject {
         if openedByRule { ruleOpenedDownloads.insert(identifier) } else { ruleOpenedDownloads.remove(identifier) }
         if rulesAlreadyDeclined { ruleDeclinedDownloads.insert(identifier) } else { ruleDeclinedDownloads.remove(identifier) }
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
-        if (download.webView as? BrowserWebView)?.owner?.isUnattended == true { unattended.insert(identifier) } else { unattended.remove(identifier) }
         download.delegate = self
         if let window { windows[ObjectIdentifier(download)] = window }
         let referrer = download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) }
@@ -500,6 +503,14 @@ final class DownloadManager: NSObject {
         return name.isEmpty ? "Download" : name
     }
 
+    /// AI apps' downloads folder, in their profile's data; nil for yours.
+    static func aiAppsFolder(for item: DownloadItem?) -> URL? {
+        guard let item, item.isForAIApps else { return nil }
+        let folder = Profiles.folder(of: item.profile).appendingPathComponent("Downloads", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
     /// A free name in Downloads, also avoiding names given to downloads still in progress (their files don't
     /// exist yet), so two "report.pdf"s started together don't collide.
     static func uniqueDestination(for filename: String, avoiding taken: Set<String> = []) -> URL {
@@ -571,8 +582,6 @@ extension DownloadManager: WKDownloadDelegate {
         var destination = Self.uniqueDestination(for: name, avoiding: inProgress)
         let window = windows.removeValue(forKey: identifier)
         let startedAt = origins.removeValue(forKey: identifier)
-        // No one there to ask where it goes: Downloads, as with the setting off.
-        let asks = unattended.remove(identifier) == nil
         if let url = download.originalRequest?.url, let earlier = restarts.removeValue(forKey: url) {
             // A paused download started over: it replaces its own partial file.
             try? FileManager.default.removeItem(at: earlier)
@@ -642,7 +651,11 @@ extension DownloadManager: WKDownloadDelegate {
         }
         var replacing: URL?
         var opensWhenFinished = false
-        if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
+        if let folder = Self.aiAppsFolder(for: item(for: download)) {
+            // AI apps' files stay in their profile's own folder, and no one is asked where.
+            let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
+            destination = Self.uniqueDestination(for: chosen?.lastPathComponent ?? name, in: folder, avoiding: inProgress)
+        } else if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
             destination = chosen
             // A name chosen ahead (an extension's download with "overwrite") only ever replaces a plain file there,
             // never a folder or a link: anything else there keeps its place and the download takes a new name.
@@ -657,7 +670,7 @@ extension DownloadManager: WKDownloadDelegate {
             // never stop the download.
             destination = place.destination
             opensWhenFinished = place.openWhenFinished
-        } else if Self.asksWhereToSave, asks {
+        } else if Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
                 items.removeAll { $0.download === download }
@@ -764,7 +777,7 @@ extension DownloadManager: WKDownloadDelegate {
         if let destination = item.destination {
             Self.markDownloaded(destination, from: item.sourceURL, page: download.originalRequest?.mainDocumentURL, isPrivate: item.isPrivate)
             // Bounce the Downloads stack in the Dock, like every Mac browser.
-            DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
+            if !item.isForAIApps { DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path) }
         }
         changed.send(item)
         if item.opensWhenFinished { openWhenFinished(item) }
@@ -847,7 +860,6 @@ extension DownloadManager: WKDownloadDelegate {
         windows.removeValue(forKey: ObjectIdentifier(download))
         chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
         addonsFiles.removeValue(forKey: ObjectIdentifier(download))
-        unattended.remove(ObjectIdentifier(download))
         guard let item = item(for: download) else { return }
         // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
         if item.state == .paused { return }

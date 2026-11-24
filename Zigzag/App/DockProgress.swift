@@ -13,11 +13,11 @@ final class DockProgress {
     private func update(finished item: DownloadItem?) {
         let manager = DownloadManager.shared
         let tile = NSApp.dockTile
-        if manager.activeCount > 0 {
+        if manager.yourActiveCount > 0 {
             tileView.progress = manager.overallProgress
             tileView.frame = NSRect(origin: .zero, size: tile.size)
             tile.contentView = tileView
-            tile.badgeLabel = manager.activeCount > 1 ? "\(manager.activeCount)" : nil
+            tile.badgeLabel = manager.yourActiveCount > 1 ? "\(manager.yourActiveCount)" : nil
         } else {
             tile.contentView = nil
             tile.badgeLabel = nil
@@ -27,7 +27,7 @@ final class DockProgress {
         // normal window, nor the other way round), unless the downloads panel is open there and already shows it. One
         // still flying to the button is announced after it lands, when that panel has opened. A failed one says so
         // too, with Try Again: otherwise it would only stop, unnoticed.
-        guard let item, item.state == .finished || item.state == .failed, !announced.contains(item.id),
+        guard let item, !item.isForAIApps, item.state == .finished || item.state == .failed, !announced.contains(item.id),
               let controller = Self.window(for: item) else { return }
         announced.insert(item.id)
         let failed = item.state == .failed

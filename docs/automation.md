@@ -294,11 +294,13 @@ While AI apps work in the background:
   (the one in front there too, as no one is looking at it) and wakes when an app comes back to it.
 - **No one is there to answer a page.** What a page asks of a person is answered no at once, so an app never waits
   on it: `alert`, `confirm` and `prompt` are dismissed, a file picker and a sign-in sheet cancelled, a site asking
-  for a certificate goes on without one, printing
-  skipped, camera, microphone, location and screen sharing denied, a link to another app (`mailto:`, a meeting app)
-  not opened. A download goes to Downloads without asking where, and a pop-up window opens as a tab, where the app
-  can find it. The app's next answer about that tab, whichever tool it is, lists what was dismissed and on which
-  page, as `dialogs`.
+  for a certificate goes on without one, printing skipped, camera, microphone, location and screen sharing denied,
+  a link to another app (`mailto:`, a meeting app) not opened. A pop-up window opens as a tab, where the app can
+  find it. The app's next answer about that tab, whichever tool it is, lists what was dismissed and on which page,
+  as `dialogs`.
+- **Their downloads are their own.** A download goes, without asking where, into a Downloads folder in the AI Apps
+  profile's data (in Zigzag's folder in `~/Library/Application Support`, under `Profiles`), never into yours, and
+  stays out of your downloads list and the Dock. Deleting the profile deletes them.
 
 You can delete the AI Apps profile in Settings › Profiles once AI apps have stopped running in the background (it's
 refused while their window is open). Its space goes with it, and Zigzag makes a new one, empty, the next time AI

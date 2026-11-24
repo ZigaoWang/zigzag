@@ -33,6 +33,23 @@ struct HeadlessTests {
         #expect(Headless.idleQuitAfter == 30 * 60)
     }
 
+    /// Their downloads go into a folder in their profile's data, never yours.
+    @Test func theirDownloadsHaveAFolderOfTheirOwn() throws {
+        let library = Library.shared
+        _ = library.headlessSpace()
+        let profile = try #require(library.directory.headless)
+        defer {
+            _ = library.removeProfile(profile.id)
+            library.finishedRemovingProfile(profile.id)
+        }
+        let theirs = DownloadItem(filename: "a.pdf", sourceURL: nil, isPrivate: false, profile: profile.id)
+        let yours = DownloadItem(filename: "a.pdf", sourceURL: nil, isPrivate: false)
+        #expect(theirs.isForAIApps && !yours.isForAIApps)
+        let folder = try #require(DownloadManager.aiAppsFolder(for: theirs))
+        #expect(folder.path.hasPrefix(Profiles.folder(of: profile.id).path) && folder.lastPathComponent == "Downloads")
+        #expect(DownloadManager.aiAppsFolder(for: yours) == nil)
+    }
+
     /// A --headless request from another copy is ignored while headless mode is off.
     @Test func notAskedForWhileOff() {
         let waiting = Headless.waitingSince
