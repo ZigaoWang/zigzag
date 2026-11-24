@@ -735,10 +735,8 @@ nonisolated enum UpdateBackup {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         // The path and process go in as arguments, never into the script itself.
-        // Passes along what a --headless run needs to continue (`Headless.restartArguments`).
-        let reopen = "app=$1; while kill -0 \"$2\" 2>/dev/null; do sleep 0.2; done; shift 2; "
-            + "if [ $# -gt 0 ]; then open \"$app\" --args \"$@\"; else open \"$app\"; fi"
-        task.arguments = ["-c", reopen, "sh", app.path, String(ProcessInfo.processInfo.processIdentifier)] + Headless.restartArguments
+        task.arguments = ["-c", "while kill -0 \"$2\" 2>/dev/null; do sleep 0.2; done; open \"$1\"",
+                          "sh", app.path, String(ProcessInfo.processInfo.processIdentifier)]
         try? task.run()
         NSApp.terminate(nil)
     }

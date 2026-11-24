@@ -256,25 +256,18 @@ do, copy the setup again and give your apps the new key; the old one opens nothi
 AI apps can work with nothing on screen, in a window of their own that no one sees, on a profile of their own. Your
 windows and tabs are then out of their reach: they can't list, read or use them.
 
-There are two ways to start it, and AI apps have to be allowed in Settings › Automation for either:
+Turn on **Run AI apps in the background** in Settings › Automation, under Let AI apps use Zigzag. It's off until
+you turn it on, and it needs AI apps allowed too.
 
-- **Run AI apps in the background**, in Settings › Automation, while Zigzag is open.
-- **Opening Zigzag with `--headless`**, for that run only. With Zigzag closed, it opens with no Dock icon, no menu
-  bar and no window, and your saved windows wait until you open Zigzag yourself:
+With both on, you can also open Zigzag with **`--headless`**. With Zigzag closed, it opens with no Dock icon, no
+menu bar and no window, and your saved windows wait until you open Zigzag yourself:
 
-  ```sh
-  open -g -a Zigzag --args --headless
-  ```
+```sh
+open -g -a Zigzag --args --headless
+```
 
-  With Zigzag already open, a plain `open` brings it forward and passes nothing on. Add `-n`, so the flag reaches
-  the copy that's running, which then keeps AI apps to the background without coming forward:
-
-  ```sh
-  open -gn -a Zigzag --args --headless
-  ```
-
-  With AI apps not allowed, neither does anything: Zigzag says why on standard error (shown when you run
-  `Zigzag.app/Contents/MacOS/Zigzag --headless` itself) and in the system log, and exits with an error.
+With either switch off, `--headless` does nothing: Zigzag says why on standard error (shown when you run
+`Zigzag.app/Contents/MacOS/Zigzag --headless` itself) and in the system log, and exits with an error.
 
 While AI apps work in the background:
 
@@ -313,7 +306,7 @@ apps run in the background. Deleting only its space, or putting that space on an
 and its tabs; the next `open_tab` makes the space again.
 
 Opened with `--headless` and nothing else, Zigzag quits on its own 30 minutes after an app last asked it anything
-(never while a download is still coming in), and as soon as AI apps are no longer allowed. Opening it with
+(never while a download is still coming in), and as soon as either switch is turned off. Opening it with
 `--headless` again counts as asking, too. Open it yourself meanwhile (from the Dock, Finder or a link) and it's the Zigzag
 you know, your windows with it; AI apps stay in their window until it quits. macOS only runs it while you're logged
 in.
@@ -347,9 +340,9 @@ every app.
 - **The app can't connect at all.** Check that Let AI apps use Zigzag is on and Zigzag is open: the server runs only
   while it is. Check that the app uses the HTTP transport, not stdio or SSE.
 - **`screenshot` fails.** The tab has to be on screen. Ask the app to switch to it with `activate_tab` first.
-- **A tool says AI apps work in the background and the tab isn't theirs.** Run AI apps in the background is on, or
-  Zigzag was opened with `--headless`: they can use only their own window's tabs. Ask the app to use `list_tabs` and
-  `open_tab`, or turn the setting off (that ends a `--headless` run's too) to give them your windows again.
+- **A tool says AI apps work in the background and the tab isn't theirs.** Run AI apps in the background is on: they
+  can use only their own window's tabs. Ask the app to use `list_tabs` and `open_tab`, or turn the setting off to
+  give them your windows again.
 - **A page's dialog never shows, or a click "did nothing".** In the background no one can answer a page, so its
   `confirm` was dismissed, which a page takes as Cancel. The tool's answer says so under `dialogs`. For a step
   that needs a yes, turn Run AI apps in the background off and let the app use a window you can see.

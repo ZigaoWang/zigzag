@@ -15,14 +15,12 @@ struct HeadlessTests {
         #expect(!Headless.isAsked(by: ["Zigzag", "--headless-not"]))
     }
 
-    /// Needs AI apps allowed: neither the setting nor the argument turns that on.
-    @Test func onlyWhileAIAppsMayUseZigzag() {
-        for isOn in [false, true] {
-            for forThisRun in [false, true] {
-                #expect(!Headless.isActive(isOn: isOn, forThisRun: forThisRun, accessOn: false))
-                #expect(Headless.isActive(isOn: isOn, forThisRun: forThisRun, accessOn: true) == (isOn || forThisRun))
-            }
-        }
+    /// Needs both switches: AI apps allowed, and in the background.
+    @Test func onlyWithBothSwitchesOn() {
+        #expect(!Headless.isActive(isOn: false, accessOn: false))
+        #expect(!Headless.isActive(isOn: true, accessOn: false))
+        #expect(!Headless.isActive(isOn: false, accessOn: true))
+        #expect(Headless.isActive(isOn: true, accessOn: true))
     }
 
     @Test func goesAfterAWhileWithNothingToDo() {
@@ -35,11 +33,10 @@ struct HeadlessTests {
         #expect(Headless.idleQuitAfter == 30 * 60)
     }
 
-    /// A --headless request from another copy is ignored while AI apps aren't allowed, not kept for the day they are.
-    @Test func notAskedForWhileAIAppsArentAllowed() {
+    /// A --headless request from another copy is ignored while headless mode is off.
+    @Test func notAskedForWhileOff() {
         let waiting = Headless.waitingSince
-        Headless.askedByAnotherCopy(accessOn: false, now: Date.distantFuture)
-        #expect(!Headless.forThisRun && !Headless.isWanted || Headless.isOn)
+        Headless.askedByAnotherCopy(active: false, now: Date.distantFuture)
         #expect(Headless.waitingSince == waiting)
     }
 
@@ -312,16 +309,6 @@ struct UnattendedPageTests {
         AgentControl.shared.reset()
         #expect(Library.shared.removeProfile(profile.id))
         Library.shared.finishedRemovingProfile(profile.id)
-    }
-
-    /// A --headless run continues over Zigzag's own restart: it passes itself an argument that keeps AI apps in the
-    /// background without making the new run one with no Dock icon.
-    @Test func aRestartOfItsOwnKeepsTheRun() {
-        #expect(Headless.isContinued(by: ["/Applications/Zigzag.app/Contents/MacOS/Zigzag", Headless.continuesArgument]))
-        #expect(!Headless.isContinued(by: [Headless.continuesArgument]) && !Headless.isContinued(by: ["Zigzag", "--headless"]))
-        #expect(!Headless.isAsked(by: ["Zigzag", Headless.continuesArgument]))
-        // Not such a run: nothing to pass on.
-        #expect(!Headless.forThisRun && Headless.restartArguments.isEmpty)
     }
 
     /// In their unseen window the front tab may sleep, and showing its pages doesn't wake it: only a tool does, which

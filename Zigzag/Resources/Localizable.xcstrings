@@ -678,13 +678,13 @@
         }
       }
     },
-    "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. Opening Zigzag with --headless does the same until it quits." : {
+    "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. With this on, opening Zigzag with --headless runs it for them alone." : {
       "comment" : "Explanation under “Run AI apps in the background” in Settings › Automation. --headless is how Zigzag is opened from Terminal for it: not translated.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它们会在“AI 应用”个人资料中获得一个自己的隐藏窗口，看不到你的窗口和标签页。用 --headless 打开 Zigzag 也会如此，直到退出为止。"
+            "value" : "它们会在“AI 应用”个人资料中获得一个自己的隐藏窗口，看不到你的窗口和标签页。打开此项后，用 --headless 打开 Zigzag 会只为它们运行。"
           }
         }
       }

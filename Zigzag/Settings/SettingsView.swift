@@ -1471,7 +1471,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         aiGroup.add(aiRow)
         backgroundToggle.onChange = { on in Headless.isOn = on }
         let backgroundRow = FormRow(title: String(localized: "Run AI apps in the background", comment: "A setting in Settings › Automation: AI apps get a hidden window of their own, on a profile of their own (AI Apps), instead of your windows."),
-                                    detail: String(localized: "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. Opening Zigzag with --headless does the same until it quits.",
+                                    detail: String(localized: "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. With this on, opening Zigzag with --headless runs it for them alone.",
                                                    comment: "Explanation under “Run AI apps in the background” in Settings › Automation. --headless is how Zigzag is opened from Terminal for it: not translated."),
                                     control: backgroundToggle)
         backgroundRow.keywords = [Self.aiAppsKeywords, String(localized: "headless background hidden window", comment: "Words that find the Run AI apps in the background setting with Find a setting in Settings. Not shown.")].joined(separator: " ")
@@ -4027,8 +4027,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Turned on or off elsewhere (another Settings tab): the switch follows.
         if aiAppsToggle.isOn != shown { aiAppsToggle.isOn = shown }
         // Only for AI apps that may use Zigzag at all.
-        // Also on for a --headless run: turning it off here ends that too.
-        if backgroundToggle.isOn != Headless.isWanted { backgroundToggle.isOn = Headless.isWanted }
+        if backgroundToggle.isOn != Headless.isOn { backgroundToggle.isOn = Headless.isOn }
         backgroundToggle.isEnabled = shown
         let detail = MCPService.problem == nil ? MCPService.address
             : MCPService.replacedKeyForBusyPort

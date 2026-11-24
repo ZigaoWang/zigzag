@@ -184,8 +184,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let backgroundOnly = Headless.isBackgroundOnly
         // Restarted for an update: exactly what was open comes back, Zigzag Mini windows too.
         let relaunch = backgroundOnly ? nil : UpdateRelaunch.take()
-        // Restarted for an update during a --headless run: AI apps stay in the background.
-        if let relaunch, UpdateRelaunch.isFresh(relaunch, now: Date()), relaunch.keepsAIAppsToBackground == true { Headless.goOn() }
         let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
                                        miniOnly: miniOnly, webAppOnly: webAppOnly, backgroundOnly: backgroundOnly)
         WindowManager.shared.sessionWaiting = plan.sessionWaiting

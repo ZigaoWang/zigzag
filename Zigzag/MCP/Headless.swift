@@ -1,9 +1,6 @@
 import AppKit
 
-/// Headless mode (#214): AI apps work in an unseen window of their own, on the AI Apps profile's space, out of reach
-/// of your windows and tabs. Turned on by `--headless` (alone, Zigzag then runs with no Dock icon, menu bar or
-/// window until you open it) or Settings › Automation › Run AI apps in the background. Only while AI apps may use
-/// Zigzag at all: it never turns that on. A menu bar item shows it, with the way to stop them.
+/// Headless mode (#214): AI apps work in an unseen window of their own, on the AI Apps profile.
 @MainActor
 enum Headless {
     // MARK: When it's on
@@ -15,25 +12,17 @@ enum Headless {
         get { UserDefaults.standard.bool(forKey: settingKey) }
         set {
             UserDefaults.standard.set(newValue, forKey: settingKey)
-            // Turning it off also cancels this run's --headless request.
-            if !newValue { forThisRun = false }
             refresh()
         }
     }
 
-    /// On for this run only: by `--headless`, at launch or from a later copy.
-    private(set) static var forThisRun = false
-
-    /// Asked for, by the setting or for this run: what the switch in Settings shows.
-    static var isWanted: Bool { isOn || forThisRun }
-
     /// Sent when headless mode starts or stops, and when Zigzag stops running for AI apps alone.
     static let changed = Signal<Void>()
 
-    /// Whether AI apps work in the background: asked for, and AI apps allowed at all.
-    nonisolated static func isActive(isOn: Bool, forThisRun: Bool, accessOn: Bool) -> Bool { accessOn && (isOn || forThisRun) }
+    /// Both switches on: AI apps may use Zigzag, and in the background.
+    nonisolated static func isActive(isOn: Bool, accessOn: Bool) -> Bool { accessOn && isOn }
 
-    static var isActive: Bool { isActive(isOn: isOn, forThisRun: forThisRun, accessOn: MCPService.isOn) }
+    static var isActive: Bool { isActive(isOn: isOn, accessOn: MCPService.isOn) }
 
     // MARK: Opening Zigzag for it
 
@@ -48,43 +37,24 @@ enum Headless {
     /// Work deferred until you open Zigzag (updates, Dock download progress, launch offers). Runs once.
     static var whenOpened: (() -> Void)?
 
-    /// Before anything shows: with `--headless`, runs for AI apps alone, or refuses and exits if they aren't allowed.
+    /// With `--headless`: runs for AI apps alone, or exits while headless mode is off.
     static func willLaunch(arguments: [String] = CommandLine.arguments) {
-        if isContinued(by: arguments) { goOn() }
         guard isAsked(by: arguments) else { return }
-        guard MCPService.isOn else { refuseWithoutAccess() }
-        forThisRun = true
+        guard isActive else { refuseWhileOff() }
         isBackgroundOnly = true
         NSApp.setActivationPolicy(.accessory)
     }
 
-    // MARK: Over a restart
-
-    /// Passed by Zigzag to itself when it restarts (a restore, a new language) during a `--headless` run: headless
-    /// mode continues, as the regular app you had made of it by opening it. Internal: others pass `--headless`.
-    nonisolated static let continuesArgument = "--ai-apps-in-background"
-
-    /// Arguments for Zigzag's own restart, so the run continues.
-    static var restartArguments: [String] { forThisRun ? [continuesArgument] : [] }
-
-    /// Whether this launch continues such a run. The first argument is the app's own path.
-    nonisolated static func isContinued(by arguments: [String]) -> Bool { arguments.dropFirst().contains(continuesArgument) }
-
-    /// Continues such a run after a restart by Zigzag itself (`continuesArgument`) or for an update
-    /// (`UpdateRelaunch.Saved`): AI apps stay in the background.
-    static func goOn() { forThisRun = true }
-
-    /// `--headless` while AI apps aren't allowed: reports it on stderr and exits with an error, never as if it worked.
-    private static func refuseWithoutAccess() -> Never {
-        FileHandle.standardError.write(Data("Zigzag: AI apps aren’t allowed to use Zigzag. Turn on Settings › Automation › Let AI apps use Zigzag first.\n".utf8))
-        NSLog("Zigzag: opened with --headless, but AI apps aren't allowed in Settings › Automation")
+    /// `--headless` with either switch off: says so on stderr and exits with an error.
+    private static func refuseWhileOff() -> Never {
+        FileHandle.standardError.write(Data("Zigzag: turn on Let AI apps use Zigzag and Run AI apps in the background in Settings › Automation first.\n".utf8))
+        NSLog("Zigzag: opened with --headless, but AI apps in the background are off in Settings › Automation")
         exit(1)
     }
 
-    /// A copy opened with `--headless` while Zigzag already runs asks the running one, then exits. The request carries
-    /// no data: it can only turn headless mode on. Refused, as with Zigzag closed, when AI apps aren't allowed.
+    /// `--headless` while Zigzag runs: asks the running copy, which only restarts its idle wait.
     static func askRunningCopy() {
-        guard MCPService.isOn else { refuseWithoutAccess() }
+        guard isActive else { refuseWhileOff() }
         DistributedNotificationCenter.default().postNotificationName(requestName, object: nil, userInfo: nil, deliverImmediately: true)
     }
 
@@ -128,11 +98,9 @@ enum Headless {
         }
     }
 
-    /// A copy opened with `--headless` asked. Ignored while AI apps aren't allowed, so it doesn't wait unseen to turn
-    /// on the day they are. Also restarts the idle wait when running for AI apps alone.
-    static func askedByAnotherCopy(accessOn: Bool? = nil, now: Date = Date()) {
-        guard accessOn ?? MCPService.isOn else { return }
-        forThisRun = true
+    /// A copy opened with `--headless` asked: the idle wait starts over. Ignored while headless mode is off.
+    static func askedByAnotherCopy(active: Bool? = nil, now: Date = Date()) {
+        guard active ?? isActive else { return }
         waitingSince = now
         refresh()
     }

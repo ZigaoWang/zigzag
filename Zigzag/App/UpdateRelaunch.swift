@@ -22,9 +22,6 @@ enum UpdateRelaunch {
         var minis: [Mini]
         /// A fresh start nothing was done in yet: the relaunch starts fresh again (#433).
         var startsFresh: Bool? = nil
-        /// Whether that run kept AI apps in the background (opened with `--headless`): they stay there after the
-        /// restart, the same run to you. Nil in notes written before this existed.
-        var keepsAIAppsToBackground: Bool?
     }
 
     /// What launch brings back.
@@ -58,19 +55,13 @@ enum UpdateRelaunch {
     /// Zigzag opened for Zigzag Mini, an installed site, or AI apps in the background (`backgroundOnly`) alone.
     nonisolated static func plan(relaunch: Saved?, now: Date, needsOnboarding: Bool, miniOnly: Bool, webAppOnly: Bool,
                                  backgroundOnly: Bool = false) -> Plan {
-        if let relaunch, isFresh(relaunch, now: now) {
+        if let relaunch, case let age = now.timeIntervalSince(relaunch.at), age > -60, age < freshFor {
             // Nothing open at all (every window closed): the browser windows, as any launch.
             let browsers = relaunch.browserWindowsOpen || relaunch.minis.isEmpty
             return Plan(restoresSession: browsers, sessionWaiting: !browsers, restoresMinis: !relaunch.minis.isEmpty)
         }
         let waiting = miniOnly || webAppOnly || backgroundOnly
         return Plan(restoresSession: !needsOnboarding && !waiting, sessionWaiting: waiting, restoresMinis: false)
-    }
-
-    /// Whether a note is from the restart that's launching now.
-    nonisolated static func isFresh(_ saved: Saved, now: Date) -> Bool {
-        let age = now.timeIntervalSince(saved.at)
-        return age > -60 && age < freshFor
     }
 
     /// Sparkle is about to quit Zigzag to install an update and open it again: what's open is written down now, the
@@ -80,8 +71,7 @@ enum UpdateRelaunch {
         let manager = WindowManager.shared
         let browsers = !manager.sessionWaiting && manager.controllers.contains { !$0.tabManager.isPrivate }
         write(Saved(at: Date(), browserWindowsOpen: browsers, minis: MiniWindowController.all.compactMap(\.savedForRelaunch),
-                    startsFresh: manager.freshStartUnused,
-                    keepsAIAppsToBackground: Headless.forThisRun ? true : nil))
+                    startsFresh: manager.freshStartUnused))
         manager.saveNow(synchronously: true)
     }
 
