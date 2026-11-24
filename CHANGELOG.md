@@ -5,9 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- A two-finger swipe on the trackpad shows its arrow, and the page starts to move, as soon as your fingers start sideways, instead of a moment later, so you can tell right away that it will go back or forward. A page that scrolls sideways under the pointer, like a carousel or a map, still keeps the swipe, and scrolling up and down never shows the arrow. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
-
 ## [0.9.5] - 2026-11-24
 
 Pages at your display's full 120 Hz like Chrome, touch that feels native on a touch display with every tap counted, iPad-style dragging and two-finger back and forward, Dia's pinned tabs on import, press and hold Back or Forward for history, a smoother Show All Tabs, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
@@ -29,6 +26,7 @@ Pages at your display's full 120 Hz like Chrome, touch that feels native on a to
 - A tab woken from sleep keeps its page's session storage, where some sites keep you signed in. Putting the tab to sleep used to drop it, so such a site could ask you to sign in again, two-factor and all, each time you came back to the tab. It's kept only in memory while the tab sleeps, and only the page that loads first on waking gets it back. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - On a touch display, a two-finger swipe sideways on a page goes back or forward even when one finger lands a moment before the other or the swipe starts a little slanted. Before, it usually scrolled the page instead.
 - Show All Tabs (⇧⌘\) opens and closes smoothly. The page starts shrinking into its card sooner, and the cards no longer hitch as they settle in, because less work runs as it opens, the overview stays ready between opens, and pages you left are made ready for it ahead of time.
+- A two-finger swipe on the trackpad shows its arrow, and the page starts to move, as soon as your fingers start sideways, instead of a moment later, so you can tell right away that it will go back or forward. A page that scrolls sideways under the pointer, like a carousel or a map, still keeps the swipe, and scrolling up and down never shows the arrow. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
 
 ## [0.9.4] - 2026-11-24
 
