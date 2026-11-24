@@ -12,14 +12,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-### 新功能
-- 把标签页往右拖，就能嵌套到上方的标签页下面，上方的标签页下面还没有标签页也可以；往左拖就会移出来。拖动时的线会显示它会落在哪一层。用键盘的话，“显示 › 嵌套标签页”（⌃⇧→）把当前标签页放到上方的标签页下面，“取消嵌套标签页”（⌃⇧←）把它移出来。感谢 [bkonia](https://github.com/bkonia) 的建议。([#523](https://github.com/ZigaoWang/zigzag/issues/523))
-
-### 修复
-- 网站或扩展为了让普通点按打开自己的查看器而特意去掉的链接，比如 Old Twitter Layout 里的引用推文，⌘-点按或中键点按照样在标签页里打开，现在由 Zigzag 里统一的一条规则处理，任何网站或扩展都能用：把地址放在 `data-zigzag-href` 里就行（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。普通点按照样打开查看器。感谢 [Lakeland97](https://github.com/Lakeland97) 的设计方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
-- 把下载交给 App、脚本或服务的规则，现在可以按文件本身的类型（例如 torrent 或 pdf）来匹配，而不只看地址。下载站的下载地址往往看不出文件名，所以 .torrent 文件现在无论地址长什么样都能交给下载器。
-- 因为 Zigzag Mini 链接、已安装的网站或后台的 AI App 单独打开 Zigzag 时，不会再丢掉上次会话的登录状态：之后打开浏览器窗口、会话恢复时，会话 Cookie 和 sessionStorage 也一起恢复，Microsoft 365 这类网站会保持登录。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-
 ## [0.9.5] - 2026-11-24
 
 可以导出你的数据，随时带走一切；实时文件夹；繁体中文界面；视频全屏留在浏览器里；地址栏可以自动隐藏；从屏幕边缘拉出边栏；Zigzag 在每个网页里做的事更少，滚动更流畅；网页按屏幕完整的 120 Hz 绘制；触控屏用起来更顺手；导入 Dia 时带上固定标签页；按住后退或前进可以选历史网页；重启后登录和 YouTube 影院模式都还在；设置里可以选密码管理器扩展。
@@ -36,6 +28,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 页面上方的地址栏可以自动隐藏了。“设置 › 外观 › 地址栏放在页面上方”现在有“关闭”“自动隐藏”和“始终”三个选项，原来开着的会保持“始终”。选“自动隐藏”时，向下滚动地址栏会跟着页面往上收，页面占用它的位置；重新向上滑动、滚到页面最顶部、把指针移到窗口顶部、按 ⌘L，或者在触控屏上轻点它原来的位置，它就会回来。在页面里输入或者页面自己滚动时，它保持不动，窗口按钮也跟着它一起收起和出现。分屏时每个页面的地址栏跟着自己的滚动。感谢 [Lakeland97](https://github.com/Lakeland97)。([#359](https://github.com/ZigaoWang/zigzag/issues/359))
 - 实时文件夹，和 Arc 一样。在边栏的 +、空间菜单或文件夹菜单里选“新建实时文件夹…”，粘贴订阅源的地址，或者直接粘贴网站地址，也可以选一个 GitHub 列表（你打开的拉取请求、指派给你的议题或请你审查的拉取请求）并输入用户名。文件夹会自己填上最新的页面，每半小时在后台检查一次，新页面带一个圆点，打开后就消失。它的菜单里有“全部标记为已读”、“立即更新”和“编辑…”，订阅源取不到时也会说明原因。把页面拖出来，就会固定在你放下的地方。GitHub 列表只显示公开仓库，因为 Zigzag 不会为此登录 GitHub。
 - 设置里的长列表可以折叠了。“隐私 › 网站权限”里每个网站是一个方框，写着网站名、有几项设置和“忘记”，设置都在里面；“扩展”里每个扩展是一个方框，带着它的开关，网站访问和隐私窗口的设置在里面；“网站存储的数据”里每个网站是一个方框，打开后是它的 Cookie 和缓存，可以单独清除，清除前会先问你，垃圾桶照样删除这个网站的全部数据。超过三个时方框默认折叠；点按它，或按空格键或 →，就会打开，设置开着的期间会保持你留下的样子。网站或扩展达到八个时，标题旁会有搜索栏来筛选列表，“查找设置”也会打开匹配项所在的方框。感谢 [Lakeland97](https://github.com/Lakeland97) 的建议。([#368](https://github.com/ZigaoWang/zigzag/issues/368))
+- 把标签页往右拖，就能嵌套到上方的标签页下面，上方的标签页下面还没有标签页也可以；往左拖就会移出来。拖动时的线会显示它会落在哪一层。用键盘的话，“显示 › 嵌套标签页”（⌃⇧→）把当前标签页放到上方的标签页下面，“取消嵌套标签页”（⌃⇧←）把它移出来。感谢 [bkonia](https://github.com/bkonia) 的建议。([#523](https://github.com/ZigaoWang/zigzag/issues/523))
 
 ### 修复
 - 英文页面不会再因为页面上的一排语言名称，就提示从印地语或马拉地语翻译；几行地名之类的短文字也不会再让页面被认成别的语言。“系统设置 › 语言与地区”列表里的任何一种语言的页面都不再提示翻译，除非你把这种语言设成了总是翻译。 ([#510](https://github.com/ZigaoWang/zigzag/issues/510))
@@ -62,6 +55,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 按住 ⇧ 点按由网站自己打开的链接（比如 YouTube 和部分 Google 页面）时，也会和其他按住 ⇧ 点按的链接一样在 Zigzag Mini 里打开，不再变成弹出的标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#522](https://github.com/ZigaoWang/zigzag/pull/522))
 - 像 Property Mate 这样在后台打开一个最小化窗口来载入网页的扩展，不会再把窗口弹到最前面。和 Chrome 一样，窗口直接进入程序坞；不要求聚焦的窗口会在你的窗口后面打开，你的窗口仍在前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
 - 把登录状态存在标签页会话存储（sessionStorage）里的网站，比如 Microsoft 365，在 Zigzag 退出后重新打开上次的会话，或者为更新而重启后，你仍然是登录状态。睡眠中的标签页，或者退出时开着的标签页，会在网页载入前拿回它的会话存储，和 Chrome 一样。它保存在你的个人资料文件夹里，只有你能读取，私密窗口从不保存；清除这个网站的数据或关闭标签页时，它也会一起删除。“启动时”设为“打开新窗口”时会直接丢弃。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- 网站或扩展为了让普通点按打开自己的查看器而特意去掉的链接，比如 Old Twitter Layout 里的引用推文，⌘-点按或中键点按照样在标签页里打开，现在由 Zigzag 里统一的一条规则处理，任何网站或扩展都能用：把地址放在 `data-zigzag-href` 里就行（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。普通点按照样打开查看器。感谢 [Lakeland97](https://github.com/Lakeland97) 的设计方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
+- 把下载交给 App、脚本或服务的规则，现在可以按文件本身的类型（例如 torrent 或 pdf）来匹配，而不只看地址。下载站的下载地址往往看不出文件名，所以 .torrent 文件现在无论地址长什么样都能交给下载器。
+- 因为 Zigzag Mini 链接、已安装的网站或后台的 AI App 单独打开 Zigzag 时，不会再丢掉上次会话的登录状态：之后打开浏览器窗口、会话恢复时，会话 Cookie 和 sessionStorage 也一起恢复，Microsoft 365 这类网站会保持登录。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.4] - 2026-11-24
 

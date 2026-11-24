@@ -9,14 +9,6 @@
 
 ## [Unreleased]
 
-### 新功能
-- 把分頁往右拖，就能巢狀放到上方的分頁下面，上方的分頁下面還沒有分頁也可以；往左拖就會移出來。拖動時的線會顯示它會落在哪一層。用鍵盤的話，「顯示 › 巢狀分頁」（⌃⇧→）把目前的分頁放到上方的分頁下面，「取消巢狀分頁」（⌃⇧←）把它移出來。感謝 [bkonia](https://github.com/bkonia) 的建議。([#523](https://github.com/ZigaoWang/zigzag/issues/523))
-
-### 修正
-- 網站或擴充功能為了讓一般點按打開自己的檢視器而刻意拿掉的連結，例如 Old Twitter Layout 裡的引用推文，⌘-點按或中鍵點按照樣會在分頁中打開，現在由 Zigzag 裡統一的一條規則處理，任何網站或擴充功能都能使用：把位址放在 `data-zigzag-href` 裡即可（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。一般點按照樣打開檢視器。感謝 [Lakeland97](https://github.com/Lakeland97) 的設計方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
-- 把下載交給 App、指令碼或服務的規則，現在可以依檔案本身的類型（例如 torrent 或 pdf）來比對，而不只看網址。下載站的網址往往看不出檔案名稱，所以 .torrent 檔案現在無論網址長什麼樣子都能交給下載器。
-- 因為 Zigzag Mini 連結、已安裝的網站或背景的 AI App 單獨打開 Zigzag 時，不會再丟掉上次工作階段的登入狀態：之後打開瀏覽器視窗、工作階段恢復時，工作階段 Cookie 和 sessionStorage 也會一起恢復，Microsoft 365 這類網站會保持登入。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-
 ## [0.9.5] - 2026-11-24
 
 可以匯出你的資料，隨時帶走一切；即時資料夾；繁體中文介面；影片全螢幕留在瀏覽器裡；網址列可以自動隱藏；從螢幕邊緣拉出側邊欄；Zigzag 在每個網頁裡做的事更少，捲動更順暢；網頁以螢幕完整的 120 Hz 繪製；觸控操作更順手；從 Dia 匯入時會一併帶入已固定分頁；按住上一頁或下一頁按鈕就能瀏覽記錄；重新啟動後會保留登入狀態和 YouTube 的劇院模式；設定裡可以選取密碼管理器延伸功能。
@@ -33,6 +25,7 @@
 - 網頁上方的網址列可以自動隱藏了。「設定 › 外觀 › 在網頁上方顯示網址列」現在有「關閉」、「自動隱藏」和「一律」三個選項，原本開啟的會維持「一律」。選擇「自動隱藏」時，向下捲動網址列會跟著網頁往上收起，網頁會使用它的空間；重新向上滑動、捲動到網頁最上方、將指標移到視窗頂端、按下 ⌘L，或在觸控螢幕上輕點它原本的位置，它就會回來。在網頁中輸入文字或網頁自行捲動時，它會保持不動，視窗按鈕也會跟著它一起收起和出現。分割顯示時，每個網頁的網址列會跟著各自的捲動。感謝 [Lakeland97](https://github.com/Lakeland97)。([#359](https://github.com/ZigaoWang/zigzag/issues/359))
 - 即時資料夾，和 Arc 一樣。在側邊欄的 +、空間選單或資料夾選單中選取「新增即時資料夾…」，貼上訂閱來源的網址，或直接貼上網站網址，也可以選取一個 GitHub 列表（你開啟的提取要求、指派給你的議題或請你審查的提取要求）並輸入使用者名稱。資料夾會自動填入最新的網頁，每半小時在背景檢查一次，新網頁會帶一個圓點，開啟後就會消失。它的選單中有「全部標示為已讀」、「立即更新」和「編輯…」，無法取得訂閱來源時也會說明原因。把網頁拖出來，就會固定在你放下的位置。GitHub 列表只會顯示公開儲存庫，因為 Zigzag 不會為此登入 GitHub。
 - 設定中的長列表可以收合了。「隱私 › 網站權限」中每個網站是一個方框，寫著網站名稱、有幾項設定和「忘記」，設定都在裡面；「延伸功能」中每個延伸功能是一個方框，帶著它的開關，網站存取和私密視窗的設定在裡面；「網站儲存的資料」中每個網站是一個方框，打開後是它的 Cookie 和快取，可以分別清除，清除前會先詢問，垃圾桶照樣刪除這個網站的全部資料。超過三個時方框預設收合；點一下，或按空白鍵或 →，就會打開，設定開著的期間會維持你留下的樣子。網站或延伸功能達到八個時，標題旁會有搜尋欄來篩選列表，「搜尋設定」也會打開符合項目所在的方框。感謝 [Lakeland97](https://github.com/Lakeland97) 的建議。([#368](https://github.com/ZigaoWang/zigzag/issues/368))
+- 把分頁往右拖，就能巢狀放到上方的分頁下面，上方的分頁下面還沒有分頁也可以；往左拖就會移出來。拖動時的線會顯示它會落在哪一層。用鍵盤的話，「顯示 › 巢狀分頁」（⌃⇧→）把目前的分頁放到上方的分頁下面，「取消巢狀分頁」（⌃⇧←）把它移出來。感謝 [bkonia](https://github.com/bkonia) 的建議。([#523](https://github.com/ZigaoWang/zigzag/issues/523))
 
 ### 修正
 - 英文網頁不會再因為列出多種語言而被誤判為印地語或馬拉地語；簡短的地名等文字也不會再讓 Zigzag 認錯語言。「系統設定 › 語言與地區」清單中的語言不會顯示翻譯提示，除非你已將該語言設為一律翻譯。([#510](https://github.com/ZigaoWang/zigzag/issues/510))
@@ -59,6 +52,9 @@
 - 按住 ⇧ 點按由網站自行開啟的連結（例如 YouTube 和部分 Google 頁面）時，也會和其他按住 ⇧ 點按的連結一樣在 Zigzag Mini 裡開啟，不再變成彈出的分頁。感謝 [Lakeland97](https://github.com/Lakeland97)。([#522](https://github.com/ZigaoWang/zigzag/pull/522))
 - 像 Property Mate 這樣在背景開啟一個縮到最小的視窗來載入網頁的延伸功能，不會再把視窗帶到最前面。和 Chrome 一樣，視窗會直接進入 Dock；不要求聚焦的視窗會在你的視窗後面開啟，你的視窗仍在前面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
 - 把登入狀態存在分頁工作階段儲存空間（sessionStorage）中的網站，例如 Microsoft 365，在 Zigzag 結束後重新開啟上次的工作階段，或為了更新而重新啟動後，你仍會保持登入。休眠中的分頁，或結束時開著的分頁，會在網頁載入前拿回它的工作階段儲存空間，和 Chrome 一樣。它儲存在你的個人資料檔案夾中，只有你能讀取，私密視窗從不儲存；清除這個網站的資料或關閉分頁時，它也會一起刪除。「啟動時」設為「開啟新視窗」時會直接捨棄。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- 網站或擴充功能為了讓一般點按打開自己的檢視器而刻意拿掉的連結，例如 Old Twitter Layout 裡的引用推文，⌘-點按或中鍵點按照樣會在分頁中打開，現在由 Zigzag 裡統一的一條規則處理，任何網站或擴充功能都能使用：把位址放在 `data-zigzag-href` 裡即可（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。一般點按照樣打開檢視器。感謝 [Lakeland97](https://github.com/Lakeland97) 的設計方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
+- 把下載交給 App、指令碼或服務的規則，現在可以依檔案本身的類型（例如 torrent 或 pdf）來比對，而不只看網址。下載站的網址往往看不出檔案名稱，所以 .torrent 檔案現在無論網址長什麼樣子都能交給下載器。
+- 因為 Zigzag Mini 連結、已安裝的網站或背景的 AI App 單獨打開 Zigzag 時，不會再丟掉上次工作階段的登入狀態：之後打開瀏覽器視窗、工作階段恢復時，工作階段 Cookie 和 sessionStorage 也會一起恢復，Microsoft 365 這類網站會保持登入。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 
 ## [0.9.4] - 2026-11-24
 
