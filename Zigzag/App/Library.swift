@@ -29,6 +29,11 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     var groupID: UUID? = nil
     /// A live folder's source and pages (`LiveFolders`). Nil: a folder you fill yourself.
     var live: LiveFolder? = nil
+    /// Where the folder sits among its parent's children, on the same number line as the pages' places: a page's
+    /// place is its index in the space's pages, and a folder's is just before its first page. Set when a drop puts
+    /// the folder somewhere, so even a folder with no pages has a place; nil: worked out from its pages, and an
+    /// empty folder sits at the top of its parent.
+    var rank: Double? = nil
 }
 
 extension Array where Element == BookmarkFolder {

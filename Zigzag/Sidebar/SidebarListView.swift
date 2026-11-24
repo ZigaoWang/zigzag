@@ -89,7 +89,8 @@ extension SidebarListDelegate {
     func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu? { listMenu(for: item) }
 }
 
-enum SidebarItem: Hashable {
+/// A row's identity, shared by the drag resolver, which is nonisolated: only `height` needs the main actor.
+nonisolated enum SidebarItem: Hashable {
     case header
     case bookmark(UUID)
     /// A folder of pinned pages; its pages follow it, set in, while it's open.
@@ -110,7 +111,7 @@ enum SidebarItem: Hashable {
         }
     }
 
-    var height: CGFloat {
+    @MainActor var height: CGFloat {
         switch self {
         case .header: SpaceHeaderView.rowHeight
         // Room enough that Clear, on the line, isn't in the way of New Tab just below it.
@@ -248,7 +249,9 @@ final class SidebarListView: NSView {
     /// Something carried in from elsewhere (another window's tab, a favorite): where the line shows it would land.
     private var external: (section: Section, index: Int, pointX: CGFloat)?
 
-    enum Section { case bookmarks, tabs }
+    /// The two sections the list shows: the pinned rows and the tabs. Nonisolated so the drag resolver, which reads
+    /// the section of a drop, can compare it off the main actor.
+    nonisolated enum Section { case bookmarks, tabs }
 
     override var isFlipped: Bool { true }
 
@@ -344,75 +347,17 @@ final class SidebarListView: NSView {
     }
 
     /// The pinned section's rows, folders and pages, with how far in each is set and how many pages each folder holds.
-    /// A folder sits where its first page is, its pages and subfolders after it, each level set in one step. A shut
+    /// A folder sits where its place says: its stored rank among its parent's children, or just before its first page
+    /// when it has never been moved; an empty folder sits at the top of its parent, in the folders' own order. A shut
     /// folder hides all that's inside it but the page you're on and its pages opened since it was shut (#94): the ones
-    /// open when you shut it, it hides too (#154). An empty folder sits at the top of where it is, where you'll see it
-    /// and can drop pages in. `bookmarks` leaves out the pages that ride in another's row. `folded`: the section is
-    /// folded, so only open pages and the page you're on show, each under the folders on its way (#325).
-    static func pinnedRows(bookmarks: [UUID], folders: [BookmarkFolder], current: UUID?, folded: Bool = false,
+    /// open when you shut it, it hides too (#154). `bookmarks` is the space's pinned pages in list order, the pages that
+    /// ride in another's row included, so a folder's place and a page's index are on one line; `riders` are those pages.
+    /// `folded`: the section is folded, so only open pages and the page you're on show, each under the folders on its
+    /// way (#325).
+    static func pinnedRows(bookmarks: [UUID], folders: [BookmarkFolder], riders: Set<UUID> = [], current: UUID?,
+                           folded: Bool = false,
                            isOpen: (UUID) -> Bool) -> (rows: [SidebarItem], depth: [SidebarItem: Int], pageCounts: [UUID: Int]) {
-        var result: [SidebarItem] = []
-        var rowDepth: [SidebarItem: Int] = [:]
-        var folderPageCounts: [UUID: Int] = [:]
-        var folderOf: [UUID: UUID] = [:]
-        for folder in folders { for id in folder.bookmarkIDs { folderOf[id] = folder.id } }
-        let byID = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        var chains: [UUID: [UUID]] = [:]
-        func path(to folder: UUID?) -> [UUID] {
-            guard let folder else { return [] }
-            if let known = chains[folder] { return known }
-            var chain: [UUID] = [], next: UUID? = folder, seen: Set<UUID> = []
-            while let id = next, seen.insert(id).inserted { chain.append(id); next = byID[id]?.parentID }
-            chain.reverse()
-            chains[folder] = chain
-            return chain
-        }
-        // How many pages each folder holds, its folders' too, for its row to say.
-        for folder in folders {
-            var next: UUID? = folder.id, seen: Set<UUID> = []
-            while let id = next, seen.insert(id).inserted { folderPageCounts[id, default: 0] += folder.bookmarkIDs.count; next = byID[id]?.parentID }
-        }
-        var stack: [UUID] = []
-        var firstShut: Int? { stack.firstIndex { byID[$0]?.isOpen == false } }
-        // Worked out once for the whole tree, not again for each folder: an imported one can have hundreds.
-        let holding = folders.holdingPages
-        let inside = Dictionary(grouping: folders, by: \.parentID)
-        let tucked = Dictionary(folders.compactMap { f in f.tucked.map { (f.id, Set($0)) } }, uniquingKeysWith: { a, _ in a })
-        if folded {
-            var shown: Set<UUID> = []
-            for id in bookmarks {
-                let chain = path(to: folderOf[id])
-                // Hidden in a shut folder on purpose, it stays hidden here too.
-                let tuckedAway = chain.contains { byID[$0]?.isOpen == false && tucked[$0]?.contains(id) == true }
-                guard id == current || (isOpen(id) && !tuckedAway) else { continue }
-                while !stack.isEmpty, stack.count > chain.count || Array(chain.prefix(stack.count)) != stack { stack.removeLast() }
-                for folder in chain.dropFirst(stack.count) {
-                    if shown.insert(folder).inserted { result.append(.folder(folder)); rowDepth[.folder(folder)] = stack.count }
-                    stack.append(folder)
-                }
-                result.append(.bookmark(id)); rowDepth[.bookmark(id)] = stack.count
-            }
-            return (result, rowDepth, folderPageCounts)
-        }
-        func enter(_ id: UUID) {
-            if firstShut == nil { result.append(.folder(id)); rowDepth[.folder(id)] = stack.count }
-            stack.append(id)
-            for child in inside[id] ?? [] where !holding.contains(child.id) { enter(child.id); stack.removeLast() }
-        }
-        for folder in inside[nil] ?? [] where !holding.contains(folder.id) { enter(folder.id); stack.removeLast() }
-        for id in bookmarks {
-            let chain = path(to: folderOf[id])
-            while !stack.isEmpty, stack.count > chain.count || Array(chain.prefix(stack.count)) != stack { stack.removeLast() }
-            for folder in chain.dropFirst(stack.count) { enter(folder) }
-            if let shut = firstShut {
-                let hiddenOnPurpose = stack[shut...].contains { byID[$0]?.isOpen == false && tucked[$0]?.contains(id) == true }
-                guard id == current || (isOpen(id) && !hiddenOnPurpose) else { continue }
-                result.append(.bookmark(id)); rowDepth[.bookmark(id)] = shut + 1
-            } else {
-                result.append(.bookmark(id)); rowDepth[.bookmark(id)] = stack.count
-            }
-        }
-        return (result, rowDepth, folderPageCounts)
+        PinnedRows.of(bookmarks: bookmarks, folders: folders, riders: riders, current: current, folded: folded, isOpen: isOpen)
     }
 
     /// How deep each tab of the space on show is nested, as the list was last built.
