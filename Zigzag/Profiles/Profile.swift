@@ -9,6 +9,17 @@ final class Profile {
 
     let id: UUID
     var isDefault: Bool { id == Self.defaultID }
+    /// The profile AI apps work in when they run in the background (its role, `ProfileInfo.role`, set when it's made
+    /// and never changed). For what's about that role itself: its tabs muted, its name, its window.
+    let isHeadless: Bool
+    /// Whether its pages are given what's yours rather than the profile's, whichever window they're in. Not in AI
+    /// apps' profile: no saved HTTP sign-in or certificate from your Keychain (`AuthenticationPrompt`,
+    /// `ClientCertificates`), no password saved or filled and no Contacts card (`Autofill`, `PasswordCapture`), no
+    /// passkey (`Passkeys`), none of your answers to sites' permission questions (`SitePermissions`,
+    /// `WebNotifications`), none of your download and link rules (`DownloadRulesStore`), none of your site routes
+    /// (`SiteRoutes`), and no place in your Archive (`TabArchive`). What you install in it yourself, an extension, is
+    /// its own. Every one of those asks this, never the role.
+    var getsYourData: Bool { !isHeadless }
     /// Cookies and everything else websites keep. One object for as long as Zigzag runs: certificate exceptions,
     /// sign-in prompts and downloads tell stores apart by which object they are. Made the first time something in
     /// the profile needs it: WebKit creates a store on disk when it's asked for, and won't remove one this run has
@@ -52,8 +63,10 @@ final class Profile {
     /// Its extensions if they've been brought up, without bringing them up.
     var startedExtensions: ExtensionHost? { host }
 
+    /// Its role is read here, once: it never changes after the profile is made.
     init(id: UUID) {
         self.id = id
+        isHeadless = id != Self.defaultID && Library.shared.directory.profile(id)?.isHeadless == true
     }
 }
 

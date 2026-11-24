@@ -179,6 +179,8 @@ final class DownloadManager: NSObject {
     private var ruleOpenedDownloads: Set<ObjectIdentifier> = []
     /// Downloads whose handoff question was put off; don't ask the same rule again.
     private var ruleDeclinedDownloads: Set<ObjectIdentifier> = []
+    /// Downloads from a page with no one there (`Tab.isUnattended`): never asked where to save.
+    private var unattended: Set<ObjectIdentifier> = []
 
     /// A Firefox package coming in from a page (the store's Add to Firefox): it is installed, not kept. The file is
     /// temporary, and the window and profile are the ones the page was in, for the install sheet.
@@ -208,6 +210,7 @@ final class DownloadManager: NSObject {
         if openedByRule { ruleOpenedDownloads.insert(identifier) } else { ruleOpenedDownloads.remove(identifier) }
         if rulesAlreadyDeclined { ruleDeclinedDownloads.insert(identifier) } else { ruleDeclinedDownloads.remove(identifier) }
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
+        if (download.webView as? BrowserWebView)?.owner?.isUnattended == true { unattended.insert(identifier) } else { unattended.remove(identifier) }
         download.delegate = self
         if let window { windows[ObjectIdentifier(download)] = window }
         let referrer = download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) }
@@ -541,8 +544,9 @@ final class DownloadManager: NSObject {
     /// decides.
     private static func rulePlace(url: URL, filename: String, response: URLResponse, download: WKDownload,
                                   avoiding taken: Set<String>) -> (destination: URL, openWhenFinished: Bool)? {
-        guard let (rule, wanted) = DownloadRulesStore.shared.destination(for: url, filename: filename) else { return nil }
         let owner = (download.webView as? BrowserWebView)?.owner
+        guard let (rule, wanted) = DownloadRulesStore.shared.destination(for: url, filename: filename,
+                                                                          in: download.webView.map { Profiles.shared.profile(ofPage: $0) }) else { return nil }
         let values = HandoffValues(link: url,
                                    referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
                                    filename: filename, mime: response.mimeType ?? "",
@@ -567,6 +571,8 @@ extension DownloadManager: WKDownloadDelegate {
         var destination = Self.uniqueDestination(for: name, avoiding: inProgress)
         let window = windows.removeValue(forKey: identifier)
         let startedAt = origins.removeValue(forKey: identifier)
+        // No one there to ask where it goes: Downloads, as with the setting off.
+        let asks = unattended.remove(identifier) == nil
         if let url = download.originalRequest?.url, let earlier = restarts.removeValue(forKey: url) {
             // A paused download started over: it replaces its own partial file.
             try? FileManager.default.removeItem(at: earlier)
@@ -603,7 +609,7 @@ extension DownloadManager: WKDownloadDelegate {
         if ruleMayAsk, let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false, filename: name,
-                                                 isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {
+                                                 isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false), in: owner.profile) {
             var handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
                                                   pageOrigin: startedAt ?? SiteOrigin.of(owner.url ?? download.webView?.url),
                                                   filename: DownloadTokens.filename(for: url, suggested: name),
@@ -651,7 +657,7 @@ extension DownloadManager: WKDownloadDelegate {
             // never stop the download.
             destination = place.destination
             opensWhenFinished = place.openWhenFinished
-        } else if Self.asksWhereToSave {
+        } else if Self.asksWhereToSave, asks {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
                 items.removeAll { $0.download === download }
@@ -841,6 +847,7 @@ extension DownloadManager: WKDownloadDelegate {
         windows.removeValue(forKey: ObjectIdentifier(download))
         chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
         addonsFiles.removeValue(forKey: ObjectIdentifier(download))
+        unattended.remove(ObjectIdentifier(download))
         guard let item = item(for: download) else { return }
         // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
         if item.state == .paused { return }

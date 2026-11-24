@@ -1091,7 +1091,7 @@ enum ZoomLevels {
             let old = defaultZoom
             if abs(newValue - 1) < 0.001 { UserDefaults.standard.removeObject(forKey: defaultKey) } else { UserDefaults.standard.set(Double(newValue), forKey: defaultKey) }
             // Open pages at the old default switch now. Manually zoomed pages keep their zoom.
-            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+            for tab in WindowManager.shared.everyOpenTab {
                 guard let webView = tab.webView, let url = tab.url, !hasOwnZoom(url),
                       abs(webView.pageZoom - old) < 0.001 else { continue }
                 webView.pageZoom = newValue

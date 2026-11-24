@@ -46,10 +46,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PageTextChecking.shared.start()
         // A second copy (one opened from the disk image while the installed one runs) would load the same data
         // and save over it: it hands over to the one already running and goes, before reading anything.
+        // With --headless, it asks the running one to keep AI apps in the background instead, without bringing it
+        // forward. Otherwise it says you opened it, so one running for AI apps alone becomes yours.
         if !Self.isHostingTests, !SingleCopy.claim() {
-            SingleCopy.showRunningCopy()
+            if Headless.isAsked(by: CommandLine.arguments) { Headless.askRunningCopy() } else { Headless.tellRunningCopyYouOpened(); SingleCopy.showRunningCopy() }
             exit(0)
         }
+        // With --headless: runs for AI apps alone, with no Dock icon or window. Set before anything shows.
+        if !Self.isHostingTests { Headless.willLaunch() }
         if !Self.isHostingTests {
             // A new version backs up the data the last one left, and a restore asked for before restarting puts
             // a backup back, both before anything reads it.
@@ -138,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppSwitching.start()
         // New lists or settings reach open pages on their next load.
         blockerToken = ContentBlocker.changed.observe {
-            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+            for tab in WindowManager.shared.everyOpenTab {
                 if let webView = tab.webView, !Tab.isExtensionPage(tab.url) { ContentBlocker.apply(to: webView, for: tab.url) }
             }
         }
@@ -146,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         developerToken = DeveloperTools.changed.observe {
             // Before the tabs, so a listed page waits for its no-images rule.
             PageImages.sitesChanged()
-            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshDevelopment(settingsChanged: true) }
+            for tab in WindowManager.shared.everyOpenTab { tab.refreshDevelopment(settingsChanged: true) }
             // Its menu items come and go with it, and whatever lists the menu bar's shortcuts hears of it.
             // The listed sizes in View › Developer › Page Size follow the list.
             if DeveloperTools.isOn { MainMenu.refreshPageSizes(in: NSApp.mainMenu) }
@@ -160,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if #available(macOS 15.4, *) {
             // An ad blocker extension turned on or off, or let onto YouTube or not: open pages follow on their next load.
             extensionsToken = ExtensionCenter.changed.observe {
-                for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+                for tab in WindowManager.shared.everyOpenTab {
                     if let webView = tab.webView, !Tab.isExtensionPage(tab.url) { ContentBlocker.applyFilters(to: webView, for: tab.url) }
                 }
             }
@@ -174,10 +178,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
         // wait until you ask for them.
         let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
+        // With --headless and nothing else: runs for AI apps alone, your windows waiting until you open Zigzag. Opened
+        // for a link or an installed site too, you're here: it's the regular app.
+        if Headless.isBackgroundOnly, !pendingURLs.isEmpty || !pendingWebApps.isEmpty { Headless.becomeRegular() }
+        let backgroundOnly = Headless.isBackgroundOnly
         // Restarted for an update: exactly what was open comes back, Zigzag Mini windows too.
-        let relaunch = UpdateRelaunch.take()
+        let relaunch = backgroundOnly ? nil : UpdateRelaunch.take()
+        // Restarted for an update during a --headless run: AI apps stay in the background.
+        if let relaunch, UpdateRelaunch.isFresh(relaunch, now: Date()), relaunch.keepsAIAppsToBackground == true { Headless.goOn() }
         let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
-                                       miniOnly: miniOnly, webAppOnly: webAppOnly)
+                                       miniOnly: miniOnly, webAppOnly: webAppOnly, backgroundOnly: backgroundOnly)
         WindowManager.shared.sessionWaiting = plan.sessionWaiting
         // Settings › General › On launch: a fresh start keeps the saved session for History › Reopen Last Session
         // instead of bringing it back, and doesn't write over it until the new window is used (#433). An update's
@@ -205,16 +215,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         pendingWebApps.forEach { WebAppStore.handle($0) }
         pendingWebApps = []
-        Updater.shared.start()
-        // Just updated: what's new comes first, and the default browser offer waits for another launch. Profiles
-        // that couldn't be read come before either: what's new waits a launch.
-        if Library.shared.profilesWereSetAside { tellProfilesSetAside() } else if !WhatsNew.offerIfUpdated() { offerDefaultBrowserOnce() }
-        DockProgress.shared.start()
-        AutoPictureInPicture.shared.start()
+        // For you, not AI apps: running for them alone, this waits until you open Zigzag.
+        let forYou = { [weak self] in
+            Updater.shared.start()
+            // Just updated: what's new comes first, and the default browser offer waits for another launch. Profiles
+            // that couldn't be read come before either: what's new waits a launch.
+            if Library.shared.profilesWereSetAside { self?.tellProfilesSetAside() } else if !WhatsNew.offerIfUpdated() { self?.offerDefaultBrowserOnce() }
+            DockProgress.shared.start()
+            AutoPictureInPicture.shared.start()
+        }
+        if Headless.isBackgroundOnly { Headless.whenOpened = forYou } else { forYou() }
         Tokens.Contrast.start()
         DebugBridge.start()
         // Only if you turned it on in Settings: otherwise nothing listens.
         MCPService.startIfOn()
+        Headless.start()
     }
 
     func applicationWillBecomeActive(_ notification: Notification) { MiniLinkWake.appWillActivate() }
@@ -227,6 +242,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidHide(_ notification: Notification) { WindowManager.shared.controllers.forEach { $0.updateHandoff() } }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Opened while it ran for AI apps alone: it's yours now, your windows with it.
+        if Headless.openedByYou() { return true }
         // Only a Zigzag Mini up counts as no window: the Dock icon brings the browser back.
         let browsing = WindowManager.shared.controllers.contains { $0.window?.isVisible == true }
         guard !flag || !browsing else { return true }
@@ -400,7 +417,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A site installed as an app, opened or quit (only its small app sends these).
         if let link = URL(string: string), WebAppLink.parse(link) != nil {
             let sender = event.attributeDescriptor(forKeyword: AEKeyword(keySenderPIDAttr))?.int32Value
-            if launched { WebAppStore.handle(link, from: sender) } else { pendingWebApps.append(link) }
+            if launched {
+                // An installed site opened while Zigzag ran for AI apps alone: you're here.
+                Headless.becomeRegular()
+                WebAppStore.handle(link, from: sender)
+            } else {
+                pendingWebApps.append(link)
+            }
             return
         }
         // Only a web address or a local page; never an internal, extension or folder URL, or other file types.
@@ -439,6 +462,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func open(_ url: URL) {
         guard launched else { pendingURLs.append(url); return }
+        // A link while it ran for AI apps alone: you're here, so it's the Zigzag you know.
+        Headless.becomeRegular()
         // Zigzag Mini comes forward on its own, as Little Arc does: activating the whole app would bring every browser
         // window up behind it.
         let mini = WindowManager.shared.opensInMini(url)
@@ -561,6 +586,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
 
+    /// Window › Show AI Apps Window: brings the AI apps' background window on screen (Headless).
+    @objc func showHeadlessWindow(_ sender: Any?) { Headless.showWindow() }
+
     /// Settings opens as a tab in the front window, as History does.
     @objc func showSettings(_ sender: Any?) { frontBrowserWindow().map { SettingsPage.open(in: $0) } }
     /// Help › Keyboard Shortcuts: every shortcut, where you can change them.
@@ -589,6 +617,11 @@ extension AppDelegate: NSMenuItemValidation {
         if menuItem.action == #selector(reopenLastSession(_:)) {
             menuItem.isHidden = LaunchChoice.choice != .fresh
             return WindowManager.shared.canReopenLastSession
+        }
+        // Only while AI apps work in the background.
+        if menuItem.action == #selector(showHeadlessWindow(_:)) {
+            menuItem.isHidden = !Headless.isActive
+            return Headless.isActive
         }
         // Zigzag Mini names it Open in Zigzag while it's in front; anywhere else it's itself again.
         if menuItem.action == #selector(openDocument(_:)) { menuItem.title = BrowserWindowController.openFileTitle }

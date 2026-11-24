@@ -943,6 +943,8 @@ final class SidebarView: NSView {
     }
     /// Whether the space keys are there to show numbers on: more than one space, in a window that switches them.
     var hasSpaceKeys: Bool { !isPrivate && dots.count > 1 }
+    /// The spaces its window lists (`TabManager.listedSpaces`): all, unless it keeps to one profile.
+    var listedSpaces: () -> [SpaceInfo] = { Library.shared.spaces }
     /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
     var isPrivate = false {
         didSet {
@@ -1334,7 +1336,7 @@ final class SidebarView: NSView {
     }
 
     func reloadSpaces(current: UUID) {
-        let spaces = Library.shared.spaces
+        let spaces = listedSpaces()
         if dots.map(\.spaceID) != spaces.map(\.id) {
             // The same spaces in a new order (a drag, its undo) keep their dots, which glide to their new places.
             var kept = Dictionary(dots.map { ($0.spaceID, $0) }, uniquingKeysWith: { first, _ in first })
@@ -2012,7 +2014,7 @@ final class SidebarView: NSView {
     /// One side per turn of the run loop, so neither holds up a scroll that has just started.
     private func prepareNeighbors(next index: Int) {
         guard index < 2, handOff == nil, swipeState != .tracking, let current = currentSpaceID else { return }
-        let spaces = Library.shared.spaces
+        let spaces = listedSpaces()
         guard let at = spaces.firstIndex(where: { $0.id == current }) else { return }
         let side: CGFloat = index == 0 ? 1 : -1
         let neighbor = at + Int(side)
@@ -2252,7 +2254,7 @@ final class SidebarView: NSView {
 
     /// The spaces either side of the one in front now.
     private func findNeighbors() {
-        let spaces = Library.shared.spaces
+        let spaces = listedSpaces()
         let index = spaces.firstIndex { $0.id == currentSpaceID }
         swipeNeighbors = (index.flatMap { $0 > 0 ? spaces[$0 - 1].id : nil },
                           index.flatMap { $0 + 1 < spaces.count ? spaces[$0 + 1].id : nil })

@@ -14,15 +14,19 @@ final class ZigzagApplication: NSApplication {
 
     #if DEBUG
     static let staysBehind = ProcessInfo.processInfo.environment["ZIGZAG_STAY_BEHIND"] == "1"
+    #else
+    static let staysBehind = false
+    #endif
 
+    /// Running for AI apps alone (Headless), Zigzag never comes forward, whatever asks (a page, a link, a window),
+    /// until you open it yourself.
     override func activate() {
-        guard !Self.staysBehind else { return }
+        guard !Self.staysBehind, !Headless.isBackgroundOnly else { return }
         super.activate()
     }
 
     override func activate(ignoringOtherApps flag: Bool) {
-        guard !Self.staysBehind else { return }
+        guard !Self.staysBehind, !Headless.isBackgroundOnly else { return }
         super.activate(ignoringOtherApps: flag)
     }
-    #endif
 }

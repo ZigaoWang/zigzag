@@ -140,6 +140,9 @@ enum SiteRoutes {
         case browser
         /// A private window: nothing is routed into or out of it.
         case privateWindow
+        /// A page whose profile isn't given your data (AI apps', `Profile.getsYourData`): your routes are yours, so
+        /// none sends it out, as from a private window.
+        case withoutYourData
         /// Zigzag Mini: left as is.
         case mini
         /// A site installed as an app.
@@ -315,6 +318,13 @@ enum SiteRoutes {
         return frame != page && (PublicSuffix.registrableDomain(frame) ?? frame) != (PublicSuffix.registrableDomain(page) ?? page)
     }
 
+    /// Where a page from `tab` (else from the space `window` shows) would open; its profile decides over its window.
+    static func place(from tab: Tab?, in window: TabManager) -> Place {
+        if window.isPrivate { return .privateWindow }
+        if !(tab?.profile ?? Profiles.shared.profile(forSpace: window.currentSpaceID)).getsYourData { return .withoutYourData }
+        return tab?.isOutsideTabList == true ? .mini : .browser
+    }
+
     /// A sign-in page by address (`Tab.isSignIn`), or one with a return URL.
     static func isSignIn(_ url: URL) -> Bool {
         if Tab.isSignIn(url) { return true }
@@ -339,8 +349,8 @@ extension SiteRoutes.Route {
 extension BrowserWindowController {
     /// The space a route sends `url` to. `tab`: the tab the link came from (else the window's space).
     func routedSpace(for url: URL, arrival: SiteRoutes.Arrival, from tab: Tab? = nil) -> UUID? {
-        let place: SiteRoutes.Place = tabManager.isPrivate ? .privateWindow : tab?.isOutsideTabList == true ? .mini : .browser
-        let target = SiteRoutes.target(for: url, arrival: arrival, from: tab?.spaceID ?? tabManager.currentSpaceID, place: place,
+        let target = SiteRoutes.target(for: url, arrival: arrival, from: tab?.spaceID ?? tabManager.currentSpaceID,
+                                       place: SiteRoutes.place(from: tab, in: tabManager),
                                        routes: Library.shared.siteRoutes)
         return target.flatMap { Library.shared.space($0) != nil ? $0 : nil }
     }

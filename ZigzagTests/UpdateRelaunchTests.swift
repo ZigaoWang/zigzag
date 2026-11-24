@@ -15,6 +15,19 @@ struct UpdateRelaunchTests {
         UpdateRelaunch.Saved(at: now.addingTimeInterval(-ago), browserWindowsOpen: browsers, minis: minis)
     }
 
+    /// A --headless run stays one after an update's restart: the note says so, and only a note from the restart
+    /// launching now is believed. Notes from before it could say so still read.
+    @Test func theNoteCarriesAIAppsInTheBackground() throws {
+        var note = saved(browsers: true, minis: [])
+        #expect(note.keepsAIAppsToBackground == nil)
+        note.keepsAIAppsToBackground = true
+        let read = try JSONDecoder().decode(UpdateRelaunch.Saved.self, from: JSONEncoder().encode(note))
+        #expect(read == note && read.keepsAIAppsToBackground == true)
+        #expect(UpdateRelaunch.isFresh(note, now: now) && !UpdateRelaunch.isFresh(saved(browsers: true, minis: [], ago: UpdateRelaunch.freshFor + 1), now: now))
+        let old = Data(#"{"at":\#(now.timeIntervalSinceReferenceDate),"browserWindowsOpen":true,"minis":[]}"#.utf8)
+        #expect(try JSONDecoder().decode(UpdateRelaunch.Saved.self, from: old).keepsAIAppsToBackground == nil)
+    }
+
     @Test func aPlainLaunchRestoresTheSession() {
         let plan = UpdateRelaunch.plan(relaunch: nil, now: now, needsOnboarding: false, miniOnly: false, webAppOnly: false)
         #expect(plan == .init(restoresSession: true, sessionWaiting: false, restoresMinis: false))

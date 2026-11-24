@@ -1201,6 +1201,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let scriptJavaScriptToggle = Toggle()
     private let aiAppsToggle = Toggle()
     private var aiAppsToken: SignalToken?
+    private let backgroundToggle = Toggle()
+    private var backgroundToken: SignalToken?
     /// The server's address and its key, there while AI apps may use Zigzag.
     private lazy var aiAddressRow: FormRow = {
         let copy = PillButton(title: String(localized: "Copy", comment: "Button that copies something to the clipboard."))
@@ -1467,6 +1469,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                             control: aiAppsToggle)
         aiRow.keywords = Self.aiAppsKeywords
         aiGroup.add(aiRow)
+        backgroundToggle.onChange = { on in Headless.isOn = on }
+        let backgroundRow = FormRow(title: String(localized: "Run AI apps in the background", comment: "A setting in Settings › Automation: AI apps get a hidden window of their own, on a profile of their own (AI Apps), instead of your windows."),
+                                    detail: String(localized: "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. Opening Zigzag with --headless does the same until it quits.",
+                                                   comment: "Explanation under “Run AI apps in the background” in Settings › Automation. --headless is how Zigzag is opened from Terminal for it: not translated."),
+                                    control: backgroundToggle)
+        backgroundRow.keywords = [Self.aiAppsKeywords, String(localized: "headless background hidden window", comment: "Words that find the Run AI apps in the background setting with Find a setting in Settings. Not shown.")].joined(separator: " ")
+        aiGroup.add(backgroundRow)
+        backgroundToken = Headless.changed.observe { [weak self] in self?.refreshAIApps() }
         aiGroup.add(aiAddressRow)
         aiGroup.add(aiKeyRow)
         connectGroup.add(aiSetupRow)
@@ -2658,8 +2668,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let spaces = library.spaces(in: profile.id).count
             let extensions = Profiles.shared.profile(profile.id).installs.installedIDs.count
             // No "0 extensions": a profile without any lists only its spaces.
-            let detail = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it.")]
+            let counts = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it.")]
                                     + (extensions == 0 ? [] : [String(localized: "\(extensions) extensions", comment: "Under a profile's name in Settings › Profiles: how many extensions it has.")]))
+            let detail = profile.isHeadless
+                ? Words.sentences(String(localized: "For AI apps in the background.", comment: "Under the name of the profile AI apps use in the background (AI Apps) in Settings › Profiles: what it's for."), counts)
+                : counts
             let row = FormRow(title: profile.displayName, detail: detail, icon: ProfileSheets.tile(for: profile), control: stack)
             if let trash { row.revealsOnHover(trash) }
             profilesGroup.add(row)
@@ -2878,6 +2891,30 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         passwordsWindowGroup.removeAllRows()
         // Saving and filling are chosen for each profile: a password manager is an extension, and those are a profile's.
         let profile = profile
+        // AI apps' profile is given nothing of yours (`Profile.getsYourData`): there's nothing to choose there.
+        if !profile.getsYourData {
+            passwordsGroup.add(FormRow(title: String(localized: "Not used in this profile", comment: "A row in Settings › Passwords, in place of the password settings, with the profile AI apps use in the background chosen."),
+                                       detail: String(localized: "AI apps work in it. Zigzag never saves or fills passwords here, nor fills forms from your card.", comment: "Explanation under “Not used in this profile” in Settings › Passwords, with the profile AI apps use in the background chosen."),
+                                       control: NSView()))
+        } else {
+            addSavingAndFilling(in: profile)
+        }
+        cardToggle.isOn = ContactCard.isOn
+        cardToggle.onChange = { on in ContactCard.isOn = on }
+        // Not a profile's: with more than one, it stands apart from the two that are.
+        (hasManyProfiles ? cardGroup : passwordsGroup).add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
+                                   detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
+                                   control: cardToggle))
+        let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
+        open.onClick = { _ in PasswordsWindowController.show() }
+        // Importing is in General and in the Passwords window itself; once here would be a third time.
+        passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
+                                         detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
+                                         control: open))
+    }
+
+    /// Who saves and fills passwords in `profile`, and whether Zigzag offers to save and fill them.
+    private func addSavingAndFilling(in profile: Profile) {
         let saves = PasswordCapture.offersToSave(in: profile), fills = Autofill.isOn(in: profile)
         saveToggle.isOn = saves
         fillToggle.isOn = fills
@@ -2938,18 +2975,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                        detail: fillNote,
                                        control: fillToggle))
         }
-        cardToggle.isOn = ContactCard.isOn
-        cardToggle.onChange = { on in ContactCard.isOn = on }
-        // Not a profile's: with more than one, it stands apart from the two that are.
-        (hasManyProfiles ? cardGroup : passwordsGroup).add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
-                                   detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
-                                   control: cardToggle))
-        let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
-        open.onClick = { _ in PasswordsWindowController.show() }
-        // Importing is in General and in the Passwords window itself; once here would be a third time.
-        passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
-                                         detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
-                                         control: open))
     }
 
     private static var iCloudPasswordsName: String {
@@ -4001,6 +4026,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let shown = MCPService.isOn
         // Turned on or off elsewhere (another Settings tab): the switch follows.
         if aiAppsToggle.isOn != shown { aiAppsToggle.isOn = shown }
+        // Only for AI apps that may use Zigzag at all.
+        // Also on for a --headless run: turning it off here ends that too.
+        if backgroundToggle.isOn != Headless.isWanted { backgroundToggle.isOn = Headless.isWanted }
+        backgroundToggle.isEnabled = shown
         let detail = MCPService.problem == nil ? MCPService.address
             : MCPService.replacedKeyForBusyPort
             ? String(localized: "Couldn’t start. Port \(Int(MCPService.port)) is in use by another app, so Zigzag made a new key. Give your AI apps the new key.",

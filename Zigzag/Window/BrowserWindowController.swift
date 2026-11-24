@@ -318,6 +318,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.privateLabel = true
             sidebar.isPrivate = true
         }
+        sidebar.listedSpaces = { [weak tabManager] in tabManager?.listedSpaces ?? Library.shared.spaces }
         applySpaceColor(animated: false)
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.onMoveSpace = { [weak self] id, index in
@@ -802,10 +803,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // A video playing in a page you're leaving follows you in the mini player; coming back puts it in its page.
             let before = root.paneCards.enumerated().compactMap { i, card in i == 0 || !card.isHidden ? card.webView : nil }
                 .compactMap { ($0 as? BrowserWebView)?.owner }
-            miniPlayer.switched(from: before, to: tab.map { tabManager.panes(of: $0) } ?? [])
+            // Not from an unattended window: its video would come up on your screen from pages you never see.
+            if !isUnattended { miniPlayer.switched(from: before, to: tab.map { tabManager.panes(of: $0) } ?? []) }
             shownTab = tab
             selectedTabToken = tab?.changed.observe { [weak self] change in self?.selectedTabChanged(change) }
-            if let tab, !tabManager.isShownElsewhere(tab), case let webView = tab.ensureWebView(), window?.isKeyWindow == true, !commandBar.isVisible {
+            if let tab, !tabManager.isShownElsewhere(tab), let webView = pageView(of: tab), window?.isKeyWindow == true, !commandBar.isVisible {
                 DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(webView) }
             }
         }
@@ -1283,7 +1285,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: first) }
                 // A page another sharing window shows stays there; the card says so (#162).
                 if tabManager.mayShow(page) {
-                    card.show(page.ensureWebView())
+                    card.show(pageView(of: page))
                 } else {
                     card.showElsewhere(page) { [weak self] in self?.showHere(page) }
                 }
@@ -1317,7 +1319,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 root.card.showElsewhere(tab) { [weak self] in self?.showHere(tab) }
             } else {
                 root.card.showElsewhere(nil)
-                root.card.show(tab?.ensureWebView())
+                root.card.show(tab.flatMap(pageView))
             }
             tab?.reloadIfItStopped()
             root.card.showLoading(of: tab)
@@ -2855,6 +2857,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Set as the window closes, for what holds on to this controller past that (Zigzag Mini's source).
     private(set) var windowClosed = false
 
+    /// Closing the AI apps' window while they work hides it again instead (Headless).
+    func windowShouldClose(_ sender: NSWindow) -> Bool { !Headless.parksInsteadOfClosing(self) }
+
     func windowWillClose(_ notification: Notification) {
         EdgeSidebar.shared.windowClosed(self)
         windowClosed = true
@@ -2985,6 +2990,14 @@ extension BrowserWindowController: SwipeArrowHost {
 
 extension BrowserWindowController: TabHost {
     var hostWindow: NSWindow? { window }
+    var isUnattended: Bool { Headless.window === self }
+    var isOutOfSight: Bool { (window as? BrowserWindow)?.isParked == true }
+
+    /// The page to put in a pane for a tab, woken if it slept, as showing a tab does. Not in a window kept out of
+    /// sight: no one came to look, so a sleeping tab stays asleep until a tool wakes it (its page then gets its pane).
+    private func pageView(of tab: Tab) -> BrowserWebView? {
+        isOutOfSight && tab.isAsleep ? nil : tab.ensureWebView()
+    }
 
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
@@ -3051,8 +3064,9 @@ extension BrowserWindowController: TabHost {
             tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
             return nil
         }
-        // Sized window.open() calls are sign-in and payment popups: give them a real small window.
-        if features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
+        // Sized window.open() calls are sign-in and payment popups: give them a real small window. Unattended, they
+        // open as tabs, which an AI app can find and use.
+        if !isUnattended, features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
             return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
         let flags = action.modifierFlags
@@ -3074,6 +3088,9 @@ extension BrowserWindowController: TabHost {
     }
 
     func tabWantsToBeShown(_ tab: Tab) {
+        // AI apps' window in the background: only the app chooses the tab in front there (`activate_tab`, `open_tab`),
+        // and its tools act on that one, so a page asking to be shown changes nothing. Nor is the window brought forward.
+        guard !isOutOfSight else { return }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
         if tabManager.selectedTab !== tab { tabManager.select(tab) }

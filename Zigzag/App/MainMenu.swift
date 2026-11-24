@@ -239,6 +239,8 @@ enum MainMenu {
             item(KeepOnTop.title, #selector(AppDelegate.toggleKeepOnTop(_:)), ""),
             .separator(),
             item(String(localized: "Downloads", comment: "Window menu item."), #selector(C.showDownloads(_:)), "l", [.command, .option]),
+            // Only while AI apps work in the background (AppDelegate.validateMenuItem).
+            item(Headless.showTitle, #selector(AppDelegate.showHeadlessWindow(_:)), ""),
             .separator(),
             item(String(localized: "Bring All to Front", comment: "Window menu item."), #selector(NSApplication.arrangeInFront(_:)), ""),
         ])

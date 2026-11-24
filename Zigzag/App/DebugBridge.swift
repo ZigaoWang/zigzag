@@ -752,6 +752,17 @@ enum DebugBridge {
             }
             return
         }
+        // headless show|close|sleep: Show AI Apps Window, its close button (hides it again while AI apps work), and
+        // putting its front tab to sleep, as happens once it's left alone.
+        if name == "headless" {
+            switch arg {
+            case "show": Headless.showWindow()
+            case "close": Headless.window?.window?.performClose(nil)
+            case "sleep": Headless.window?.tabManager.selectedTab?.suspend(because: "debug")
+            default: break
+            }
+            return
+        }
         if name == "relayout" {
             // relayout: every browser window lays its pages out again, as a resize would, without coming forward.
             WindowManager.shared.controllers.forEach { $0.root.needsLayout = true; $0.root.paneCards.forEach { $0.needsLayout = true } }

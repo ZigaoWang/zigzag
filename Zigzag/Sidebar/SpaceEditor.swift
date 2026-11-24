@@ -2121,7 +2121,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     /// Whether the space has pages loaded, which another profile rebuilds.
     private var hasOpenPages: Bool {
-        WindowManager.shared.controllers.flatMap { $0.tabManager.allTabs }.contains { $0.spaceID == spaceID && !$0.isPrivate && $0.webView != nil }
+        WindowManager.shared.everyOpenTab.contains { $0.spaceID == spaceID && !$0.isPrivate && $0.webView != nil }
     }
 
     /// Pages that are loaded are rebuilt in the other profile, which is worth a question; a space with none open

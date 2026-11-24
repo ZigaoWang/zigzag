@@ -1289,6 +1289,7 @@ extension CommandBarController {
         case "history": HistoryPage.open(in: controller)
         case "archive": ArchivePage.open(in: controller)
         case "settings": SettingsPage.open(in: controller)
+        case "show-headless": Headless.showWindow()
         // The page and window commands do what the menu bar's items of the same name do.
         case "pin": if let tab = controller.tabManager.selectedTab { controller.save(tab, request: .quick) }
         case "pin-to-folder": if let tab = controller.tabManager.selectedTab { controller.save(tab, request: .picker) }

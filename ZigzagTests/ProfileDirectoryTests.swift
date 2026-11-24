@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// Which profiles there are and which space is on which, as Profiles.json keeps it.
@@ -518,5 +519,273 @@ struct ListedProfileTests {
 
     @Test func theFirstProfileIsAlwaysListed() {
         #expect(Profiles.shared.listed(Profile.defaultID) === Profiles.shared.default)
+    }
+}
+
+/// The AI Apps profile, where AI apps work in the background: made when needed, never twice, with a fixed name,
+/// and made anew after removal.
+@MainActor
+struct HeadlessProfileTests {
+    @Test func itsMadeOnceAndKnownByWhatItsFor() {
+        var directory = ProfileDirectory()
+        #expect(directory.headless == nil)
+        let made = directory.addHeadless(name: "AI Apps")
+        #expect(made.isHeadless && !made.isDefault && directory.headless == made)
+        // Asked again, it's the same one.
+        #expect(directory.addHeadless(name: "AI Apps") == made && directory.others.count == 1)
+        // A profile you make is never it.
+        #expect(!directory.add(name: "AI Apps").isHeadless && directory.headless == made)
+    }
+
+    @Test func itsNameStays() {
+        var directory = ProfileDirectory()
+        let made = directory.addHeadless(name: "AI Apps", color: .mint)
+        directory.update(made.id, name: "Mine now", color: .sky)
+        #expect(directory.headless?.name == "AI Apps" && directory.headless?.color == .sky)
+        // Shown in your language, whatever was stored.
+        #expect(directory.headless?.displayName == String(localized: "AI Apps", comment: "The name of the profile AI apps use in the background. It can't be changed."))
+    }
+
+    @Test func afterItsRemovedANewOneIsMade() {
+        var directory = ProfileDirectory()
+        let first = directory.addHeadless(name: "AI Apps")
+        directory.remove(first.id)
+        #expect(directory.headless == nil)
+        let second = directory.addHeadless(name: "AI Apps")
+        #expect(second.id != first.id && directory.headless == second)
+    }
+
+    @Test func itSurvivesTheFileAndOldFilesStillRead() throws {
+        var directory = ProfileDirectory()
+        let made = directory.addHeadless(name: "AI Apps")
+        let read = try JSONDecoder().decode(ProfileDirectory.self, from: JSONEncoder().encode(directory))
+        #expect(read.headless == made)
+        // A file from before roles, or with a role from a later Zigzag, still reads: neither is Headless.
+        let id = UUID(), later = UUID()
+        let json = #"{"others":[{"id":"\#(id.uuidString)","name":"Crypto"},{"id":"\#(later.uuidString)","name":"Other","role":"somethingNew"}]}"#
+        let old = try JSONDecoder().decode(ProfileDirectory.self, from: Data(json.utf8))
+        #expect(old.all.count == 3 && old.headless == nil)
+    }
+
+    @Test func itsNotRemovedWhileAIAppsUseIt() {
+        var directory = ProfileDirectory()
+        let made = directory.addHeadless(name: "AI Apps")
+        #expect(directory.removalBlock(made.id) == nil)
+        #expect(directory.removalBlock(made.id, inUse: [made.id]) == .inUse)
+    }
+}
+
+/// The AI Apps profile's space, through the library: made once with it, its name can't follow a space's, and
+/// removed with it instead of moving to your first profile.
+@MainActor
+struct HeadlessSpaceTests {
+    @Test func madeOnceAndGoneWithItsProfile() throws {
+        let library = Library.shared
+        let before = library.spaces.count
+        let space = library.headlessSpace()
+        let profile = try #require(library.directory.headless)
+        #expect(library.profileID(ofSpace: space.id) == profile.id)
+        // Asked again, it's the same one, and nothing is saved or announced: every tab an AI app opens asks.
+        var told = 0
+        let token = library.changed.observe { told += 1 }
+        #expect(library.headlessSpace().id == space.id && library.spaces.count == before + 1)
+        #expect(told == 0)
+        token.cancel()
+        library.renameProfile(profile.id, after: "Mine now")
+        #expect(library.directory.headless?.name == "AI Apps")
+        #expect(library.removeProfile(profile.id))
+        #expect(library.space(space.id) == nil && library.spaces.count == before)
+        library.finishedRemovingProfile(profile.id)
+    }
+}
+
+/// AI apps' profile is given nothing of yours (`Profile.isHeadless`): each thing Zigzag keeps for you, not for a
+/// profile, is still given in your profiles and withheld in theirs, whichever window the page is in.
+@MainActor
+struct NothingOfYoursTests {
+    /// A tab of theirs, and one of yours, each in no window; `check` runs while their profile is there.
+    private func withTabs(_ check: (_ theirs: Tab, _ yours: Tab) async throws -> Void) async throws {
+        let library = Library.shared
+        let space = library.headlessSpace()
+        let profile = try #require(library.directory.headless)
+        defer {
+            _ = library.removeProfile(profile.id)
+            library.finishedRemovingProfile(profile.id)
+        }
+        let theirs = Tab(url: nil, spaceID: space.id), yours = Tab(url: nil, spaceID: library.spaces[0].id)
+        #expect(theirs.profile.isHeadless && !yours.profile.isHeadless)
+        try await check(theirs, yours)
+    }
+
+    private final class Sender: NSObject, URLAuthenticationChallengeSender {
+        func use(_ credential: URLCredential, for challenge: URLAuthenticationChallenge) {}
+        func continueWithoutCredential(for challenge: URLAuthenticationChallenge) {}
+        func cancel(_ challenge: URLAuthenticationChallenge) {}
+    }
+
+    private func challenge(_ space: URLProtectionSpace) -> URLAuthenticationChallenge {
+        URLAuthenticationChallenge(protectionSpace: space, proposedCredential: nil, previousFailureCount: 0, failureResponse: nil,
+                                   error: nil, sender: Sender())
+    }
+
+    /// A site's sign-in with a login saved for it: given in your profile, never in theirs.
+    @Test func noSavedSignIn() async throws {
+        try await withTabs { theirs, yours in
+            let space = URLProtectionSpace(host: "zz-\(UUID().uuidString.lowercased()).example", port: 443, protocol: "https", realm: "Test",
+                                           authenticationMethod: NSURLAuthenticationMethodHTTPBasic)
+            let saved = URLCredential(user: "me", password: "secret", persistence: .forSession)
+            URLCredentialStorage.shared.setDefaultCredential(saved, for: space)
+            defer { URLCredentialStorage.shared.remove(saved, for: space) }
+            for (tab, gives) in [(yours, true), (theirs, false)] {
+                let page = tab.ensureWebView()
+                let answer = await AuthenticationPrompt.respond(to: challenge(space), window: nil, store: page.configuration.websiteDataStore, page: page)
+                #expect((answer.0 == .useCredential && answer.1?.user == "me") == gives, "\(tab.profile.isHeadless) \(answer.0.rawValue)")
+            }
+        }
+    }
+
+    /// A site asking for a certificate there goes on without one, before the Keychain or a kept choice is read.
+    @Test func noCertificate() async throws {
+        try await withTabs { theirs, _ in
+            let space = URLProtectionSpace(host: "zz-\(UUID().uuidString.lowercased()).example", port: 443, protocol: "https", realm: nil,
+                                           authenticationMethod: NSURLAuthenticationMethodClientCertificate)
+            let page = theirs.ensureWebView()
+            let answer = await ClientCertificates.respond(to: challenge(space), window: nil, store: page.configuration.websiteDataStore, page: page)
+            #expect(answer.0 == .rejectProtectionSpace && answer.1 == nil)
+        }
+    }
+
+    /// Zigzag saves and fills no password there, and fills no form from your card, whatever was chosen.
+    @Test func noPasswordsOrCard() async throws {
+        try await withTabs { theirs, yours in
+            Autofill.setOn(true, in: theirs.profile)
+            PasswordCapture.setOffersToSave(true, in: theirs.profile)
+            #expect(!Autofill.isOn(in: theirs.profile) && !PasswordCapture.offersToSave(in: theirs.profile))
+            let card = ContactCard.isOn
+            ContactCard.isOn = true
+            defer { ContactCard.isOn = card }
+            #expect(Autofill.fillsForms(in: yours) && !Autofill.fillsForms(in: theirs))
+        }
+    }
+
+    /// A passkey needs you there to confirm it: their pages are told there are none, with Apple's entitlement or not,
+    /// a password manager on or not. Yours are left alone with the entitlement, as before.
+    @Test func noPasskeys() {
+        for available in [true, false] {
+            for managerOn in [true, false] {
+                #expect(Passkeys.isShimmed(available: available, isPrivate: false, forAIApps: true, managerOn: managerOn))
+            }
+        }
+        #expect(!Passkeys.isShimmed(available: true, isPrivate: false, forAIApps: false, managerOn: false))
+        #expect(!Passkeys.isShimmed(available: false, isPrivate: false, forAIApps: false, managerOn: true))
+        #expect(Passkeys.isShimmed(available: false, isPrivate: false, forAIApps: false, managerOn: false))
+        #expect(Passkeys.isShimmed(available: false, isPrivate: true, forAIApps: false, managerOn: true))
+    }
+
+    /// What you allowed a site (notifications here, as the camera and location are kept alike) isn't given to it
+    /// there: it's asked, and with no one there to answer, refused.
+    @Test func noPermissionsYouGave() async throws {
+        let suite = "zigzag-nothing-of-yours-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try await withTabs { theirs, yours in
+            let origin = "https://news.example"
+            SitePermissions.remember("allow", subject: PermissionSubject.notifications, origin: origin)
+            #expect(await SitePermissions.requestNotifications(origin: origin, window: nil, isPrivate: false, tab: yours) == true)
+            #expect(SitePermissions.notifications(origin: origin, tab: theirs) == nil)
+            // Notifications from their pages would land on your screen: never shown there, as in a private window.
+            #expect(!WebNotifications.alwaysDenies(yours) && WebNotifications.alwaysDenies(theirs))
+            yours.load(URL(string: origin)!)
+            theirs.load(URL(string: origin)!)
+            #expect(yours.notifiesUser && !theirs.notifiesUser)
+        }
+    }
+
+    /// Your download and link rules (hand a file to an app, run a script, open it when done) never act on theirs.
+    @Test func noRulesOfYours() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-rules-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let store = DownloadRulesStore(file: file)
+        var script = DownloadRule(name: "Zips", applies: .linksAndDownloads, match: .contains, pattern: ".zip",
+                                  action: DownloadRuleAction(kind: .runScript))
+        script.action.scriptPath = "/usr/bin/true"
+        store.add(script)
+        store.add(DownloadRule(name: "PDFs", applies: .downloads, match: .contains, pattern: ".pdf", action: DownloadRuleAction(kind: .openFile)))
+        let zip = URL(string: "https://files.example/a.zip")!, pdf = URL(string: "https://files.example/a.pdf")!
+        try await withTabs { theirs, yours in
+            #expect(store.firstHandoffMatch(url: zip, filename: "a.zip", appliesToLinks: false, in: yours.profile)?.id == script.id)
+            #expect(store.firstHandoffMatch(url: zip, filename: "a.zip", appliesToLinks: false, in: theirs.profile) == nil)
+            #expect(store.destination(for: pdf, filename: "a.pdf", in: yours.profile)?.destination == .open)
+            #expect(store.destination(for: pdf, filename: "a.pdf", in: theirs.profile) == nil)
+        }
+    }
+
+    /// Only theirs isn't given your data; the role and the policy are known without asking the directory again.
+    @Test func onlyTheirsIsNotGivenYourData() async throws {
+        try await withTabs { theirs, yours in
+            #expect(!theirs.profile.getsYourData && yours.profile.getsYourData)
+            #expect(Profiles.shared.default.getsYourData)
+        }
+    }
+
+    /// Your site routes don't send their pages out, whether in their window or with their space open in yours.
+    @Test func noRoutesOfYours() async throws {
+        try await withTabs { theirs, yours in
+            let window = TabManager(spaceID: yours.spaceID)
+            defer { window.invalidate() }
+            #expect(SiteRoutes.place(from: yours, in: window) == .browser)
+            #expect(SiteRoutes.place(from: theirs, in: window) == .withoutYourData)
+            // A page typed in with their space in front: the space's profile decides.
+            let onTheirs = TabManager(spaceID: theirs.spaceID)
+            defer { onTheirs.invalidate() }
+            #expect(SiteRoutes.place(from: nil, in: onTheirs) == .withoutYourData)
+            #expect(SiteRoutes.place(from: nil, in: window) == .browser)
+        }
+    }
+
+    /// Your Archive is yours: a tab of theirs gone unseen past the setting stays where it is, and isn't counted
+    /// toward the offer to turn archiving on. One of yours is archived, as ever.
+    @Test func noPlaceInYourArchive() async throws {
+        let key = "ArchiveTabsAfter", before = UserDefaults.standard.string(forKey: key)
+        TabArchive.after = .day
+        defer { UserDefaults.standard.set(before, forKey: key) }
+        try await withTabs { theirs, yours in
+            let window = TabManager(spaceID: yours.spaceID)
+            defer { window.invalidate() }
+            let old = Date().addingTimeInterval(-3 * 24 * 3600)
+            var stale: [Tab] = []
+            for space in [yours.spaceID, theirs.spaceID] {
+                window.newTab(url: URL(string: "https://front.example/\(space)")!, spaceID: space, select: true)
+                let tab = window.newTab(url: URL(string: "https://stale.example/\(space)")!, spaceID: space, select: false)
+                tab.lastActivated = old
+                stale.append(tab)
+            }
+            window.switchToSpace(yours.spaceID)
+            let mine = stale[0], notMine = stale[1]
+            let counted = window.archivableTabs.flatMap { $0 }
+            #expect(counted.contains { $0 === mine } && !counted.contains { $0 === notMine })
+            window.sleepIdleTabs()
+            #expect(mine.isClosed && !notMine.isClosed)
+            let archived = TabArchive.shared.entries.map(\.url)
+            let mineURL = try #require(mine.url), notMineURL = try #require(notMine.url)
+            #expect(archived.contains(mineURL) && !archived.contains(notMineURL))
+            TabArchive.shared.remove(url: mineURL)
+        }
+    }
+
+    /// Their tabs start muted, and stay as you set them.
+    @Test func theirTabsStartMuted() async throws {
+        try await withTabs { theirs, yours in
+            #expect(theirs.isMuted && !yours.isMuted)
+            theirs.ensureWebView()
+            #expect(theirs.isMuted)
+            theirs.setMuted(false)
+            #expect(!theirs.isMuted)
+        }
     }
 }

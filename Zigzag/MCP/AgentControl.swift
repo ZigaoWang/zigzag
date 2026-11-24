@@ -17,6 +17,8 @@ final class AgentControl {
     static let quietAfter: TimeInterval = 5 * 60
 
     private(set) var inUse: [UUID: Use] = [:]
+    /// Sent when a tab starts or stops being in use.
+    let changed = Signal<Void>()
     private(set) var stopped: Set<UUID> = []
     /// Bumped on every Stop and when the setting turns off, so earlier tool calls never act after.
     private(set) var generation = 0
@@ -36,6 +38,8 @@ final class AgentControl {
 
     /// Stopped or turned off since `generation` was read.
     func stopped(since generation: Int) -> Bool { self.generation != generation }
+    /// An AI app is using the tab: it's in use (`Tab.isInUse`), so nothing puts it away under the app.
+    func isUsing(_ id: UUID) -> Bool { inUse[id] != nil }
 
     /// Stop on the bar: the tab is let go and kept out of reach, and every app is disconnected (`onStop`).
     func stop(_ id: UUID) {
@@ -119,7 +123,9 @@ final class AgentControl {
     }
 
     func refresh() {
-        let controllers = WindowManager.shared.controllers
+        changed.send()
+        // Their own background window too: when shown, it has the bar like any other.
+        let controllers = WindowManager.shared.everyController
         let live = Set(controllers.map(ObjectIdentifier.init))
         for (key, banner) in banners where !live.contains(key) {
             banner.removeFromSuperview()

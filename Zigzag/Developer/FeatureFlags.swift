@@ -167,7 +167,7 @@ enum FeatureFlags {
     /// Every open web view except sleeping tabs, which pick up settings on wake. Each has its own preferences
     /// (`WebKitSetup.separatePreferences`), so each is set: tabs, Mini, web apps, pop-ups.
     static var openWebViews: [WKWebView] {
-        let tabs: [Tab] = WindowManager.shared.controllers.flatMap(\.tabManager.allTabs)
+        let tabs: [Tab] = WindowManager.shared.everyOpenTab
             + MiniWindowController.all.map(\.tab) + WebAppWindowController.all.map(\.tab)
         let pages: [WKWebView] = tabs.compactMap { $0.webView }
         return pages + PopupWindowController.all.map(\.webView)
@@ -176,7 +176,7 @@ enum FeatureFlags {
     /// Reloads every page that's showing a website in a browser window, so a change takes effect. Zigzag's own pages
     /// (Settings, History) and sleeping tabs are left as they are.
     static func reloadAllTabs() {
-        for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+        for tab in WindowManager.shared.everyOpenTab {
             guard let webView = tab.webView, let scheme = webView.url?.scheme?.lowercased(), ["http", "https", "file"].contains(scheme) else { continue }
             webView.reload()
         }

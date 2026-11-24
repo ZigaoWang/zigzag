@@ -544,19 +544,25 @@ enum SitePermissions {
     /// The site's notification answer on `tab`'s page: Allow or Block kept for the site, else the answer given on
     /// this page.
     static func notifications(origin: String, tab: Tab?) -> Bool? {
-        notifications(origin: origin) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
+        kept(notifications(origin: origin), for: tab) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
+    }
+
+    /// What you kept for a site (Allow or Block), for a page in `tab`: none in AI apps' profile, which is given
+    /// nothing of yours (`Profile.getsYourData`). There the page is asked, and with no one to answer, refused.
+    static func kept<Answer>(_ answer: @autoclosure () -> Answer?, for tab: Tab?) -> Answer? {
+        tab?.profile.getsYourData == false ? nil : answer()
     }
 
     /// Asked like the camera, Remember checked to start. A private window never shows them anyway.
     static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
         if let known = notifications(origin: origin, tab: tab) { return known }
-        guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { tab?.noteUnanswered(.permission, "notifications"); return nil }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, answerKey: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 actions: [.deny, .allow], canRemember: true,
                                                 remembersByDefault: remembersByDefault(PermissionSubject.notifications),
                                                 answered: {
-                                                    knownAnswer(site: notifications(origin: origin),
+                                                    knownAnswer(site: kept(notifications(origin: origin), for: tab),
                                                                 page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
                                                 })
         guard let answer else { return nil }
@@ -565,13 +571,13 @@ enum SitePermissions {
 
     /// The location answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on this page.
     private static func location(key: String, tab: Tab?) -> Bool? {
-        location(origin: key) ?? tab?.permissionAnswers.answer(key: key, kind: "location")
+        kept(location(origin: key), for: tab) ?? tab?.permissionAnswers.answer(key: key, kind: "location")
     }
 
     /// The camera or microphone answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on
     /// this page.
     private static func decision(key: String, type: WKMediaCaptureType, tab: Tab?) -> Bool? {
-        decision(origin: key, type: type) ?? tab?.permissionAnswers.answer(key: key, kind: kind(type))
+        kept(decision(origin: key, type: type), for: tab) ?? tab?.permissionAnswers.answer(key: key, kind: kind(type))
     }
 
     /// Location, asked the same way as the camera. A page with no origin to keep it under (file:) is asked every time.
@@ -580,7 +586,7 @@ enum SitePermissions {
         let key = answerKey(frame: frame, page: page)
         if let key, let known = location(key: key, tab: tab) { return known ? .grant : .deny }
         noteAsked(.location, origin: page, isPrivate: isPrivate)
-        guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { tab?.noteUnanswered(.permission, "location"); return .deny }
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
@@ -588,7 +594,7 @@ enum SitePermissions {
                                                 remembersByDefault: remembersByDefault(PermissionSubject.location),
                                                 answered: {
                                                     key.flatMap { key in
-                                                        knownAnswer(site: location(origin: key),
+                                                        knownAnswer(site: kept(location(origin: key), for: tab),
                                                                     page: tab?.permissionAnswers.answer(key: key, kind: "location"))
                                                     }
                                                 })
@@ -612,6 +618,8 @@ enum SitePermissions {
             for type in types where key.flatMap({ decision(key: $0, type: type, tab: tab) }) == nil {
                 noteAsked(type == .microphone ? .microphone : .camera, origin: page, isPrivate: isPrivate)
             }
+            // A page with no one there says so to the AI app using it.
+            tab?.noteUnanswered(.permission, type == .camera ? "camera" : type == .microphone ? "microphone" : "camera and microphone")
             return .deny
         }
         // A no for either kind already settles it; don't ask about the other.
@@ -638,7 +646,7 @@ enum SitePermissions {
                                                     remembersByDefault: remembersByDefault(PermissionSubject.media(type)),
                                                     answered: {
                                                         key.flatMap { key in
-                                                            knownAnswer(site: decision(origin: key, type: type),
+                                                            knownAnswer(site: kept(decision(origin: key, type: type), for: tab),
                                                                         page: tab?.permissionAnswers.answer(key: key, kind: kind(type)))
                                                         }
                                                     })
@@ -662,6 +670,7 @@ enum SitePermissions {
         let isPrivate = tab?.isPrivate ?? false
         guard let controller = WindowManager.shared.promptHost(for: window) else {
             noteAsked(.screen, origin: page, isPrivate: isPrivate)
+            tab?.noteUnanswered(.permission, "screen sharing")
             return .deny
         }
         if let key, let kept = screenAnswer(key: key, tab: tab) {
@@ -688,8 +697,8 @@ enum SitePermissions {
 
     /// The site's kept choice, then the page's.
     private static func screenAnswer(key: String, tab: Tab?) -> PermissionAnswer? {
-        if let kept = DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: key)) {
-            return PermissionAnswer(action: kept.action, remember: true)
+        if let site = kept(DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: key)), for: tab) {
+            return PermissionAnswer(action: site.action, remember: true)
         }
         if let page = tab?.permissionAnswers.action(key: key, kind: PermissionSubject.screen),
            let kept = DisplayCaptureChoice(action: page) {

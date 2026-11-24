@@ -808,8 +808,11 @@ final class DownloadRulesStore {
 
     /// First handoff rule for a download, unless an earlier destination rule claims it first (a later catch-all
     /// handoff can't take a file a type rule claimed). An Open refused by `DownloadOpening` counts as no match.
-    func firstHandoffMatch(url: URL, filename: String, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
-        Self.firstHandoffMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+    /// `profile`: the asking page's. None apply in AI apps' profile (`Profile.getsYourData`): your rules hand files to
+    /// your apps and run your scripts.
+    func firstHandoffMatch(url: URL, filename: String, appliesToLinks: Bool, isPrivate: Bool = false, in profile: Profile?) -> DownloadRule? {
+        guard profile?.getsYourData != false else { return nil }
+        return Self.firstHandoffMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
     }
 
     nonisolated static func firstHandoffMatch(in rules: [DownloadRule], url: URL, filename: String = "",
@@ -832,9 +835,10 @@ final class DownloadRulesStore {
     }
 
     /// First destination rule (`saveToFolder`, `openFile`) for this download; handoff rules are left to the handoff
-    /// path. First match wins.
-    func destination(for url: URL, filename: String) -> (rule: DownloadRule, destination: DownloadDestination)? {
-        Self.destination(in: rules, url: url, filename: filename)
+    /// path. First match wins. `profile`: the downloading page's; none apply in AI apps' profile, as for hand-offs.
+    func destination(for url: URL, filename: String, in profile: Profile?) -> (rule: DownloadRule, destination: DownloadDestination)? {
+        guard profile?.getsYourData != false else { return nil }
+        return Self.destination(in: rules, url: url, filename: filename)
     }
 
     /// Static version for testing or previews.

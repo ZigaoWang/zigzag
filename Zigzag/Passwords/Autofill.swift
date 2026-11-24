@@ -52,14 +52,19 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private var scrollMonitor: Any?
 
     /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them
-    /// and Zigzag has no passwords brought over from another browser.
+    /// and Zigzag has no passwords brought over from another browser. Never where the profile isn't given your data (`Profile.getsYourData`).
     static func isOn(in profile: Profile) -> Bool {
-        PasswordManagers.zigzagHandles(chosen: ProfileKey.fillsPasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil,
+        profile.getsYourData && PasswordManagers.zigzagHandles(chosen: ProfileKey.fillsPasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil,
                                        imported: UserDefaults.standard.bool(forKey: importedKey))
     }
 
     static func setOn(_ on: Bool, in profile: Profile) {
         UserDefaults.standard.set(on, forKey: ProfileKey.fillsPasswords.name(in: profile.id))
+    }
+
+    /// Whether a form in `tab` is offered your card from Contacts: not in a private window, nor in AI apps' profile.
+    static func fillsForms(in tab: Tab?) -> Bool {
+        ContactCard.isOn && !(tab?.isPrivate ?? false) && (tab?.profile.getsYourData ?? true)
     }
 
     static var script: WKUserScript {
@@ -93,7 +98,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let current = generation
             // A name, email, phone or address field: offer your card from Contacts. Read only once you pick it.
             if body["isForm"] as? Bool == true {
-                guard ContactCard.isOn, !(webView.owner?.isPrivate ?? false) else { hide(); return }
+                guard Self.fillsForms(in: webView.owner) else { hide(); return }
                 show([.contact], under: field, in: webView, frame: frame, origin: origin)
                 return
             }

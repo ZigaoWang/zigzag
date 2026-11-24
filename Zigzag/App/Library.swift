@@ -1941,9 +1941,19 @@ final class Library {
         return info
     }
 
+    /// The space AI apps work in in the background: the AI Apps profile's. Both are made on first need (and again
+    /// after you remove them), never twice.
+    func headlessSpace() -> SpaceInfo {
+        let used = profiles.map { color(of: $0) }
+        let profile = directory.headless ?? directory.addHeadless(name: "AI Apps", color: SpaceColor.next(unused: used))
+        // An existing space needs no save or signal. A new profile has no space yet, and making its space saves both.
+        if let space = spaces(in: profile.id).first { return space }
+        return addSpace(name: profile.displayName, color: profile.color, profile: profile.id)
+    }
+
     /// A profile made for a space keeps its name while the space is being named: typed, the space's new name.
     func renameProfile(_ id: UUID, after spaceName: String) {
-        guard let profile = directory.profile(id), !profile.isDefault else { return }
+        guard let profile = directory.profile(id), !profile.isDefault, !profile.isHeadless else { return }
         let name = ProfileDirectory.freshName(spaceName, taken: profiles.filter { $0.id != id }.map(\.displayName))
         guard !name.isEmpty, name != profile.name else { return }
         directory.update(id, name: name, color: profile.color)
@@ -1984,22 +1994,29 @@ final class Library {
     }
 
     /// Takes a profile out of the list, leaving its data to be erased (Profiles). Its spaces move to the first
-    /// profile; its favorites go with it. Written at once: from here on, a removal that's interrupted is finished
+    /// profile (the AI Apps profile's go with it); its favorites go with it. Written at once: from here on, a
+    /// removal that's interrupted is finished
     /// at the next start.
     ///
     /// False, with nothing changed, when that couldn't be written (a full disk): erasing its data then would leave
     /// a profile that comes back at the next start with its extensions and history gone.
     @discardableResult
     func removeProfile(_ id: UUID) -> Bool {
-        guard directory.profile(id)?.isDefault == false else { return false }
-        let before = (directory, favorites, favoriteSplits)
+        guard let profile = directory.profile(id), !profile.isDefault else { return false }
+        let before = (directory, favorites, favoriteSplits, spaces)
         let gone = Set(favorites(in: id).map(\.id))
         favorites.removeAll { gone.contains($0.id) }
         tidyFavorites()
+        // The AI Apps profile's spaces were made for AI apps, not by you: they go with it instead of moving to your
+        // first profile, and come back with it when AI apps next run in the background. One space is always left.
+        if profile.isHeadless {
+            let own = Set(spaces(in: id).map(\.id))
+            if spaces.count > own.count { spaces.removeAll { own.contains($0.id) } }
+        }
         directory.remove(id)
         saveNow()
         guard savedDirectory == directory else {
-            (directory, favorites, favoriteSplits) = before
+            (directory, favorites, favoriteSplits, spaces) = before
             return false
         }
         changed.send()

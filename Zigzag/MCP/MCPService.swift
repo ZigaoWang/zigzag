@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import WebKit
 
 /// Settings › Automation › Let AI apps use Zigzag: an MCP server on this Mac only, off until you turn it
 /// on. Off, nothing listens at all. On, apps that have its key can list, open, read and use your tabs.
@@ -27,6 +28,9 @@ enum MCPService {
     static let changed = Signal<Void>()
 
     private static var server: MCPServer?
+
+    /// When an AI app last asked anything of Zigzag, if one has since the server started.
+    static var lastRequest: Date? { server?.endpoint.lastRequest }
 
     static func setOn(_ on: Bool) {
         UserDefaults.standard.set(on, forKey: key)
@@ -147,7 +151,13 @@ enum MCPService {
     #if DEBUG
     static var debugState: [String: Any] {
         ["on": isOn, "port": Int(port), "problem": problem ?? "", "running": server != nil, "sessions": server?.endpoint.sessionCount ?? 0,
-         "inUse": AgentControl.shared.inUse.count, "banners": AgentControl.shared.debugBannerLines]
+         "inUse": AgentControl.shared.inUse.count, "banners": AgentControl.shared.debugBannerLines,
+         "headless": Headless.isActive, "headlessWindow": Headless.window != nil, "backgroundOnly": Headless.isBackgroundOnly,
+         "headlessTabs": Headless.window?.tabManager.allTabs.count ?? 0,
+         "headlessAsleep": Headless.window?.tabManager.allTabs.filter(\.isSuspended).count ?? 0,
+         // Muted as Zigzag has it and as WebKit has the page (a tab with no page yet counts by its own).
+         "headlessMuted": Headless.window?.tabManager.allTabs.filter { $0.isMuted && ($0.webView?.pageMutedState.map(WKWebView.isAudioMuted) ?? true) }.count ?? 0,
+         "headlessKey": Headless.window?.window.map { $0.isKeyWindow || $0.isMainWindow } ?? false]
     }
     #endif
 }

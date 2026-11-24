@@ -187,7 +187,7 @@ final class MemoryPressure {
         guard TabSleep.looksAgain(at: now, lastLook: lastLook, lastLevel: lastLookLevel, level: level) else { return }
         lastLook = now
         lastLookLevel = level
-        for controller in WindowManager.shared.controllers { controller.tabManager.sleepIdleTabs() }
+        for controller in WindowManager.shared.everyController { controller.tabManager.sleepIdleTabs() }
     }
 
     /// When a warning last had every window look for tabs to sleep, and how short memory was then.
