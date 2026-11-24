@@ -155,8 +155,7 @@ final class WindowManager {
         return controllers.first { $0.tabManager.tab(with: tab.id) === tab }
     }
 
-    /// Each open tab of your windows once, however many list it. For what reaches every running page (a setting, a
-    /// refresh), `everyOpenTab`, which adds AI apps' own.
+    /// Each open tab of your windows once; `everyOpenTab` adds AI apps'.
     var openTabs: [Tab] {
         var seen = Set<ObjectIdentifier>()
         return controllers.flatMap { controller -> [Tab] in
@@ -274,17 +273,13 @@ final class WindowManager {
         return controller
     }
 
-    /// Every browser window with tabs: yours, plus the AI apps' background window, which `controllers` leaves out. For
-    /// what concerns tabs wherever they are (the AI app bar, sleep), never for what concerns your windows.
+    /// Your windows plus AI apps' unseen one: for tabs wherever they are, never for your windows.
     var everyController: [BrowserWindowController] { controllers + [Headless.window].compactMap { $0 } }
 
-    /// Each open tab once, yours (`openTabs`) and those of the window AI apps work in: for whatever reaches every
-    /// running page.
+    /// Each open tab once, AI apps' included: for what reaches every running page.
     var everyOpenTab: [Tab] { openTabs + (Headless.window?.tabManager.allTabs ?? []) }
 
-    /// The AI apps' background window (Headless): made like any browser window but never shown, and kept out of
-    /// `controllers`. Not one of your windows, so never saved or restored, scripted, asked about when quitting, given
-    /// extensions' tabs, or taken for the front one.
+    /// AI apps' unseen window, kept out of `controllers`: never saved, scripted or taken for the front one.
     func makeHeadless(spaceID: UUID) -> BrowserWindowController {
         BrowserWindowController(tabManager: TabManager(spaceID: spaceID, isPrivate: false, keepsToProfile: Library.shared.profileID(ofSpace: spaceID)),
                                 frame: NSRect(origin: Headless.parkedOrigin, size: Headless.parkedSize))

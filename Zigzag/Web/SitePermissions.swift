@@ -547,8 +547,7 @@ enum SitePermissions {
         kept(notifications(origin: origin), for: tab) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
     }
 
-    /// What you kept for a site (Allow or Block), for a page in `tab`: none in AI apps' profile, which is given
-    /// nothing of yours (`Profile.getsYourData`). There the page is asked, and with no one to answer, refused.
+    /// What you kept for a site; none for AI apps' pages, which are asked and so refused.
     static func kept<Answer>(_ answer: @autoclosure () -> Answer?, for tab: Tab?) -> Answer? {
         tab?.profile.getsYourData == false ? nil : answer()
     }

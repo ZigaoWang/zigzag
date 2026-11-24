@@ -59,8 +59,7 @@ enum Headless {
         DistributedNotificationCenter.default().postNotificationName(requestName, object: nil, userInfo: nil, deliverImmediately: true)
     }
 
-    /// A copy opened the usual way tells the running one, which may be running for AI apps alone with no icon to
-    /// click: activating it alone wouldn't make it yours. Carries no data.
+    /// A copy opened the usual way tells the running one, so one running for AI apps becomes yours.
     static func tellRunningCopyYouOpened() {
         DistributedNotificationCenter.default().postNotificationName(openedName, object: nil, userInfo: nil, deliverImmediately: true)
     }
@@ -106,8 +105,7 @@ enum Headless {
         refresh()
     }
 
-    /// You opened Zigzag (its icon, or a copy opened the usual way) while it ran for AI apps alone: it becomes yours,
-    /// with your windows. False when it already was.
+    /// You opened Zigzag while it ran for AI apps alone: it becomes yours. False when it already was.
     static func openedByYou() -> Bool {
         guard isBackgroundOnly else { return false }
         becomeRegular()
@@ -130,8 +128,7 @@ enum Headless {
         NSApp.activate()
     }
 
-    /// After anything that may start or stop it: updates the menu bar item, and closes the AI apps' window once they
-    /// can't use it. Zigzag then quits if it ran for them alone.
+    /// Updates the menu bar item, and closes their window (and quits, if it ran for them alone) once it's off.
     static func refresh() {
         if !isActive {
             closeWindow()
@@ -159,9 +156,7 @@ enum Headless {
     /// The window AI apps work in, while it's open.
     static var window: BrowserWindowController? { controller }
 
-    /// The window AI apps work in, as it is, or made on first need on the AI Apps profile's space (with the profile
-    /// and its space if missing: `Library.headlessSpace`). Open, it's left on the space it shows: one of theirs
-    /// (`TabManager.keepsTo`), and closed if that space goes.
+    /// Their window, made on first need on the AI Apps space; closed if that space goes.
     static func openWindow() -> BrowserWindowController {
         if let controller { return controller }
         let space = Library.shared.headlessSpace()
@@ -186,8 +181,7 @@ enum Headless {
         return made
     }
 
-    /// Show AI Apps Window: brings their window on screen (making it if needed) to watch them work, with the same tabs
-    /// and refs. Zigzag becomes a regular app. Your own windows open when you ask.
+    /// Show AI Apps Window: their window on screen, with the same tabs and refs.
     static func showWindow() {
         guard isActive else { return }
         let controller = openWindow()
@@ -207,8 +201,7 @@ enum Headless {
         window.ignoresMouseEvents = false
         window.isExcludedFromWindowsMenu = false
         window.hasShadow = true
-        // For watching only: no full screen, no Dock. Minimized, it would stop counting as on screen, and pages
-        // couldn't be captured.
+        // For watching only: never full screen or minimized, so its pages can still be captured.
         window.collectionBehavior = [.fullScreenNone]
         window.styleMask.remove(.miniaturizable)
         window.setFrame(BrowserWindowController.defaultFrame(), display: true)
@@ -227,9 +220,7 @@ enum Headless {
     /// Whether macOS is kept from napping Zigzag, for their pages' sake.
     static var holdsOffAppNap: Bool { activity != nil }
 
-    /// Keeps their pages running while an AI app uses one (`AgentControl`: until a while after its last tool), since
-    /// macOS naps an app with no window on screen. Not held whenever the window is open: idle, it costs what any window
-    /// of sleeping tabs does.
+    /// Holds off App Nap while an app is using one of their tabs.
     private static func refreshActivity() {
         let atWork = controller?.tabManager.allTabs.contains { AgentControl.shared.isUsing($0.id) } ?? false
         if atWork, activity == nil {
@@ -266,8 +257,7 @@ enum Headless {
         return controller.tabManager.allTabs.contains { $0 === tab }
     }
 
-    /// Hides the window as extensions' hidden pages are (BridgeOffscreen): far off screen, clear, and skipped by the
-    /// mouse, Mission Control and ⌘`. It still counts as shown, so its pages run and draw.
+    /// Parks the window off screen and clear, as BridgeOffscreen does, so its pages still draw.
     static func park(_ controller: BrowserWindowController) {
         guard let window = controller.window as? BrowserWindow else { return }
         // Ordered out first when key or main, so keyboard focus moves to your next window instead of staying unseen.
@@ -295,8 +285,7 @@ enum Headless {
     /// Start of the idle wait when running for AI apps alone: launch, or the last `--headless` request.
     private(set) static var waitingSince = Date()
 
-    /// How long Zigzag, running for AI apps alone, stays after their last request. Long enough for an app that thinks
-    /// a while between steps.
+    /// How long Zigzag, running for AI apps alone, waits after their last request.
     static var idleQuitAfter: TimeInterval {
         #if DEBUG
         if let seconds = ProcessInfo.processInfo.environment["ZIGZAG_HEADLESS_IDLE"].flatMap(TimeInterval.init) { return seconds }
@@ -304,8 +293,7 @@ enum Headless {
         return 30 * 60
     }
 
-    /// Whether Zigzag, running for AI apps alone, may quit: no request for long enough (`last`: their last request of
-    /// any kind, MCPEndpoint) and no active download.
+    /// Idle: no request for `wait` since `last`, and nothing downloading.
     nonisolated static func isIdle(since last: Date, downloads: Int = 0, now: Date, after wait: TimeInterval) -> Bool {
         downloads == 0 && now.timeIntervalSince(last) >= wait
     }

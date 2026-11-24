@@ -20,11 +20,9 @@ protocol TabHost: AnyObject {
     func tab(_ tab: Tab, pageFullScreenChanged on: Bool)
     /// The expand button over a page-filled page: the one explicit hand-off to WebKit's own full screen.
     func tabDidAskToExpandFullScreen(_ tab: Tab)
-    /// Whether no one is there to answer its pages: true for the AI apps' background window (Headless), where what a
-    /// page asks of a person (a dialog, a file, where to save) gets the quiet answer.
+    /// No one there to answer its pages (AI apps' window): prompts get the quiet answer.
     var isUnattended: Bool { get }
-    /// Whether its window is kept unseen (the AI apps' window until shown): its selected tab isn't on screen and
-    /// sleeps like any other once idle.
+    /// Its window is kept unseen, so its selected tab may sleep.
     var isOutOfSight: Bool { get }
 }
 
@@ -252,8 +250,7 @@ final class Tab: NSObject {
     /// Its profile's extensions. In a private tab, only those allowed in private windows run (ExtensionHost).
     @available(macOS 15.4, *)
     var extensionHost: ExtensionHost? { profile.extensions }
-    /// In a call (camera or microphone on, even muted), floating in Picture in Picture, playing in the mini player, or
-    /// used by an AI app (`AgentControl`), asleep or not: not to be put to sleep, archived or cleared away.
+    /// In a call, in Picture in Picture or the mini player, or used by an AI app: never slept or archived.
     var isInUse: Bool {
         if AgentControl.shared.isUsing(id) { return true }
         guard let webView else { return false }
@@ -310,8 +307,7 @@ final class Tab: NSObject {
 
     /// No one is there to answer what its page asks (`TabHost.isUnattended`).
     var isUnattended: Bool { host?.isUnattended ?? false }
-    /// The window its page's prompts show in. Nil when no one is there to answer: each prompt then takes the path of
-    /// a page in no window, and is answered no.
+    /// Where its prompts show; nil with no one there, so each is answered no.
     private var promptWindow: NSWindow? { isUnattended ? nil : host?.hostWindow }
 
     /// Something a page asked with no one there, answered no for it.
@@ -414,8 +410,7 @@ final class Tab: NSObject {
         // A page WebKit made for another page's new window is in that page's profile, whatever space it lands in.
         let profile = configuration.flatMap { Profiles.shared.profile(ofStore: $0.websiteDataStore) } ?? Profiles.shared.profile(forSpace: spaceID)
         self.profile = profile
-        // AI apps' pages play to no one: muted from the start, until you unmute one in their window. Each page the
-        // tab loads is muted with it (`ensureWebView`).
+        // AI apps' tabs start muted, each page with them (`ensureWebView`).
         self.isMuted = profile.isHeadless
         self.pendingConfiguration = configuration
         self.pendingInteractionState = interactionState
@@ -1522,16 +1517,12 @@ final class Tab: NSObject {
         }
     }
 
-    /// The number of holds on its page out of sight (`holdOutOfSight`), which placement this is (it may be taken away
-    /// and placed again during an earlier hold), and its holder's resizing mask before.
+    /// Holds on its page out of sight, which placement it is, and its holder's old mask.
     private var outOfSightHolds = 0
     private var outOfSightSetting = 0
     private var resizingBeforeHold: NSView.AutoresizingMask = []
 
-    /// Places its page in `host` at `size`, where it's drawn unseen: a page in no window isn't drawn at all. Returns
-    /// the release, or nil when there's no page to hold or it's already in a window. With several holds (two
-    /// pictures), the last release frees it. A hold from before something else took the page (you selected its tab)
-    /// releases nothing placed since.
+    /// Puts its page in `host` to draw unseen; the last release frees it. Nil with no page or one in a window.
     func holdOutOfSight(in host: NSView, size: NSSize) -> (() -> Void)? {
         guard let webView, let holder = pageHolder, webView.superview === holder, hasLoadedOnce,
               host.window != nil, size.width > 0, size.height > 0 else { return nil }
@@ -1731,8 +1722,7 @@ final class Tab: NSObject {
         #endif
     }()
 
-    /// `watchesCover` for this tab: never for AI apps' pages (Headless), which run as if seen in a window no one sees,
-    /// so nothing turns WebKit's hiding back on once their sound stops.
+    /// Never for AI apps' pages, which run as if seen.
     var watchesCover: Bool { Self.watchesCover && !profile.isHeadless }
 
     static func setWatchesCover(_ on: Bool, of webView: WKWebView) {
@@ -2708,8 +2698,7 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let answer = await AuthenticationPrompt.respond(to: challenge, window: promptWindow, store: webView.configuration.websiteDataStore, page: webView,
                                                         tab: isPrivate ? nil : self)
-        // With no one there, a site's name and password prompt is cancelled, and a site asking for a certificate goes
-        // on without one (AI apps' profile is given none of yours): the app is told.
+        // With no one there, sign-in and certificate requests are refused, and the app is told.
         let method = challenge.protectionSpace.authenticationMethod
         if isUnattended, answer.0 == .cancelAuthenticationChallenge,
            [NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodHTTPDigest, NSURLAuthenticationMethodNTLM].contains(method) {

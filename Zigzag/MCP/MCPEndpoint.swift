@@ -195,8 +195,7 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
     private let lock = NSLock()
     private var token: String
     private var sessions: [String: Session] = [:]
-    /// When an app last had a request accepted: starting a session, asking in one, or a request that carries all it is.
-    /// Refused requests and goodbyes don't count.
+    /// When an app last had a request accepted; refusals and goodbyes don't count.
     private var lastRequestAt: Date?
     private let runner: MCPToolRunner
     private let serverVersion: String
@@ -250,8 +249,7 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
         return sessions.count
     }
 
-    /// When an app last asked anything (a tool, a list of them, a ping), or nil if none has yet. Sessions never end by
-    /// themselves, so this, not their count, says whether apps are still about.
+    /// When an app last asked anything, or nil: sessions never end on their own.
     var lastRequest: Date? {
         lock.lock(); defer { lock.unlock() }
         return lastRequestAt

@@ -522,8 +522,7 @@ struct ListedProfileTests {
     }
 }
 
-/// The AI Apps profile, where AI apps work in the background: made when needed, never twice, with a fixed name,
-/// and made anew after removal.
+/// The AI Apps profile: made once when needed, fixed name, made anew after removal.
 @MainActor
 struct HeadlessProfileTests {
     @Test func itsMadeOnceAndKnownByWhatItsFor() {
@@ -575,8 +574,7 @@ struct HeadlessProfileTests {
     }
 }
 
-/// The AI Apps profile's space, through the library: made once with it, its name can't follow a space's, and
-/// removed with it instead of moving to your first profile.
+/// The AI Apps space: made once with its profile, and removed with it.
 @MainActor
 struct HeadlessSpaceTests {
     @Test func madeOnceAndGoneWithItsProfile() throws {
@@ -604,8 +602,7 @@ struct HeadlessSpaceTests {
     }
 }
 
-/// AI apps' profile is given nothing of yours (`Profile.isHeadless`): each thing Zigzag keeps for you, not for a
-/// profile, is still given in your profiles and withheld in theirs, whichever window the page is in.
+/// What's yours is given in your profiles and withheld in AI Apps.
 @MainActor
 struct NothingOfYoursTests {
     /// A tab of theirs, and one of yours, each in no window; `check` runs while their profile is there.
@@ -673,8 +670,7 @@ struct NothingOfYoursTests {
         }
     }
 
-    /// A passkey needs you there to confirm it: their pages are told there are none, with Apple's entitlement or not,
-    /// a password manager on or not. Yours are left alone with the entitlement, as before.
+    /// Their pages are told there are no passkeys, entitlement or not.
     @Test func noPasskeys() {
         for available in [true, false] {
             for managerOn in [true, false] {
@@ -687,8 +683,7 @@ struct NothingOfYoursTests {
         #expect(Passkeys.isShimmed(available: false, isPrivate: true, forAIApps: false, managerOn: true))
     }
 
-    /// What you allowed a site (notifications here, as the camera and location are kept alike) isn't given to it
-    /// there: it's asked, and with no one there to answer, refused.
+    /// What you allowed a site isn't given there: it's asked, and so refused.
     @Test func noPermissionsYouGave() async throws {
         let suite = "zigzag-nothing-of-yours-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -799,8 +794,7 @@ struct NothingOfYoursTests {
         }
     }
 
-    /// Your Archive is yours: a tab of theirs gone unseen past the setting stays where it is, and isn't counted
-    /// toward the offer to turn archiving on. One of yours is archived, as ever.
+    /// A stale tab of theirs isn't archived or counted toward the offer; one of yours is.
     @Test func noPlaceInYourArchive() async throws {
         let key = "ArchiveTabsAfter", before = UserDefaults.standard.string(forKey: key)
         TabArchive.after = .day

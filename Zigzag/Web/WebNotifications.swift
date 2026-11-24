@@ -108,8 +108,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         }
     }
 
-    /// A page that may never show one: in a private window, which leaves no trace, and in AI apps' profile, where no
-    /// one would see it but it would come up on your screen.
+    /// Never in a private window or for AI apps, whose notifications would land on your screen.
     static func alwaysDenies(_ tab: Tab) -> Bool { tab.isPrivate || !tab.profile.getsYourData }
 
     private func permission(origin: String, tab: Tab) -> String {

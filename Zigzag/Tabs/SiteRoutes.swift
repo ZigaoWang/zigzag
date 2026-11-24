@@ -140,8 +140,7 @@ enum SiteRoutes {
         case browser
         /// A private window: nothing is routed into or out of it.
         case privateWindow
-        /// A page whose profile isn't given your data (AI apps', `Profile.getsYourData`): your routes are yours, so
-        /// none sends it out, as from a private window.
+        /// AI apps' pages (`Profile.getsYourData`): never routed, as from a private window.
         case withoutYourData
         /// Zigzag Mini: left as is.
         case mini

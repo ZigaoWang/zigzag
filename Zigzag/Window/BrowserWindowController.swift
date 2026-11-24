@@ -2995,8 +2995,7 @@ extension BrowserWindowController: TabHost {
     var isUnattended: Bool { Headless.window === self }
     var isOutOfSight: Bool { (window as? BrowserWindow)?.isParked == true }
 
-    /// The page to put in a pane for a tab, woken if it slept, as showing a tab does. Not in a window kept out of
-    /// sight: no one came to look, so a sleeping tab stays asleep until a tool wakes it (its page then gets its pane).
+    /// The page for a pane, woken if it slept; not in an unseen window, where only a tool wakes it.
     private func pageView(of tab: Tab) -> BrowserWebView? {
         isOutOfSight && tab.isAsleep ? nil : tab.ensureWebView()
     }
@@ -3066,8 +3065,7 @@ extension BrowserWindowController: TabHost {
             tab.openFromPage(url, isClick: PopupNotice.isUserInitiated(action), asker: action.sourceFrame.securityOrigin)
             return nil
         }
-        // Sized window.open() calls are sign-in and payment popups: give them a real small window. Unattended, they
-        // open as tabs, which an AI app can find and use.
+        // Sized window.open() calls get a small window; with no one there, a tab.
         if !isUnattended, features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false {
             return PopupWindowController.open(configuration: configuration, features: features, parent: window, opener: tab)
         }
@@ -3090,8 +3088,7 @@ extension BrowserWindowController: TabHost {
     }
 
     func tabWantsToBeShown(_ tab: Tab) {
-        // AI apps' window in the background: only the app chooses the tab in front there (`activate_tab`, `open_tab`),
-        // and its tools act on that one, so a page asking to be shown changes nothing. Nor is the window brought forward.
+        // In AI apps' window only the app picks the tab in front, and the window never comes forward.
         guard !isOutOfSight else { return }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)

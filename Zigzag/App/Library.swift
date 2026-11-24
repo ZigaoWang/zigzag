@@ -1948,8 +1948,7 @@ final class Library {
         return info
     }
 
-    /// The space AI apps work in in the background: the AI Apps profile's. Both are made on first need (and again
-    /// after you remove them), never twice.
+    /// The AI Apps profile's space, made with the profile on first need.
     func headlessSpace() -> SpaceInfo {
         let used = profiles.map { color(of: $0) }
         let profile = directory.headless ?? directory.addHeadless(name: "AI Apps", color: SpaceColor.next(unused: used))
@@ -2002,8 +2001,7 @@ final class Library {
 
     /// Takes a profile out of the list, leaving its data to be erased (Profiles). Its spaces move to the first
     /// profile (the AI Apps profile's go with it); its favorites go with it. Written at once: from here on, a
-    /// removal that's interrupted is finished
-    /// at the next start.
+    /// removal that's interrupted is finished at the next start.
     ///
     /// False, with nothing changed, when that couldn't be written (a full disk): erasing its data then would leave
     /// a profile that comes back at the next start with its extensions and history gone.

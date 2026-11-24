@@ -82,8 +82,7 @@ enum ExternalLinks {
         let scheme = url.scheme?.lowercased() ?? ""
         // Only a site installed as an app sends these, from its own small app: never a page.
         if scheme == WebAppLink.scheme { return }
-        // A page with no one there (AI apps in the background) never opens another app: no one can be asked, and an
-        // Always Open for the site was chosen for you, not for them.
+        // With no one there, a page never opens another app.
         if let tab = (webView as? BrowserWebView)?.owner, tab.isUnattended {
             Diagnostics.note("Blocked opening an app", site: webView.url?.host(), "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             tab.noteUnanswered(.app, "\(scheme):")

@@ -108,16 +108,13 @@ final class TabManager {
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
     var privateStore: WKWebsiteDataStore? { store.privateStore }
     var isPrivate: Bool { privateStore != nil }
-    /// The one profile whose spaces this window shows, if it keeps to one. The AI apps' window keeps to the Headless
-    /// profile (Headless), so nothing of yours opens unseen and nothing is saved.
+    /// The one profile whose spaces this window shows: AI apps' window keeps to theirs.
     let keepsToProfile: UUID?
 
-    /// Whether the window may show a space: a private window only its own, a window that keeps to a profile only
-    /// that profile's.
+    /// Whether the window may show a space: never from a private one, only those it keeps to.
     func mayShowSpace(_ space: UUID) -> Bool { !isPrivate && keepsTo(space) }
 
-    /// Whether a space is one the window keeps its tabs in: any, or its profile's when it keeps to one. Asked
-    /// wherever a tab is put in a space, made or moved, so none of yours ends up in their window out of sight.
+    /// Its profile's spaces when it keeps to one, else all but AI Apps'.
     func keepsTo(_ space: UUID) -> Bool { Self.keeps(space, to: keepsToProfile) }
 
     private static func keeps(_ space: UUID, to profile: UUID?) -> Bool {
@@ -2834,8 +2831,7 @@ final class TabManager {
         return !WindowManager.shared.everyController.contains { $0.tabManager.shows(tab) }
     }
 
-    /// Whether this window shows the tab to someone: selected, or beside it in a split. Never in a window kept out of
-    /// sight (AI apps' own, until shown), where only use keeps a tab awake. Used wherever sleep is decided.
+    /// Whether someone sees the tab here: selected or in its split, never in an unseen window.
     func shows(_ tab: Tab) -> Bool { shownTabs.contains { $0 === tab } }
 
     /// The tabs this window shows to someone, for a pass over many tabs to work out once.
@@ -2844,8 +2840,7 @@ final class TabManager {
         return panes(of: selected)
     }
 
-    /// The tabs the archive may take, space by space, and counts toward offering it. Never a private window's, nor
-    /// those in a space whose profile isn't given your data (AI apps', `Profile.getsYourData`): the Archive is yours.
+    /// The tabs the Archive may take, by space: never a private window's or AI apps'.
     var archivableTabs: [[Tab]] {
         guard !isPrivate else { return [] }
         return tabsBySpace.filter { Profiles.shared.profile(forSpace: $0.key).getsYourData }.map(\.value)

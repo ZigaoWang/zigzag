@@ -404,8 +404,7 @@ enum AuthenticationPrompt {
         guard Self.mayAnswer(pageHost: pageHost, askingHost: challenge.protectionSpace.host) else {
             return (.cancelAuthenticationChallenge, nil)
         }
-        // Your sign-ins, saved in the Keychain or in Zigzag's passwords, are never offered in AI apps' profile
-        // (`Profile.getsYourData`); its extensions, its own, are still asked.
+        // Your saved sign-ins are never offered to AI apps' pages; their own extensions still are.
         let offersYours = await MainActor.run { Profiles.shared.profile(ofPage: page).getsYourData }
         if offersYours, challenge.previousFailureCount == 0, let saved = URLCredentialStorage.shared.defaultCredential(for: challenge.protectionSpace) {
             return (.useCredential, saved)

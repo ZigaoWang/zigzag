@@ -752,8 +752,7 @@ enum DebugBridge {
             }
             return
         }
-        // headless show|close|sleep: Show AI Apps Window, its close button (hides it again while AI apps work), and
-        // putting its front tab to sleep, as happens once it's left alone.
+        // headless show|close|sleep: show their window, hide it, or sleep its front tab.
         if name == "headless" {
             switch arg {
             case "show": Headless.showWindow()

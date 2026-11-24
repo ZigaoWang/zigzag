@@ -38,8 +38,7 @@ enum Passkeys {
         }
     }
 
-    /// Whether pages are told there are no passkeys: without the entitlement, unless a password manager brings its
-    /// own (a private window has none). Always in AI apps' profile: a passkey needs you there to confirm it.
+    /// No passkeys: always for AI apps, else without the entitlement unless a password manager has them.
     nonisolated static func isShimmed(available: Bool, isPrivate: Bool, forAIApps: Bool, managerOn: Bool) -> Bool {
         forAIApps || (!available && (isPrivate || !managerOn))
     }

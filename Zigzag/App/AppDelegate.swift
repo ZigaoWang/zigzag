@@ -46,8 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PageTextChecking.shared.start()
         // A second copy (one opened from the disk image while the installed one runs) would load the same data
         // and save over it: it hands over to the one already running and goes, before reading anything.
-        // With --headless, it asks the running one to keep AI apps in the background instead, without bringing it
-        // forward. Otherwise it says you opened it, so one running for AI apps alone becomes yours.
+        // With --headless it asks the running copy instead; otherwise it says you opened it.
         if !Self.isHostingTests, !SingleCopy.claim() {
             if Headless.isAsked(by: CommandLine.arguments) { Headless.askRunningCopy() } else { Headless.tellRunningCopyYouOpened(); SingleCopy.showRunningCopy() }
             exit(0)
@@ -178,8 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
         // wait until you ask for them.
         let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
-        // With --headless and nothing else: runs for AI apps alone, your windows waiting until you open Zigzag. Opened
-        // for a link or an installed site too, you're here: it's the regular app.
+        // With --headless alone it runs for AI apps; a link or an installed site makes it the regular app.
         if Headless.isBackgroundOnly, !pendingURLs.isEmpty || !pendingWebApps.isEmpty { Headless.becomeRegular() }
         let backgroundOnly = Headless.isBackgroundOnly
         // Restarted for an update: exactly what was open comes back, Zigzag Mini windows too.
