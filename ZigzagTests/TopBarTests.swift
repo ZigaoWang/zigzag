@@ -883,6 +883,34 @@ struct TopBarTests {
         #expect(root.autohideOffset(at: 0) == 0)
     }
 
+    /// A bar left part way out when the scroll stops goes to the nearer end; a finger still on the trackpad keeps it.
+    @Test func aBarLeftPartWayOutSettles() throws {
+        #expect(BrowserWindowController.settledOffset(10, travel: 50) == 0)
+        #expect(BrowserWindowController.settledOffset(25, travel: 50) == 50)
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let (controller, manager, _) = autohideWindow("settle")
+        defer { controller.window?.close(); manager.invalidate() }
+        let root = controller.root
+        let travel = root.autohideTravel(at: 0)
+        controller.pageScrolled(to: 0, trusted: true, editing: false)
+        controller.pageScrolled(to: travel / 4, trusted: true, editing: false)
+        controller.settleAutohide()
+        #expect(root.autohideOffset(at: 0) == 0)
+        controller.pageScrolled(to: travel, trusted: true, editing: false)
+        #expect(root.autohideOffset(at: 0) == travel * 3 / 4)
+        // Fingers still down: it stays where they left it.
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 0, wheel2: 0, wheel3: 0))
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
+        controller.noteScrollGesture(try #require(NSEvent(cgEvent: cg)), inPane: 0)
+        controller.settleAutohide()
+        #expect(root.autohideOffset(at: 0) == travel * 3 / 4)
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 4)
+        controller.noteScrollGesture(try #require(NSEvent(cgEvent: cg)), inPane: 0)
+        controller.settleAutohide()
+        #expect(root.autohideOffset(at: 0) == travel)
+    }
+
     /// ⌘L brings the bar back to edit the address there, and the next scroll down can take it again.
     @Test func openLocationBringsTheBarBack() {
         let before = Library.shared.snapshot

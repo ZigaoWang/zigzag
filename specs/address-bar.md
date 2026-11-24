@@ -17,6 +17,8 @@
   Test: TopBarTests.autohideIsBoundToThePagesPosition
 - While the bar moves, the content moves with your fingers once, not twice.
   Test: TopBarTests.thePagesOwnMovementMovesTheBar
+- Stop scrolling with the bar part way out → it slides the rest of the way to whichever end is nearer; while your fingers are still on the trackpad it stays.
+  Test: TopBarTests.aBarLeftPartWayOutSettles
 - Scroll back up in the same swipe, wheel burst or scroll bar drag that took the bar fully out → it stays out; the next one brings it back as you scroll up.
   Test: TopBarTests.aGestureThatClosedTheBarDoesNotReopenIt
   Test: TopBarTests.aScrollBarDragThatClosedTheBarDoesNotReopenIt

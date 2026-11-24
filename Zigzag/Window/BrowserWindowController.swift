@@ -1210,6 +1210,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private var autohidePointerMonitor: Any?
     /// While the sidebar is sliding: the bar stays as it is, so the lights don't have to cross it.
     private var sidebarMovingUntil = Date.distantPast
+    /// Settles a bar left part way out once the scroll stops.
+    private var autohideSettleWork: DispatchWorkItem?
+    /// How long a scroll has to stop before the bar settles.
+    static let autohideSettleDelay: TimeInterval = 0.2
 
     /// The pane a page is in: its place in the selected tab's group, one page with index 0.
     func paneIndex(of tab: Tab) -> Int? {
@@ -1235,6 +1239,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         } else if event.phase == .ended || event.phase == .cancelled {
             // The gesture is over. The lock stays until the next gesture begins.
             state.gestureActive = false
+            settleAutohideSoon()
         } else if event.phase.isEmpty, event.momentumPhase.isEmpty {
             // A wheel or a mouse's scroll: a new burst after a pause, one gesture while it keeps coming.
             if event.timestamp - state.lastWheelAt > 0.25 { beginAutohideGesture(state: &state) }
@@ -1282,12 +1287,36 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         state.locked = step.locked
         autohidePanes[pane] = state
         root.setAutohideOffset(step.offset, at: pane)
+        settleAutohideSoon()
         // The bar's travel takes that much of the scroll: the page scrolls back by it, so the content moves once.
         let consumed = step.offset - was
         if abs(consumed) > 0.5, let webView = tab?.webView {
             webView.evaluateJavaScript("window.__zigzagScrollBy?.(\(Double(-consumed)))", in: nil, in: .defaultClient, completionHandler: nil)
         }
     }
+
+    private func settleAutohideSoon() {
+        autohideSettleWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.settleAutohide() } }
+        autohideSettleWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.autohideSettleDelay, execute: work)
+    }
+
+    /// A bar left part way out slides to the nearer end, unless a finger, the scroll bar or the pointer still has it.
+    func settleAutohide() {
+        guard root.autohidesBar, root.barHoldsAddress else { return }
+        for index in 0..<root.autohidePaneCount {
+            let state = autohidePanes[index]
+            let offset = root.autohideOffset(at: index), travel = root.autohideTravel(at: index)
+            guard state?.gestureActive != true, state?.dragging != true, offset > 0.5, offset < travel - 0.5,
+                  !autohideHeld(inPane: index) else { continue }
+            let target = Self.settledOffset(offset, travel: travel)
+            if root.tiles == nil { root.setBarOffset(target, animated: true) } else { root.setAutohideOffset(target, at: index) }
+        }
+    }
+
+    /// The nearer end for a bar part way out.
+    nonisolated static func settledOffset(_ offset: CGFloat, travel: CGFloat) -> CGFloat { offset >= travel / 2 ? travel : 0 }
 
     /// A new page starts at its top, with the bar there (#359).
     private func resetAutohide(animated: Bool) {
