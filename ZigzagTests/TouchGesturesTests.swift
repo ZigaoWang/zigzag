@@ -1,4 +1,5 @@
 import AppKit
+import JavaScriptCore
 import ObjectiveC
 import Testing
 import WebKit
@@ -819,6 +820,127 @@ struct TouchMovesTests {
         holder.touchSwipeMoved(dx: 200)
         holder.touchSwipeEnded(cancelled: false)
         #expect(!page.swipeNavigator.isTracking)
+    }
+
+    /// The swipe sits on the page's holder, an ancestor of the web view where WebKit's recognizers are, so it sees
+    /// the page's fingers; WebKit's touch scrolling waits for it, and nothing else of WebKit's does.
+    @Test func webKitsTouchScrollingWaitsForTheSwipe() throws {
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let holder = PageHolder(holding: page)
+        let swipe = try #require(holder.pageSwipe)
+        #expect(swipe.view === holder && page.isDescendant(of: holder))
+        let delegate = try #require(swipe.delegate as? TouchOnly)
+        let pan = try #require(page.gestureRecognizers.first { $0 is NSPanGestureRecognizer })
+        #expect(holder.isPageScrolling(pan))
+        #expect(delegate.gestureRecognizer(swipe, shouldBeRequiredToFailBy: pan))
+        for other in page.gestureRecognizers where !(other is NSPanGestureRecognizer) {
+            #expect(!delegate.gestureRecognizer(swipe, shouldBeRequiredToFailBy: other))
+        }
+        // A pan elsewhere (the sidebar's list) doesn't wait on it.
+        let elsewhere = NSPanGestureRecognizer()
+        NSView().addGestureRecognizer(elsewhere)
+        #expect(!delegate.gestureRecognizer(swipe, shouldBeRequiredToFailBy: elsewhere))
+        // The swipe never runs alongside the page's scrolling; the pinch does, so the page still zooms.
+        #expect(!delegate.gestureRecognizer(swipe, shouldRecognizeSimultaneouslyWith: pan))
+        let pinch = try #require(holder.overviewPinch)
+        let magnification = try #require(page.gestureRecognizers.first { $0 is NSMagnificationGestureRecognizer })
+        #expect(try #require(pinch.delegate as? TouchOnly).gestureRecognizer(pinch, shouldRecognizeSimultaneouslyWith: magnification))
+    }
+
+    /// Fingers that can't be a swipe let WebKit scroll at once: nowhere to go, three of them, or a pinch.
+    @Test func fingersThatCantSwipeAreLetGoAtOnce() {
+        let out = { (fingers: Int, spread: CGFloat, canGo: Bool) in
+            TouchSwipe.ruledOutOnPage(fingers: fingers, spread: spread, moved: 0, sinceLanding: 0, canGoEitherWay: canGo)
+        }
+        #expect(out(1, 0, false))
+        #expect(out(2, 0, false))
+        #expect(!out(1, 0, true))
+        #expect(!out(2, 4, true))
+        #expect(out(2, 10, true))
+        #expect(out(2, -12, true))
+        #expect(out(3, 0, true))
+        // No history and no window here: the holder lets the fingers go as they land.
+        let holder = PageHolder(holding: BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600)))
+        #expect(holder.swipeRuledOut(TouchSwipeRecognizer()))
+    }
+
+    /// One finger scrolls the page at once: it's let go within 3 points or 40 ms, while a second finger landing
+    /// soon after keeps the swipe possible, and two fingers still take the full 10 points to decide.
+    @Test func aLoneFingerIsLetGoAtOnce() {
+        let lone = { (fingers: Int, moved: CGFloat, since: TimeInterval) in
+            TouchSwipe.ruledOutOnPage(fingers: fingers, spread: 0, moved: moved, sinceLanding: since, canGoEitherWay: true)
+        }
+        #expect(!lone(1, 0, 0))
+        #expect(!lone(1, 2.9, 0.039))
+        #expect(lone(1, 3, 0.005))
+        #expect(lone(1, 0.5, 0.04))
+        // The second finger at 20 ms: still possible, then as far as two fingers decide.
+        #expect(!lone(2, 0, 0.02))
+        #expect(!lone(2, 9, 0.2))
+        #expect(TouchSwipe.isLoneFinger(fingers: 1, moved: 3, sinceLanding: 0))
+        #expect(!TouchSwipe.isLoneFinger(fingers: 2, moved: 30, sinceLanding: 1))
+    }
+
+    /// Two fingers sideways go back or forward, up and down scroll, a pinch zooms, and a page that keeps the spot
+    /// sideways keeps the fingers.
+    @Test func twoFingersRouteBySpotAndShape() {
+        typealias Room = SwipeDecision.TouchRoom
+        let open = Room(left: false, right: false, frame: false, still: false, pansItself: false)
+        #expect(TouchSwipe.goesBackOrForward(fingers: 2, translation: NSPoint(x: 14, y: 2), spread: 0))
+        #expect(!TouchSwipe.goesBackOrForward(fingers: 2, translation: NSPoint(x: 1, y: -14), spread: 0))
+        #expect(!TouchSwipe.goesBackOrForward(fingers: 2, translation: NSPoint(x: 3, y: 1), spread: 12))
+        #expect(SwipeDecision.touch(-1, room: open, waited: 0.01) == true)
+        #expect(SwipeDecision.touch(1, room: open, waited: 0.01) == true)
+        // A carousel with room to the left keeps a swipe back there, not one forward.
+        var carousel = open
+        carousel.left = true
+        #expect(SwipeDecision.touch(-1, room: carousel, waited: 0.01) == false)
+        #expect(SwipeDecision.touch(1, room: carousel, waited: 0.01) == true)
+        for keeps in [Room(left: false, right: false, frame: true, still: false, pansItself: false),
+                      Room(left: false, right: false, frame: false, still: true, pansItself: false),
+                      Room(left: false, right: false, frame: false, still: false, pansItself: true)] {
+            #expect(SwipeDecision.touch(-1, room: keeps, waited: 0.01) == false)
+        }
+        // Not answered yet: it waits a moment, then goes on without the answer, as a trackpad swipe does.
+        #expect(SwipeDecision.touch(-1, room: nil, waited: 0.01) == nil)
+        #expect(SwipeDecision.touch(-1, room: nil, waited: SwipeDecision.frameWait) == true)
+    }
+
+    /// The navigator's answer for the fingers comes from what the page said where they landed.
+    @Test func thePagesAnswerDecidesTheFingers() {
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let now = ProcessInfo.processInfo.systemUptime
+        page.swipeNavigator.debugSetTouchRoom(nil, landedAt: now)
+        #expect(page.swipeNavigator.touchPageLeaves(-1, at: now + 0.01) == nil)
+        page.swipeNavigator.debugSetTouchRoom(SwipeDecision.TouchRoom(left: true, right: false, frame: false, still: false, pansItself: false), landedAt: now)
+        #expect(page.swipeNavigator.touchPageLeaves(-1, at: now + 0.01) == false)
+        #expect(page.swipeNavigator.touchPageLeaves(1, at: now + 0.01) == true)
+    }
+
+    /// `touch-action` without sideways panning (a map, a carousel) is the page's own.
+    @Test func touchActionTellsWhoPansSideways() throws {
+        let context = try #require(JSContext())
+        context.evaluateScript("const pansItself = \(SwipeAnswers.pansItself);")
+        let check: (String) -> Bool = { actions in
+            let script = """
+            (() => {
+              const list = \(actions);
+              let el = null;
+              for (let i = list.length - 1; i >= 0; i--) el = { nodeType: 1, touchAction: list[i], parentElement: el };
+              return pansItself(el, (e) => ({ touchAction: e.touchAction }));
+            })()
+            """
+            return context.evaluateScript(script)?.toBool() ?? false
+        }
+        #expect(!check("['auto', 'auto']"))
+        #expect(!check("['manipulation', 'auto']"))
+        #expect(!check("['pan-x pan-y', 'auto']"))
+        #expect(!check("['pan-left', 'auto']"))
+        #expect(check("['none', 'auto']"))
+        #expect(check("['auto', 'pan-y']"))
+        #expect(check("['pinch-zoom', 'auto']"))
+        // An engine without the property leaves it to the room.
+        #expect(!check("[undefined, '']"))
     }
 
     // MARK: The hidden sidebar from the edge

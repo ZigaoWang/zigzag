@@ -265,21 +265,10 @@ final class SwipeNavigator {
     /// a frame, which only the frame's own answer can speak for.
     private func probe(at point: NSPoint) {
         guard let webView else { return }
-        // Pinched in, the page's points are bigger still.
-        let zoom = webView.pageZoom * webView.magnification
-        let x = point.x / zoom, y = (webView.isFlipped ? point.y : webView.bounds.height - point.y) / zoom
-        let script = """
-        (() => {
-          // Pinched in, the visible part starts that far into the page.
-          const v = window.visualViewport, el = document.elementFromPoint(\(x) + (v ? v.offsetLeft : 0), \(y) + (v ? v.offsetTop : 0));
-          const room = (\(SwipeAnswers.sideways))(el, getComputedStyle, document.scrollingElement, [document.documentElement, document.body], window.visualViewport);
-          return [room.left, room.right, !!el && /^(IFRAME|FRAME|EMBED|OBJECT)$/.test(el.tagName), room.still];
-        })()
-        """
         let gesture = gesture
-        webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { [weak self] result in
+        webView.evaluateJavaScript(probeScript(at: point, in: webView), in: nil, in: .defaultClient) { [weak self] result in
             guard let self, self.gesture == gesture, !self.covered,
-                  case .success(let value) = result, let answer = value as? [Bool], answer.count == 4 else { return }
+                  case .success(let value) = result, let answer = value as? [Bool], answer.count >= 4 else { return }
             self.pageScrolls = (answer[0], answer[1])
             self.overFrame = answer[2]
             // The page asked for no overscroll: like a page that cancels the scrolls, it keeps the gesture.
@@ -287,7 +276,52 @@ final class SwipeNavigator {
         }
     }
 
+    /// What's under `point`: its room left and right, whether it's a frame, whether it asked for no overscroll, and
+    /// whether it pans sideways under a finger itself (`touch-action`).
+    private func probeScript(at point: NSPoint, in webView: WKWebView) -> String {
+        // Pinched in, the page's points are bigger still.
+        let zoom = webView.pageZoom * webView.magnification
+        let x = point.x / zoom, y = (webView.isFlipped ? point.y : webView.bounds.height - point.y) / zoom
+        return """
+        (() => {
+          // Pinched in, the visible part starts that far into the page.
+          const v = window.visualViewport, el = document.elementFromPoint(\(x) + (v ? v.offsetLeft : 0), \(y) + (v ? v.offsetTop : 0));
+          const room = (\(SwipeAnswers.sideways))(el, getComputedStyle, document.scrollingElement, [document.documentElement, document.body], window.visualViewport);
+          return [room.left, room.right, !!el && /^(IFRAME|FRAME|EMBED|OBJECT)$/.test(el.tagName), room.still, (\(SwipeAnswers.pansItself))(el, getComputedStyle)];
+        })()
+        """
+    }
+
+    /// When the first finger landed on the page, and what the page said about the spot since.
+    private var touchLandedAt: TimeInterval = 0
+    private(set) var touchRoom: SwipeDecision.TouchRoom?
+
+    /// A finger landed at `point` (the web view's terms): the page is asked about the spot, as a trackpad swipe's
+    /// first scroll asks it, so it has answered by the time the fingers have gone far enough to decide.
+    func touchLanded(at point: NSPoint, time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        touchLandedAt = time
+        touchRoom = nil
+        guard let webView, webView.window != nil else { return }
+        gesture += 1
+        let gesture = gesture
+        webView.evaluateJavaScript(probeScript(at: point, in: webView), in: nil, in: .defaultClient) { [weak self] result in
+            guard let self, self.gesture == gesture, case .success(let value) = result, let a = value as? [Bool], a.count == 5 else { return }
+            self.touchRoom = SwipeDecision.TouchRoom(left: a[0], right: a[1], frame: a[2], still: a[3], pansItself: a[4])
+            TouchLog.note("page answered left=\(a[0]) right=\(a[1]) frame=\(a[2]) still=\(a[3]) pansItself=\(a[4])")
+        }
+    }
+
+    /// Whether the page leaves fingers going `wanted`'s way to go back or forward (nil: it hasn't said yet).
+    func touchPageLeaves(_ wanted: Int, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Bool? {
+        SwipeDecision.touch(wanted, room: touchRoom, waited: time - touchLandedAt)
+    }
+
     #if DEBUG
+    func debugSetTouchRoom(_ room: SwipeDecision.TouchRoom?, landedAt: TimeInterval) {
+        touchRoom = room
+        touchLandedAt = landedAt
+    }
+
     /// Debug builds: holds a swipe at `progress` toward navigating (1 arms it), so a test copy can show it without a
     /// trackpad (`swipestep back 0.5`). `nil` releases without navigating.
     func debugHold(direction wanted: Int, progress value: CGFloat?) {
@@ -463,6 +497,25 @@ enum SwipeDecision: Equatable {
         return kept ? .took : .left
     }
 
+    /// What the page said about where fingers landed on it.
+    struct TouchRoom: Equatable {
+        var left: Bool
+        var right: Bool
+        var frame: Bool
+        var still: Bool
+        var pansItself: Bool
+    }
+
+    /// For fingers on the screen going `wanted`'s way (-1 back, 1 forward) `waited` after they landed: whether the
+    /// page leaves them the swipe, or nil while it hasn't answered and may still. A frame (which only its own page
+    /// can speak for), a page that pans sideways under a finger itself, scrolls that way there, or asked for no
+    /// overscroll keeps it.
+    static func touch(_ wanted: Int, room: TouchRoom?, waited: TimeInterval) -> Bool? {
+        guard let room else { return waited < frameWait ? nil : true }
+        if room.frame || room.still || room.pansItself { return false }
+        return !(wanted < 0 ? room.left : room.right)
+    }
+
     /// `pageScrolls` is the room the page (or what covers it) can still scroll sideways under the pointer, once known;
     /// `waited`, the time since the gesture began; `overFrame`, that the pointer is over a frame in the page. `dx` is
     /// the scroll, not the fingers: positive is toward the page's left edge, whichever way the Mac scrolls.
@@ -536,6 +589,19 @@ final class SwipeAnswers: NSObject, WKScriptMessageHandler {
       // The page's own setting is what turns off going back and forward.
       for (const end of ends) if (end && /(none|contain)/.test(style(end).overscrollBehaviorX)) still = true;
       return { left, right, still };
+    }
+    """
+
+    /// A function of the element under a finger: whether it or anything around it pans sideways itself instead of
+    /// letting the finger scroll (`touch-action` without `pan-x`, as maps and carousels set).
+    static let pansItself = """
+    (el, style) => {
+      for (; el; el = el.parentElement || (el.parentNode && el.parentNode.host) || null) {
+        if (el.nodeType !== 1) continue;
+        const t = style(el).touchAction;
+        if (t && !/(auto|manipulation|pan-x|pan-left|pan-right)/.test(t)) return true;
+      }
+      return false;
     }
     """
 

@@ -771,6 +771,24 @@ enum TouchSwipe {
     nonisolated static func goesBackOrForward(fingers: Int, translation: NSPoint, spread: CGFloat) -> Bool {
         fingers == 2 && verdict(translation, forgiving: false) == .sideways && abs(spread) < abs(translation.x) / 2
     }
+
+    /// A lone finger is let go once it has moved this far, so one-finger scrolling starts at once.
+    nonisolated static let loneFingerMove: CGFloat = 3
+    /// Or this long after it landed: a second finger of a two-finger swipe lands within a few milliseconds.
+    nonisolated static let loneFingerWait: TimeInterval = 0.04
+
+    /// Whether a single finger, `moved` points from where it landed `sinceLanding` seconds ago, is a scroll and not
+    /// the start of a two-finger swipe.
+    nonisolated static func isLoneFinger(fingers: Int, moved: CGFloat, sinceLanding: TimeInterval) -> Bool {
+        fingers == 1 && (moved >= loneFingerMove || sinceLanding >= loneFingerWait)
+    }
+
+    /// Whether fingers on a page can no longer be a back or forward swipe: neither way is open, a lone finger, more
+    /// than two, or a pinch. WebKit's scrolling waits on the swipe only until then.
+    nonisolated static func ruledOutOnPage(fingers: Int, spread: CGFloat, moved: CGFloat, sinceLanding: TimeInterval,
+                                           canGoEitherWay: Bool) -> Bool {
+        !canGoEitherWay || fingers > 2 || abs(spread) >= decision || isLoneFinger(fingers: fingers, moved: moved, sinceLanding: sinceLanding)
+    }
 }
 
 /// Fingers moved across something, decided once: it stays undecided until they have gone `TouchSwipe.decision`
@@ -781,6 +799,12 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
     var handler: ((TouchSwipeRecognizer) -> Void)?
     /// Whether the swipe is this one's, asked once the fingers have gone far enough.
     var decides: ((TouchSwipeRecognizer) -> Bool)?
+    /// Not ready to decide yet (waiting on the page's answer): asked again on the next move.
+    var waits: ((TouchSwipeRecognizer) -> Bool)?
+    /// Can't be this swipe whatever the fingers do next: fails at once, so what waits on it goes now.
+    var ruledOut: ((TouchSwipeRecognizer) -> Bool)?
+    /// The first finger landed.
+    var landed: ((TouchSwipeRecognizer) -> Void)?
     /// More fingers than this down and it isn't this swipe.
     var maxFingers = 1
     /// The fingers turned out not to be this swipe: a tap, another way, or more of them.
@@ -793,6 +817,9 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
     private(set) var start = NSPoint.zero
     /// How much further apart the fingers are than when they landed.
     private(set) var spread: CGFloat = 0
+    /// When the first finger landed, and when the latest touch event came.
+    private(set) var landedAt: TimeInterval = 0
+    private(set) var eventAt: TimeInterval = 0
     private var touches: [(id: any NSCopying & NSObjectProtocol, start: NSPoint, last: NSPoint)] = []
     private var samples: [(time: TimeInterval, point: NSPoint)] = []
     private var following = false
@@ -852,14 +879,18 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
 
     override func touchesBegan(with event: NSEvent) {
         guard let view, state == .possible else { return }
+        eventAt = event.timestamp
+        if fingers == 0 { landedAt = event.timestamp }
         for touch in event.touches(matching: .began, in: view) {
             let point = touch.location(in: view)
             touches.append((touch.identity, point, point))
         }
-        if fingers == 0 { start = centroid(touches.map(\.start)) }
+        let first = fingers == 0
+        if first { start = centroid(touches.map(\.start)) }
         fingers = touches.count
         measure()
-        if fingers > maxFingers { fail() }
+        if first { landed?(self) }
+        if fingers > maxFingers || ruledOut?(self) == true { fail() }
     }
 
     override func touchesMoved(with event: NSEvent) {
@@ -870,10 +901,12 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
         }
         measure()
         samples.append((event.timestamp, translation))
+        eventAt = event.timestamp
         samples.removeAll { event.timestamp - $0.time > 0.2 }
         switch state {
         case .possible:
-            guard hypot(translation.x, translation.y) >= TouchSwipe.decision else { return }
+            if ruledOut?(self) == true { fail(); return }
+            guard hypot(translation.x, translation.y) >= TouchSwipe.decision, waits?(self) != true else { return }
             if decides?(self) == true {
                 following = true
                 Self.followingCount += 1
@@ -932,6 +965,8 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
         spread = 0
         samples = []
         endedAt = nil
+        landedAt = 0
+        eventAt = 0
     }
 
     override func location(in view: NSView?) -> NSPoint {

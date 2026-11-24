@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate.
+- On a touch display, two fingers swiped sideways on a page go back or forward again, with the same arrow, distance and flick as on the trackpad. Before, the page scrolled instead. Up and down still scrolls, a pinch still zooms, and a page that pans sideways itself under your finger, like a map or a carousel, keeps the swipe.
 
 ## [0.9.4] - 2026-11-24
 

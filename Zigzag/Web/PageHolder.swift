@@ -106,11 +106,13 @@ final class PageHolder: NSView {
     private func addTouchGestures() {
         let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.pageSwipeChanged(swipe) }
         swipe.maxFingers = 2
-        swipe.decides = { [weak self] swipe in
-            guard let self, TouchSwipe.goesBackOrForward(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread)
-            else { return false }
-            return self.takesBackForward(dx: swipe.translation.x)
-        }
+        swipe.landed = { [weak self] swipe in self?.fingersLanded(swipe) }
+        swipe.ruledOut = { [weak self] swipe in self?.swipeRuledOut(swipe) ?? true }
+        swipe.waits = { [weak self] swipe in self?.swipeWaits(swipe) ?? false }
+        swipe.decides = { [weak self] swipe in self?.swipeDecides(swipe) ?? false }
+        // WebKit's touch scrolling takes one or two fingers from their first point of movement and gives its own
+        // recognizers precedence: it waits until the swipe has decided.
+        swipe.touchOnly.outranks = { [weak self] other in self?.isPageScrolling(other) ?? false }
         addGestureRecognizer(swipe)
         pageSwipe = swipe
 
@@ -124,6 +126,53 @@ final class PageHolder: NSView {
     func takesBackForward(dx: CGFloat) -> Bool {
         (page as? BrowserWebView)?.swipeNavigator.takesTouchSwipe(dx > 0 ? -1 : 1) == true
     }
+
+    /// WebKit's pan on the page, which turns fingers into scrolling and sends it straight to the page, never
+    /// through `scrollWheel`.
+    func isPageScrolling(_ recognizer: NSGestureRecognizer) -> Bool {
+        recognizer is NSPanGestureRecognizer && recognizer.view === page
+    }
+
+    private func fingersLanded(_ swipe: TouchSwipeRecognizer) {
+        guard let page = page as? BrowserWebView else { return }
+        let canGo = takesBackForward(dx: 1) || takesBackForward(dx: -1)
+        TouchLog.note("landed fingers=\(swipe.fingers) canGo=\(canGo) seen by \(TouchLog.recognizers(from: page))")
+        if canGo { page.swipeNavigator.touchLanded(at: page.convert(swipe.start, from: self)) }
+    }
+
+    func swipeRuledOut(_ swipe: TouchSwipeRecognizer) -> Bool {
+        let moved = hypot(swipe.translation.x, swipe.translation.y), since = swipe.eventAt - swipe.landedAt
+        let out = TouchSwipe.ruledOutOnPage(fingers: swipe.fingers, spread: swipe.spread, moved: moved, sinceLanding: since,
+                                            canGoEitherWay: takesBackForward(dx: 1) || takesBackForward(dx: -1))
+        if out {
+            let lone = TouchSwipe.isLoneFinger(fingers: swipe.fingers, moved: moved, sinceLanding: since)
+            TouchLog.note("ruled out\(lone ? " (one finger)" : "") fingers=\(swipe.fingers) spread=\(Int(swipe.spread)) "
+                          + "moved=\(Self.describe(swipe.translation)) after=\(Int(since * 1000))ms")
+        }
+        return out
+    }
+
+    /// Sideways and taken so far, with the page yet to say whether it keeps the spot: asked again on the next move.
+    func swipeWaits(_ swipe: TouchSwipeRecognizer) -> Bool {
+        guard TouchSwipe.goesBackOrForward(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread),
+              let navigator = (page as? BrowserWebView)?.swipeNavigator else { return false }
+        let waits = navigator.touchPageLeaves(swipe.translation.x > 0 ? -1 : 1) == nil
+        if waits { TouchLog.note("waiting for the page") }
+        return waits
+    }
+
+    func swipeDecides(_ swipe: TouchSwipeRecognizer) -> Bool {
+        let wanted = swipe.translation.x > 0 ? -1 : 1
+        let shape = TouchSwipe.goesBackOrForward(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread)
+        let open = shape && takesBackForward(dx: swipe.translation.x)
+        let leaves = open ? (page as? BrowserWebView)?.swipeNavigator.touchPageLeaves(wanted) ?? false : false
+        TouchLog.note("decided \(leaves ? (wanted < 0 ? "back" : "forward") : "page") fingers=\(swipe.fingers) moved=\(Self.describe(swipe.translation)) "
+                      + "spread=\(Int(swipe.spread)) shape=\(shape) open=\(open) room=\(String(describing: (page as? BrowserWebView)?.swipeNavigator.touchRoom)) "
+                      + "seen by \(TouchLog.recognizers(from: page))")
+        return leaves
+    }
+
+    private static func describe(_ point: NSPoint) -> String { "\(Int(point.x)),\(Int(point.y))" }
 
     private func pageSwipeChanged(_ swipe: TouchSwipeRecognizer) {
         let x = swipe.translation.x
