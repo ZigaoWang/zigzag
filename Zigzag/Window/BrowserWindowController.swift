@@ -720,10 +720,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.sidebarContainer.tint = color
         root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
         root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0
+        #if DEBUG
+        if GlassVariant.now.dropsGrain { root.sidebarContainer.grain = 0 }
+        #endif
         root.sidebarContainer.texture = space.texture
         root.sidebarContainer.windowGlass = root.windowGlass
         root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
     }
+
+    #if DEBUG
+    /// Redraws the window for a new `GlassVariant`.
+    func debugApplyGlassVariant() {
+        applySpaceColor(animated: false)
+        root.paneCards.forEach { $0.debugRefreshVariant() }
+    }
+    #endif
 
     /// Back, Forward, Reload, the address and its star for the page you're on, in the sidebar or the bar above the
     /// page: the one place every path refreshes them, so none shows another's state.

@@ -232,7 +232,35 @@ final class PageCardView: NSView {
 
     /// Beside the sidebar the page rests on the frame as a sheet: a soft shadow falls onto the sidebar along its edge
     /// (the window's own edges hide it everywhere else); floating, the card keeps its whisper of shadow.
-    private var castsShadow: Bool { !edgeToEdge }
+    private var castsShadow: Bool {
+        #if DEBUG
+        if GlassVariant.now.dropsCardShadow { return false }
+        #endif
+        return !edgeToEdge
+    }
+
+    #if DEBUG
+    /// `GlassVariant.opaqueUnderPage`: opaque layers under the card, inside its rounded corners.
+    private let opaqueBacking = [CALayer(), CALayer()]
+
+    /// Picks up a new `GlassVariant`.
+    func debugRefreshVariant() {
+        refreshColors()
+        needsLayout = true
+    }
+
+    private func placeOpaqueBacking() {
+        let on = GlassVariant.now.backsPageOpaque && !isHidden
+        let r = cornerRadius
+        for (i, backing) in opaqueBacking.enumerated() {
+            if backing.superlayer == nil { backing.zPosition = -2; layer?.addSublayer(backing) }
+            backing.isOpaque = true
+            backing.backgroundColor = cgColor(ground).copy(alpha: 1)
+            backing.isHidden = !on
+            backing.frame = i == 0 ? bounds.insetBy(dx: r, dy: 0) : bounds.insetBy(dx: 0, dy: r)
+        }
+    }
+    #endif
 
     /// Squares the corners off (or rounds them back) over `duration`, in step with the sidebar sliding away or back.
     func setEdgeToEdge(_ on: Bool, duration: TimeInterval) {
@@ -519,6 +547,9 @@ final class PageCardView: NSView {
             // to reach.
             let outline = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
             ambient.frame = bounds
+            #if DEBUG
+            placeOpaqueBacking()
+            #endif
             for shadow in [layer, ambient].compactMap({ $0 }) {
                 follow(move, shadow, "shadowPath", from: (shadow.presentation() ?? shadow).shadowPath)
                 shadow.shadowPath = outline

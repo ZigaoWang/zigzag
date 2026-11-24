@@ -1,5 +1,8 @@
 import AppKit
 import WebKit
+#if DEBUG
+import ScreenCaptureKit
+#endif
 
 /// Debug builds only: lets scripts drive the UI (for screenshots and testing) via distributed notifications.
 /// `xcrun swift -e` or the bundled `zz` script posts "app.zigzag.debug" with a command string.
@@ -34,6 +37,7 @@ enum DebugBridge {
                                                             name: .init(channel), object: nil, suspensionBehavior: .deliverImmediately)
         // ZIGZAG_DEBUG_COMMANDS: commands to run once launched, split by " ;; ", one every 1.5 s after a short wait,
         // for when the Mac doesn't pass notifications along.
+        MainActor.assumeIsolated { DebugMenu.install() }
         let script = ProcessInfo.processInfo.environment["ZIGZAG_DEBUG_COMMANDS"] ?? ""
         for (i, command) in script.components(separatedBy: " ;; ").filter({ !$0.isEmpty }).enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 4 + Double(i) * 1.5) { MainActor.assumeIsolated { run(command) } }
@@ -776,6 +780,9 @@ enum DebugBridge {
             return
         }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
+        if name == "fpsbench" { FrameRateBench.run(arg, in: controller); return }
+        // glassvariant <name>: draws clear glass another way (`GlassVariant`), until relaunch.
+        if name == "glassvariant" { if let variant = GlassVariant(rawValue: arg) { DebugMenu.apply(variant) }; return }
         // card [tilt <x> <y>|tilt off|finish <name>|flip|hover <n>|save <path>|shot <path>|close]: About with Your Zigzag Card, opened behind, leaning as if
         // the pointer were there (-1 to 1 from its middle, y up), its picture saved, or its window captured by number.
         // card start <yyyy-mm-dd> <version> [exact]: the kept start, replaced, for a test copy.
@@ -3944,6 +3951,255 @@ enum ScrollBench {
                 try? data.write(to: URL(fileURLWithPath: path))
             }
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// fpsbench [seconds] [path|-] [window|js]: scrolls the front page up and down, by trackpad-like scrolls sent through
+/// the window (`window`, 12 pt at 120 Hz) or in the page (`js`, 12 pt an animation frame), and measures how often the
+/// window's part of the screen is presented, from ScreenCaptureKit when Screen Recording is allowed, and the display
+/// link's beat. Results go to debug.log, the file if given, and a label in the window's corner while it runs.
+@MainActor
+enum FrameRateBench {
+    private static var running = false
+
+    /// Frames of the screen under one window, as ScreenCaptureKit sees them presented.
+    nonisolated private final class Presented: NSObject, SCStreamOutput, @unchecked Sendable {
+        private let lock = NSLock()
+        private var times: [Double] = []
+        private var stream: SCStream?
+        private let scale: Double = {
+            var base = mach_timebase_info_data_t()
+            mach_timebase_info(&base)
+            return Double(base.numer) / Double(base.denom) / 1_000_000
+        }()
+
+        func start(window number: Int) async throws {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            guard let window = content.windows.first(where: { $0.windowID == CGWindowID(number) }),
+                  let display = content.displays.first(where: { $0.frame.intersects(window.frame) }) else { throw CocoaError(.featureUnsupported) }
+            let config = SCStreamConfiguration()
+            // The window's part of the display, small: only when frames come matters.
+            let rect = window.frame.intersection(display.frame).offsetBy(dx: -display.frame.minX, dy: -display.frame.minY)
+            config.sourceRect = rect
+            config.width = 320
+            config.height = max(2, Int(320 * rect.height / max(rect.width, 1)))
+            config.minimumFrameInterval = CMTime(value: 1, timescale: 240)
+            config.queueDepth = 8
+            config.showsCursor = false
+            let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []), configuration: config, delegate: nil)
+            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: DispatchQueue(label: "fpsbench"))
+            try await stream.startCapture()
+            lock.withLock { self.stream = stream }
+        }
+
+        func stop() async {
+            let stream = lock.withLock { self.stream }
+            try? await stream?.stopCapture()
+        }
+
+        /// Display times of the frames so far, in ms.
+        var frames: [Double] { lock.withLock { times } }
+
+        func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
+            guard type == .screen,
+                  let attachments = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
+                  let info = attachments.first, let raw = info[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete else { return }
+            let time = (info[.displayTime] as? UInt64).map { Double($0) * scale } ?? CMSampleBufferGetPresentationTimeStamp(buffer).seconds * 1000
+            lock.withLock { times.append(time) }
+        }
+    }
+
+    private final class Beat: NSObject {
+        var times: [Double] = []
+        @objc func fire(_ link: CADisplayLink) { times.append(link.timestamp * 1000) }
+    }
+
+    private static func gaps(_ times: [Double]) -> [Double] { zip(times.dropFirst(), times).map { $0 - $1 } }
+
+    private static func summary(_ gaps: [Double]) -> (p50: Double, p95: Double, fps: Double)? {
+        guard gaps.count > 4 else { return nil }
+        let sorted = gaps.sorted()
+        let p50 = sorted[sorted.count / 2], p95 = sorted[min(sorted.count - 1, sorted.count * 95 / 100)]
+        return (p50, p95, 1000 * Double(gaps.count) / gaps.reduce(0, +))
+    }
+
+    private static func line(_ name: String, _ gaps: [Double]) -> String {
+        guard let s = summary(gaps) else { return "\(name) none" }
+        return String(format: "%@ %.0f fps  p50 %.2f ms  p95 %.2f ms", name, s.fps, s.p50, s.p95)
+    }
+
+    static func run(_ arg: String, in controller: BrowserWindowController) {
+        guard !running, let webView = controller.selectedWebView, let window = webView.window, let content = window.contentView else { return }
+        let f = arg.split(separator: " ").map(String.init)
+        let seconds = f.first.flatMap(Double.init) ?? 6
+        let path = f.count > 1 && f[1] != "-" ? f[1] : nil
+        let inPage = f.count > 2 && f[2] == "js"
+        running = true
+
+        let hud = NSTextField(labelWithString: "Measuring…")
+        hud.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        hud.textColor = .white
+        hud.drawsBackground = true
+        hud.backgroundColor = NSColor.black.withAlphaComponent(0.7)
+        hud.maximumNumberOfLines = 3
+        content.addSubview(hud)
+        func placeHUD() {
+            hud.sizeToFit()
+            hud.frame.origin = NSPoint(x: content.bounds.maxX - hud.frame.width - 12,
+                                       y: content.isFlipped ? content.bounds.maxY - hud.frame.height - 12 : 12)
+        }
+        placeHUD()
+
+        let beat = Beat()
+        let link = webView.displayLink(target: beat, selector: #selector(Beat.fire(_:)))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+        link.add(to: .main, forMode: .common)
+        let presented = Presented()
+        let allowed = CGPreflightScreenCaptureAccess()
+        let started = CACurrentMediaTime() * 1000
+        // The figure so far, twice a second.
+        let ticker = Timer(timeInterval: 0.5, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let now = CACurrentMediaTime() * 1000
+                let recent = (allowed ? presented.frames : beat.times).filter { $0 > now - 500 }
+                hud.stringValue = String(format: "%@ %.0f fps", allowed ? "presented" : "display link", Double(max(recent.count - 1, 0)) * 2)
+                placeHUD()
+            }
+        }
+        RunLoop.main.add(ticker, forMode: .common)
+        if !inPage { scrollThroughWindow(webView, seconds: seconds) }
+
+        let script = """
+        const scrolls = inPage;
+        let dir = 1, frames = 0;
+        const end = performance.now() + seconds * 1000;
+        await new Promise((done) => {
+          const frame = (t) => {
+            const max = document.scrollingElement.scrollHeight - innerHeight;
+            if (scrollY >= max - 1) dir = -1; else if (scrollY <= 0) dir = 1;
+            if (scrolls) window.scrollBy(0, dir * 12);
+            frames++;
+            if (t < end) requestAnimationFrame(frame); else done();
+          };
+          requestAnimationFrame(frame);
+        });
+        return frames;
+        """
+        Task {
+            var note = ""
+            if allowed {
+                do { try await presented.start(window: window.windowNumber) } catch { note = "capture failed: \(error)" }
+            } else {
+                note = "no Screen Recording: display link only"
+            }
+            let value = try? await webView.callAsyncJavaScript(script, arguments: ["seconds": seconds, "inPage": inPage], in: nil, contentWorld: .defaultClient)
+            let pageFrames = (value as? NSNumber)?.intValue ?? 0
+            await presented.stop()
+            ticker.invalidate()
+            link.invalidate()
+            // The first half second settles.
+            let shown = gaps(presented.frames.filter { $0 > started + 500 })
+            let beats = gaps(beat.times.filter { $0 > started + 500 })
+            let screen = window.screen?.maximumFramesPerSecond ?? 0
+            let opaque = window.isOpaque
+            let text = [note.isEmpty ? line("presented", shown) : note, line("display link", beats),
+                        "\(inPage ? "js" : "window")  \(GlassVariant.now.rawValue)  opaque \(opaque)  screen \(screen) Hz  page \(Int(Double(pageFrames) / seconds)) fps"].joined(separator: "\n")
+            debugLog("fpsbench \(text.replacingOccurrences(of: "\n", with: " | "))")
+            hud.stringValue = text
+            placeHUD()
+            if let path {
+                var result: [String: Any] = ["variant": GlassVariant.now.rawValue, "mode": inPage ? "js" : "window", "opaque": opaque, "screenFPS": screen, "seconds": seconds,
+                                             "pageFPS": Double(pageFrames) / seconds, "note": note, "key": window.isKeyWindow,
+                                             "visible": window.occlusionState.contains(.visible)]
+                if let s = summary(shown) { result["presented"] = ["p50": s.p50, "p95": s.p95, "fps": s.fps, "count": shown.count] }
+                if let s = summary(beats) { result["displayLink"] = ["p50": s.p50, "p95": s.p95, "fps": s.fps, "count": beats.count] }
+                if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: path)) }
+            }
+            running = false
+            try? await Task.sleep(for: .seconds(4))
+            hud.removeFromSuperview()
+        }
+    }
+
+    /// Trackpad-like scrolls through the window at 120 Hz, 12 pt each, turning every 1.5 s, as `scrollbench window`.
+    private static func scrollThroughWindow(_ webView: WKWebView, seconds: Double) {
+        guard let window = webView.window else { return }
+        let inWindow = webView.convert(NSPoint(x: webView.bounds.midX, y: webView.bounds.midY), to: nil)
+        let onScreen = window.convertPoint(toScreen: inWindow)
+        let at = CGPoint(x: onScreen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y)
+        func send(_ dy: Int32, phase: Int64) {
+            guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: 0, wheel3: 0) else { return }
+            cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+            cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+            cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
+            cg.location = at
+            cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+            cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+            if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
+        }
+        let start = CACurrentMediaTime()
+        var turn = start, direction: Int32 = 1, began = false
+        let clock = Timer(timeInterval: 1.0 / 120, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let now = CACurrentMediaTime()
+                guard now - start < seconds else { return }
+                if now - turn > 1.5 { turn = now; send(0, phase: 4); direction = -direction; began = false }
+                send(-direction * 12, phase: began ? 2 : 1)
+                began = true
+            }
+        }
+        RunLoop.main.add(clock, forMode: .common)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { clock.invalidate(); send(0, phase: 4) }
+    }
+}
+
+/// Debug builds only: a Debug menu in the menu bar, for what's easier to start with the mouse.
+@MainActor
+final class DebugMenu: NSObject, NSMenuItemValidation {
+    static let shared = DebugMenu()
+
+    static func install() {
+        guard let main = NSApp.mainMenu, !main.items.contains(where: { $0.title == "Debug" }) else { return }
+        let menu = NSMenu(title: "Debug")
+        let measure = NSMenuItem(title: "Measure Frame Rate", action: #selector(measure(_:)), keyEquivalent: "")
+        measure.target = shared
+        menu.addItem(measure)
+        let variants = NSMenu(title: "Glass Variant")
+        for variant in GlassVariant.allCases {
+            let item = NSMenuItem(title: variant.rawValue, action: #selector(choose(_:)), keyEquivalent: "")
+            item.target = shared
+            item.representedObject = variant.rawValue
+            variants.addItem(item)
+        }
+        let variantItem = NSMenuItem(title: "Glass Variant", action: nil, keyEquivalent: "")
+        variantItem.submenu = variants
+        menu.addItem(variantItem)
+        let top = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
+        top.submenu = menu
+        main.insertItem(top, at: max(0, main.items.count - 1))
+    }
+
+    static func apply(_ variant: GlassVariant) {
+        GlassVariant.now = variant
+        WindowManager.shared.controllers.forEach { $0.debugApplyGlassVariant() }
+        debugLog("glass variant \(variant.rawValue)")
+    }
+
+    @objc func measure(_ sender: Any?) {
+        guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        FrameRateBench.run("6", in: controller)
+    }
+
+    @objc func choose(_ sender: NSMenuItem) {
+        if let variant = (sender.representedObject as? String).flatMap(GlassVariant.init(rawValue:)) { Self.apply(variant) }
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(choose(_:)) { item.state = item.representedObject as? String == GlassVariant.now.rawValue ? .on : .off }
+        return true
     }
 }
 #endif
