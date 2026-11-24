@@ -5,21 +5,13 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Press and hold Back or Forward to see the pages that way and pick one, as in Safari and Chrome. Slide onto a page and let go to go there, or let go and click one. It works in the sidebar, the bar above the page, split view, Zigzag Mini and web apps, and a finger held on a touch display opens the same list. A right-click still opens it too, now in Zigzag's own menu. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
-
-### Fixed
-- On a touch display, a two-finger swipe goes back or forward after about 2 cm of finger travel, as it feels on the trackpad, instead of twice that, and a page that fits the window no longer slides sideways under your fingers.
-- Pages draw at the display's full refresh rate, up to 120 times a second on a ProMotion display, as in Chrome, so scrolling and animations are smoother. A page too heavy to keep up while you scroll, like signed-in GitHub, steadies at 60 until you go to another site, instead of stuttering. Settings › Developer › Feature Flags › Prefer Page Rendering Updates near 60fps still holds every page at 60. ([#394](https://github.com/ZigaoWang/zigzag/issues/394))
-- A tab woken from sleep keeps its page's session storage, where some sites keep you signed in. Putting the tab to sleep used to drop it, so such a site could ask you to sign in again, two-factor and all, each time you came back to the tab. It's kept only in memory while the tab sleeps, and only the page that loads first on waking gets it back. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- On a touch display, a two-finger swipe sideways on a page goes back or forward even when one finger lands a moment before the other or the swipe starts a little slanted. Before, it usually scrolled the page instead.
-- Show All Tabs (⇧⌘\) opens and closes smoothly. The page starts shrinking into its card sooner, and the cards no longer hitch as they settle in, because less work runs as it opens, the overview stays ready between opens, and pages you left are made ready for it ahead of time.
-
 ## [0.9.5] - 2026-11-24
 
-Touch that feels native on a touch display, with every tap counted, iPad-style dragging and two-finger back and forward, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
+Pages at your display's full 120 Hz like Chrome, touch that feels native on a touch display with every tap counted, iPad-style dragging and two-finger back and forward, Dia's pinned tabs on import, press and hold Back or Forward for history, a smoother Show All Tabs, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
+
 ### New
 - Importing from Dia brings its sidebar too, as from Arc. Each Dia profile's pinned tabs are pinned in the space its bookmarks go in, split views stay side by side, Dia's favorites become favorites, and with Open Tabs on, the tabs open there come over and wait to load until clicked. Importing again adds only what's new. ([#511](https://github.com/ZigaoWang/zigzag/issues/511))
+- Press and hold Back or Forward to see the pages that way and pick one, as in Safari and Chrome. Slide onto a page and let go to go there, or let go and click one. It works in the sidebar, the bar above the page, split view, Zigzag Mini and web apps, and a finger held on a touch display opens the same list. A right-click still opens it too, now in Zigzag's own menu. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
 
 ### Fixed
 - An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate. ([#510](https://github.com/ZigaoWang/zigzag/issues/510))
@@ -29,6 +21,11 @@ Touch that feels native on a touch display, with every tap counted, iPad-style d
 - On a touch display, a tap on a tab, a favorite or a sidebar button always does what a click does, even when macOS sends no click for it, and quick taps one after another each count.
 - On a touch display, dragging tabs, pinned tabs, folders, favorites and space dots works like on an iPad. Hold for about a third of a second and the item lifts under your finger right away; move a few points and it drags, following your finger. Its menu only opens if you keep still a moment longer, so it no longer pops up in the way of a drag. Once lifted, the list doesn't scroll out from under the drag, and holding a tab near the top or bottom of the list scrolls it, faster nearer the edge.
 - Settings › Passwords › Password manager lists each password manager extension you have on, like Bitwarden or 1Password, after Zigzag and iCloud Passwords. While one handles your passwords it shows checked instead of Zigzag. Choosing it turns off Zigzag's own Offer to save passwords and Fill saved passwords, and choosing Zigzag turns them back on.
+- On a touch display, a two-finger swipe goes back or forward after about 2 cm of finger travel, as it feels on the trackpad, instead of twice that, and a page that fits the window no longer slides sideways under your fingers.
+- Pages draw at the display's full refresh rate, up to 120 times a second on a ProMotion display, as in Chrome, so scrolling and animations are smoother. A page too heavy to keep up while you scroll, like signed-in GitHub, steadies at 60 until you go to another site, instead of stuttering. Settings › Developer › Feature Flags › Prefer Page Rendering Updates near 60fps still holds every page at 60. ([#394](https://github.com/ZigaoWang/zigzag/issues/394))
+- A tab woken from sleep keeps its page's session storage, where some sites keep you signed in. Putting the tab to sleep used to drop it, so such a site could ask you to sign in again, two-factor and all, each time you came back to the tab. It's kept only in memory while the tab sleeps, and only the page that loads first on waking gets it back. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- On a touch display, a two-finger swipe sideways on a page goes back or forward even when one finger lands a moment before the other or the swipe starts a little slanted. Before, it usually scrolled the page instead.
+- Show All Tabs (⇧⌘\) opens and closes smoothly. The page starts shrinking into its card sooner, and the cards no longer hitch as they settle in, because less work runs as it opens, the overview stays ready between opens, and pages you left are made ready for it ahead of time.
 
 ## [0.9.4] - 2026-11-24
 
