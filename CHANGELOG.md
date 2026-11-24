@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- With Settings › Tabs › Full screen videos fill set to The Whole Screen, a video's full screen now stays in the browser window. The window goes into its own full-screen space, as with View › Enter Full Screen, and the sidebar and bar step aside; move the pointer to the top to bring the bar down. In split view the video fills its own pane instead. Esc puts the window back as it was, and a window that was already in full screen stays there. The button in the video's top corner still gives it a full screen of its own, as before. Web apps, Zigzag Mini and the mini player keep the full screen they had. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#462](https://github.com/ZigaoWang/zigzag/issues/462))
+
 ### Fixed
 - A feature flag you changed in Settings › Developer has a Reset button beside its switch, in place of a plain “Changed”, and a flag Zigzag starts other than WebKit, like Prefer Page Rendering Updates near 60fps, says so under its name.
 - Letting go of a swipe that goes back or forward no longer springs the page back before it leaves. The page slides on a little and dims, then the next page shows in its place, so you can tell the swipe took without looking at the arrow. A swipe called off still springs back, and with Reduce Motion the page stays put. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
