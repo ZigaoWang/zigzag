@@ -135,6 +135,15 @@ nonisolated enum ChromiumImporter {
         }
     }
 
+    /// What a browser of several profiles marks things from `folder` with, so they land in that profile's space; nil
+    /// with one profile (`labels` empty).
+    static func importProfile(of browser: Browser, folder: String,
+                              labels: [(folder: String, label: String, display: String)]) -> ImportBatch.BrowserProfile? {
+        labels.first { $0.folder == folder }.map {
+            ImportBatch.BrowserProfile(key: "\(browser.root)/\(folder)", browser: browser.name, name: $0.label, display: $0.display)
+        }
+    }
+
     // MARK: Reading
 
     struct Choice: OptionSet, Sendable {
@@ -219,9 +228,7 @@ nonisolated enum ChromiumImporter {
             let labels = profileLabels(of: browser, in: root)
             for profile in profiles {
                 let folder = profile.lastPathComponent
-                let from = labels.first { $0.folder == folder }.map {
-                    ImportBatch.BrowserProfile(key: "\(browser.root)/\(folder)", browser: browser.name, name: $0.label, display: $0.display)
-                }
+                let from = importProfile(of: browser, folder: folder, labels: labels)
                 batch.bookmarks += bookmarks(at: profile.appendingPathComponent("Bookmarks")).map { var b = $0; b.from = from; return b }
             }
         }

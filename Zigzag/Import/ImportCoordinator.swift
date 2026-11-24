@@ -35,7 +35,7 @@ enum ImportCoordinator {
         var offers: Choice {
             switch kind {
             // Only Chrome and its kin share a store with Zigzag: Firefox's and Safari's extensions come from their own.
-            case .chromium(let browser) where browser.name == "Arc": [.passwords, .bookmarks, .history, .tabs, .openTabs, .signIns, .extensions]
+            case .chromium(let browser) where browser.name == "Arc" || browser.name == "Dia": [.passwords, .bookmarks, .history, .tabs, .openTabs, .signIns, .extensions]
             // Passwords and most sign-ins need the browser's Keychain item; without one known, they stay behind.
             case .chromium(let browser) where browser.safeStorage == nil: [.bookmarks, .history, .extensions]
             case .chromium: [.passwords, .bookmarks, .history, .signIns, .extensions]
@@ -398,6 +398,20 @@ enum ImportCoordinator {
             arcReading = reading.intersection([.passwords, .cookies])
         }
 
+        // Dia's favorites, pinned tabs and open tabs, into the spaces its profiles' bookmarks go in.
+        var diaProblems: [ImportProblem] = []
+        if case .chromium(let browser) = source.kind, browser.name == "Dia" {
+            let parts = ArcImporter.Parts(choice)
+            if !parts.isEmpty {
+                let sidebar = { DiaImporter.importSidebar(browser, into: profile.id, parts: parts) }
+                let result = parts.isDisjoint(with: [.spaces, .favorites]) ? sidebar() : Library.shared.importing(into: profile.id, sidebar)
+                summary.spaces += result.spaces
+                summary.bookmarks += result.bookmarks
+                summary.tabs += result.tabs
+                diaProblems = result.problems
+            }
+        }
+
         if choice.contains(.extensions), case .chromium(let browser) = source.kind {
             let installed = Set(profile.installs.installedIDs), name = source.name
             summary.foundExtensions = await Task.detached(priority: .userInitiated) {
@@ -431,6 +445,9 @@ enum ImportCoordinator {
         }.value
 
         summary.problems += batch.problems
+        // macOS keeping Dia's data private is said once.
+        let saidPrivate = batch.problems.contains { $0.fix == .fullDiskAccess }
+        summary.problems += diaProblems.filter { !saidPrivate || $0.fix != .fullDiskAccess }
         if choice.contains(.passwords) { await savePasswords(batch.logins, into: &summary) }
         if choice.contains(.bookmarks), !batch.bookmarks.isEmpty {
             let added = Library.shared.importing(into: profile.id) { addBookmarks(batch.bookmarks, from: source.name, into: profile.id) }

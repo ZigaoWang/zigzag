@@ -58,6 +58,16 @@
 - Importing again where those pages were moved apart or into another folder → they stay where they are, not split.
   Test: ArcFolderTests.importingAgainLeavesMovedPagesApart
 
+## Importing from Dia
+- Spaces and Pinned Tabs and Bookmarks from Dia → each Dia profile's pinned tabs are pinned in the space its bookmarks go in, in Dia's order; its favorites become favorites.
+  Test: DiaImportTests.pinnedTabsAndFavoritesComeOver
+- A split view pinned in Dia → a pinned split view of the same pages, up to four.
+  Test: DiaImportTests.splitTabsStaySplit
+- Tabs that aren't web pages and parts of Dia's sidebar Zigzag doesn't know → stay behind; the rest still comes over.
+  Test: DiaImportTests.unknownPartsStayBehind
+- Importing from Dia again → nothing is added twice.
+  Test: DiaImportTests.importingAgainAddsNothingTwice
+
 ## Favorites
 - Add to Favorites on a pinned page → it shows in Favorites in every space of its profile, as the same page, not a copy.
   Test: SavePathTests.inEverySpaceIsATickOnASavedPage

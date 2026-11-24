@@ -1,0 +1,81 @@
+{
+  "version": 3,
+  "somethingNew": {"kept": true},
+  "containers": [
+    {
+      "id": {"container": {"favorites": {}}},
+      "profileID": "1C7E4D2A-8B3F-4A51-9C60-0A1B2C3D4E01",
+      "tabs": [
+        {"id": "f1", "contents": [{"id": "f1c", "variant": {"webContent": {"_0": {"title": "Mail", "url": "https://mail.example.com/"}}}, "creationDate": 1.5, "tabSessionID": 1}], "referrerID": "", "creationDate": 1.5, "lastActiveDate": 2.5},
+        {"id": "f2", "contents": [{"id": "f2c", "variant": {"webContent": {"_0": {"title": "Calendar", "url": "https://calendar.example.com/"}}}, "creationDate": 1.5, "tabSessionID": 2}]}
+      ]
+    },
+    {
+      "id": {"container": {"pinned": {"_0": "unused"}}},
+      "profileID": "1C7E4D2A-8B3F-4A51-9C60-0A1B2C3D4E01",
+      "tabs": [
+        {"id": "p1", "contents": [{"id": "p1c", "variant": {"webContent": {"_0": {"title": "Docs", "url": "https://docs.example.com/"}}}}], "assistantSession": {"messages": []}},
+        {"id": "p2", "contents": [
+          {"id": "p2a", "variant": {"webContent": {"_0": {"title": "Left", "url": "https://example.com/left"}}}},
+          {"id": "p2b", "variant": {"webContent": {"_0": {"title": "Right", "url": "https://example.com/right"}}}}
+        ], "splitViewWidths": {"paneWidths": [600, 600]}},
+        {"id": "p3", "contents": [{"id": "p3c", "variant": {"chat": {"_0": {"title": "Not a page"}}}}]},
+        {"id": "p4", "contents": [
+          {"id": "p4a", "variant": {"settings": {}}},
+          {"id": "p4b", "variant": {"webContent": {"_0": {"title": "Alone", "url": "https://example.com/alone"}}}}
+        ]},
+        {"id": "p5", "contents": [{"id": "p5c", "variant": {"webContent": {"_0": {"title": "Files", "url": "ftp://files.example.com/"}}}}]},
+        {"id": "p6"},
+        {"id": "p7", "contents": [{"id": "p7c", "variant": {"webContent": {"_0": {"url": "https://untitled.example.com/page"}}}}]},
+        {"id": "p8", "contents": [{"id": "p8c", "variant": {"webContent": {"_0": {"title": "No address"}}}}]}
+      ]
+    },
+    {
+      "id": {"container": {"unpinned": {}}},
+      "profileID": "1C7E4D2A-8B3F-4A51-9C60-0A1B2C3D4E01",
+      "tabs": [
+        {"id": "o1", "contents": [{"id": "o1c", "variant": {"webContent": {"_0": {"title": "News", "url": "https://news.example.com/"}}}}]},
+        {"id": "o2", "contents": [
+          {"id": "o2a", "variant": {"webContent": {"_0": {"title": "One", "url": "https://example.com/one"}}}},
+          {"id": "o2b", "variant": {"webContent": {"_0": {"title": "Two", "url": "https://example.com/two"}}}}
+        ]}
+      ]
+    },
+    {
+      "id": {"container": {"archived": {}}},
+      "profileID": "1C7E4D2A-8B3F-4A51-9C60-0A1B2C3D4E01",
+      "tabs": [
+        {"id": "a1", "contents": [{"id": "a1c", "variant": {"webContent": {"_0": {"title": "Old", "url": "https://old.example.com/"}}}}]}
+      ]
+    },
+    {
+      "id": {"container": {"pinned": {}}},
+      "profileID": "9F0E8D7C-6B5A-4948-8776-655443322102",
+      "tabs": [
+        {"id": "w1", "contents": [{"id": "w1c", "variant": {"webContent": {"_0": {"title": "Wiki", "url": "https://wiki.example.com/"}}}}]},
+        {"id": "w2", "contents": [
+          {"id": "w2a", "variant": {"webContent": {"_0": {"title": "Q1", "url": "https://example.com/q1"}}}},
+          {"id": "w2b", "variant": {"webContent": {"_0": {"title": "Q2", "url": "https://example.com/q2"}}}},
+          {"id": "w2c", "variant": {"webContent": {"_0": {"title": "Q3", "url": "https://example.com/q3"}}}},
+          {"id": "w2d", "variant": {"webContent": {"_0": {"title": "Q4", "url": "https://example.com/q4"}}}},
+          {"id": "w2e", "variant": {"webContent": {"_0": {"title": "Q5", "url": "https://example.com/q5"}}}}
+        ]}
+      ]
+    },
+    {
+      "profileID": "9F0E8D7C-6B5A-4948-8776-655443322102",
+      "tabs": [
+        {"id": "x1", "contents": [{"id": "x1c", "variant": {"webContent": {"_0": {"title": "No kind", "url": "https://nokind.example.com/"}}}}]}
+      ]
+    },
+    {
+      "id": {"container": {"favorites": {}}},
+      "profileID": "9F0E8D7C-6B5A-4948-8776-655443322102",
+      "tabs": [
+        {"id": "f3", "contents": [{"id": "f3c", "variant": {"webContent": {"_0": {"title": "Mail again", "url": "https://mail.example.com/"}}}}]}
+      ]
+    },
+    "not a container",
+    7
+  ]
+}

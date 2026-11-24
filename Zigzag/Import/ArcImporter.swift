@@ -29,9 +29,7 @@ enum ArcImporter {
     private static func problem(reading part: Part, _ error: Error, retries: Int = 2 | 8 | 64) -> ImportProblem {
         let ns = error as NSError
         log.error("Arc import: couldn't read \(part.rawValue, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
-        let denied = (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
-            || (ns.underlyingErrors.first as NSError?).map { $0.domain == NSPOSIXErrorDomain && ($0.code == Int(EPERM) || $0.code == Int(EACCES)) } ?? false
-        if denied {
+        if isDenied(error) {
             let message = switch part {
             case .history: String(localized: "macOS didn’t let Zigzag read Arc’s history. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.",
                                   comment: "Problem in the Import window. Arc is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.")
@@ -45,6 +43,13 @@ enum ArcImporter {
         case .sidebar: String(localized: "Zigzag couldn’t read Arc’s spaces and pinned tabs. Try again.", comment: "Problem in the Import window. Arc is a browser's name.")
         }
         return ImportProblem(message: message, fix: .retry, retries: retries)
+    }
+
+    /// Whether a file error is macOS refusing access, which Files & Folders fixes.
+    static func isDenied(_ error: Error) -> Bool {
+        let ns = error as NSError
+        return (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
+            || (ns.underlyingErrors.first as NSError?).map { $0.domain == NSPOSIXErrorDomain && ($0.code == Int(EPERM) || $0.code == Int(EACCES)) } ?? false
     }
 
     nonisolated static var arcSupport: URL {

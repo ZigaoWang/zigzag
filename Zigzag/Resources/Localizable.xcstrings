@@ -24236,6 +24236,17 @@
         }
       }
     },
+    "Zigzag couldn’t read Dia’s pinned tabs. Try again." : {
+      "comment" : "Problem in the Import window. Dia is a browser's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 未能读取 Dia 的已固定标签页。请再试一次。"
+          }
+        }
+      }
+    },
     "Zigzag couldn’t read the passwords it already has, so it didn’t add any. Try again." : {
       "comment" : "Problem in the Import window.",
       "localizations" : {
@@ -25265,6 +25276,24 @@
         }
       }
     },
+    "import.dia-profile" : {
+      "comment" : "Name of the space for a Dia profile whose name couldn't be found: Profile 2.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Profile %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人资料 %lld"
+          }
+        }
+      }
+    },
     "import.short-list" : {
       "comment" : "Joins the items of a short list in the Import window, like “6 passwords, history”.",
       "extractionState" : "extracted_with_value",
@@ -25330,6 +25359,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 不允许 Zigzag 读取 Arc 的空间和已固定标签页。请在“系统设置 › 隐私与安全性 › 文件与文件夹”中找到 Zigzag，打开 Arc，然后再试一次。"
+          }
+        }
+      }
+    },
+    "macOS didn’t let Zigzag read Dia’s pinned tabs. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Dia, then try again." : {
+      "comment" : "Problem in the Import window. Dia is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 不允许 Zigzag 读取 Dia 的已固定标签页。请在“系统设置 › 隐私与安全性 › 文件与文件夹”中找到 Zigzag，打开 Dia，然后再试一次。"
           }
         }
       }

@@ -8,6 +8,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [0.9.5] - 2026-11-24
 
 Touch that feels native on a touch display, with every tap counted, iPad-style dragging and two-finger back and forward, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
+### New
+- Importing from Dia brings its sidebar too, as from Arc. Each Dia profile's pinned tabs are pinned in the space its bookmarks go in, split views stay side by side, Dia's favorites become favorites, and with Open Tabs on, the tabs open there come over and wait to load until clicked. Importing again adds only what's new. ([#511](https://github.com/ZigaoWang/zigzag/issues/511))
 
 ### Fixed
 - An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate. ([#510](https://github.com/ZigaoWang/zigzag/issues/510))

@@ -234,6 +234,9 @@
 		686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18895E549507CE748D20047 /* TabDropIndexTests.swift */; };
 		689E7D1B46055A22C2F3FE3A /* SiteRouteRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5729983AF049602057502EBA /* SiteRouteRow.swift */; };
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
+		D1A051100000000000000001 /* DiaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A051100000000000000002 /* DiaImporter.swift */; };
+		D1A051100000000000000003 /* DiaImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A051100000000000000004 /* DiaImportTests.swift */; };
+		D1A051100000000000000005 /* dia-profile-containers.json in Resources */ = {isa = PBXBuildFile; fileRef = D1A051100000000000000006 /* dia-profile-containers.json */; };
 		694A0100C79943F9F99EAFD1 /* NetworkChanges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
 		6A33BB5CABADE7C1D292DE54 /* SaveFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = E95FE283163E55EA089497AE /* SaveFailure.swift */; };
@@ -1185,6 +1188,9 @@
 		ECFB222D7082B8C1D2724708 /* tab-capture.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "tab-capture.js"; sourceTree = "<group>"; };
 		ED6BBDD8A2A81F07A7506CB3 /* EnergyWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyWatch.swift; sourceTree = "<group>"; };
 		EDF5DDEF3F10D52662345203 /* ArcImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArcImporter.swift; sourceTree = "<group>"; };
+		D1A051100000000000000002 /* DiaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaImporter.swift; sourceTree = "<group>"; };
+		D1A051100000000000000004 /* DiaImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaImportTests.swift; sourceTree = "<group>"; };
+		D1A051100000000000000006 /* dia-profile-containers.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "dia-profile-containers.json"; sourceTree = "<group>"; };
 		EE1EE7853A66CE1029968DA5 /* Scripting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scripting.swift; sourceTree = "<group>"; };
 		EE467D41C2D9D9428EE46A32 /* avoidxray.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = avoidxray.png; sourceTree = "<group>"; };
 		EEE9BA12566291B727684678 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -1650,6 +1656,7 @@
 				44538995DDF31F54687ED10E /* BookmarksHTML.swift */,
 				D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */,
 				59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */,
+				D1A051100000000000000002 /* DiaImporter.swift */,
 				E314E1B3C6242087C5B2B7E3 /* CSVImporter.swift */,
 				1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */,
 				0F8D15DA6B83F9C7DF8A4CB0 /* ImportBatch.swift */,
@@ -1755,6 +1762,7 @@
 				DCF6BF1C148060F0A2977094 /* chrome-bookmarks-personal.json */,
 				BD3E507FE9CD5CD3025750FE /* chrome-bookmarks-work.json */,
 				DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */,
+				D1A051100000000000000006 /* dia-profile-containers.json */,
 				8BC5CFBDE21CD4D0E29009EB /* find-count.html */,
 				A34665F5B0772208AD8F75F5 /* firefox-bookmarks.html */,
 				473190C1E7236CBBFB9B7D43 /* safari-bookmarks.html */,
@@ -1796,6 +1804,7 @@
 				45FC278A744522036D5BB671 /* ApplePayMarkTests.swift */,
 				9ECD9D5ED762C400BEBCDD93 /* ArchiveTests.swift */,
 				3793F63D79DA937BC749EE1B /* ArcOpenTabsTests.swift */,
+				D1A051100000000000000004 /* DiaImportTests.swift */,
 				0E012EDE5594146129BF106F /* AsleepMarkTests.swift */,
 				FD0F5740003190746ACD4D73 /* AutoPictureInPictureTests.swift */,
 				9D5275896F347F531AE3C184 /* BlockedScriptStandInsTests.swift */,
@@ -2290,6 +2299,7 @@
 				59457E9E257B31175B33588C /* chrome-bookmarks-personal.json in Resources */,
 				0617A9798A9371758CAD4DE8 /* chrome-bookmarks-work.json in Resources */,
 				FB2AE7D5BF0E44C75BDAEBBB /* chrome-local-state.json in Resources */,
+				D1A051100000000000000005 /* dia-profile-containers.json in Resources */,
 				F33B0673811E66F305F2EC55 /* favourites.plist in Resources */,
 				789E734404BE475A5AA09EE2 /* find-count.html in Resources */,
 				97651CF3BA0DE88257AEFD02 /* firefox-bookmarks.html in Resources */,
@@ -2370,6 +2380,7 @@
 				49171D1B593738C5F5041F13 /* AppBundledExtensions.swift in Sources */,
 				3690704E0C2C6021A3E511D7 /* AppDelegate.swift in Sources */,
 				691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */,
+				D1A051100000000000000001 /* DiaImporter.swift in Sources */,
 				F6B88CC7B4F25DEC893C84A7 /* ArchivePage.swift in Sources */,
 				A51ADDC4218AC8285461C618 /* Atmosphere.swift in Sources */,
 				9663A7E0A6D077696C60C6CB /* AttentionEdge.swift in Sources */,
@@ -2688,6 +2699,7 @@
 				C81F9C4850E8A068FF99DE78 /* AppBundledExtensionsTests.swift in Sources */,
 				900908465AF9EC502A7E417D /* ApplePayMarkTests.swift in Sources */,
 				2730AFB9F9F959653E83DA33 /* ArcOpenTabsTests.swift in Sources */,
+				D1A051100000000000000003 /* DiaImportTests.swift in Sources */,
 				AAEAD7718FF45E11736C2FB5 /* ArchiveTests.swift in Sources */,
 				51C6E5A688AD4C767333719C /* AsleepMarkTests.swift in Sources */,
 				9D02F7D07BA7EFB165D985AE /* AutoPictureInPictureTests.swift in Sources */,
