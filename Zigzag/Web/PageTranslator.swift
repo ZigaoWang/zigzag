@@ -198,10 +198,13 @@ enum PageTranslator {
     static func pageLanguage(of webView: WKWebView) async -> Locale.Language? {
         guard let json = try? await webView.runOwnScript(script("sample()")) as? String,
               let sample = try? JSONDecoder().decode(Sample.self, from: Data(json.utf8)) else { return nil }
-        return pageLanguage(blocks: sample.blocks, declared: sample.lang) ?? dominantLanguage(of: sample.all)
+        // Off the main thread: reading a long page's language takes tens of milliseconds.
+        return await Task.detached(priority: .utility) {
+            pageLanguage(blocks: sample.blocks, declared: sample.lang) ?? dominantLanguage(of: sample.all)
+        }.value
     }
 
-    private struct Sample: Decodable {
+    private nonisolated struct Sample: Decodable, Sendable {
         var blocks: [String]
         var all: String
         var lang: String?
