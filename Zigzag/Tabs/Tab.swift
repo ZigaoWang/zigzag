@@ -2344,6 +2344,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
+        // A page swiped away from is replaced: the new one shows in place.
+        (webView as? BrowserWebView)?.swipeNavigator.pageArrived()
         DarkPages.pageCommitted(in: webView)
         // A reload asks the site again and keeps the restored history.
         let reloadsRestored = restoredPage == .reloads
@@ -2505,6 +2507,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLeavingPage = false
+        // A swipe's page that never came: the one still showing goes back in place.
+        (webView as? BrowserWebView)?.swipeNavigator.pageArrived()
         restoredPage = nil
         addressWaitsForCommit = false
         // Failed load: clear rule-opened and declined state.

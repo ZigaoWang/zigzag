@@ -58,6 +58,10 @@ final class SwipeNavigator {
     /// While the fingers rest mid-swipe no events come at all, which looks the same as a lost end. A rest keeps the
     /// swipe where it is; only doing something else (moving the pointer, a click, a key) shows the fingers are gone.
     private var restMonitor: Any?
+    /// Gone back or forward: the page carries on the swipe's way until the next one arrives, or this runs out.
+    private var arrival: DispatchWorkItem?
+    /// The card that carried the page on, if it moved in one.
+    private weak var carried: PageCardView?
 
     /// How far to swipe before letting go navigates: a third of the page, as in Safari (#377).
     private var threshold: CGFloat {
@@ -76,6 +80,7 @@ final class SwipeNavigator {
     /// The page left its window (another tab came to the front mid-swipe): its gesture's end will never come here,
     /// so the swipe is dropped now rather than holding over a page that isn't shown.
     func leftWindow() {
+        pageArrived()
         watchdog?.cancel()
         stopWatchingRest()
         if state == .tracking || state == .leaning { cancel() }
@@ -101,6 +106,7 @@ final class SwipeNavigator {
         case .began:
             // A new gesture: anything left from the last one goes now.
             if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
+            pageArrived()
             watchdog?.cancel()
             stopWatchingRest()
             guard webView.window != nil else { state = .idle; return false }
@@ -231,6 +237,7 @@ final class SwipeNavigator {
     func touchBegan(direction wanted: Int) {
         if state == .tracking || state == .leaning { cancel() }
         if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
+        pageArrived()
         watchdog?.cancel()
         stopWatchingRest()
         direction = wanted
@@ -259,7 +266,18 @@ final class SwipeNavigator {
 
     #if DEBUG
     var isTracking: Bool { state == .tracking }
+    /// Gone, with the page carried on and waiting for the next one.
+    var isCarryingOn: Bool { arrival != nil }
     #endif
+
+    /// The page gone to has arrived (or failed to): the web view is back in place, at once.
+    func pageArrived() {
+        guard let arrival else { return }
+        arrival.cancel()
+        self.arrival = nil
+        if let carried { carried.endSwipe() } else if let layer = webView?.layer { SwipeExit.rest(layer) }
+        carried = nil
+    }
 
     private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / threshold }
 
@@ -412,6 +430,7 @@ final class SwipeNavigator {
         }
         if state != .tracking || direction != wanted {
             if state == .tracking { cancel() }
+            pageArrived()
             direction = wanted
             arming = SwipeArming()
             state = .tracking
@@ -467,7 +486,7 @@ final class SwipeNavigator {
         if arrow.isArmed != arming.armed { arrow.isArmed = arming.armed }
     }
 
-    /// The page settles back into place: with the page it went to, or without, if let go too soon.
+    /// Let go too soon: the page springs back into place.
     private func settlePage() {
         if let card { card.settleSwipe(); return }
         guard let layer = webView?.layer else { return }
@@ -486,20 +505,100 @@ final class SwipeNavigator {
         stopWatchingRest()
         // Let go after its tab went to the back: it isn't where you're looking, so it doesn't move.
         guard let webView, webView.window != nil else { cancel(); return }
+        // Its tab closing as it goes back to its opener doesn't call the swipe off.
+        state = .finishing
         // In a split, the page swiped is the one that goes, and the one you're in from now on (#170).
         if let owner = webView.owner { owner.host?.tabWantsFocus(owner) }
+        let arrow = arrow
+        self.arrow = nil
+        // Back to the opener closes the tab, so no page arrives here: it goes back in place now.
+        let closes = direction < 0 && webView.owner.map { !$0.canGoBack && $0.returnsToOpener } == true
+        if closes || Tokens.Motion.reduceMotion { restPage() } else { carryOn() }
         if direction < 0 { if let owner = webView.owner { owner.goBack() } else { webView.goBack() } } else if let owner = webView.owner { owner.goForward() } else { webView.goForward() }
-        settlePage()
         arrow?.leave(toward: direction, navigated: true)
-        arrow = nil
+    }
+
+    /// The page slides on a little and dims, rather than springing back, until the next one arrives (#508).
+    private func carryOn() {
+        guard let webView else { return }
+        let to = SwipeExit.offset(from: shift * CGFloat(-direction), direction: direction)
+        if let card {
+            card.carrySwipe(to: to)
+            carried = card
+        } else if let layer = webView.layer {
+            SwipeExit.carry(layer, to: to)
+        }
+        arrival?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.pageArrived() }
+        arrival = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + SwipeExit.wait, execute: work)
+    }
+
+    /// The page straight back in place, with no animation.
+    private func restPage() {
+        arrival?.cancel()
+        arrival = nil
+        if let card { card.endSwipe() } else if let layer = webView?.layer { SwipeExit.rest(layer, undims: false) }
     }
 
     private func cancel() {
         watchdog?.cancel()
         stopWatchingRest()
+        pageArrived()
         settlePage()
         arrow?.leave(toward: -direction, navigated: false)
         arrow = nil
+    }
+}
+
+/// How a page leaves after a swipe that went back or forward, until the next one takes its place (#508).
+enum SwipeExit {
+    /// How much further the page goes after letting go.
+    static let travel: CGFloat = 44
+    /// How dim it gets meanwhile.
+    static let dim: Float = 0.85
+    static let duration: TimeInterval = 0.18
+    /// The longest the page waits shifted for the next one to arrive.
+    static let wait: TimeInterval = 0.4
+
+    /// Where a page shifted `offset` goes after a swipe going `direction` (-1 back, 1 forward).
+    static func offset(from offset: CGFloat, direction: Int) -> CGFloat {
+        offset + travel * CGFloat(-direction)
+    }
+
+    /// Slides `layer` on to `offset` and dims it, eased out.
+    @MainActor static func carry(_ layer: CALayer, to offset: CGFloat, dims: Bool = true) {
+        let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
+        let opacity = layer.presentation()?.opacity ?? layer.opacity
+        Tokens.Motion.withoutAnimation {
+            layer.removeAnimation(forKey: "swipe.settle")
+            layer.setAffineTransform(CGAffineTransform(translationX: offset, y: 0))
+            if dims { layer.opacity = dim }
+        }
+        let move = CABasicAnimation(keyPath: "transform")
+        move.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
+        move.toValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(layer.affineTransform()))
+        move.duration = duration
+        move.timingFunction = Tokens.Motion.easeOut
+        layer.add(move, forKey: "swipe.settle")
+        guard dims else { return }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = opacity
+        fade.toValue = dim
+        fade.duration = duration
+        fade.timingFunction = Tokens.Motion.easeOut
+        layer.add(fade, forKey: "swipe.dim")
+    }
+
+    /// `layer` back in place, and fully there again if `carry` dimmed it, with no animation.
+    @MainActor static func rest(_ layer: CALayer, undims: Bool = true) {
+        Tokens.Motion.withoutAnimation {
+            layer.removeAnimation(forKey: "swipe.settle")
+            layer.setAffineTransform(.identity)
+            guard undims else { return }
+            layer.removeAnimation(forKey: "swipe.dim")
+            layer.opacity = 1
+        }
     }
 }
 
@@ -846,7 +945,7 @@ final class SwipeArrowView: NSView {
         armed ? 1 : min(1, 0.4 + max(0, progress) * 3)
     }
 
-    /// Fades as the page settles back. Navigated, it shows filled first, however fast the swipe was.
+    /// Fades as the page settles back or goes on. Navigated, it shows filled first, however fast the swipe was.
     func leave(toward direction: Int, navigated: Bool) {
         if navigated {
             progress = 1

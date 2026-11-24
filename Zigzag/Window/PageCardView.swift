@@ -653,6 +653,8 @@ final class PageCardView: NSView {
     private let swipeShade = CALayer()
     /// Counts settles, so one finishing after a new swipe began leaves the backdrop alone.
     private var swipeSettles = 0
+    /// Carried on after going back or forward: the page is dimmed until `endSwipe`.
+    private var swipeDimmed = false
 
     /// Layers moved by the swipe: the page and anything covering it (PDF, Reader).
     private var swipeMoving: [CALayer] {
@@ -709,15 +711,24 @@ final class PageCardView: NSView {
         CATransaction.commit()
     }
 
+    /// After a swipe that went back or forward: the page carries on to `offset` and dims until `endSwipe` (#508).
+    func carrySwipe(to offset: CGFloat) {
+        swipeSettles += 1
+        swipeDimmed = true
+        let shade = swipeShade
+        for layer in swipeMoving { SwipeExit.carry(layer, to: offset, dims: layer !== shade) }
+    }
+
+    /// The page gone to has arrived: everything back in place at once.
+    func endSwipe() { dropSwipe() }
+
     /// Cancels any swipe immediately: everything back, backdrop removed.
     private func dropSwipe() {
         guard !swipeBackdrop.isHidden, swipeBackdrop.superview != nil else { return }
         swipeSettles += 1
         Tokens.Motion.withoutAnimation {
-            for layer in swipeMoving {
-                layer.removeAnimation(forKey: "swipe.settle")
-                layer.setAffineTransform(.identity)
-            }
+            for layer in swipeMoving { SwipeExit.rest(layer, undims: swipeDimmed) }
+            swipeDimmed = false
             holder?.layer?.masksToBounds = false
             swipeBackdrop.isHidden = true
         }

@@ -1484,3 +1484,86 @@ struct ZigzagCardTests {
         }
     }
 }
+
+/// A swipe that went back or forward carries the page on until the next one arrives; one called off springs back (#508).
+@MainActor
+@Suite(.serialized)
+struct SwipeExitTests {
+    private final class Host: NSWindowController, SwipeArrowHost {
+        let swipeArrowLayer = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+    }
+
+    /// A page in a window that shows the arrow, swiped `dx` points toward back.
+    private func swiping(dx: CGFloat) -> (BrowserWebView, Host) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.borderless],
+                              backing: .buffered, defer: true)
+        let host = Host(window: window)
+        let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        page.wantsLayer = true
+        window.contentView?.addSubview(page)
+        window.contentView?.addSubview(host.swipeArrowLayer)
+        page.swipeNavigator.touchBegan(direction: -1)
+        page.swipeNavigator.touchMoved(dx: dx, at: 1)
+        return (page, host)
+    }
+
+    private func offset(_ page: BrowserWebView) -> CGFloat { page.layer?.affineTransform().tx ?? 0 }
+
+    @Test func goingCarriesThePageOnUntilTheNextArrives() {
+        #expect(SwipeExit.offset(from: 50, direction: -1) == 50 + SwipeExit.travel)
+        #expect(SwipeExit.offset(from: -50, direction: 1) == -50 - SwipeExit.travel)
+        let (page, host) = swiping(dx: 150)
+        let held = offset(page)
+        #expect(held > 0)
+        page.swipeNavigator.touchEnded(at: 1.05, cancelled: false)
+        // Not settled: further the swipe's way, dimmed.
+        #expect(page.swipeNavigator.isCarryingOn)
+        #expect(abs(offset(page) - (held + SwipeExit.travel)) < 0.5)
+        #expect(page.layer?.opacity == SwipeExit.dim)
+        // The next page arrives: in place at once.
+        page.swipeNavigator.pageArrived()
+        #expect(!page.swipeNavigator.isCarryingOn)
+        #expect(offset(page) == 0 && page.layer?.opacity == 1)
+        #expect(page.layer?.animation(forKey: "swipe.settle") == nil)
+        _ = host
+    }
+
+    @Test func aPageThatNeverArrivesStillGoesBackInPlace() async throws {
+        let (page, host) = swiping(dx: 150)
+        page.swipeNavigator.touchEnded(at: 1.05, cancelled: false)
+        #expect(page.swipeNavigator.isCarryingOn)
+        try await Task.sleep(for: .seconds(SwipeExit.wait + 0.2))
+        #expect(!page.swipeNavigator.isCarryingOn)
+        #expect(offset(page) == 0 && page.layer?.opacity == 1)
+        _ = host
+    }
+
+    @Test func callingItOffStillSpringsBack() {
+        let (page, host) = swiping(dx: 150)
+        page.swipeNavigator.touchEnded(at: 1.05, cancelled: true)
+        #expect(!page.swipeNavigator.isCarryingOn)
+        #expect(offset(page) == 0 && page.layer?.opacity == 1)
+        #expect(page.layer?.animation(forKey: "swipe.settle") != nil)
+        _ = host
+    }
+
+    @Test func aNewSwipePutsACarriedPageBackFirst() {
+        let (page, host) = swiping(dx: 150)
+        page.swipeNavigator.touchEnded(at: 1.05, cancelled: false)
+        page.swipeNavigator.touchBegan(direction: -1)
+        #expect(!page.swipeNavigator.isCarryingOn)
+        #expect(page.layer?.opacity == 1)
+        _ = host
+    }
+
+    @Test func reduceMotionLeavesThePageWhereItIs() {
+        Tokens.Motion.debugReduceMotion = true
+        defer { Tokens.Motion.debugReduceMotion = false }
+        let (page, host) = swiping(dx: 150)
+        #expect(offset(page) == 0)
+        page.swipeNavigator.touchEnded(at: 1.05, cancelled: false)
+        #expect(!page.swipeNavigator.isCarryingOn)
+        #expect(offset(page) == 0 && page.layer?.opacity == 1)
+        _ = host
+    }
+}

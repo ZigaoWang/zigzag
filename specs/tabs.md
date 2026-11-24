@@ -215,3 +215,11 @@
   Test: BookmarkFolderTests.swipeArrowDoesntWaitOnABusyPage
 - The page is asked about the spot under the pointer as two fingers touch the trackpad, before they move.
   Test: BookmarkFolderTests.aTouchDownsProbeIsForTheGestureAtItsSpot
+- Let go of a swipe that goes back or forward → the page slides on a little the swipe's way and dims, no spring back; the next page shows in place as it arrives, and within 0.4 seconds the page is back in place whatever happened. Trackpad or fingers on the screen, in a split pane and in Zigzag Mini.
+  Test: SwipeExitTests.goingCarriesThePageOnUntilTheNextArrives
+  Test: SwipeExitTests.aPageThatNeverArrivesStillGoesBackInPlace
+  Test: SwipeExitTests.aNewSwipePutsACarriedPageBackFirst
+- Let go of a swipe too soon → the page springs back into place.
+  Test: SwipeExitTests.callingItOffStillSpringsBack
+- Reduce Motion → the page stays put through a swipe; the arrow alone shows it.
+  Test: SwipeExitTests.reduceMotionLeavesThePageWhereItIs

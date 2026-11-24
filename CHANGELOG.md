@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A feature flag you changed in Settings › Developer has a Reset button beside its switch, in place of a plain “Changed”, and a flag Zigzag starts other than WebKit, like Prefer Page Rendering Updates near 60fps, says so under its name.
+- Letting go of a swipe that goes back or forward no longer springs the page back before it leaves. The page slides on a little and dims, then the next page shows in its place, so you can tell the swipe took without looking at the arrow. A swipe called off still springs back, and with Reduce Motion the page stays put. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
 
 ## [0.9.5] - 2026-11-24
 
