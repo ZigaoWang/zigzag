@@ -5,8 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-11-24
+
+Touch that feels native on a touch display, with every tap counted, iPad-style dragging and two-finger back and forward, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
+
 ### Fixed
-- An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate.
+- An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate. ([#510](https://github.com/ZigaoWang/zigzag/issues/510))
 - On a touch display, two fingers swiped sideways on a page go back or forward again, with the same arrow, distance and flick as on the trackpad. Before, the page scrolled instead. Up and down still scrolls, a pinch still zooms, and a page that pans sideways itself under your finger, like a map or a carousel, keeps the swipe.
 - YouTube's theater mode and sign-ins that use session cookies stay after a relaunch when Zigzag reopens your last session, as in Chrome. With On launch set to Open a new window they're dropped as before, and private windows keep none.
 - On a touch display, tapping one tab right after another selects each one. Before, a quick tap on the tab next to the one you just tapped renamed it, as two taps on the same tab do.
@@ -1609,6 +1613,7 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 - The first public release: signed and notarized, with updates that install themselves.
 
 [Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...HEAD
+[0.9.5]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...HEAD
 [0.9.4]: https://github.com/ZigaoWang/zigzag/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...v0.9.2
