@@ -40217,6 +40217,23 @@
           }
         }
       }
+    },
+    "Apps on this Mac" : {
+      "comment" : "Row in the site panel's This Site group: lets this site's own scripts talk to a program listening on this Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的 App"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 上的 App"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
