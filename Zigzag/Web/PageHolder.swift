@@ -110,6 +110,7 @@ final class PageHolder: NSView {
         swipe.ruledOut = { [weak self] swipe in self?.swipeRuledOut(swipe) ?? true }
         swipe.waits = { [weak self] swipe in self?.swipeWaits(swipe) ?? false }
         swipe.decides = { [weak self] swipe in self?.swipeDecides(swipe) ?? false }
+        swipe.notes = { [weak self] _, line in TouchLog.note("page swipe \(line) seen by \(TouchLog.recognizers(from: self?.page))") }
         // WebKit's touch scrolling takes one or two fingers from their first point of movement and gives its own
         // recognizers precedence: it waits until the swipe has decided.
         swipe.touchOnly.outranks = { [weak self] other in self?.isPageScrolling(other) ?? false }
@@ -167,7 +168,7 @@ final class PageHolder: NSView {
         let open = shape && takesBackForward(dx: swipe.translation.x)
         let leaves = open ? (page as? BrowserWebView)?.swipeNavigator.touchPageLeaves(wanted) ?? false : false
         TouchLog.note("decided \(leaves ? (wanted < 0 ? "back" : "forward") : "page") fingers=\(swipe.fingers) moved=\(Self.describe(swipe.translation)) "
-                      + "spread=\(Int(swipe.spread)) shape=\(shape) open=\(open) room=\(String(describing: (page as? BrowserWebView)?.swipeNavigator.touchRoom)) "
+                      + "angle=\(TouchSwipe.degreesOffLevel(swipe.translation)) spread=\(Int(swipe.spread)) shape=\(shape) open=\(open) room=\(String(describing: (page as? BrowserWebView)?.swipeNavigator.touchRoom)) "
                       + "seen by \(TouchLog.recognizers(from: page))")
         return leaves
     }

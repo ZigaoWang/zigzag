@@ -1028,6 +1028,11 @@ enum TouchSwipe {
         fingers == 2 && verdict(translation, forgiving: false) == .sideways && abs(spread) < abs(translation.x) / 2
     }
 
+    /// How far off level fingers that moved by `translation` go, in degrees.
+    nonisolated static func degreesOffLevel(_ translation: NSPoint) -> Int {
+        Int((atan2(abs(translation.y), abs(translation.x)) * 180 / .pi).rounded())
+    }
+
     /// A lone finger is let go once it has moved this far, so one-finger scrolling starts at once.
     nonisolated static let loneFingerMove: CGFloat = 3
     /// Or this long after it landed: a second finger of a two-finger swipe lands within a few milliseconds.
@@ -1044,6 +1049,41 @@ enum TouchSwipe {
     nonisolated static func ruledOutOnPage(fingers: Int, spread: CGFloat, moved: CGFloat, sinceLanding: TimeInterval,
                                            canGoEitherWay: Bool) -> Bool {
         !canGoEitherWay || fingers > 2 || abs(spread) >= decision || isLoneFinger(fingers: fingers, moved: moved, sinceLanding: sinceLanding)
+    }
+}
+
+/// The fingers of a touch swipe, each from where it landed: their shared movement and how much they spread apart.
+nonisolated struct TouchFingers {
+    private(set) var touches: [(id: any NSCopying & NSObjectProtocol, start: NSPoint, last: NSPoint)] = []
+    var count: Int { touches.count }
+
+    mutating func land(_ id: any NSCopying & NSObjectProtocol, at point: NSPoint) { touches.append((id, point, point)) }
+
+    mutating func move(_ id: any NSCopying & NSObjectProtocol, to point: NSPoint) {
+        guard let i = touches.firstIndex(where: { $0.id.isEqual(id) }) else { return }
+        touches[i].last = point
+    }
+
+    static func centroid(_ points: [NSPoint]) -> NSPoint {
+        guard !points.isEmpty else { return .zero }
+        let n = CGFloat(points.count)
+        return NSPoint(x: points.map(\.x).reduce(0, +) / n, y: points.map(\.y).reduce(0, +) / n)
+    }
+
+    var startCentroid: NSPoint { Self.centroid(touches.map(\.start)) }
+
+    /// From where each landed to where it is.
+    var translation: NSPoint {
+        let from = startCentroid, to = Self.centroid(touches.map(\.last))
+        return NSPoint(x: to.x - from.x, y: to.y - from.y)
+    }
+
+    var spread: CGFloat {
+        guard touches.count > 1 else { return 0 }
+        let from = startCentroid, to = Self.centroid(touches.map(\.last))
+        let before = touches.map { hypot($0.start.x - from.x, $0.start.y - from.y) }.reduce(0, +)
+        let now = touches.map { hypot($0.last.x - to.x, $0.last.y - to.y) }.reduce(0, +)
+        return (now - before) / CGFloat(touches.count)
     }
 }
 
@@ -1065,6 +1105,8 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
     var maxFingers = 1
     /// The fingers turned out not to be this swipe: a tap, another way, or more of them.
     var failed: (() -> Void)?
+    /// Each way it ends without `ruledOut` or `decides` saying so, and each later finger landing, for the touch log.
+    var notes: ((TouchSwipeRecognizer, String) -> Void)?
     /// The fingers down so far, or when it decided.
     private(set) var fingers = 0
     /// How far the fingers have moved together since they landed, in the view's terms.
@@ -1076,7 +1118,9 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
     /// When the first finger landed, and when the latest touch event came.
     private(set) var landedAt: TimeInterval = 0
     private(set) var eventAt: TimeInterval = 0
-    private var touches: [(id: any NSCopying & NSObjectProtocol, start: NSPoint, last: NSPoint)] = []
+    private var touches = TouchFingers()
+    /// It set its own end; any other end is AppKit's, for another recognizer.
+    private var endedOwn = false
     private var samples: [(time: TimeInterval, point: NSPoint)] = []
     private var following = false
 
@@ -1117,44 +1161,45 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
         return NSPoint(x: (last.point.x - first.point.x) / dt, y: (last.point.y - first.point.y) / dt)
     }
 
-    private func centroid(_ points: [NSPoint]) -> NSPoint {
-        guard !points.isEmpty else { return .zero }
-        let n = CGFloat(points.count)
-        return NSPoint(x: points.map(\.x).reduce(0, +) / n, y: points.map(\.y).reduce(0, +) / n)
+    private func measure() {
+        translation = touches.translation
+        spread = touches.spread
     }
 
-    /// The fingers' shared movement and spread, from where each landed to where it is.
-    private func measure() {
-        let from = centroid(touches.map(\.start)), to = centroid(touches.map(\.last))
-        translation = NSPoint(x: to.x - from.x, y: to.y - from.y)
-        guard touches.count > 1 else { spread = 0; return }
-        let before = touches.map { hypot($0.start.x - from.x, $0.start.y - from.y) }.reduce(0, +)
-        let now = touches.map { hypot($0.last.x - to.x, $0.last.y - to.y) }.reduce(0, +)
-        spread = (now - before) / CGFloat(touches.count)
+    override var state: NSGestureRecognizer.State {
+        didSet {
+            guard state == .failed || state == .cancelled, !endedOwn, fingers > 0 else { return }
+            endedOwn = true
+            notes?(self, "ended by another recognizer \(described)")
+        }
+    }
+
+    /// Fingers, travel and time since landing, for the log.
+    private var described: String {
+        "fingers=\(fingers) moved=\(Int(translation.x)),\(Int(translation.y)) after=\(Int((eventAt - landedAt) * 1000))ms"
     }
 
     override func touchesBegan(with event: NSEvent) {
         guard let view, state == .possible else { return }
         eventAt = event.timestamp
         if fingers == 0 { landedAt = event.timestamp }
-        for touch in event.touches(matching: .began, in: view) {
-            let point = touch.location(in: view)
-            touches.append((touch.identity, point, point))
-        }
+        for touch in event.touches(matching: .began, in: view) { touches.land(touch.identity, at: touch.location(in: view)) }
         let first = fingers == 0
-        if first { start = centroid(touches.map(\.start)) }
+        if first { start = touches.startCentroid }
         fingers = touches.count
         measure()
-        if first { landed?(self) }
-        if fingers > maxFingers || ruledOut?(self) == true { fail() }
+        if first { landed?(self) } else { notes?(self, "finger \(fingers) landed \(described)") }
+        if fingers > maxFingers {
+            notes?(self, "more than \(maxFingers) fingers")
+            fail()
+        } else if ruledOut?(self) == true {
+            fail()
+        }
     }
 
     override func touchesMoved(with event: NSEvent) {
         guard let view else { return }
-        for touch in event.touches(matching: .moved, in: view) {
-            guard let i = touches.firstIndex(where: { $0.id.isEqual(touch.identity) }) else { continue }
-            touches[i].last = touch.location(in: view)
-        }
+        for touch in event.touches(matching: .moved, in: view) { touches.move(touch.identity, to: touch.location(in: view)) }
         measure()
         samples.append((event.timestamp, translation))
         eventAt = event.timestamp
@@ -1179,27 +1224,37 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
 
     override func touchesEnded(with event: NSEvent) {
         endedAt = event.timestamp
+        eventAt = event.timestamp
         switch state {
         case .began, .changed:
             stopFollowing()
+            endedOwn = true
             state = .ended
-        case .possible: fail()
+        case .possible:
+            notes?(self, "lifted before deciding \(described)")
+            fail()
         default: break
         }
     }
 
     override func touchesCancelled(with event: NSEvent) {
+        eventAt = event.timestamp
         switch state {
         case .began, .changed:
+            notes?(self, "cancelled while following \(described)")
             stopFollowing()
+            endedOwn = true
             state = .cancelled
-        case .possible: fail()
+        case .possible:
+            notes?(self, "cancelled before deciding \(described)")
+            fail()
         default: break
         }
     }
 
     /// It isn't this swipe: `failed` hears.
     private func fail() {
+        endedOwn = true
         state = .failed
         failed?()
     }
@@ -1212,9 +1267,11 @@ final class TouchSwipeRecognizer: NSGestureRecognizer {
     isolated deinit { stopFollowing() }
 
     override func reset() {
+        if fingers > 0, !endedOwn { notes?(self, "ended by another recognizer \(described)") }
+        endedOwn = false
         super.reset()
         stopFollowing()
-        touches = []
+        touches = TouchFingers()
         fingers = 0
         translation = .zero
         start = .zero
