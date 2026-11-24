@@ -99,3 +99,27 @@
   Test: SidebarRowMenuTests.aPrivateWindowNeitherFavoritesNorRenamesYourPins
 - Pinned pages and folders in a private window → no filing, moving or folder edits in their menus, and dragging them changes nothing.
   Test: SidebarRowMenuTests.aPrivateWindowLeavesYourPinsWhereTheyAre
+
+## Live folders
+- New Live Folder… in the sidebar's +, its empty space, a space's menu or a folder's menu → a sheet for a feed or site address, or a GitHub list and username; the folder is named after the feed unless you name it.
+  Test: SidebarMenuTests.plusOffersTabFolderThenSpace
+- A site's address instead of its feed's → the feed its page links to is found, used and kept.
+  Test: LiveFoldersTests.aSitesAddressFindsItsFeed
+- A live folder → its feed's pages, newest first, at most its count (10, 25 or 50), each new one with a dot.
+  Test: LiveFoldersTests.aFetchFillsTheFolderNewestFirstWithDots
+- Opening one of its pages → it opens in place as a pinned page does, and its dot goes; Mark All as Read takes every dot off. A private window shows no live folders and reads nothing.
+  Test: LiveFoldersTests.openingAPageReadsIt
+- A page that leaves the feed and comes back → it isn't new again.
+  Test: LiveFoldersTests.newPagesAreUnreadOnceAndStayReadWhenTheyComeBack
+- Feeds are fetched every half hour in the background, at most hourly in Low Power Mode, and later and later after failures; each fetch asks only for what changed.
+  Test: LiveFoldersTests.fetchesEveryHalfHourAndBacksOffAfterFailures
+- A feed that hasn't changed → nothing in the pins changes, so ⌘Z still undoes what you did last.
+  Test: LiveFoldersTests.fetchesAgainOnlyForWhatChanged
+- A fetch that fails → no alert; the folder's menu says Couldn’t Refresh with the reason and Try Again.
+  Test: SidebarRowMenuTests.aLiveFoldersMenuReadsRefreshesEditsAndDeletes
+- Dragging a page out of a live folder → it's pinned where it's dropped, and the folder keeps its own; nothing can be dropped into one.
+  Test: LiveFoldersTests.itsPagesAreItsFeedsAlone
+- Delete Live Folder → the folder and its pages go; ⌘Z brings them back.
+  Test: SidebarRowMenuTests.aLiveFoldersMenuReadsRefreshesEditsAndDeletes
+- A GitHub list → open pull requests, issues or review requests in public repositories for that username; when GitHub asks to wait, it waits.
+  Test: LiveFoldersTests.gitHubListsComeFromItsSearchAndWaitWhenAsked
