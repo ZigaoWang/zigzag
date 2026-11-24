@@ -45,6 +45,8 @@ enum ImportCoordinator {
             // Orion's passwords are in its own Keychain (a note says how to export them); its sign-ins, like
             // Safari's, aren't in a file Zigzag reads. Its Chrome Web Store extensions come from the same store.
             case .orion: [.passwords, .bookmarks, .history, .extensions]
+            // A Zigzag backup brings what it holds; its settings only when asked.
+            case .file(let url) where ZigzagBackup.isBackup(url): [.bookmarks, .history, .tabs, .openTabs, .settings]
             case .file: [.passwords, .bookmarks, .history]
             }
         }
@@ -63,6 +65,8 @@ enum ImportCoordinator {
         static let extensions = Choice(rawValue: 32)
         /// Each of Arc's spaces' open tabs (Today's, not pinned), which wait to load until clicked.
         static let openTabs = Choice(rawValue: 64)
+        /// A Zigzag backup's settings, in place of the ones here.
+        static let settings = Choice(rawValue: 128)
 
         /// What trying again after these problems should run: just the parts that failed, or everything.
         static func retrying(_ problems: [ImportProblem], else all: Choice) -> Choice {
@@ -345,6 +349,7 @@ enum ImportCoordinator {
             return summary
         }
         defer { Profiles.shared.done(profile.id) }
+        if case .file(let url) = source.kind, ZigzagBackup.isBackup(url) { return await ZigzagBackup.restore(url, settings: choice.contains(.settings)) }
         let reading = choice.reading
         let isArc: Bool = { if case .chromium(let b) = source.kind { return b.name == "Arc" } else { return false } }()
 

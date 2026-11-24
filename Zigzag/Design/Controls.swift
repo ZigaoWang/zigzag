@@ -743,7 +743,14 @@ class InteractiveView: NSView {
 /// default; inside a row or a field, `.compact` (`Metric.compactIconButton`, `Symbol.compactGlyph`).
 final class IconButton: InteractiveView {
     private let imageView = NSImageView()
-    var symbol: String { didSet { imageView.image = Tokens.Symbol.image(symbol, size: symbolSize); needsLayout = true } }
+    var symbol: String {
+        didSet {
+            // The same symbol again: the image it would make is the one showing.
+            if oldValue == symbol, image == nil, glyph == nil, imageView.image != nil { return }
+            imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
+            needsLayout = true
+        }
+    }
     /// A full-color image instead of a symbol (extension icons).
     var image: NSImage? {
         didSet {

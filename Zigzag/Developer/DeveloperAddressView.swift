@@ -10,6 +10,8 @@ final class DeveloperAddressView: InteractiveView {
     /// The bar is the top of the page's card, in the page's color: the neutral fills, as its buttons take.
     var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false) } } }
     private(set) var url: URL?
+    /// Which lock shows.
+    private var lockSecure: Bool?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -45,7 +47,11 @@ final class DeveloperAddressView: InteractiveView {
         self.url = url
         let secure = url?.scheme == "https" && !notSecure
         text.stringValue = Self.shown(url)
-        lock.image = Tokens.Symbol.image(secure ? "lock" : "lock.open", size: Tokens.Symbol.inline)
+        // Made again only when it changes: a page can change its address many times a second as you scroll.
+        if secure != lockSecure {
+            lockSecure = secure
+            lock.image = Tokens.Symbol.image(secure ? "lock" : "lock.open", size: Tokens.Symbol.inline)
+        }
         lock.contentTintColor = Tokens.Color.textSecondary
         lock.isHidden = url == nil
         toolTip = secure ? nil : SitePanel.notSecure

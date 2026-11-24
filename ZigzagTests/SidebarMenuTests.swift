@@ -8,11 +8,11 @@ import WebKit
 @MainActor
 struct SidebarMenuTests {
     @Test func plusOffersTabFolderThenSpace() {
-        #expect(SidebarMenus.addEntries(isPrivate: false) == [.newTab, .newFolder, .newSpace])
+        #expect(SidebarMenus.addEntries(isPrivate: false) == [.newTab, .newFolder, .newLiveFolder, .newSpace])
     }
 
     @Test func emptySpaceMatchesThePlusWithEditSpace() {
-        #expect(SidebarMenus.blankEntries(isPrivate: false) == [.newTab, .newFolder, .separator, .editSpace, .newSpace])
+        #expect(SidebarMenus.blankEntries(isPrivate: false) == [.newTab, .newFolder, .newLiveFolder, .separator, .editSpace, .newSpace])
         // The same items as the +, in the same order.
         #expect(SidebarMenus.blankEntries(isPrivate: false).filter { $0 != .separator && $0 != .editSpace } == SidebarMenus.addEntries(isPrivate: false))
     }
@@ -32,6 +32,9 @@ struct SidebarMenuTests {
         #expect(SidebarMenus.action(of: .editSpace) == #selector(BrowserWindowController.renameSpace(_:)))
         // No menu bar item makes a folder, so it shows no shortcut rather than an invented one.
         #expect(SidebarMenus.action(of: .newFolder) == nil)
+        #expect(SidebarMenus.action(of: .newLiveFolder) == nil)
+        // It opens a sheet first.
+        #expect(SidebarMenus.title(of: .newLiveFolder).hasSuffix("…"))
         // New Space makes the space at once, as New Folder does: no ellipsis, the same as in the menu bar.
         #expect(SidebarMenus.title(of: .newSpace) == String(localized: "New Space", comment: "View menu item."))
         #expect(SidebarMenus.title(of: .editSpace).hasSuffix("…"))
@@ -685,6 +688,35 @@ struct SidebarRowMenuTests {
             controller.unpinMarked([second.id])
             controller.favoriteMarked([.bookmark(second.id)])
             #expect(Library.shared.snapshot == before)
+        }
+    }
+
+    /// A live folder's menu: what's new, its source and deleting it, never filing into it; its pages' menu: read or
+    /// unread, and no renaming, filing or removing.
+    @Test func aLiveFoldersMenuReadsRefreshesEditsAndDeletes() throws {
+        try inWindow(["A"]) { controller, _, space in
+            let folder = try #require(Library.shared.addLiveFolder(named: "News", source: .feed(URL(string: "https://example.com/menu/feed")!), limit: 25,
+                                                                   namedByFeed: false, in: space))
+            LiveFolders.shared.apply(.entries([LiveFeed.Entry(key: "n1", url: URL(string: "https://example.com/menu/n1")!, title: "N1")], title: nil, feed: nil,
+                                              validators: .init()), to: folder.id)
+            let shown = try #require(Library.shared.folder(folder.id))
+            #expect(titles(SidebarMenus.folderMenu(for: shown, controller: controller))
+                    == ["Open All in Tabs", "-", "Close Folder", "-", "Mark All as Read", "Refresh Now", "-", "Edit…", SidebarMenus.changeIconTitle, "-", "Delete Live Folder"])
+            let page = try #require(shown.bookmarkIDs.first.flatMap(Library.shared.bookmark))
+            let pageMenu = titles(SidebarMenus.bookmarkMenu(for: page, controller: controller))
+            #expect(pageMenu.contains("Mark as Read"))
+            for title in ["Rename", "Unpin Tab", "Add to Folder", "Add to New Folder", "Move to Space", SidebarMenus.removePinsTitle(1)] { #expect(!pageMenu.contains(title), "\(title)") }
+            // Couldn't refresh: why, and Try Again in Refresh Now's place.
+            LiveFolders.shared.apply(.failed(.status(500), retryAfter: nil), to: folder.id)
+            let failed = titles(SidebarMenus.folderMenu(for: shown, controller: controller))
+            #expect(Array(failed.prefix(3)) == ["Couldn’t Refresh", LiveProblem.status(500).message, "Try Again"])
+            #expect(!failed.contains("Refresh Now"))
+            // Deleted with its pages, and back with ⌘Z.
+            controller.deleteLiveFolderWithUndo(folder.id)
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(Library.shared.bookmark(page.id) == nil)
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.folder(folder.id)?.bookmarkIDs == shown.bookmarkIDs)
         }
     }
 

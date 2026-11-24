@@ -21,6 +21,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
     @objc func openLocation(_ sender: Any?) {
         if commandBar.isVisible && commandBar.mode == .editCurrent { commandBar.dismiss(); return }
+        // Autohide's bar comes back first, so the address is edited where it is (#359).
+        revealAutohide()
         commandBar.show(mode: .editCurrent)
     }
     /// Select All after a sidebar click with no field or page to take it: select its tabs (#302).

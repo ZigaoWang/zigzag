@@ -141,6 +141,8 @@ final class AddressView: InteractiveView {
             pendingPins = (pins, animated)
             return
         }
+        // No extension pinned, before or after: nothing moves.
+        if pins.isEmpty, pinEntries.isEmpty { return }
         let kept = Set(pins.map(\.id))
         for gone in pinEntries where !kept.contains(gone.pin.id) { takeAway(gone.button, animated: animated, removing: true) }
         let existing = Dictionary(uniqueKeysWithValues: pinEntries.map { ($0.pin.id, $0) })
@@ -534,8 +536,15 @@ final class AddressView: InteractiveView {
         return CGFloat(count) * Self.pinStep - 2
     }
 
+    /// What `show` last put up: the site's name and whether it's marked not secure.
+    private var shown: (name: String, insecure: Bool)?
+
     func show(url: URL?, notSecure: Bool) {
-        label.stringValue = Self.name(of: url)
+        // The same site as it was: a page moving its address as you scroll it (a forum's post number) redraws nothing.
+        let now = (name: Self.name(of: url), insecure: notSecure && url != nil)
+        if let shown, shown == now { return }
+        shown = now
+        label.stringValue = now.name
         label.lineBreakMode = Self.lineBreak(forName: label.stringValue)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
@@ -1317,12 +1326,20 @@ final class SidebarView: NSView {
 
     // MARK: Updating
 
+    /// Whether the reload button's tip says Stop (`update`).
+    private var tipLoading: Bool?
+
     func update(tab: Tab?) {
         backButton.isEnabled = tab?.canGoBackOrReturn ?? false
         forwardButton.isEnabled = tab?.canGoForward ?? false
         reloadButton.isEnabled = tab != nil
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
-        reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
+        // Worked out again only when it changes: the tip reads the menus for its shortcut.
+        let loading = tab?.isLoading ?? false
+        if loading != tipLoading {
+            tipLoading = loading
+            reloadButton.toolTip = Self.reloadTip(loading: loading)
+        }
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
     }

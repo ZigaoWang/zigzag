@@ -1190,7 +1190,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let fullScreenFill = DropdownButton()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
-    private let addressAboveToggle = Toggle()
+    private let addressPlaceMenu = DropdownButton()
     private let sidebarSide = DropdownButton()
     /// Sidebar position's choices, Left then Right, as whether the sidebar is on the right (#360).
     static let sidebarSides = [false, true]
@@ -1446,6 +1446,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Import from another browser", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Passwords, bookmarks and history. The other browser isn’t changed.", comment: "Explanation under “Import from another browser” in Settings › General."),
                                  control: importButton))
+        let exportButton = PillButton(title: String(localized: "Export…", comment: "Button in Settings › General that opens the Export Your Data sheet."))
+        exportButton.onClick = { [weak self] _ in
+            guard let controller = (self?.window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController else { return }
+            DataExport.show(in: controller)
+        }
+        let exportRow = FormRow(title: String(localized: "Export your data", comment: "A setting in Settings › General."),
+                                detail: String(localized: "Your spaces and pinned tabs as a bookmarks file for any browser, and a Zigzag backup.", comment: "Explanation under “Export your data” in Settings › General."),
+                                control: exportButton)
+        exportRow.keywords = String(localized: "export backup save bookmarks html restore move leave", comment: "Words that find the Export your data setting with Find a setting. Not shown.")
+        generalGroup.add(exportRow)
         quitToggle.onChange = { on in AppDelegate.asksBeforeQuitting = on }
         let quitRow = FormRow(title: String(localized: "Ask before quitting", comment: "A setting in Settings › General."),
                               control: quitToggle)
@@ -1593,10 +1603,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window.", comment: "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys."),
                                     control: borderlessToggle))
-        addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
+        addressPlaceMenu.options = AddressBarPlace.allCases.map { place in
+            switch place {
+            case .off: DropdownButton.Option(title: String(localized: "Off", comment: "Address bar above the page: the address stays in the sidebar."))
+            case .autohide: DropdownButton.Option(title: String(localized: "Autohide", comment: "Address bar above the page: the bar hides as you scroll down and comes back as you scroll up."))
+            case .always: DropdownButton.Option(title: String(localized: "Always", comment: "Address bar above the page: the bar stays above the page."))
+            }
+        }
+        addressPlaceMenu.onSelect = { index in
+            let places = AddressBarPlace.allCases
+            guard places.indices.contains(index) else { return }
+            BrowserRootView.addressBarPlace = places[index]
+        }
         let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
-                                 detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
-                                 control: addressAboveToggle)
+                                 detail: String(localized: "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top.",
+                                                      comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
+                                 control: addressPlaceMenu)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
         sidebarSide.options = [
@@ -4111,7 +4133,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
-        addressAboveToggle.isOn = BrowserRootView.addressAbovePage
+        addressPlaceMenu.selectedIndex = BrowserRootView.addressBarPlace.menuIndex
         sidebarSide.selectedIndex = Self.sidebarSides.firstIndex(of: BrowserRootView.sidebarOnRight) ?? 0
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         largeNamesToggle.isOn = SpaceHeaderView.isLarge

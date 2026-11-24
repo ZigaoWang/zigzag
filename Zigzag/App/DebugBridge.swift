@@ -791,6 +791,7 @@ enum DebugBridge {
         }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
         if name == "fpsbench" { FrameRateBench.run(arg, in: controller); return }
+        if name == "perfsuite" { PerfBench.run(arg); return }
         // glassvariant <name>: draws clear glass another way (`GlassVariant`), until relaunch.
         if name == "glassvariant" { if let variant = GlassVariant(rawValue: arg) { DebugMenu.apply(variant) }; return }
         // card [tilt <x> <y>|tilt off|finish <name>|flip|hover <n>|save <path>|shot <path>|close]: About with Your Zigzag Card, opened behind, leaning as if
@@ -913,8 +914,13 @@ enum DebugBridge {
             try? (rows + [controller.tabManager.selectedTab?.displayTitle ?? "-"]).joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         // newtabclick <i>: clicks the i-th of those rows.
         case "newtabclick": controller.newTabNote.debugClick(Int(arg) ?? 0)
-        // topbar on|off: Settings › Appearance › Address bar above the page.
-        case "topbar": BrowserRootView.addressAbovePage = arg == "on"
+        // topbar off|autohide|always|on: Settings › Appearance › Address bar above the page.
+        case "topbar":
+            switch arg {
+            case "on", "always": BrowserRootView.addressBarPlace = .always
+            case "autohide": BrowserRootView.addressBarPlace = .autohide
+            default: BrowserRootView.addressBarPlace = .off
+            }
         // sidebarside right|left: Settings › Appearance › Sidebar position.
         case "sidebarside": BrowserRootView.sidebarOnRight = arg == "right"
         // sideframes: where the sidebar, the page and the traffic lights are, in the debug log.
@@ -2042,6 +2048,15 @@ enum DebugBridge {
             // newfolder <n>: a folder holding the space's first n pinned pages.
             let ids = Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).prefix(Int(arg) ?? 0).map(\.id)
             controller.newFolder(with: Array(ids))
+        case "livefolder":
+            // livefolder <address>: a live folder of that feed at the top of the pins, fetched now.
+            if let url = LiveFolderSheet.address(from: arg),
+               let made = Library.shared.addLiveFolder(named: url.host() ?? "Live", source: .feed(url), limit: 25, namedByFeed: true, in: controller.tabManager.currentSpaceID) {
+                LiveFolders.shared.refreshNow(made.id)
+            }
+        case "livesheet":
+            // livesheet: the New Live Folder sheet.
+            controller.newLiveFolder()
         case "spacegrain":
             // spacegrain <0-1>: the current space's grain.
             if let grain = Double(arg) { Library.shared.setGrain(grain, for: controller.tabManager.currentSpaceID) }
@@ -2529,6 +2544,7 @@ enum DebugBridge {
             if let view = WelcomeWindowController.shared?.window?.contentView as? OnboardingView,
                let step = Int(arg.prefix(1)).flatMap(OnboardingView.Step.init(rawValue:)) { view.show(step, animated: arg.hasSuffix("a")) }
         case "importwindow": ImportWindowController.show()
+        case "exportsheet": (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first).map { DataExport.show(in: $0) }
         case "importfile":
             // importfile <profile name> <path>: brings a chosen file (a Safari export, a passwords CSV) into that
             // profile, as the Import window does. Only in a test copy, with made-up data.
@@ -4210,6 +4226,475 @@ final class DebugMenu: NSObject, NSMenuItemValidation {
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(choose(_:)) { item.state = item.representedObject as? String == GlassVariant.now.rawValue ? .on : .off }
         return true
+    }
+}
+#endif
+
+#if DEBUG
+/// perfsuite <plan.json>: measured scrolls of pages, for comparing Zigzag's tab with a plain web view. Each run loads a
+/// page in the front tab (`tab`, less the page scripts named in `skip`) or in a plain web view laid over it (`bare`:
+/// WebKit's defaults with Zigzag's feature flags and ad list, no scripts), waits, then scrolls it (`wheel`: trackpad
+/// scrolls through the window at 120 Hz; `js`: scrollBy each animation frame; `idle`: none) and notes the page
+/// process's and Zigzag's CPU time, Zigzag's main thread busy time, the page's animation frame gaps, and the messages
+/// and script calls between page and Zigzag. Results go to the plan's `out` as JSON.
+@MainActor
+enum PerfBench {
+    struct Run {
+        var url: URL
+        var variant: String
+        var mode: String
+        var seconds: Double
+        var skip: Set<String>
+        var settle: Double
+        var name: String
+    }
+
+    private static var running = false
+    /// Messages from scripts to Zigzag, by handler name, for the page measured.
+    private static var messages: [String: Int] = [:]
+    /// Scripts Zigzag ran in the page measured, by how.
+    private static var scriptCalls: [String: Int] = [:]
+    private static weak var measured: WKWebView?
+    private static var counting = false
+
+    // MARK: Plan
+
+    static func run(_ arg: String) {
+        guard !running, let data = FileManager.default.contents(atPath: arg),
+              let plan = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { debugLog("perfsuite: no plan at \(arg)"); return }
+        running = true
+        installCounters()
+        FramePacing.keepsRate = plan["keepRate"] as? Bool ?? true
+        let out = plan["out"] as? String ?? arg + ".out.json"
+        var runs: [Run] = []
+        for entry in plan["runs"] as? [[String: Any]] ?? [] {
+            guard let url = (entry["url"] as? String).flatMap(URL.init(string:)) else { continue }
+            let run = Run(url: url, variant: entry["variant"] as? String ?? "tab", mode: entry["mode"] as? String ?? "wheel",
+                          seconds: entry["seconds"] as? Double ?? 8, skip: Set(entry["skip"] as? [String] ?? []),
+                          settle: entry["settle"] as? Double ?? 3, name: entry["name"] as? String ?? "")
+            for _ in 0..<max(1, entry["repeat"] as? Int ?? 1) { runs.append(run) }
+        }
+        let quits = plan["quit"] as? Bool ?? false
+        // Behind other apps, App Nap would slow the copy to a few frames a second partway through.
+        let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical, .idleDisplaySleepDisabled], reason: "perfsuite")
+        Task { @MainActor in
+            defer { ProcessInfo.processInfo.endActivity(activity) }
+            var results: [[String: Any]] = []
+            for (i, run) in runs.enumerated() {
+                debugLog("perfsuite \(i + 1)/\(runs.count) \(run.variant) \(run.mode) \(run.url.host() ?? "") skip=\(run.skip.sorted())")
+                results.append(await measure(run))
+                write(["runs": results, "done": false], to: out)
+            }
+            write(["runs": results, "done": true, "inventory": inventory()], to: out)
+            running = false
+            if quits { NSApp.terminate(nil) }
+        }
+    }
+
+    private static func write(_ object: [String: Any], to path: String) {
+        if let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
+    }
+
+    // MARK: Page scripts
+
+    /// A short name for a page script: its marking comment, the first handler it posts to, or its start.
+    static func label(_ script: WKUserScript) -> String {
+        let source = script.source
+        let head = String(source.prefix(160))
+        if head.hasPrefix("/* zigzag"), let end = head.range(of: "*/") {
+            return String(head[head.index(head.startIndex, offsetBy: 3)..<end.lowerBound]).trimmingCharacters(in: .whitespaces)
+        }
+        if let range = source.range(of: "messageHandlers.") {
+            let name = source[range.upperBound...].prefix { $0.isLetter || $0.isNumber || $0 == "_" }
+            if !name.isEmpty { return String(name) }
+        }
+        if source.contains("__zigzagTyped") { return "pageState" }
+        if source.contains("__zigzagSecret") { return "secretWatch" }
+        return String(head.prefix(40)).replacingOccurrences(of: "\n", with: " ")
+    }
+
+    /// Every page script of the front tab, with its size and where it runs.
+    private static func inventory() -> [[String: Any]] {
+        guard let webView = WindowManager.shared.controllers.first?.tabManager.selectedTab?.webView else { return [] }
+        return webView.configuration.userContentController.userScripts.map {
+            ["label": label($0), "bytes": $0.source.utf8.count, "mainFrameOnly": $0.isForMainFrameOnly,
+             "start": $0.injectionTime == .atDocumentStart]
+        }
+    }
+
+    private static func filter(_ controller: WKUserContentController, skipping skip: Set<String>) -> [String] {
+        guard !skip.isEmpty else { return [] }
+        let all = controller.userScripts.map { $0 }
+        let everything = skip.contains("*")
+        let kept = all.filter { !everything && !skip.contains(label($0)) }
+        guard kept.count != all.count else { return [] }
+        controller.removeAllUserScripts()
+        kept.forEach(controller.addUserScript)
+        return all.filter { everything || skip.contains(label($0)) }.map(label)
+    }
+
+    private static func restore(_ controller: WKUserContentController, to scripts: [WKUserScript]) {
+        controller.removeAllUserScripts()
+        scripts.forEach(controller.addUserScript)
+    }
+
+    // MARK: Counting
+
+    /// Counts the messages Zigzag's own handlers get, and the scripts it runs in pages.
+    private static func installCounters() {
+        var count: UInt32 = 0
+        // Only Zigzag's own classes: touching every class in the process wakes some that abort.
+        guard let image = class_getImageName(PageMessages.self), let names = objc_copyClassNamesForImage(image, &count) else { return }
+        let plain = NSSelectorFromString("userContentController:didReceiveScriptMessage:")
+        let reply = NSSelectorFromString("userContentController:didReceiveScriptMessage:replyHandler:")
+        for i in 0..<Int(count) {
+            guard let cls = objc_getClass(names[i]) as? AnyClass else { continue }
+            var methods: UInt32 = 0
+            guard let list = class_copyMethodList(cls, &methods) else { continue }
+            for j in 0..<Int(methods) {
+                let method = list[j]
+                let name = method_getName(method)
+                if name == plain {
+                    typealias F = @convention(c) (AnyObject, Selector, AnyObject, WKScriptMessage) -> Void
+                    let original = unsafeBitCast(method_getImplementation(method), to: F.self)
+                    let block: @convention(block) (AnyObject, AnyObject, WKScriptMessage) -> Void = { object, controller, message in
+                        counted(message)
+                        original(object, plain, controller, message)
+                    }
+                    method_setImplementation(method, imp_implementationWithBlock(block))
+                } else if name == reply {
+                    typealias F = @convention(c) (AnyObject, Selector, AnyObject, WKScriptMessage, AnyObject) -> Void
+                    let original = unsafeBitCast(method_getImplementation(method), to: F.self)
+                    let block: @convention(block) (AnyObject, AnyObject, WKScriptMessage, AnyObject) -> Void = { object, controller, message, handler in
+                        counted(message)
+                        original(object, reply, controller, message, handler)
+                    }
+                    method_setImplementation(method, imp_implementationWithBlock(block))
+                }
+            }
+            free(list)
+        }
+        for (selector, how) in [("evaluateJavaScript:completionHandler:", "evaluate"),
+                                ("evaluateJavaScript:inFrame:inContentWorld:completionHandler:", "evaluateIn"),
+                                ("callAsyncJavaScript:arguments:inFrame:inContentWorld:completionHandler:", "callAsync")] {
+            let sel = NSSelectorFromString(selector)
+            guard let method = class_getInstanceMethod(WKWebView.self, sel) else { continue }
+            switch method_getNumberOfArguments(method) {
+            case 4:
+                typealias F = @convention(c) (WKWebView, Selector, AnyObject, AnyObject?) -> Void
+                let original = unsafeBitCast(method_getImplementation(method), to: F.self)
+                let block: @convention(block) (WKWebView, AnyObject, AnyObject?) -> Void = { webView, a, b in
+                    calledScript(webView, how)
+                    original(webView, sel, a, b)
+                }
+                method_setImplementation(method, imp_implementationWithBlock(block))
+            case 6:
+                typealias F = @convention(c) (WKWebView, Selector, AnyObject, AnyObject?, AnyObject?, AnyObject?) -> Void
+                let original = unsafeBitCast(method_getImplementation(method), to: F.self)
+                let block: @convention(block) (WKWebView, AnyObject, AnyObject?, AnyObject?, AnyObject?) -> Void = { webView, a, b, c, d in
+                    calledScript(webView, how)
+                    original(webView, sel, a, b, c, d)
+                }
+                method_setImplementation(method, imp_implementationWithBlock(block))
+            case 7:
+                typealias F = @convention(c) (WKWebView, Selector, AnyObject, AnyObject?, AnyObject?, AnyObject?, AnyObject?) -> Void
+                let original = unsafeBitCast(method_getImplementation(method), to: F.self)
+                let block: @convention(block) (WKWebView, AnyObject, AnyObject?, AnyObject?, AnyObject?, AnyObject?) -> Void = { webView, a, b, c, d, e in
+                    calledScript(webView, how)
+                    original(webView, sel, a, b, c, d, e)
+                }
+                method_setImplementation(method, imp_implementationWithBlock(block))
+            default:
+                break
+            }
+        }
+    }
+
+    nonisolated private static func counted(_ message: WKScriptMessage) {
+        MainActor.assumeIsolated {
+            guard counting, message.webView === measured else { return }
+            let type = ((message.body as? [String: Any])?["type"] as? String).map { ":" + $0 } ?? ""
+            messages[message.name + type, default: 0] += 1
+        }
+    }
+
+    nonisolated private static func calledScript(_ webView: WKWebView, _ how: String) {
+        MainActor.assumeIsolated {
+            guard counting, webView === measured else { return }
+            scriptCalls[how, default: 0] += 1
+        }
+    }
+
+    // MARK: Clocks
+
+    private static let ticksToNanos: Double = {
+        var base = mach_timebase_info_data_t()
+        mach_timebase_info(&base)
+        return Double(base.numer) / Double(base.denom)
+    }()
+
+    /// CPU time of a process, in ms.
+    private static func cpu(_ pid: pid_t) -> Double? {
+        guard pid > 0 else { return nil }
+        var info = rusage_info_v2()
+        let ok = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
+        }
+        guard ok == 0 else { return nil }
+        return Double(info.ri_user_time + info.ri_system_time) * ticksToNanos / 1_000_000
+    }
+
+    /// CPU time of Zigzag's main thread, in ms.
+    private static func mainThreadCPU() -> Double {
+        var info = thread_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let port = pthread_mach_thread_np(pthread_self())
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { thread_info(port, thread_flavor_t(THREAD_BASIC_INFO), $0, &count) }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        return Double(info.user_time.seconds + info.system_time.seconds) * 1000
+            + Double(info.user_time.microseconds + info.system_time.microseconds) / 1000
+    }
+
+    private static func pid(_ webView: WKWebView, _ key: String) -> pid_t {
+        guard webView.responds(to: NSSelectorFromString(key)) else { return 0 }
+        return (webView.value(forKey: key) as? NSNumber)?.int32Value ?? 0
+    }
+
+    /// Main thread busy time: from each wake of the main run loop to its next wait.
+    private final class Busy {
+        var total = 0.0
+        var longest = 0.0
+        var over16 = 0
+        var over50 = 0
+        private var last = CACurrentMediaTime()
+        private var awake = true
+        private var segment = 0.0
+        private var observer: CFRunLoopObserver?
+
+        func start() {
+            // Last of the run loop's observers, so the drawing Core Animation does before a wait counts.
+            let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.allActivities.rawValue, true, CFIndex.max) { [unowned self] _, activity in
+                let now = CACurrentMediaTime()
+                if self.awake {
+                    let gap = (now - self.last) * 1000
+                    self.total += gap
+                    self.segment += gap
+                }
+                if activity == .beforeWaiting || activity == .exit {
+                    if self.segment > 16 { self.over16 += 1 }
+                    if self.segment > 50 { self.over50 += 1 }
+                    self.longest = max(self.longest, self.segment)
+                    self.segment = 0
+                    self.awake = false
+                } else {
+                    self.awake = true
+                }
+                self.last = now
+            }
+            CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+            self.observer = observer
+        }
+
+        func stop() {
+            if let observer { CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes) }
+        }
+    }
+
+    // MARK: A run
+
+    private static func wait(for webView: WKWebView, timeout: Double = 25) async {
+        let end = Date().addingTimeInterval(timeout)
+        try? await Task.sleep(for: .milliseconds(300))
+        while Date() < end, webView.isLoading { try? await Task.sleep(for: .milliseconds(100)) }
+    }
+
+    private static var overlay: WKWebView?
+
+    /// `with`: Zigzag's own settings added one by one (`store`, `ext`, `dev`, `fraud`), or `config` for the whole of
+    /// `WebKitSetup.makeConfiguration` with none of a tab's own work.
+    private static func bareWebView(over page: WKWebView, with: Set<String> = [], profile: Profile) -> WKWebView {
+        overlay?.removeFromSuperview()
+        let configuration = with.contains("config") ? WebKitSetup.makeConfiguration(for: profile) : WKWebViewConfiguration()
+        if !with.contains("config") {
+            configuration.websiteDataStore = with.contains("store") ? profile.store : .nonPersistent()
+            configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
+            FeatureFlags.apply(to: configuration.preferences)
+            if ContentBlocker.isEnabled, let list = ContentBlocker.activeList { configuration.userContentController.add(list) }
+            if #available(macOS 15.4, *), with.contains("ext") { configuration.webExtensionController = profile.extensions.controller }
+            if with.contains("dev") { configuration.preferences.setValue(true, forKey: "developerExtrasEnabled") }
+            configuration.preferences.isFraudulentWebsiteWarningEnabled = with.contains("fraud")
+        }
+        configuration.mediaTypesRequiringUserActionForPlayback = .all
+        let webView = WKWebView(frame: page.frame, configuration: configuration)
+        webView.autoresizingMask = page.autoresizingMask
+        page.superview?.addSubview(webView, positioned: .above, relativeTo: page)
+        Tab.setWatchesCover(false, of: webView)
+        overlay = webView
+        return webView
+    }
+
+    private static func measure(_ run: Run) async -> [String: Any] {
+        var result: [String: Any] = ["name": run.name, "url": run.url.absoluteString, "variant": run.variant, "mode": run.mode,
+                                     "seconds": run.seconds, "skip": run.skip.sorted()]
+        guard let controller = WindowManager.shared.controllers.first, let tab = controller.tabManager.selectedTab,
+              let page = tab.webView, let window = page.window else { result["error"] = "no tab"; return result }
+        var webView: WKWebView = page
+        var snapshot: [WKUserScript]?
+        let scripts = page.configuration.userContentController
+        overlay?.removeFromSuperview()
+        overlay = nil
+        tab.load(URL(string: "about:blank")!)
+        await wait(for: page)
+        if run.variant.hasPrefix("bare") {
+            let with = Set(run.variant.split(separator: ":").dropFirst().first.map { $0.split(separator: ",").map(String.init) } ?? [])
+            webView = bareWebView(over: page, with: with, profile: tab.profile)
+            webView.load(URLRequest(url: run.url))
+            await wait(for: webView)
+        } else {
+            snapshot = scripts.userScripts.map { $0 }
+            result["scripts"] = scripts.userScripts.count
+            result["removed"] = filter(scripts, skipping: run.skip)
+            debugLog("perfsuite scripts \(scripts.userScripts.count) of \(snapshot?.count ?? 0)")
+            tab.load(run.url)
+            await wait(for: page)
+            debugLog("perfsuite loaded \(page.url?.absoluteString ?? "")")
+            // Scripts Zigzag puts back on its way to a page: taken out again, and the page loaded once more.
+            let back = run.skip.contains("*") ? scripts.userScripts.map(label) : scripts.userScripts.map(label).filter(run.skip.contains)
+            if !back.isEmpty {
+                result["putBack"] = back
+                _ = filter(scripts, skipping: run.skip)
+                page.reload()
+                await wait(for: page)
+            }
+        }
+        try? await Task.sleep(for: .seconds(run.settle))
+        _ = try? await webView.callAsyncJavaScript("window.scrollTo(0, 0)", arguments: [:], in: nil, contentWorld: .defaultClient)
+        try? await Task.sleep(for: .milliseconds(400))
+        debugLog("perfsuite measuring")
+
+        let screenFPS = Double(window.screen?.maximumFramesPerSecond ?? 60)
+        let webContent = pid(webView, "_webProcessIdentifier")
+        let gpu = pid(webView, "_gpuProcessIdentifier")
+        var changes: [String: Int] = [:]
+        let token = run.variant == "tab" ? tab.changed.observe { change in changes["\(change)", default: 0] += 1 } : nil
+        messages = [:]
+        scriptCalls = [:]
+        measured = webView
+        let busy = Busy()
+        let started = (wc: cpu(webContent), gpu: cpu(gpu), app: cpu(getpid()), main: mainThreadCPU(), at: CACurrentMediaTime())
+        counting = true
+        busy.start()
+
+        // Trackpad-like scrolls through the window, 12 pt at 120 Hz, down for 2 s then up for 1 s.
+        var sender: Timer?
+        if run.mode == "wheel" {
+            let inWindow = webView.convert(NSPoint(x: webView.bounds.midX, y: webView.bounds.midY), to: nil)
+            let onScreen = window.convertPoint(toScreen: inWindow)
+            let at = CGPoint(x: onScreen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y)
+            let begin = CACurrentMediaTime()
+            var began = false
+            var down = true
+            let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { _ in
+                MainActor.assumeIsolated {
+                    let downNow = (CACurrentMediaTime() - begin).truncatingRemainder(dividingBy: 3) < 2
+                    if downNow != down {
+                        down = downNow
+                        began = false
+                        if let end = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: 0, wheel3: 0) {
+                            end.setIntegerValueField(.scrollWheelEventScrollPhase, value: 4)
+                            end.location = at
+                            if let e = NSEvent(cgEvent: end) { window.sendEvent(e) }
+                        }
+                    }
+                    let dy: Int32 = down ? -12 : 12
+                    guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: 0, wheel3: 0) else { return }
+                    cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+                    cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: began ? 2 : 1)
+                    cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+                    cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
+                    cg.location = at
+                    cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+                    cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+                    began = true
+                    if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            sender = timer
+        }
+        let script = """
+        const gaps = []; let last = 0, dir = 1, y0 = scrollY, moved = 0;
+        const end = performance.now() + seconds * 1000;
+        await new Promise((done) => {
+          const frame = (t) => {
+            if (last) gaps.push(t - last);
+            last = t;
+            if (mode === 'js') {
+              const max = document.scrollingElement.scrollHeight - innerHeight;
+              if (scrollY >= max - 1) dir = -1; else if (scrollY <= 0) dir = 1;
+              window.scrollBy(0, dir * 12);
+            }
+            moved += Math.abs(scrollY - y0); y0 = scrollY;
+            if (t < end) requestAnimationFrame(frame); else done();
+          };
+          requestAnimationFrame(frame);
+        });
+        return JSON.stringify({ gaps, moved, height: document.scrollingElement.scrollHeight,
+          nodes: document.getElementsByTagName('*').length, visibility: document.visibilityState });
+        """
+        let value = try? await webView.callAsyncJavaScript(script, arguments: ["mode": run.mode, "seconds": run.seconds], in: nil, contentWorld: .defaultClient)
+        sender?.invalidate()
+        counting = false
+        busy.stop()
+        token?.cancel()
+        func delta(_ before: Double?, _ after: Double?) -> Any { before.flatMap { b in after.map { $0 - b } } ?? NSNull() }
+        result["ms"] = (CACurrentMediaTime() - started.at) * 1000
+        result["webContentCPU"] = delta(started.wc, cpu(webContent))
+        result["gpuCPU"] = delta(started.gpu, cpu(gpu))
+        result["appCPU"] = delta(started.app, cpu(getpid()))
+        result["mainThreadCPU"] = mainThreadCPU() - started.main
+        result["mainBusy"] = busy.total
+        result["mainLongest"] = busy.longest
+        result["mainOver16"] = busy.over16
+        result["mainOver50"] = busy.over50
+        result["messages"] = messages
+        result["messageCount"] = messages.values.reduce(0, +)
+        result["scriptCalls"] = scriptCalls
+        result["changes"] = changes
+        result["screenFPS"] = screenFPS
+        result["occluded"] = !window.occlusionState.contains(.visible)
+        result["near60"] = FramePacing.holds(webView)
+        if let text = value as? String, let data = text.data(using: .utf8),
+           let measuredPage = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let gaps = measuredPage["gaps"] as? [Double] ?? []
+            let interval = 1000 / screenFPS
+            let missed = gaps.reduce(0) { $0 + max(0, Int(($1 / interval).rounded()) - 1) }
+            let sorted = gaps.sorted()
+            func pct(_ p: Double) -> Double { sorted.isEmpty ? 0 : sorted[min(sorted.count - 1, Int(Double(sorted.count) * p))] }
+            result["frames"] = gaps.count
+            result["fps"] = gaps.isEmpty ? 0 : 1000 * Double(gaps.count) / gaps.reduce(0, +)
+            result["missed"] = missed
+            result["missedShare"] = gaps.isEmpty ? 0 : Double(missed) / Double(missed + gaps.count)
+            result["gapP50"] = pct(0.5)
+            result["gapP95"] = pct(0.95)
+            result["gapP99"] = pct(0.99)
+            result["gapMax"] = sorted.last ?? 0
+            result["over2frames"] = gaps.filter { $0 > interval * 2.5 }.count
+            result["moved"] = measuredPage["moved"]
+            result["height"] = measuredPage["height"]
+            result["nodes"] = measuredPage["nodes"]
+            result["visibility"] = measuredPage["visibility"]
+        } else {
+            result["error"] = "page script failed"
+        }
+        if let snapshot { restore(scripts, to: snapshot) }
+        overlay?.removeFromSuperview()
+        overlay = nil
+        return result
     }
 }
 #endif

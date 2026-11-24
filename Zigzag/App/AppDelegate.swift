@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingHandoffs: Set<URL> = []
     /// Sites installed as apps asked for before launch finished (one opened with Zigzag not running).
     private var pendingWebApps: [URL] = []
+    /// Zigzag backups opened from Finder before launch finished.
+    private var pendingBackups: [URL] = []
     private var launched = false
     private var blockerToken: SignalToken?
     private var extensionsToken: SignalToken?
@@ -137,6 +139,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Diagnostics.start()
         // HTTP/3 kept from another network can go around a VPN or proxy: forgotten now and whenever the network changes.
         NetworkChanges.start()
+        // Live folders fetch their feeds in the background; the test host fetches nothing.
+        if !Self.isHostingTests { LiveFolders.shared.start() }
         // The app you were in, for Zigzag Mini to go back to.
         AppSwitching.start()
         // New lists or settings reach open pages on their next load.
@@ -211,6 +215,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         pendingWebApps.forEach { WebAppStore.handle($0) }
         pendingWebApps = []
+        pendingBackups.forEach { ImportWindowController.restore($0) }
+        pendingBackups = []
         // For you, not AI apps: running for them alone, this waits until you open Zigzag.
         let forYou = { [weak self] in
             Updater.shared.start()
@@ -384,6 +390,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HistoryStore.finishWriting()
         FaviconStore.finishWriting()
         StrictTransport.finishWriting()
+        LiveFolders.shared.saveNow()
         // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Clears a copied password from the clipboard on quit.
@@ -440,9 +447,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         senderPID == ProcessInfo.processInfo.processIdentifier
     }
 
-    /// Files opened with Zigzag, and links handed over as a document: web addresses and local files only.
+    /// Files opened with Zigzag, and links handed over as a document: web addresses and local files only. A Zigzag
+    /// backup goes to the Import window, which asks before restoring it.
     func application(_ application: NSApplication, open urls: [URL]) {
-        urls.filter(Self.opensAsDocument).forEach(open)
+        for url in urls {
+            switch Self.documentRoute(url) {
+            case .restore:
+                if launched { ImportWindowController.restore(url) } else { pendingBackups.append(url) }
+            case .page: open(url)
+            case .ignore: break
+            }
+        }
+    }
+
+    nonisolated enum DocumentRoute: Equatable { case page, restore, ignore }
+
+    /// Where a URL handed over as a document goes: a Zigzag backup to the Import window, never a tab.
+    nonisolated static func documentRoute(_ url: URL) -> DocumentRoute {
+        guard opensAsDocument(url) else { return .ignore }
+        return url.isFileURL && url.pathExtension.lowercased() == "zigzagbackup" ? .restore : .page
     }
 
     /// Whether a URL handed over as a document opens: local files always open in a tab; web addresses only when Zigzag
@@ -595,6 +618,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func makeDefaultBrowser(_ sender: Any?) { DefaultBrowser.make() }
 
     @objc func importFromBrowser(_ sender: Any?) { ImportWindowController.show() }
+
+    @objc func exportData(_ sender: Any?) { frontBrowserWindow().map { DataExport.show(in: $0) } }
 
     @objc func showPasswords(_ sender: Any?) { PasswordsWindowController.show() }
 

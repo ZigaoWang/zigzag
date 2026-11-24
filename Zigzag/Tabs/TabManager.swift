@@ -1208,6 +1208,8 @@ final class TabManager {
                 structureChanged()
             }
         }
+        // A live folder's new page, opened: read.
+        if !isPrivate { LiveFolders.shared.markRead(bookmark: bookmark.id) }
         select(tab)
     }
 

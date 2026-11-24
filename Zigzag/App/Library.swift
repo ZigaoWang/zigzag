@@ -27,6 +27,8 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     var tucked: [UUID]? = nil
     /// The tab group (#209) this folder was pinned from; nil if made by hand.
     var groupID: UUID? = nil
+    /// A live folder's source and pages (`LiveFolders`). Nil: a folder you fill yourself.
+    var live: LiveFolder? = nil
 }
 
 extension Array where Element == BookmarkFolder {
@@ -1382,7 +1384,8 @@ final class Library {
         let at = max(0, min(index, spaces[target].bookmarks.count))
         spaces[target].bookmarks.insert(contentsOf: moving, at: at)
         let keep: UUID? = from == spaceID ? folderID(containing: id) : nil
-        let landsIn: UUID? = switch folder { case .some(let chosen): chosen; case .none: keep }
+        let chosen: UUID? = switch folder { case .some(let chosen): chosen; case .none: keep }
+        let landsIn = outsideLive(chosen)
         for s in spaces.indices {
             for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { ids.contains($0) } }
         }
@@ -1444,7 +1447,8 @@ final class Library {
             let homes = Set(members.map { id in spaces[s].folders?.first { $0.bookmarkIDs.contains(id) }?.id })
             return homes.count == 1 ? homes.first ?? nil : nil
         }()
-        let inside: UUID? = switch parent { case .some(let chosen): chosen; case .none: shared }
+        let chosen: UUID? = switch parent { case .some(let chosen): chosen; case .none: shared }
+        let inside = outsideLive(chosen)
         for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { members.contains($0) } }
         var folder = BookmarkFolder(name: name, bookmarkIDs: members)
         if let inside, spaces[s].folders?.contains(where: { $0.id == inside }) == true {
@@ -1510,6 +1514,14 @@ final class Library {
     /// The folder goes; what was in it (pages and folders) stays where it was, one level up.
     func removeFolder(_ id: UUID) {
         guard let s = spaceIndex(ofFolder: id), let gone = spaces[s].folders?.first(where: { $0.id == id }) else { return }
+        // A live folder's pages are its source's: they go with it.
+        if gone.live != nil {
+            spaces[s].bookmarks.removeAll { gone.bookmarkIDs.contains($0.id) }
+            spaces[s].folders?.removeAll { $0.id == id }
+            tidyFolders(s)
+            commit()
+            return
+        }
         for f in (spaces[s].folders ?? []).indices where spaces[s].folders?[f].parentID == id {
             spaces[s].folders?[f].parentID = gone.parentID
         }
@@ -1530,7 +1542,8 @@ final class Library {
               let f = spaces[s].folders?.firstIndex(where: { $0.id == id }), var folder = spaces[s].folders?[f] else { return }
         let inner = (spaces[s].folders ?? []).descendants(of: id)
         // Never into itself or a folder inside it, and only into a folder of the space it lands in.
-        var into: UUID? = switch parent { case .some(let chosen): chosen; case .none: s == target ? folder.parentID : nil }
+        let chosen: UUID? = switch parent { case .some(let chosen): chosen; case .none: s == target ? folder.parentID : nil }
+        var into = outsideLive(chosen)
         if let p = into, p == id || inner.contains(p) || spaces[target].folders?.contains(where: { $0.id == p }) != true { into = folder.parentID.flatMap { s == target ? $0 : nil } }
         // Into a folder with no place given: at the end of that folder's pages, or where it sits if it has none.
         var at = into == nil ? folderDropIndex(index, moving: id, in: spaceID) : index
@@ -1601,6 +1614,7 @@ final class Library {
     func setFolder(of bookmarkID: UUID, to folderID: UUID?) {
         // A pinned split goes in as one: its first page leads, and the rest follow it there.
         let bookmarkID = pinnedSplit(containing: bookmarkID)?.left ?? bookmarkID
+        let folderID = outsideLive(folderID)
         guard let s = spaces.firstIndex(where: { $0.bookmarks.contains { $0.id == bookmarkID } }) else { return }
         for f in (spaces[s].folders ?? []).indices { spaces[s].folders?[f].bookmarkIDs.removeAll { $0 == bookmarkID } }
         if let folderID, let f = spaces[s].folders?.firstIndex(where: { $0.id == folderID }) {
@@ -1639,6 +1653,7 @@ final class Library {
     /// its first page is (or, for `keeping`, around the page just moved, so a drop lands where it was dropped).
     /// Pinned splits too: each keeps both its pages, side by side, or ends.
     private func tidyFolders(_ s: Int, keepingPlaceOf moved: UUID? = nil) {
+        keepLive(s)
         let folders = spaces[s].folders ?? [], splits = spaces[s].pinnedSplits ?? []
         guard !folders.isEmpty || !splits.isEmpty else { return }
         let tidy = Self.tidied(spaces[s].bookmarks, folders, splits)
@@ -1674,6 +1689,153 @@ final class Library {
         }
         let (tidyList, tidyFolders) = tidied(list, folders)
         return (tidyList, tidyFolders, kept)
+    }
+
+    // MARK: Live folders
+
+    /// Every live folder, in every space.
+    var liveFolders: [BookmarkFolder] { spaces.flatMap { ($0.folders ?? []).filter { $0.live != nil } } }
+
+    /// The live folder a pinned page is shown by, and the entry it is.
+    func liveItem(forBookmark id: UUID) -> (folder: UUID, item: LiveItem)? {
+        for space in spaces {
+            for folder in space.folders ?? [] {
+                if let item = folder.live?.items.first(where: { $0.bookmarkID == id }) { return (folder.id, item) }
+            }
+        }
+        return nil
+    }
+
+    func isLivePage(_ id: UUID) -> Bool { liveItem(forBookmark: id) != nil }
+
+    /// Nothing is filed into a live folder: it goes in the folder the live one is in instead.
+    private func outsideLive(_ folder: UUID?) -> UUID? {
+        var folder = folder, seen: Set<UUID> = []
+        while let id = folder, seen.insert(id).inserted, let found = self.folder(id), found.live != nil { folder = found.parentID }
+        return folder
+    }
+
+    /// A new live folder, empty until its source is fetched, at the top of the pins (or of `parent`'s pages).
+    @discardableResult
+    func addLiveFolder(named name: String, source: LiveSource, limit: Int, namedByFeed: Bool, in spaceID: UUID, parent: UUID? = nil) -> BookmarkFolder? {
+        guard let s = self.index(of: spaceID) else { return nil }
+        var folder = BookmarkFolder(name: name)
+        folder.live = LiveFolder(source: source, limit: limit, namedByFeed: namedByFeed)
+        if let inside = outsideLive(parent), let p = spaces[s].folders?.firstIndex(where: { $0.id == inside }) {
+            folder.parentID = inside
+            spaces[s].folders?[p].isOpen = true
+            spaces[s].folders?[p].tucked = nil
+        }
+        spaces[s].folders = (spaces[s].folders ?? []) + [folder]
+        tidyFolders(s)
+        commit()
+        return folder
+    }
+
+    /// Edit…: a new name, source or count. A new source starts over, its pages gone until it's fetched.
+    func updateLiveFolder(_ id: UUID, name: String, namedByFeed: Bool, source: LiveSource, limit: Int) {
+        guard let s = spaceIndex(ofFolder: id), let f = spaces[s].folders?.firstIndex(where: { $0.id == id }),
+              var live = spaces[s].folders?[f].live else { return }
+        let before = spaces[s]
+        if live.source != source {
+            let pages = Set(live.items.map(\.bookmarkID))
+            spaces[s].bookmarks.removeAll { pages.contains($0.id) }
+            live.items = []
+            live.source = source
+        }
+        live.limit = LiveFolder.limits.contains(limit) ? limit : LiveFolder.defaultLimit
+        if live.items.count > live.limit {
+            let over = Set(live.items[live.limit...].map(\.bookmarkID))
+            spaces[s].bookmarks.removeAll { over.contains($0.id) }
+            live.items.removeLast(live.items.count - live.limit)
+        }
+        live.namedByFeed = namedByFeed
+        spaces[s].folders?[f].live = live
+        spaces[s].folders?[f].name = name
+        tidyFolders(s)
+        if spaces[s] != before { commit() }
+    }
+
+    /// What a fetch brought, newest first and at most the folder's count: pages kept for the entries still there
+    /// (renamed when the feed renames them), new ones for new entries, the rest gone. `feedTitle` names a folder
+    /// still named after its feed; `foundFeed` is the feed a site's page led to.
+    func setLiveItems(_ items: [LiveItem], ofFolder id: UUID, feedTitle: String? = nil, foundFeed: URL? = nil) {
+        guard let s = spaceIndex(ofFolder: id), let f = spaces[s].folders?.firstIndex(where: { $0.id == id }),
+              var live = spaces[s].folders?[f].live else { return }
+        let before = spaces[s]
+        let old = Dictionary(live.items.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+        var seen: Set<String> = []
+        var next: [LiveItem] = []
+        for item in items where seen.insert(item.key).inserted && next.count < live.limit {
+            guard var kept = old[item.key] else { next.append(item); continue }
+            if let b = spaces[s].bookmarks.firstIndex(where: { $0.id == kept.bookmarkID }) {
+                if kept.title != item.title { spaces[s].bookmarks[b].title = item.title }
+                if kept.url != item.url { spaces[s].bookmarks[b].url = item.url }
+            }
+            kept.title = item.title
+            kept.url = item.url
+            next.append(kept)
+        }
+        let staying = Set(next.map(\.bookmarkID))
+        let shown = Set(spaces[s].folders?[f].bookmarkIDs ?? [])
+        spaces[s].bookmarks.removeAll { shown.contains($0.id) && !staying.contains($0.id) }
+        live.items = next
+        if let foundFeed, live.source.feed == nil { live.source.feed = foundFeed }
+        if live.namedByFeed, let feedTitle, !feedTitle.isEmpty { spaces[s].folders?[f].name = feedTitle }
+        spaces[s].folders?[f].live = live
+        tidyFolders(s)
+        if spaces[s] != before { commit() }
+    }
+
+    /// A live folder shows its source's pages and only those, newest first, side by side where it sits: one taken out
+    /// (dragged away, made a favorite, unpinned) leaves a copy in its place, and one put in goes just after it. It holds
+    /// no folders, and its pages are never part of a pinned split.
+    private func keepLive(_ s: Int) {
+        guard let folders = spaces[s].folders, folders.contains(where: { $0.live != nil }) else { return }
+        for f in folders.indices {
+            guard let folder = spaces[s].folders?[f], var live = folder.live else { continue }
+            for i in (spaces[s].folders ?? []).indices where spaces[s].folders?[i].parentID == folder.id { spaces[s].folders?[i].parentID = folder.parentID }
+            let list = spaces[s].bookmarks
+            let byID = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let held = folder.bookmarkIDs
+            var claimed: Set<UUID> = []
+            var pages: [Bookmark] = []
+            for i in live.items.indices {
+                let item = live.items[i]
+                if held.contains(item.bookmarkID), let page = byID[item.bookmarkID], claimed.insert(page.id).inserted {
+                    pages.append(page)
+                    continue
+                }
+                // Put back by undo, or saved by an older Zigzag: the same page under another id.
+                if let page = held.lazy.compactMap({ byID[$0] }).first(where: { $0.url == item.url && !claimed.contains($0.id) }) {
+                    claimed.insert(page.id)
+                    live.items[i].bookmarkID = page.id
+                    pages.append(page)
+                    continue
+                }
+                // Always a new id: the one it had may be on its way somewhere else (a favorite, another space).
+                let id = UUID()
+                claimed.insert(id)
+                live.items[i].bookmarkID = id
+                pages.append(Bookmark(id: id, url: item.url, title: item.title))
+            }
+            let ids = pages.map(\.id)
+            let order = list.map(\.id).filter { claimed.contains($0) }
+            guard ids != held || order != ids || live != folder.live else { continue }
+            // Where the folder's first page was, or where an empty folder sits.
+            let first = list.firstIndex { held.contains($0.id) || claimed.contains($0.id) }
+            var rest = list.filter { !claimed.contains($0.id) }
+            let at = first.map { i in list[..<i].filter { !claimed.contains($0.id) }.count } ?? insertionIndex(intoEmptyFolder: folder.id, space: s)
+            rest.insert(contentsOf: pages, at: min(at, rest.count))
+            spaces[s].bookmarks = rest
+            spaces[s].folders?[f].bookmarkIDs = ids
+            spaces[s].folders?[f].live = live
+            let mine = Set(ids)
+            if let splits = spaces[s].pinnedSplits, splits.contains(where: { $0.ids.contains(where: mine.contains) }) {
+                let kept = splits.filter { !$0.ids.contains(where: mine.contains) }
+                spaces[s].pinnedSplits = kept.isEmpty ? nil : kept
+            }
+        }
     }
 
     // MARK: Pinned splits
@@ -1905,6 +2067,30 @@ final class Library {
         favorites = snapshot.favorites
         favoriteSplits = snapshot.favoriteSplits
         directory.restore(assignments: snapshot.spaceProfiles)
+        commit()
+    }
+
+    /// Spaces, favorites, site rules and profiles together, for a backup to be made from or merged into.
+    struct Contents {
+        var spaces: [SpaceInfo]
+        var favorites: [Bookmark]
+        var favoriteSplits: [PinnedSplit]
+        var siteRoutes: [SiteRoutes.Route]
+        var directory: ProfileDirectory
+    }
+
+    var contents: Contents {
+        Contents(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits, siteRoutes: siteRoutes, directory: directory)
+    }
+
+    /// Puts in what a restored backup merged into `contents`, saved and shown once.
+    func replaceContents(_ new: Contents) {
+        spaces = new.spaces
+        favorites = new.favorites
+        favoriteSplits = new.favoriteSplits
+        siteRoutes = new.siteRoutes
+        directory = new.directory
+        tidyFavorites()
         commit()
     }
 

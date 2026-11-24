@@ -104,6 +104,7 @@ import Testing
             "clear-cache": #selector(BrowserWindowController.clearCache(_:)), "clear-cookies": #selector(BrowserWindowController.clearCookies(_:)),
             "settings": #selector(AppDelegate.showSettings(_:)), "archive": #selector(AppDelegate.showArchive(_:)),
             "passwords": #selector(AppDelegate.showPasswords(_:)), "import": #selector(AppDelegate.importFromBrowser(_:)),
+            "export": #selector(AppDelegate.exportData(_:)),
             "feedback": #selector(BrowserWindowController.sendFeedback(_:)), "report": #selector(BrowserWindowController.reportProblem(_:)),
         ]
         for action in CommandRanker.actions {

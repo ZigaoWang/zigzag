@@ -254,10 +254,16 @@ final class SidebarListView: NSView {
         guard let manager else { return [] }
         var result: [SidebarItem] = [.header]
         let spaceID = spaceOverride ?? manager.currentSpaceID
-        let bookmarks = Library.shared.bookmarks(in: spaceID)
+        var bookmarks = Library.shared.bookmarks(in: spaceID)
         let collapsed = Self.isCollapsed(spaceID)
         // Folded, the section still shows the pinned page you're on, so where you are never disappears.
-        let folders = Library.shared.folders(in: spaceID)
+        var folders = Library.shared.folders(in: spaceID)
+        // A private window has no live folders: what's new and read is yours.
+        if manager.isPrivate, folders.contains(where: { $0.live != nil }) {
+            let live = Set(folders.filter { $0.live != nil }.flatMap(\.bookmarkIDs))
+            bookmarks.removeAll { live.contains($0.id) }
+            folders.removeAll { $0.live != nil }
+        }
         rowDepth = [:]
         folderPageCounts = [:]
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
@@ -430,6 +436,7 @@ final class SidebarListView: NSView {
     }
 
     func reload(animated: Bool) {
+        Freezes.mark("sidebar reload")
         // Re-place the space name after a reload, which may recreate its row at a new size.
         defer { followMarks(); pinHeader() }
         guard drag == nil else { return }
@@ -1171,7 +1178,8 @@ final class SidebarListView: NSView {
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
             let count = folderPageCounts[id] ?? Library.shared.allBookmarkIDs(inFolder: id).count
             let folded = shownSpaceID.map(Self.isCollapsed) ?? false
-            row.configure(name: folder.name, open: folder.isOpen && !folded, count: count, icon: folder.icon)
+            row.configure(name: folder.name, open: folder.isOpen && !folded, count: count, icon: folder.icon,
+                          live: folder.live != nil, unread: folder.live == nil ? 0 : LiveFolders.shared.unreadCount(id))
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
         case .tabGroup(let id):
             guard let row = view as? FolderRowView, let group = manager.group(id) else { return }
@@ -1200,6 +1208,7 @@ final class SidebarListView: NSView {
                            partnerLeads: beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id, selected: selected)
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
             row.isMarked = marked.contains(item)
+            row.isUnread = !manager.isPrivate && LiveFolders.shared.isUnread(bookmark: id)
         default:
             break
         }
@@ -2062,6 +2071,8 @@ final class SidebarListView: NSView {
             guard band.contains(pointer), canSplit(item, onto: candidate) else { continue }
             // A pinned split would pin what can't be pinned.
             if case .bookmark = candidate, drag?.pinnable == false { continue }
+            // A live folder's page splits with nothing: it's its feed's.
+            if case .bookmark(let id) = candidate, Library.shared.isLivePage(id) { continue }
             switch candidate {
             case .tab(let id), .bookmark(let id): return SplitDrop(id: id, onRight: pointer.x > view.frame.midX)
             default: continue
@@ -2260,6 +2271,8 @@ final class SidebarListView: NSView {
             // Resting on a folder row: it lights up to take the page.
             // A page or tab goes in a folder it rests on; so does a folder, if it isn't that folder or one inside it.
             let takes: (UUID) -> Bool = { target in
+                // A live folder fills itself.
+                if Library.shared.folder(target)?.live != nil { return false }
                 switch drag.item {
                 case .bookmark: return true
                 case .tab: return drag.pinnable
@@ -2283,6 +2296,9 @@ final class SidebarListView: NSView {
                 (section, index) = candidate == nil ? reorderTarget(pointerY: point.y, dragging: drag) : (drag.targetSection, drag.targetIndex)
                 // Over Pinned with something that can't be pinned: no line, and letting go puts it back.
                 if section == .bookmarks, !drag.pinnable { section = nil }
+                // Among a live folder's pages: nothing goes in, and its own pages keep their order.
+                if section == .bookmarks, let gap = folderForGap(in: withPlaceholder(items.filter { !drag.carried.contains($0) }, section: .bookmarks, index: index, carried: drag.carried), pointX: point.x),
+                   Library.shared.folder(gap)?.live != nil { section = nil }
             }
         } else if drag.folderTarget != nil || drag.groupTarget != nil {
             drag.folderTarget = nil
