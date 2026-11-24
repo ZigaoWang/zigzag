@@ -3786,13 +3786,15 @@ enum TrafficLightWatch {
 #if DEBUG
 /// scrollbench <path> [seconds] [js|wheel] [points per frame]: scrolls the front page and writes frame gaps (JSON), in
 /// the page (animation frames) and on the main thread (display link). `js` uses `scrollBy`; `wheel` sends synthetic
-/// trackpad events to the web view only.
+/// trackpad events to the web view only, `window` through the window and its event monitors.
 @MainActor
 enum ScrollBench {
     private final class Ticker: NSObject {
         var last: CFTimeInterval = 0
         var gaps: [Double] = []
         var tick: ((CADisplayLink) -> Void)?
+        var beat: (() -> Void)?
+        @objc func beatFired(_ timer: Timer) { beat?() }
         /// WebKit's page layers; counts display frames where any moved.
         weak var root: CALayer?
         var previous: [ObjectIdentifier: CGFloat] = [:]
@@ -3841,21 +3843,23 @@ enum ScrollBench {
         let ticker = Ticker()
         var direction = 1.0
         var sent = 0
-        if mode == "wheel" {
+        // How long each scroll took to hand over, in microseconds.
+        var dispatch: [Double] = []
+        if mode == "wheel" || mode == "window" {
+            let throughWindow = mode == "window"
             let center = NSPoint(x: webView.bounds.midX, y: webView.bounds.midY)
             let inWindow = webView.convert(center, to: nil)
             let onScreen = window.convertPoint(toScreen: inWindow)
             let flippedY = (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y
             var phaseStart = CACurrentMediaTime()
             var began = false
-            ticker.tick = { link in
-                let now = link.timestamp
+            let send: (CFTimeInterval) -> Void = { now in
                 // Alternates direction every 1.5 s.
                 if now - phaseStart > 1.5 { phaseStart = now; direction = -direction; began = false
                     if let end = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: 0, wheel3: 0) {
                         end.setIntegerValueField(.scrollWheelEventScrollPhase, value: 4)
                         end.location = CGPoint(x: onScreen.x, y: flippedY)
-                        if let e = NSEvent(cgEvent: end) { webView.scrollWheel(with: e) }
+                        if let e = NSEvent(cgEvent: end) { if throughWindow { window.sendEvent(e) } else { webView.scrollWheel(with: e) } }
                     }
                 }
                 let dy = Int32(-direction * step)
@@ -3868,7 +3872,21 @@ enum ScrollBench {
                 cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
                 cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
                 began = true
-                if let event = NSEvent(cgEvent: cg) { webView.scrollWheel(with: event); sent += 1 }
+                if let event = NSEvent(cgEvent: cg) {
+                    let start = CACurrentMediaTime()
+                    if throughWindow { window.sendEvent(event) } else { webView.scrollWheel(with: event) }
+                    dispatch.append((CACurrentMediaTime() - start) * 1_000_000)
+                    sent += 1
+                }
+            }
+            // Through the window, on a clock of its own: a display link stops while the window is covered.
+            if throughWindow {
+                ticker.beat = { send(CACurrentMediaTime()) }
+                let clock = Timer(timeInterval: 1.0 / 120, target: ticker, selector: #selector(Ticker.beatFired(_:)), userInfo: nil, repeats: true)
+                RunLoop.main.add(clock, forMode: .common)
+                DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { clock.invalidate() }
+            } else {
+                ticker.tick = { link in send(link.timestamp) }
             }
         }
         ticker.root = webView.layer
@@ -3913,6 +3931,11 @@ enum ScrollBench {
             link.invalidate()
             result["mainThread"] = stats(ticker.gaps, frame: 1000 / Double(max(screenFPS, 60)))
             result["wheelEvents"] = sent
+            let byTime = dispatch.sorted()
+            if !byTime.isEmpty {
+                result["dispatchMicros"] = ["p50": byTime[byTime.count / 2], "p95": byTime[byTime.count * 95 / 100], "max": byTime.last!,
+                                            "mean": byTime.reduce(0, +) / Double(byTime.count)]
+            }
             result["layerMovedTicks"] = ticker.movedTicks
             result["layerTicks"] = ticker.ticks
             if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]) {
