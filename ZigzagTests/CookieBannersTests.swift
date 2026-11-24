@@ -314,6 +314,40 @@ struct CookieBannersTests {
         }
     }
 
+    /// A pop-up that comes while the page scrolls is still refused: Autoconsent's next look waits for the page to be
+    /// still, a few seconds at most.
+    @Test func aPopUpThatComesWhileScrollingIsRefused() async throws {
+        try await withDefaults {
+            let site = "consent-\(UUID().uuidString.prefix(8).lowercased()).test"
+            let late = """
+            <!doctype html><html><body style="height: 30000px">
+            <p>Page</p>
+            <script>
+              const started = performance.now();
+              const tick = setInterval(() => {
+                scrollBy(0, 2);
+                document.body.appendChild(document.createElement('i'));
+                if (performance.now() - started > 4000) clearInterval(tick);
+              }, 16);
+              setTimeout(() => {
+                const box = document.createElement('div');
+                box.className = 'c-cookie-popup';
+                box.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; height: 120px; background: #eee';
+                box.innerHTML = '<button data-role="accept-cookies" onclick="document.body.dataset.answer = \\'accepted\\'; this.parentNode.remove()">Accept</button>'
+                  + '<button data-role="refuse-cookies" onclick="document.body.dataset.answer = \\'refused\\'; this.parentNode.remove()">Refuse</button>';
+                document.body.appendChild(box);
+              }, 1200);
+            </script>
+            </body></html>
+            """
+            let webView = await page(late, at: "https://\(site)")
+            let answered = try await until(15) { try await answer(webView) != nil }
+            #expect(answered)
+            let said = try await answer(webView)
+            #expect(said == "refused")
+        }
+    }
+
     @Test func leftAloneItsOnlyFound() async throws {
         try await withDefaults {
             CookieBanners.mode = .leave

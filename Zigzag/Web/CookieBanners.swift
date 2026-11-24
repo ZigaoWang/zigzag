@@ -152,6 +152,12 @@ enum CookieBanners {
     /// The messages from Autoconsent that Zigzag answers or hears. Its `report`s, sent at every step, aren't sent on.
     static let heard: Set<String> = ["init", "eval", "popupFound", "optOutResult", "autoconsentDone"]
 
+    /// Autoconsent's wait between looks for a pop-up, in ms; a look due while the page scrolls waits until it has
+    /// been still for `stillMS`.
+    static let lookAgainMS = 500
+    static let stillMS = 250
+    static let longestWaitMS = 3000
+
     /// Zigzag's side of the script: the two globals Autoconsent talks through (window.autoconsentSendMessage, which
     /// posts to Zigzag and hands its answer back to window.autoconsentReceiveMessage), set in Zigzag's own world, then
     /// Autoconsent itself, as it comes. Only in web pages' frames.
@@ -164,6 +170,20 @@ enum CookieBanners {
           const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(messageName);
           if (!handler) return;
           const heard = new Set(\(heard));
+          // Autoconsent looks again every half second while a page keeps changing, through all its rules: while you
+          // scroll, the next look waits until the page has been still a moment, for a few seconds at most.
+          let scrolledAt = -1e9;
+          addEventListener('scroll', () => { scrolledAt = performance.now(); }, { capture: true, passive: true });
+          const later = window.setTimeout.bind(window);
+          const setTimeout = (run, ms, ...rest) => {
+            if (ms !== \(lookAgainMS)) return later(run, ms, ...rest);
+            const until = performance.now() + \(longestWaitMS);
+            const due = () => {
+              const now = performance.now(), still = now - scrolledAt;
+              if (still < \(stillMS) && now < until) later(due, \(stillMS) - still); else run(...rest);
+            };
+            return later(due, ms);
+          };
           window.autoconsentSendMessage = async (message) => {
             if (!message || !heard.has(message.type)) return;
             let reply = null;
