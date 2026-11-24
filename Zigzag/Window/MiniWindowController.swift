@@ -645,6 +645,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func fadeAway(then done: @escaping @MainActor () -> Void) {
         guard let window else { done(); return }
         isLeaving = true
+        // Open in pressed before the window finished fading in has no alpha to animate away. AppKit then never calls
+        // the group's completion, so the page would wait for an animation that can't run.
+        guard window.alphaValue > 0.001 else {
+            window.alphaValue = 0
+            done()
+            return
+        }
         if !Tokens.Motion.reduceMotion, let layer = root.layer {
             let shrink = CABasicAnimation(keyPath: "transform")
             shrink.fromValue = NSValue(caTransform3D: layer.presentation()?.transform ?? CATransform3DIdentity)
