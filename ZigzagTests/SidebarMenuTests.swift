@@ -37,6 +37,15 @@ struct SidebarMenuTests {
         #expect(SidebarMenus.title(of: .editSpace).hasSuffix("…"))
     }
 
+    @Test func aShortcutIsFoundAsTheFullListFindsIt() {
+        let items = Shortcuts.allItems
+        #expect(!items.isEmpty)
+        for action in Set(items.compactMap(\.action)) {
+            #expect(Shortcuts.item(for: action) === items.first { $0.action == action }, "\(action)")
+        }
+        #expect(Shortcuts.item(for: #selector(NSObject.description)) == nil)
+    }
+
     // MARK: The drawn menu
 
     private func host() -> (NSWindow, NSView) {

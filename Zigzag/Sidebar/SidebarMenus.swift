@@ -83,7 +83,7 @@ enum SidebarMenus {
 
     /// The menu bar's shortcut for `action`, as it is now, shown on the item.
     static func withShortcut(_ item: NSMenuItem, of action: Selector) -> NSMenuItem {
-        guard let bar = Shortcuts.allItems.first(where: { $0.action == action }), !bar.keyEquivalent.isEmpty else { return item }
+        guard let bar = Shortcuts.item(for: action), !bar.keyEquivalent.isEmpty else { return item }
         item.keyEquivalent = bar.keyEquivalent
         item.keyEquivalentModifierMask = bar.keyEquivalentModifierMask
         return item

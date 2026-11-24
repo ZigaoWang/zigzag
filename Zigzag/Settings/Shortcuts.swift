@@ -249,7 +249,22 @@ enum Shortcuts {
 
     /// The menu item's shortcut as it is now, one key per cap, or none.
     static func caps(for action: Selector) -> [String] {
-        allItems.first { $0.action == action }.map { caps($0) } ?? []
+        item(for: action).map { caps($0) } ?? []
+    }
+
+    /// The first of `allItems` doing `action`, found without listing them all.
+    static func item(for action: Selector) -> NSMenuItem? {
+        func walk(_ menu: NSMenu) -> NSMenuItem? {
+            for item in menu.items {
+                if let sub = item.submenu {
+                    if let found = walk(sub) { return found }
+                } else if item.action == action, id(item) != nil {
+                    return item
+                }
+            }
+            return nil
+        }
+        return NSApp.mainMenu.flatMap(walk)
     }
 
     private static func name(of key: String) -> String {
