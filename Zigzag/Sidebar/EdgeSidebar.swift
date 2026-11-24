@@ -10,6 +10,8 @@ enum EdgeSidebarLayout {
     static let dwell: TimeInterval = 0.25
     /// How long the pointer can be off the panel before it goes back.
     static let leaveDelay: TimeInterval = 0.15
+    /// Room beside the card for a menu from it and its submenu.
+    static let menuRoom: CGFloat = 480
 
     /// The panel: the visible frame's height, `width` wide against the screen's edge, never wider than the screen.
     static func frame(in visible: NSRect, width: CGFloat, onRight: Bool) -> NSRect {
@@ -17,8 +19,7 @@ enum EdgeSidebarLayout {
         return NSRect(x: onRight ? visible.maxX - width : visible.minX, y: visible.minY, width: width, height: visible.height)
     }
 
-    /// The pointer is against the screen's outer edge on the sidebar's side, below the menu bar, above a bottom Dock
-    /// and away from the corners. An edge shared with another display is a way across, not an edge.
+    /// Against the screen's outer side edge, clear of the menu bar, a bottom Dock, the corners and other displays.
     static func opens(at point: NSPoint, screen: NSRect, visible: NSRect, onRight: Bool, screens: [NSRect]) -> Bool {
         let atEdge = onRight ? point.x >= screen.maxX - edgeWidth : point.x < screen.minX + edgeWidth
         let low = max(visible.minY, screen.minY + cornerReserve)
@@ -47,11 +48,7 @@ enum EdgeSidebarLayout {
     }
 }
 
-/// The sidebar at the screen's edge (#363): one switch, and the panel that comes out of it.
-///
-/// While the switch is on, a global monitor reads the pointer against the screen's edge on the sidebar's side. The
-/// panel shows a live second `SidebarView` of the last browser window in front; anything picked in it happens in that
-/// window, which comes forward.
+/// The sidebar at the screen's edge (#363): the last browser window's sidebar, over other apps.
 @MainActor
 final class EdgeSidebar {
     static let shared = EdgeSidebar()
@@ -67,6 +64,9 @@ final class EdgeSidebar {
     private var host: EdgeSidebarHost?
     private(set) var isShowing = false
     private var shownOnRight = false
+    /// The visible frame the panel is on, and the panel's frame without a menu's room.
+    private var shownVisible: NSRect = .zero
+    private var cardPanelFrame: NSRect = .zero
     private var monitor: Any?
     private var observers: [NSObjectProtocol] = []
     private var workspaceObservers: [NSObjectProtocol] = []
@@ -149,6 +149,7 @@ final class EdgeSidebar {
 
     private func moved() {
         guard !isShowing, !NSApp.isActive else { return }
+        if target == nil, let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { target = key }
         guard let target, atEdge(target: target) else { return cancelDwell() }
         guard dwellTimer == nil else { return }
         let timer = Timer(timeInterval: EdgeSidebarLayout.dwell, repeats: false) { [weak self] _ in
@@ -191,7 +192,9 @@ final class EdgeSidebar {
         // A pressed button, a menu from the panel or a sheet keeps it out.
         let held = NSEvent.pressedMouseButtons != 0 || MenuPanel.current != nil
             || RunLoop.current.currentMode == .eventTracking || NSApp.modalWindow != nil
-        if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: panel.frame) {
+        // The menu's room goes with the menu.
+        if MenuPanel.current == nil, panel.frame != cardPanelFrame { panel.setFrame(cardPanelFrame, display: true) }
+        if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: cardPanelFrame) {
             leftAt = nil
             return
         }
@@ -207,11 +210,12 @@ final class EdgeSidebar {
         let panel = panel ?? makePanel()
         guard let host else { return }
         host.onRight = onRight
+        host.cardWidth = target.edgeSidebarWidth
         host.set(container)
         generation += 1
-        let width = target.edgeSidebarWidth + Tokens.Metric.cardInset
-        panel.setFrame(EdgeSidebarLayout.frame(in: visible, width: width, onRight: onRight), display: true)
-        host.frame = NSRect(origin: .zero, size: panel.frame.size)
+        cardPanelFrame = EdgeSidebarLayout.frame(in: visible, width: host.cardWidth + host.inset, onRight: onRight)
+        shownVisible = visible
+        panel.setFrame(cardPanelFrame, display: true)
         host.placeCard()
         isShowing = true
         shownOnRight = onRight
@@ -252,6 +256,13 @@ final class EdgeSidebar {
         }
     }
 
+    /// A menu is opening in the panel: it widens on the inner side, the card staying put, so the menu isn't cut off.
+    func makeRoomForMenu() {
+        guard isShowing, let panel else { return }
+        let width = cardPanelFrame.width + EdgeSidebarLayout.menuRoom
+        panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
+    }
+
     /// ⌘T with the panel clicked into: a new tab in the window, which comes forward.
     func newTab() { target?.newTabFromEdge() }
 
@@ -282,6 +293,8 @@ final class EdgeSidebar {
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
+        // ⌘H hides Zigzag's windows, not the way back to them.
+        panel.canHide = false
         panel.eventInterceptor = { [weak self] event in self?.intercept(event) ?? false }
         let host = EdgeSidebarHost()
         panel.contentView = host
@@ -323,11 +336,14 @@ final class EdgeSidebarHost: NSView {
     private(set) weak var container: SidebarContainer?
     let inset = Tokens.Metric.cardInset
     var onRight = false { didSet { placeCard() } }
+    var cardWidth: CGFloat = 0 { didSet { placeCard() } }
 
     override var isFlipped: Bool { true }
 
+    /// Against the screen's edge, whatever room beside it a menu has.
     var cardFrame: NSRect {
-        NSRect(x: onRight ? 0 : inset, y: inset, width: max(0, bounds.width - inset), height: max(0, bounds.height - inset * 2))
+        NSRect(x: onRight ? bounds.width - inset - cardWidth : inset, y: inset, width: cardWidth,
+               height: max(0, bounds.height - inset * 2))
     }
 
     func set(_ container: SidebarContainer) {
@@ -349,7 +365,7 @@ final class EdgeSidebarHost: NSView {
         placeCard()
     }
 
-    /// A click in the gutter beside the card puts the panel away.
+    /// A click beside the card puts the panel away.
     override func mouseDown(with event: NSEvent) {
         if container?.frame.contains(convert(event.locationInWindow, from: nil)) != true {
             EdgeSidebar.shared.hide()

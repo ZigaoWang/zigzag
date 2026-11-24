@@ -2100,6 +2100,7 @@ final class MenuPanel: FloatingPanelView {
     static func show(_ entries: [Entry], from anchor: NSView, placement: Placement = .below, minWidth: CGFloat = 0,
                      appearance: NSAppearance? = nil, closed: (() -> Void)? = nil) -> MenuPanel? {
         current?.close(animated: false)
+        if EdgeSidebar.shared.isPanel(anchor.window) { EdgeSidebar.shared.makeRoomForMenu() }
         guard let window = anchor.window, let host = window.contentView else { closed?(); return nil }
         let menu = MenuPanel(entries: entries)
         menu.appearance = appearance
