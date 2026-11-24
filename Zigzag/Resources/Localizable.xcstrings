@@ -296,19 +296,19 @@
         }
       }
     },
-    "Favorites" : {
-      "comment" : "Folder in an exported bookmarks file holding the favorites.",
+    "Zigzag Favorites" : {
+      "comment" : "Folder in an exported bookmarks file holding the favorites. Zigzag is a name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收藏"
+            "value" : "Zigzag 收藏"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收藏"
+            "value" : "Zigzag 收藏"
           }
         }
       }

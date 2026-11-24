@@ -1,7 +1,7 @@
 # Export
 
 ## Bookmarks file
-- File › Export Your Data… with Bookmarks file on → an HTML bookmarks file other browsers import: one folder per space in the sidebar's order, its pinned pages and folders nested as in the sidebar, a split's pages one after another, an empty folder at the top of its level, and Favorites as a folder of its own.
+- File › Export Your Data… with Bookmarks file on → an HTML bookmarks file other browsers import: one folder per space in the sidebar's order, its pinned pages and folders nested as in the sidebar, a split's pages one after another, an empty folder at the top of its level, and favorites in a Zigzag Favorites folder, which no importer folds away.
   Test: ExportTests.theBookmarksFileNestsAsTheSidebarAndReadsBackThroughTheImporter
 - Titles, folder names and addresses with `&`, `<`, `>` or `"` → escaped, and read back as they were.
   Test: ExportTests.theBookmarksFileNestsAsTheSidebarAndReadsBackThroughTheImporter

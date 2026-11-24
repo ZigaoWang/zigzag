@@ -10,6 +10,12 @@ enum BookmarksExport {
         case folder(name: String, children: [Node])
     }
 
+    /// Not plain "Favorites": at the top of a file, Safari's own folder of that name is folded away on import, by
+    /// Zigzag's importer too.
+    static var favoritesName: String {
+        String(localized: "Zigzag Favorites", comment: "Folder in an exported bookmarks file holding the favorites. Zigzag is a name.")
+    }
+
     static func tree(_ backup: ZigzagBackup) -> [Node] {
         let open = Dictionary((backup.openTabs ?? []).map { ($0.spaceID, $0.rows.flatMap { $0 }) }, uniquingKeysWith: { a, _ in a })
         func profile(ofSpace id: UUID) -> UUID { backup.spaceProfiles[id.uuidString] ?? Profile.defaultID }
@@ -23,8 +29,7 @@ enum BookmarksExport {
                 return owner == id || (id == Profile.defaultID && !known.contains(owner))
             }
             if !favorites.isEmpty {
-                nodes.append(.folder(name: String(localized: "Favorites", comment: "Folder in an exported bookmarks file holding the favorites."),
-                                     children: favorites.map { .page(title: $0.title, url: $0.url) }))
+                nodes.append(.folder(name: favoritesName, children: favorites.map { .page(title: $0.title, url: $0.url) }))
             }
             for space in backup.spaces {
                 let owner = profile(ofSpace: space.id)

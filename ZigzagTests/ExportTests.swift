@@ -35,7 +35,7 @@ import Testing
         backup.spaces = [sampleSpace(), SpaceInfo(name: "Nothing yet", color: .rose)]
         backup.favorites = [page("mail", "Mail")]
         let tree = BookmarksExport.tree(backup)
-        let favorites = String(localized: "Favorites", comment: "Folder in an exported bookmarks file holding the favorites.")
+        let favorites = BookmarksExport.favoritesName
         #expect(tree.map(\.name) == [favorites, "Work", "Nothing yet"])
         // The empty folder sits at the top of its level; a split's pages follow one another.
         guard case .folder(_, let work) = tree[1] else { Issue.record("no Work folder"); return }
@@ -47,8 +47,8 @@ import Testing
         #expect(html.contains("HREF=\"https://example.com/inner?a=1&amp;b=%222%22\"") || html.contains("HREF=\"https://example.com/inner?a=1&amp;b=&quot;2&quot;\""))
         #expect(!html.contains("<Best>"))
         let read = BookmarksHTML.bookmarks(in: html).map { ($0.folders + [$0.title]).joined(separator: " / ") }
-        // A top-level Favorites folder reads as the browser's own, as Safari's does.
-        #expect(read == ["Mail", "Work / Top & <Best>", "Work / Docs \"&\" notes / Inner", "Work / Docs \"&\" notes / Sub / Deep", "Work / Left", "Work / Right"])
+        // Favorites stay a folder of their own, not folded away as a browser's own Favorites folder is.
+        #expect(read == ["\(favorites) / Mail", "Work / Top & <Best>", "Work / Docs \"&\" notes / Inner", "Work / Docs \"&\" notes / Sub / Deep", "Work / Left", "Work / Right"])
         #expect(BookmarksHTML.bookmarks(in: html).first { $0.title == "Inner" }?.url.absoluteString.contains("a=1&b=") == true)
     }
 
@@ -65,7 +65,7 @@ import Testing
         backup.favoriteProfiles = [theirs.id.uuidString: work.id]
         backup.openTabs = [ZigzagBackup.SpaceTabs(spaceID: office.id, rows: [[ZigzagBackup.Page(url: URL(string: "https://example.org/a")!, title: "A")]])]
         let tree = BookmarksExport.tree(backup)
-        let favorites = String(localized: "Favorites", comment: "Folder in an exported bookmarks file holding the favorites.")
+        let favorites = BookmarksExport.favoritesName
         let openTabs = String(localized: "Open Tabs", comment: "Folder in an exported bookmarks file holding a space's open tabs, not pinned ones.")
         #expect(tree.map(\.name) == [ProfileInfo(id: Profile.defaultID).displayName, "Work"])
         #expect(tree[0].children.map(\.name) == [favorites, "Home"])
