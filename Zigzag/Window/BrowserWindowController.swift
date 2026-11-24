@@ -270,6 +270,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tabManager.host = self
         tokens.append(tabManager.changed.observe { [weak self] change in self?.tabManagerChanged(change) })
         tokens.append(Library.shared.changed.observe { [weak self] in self?.libraryChanged() })
+        // A live folder's pages read, or its refresh failing: their rows and menu follow.
+        tokens.append(LiveFolders.shared.changed.observe { [weak self] in self?.sidebar.list.refreshRows() })
         // Tools above the page turned on or off (Settings › Developer): the page you're on gains or loses them.
         tokens.append(DeveloperTools.changed.observe { [weak self] in self?.showDeveloperBarTools() })
         // Always or Never Translate chosen in another window or Settings: the translate button follows.
