@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// Headless mode (#214): AI apps work in an unseen window of their own, on the AI Apps profile.
 @MainActor
@@ -322,6 +323,34 @@ enum Headless {
         AppDelegate.quitConfirmed = true
         NSApp.terminate(nil)
     }
+
+    // MARK: Their pages
+
+    /// No WebKit full screen and no clipboard writes for their pages: an app's clicks count as yours to WebKit.
+    static func prepare(_ configuration: WKWebViewConfiguration) {
+        configuration.preferences.isElementFullscreenEnabled = false
+        let controller = configuration.userContentController
+        guard !controller.userScripts.contains(where: { ($0.source as NSString).hasPrefix(clipboardMarker) }) else { return }
+        controller.addUserScript(WKUserScript(source: clipboardMarker + "\n" + clipboardScript, injectionTime: .atDocumentStart,
+                                              forMainFrameOnly: false, in: .page))
+    }
+
+    private static let clipboardMarker = "/* zigzag ai apps clipboard */"
+
+    /// Copy and cut from script, and the async Clipboard API's writes, are refused. Your own ⌘C still copies.
+    static let clipboardScript = #"""
+    (() => {
+      const refused = () => Promise.reject(new DOMException('Write permission denied.', 'NotAllowedError'));
+      const lock = (o, n, value) => { try { Object.defineProperty(o, n, { value, writable: false, configurable: false }); } catch (e) {} };
+      const C = window.Clipboard && Clipboard.prototype;
+      if (C) for (const n of ['write', 'writeText']) if (n in C) lock(C, n, refused);
+      const exec = Document.prototype.execCommand;
+      if (exec) lock(Document.prototype, 'execCommand', function (command, ...rest) {
+        if (/^\s*(copy|cut)\s*$/i.test(String(command))) return false;
+        return exec.call(this, command, ...rest);
+      });
+    })();
+    """#
 
     // MARK: The menu bar item
 

@@ -299,6 +299,9 @@ While AI apps work in the background:
   a link to another app (`mailto:`, a meeting app) not opened. A pop-up window opens as a tab, where the app can
   find it. The app's next answer about that tab, whichever tool it is, lists what was dismissed and on which page,
   as `dialogs`.
+- **Nothing of theirs reaches your screen or clipboard.** A page's full screen only ever fills its page, never
+  the screen, and a page can't copy to your clipboard (an app's clicks and keys count as someone being there, so
+  this is refused outright). You can still copy from their window yourself while you watch.
 - **Their downloads are their own.** A download goes, without asking where, into a Downloads folder in the AI Apps
   profile's data (in Zigzag's folder in `~/Library/Application Support`, under `Profiles`), never into yours, and
   stays out of your downloads list and the Dock. Deleting the profile deletes them.

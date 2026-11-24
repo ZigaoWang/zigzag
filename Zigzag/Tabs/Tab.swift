@@ -33,7 +33,7 @@ extension TabHost {
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
     /// No space of the window's own for the page here (a web app, Zigzag Mini): The Whole Screen is WebKit's, as before.
     func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {
-        if on, PageFullScreen.fills(for: tab.url) == .screen { PageFullScreen.handToWebKit(tab) }
+        if on, !tab.profile.isHeadless, PageFullScreen.fills(for: tab.url) == .screen { PageFullScreen.handToWebKit(tab) }
     }
     func tabDidAskToExpandFullScreen(_ tab: Tab) { PageFullScreen.expand(tab) }
     /// Loads an address with no sender: page links and every caller except a rule.
@@ -270,7 +270,7 @@ final class Tab: NSObject {
                 guard let self else { return }
                 self.host?.tabDidAskToExpandFullScreen(self)
             }
-            pageHolder?.showsExpand = isInPageFullScreen
+            pageHolder?.showsExpand = isInPageFullScreen && !profile.isHeadless
             host?.tab(self, pageFullScreenChanged: isInPageFullScreen)
         }
     }

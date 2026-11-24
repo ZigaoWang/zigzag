@@ -730,7 +730,26 @@ struct NothingOfYoursTests {
         }
     }
 
-    /// Only theirs isn't given your data; the role and the policy are known without asking the directory again.
+    /// Their pages can't take your screen with WebKit's full screen, nor write your clipboard.
+    @Test func noFullScreenOrClipboardWrites() async throws {
+        try await withTabs { theirs, yours in
+            let mine = yours.ensureWebView(), page = theirs.ensureWebView()
+            #expect(mine.configuration.preferences.isElementFullscreenEnabled)
+            #expect(!page.configuration.preferences.isElementFullscreenEnabled)
+            for view in [mine, page] {
+                view.loadHTMLString("<p>Hi</p>", baseURL: URL(string: "https://example.com/"))
+                for _ in 0..<100 where view.isLoading || view.url == nil { try await Task.sleep(for: .milliseconds(50)) }
+            }
+            let native = "String(Document.prototype.execCommand).includes('[native code]')"
+            #expect(try await mine.evaluateJavaScript(native) as? Bool == true)
+            #expect(try await page.evaluateJavaScript(native) as? Bool == false)
+            #expect(try await page.evaluateJavaScript("document.execCommand('copy')") as? Bool == false)
+            let written = try await page.callAsyncJavaScript("return navigator.clipboard ? await navigator.clipboard.writeText('x').then(() => 'written', e => e.name) : 'none'",
+                                                            contentWorld: .page) as? String
+            #expect(written == "NotAllowedError" || written == "none")
+        }
+    }
+
     /// Apps on This Mac is your switch: their pages never get the door, even on a site you allowed.
     @Test func noDoorToAppsOnThisMac() async throws {
         let name = "NothingOfYoursTests-\(UUID().uuidString)"
@@ -757,6 +776,7 @@ struct NothingOfYoursTests {
         }
     }
 
+    /// Only theirs isn't given your data; the role and the policy are known without asking the directory again.
     @Test func onlyTheirsIsNotGivenYourData() async throws {
         try await withTabs { theirs, yours in
             #expect(!theirs.profile.getsYourData && yours.profile.getsYourData)
@@ -787,20 +807,21 @@ struct NothingOfYoursTests {
         defer { UserDefaults.standard.set(before, forKey: key) }
         try await withTabs { theirs, yours in
             let window = TabManager(spaceID: yours.spaceID)
-            defer { window.invalidate() }
+            let theirWindow = TabManager(spaceID: theirs.spaceID, keepsToProfile: theirs.profile.id)
+            defer { window.invalidate(); theirWindow.invalidate() }
             let old = Date().addingTimeInterval(-3 * 24 * 3600)
             var stale: [Tab] = []
-            for space in [yours.spaceID, theirs.spaceID] {
-                window.newTab(url: URL(string: "https://front.example/\(space)")!, spaceID: space, select: true)
-                let tab = window.newTab(url: URL(string: "https://stale.example/\(space)")!, spaceID: space, select: false)
+            for (manager, space) in [(window, yours.spaceID), (theirWindow, theirs.spaceID)] {
+                manager.newTab(url: URL(string: "https://front.example/\(space)")!, spaceID: space, select: true)
+                let tab = manager.newTab(url: URL(string: "https://stale.example/\(space)")!, spaceID: space, select: false)
                 tab.lastActivated = old
                 stale.append(tab)
             }
-            window.switchToSpace(yours.spaceID)
             let mine = stale[0], notMine = stale[1]
-            let counted = window.archivableTabs.flatMap { $0 }
-            #expect(counted.contains { $0 === mine } && !counted.contains { $0 === notMine })
+            #expect(window.archivableTabs.flatMap { $0 }.contains { $0 === mine })
+            #expect(!theirWindow.archivableTabs.flatMap { $0 }.contains { $0 === notMine })
             window.sleepIdleTabs()
+            theirWindow.sleepIdleTabs()
             #expect(mine.isClosed && !notMine.isClosed)
             let archived = TabArchive.shared.entries.map(\.url)
             let mineURL = try #require(mine.url), notMineURL = try #require(notMine.url)

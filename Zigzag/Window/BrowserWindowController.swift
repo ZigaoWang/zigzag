@@ -2617,6 +2617,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if tab === pageFullScreenTab { endWholeScreen() }
             return
         }
+        // AI apps' pages only ever fill the page: nothing of theirs takes your screen.
+        guard !tab.profile.isHeadless else { return }
         let onScreen = tabManager.selectedTab.map { tabManager.panes(of: $0).contains { $0 === tab } } ?? false
         switch Self.pageFullScreenGoes(fill: PageFullScreen.fills(for: tab.url), onScreen: onScreen, inSplit: tabManager.split(for: tab) != nil) {
         case .page: break
@@ -2704,7 +2706,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// there; from The Whole Screen the browser's space is given back first, so WebKit does not open a window inside
     /// a space the browser made for the page.
     func tabDidAskToExpandFullScreen(_ tab: Tab) {
-        guard tab === tabManager.selectedTab, tab.isInPageFullScreen else { return }
+        guard tab === tabManager.selectedTab, tab.isInPageFullScreen, !tab.profile.isHeadless else { return }
         if tab === pageFullScreenTab, pageFullScreenAskedForSpace, browserWindow.fullScreenPhase != .windowed {
             pageFullScreenNativeAfterSpace = tab
             endWholeScreen()
