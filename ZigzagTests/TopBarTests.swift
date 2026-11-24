@@ -983,8 +983,7 @@ struct TopBarTests {
         #expect(root.autohideOffset(at: 0) == 0, "the top always brings the bar back")
     }
 
-    /// With the sidebar docked on the left, the window buttons stay in its row for the whole travel; only a hidden
-    /// sidebar puts them over the page when the bar goes away.
+    /// With the sidebar docked on the left, the window buttons stay in its row for the whole travel.
     @Test func aDockedSidebarKeepsTheLightsInItsRowWhileTheBarTravels() {
         let before = Library.shared.snapshot
         defer { Library.shared.restore(before) }
@@ -1019,6 +1018,42 @@ struct TopBarTests {
             controller.layoutTrafficLights()
             #expect(lightTopLeft() == docked, "offset \(offset)")
         }
+    }
+
+    /// With the sidebar hidden, the window buttons ride in the bar as it travels and go with it.
+    @Test func theLightsGoWithAnAutohideBar() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/hidden-lights")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        guard let window = controller.window as? BrowserWindow else { Issue.record("no window"); return }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        controller.layoutTrafficLights()
+        #expect(!window.trafficLightsHidden)
+        let shown = window.trafficLightOrigin?.y ?? 0
+        let travel = root.autohideTravel(at: 0)
+        root.setBarOffset(travel / 2, animated: false)
+        controller.layoutTrafficLights()
+        #expect(!window.trafficLightsHidden)
+        #expect(abs((window.trafficLightOrigin?.y ?? 0) - (shown - travel / 2)) < 0.5, "they ride up with the bar")
+        root.setBarOffset(travel, animated: false)
+        controller.layoutTrafficLights()
+        #expect(window.trafficLightsHidden, "nothing over the page while the bar is away")
+        root.setBarOffset(0, animated: false)
+        controller.layoutTrafficLights()
+        #expect(!window.trafficLightsHidden && window.trafficLightOrigin?.y == shown)
     }
 
     /// A page that gives no color of its own (`underPageBackgroundColor` clear) still has a bar: its band is the

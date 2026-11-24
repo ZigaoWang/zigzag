@@ -2670,23 +2670,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func sidebarSliding(_ duration: TimeInterval) {
         if !browserWindow.trafficLightsHidden, let image = browserWindow.trafficLightsImage() { trafficLightsPicture = image }
         sidebarMovingUntil = duration > 0 ? Date().addingTimeInterval(duration) : .distantPast
-        // The bar holds the address: the lights stay at the window's leading edge, on the bar's line, or over the page
-        // while Autohide has the bar away (#359). They don't ride the sidebar, and the bar's hold keeps the bar there
-        // through the slide, so this never crosses it.
-        if root.barHoldsAddress {
-            slideEndsAt = .distantPast
-            if root.showsTopBar, duration > 0 {
-                toggleHeldUntil = Date().addingTimeInterval(duration)
-            }
-            layoutTrafficLights()
-            if duration > 0 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.01) { [weak self] in self?.layoutTrafficLights() }
-            }
-            return
-        }
-        // Beside a sidebar on the right, a bar there for a page's tools alone leaves them in the sidebar's row, and
-        // they ride with it; on the left with the bar there they stay put while it slides out from under them.
-        let stays = root.showsTopBar && (!root.sidebarOnRight && !root.isSidebarFloatingVisible)
+        // Docked and in the bar above the page, the lights are in the same spot: they stay put while the sidebar
+        // slides out from under them or back, and go straight back to it as the floating sidebar leaves.
+        // Beside a sidebar on the right they're in the bar holding the address the whole time, slid out or not; with
+        // only a page's tools there, they ride in the sidebar at the window's other edge, and go with it.
+        let barKeepsLights = root.sidebarOnRight && root.barHoldsAddress
+        let stays = root.showsTopBar && (barKeepsLights || (!root.sidebarOnRight && !root.isSidebarFloatingVisible))
         // On either side the bar's toggle is where the sidebar's lands (on the right, both at the window's right end).
         if stays, duration > 0 {
             toggleHeldUntil = Date().addingTimeInterval(duration)
@@ -2703,40 +2692,48 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let floating = root.isSidebarFloatingVisible
         let docked = root.sidebarVisible
         let sliding = isSliding
-        // Only a sliding, visible sidebar shows the picture; full screen has the title bar instead.
+        // The picture shows only mid-slide, and only when the sidebar is (or is becoming) visible.
+        // Not in full screen: the lights live in the title bar that comes down with the menu bar there, so a picture of
+        // them on the sliding sidebar would only flash and vanish.
         let fullScreen = window.styleMask.contains(.fullScreen)
-        // In full screen with neither bar nor sidebar, the page is under the lights (#462).
+        // The page is under the lights only in full screen with neither the bar nor the sidebar there; then they
+        // get a backing so they don't float over it (#462). The bar or sidebar is their backing otherwise.
         let backing = trafficLightBacking(fullScreen: fullScreen)
         if (fullScreenBar != nil) != backing, !window.fullScreenPhase.isMoving { showFullScreenBar(backing) }
-        // The bar keeps them at its leading end when the sidebar is hidden, or on the right with the address.
+        // With the sidebar hidden, the bar above the page keeps them at its leading end, where they'd be docked.
+        // Beside a sidebar on the right, the bar holding the address keeps them there always: the window's top left.
+        // Without it they're in the sidebar's top row on either side, the page running up to the top as on the left
+        // (#166), and a bar there for a page's tools alone leaves them be, as on the left.
         let onRight = root.sidebarOnRight
-        let barShown = root.barOnScreen
-        // An away bar puts them over the page; a docked left sidebar keeps its own row (#358, #359).
-        let overPage = !fullScreen && !barShown && ((root.barHoldsAddress && onRight) || (!docked && !floating))
         let barKeepsLights = onRight && root.barHoldsAddress
-        let inBar = barShown && (barKeepsLights || (!docked && !floating))
+        // An Autohide bar takes them with it as it goes (#359).
+        let inBar = root.barOnScreen && (barKeepsLights || (!docked && !floating))
         let room = Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
-        // Their room in the sidebar's row comes and goes with the slide.
+        // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
+        // nothing in the row moves while it's on screen; until then their picture rides in it.
         if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
         sidebar.showTrafficLightsPicture(sliding && !fullScreen && sidebar.trafficLightsWidth > 0 ? trafficLightsPicture : nil)
         // A finger in use with the sidebar hidden: they show with its toggle, where the docked sidebar has them.
         let withGrabber = root.grabberPlace == .lights && !docked && !floating && !inBar
-        window.trafficLightsHidden = sliding || !(docked || floating || inBar || overPage || withGrabber)
+        window.trafficLightsHidden = sliding || !(docked || floating || inBar || withGrabber)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
-        // Docked, from the sidebar's edge; in the bar or over the page, from the window's edge.
+        // Docked, from where the docked sidebar starts: the window's left edge, or on the right its width in from the
+        // right edge.
         let dockedMinX = onRight ? root.bounds.width - root.sidebarWidth : 0
-        let x = (inBar || overPage ? 0 : docked || withGrabber ? dockedMinX : container.minX) + SidebarView.trafficLightsX
-        // In the bar, on its middle line; over the page, the installed app's line.
-        let barCenter = root.barTop + Tokens.Sidebar.lightsCenter
-        let pageCenter = Tokens.Metric.webAppTitleBarHeight / 2
-        let center = inBar ? barCenter : overPage ? pageCenter : (docked || withGrabber ? 0 : container.minY) + sidebar.trafficLightCenterY
+        let x = (inBar ? 0 : docked || withGrabber ? dockedMinX : container.minX) + SidebarView.trafficLightsX
+        // In the bar, on its middle line, wherever the bar starts or Autohide has it: not the sidebar's line, which is
+        // still the docked one while it slides away.
+        let center = inBar ? root.barTop + Tokens.Sidebar.lightsCenter : (docked || withGrabber ? 0 : container.minY) + sidebar.trafficLightCenterY
         let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
-        if !sliding, docked || floating || inBar || overPage, let image = window.trafficLightsImage() { trafficLightsPicture = image }
-        // The bar keeps their room in full screen too, so its controls stay clear.
+        if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
+        // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
+        // Full screen included: the lights come down with the menu bar, so the bar leaves their space
+        // rather than drawing its controls under them.
         root.topBar.trafficLightsWidth = root.showsTopBar && (!docked || barKeepsLights) ? window.trafficLightsWidth : 0
-        // The bar's sidebar toggle replaces the hidden sidebar's, landing where the sidebar's does.
+        // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
+        // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
         let held = root.showsTopBar && holdsToggle
         root.topBar.showsSidebarButton = root.showsTopBar && !docked
         root.topBar.sidebarOnRight = onRight
@@ -2781,14 +2778,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fullScreenBar = bar
     }
 
-    /// Whether the lights need their own backing here: full screen with no bar on screen and no sidebar (#462).
+    /// The backing for this window now: an Autohide bar that's away is no backing (#462).
     func trafficLightBacking(fullScreen: Bool) -> Bool {
-        Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.barOnScreen,
-                                      sidebarVisible: root.sidebarVisible,
+        Self.needsTrafficLightBacking(fullScreen: fullScreen, barShown: root.barOnScreen, sidebarVisible: root.sidebarVisible,
                                       sidebarFloating: root.isSidebarFloatingVisible)
     }
 
-    /// The lights' backing decision from the parts, so the full-screen case can be tested without a full-screen window.
+    /// Whether the lights need a backing of their own: in full screen, when the page is under them because neither
+    /// the bar nor the sidebar is. With either there, they sit on Zigzag's own chrome (#462).
     nonisolated static func needsTrafficLightBacking(fullScreen: Bool, barShown: Bool, sidebarVisible: Bool,
                                                      sidebarFloating: Bool) -> Bool {
         fullScreen && !barShown && !sidebarVisible && !sidebarFloating
