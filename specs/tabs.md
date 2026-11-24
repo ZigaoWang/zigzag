@@ -34,7 +34,9 @@
   Test: SessionCookiesTests.clearingASiteTakesItsSavedCookies
 - Quit and open again with Continue where you left off, or restart for an update → each tab's page gets back the sessionStorage it had (asleep, or open as Zigzag quit) before its own scripts first run, so a site that keeps your sign-in there (Microsoft 365) still has you signed in; no other page gets it.
   Test: UnloadedTabTests.aRestoredTabGetsItsSessionStorageBackBeforeItsFirstLoad
-  Test: SessionCookiesTests.sessionStorageWaitsForItsTabAndTheFileGoes
+  Test: SessionCookiesTests.sessionStorageWaitsForItsTabAndTheFileStays
+- Zigzag opened for Zigzag Mini, an installed site or AI apps alone, then a browser window → the session comes back with its session cookies and sessionStorage, as it would at launch.
+  Test: RelaunchIgnoresLaunchChoiceTests.aSessionLeftWaitingKeepsItsSignIns
 - The same with Open a new window → it's gone unread. A private tab's is never kept.
   Test: SessionCookiesTests.openANewWindowDropsSessionStorageUnread
   Test: SessionCookiesTests.aPrivateTabsSessionStorageIsNeverKept

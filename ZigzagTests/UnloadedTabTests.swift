@@ -278,7 +278,7 @@ import WebKit
 
         // The next launch.
         SavedSessionStorage.prepare(file, resumes: true, profile: open.profile.id)
-        #expect(!FileManager.default.fileExists(atPath: file.path))
+        #expect(FileManager.default.fileExists(atPath: file.path))
         let space = Library.shared.spaces[0].id
         let restored = Tab(id: open.id, url: page, title: "Session", spaceID: space, interactionState: history)
         let withoutHistory = Tab(id: bare.tab, url: page, title: "Session", spaceID: space)

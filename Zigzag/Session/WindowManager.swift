@@ -529,6 +529,8 @@ final class WindowManager {
     @discardableResult
     func restoreSession() -> Bool {
         sessionWaiting = false
+        // Its tabs are made by now: what they kept of their sessionStorage is saved again from here.
+        defer { SavedSessionStorage.sessionCameBack() }
         // The session on disk is the one a fresh start passed over: it comes back only from History.
         if freshStartUnused { return false }
         finishSaving()

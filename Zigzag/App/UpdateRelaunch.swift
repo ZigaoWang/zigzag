@@ -38,6 +38,13 @@ enum UpdateRelaunch {
         plan.restoresSession && !startsFresh(plan: plan, relaunch: relaunch, choice: choice)
     }
 
+    /// Whether the last session's sign-ins (session cookies, kept sessionStorage) come back: with the session, or
+    /// waiting with it for a browser window; dropped on a fresh start.
+    nonisolated static func keepsSignIns(plan: Plan, relaunch: Saved?, choice: LaunchChoice) -> Bool {
+        resumes(plan: plan, relaunch: relaunch, choice: choice)
+            || (plan.sessionWaiting && !startsFresh(plan: plan, relaunch: relaunch, choice: choice))
+    }
+
     /// Whether this launch is a fresh start, the saved windows waiting for a Zigzag Mini link included. An update's
     /// relaunch is one only when the fresh start it interrupted was still unused.
     nonisolated static func startsFresh(plan: Plan, relaunch: Saved?, choice: LaunchChoice) -> Bool {

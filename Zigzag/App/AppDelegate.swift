@@ -195,12 +195,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let resumes = UpdateRelaunch.resumes(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
         WindowManager.shared.startingFresh = UpdateRelaunch.startsFresh(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
         if WindowManager.shared.startingFresh { WindowManager.shared.keepSessionForReopening() }
-        // Session cookies come back with the session, before any of its pages loads; otherwise they're dropped.
-        SessionCookies.start(resumes: resumes)
-        // So does the sessionStorage tabs kept, onto the tabs it was read from.
-        SavedSessionStorage.start(resumes: resumes)
+        // Session cookies come back with the session, before any of its pages loads, a session left waiting for a
+        // browser window included; otherwise they're dropped.
+        let keepsSignIns = UpdateRelaunch.keepsSignIns(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
+        SessionCookies.start(resumes: keepsSignIns)
+        // So does the sessionStorage tabs kept, onto the tabs it was read from, whenever those are made.
+        SavedSessionStorage.start(resumes: keepsSignIns)
         let restored = resumes ? WindowManager.shared.restoreSession() : false
-        SavedSessionStorage.started()
+        if plan.sessionWaiting, keepsSignIns { SavedSessionStorage.waitForSession() } else { SavedSessionStorage.started() }
         if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
         MoveToApplications.offerWhenReady()

@@ -155,14 +155,15 @@ struct SessionCookiesTests {
         SavedSessionStorage.Saved(tab: tab, url: URL(string: origin + "/app")!, origin: origin, items: [["k", String(repeating: "v", count: size - 1)]])
     }
 
-    @Test func sessionStorageWaitsForItsTabAndTheFileGoes() {
+    @Test func sessionStorageWaitsForItsTabAndTheFileStays() {
         defer { cleanUp() }
         let tab = UUID()
         SavedSessionStorage.write([stored(tab)], to: storageURL)
         #expect(SavedSessionStorage.read(storageURL).map(\.tab) == [tab])
         SavedSessionStorage.prepare(storageURL, resumes: true, profile: Profile.defaultID)
         #expect(SavedSessionStorage.isWaiting(for: tab))
-        #expect(!FileManager.default.fileExists(atPath: storageURL.path))
+        // Kept until saving starts, in case the session waits for a window and Zigzag quits first.
+        #expect(FileManager.default.fileExists(atPath: storageURL.path))
         // Another tab made from the session takes nothing of it.
         SavedSessionStorage.restore(into: Tab(url: URL(string: "https://login.example.com/app"), spaceID: Library.shared.spaces[0].id))
         #expect(SavedSessionStorage.isWaiting(for: tab))

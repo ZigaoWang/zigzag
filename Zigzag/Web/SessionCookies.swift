@@ -350,12 +350,13 @@ enum SavedSessionStorage {
     /// Read at launch for the session's tabs, by tab, with the profile each was saved in.
     private static var waiting: [UUID: (profile: UUID, saved: Saved)] = [:]
 
-    /// A profile's file at launch: read for the tabs the last session brings back, or (On launch is Open a new
-    /// window) left unread; removed either way, and the next save writes it again.
+    /// A profile's file at launch: read for the tabs the last session brings back, and kept until saving starts
+    /// writes it again (a session left waiting may not come back before Zigzag quits); or (On launch is Open a new
+    /// window) removed unread.
     static func prepare(_ url: URL, resumes: Bool, profile: UUID) {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
-        if resumes { for saved in read(url) { waiting[saved.tab] = (profile, saved) } }
-        SessionCookies.remove(url)
+        guard resumes else { SessionCookies.remove(url); return }
+        for saved in read(url) { waiting[saved.tab] = (profile, saved) }
     }
 
     /// A tab made from the last session: its page's sessionStorage goes back on it, before its first load.
@@ -383,10 +384,20 @@ enum SavedSessionStorage {
 
     /// The session's tabs are made: what none of them took is dropped, and the files are written for what they hold.
     static func started() {
+        sessionLeftWaiting = false
         dropWaiting()
         isOn = true
         saveNow()
     }
+
+    /// Opened for Zigzag Mini, an installed site or AI apps alone: saving starts once the session comes back.
+    private static var sessionLeftWaiting = false
+
+    /// The session waits for a browser window (`WindowManager.sessionWaiting`): its tabs take theirs when it comes back.
+    static func waitForSession() { sessionLeftWaiting = true }
+
+    /// The waiting session came back, or there was none to bring.
+    static func sessionCameBack() { if sessionLeftWaiting { started() } }
 
     static func dropWaiting() { waiting = [:] }
 
