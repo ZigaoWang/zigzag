@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A two-finger swipe on the trackpad shows its arrow, and the page starts to move, as soon as your fingers start sideways, instead of a moment later, so you can tell right away that it will go back or forward. A page that scrolls sideways under the pointer, like a carousel or a map, still keeps the swipe, and scrolling up and down never shows the arrow. ([#508](https://github.com/ZigaoWang/zigzag/issues/508))
+
 ## [0.9.5] - 2026-11-24
 
 Pages at your display's full 120 Hz like Chrome, touch that feels native on a touch display with every tap counted, iPad-style dragging and two-finger back and forward, Dia's pinned tabs on import, press and hold Back or Forward for history, a smoother Show All Tabs, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.

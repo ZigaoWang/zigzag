@@ -318,6 +318,71 @@ struct BookmarkFolderTests {
         #expect(decide(dx: 14, scrolls: nil, page: .left, waited: 0.001) == .track(-1))
     }
 
+    @Test func swipeArrowLeansInWhileThePageAnswers() {
+        func lean(dx: CGFloat, dy: CGFloat = 0, scrolls: (left: Bool, right: Bool)? = (false, false), page: SwipeDecision.Page = .unknown,
+                  waited: TimeInterval = 0.01, overFrame: Bool = false, leans: Bool = true) -> SwipeDecision {
+            SwipeDecision.decide(dx: dx, dy: dy, canGoBack: true, canGoForward: true, pageScrolls: scrolls, page: page,
+                                 waited: waited, overFrame: overFrame, leans: leans)
+        }
+        // Nothing sideways under the pointer: the arrow comes with the first sideways steps, the page not yet heard from (#508).
+        #expect(lean(dx: 12) == .lean(-1))
+        #expect(lean(dx: -12) == .lean(1))
+        // The page's answer, or the end of the wait, makes it the swipe's.
+        #expect(lean(dx: 12, page: .left) == .track(-1))
+        #expect(lean(dx: 12, waited: SwipeDecision.answerWait) == .track(-1))
+        // A carousel or wide table with room that way keeps it, and one that cancelled the scrolls takes it back.
+        #expect(lean(dx: 12, scrolls: (true, false)) == .ignore)
+        #expect(lean(dx: 12, page: .took) == .ignore)
+        // Up and down the page never shows it.
+        #expect(lean(dx: 2, dy: 14) == .ignore)
+        #expect(lean(dx: 12, dy: 11) == .ignore)
+        #expect(lean(dx: 4) == .undecided)
+        // Over a frame, not yet probed, or on a page that cancelled sideways scrolls before: it waits as before.
+        #expect(lean(dx: 12, overFrame: true) == .undecided)
+        #expect(lean(dx: 12, scrolls: nil) == .undecided)
+        #expect(lean(dx: 12, leans: false) == .undecided)
+    }
+
+    @Test func swipeArrowShowsWithTheFirstMovement() {
+        // Visible as soon as it comes, fully there a fifth of the way (#508).
+        #expect(SwipeArrowView.opacity(progress: 0.05, armed: false) >= 0.4)
+        #expect(SwipeArrowView.opacity(progress: 0.2, armed: false) == 1)
+        #expect(SwipeArrowView.opacity(progress: 0, armed: true) == 1)
+    }
+
+    /// Milliseconds from a gesture's first scroll to its arrow showing: `step` points toward back every 8 ms, the probe
+    /// answering after `probe` ms and the page after `answer` ms, as SwipeNavigator decides each step.
+    private func arrowAfter(step: CGFloat, probe: Double, answer: Double, leans: Bool) -> Double? {
+        var dx: CGFloat = 0
+        for index in 1...40 {
+            let ms = Double(index) * 8
+            dx += step
+            let decision = SwipeDecision.decide(dx: dx, dy: 0, canGoBack: true, canGoForward: false,
+                                                pageScrolls: ms >= probe ? (false, false) : nil, page: ms >= answer ? .left : .unknown,
+                                                waited: ms / 1000, leans: leans)
+            if case .track = decision { return ms }
+            if case .lean = decision { return ms }
+        }
+        return nil
+    }
+
+    @Test func swipeArrowDoesntWaitOnABusyPage() {
+        // A page that answers in a frame: the arrow comes with the step that crosses 10 points either way.
+        #expect(arrowAfter(step: 3, probe: 4, answer: 12, leans: true) == 32)
+        #expect(arrowAfter(step: 3, probe: 4, answer: 12, leans: false) == 32)
+        // A busy page slow to answer the scroll: before, the arrow waited out the 50 ms; now it comes at 10 points (#508).
+        #expect(arrowAfter(step: 3, probe: 4, answer: 90, leans: false) == 56)
+        #expect(arrowAfter(step: 3, probe: 4, answer: 90, leans: true) == 32)
+        // The probe asked at touch-down is back before the scroll begins; one not back yet waits as before.
+        #expect(arrowAfter(step: 3, probe: 200, answer: 200, leans: true) == 120)
+    }
+
+    @Test func aTouchDownsProbeIsForTheGestureAtItsSpot() {
+        // Two-finger scrolls leave the pointer where it is: the answer from the touch-down holds for that gesture.
+        #expect(SwipeNavigator.sameSpot(NSPoint(x: 100, y: 200), NSPoint(x: 101, y: 200)))
+        #expect(!SwipeNavigator.sameSpot(NSPoint(x: 100, y: 200), NSPoint(x: 140, y: 200)))
+    }
+
     @Test func swipeAnswersBelongToTheirGesture() {
         let began = 1_000_000.0
         // The first answer decides; one about the last gesture's momentum, answered late, doesn't count.

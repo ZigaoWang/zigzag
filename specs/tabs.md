@@ -207,3 +207,9 @@
   Test: SidebarRowMenuTests.aDisabledBackOpensNothing
 - A finger held on Back or Forward → the same list; slide onto a page and lift to go there.
   Test: SidebarRowMenuTests.aFingerHeldOnBackOpensTheSameList
+- Two fingers sideways on the trackpad over a page with nothing that scrolls sideways under the pointer → the arrow shows with the first steps, before the page has answered; a page that pans itself takes it back, and up and down never shows it.
+  Test: BookmarkFolderTests.swipeArrowLeansInWhileThePageAnswers
+  Test: BookmarkFolderTests.swipeArrowShowsWithTheFirstMovement
+  Test: BookmarkFolderTests.swipeArrowDoesntWaitOnABusyPage
+- The page is asked about the spot under the pointer as two fingers touch the trackpad, before they move.
+  Test: BookmarkFolderTests.aTouchDownsProbeIsForTheGestureAtItsSpot

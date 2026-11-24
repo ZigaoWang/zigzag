@@ -20,7 +20,8 @@ final class SwipeNavigator {
     private weak var webView: BrowserWebView?
     private var arrow: SwipeArrowView?
 
-    private enum State { case idle, deciding, tracking, ignoring, finishing }
+    /// `leaning`: the arrow shows while the page, with nothing sideways under the pointer, still gets the scroll until it answers.
+    private enum State { case idle, deciding, leaning, tracking, ignoring, finishing }
     private var state = State.idle
     private var dx: CGFloat = 0
     private var dy: CGFloat = 0
@@ -43,6 +44,12 @@ final class SwipeNavigator {
     private var gesture = 0
     /// Something covering the page has this gesture (a zoomed-in PDF), and says what room it has.
     private var covered = false
+    /// Where the pointer was as the gesture began, to match an answer to a probe sent as the fingers touched down.
+    private var beganPoint = NSPoint.zero
+    /// The probe sent as the fingers touched down, before the scroll began: where, when, and its answer once back.
+    private var early: (point: NSPoint, time: TimeInterval, answer: [Bool]?)?
+    /// The page that cancelled sideways scrolls with its own code (a canvas): its swipes wait for its answer again.
+    private var keptOn: URL?
     private var arming = SwipeArming()
     /// Recent finger movement, to tell a quick flick from a slow drag.
     private var samples: [(time: TimeInterval, dx: CGFloat)] = []
@@ -71,13 +78,15 @@ final class SwipeNavigator {
     func leftWindow() {
         watchdog?.cancel()
         stopWatchingRest()
-        if state == .tracking { cancel() }
+        if state == .tracking || state == .leaning { cancel() }
         state = .idle
     }
 
     /// Returns true when it took the event, so the page doesn't also scroll with it. `room`, from something
     /// covering the page (a zoomed-in PDF), is which way it can still scroll sideways, in place of asking the page.
     func handle(_ event: NSEvent, room: (left: Bool, right: Bool)? = nil) -> Bool {
+        // Fingers touching down: the page is asked about the spot now, so it has answered by the time they move.
+        if event.phase == .mayBegin, room == nil, state != .tracking, state != .leaning { probeEarly(event); return false }
         // Mid-scroll with no swipe under way: nothing to decide, so no settings are read for it.
         if state == .idle || state == .ignoring, Self.isMidGesture(event.phase) { return false }
         // A video in full screen keeps every swipe: going back there would leave the page from under it.
@@ -98,7 +107,9 @@ final class SwipeNavigator {
             // Fingers dragging the page on the screen scroll it; their own swipe goes back (PageHolder).
             if TouchPress.isTouchScroll(at: event.timestamp) { state = .ignoring; return false }
             state = .deciding
-            dx = 0; dy = 0; direction = 0; arming = SwipeArming(); pageScrolls = nil; overFrame = false; samples = []
+            // The first step's movement counts toward deciding.
+            dx = event.scrollingDeltaX; dy = event.scrollingDeltaY
+            direction = 0; arming = SwipeArming(); pageScrolls = nil; overFrame = false; samples = []
             byTouch = false
             began = event.timestamp
             beganAt = (Date().timeIntervalSince1970 - (ProcessInfo.processInfo.systemUptime - event.timestamp)) * 1000
@@ -106,7 +117,15 @@ final class SwipeNavigator {
             // Something covering the page has the scroll, not the page: what it says is its room.
             covered = room != nil
             page = covered ? .left : .unknown
-            if let room { pageScrolls = room } else { probe(at: webView.convert(event.locationInWindow, from: nil)) }
+            beganPoint = webView.convert(event.locationInWindow, from: nil)
+            log(at: event.timestamp, "began")
+            if let room { pageScrolls = room } else {
+                // What the page said as the fingers touched down holds until the fresh answer comes.
+                if let early, let answer = early.answer, Self.sameSpot(early.point, beganPoint), event.timestamp - early.time < 1 {
+                    heard(answer, early: true)
+                }
+                probe(at: beganPoint)
+            }
             return false
         case .changed:
             // What covers the page knows its room as it scrolls: it's kept up to date through the gesture.
@@ -118,22 +137,36 @@ final class SwipeNavigator {
             samples.append((event.timestamp, dx))
             if samples.count > 8 { samples.removeFirst(samples.count - 8) }
             switch state {
-            case .deciding:
-                switch SwipeDecision.decide(dx: dx, dy: dy, canGoBack: webView.owner?.canGoBackOrReturn ?? webView.canGoBack,
-                                            canGoForward: webView.canGoForward, pageScrolls: pageScrolls, page: page,
-                                            waited: event.timestamp - began, overFrame: overFrame) {
+            case .deciding, .leaning:
+                let decision = SwipeDecision.decide(dx: dx, dy: dy, canGoBack: webView.owner?.canGoBackOrReturn ?? webView.canGoBack,
+                                                    canGoForward: webView.canGoForward, pageScrolls: pageScrolls, page: page,
+                                                    waited: event.timestamp - began, overFrame: overFrame,
+                                                    leans: keptOn == nil || webView.url != keptOn)
+                switch decision {
                 case .undecided:
+                    if state == .leaning { update(); armWatchdog() }
                     return false
                 case .ignore:
+                    if state == .leaning { cancel() }
+                    log(at: event.timestamp, "ignored dx=\(Int(dx)) dy=\(Int(dy)) page=\(page) scrolls=\(String(describing: pageScrolls))")
                     state = .ignoring
                     return false
-                case .track(let wanted):
-                    direction = wanted
-                    state = .tracking
-                    showArrow()
+                case .lean(let wanted), .track(let wanted):
+                    // Already leaning the same way: the arrow carries on from where it is.
+                    if state != .leaning || direction != wanted {
+                        if state == .leaning { cancel() }
+                        direction = wanted
+                        showArrow()
+                    }
+                    let tracks = decision == .track(wanted)
+                    if tracks || state != .leaning {
+                        log(at: event.timestamp, "\(tracks ? "tracking" : "leaning") dx=\(Int(dx)) dy=\(Int(dy)) page=\(page) probed=\(pageScrolls != nil)")
+                    }
+                    state = tracks ? .tracking : .leaning
                     update()
                     armWatchdog()
-                    return true
+                    // Leaning, the page still gets the scroll, so it can answer that it keeps it.
+                    return tracks
                 }
             case .tracking:
                 // The page answered late that it scrolls this way: hand the swipe back.
@@ -148,6 +181,8 @@ final class SwipeNavigator {
             let wasTracking = state == .tracking
             watchdog?.cancel()
             stopWatchingRest()
+            // Let go before the page answered: it never navigates, as before the arrow showed this early.
+            if state == .leaning { cancel() }
             if wasTracking {
                 // Letting go goes when the arrow is filled, or with a flick still moving as the fingers lift.
                 if event.phase == .ended, arming.release(progress: progress, speed: speed(at: event.timestamp)) { go() } else { cancel() }
@@ -171,10 +206,15 @@ final class SwipeNavigator {
     /// them (`kept`). `at` is when that scroll came, in wall-clock milliseconds.
     func pageAnswered(kept: Bool, at: Double) {
         // Covered by something else (a zoomed-in PDF), the page isn't what's scrolling.
-        guard !covered, state == .deciding || state == .tracking else { return }
+        guard !covered, state == .deciding || state == .leaning || state == .tracking else { return }
+        let was = page
         page = SwipeDecision.page(page, answered: kept, at: at, began: beganAt)
+        guard page != was else { return }
+        log(at: ProcessInfo.processInfo.systemUptime, "page answered kept=\(kept)")
+        // Kept with no room to scroll there: it pans with its own code, so its next swipes wait for it again.
+        if page == .took, at.isFinite, state == .leaning || pageScrolls.map({ !$0.left && !$0.right }) == true { keptOn = webView?.url }
         // It took it after all, answering after the swipe had started: the arrow goes and the page has the rest.
-        if page == .took, state == .tracking { cancel(); state = .ignoring }
+        if page == .took, state == .tracking || state == .leaning { cancel(); state = .ignoring }
     }
 
     // MARK: Two fingers on the screen
@@ -189,7 +229,7 @@ final class SwipeNavigator {
 
     /// Fingers on the screen are swiping `wanted`'s way: the arrow comes, as for two fingers on the trackpad.
     func touchBegan(direction wanted: Int) {
-        if state == .tracking { cancel() }
+        if state == .tracking || state == .leaning { cancel() }
         if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
         watchdog?.cancel()
         stopWatchingRest()
@@ -233,7 +273,7 @@ final class SwipeNavigator {
         // Still for a moment: the fingers may be resting (to read a little more before going back), so the swipe
         // holds. Anything else the hand does means the gesture ended without saying so, and it's dropped then.
         let work = DispatchWorkItem { [weak self] in
-            guard let self, self.state == .tracking else { return }
+            guard let self, self.state == .tracking || self.state == .leaning else { return }
             // Not shown any more: there's no resting on a page that's gone.
             guard self.webView?.window != nil else { self.abandonRest(); return }
             self.restMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
@@ -251,7 +291,7 @@ final class SwipeNavigator {
 
     private func abandonRest() {
         stopWatchingRest()
-        guard state == .tracking else { return }
+        guard state == .tracking || state == .leaning else { return }
         cancel()
         state = .idle
     }
@@ -275,11 +315,45 @@ final class SwipeNavigator {
         webView.evaluateJavaScript(probeScript(at: point, in: webView), in: nil, in: .defaultClient) { [weak self] result in
             guard let self, self.gesture == gesture, !self.covered,
                   case .success(let value) = result, let answer = value as? [Bool], answer.count >= 4 else { return }
-            self.pageScrolls = (answer[0], answer[1])
-            self.overFrame = answer[2]
-            // The page asked for no overscroll: like a page that cancels the scrolls, it keeps the gesture.
-            if answer[3] { self.pageAnswered(kept: true, at: .infinity) }
+            self.heard(answer, early: false)
         }
+    }
+
+    /// Fingers touched down at `event`'s spot: the same probe, ahead of the gesture it may begin.
+    private func probeEarly(_ event: NSEvent) {
+        guard let webView, webView.window != nil, event.hasPreciseScrollingDeltas, NSEvent.isSwipeTrackingFromScrollEventsEnabled,
+              Self.isOn, webView.fullscreenState == .notInFullscreen else { return }
+        let point = webView.convert(event.locationInWindow, from: nil), time = event.timestamp
+        early = (point, time, nil)
+        webView.evaluateJavaScript(probeScript(at: point, in: webView), in: nil, in: .defaultClient) { [weak self] result in
+            guard let self, let early = self.early, early.time == time,
+                  case .success(let value) = result, let answer = value as? [Bool], answer.count >= 4 else { return }
+            self.early?.answer = answer
+            // The gesture began before this came back, at the same spot, and its own probe hasn't answered yet.
+            if self.state == .deciding || self.state == .leaning, !self.covered, self.pageScrolls == nil,
+               Self.sameSpot(point, self.beganPoint), self.began - time < 1 {
+                self.heard(answer, early: true)
+            }
+        }
+    }
+
+    /// The probe's answer for this gesture: room left and right, a frame, no overscroll.
+    private func heard(_ answer: [Bool], early: Bool) {
+        pageScrolls = (answer[0], answer[1])
+        overFrame = answer[2]
+        log(at: ProcessInfo.processInfo.systemUptime, "probe\(early ? " (touch-down)" : "") left=\(answer[0]) right=\(answer[1]) frame=\(answer[2]) still=\(answer[3])")
+        // The page asked for no overscroll: like a page that cancels the scrolls, it keeps the gesture.
+        if answer[3] { pageAnswered(kept: true, at: .infinity) }
+    }
+
+    /// Two-finger scrolls leave the pointer where it is, so a touch-down and the gesture after it share a spot.
+    nonisolated static func sameSpot(_ a: NSPoint, _ b: NSPoint) -> Bool { hypot(a.x - b.x, a.y - b.y) < 2 }
+
+    /// Debug builds: a line with the milliseconds since the gesture began, to see what a swipe waited for.
+    private func log(at time: TimeInterval, _ line: @autoclosure () -> String) {
+        #if DEBUG
+        debugLog(String(format: "swipe +%.0f ms ", (time - began) * 1000) + line())
+        #endif
     }
 
     /// What's under `point`: its room left and right, whether it's a frame, whether it asked for no overscroll, and
@@ -461,6 +535,9 @@ enum SwipeDecision: Equatable {
     case undecided
     /// Back (-1) or forward (1): the arrow comes and the page gets no more of the gesture.
     case track(Int)
+    /// Back (-1) or forward (1) unless the page says otherwise: the arrow comes with the fingers while the page, which
+    /// has nothing sideways under the pointer, still gets the scroll until it answers or the wait is up.
+    case lean(Int)
     /// The page's, or a scroll: it gets the whole gesture.
     case ignore
 
@@ -539,10 +616,11 @@ enum SwipeDecision: Equatable {
 
     /// `pageScrolls` is the room the page (or what covers it) can still scroll sideways under the pointer, once known;
     /// `waited`, the time since the gesture began; `overFrame`, that the pointer is over a frame in the page. `dx` is
-    /// the scroll, not the fingers: positive is toward the page's left edge, whichever way the Mac scrolls.
+    /// the scroll, not the fingers: positive is toward the page's left edge, whichever way the Mac scrolls. `leans`:
+    /// the arrow may show while waiting, unless the page has cancelled sideways scrolls with its own code before.
     static func decide(dx: CGFloat, dy: CGFloat, canGoBack: Bool, canGoForward: Bool,
                        pageScrolls: (left: Bool, right: Bool)?, page: Page, waited: TimeInterval,
-                       overFrame: Bool = false) -> SwipeDecision {
+                       overFrame: Bool = false, leans: Bool = false) -> SwipeDecision {
         // A page that pans with its own code (a canvas, a map), scrolls there, or asked for no overscroll has the
         // gesture, as in Safari and Chrome.
         if page == .took { return .ignore }
@@ -554,7 +632,10 @@ enum SwipeDecision: Equatable {
         // Swiping toward "back" scrolls toward the page's left edge, so it's the room there that matters.
         let pageTakes = pageScrolls.map { wanted < 0 ? $0.left : $0.right } ?? false
         guard sideways, canGo, !pageTakes else { return .ignore }
-        if page == .unknown, waited < (overFrame || pageScrolls == nil ? frameWait : answerWait) { return .undecided }
+        if page == .unknown, waited < (overFrame || pageScrolls == nil ? frameWait : answerWait) {
+            // Known to have nothing sideways here and not a frame: the arrow needn't wait for the page to say so.
+            return leans && pageScrolls != nil && !overFrame ? .lean(wanted) : .undecided
+        }
         return .track(wanted)
     }
 }
@@ -757,8 +838,12 @@ final class SwipeArrowView: NSView {
         }
         symbol.contentTintColor = isArmed ? theme.onAccent : Tokens.Color.icon
         Tokens.Motion.withoutAnimation { ring.strokeEnd = min(max(progress, 0), 1) }
-        // Fades in as you swipe; once letting go will move, it fills.
-        alphaValue = isArmed ? 1 : min(1, max(0, (progress - 0.1) * 2))
+        alphaValue = Self.opacity(progress: progress, armed: isArmed)
+    }
+
+    /// Shows at once as the swipe starts and is fully there a fifth of the way; once letting go will move, it fills.
+    static func opacity(progress: CGFloat, armed: Bool) -> CGFloat {
+        armed ? 1 : min(1, 0.4 + max(0, progress) * 3)
     }
 
     /// Fades as the page settles back. Navigated, it shows filled first, however fast the swipe was.
