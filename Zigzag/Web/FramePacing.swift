@@ -172,7 +172,7 @@ enum FramePacing {
         let after = NSSelectorFromString("_doAfterActivityStateUpdate:")
         guard webView.window != nil, !webView.isHidden, webView.responds(to: after) else { return }
         typealias After = @convention(c) (AnyObject, Selector, @escaping @convention(block) () -> Void) -> Void
-        let hidden = Hidden(webView)
+        let hidden = Hidden(webView, focus: webView.window?.firstResponder)
         webView.isHidden = true
         unsafeBitCast(webView.method(for: after), to: After.self)(webView, after, { hidden.show() })
         // Should WebKit not answer, shown again on the next turn.
@@ -182,15 +182,21 @@ enum FramePacing {
     /// A web view hidden for a moment, shown again once.
     private final class Hidden: @unchecked Sendable {
         private weak var webView: WKWebView?
+        /// What had the keyboard: hiding the page takes it away, so it gets it back.
+        private weak var focus: NSResponder?
         private var shown = false
 
-        init(_ webView: WKWebView) { self.webView = webView }
+        init(_ webView: WKWebView, focus: NSResponder?) {
+            self.webView = webView
+            self.focus = focus
+        }
 
         func show() {
             MainActor.assumeIsolated {
                 guard !shown else { return }
                 shown = true
                 webView?.isHidden = false
+                if let focus, let window = webView?.window, window.firstResponder !== focus { window.makeFirstResponder(focus) }
             }
         }
     }
