@@ -33,3 +33,7 @@
   Test: ExportTests.pagesWhoseIDsAreTakenGetNewOnes
 - A backup whose settings differ from yours → the Import window asks whether to use them or keep yours.
   No test yet.
+- Double-click a backup in Finder → the Import window asks before restoring it; it never opens as a page.
+  Test: ExportTests.aBackupOpenedFromFinderGoesToTheImportWindowNeverATab
+- A backup opened from Finder → nothing changes until the question is answered.
+  Test: ExportTests.aBackupOpenedFromFinderAsksBeforeRestoring

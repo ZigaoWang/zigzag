@@ -252,6 +252,38 @@ import Testing
         #expect(Set(ids).count == ids.count)
         #expect(merge.contents.spaces[1].bookmarks.count == 5)
     }
+
+    // MARK: Opened from Finder
+
+    @Test func aBackupOpenedFromFinderGoesToTheImportWindowNeverATab() {
+        #expect(AppDelegate.documentRoute(URL(fileURLWithPath: "/tmp/Zigzag Backup 2026-11-24.zigzagbackup")) == .restore)
+        #expect(AppDelegate.documentRoute(URL(fileURLWithPath: "/tmp/old.ZIGZAGBACKUP")) == .restore)
+        #expect(AppDelegate.documentRoute(URL(fileURLWithPath: "/tmp/page.html")) == .page)
+        #expect(AppDelegate.documentRoute(URL(string: "https://example.com/a.zigzagbackup")!) == .page)
+        #expect(AppDelegate.documentRoute(URL(string: "ftp://example.com/")!) == .ignore)
+    }
+
+    /// Opened from Finder, a backup is only asked about: nothing changes until the question is answered.
+    @Test func aBackupOpenedFromFinderAsksBeforeRestoring() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-export-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var backup = ZigzagBackup()
+        backup.spaces = [sampleSpace(name: "From Finder \(UUID().uuidString)")]
+        let file = folder.appendingPathComponent("Test.zigzagbackup")
+        try backup.encoded().write(to: file)
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 560), styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let view = ImportView(presentation: .window, detect: { [] })
+        window.contentView = view
+        view.offerBackup(file)
+        #expect(view.subviews.contains { $0 is ConfirmSheet })
+        #expect(view.stage == .choose)
+        #expect(Library.shared.snapshot == before)
+    }
 }
 
 private extension BookmarksExport.Node {

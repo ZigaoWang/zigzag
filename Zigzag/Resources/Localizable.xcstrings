@@ -1,6 +1,40 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Restore “%@”?" : {
+      "comment" : "Title of the question in the Import window when a Zigzag backup is opened from Finder. The placeholder is the file's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复“%@”吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還原「%@」嗎？"
+          }
+        }
+      }
+    },
+    "Its spaces, pinned tabs and favorites are added to yours. Nothing here is removed." : {
+      "comment" : "Message of the question in the Import window when a Zigzag backup is opened from Finder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的空间、已固定标签页和收藏会加到你现有的里面，这里的内容不会被删除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的空間、已固定分頁和收藏會加到你現有的項目中，這裡的內容不會被刪除。"
+          }
+        }
+      }
+    },
     "Export Your Data…" : {
       "comment" : "File menu item, Settings button and command bar command: opens the sheet that saves your bookmarks and a Zigzag backup to files.",
       "localizations" : {
@@ -27233,7 +27267,7 @@
       }
     },
     "Restore" : {
-      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.",
+      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nButton in the Import window's question when a Zigzag backup is opened from Finder.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

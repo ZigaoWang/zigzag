@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingHandoffs: Set<URL> = []
     /// Sites installed as apps asked for before launch finished (one opened with Zigzag not running).
     private var pendingWebApps: [URL] = []
+    /// Zigzag backups opened from Finder before launch finished.
+    private var pendingBackups: [URL] = []
     private var launched = false
     private var blockerToken: SignalToken?
     private var extensionsToken: SignalToken?
@@ -205,6 +207,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         pendingWebApps.forEach { WebAppStore.handle($0) }
         pendingWebApps = []
+        pendingBackups.forEach { ImportWindowController.restore($0) }
+        pendingBackups = []
         Updater.shared.start()
         // Just updated: what's new comes first, and the default browser offer waits for another launch. Profiles
         // that couldn't be read come before either: what's new waits a launch.
@@ -421,9 +425,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         senderPID == ProcessInfo.processInfo.processIdentifier
     }
 
-    /// Files opened with Zigzag, and links handed over as a document: web addresses and local files only.
+    /// Files opened with Zigzag, and links handed over as a document: web addresses and local files only. A Zigzag
+    /// backup goes to the Import window, which asks before restoring it.
     func application(_ application: NSApplication, open urls: [URL]) {
-        urls.filter(Self.opensAsDocument).forEach(open)
+        for url in urls {
+            switch Self.documentRoute(url) {
+            case .restore:
+                if launched { ImportWindowController.restore(url) } else { pendingBackups.append(url) }
+            case .page: open(url)
+            case .ignore: break
+            }
+        }
+    }
+
+    nonisolated enum DocumentRoute: Equatable { case page, restore, ignore }
+
+    /// Where a URL handed over as a document goes: a Zigzag backup to the Import window, never a tab.
+    nonisolated static func documentRoute(_ url: URL) -> DocumentRoute {
+        guard opensAsDocument(url) else { return .ignore }
+        return url.isFileURL && url.pathExtension.lowercased() == "zigzagbackup" ? .restore : .page
     }
 
     /// Whether a URL handed over as a document opens: local files always open in a tab; web addresses only when Zigzag

@@ -162,6 +162,11 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [com.adobe.pdf]
+          # Opened from Finder: the Import window asks before restoring it.
+          - CFBundleTypeName: Zigzag Backup
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [wang.zigao.zigzag.backup]
         # File › Export Your Data…'s backup, which File › Import restores.
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: wang.zigao.zigzag.backup

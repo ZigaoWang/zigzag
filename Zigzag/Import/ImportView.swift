@@ -548,6 +548,23 @@ final class ImportView: NSView {
         if let window { panel.beginSheetModal(for: window, completionHandler: handle) } else { handle(panel.runModal()) }
     }
 
+    /// A backup opened from Finder: asked about first, always. With settings that differ, the same question as
+    /// Choose File… asks; otherwise whether to restore it at all. Cancel restores nothing.
+    func offerBackup(_ url: URL) {
+        guard stage == .choose, let host = window?.contentView else { return }
+        let everything: ImportCoordinator.Choice = [.bookmarks, .history, .tabs, .openTabs]
+        guard case .success(let backup) = ZigzagBackup.read(url) else { importFile(url, data: everything); return }
+        if backup.settingsDiffer(from: .standard, searchEngine: Library.shared.searchEngine) {
+            askAboutSettings(in: url) { [weak self] settings in self?.importFile(url, data: settings ? everything.union(.settings) : everything) }
+            return
+        }
+        ConfirmSheet.show(in: host, title: String(localized: "Restore “\(url.deletingPathExtension().lastPathComponent)”?", comment: "Title of the question in the Import window when a Zigzag backup is opened from Finder. The placeholder is the file's name."),
+                          message: String(localized: "Its spaces, pinned tabs and favorites are added to yours. Nothing here is removed.", comment: "Message of the question in the Import window when a Zigzag backup is opened from Finder."),
+                          confirmTitle: String(localized: "Restore", comment: "Button in the Import window's question when a Zigzag backup is opened from Finder.")) { [weak self] restore in
+            if restore { self?.importFile(url, data: everything) }
+        }
+    }
+
     private func importFile(_ url: URL, data: ImportCoordinator.Choice) {
         let row = SourceRow(source: ImportCoordinator.fileSource(url))
         row.isChosen = true
@@ -975,6 +992,14 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         window.center()
         shared = controller
         controller.showWindow(nil)
+    }
+
+    /// The Import window, for a backup opened from Finder. Nothing is restored until you answer its question.
+    static func restore(_ url: URL) {
+        show()
+        guard let view = shared?.window?.contentView as? ImportView else { return }
+        NSApp.activate()
+        view.offerBackup(url)
     }
 
     /// Whether the Import window, asked for again, opens afresh: once its import is done. Choosing or importing,
