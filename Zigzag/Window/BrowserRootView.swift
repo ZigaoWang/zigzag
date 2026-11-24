@@ -18,9 +18,7 @@ enum AddressBarAutohide {
         var locked: Bool
     }
 
-    /// `offset`: how far the bar is out now. `pageDelta`: how far the page moved since the last report, down
-    /// positive. `travel`: how far the bar can go before it is out. `locked`: this gesture has taken the bar fully
-    /// out, so the same gesture can't bring it back; a new gesture or the pointer at the window's top unlocks it.
+    /// The bar's next offset for a page movement (down positive); a gesture that takes it fully out locks it out.
     static func step(offset: CGFloat, pageDelta: CGFloat, travel: CGFloat, locked: Bool) -> Step {
         guard travel > 0 else { return Step(offset: 0, locked: false) }
         let current = min(max(offset, 0), travel)
@@ -538,8 +536,7 @@ final class BrowserRootView: SpaceFrameView {
         let before = tiles?.regions.count ?? 1, after = shape?.regions.count ?? 1
         let old = paneCards.map(\.frame)
         tiles = shape
-        // A new group starts with every bar there, one page with the window's own bar; no pane carries an old
-        // Autohide offset into a layout it wasn't in.
+        // A new group starts with every bar there.
         barOffset = 0
         paneBarOffsets = Array(repeating: 0, count: after)
         // Like the sidebar, a split moves the window's layout: it animates from the keyboard too.
@@ -678,19 +675,14 @@ final class BrowserRootView: SpaceFrameView {
             if !autohidesBar { setBarOffset(0, animated: false) }
         }
     }
-    /// How far the bar has travelled out of the window, in points (#359). Autohide binds this to the page's position:
-    /// as the page scrolls, the bar and the page's top move by the same amount, so the bar leaves with the page rather
-    /// than on an animation of its own. 0 is fully there, `maxBarOffset` fully away.
+    /// How far Autohide has moved the bar up with the page: 0 there, `maxBarOffset` away (#359).
     private(set) var barOffset: CGFloat = 0
-    /// A split's own Autohide: how far each pane's bar has travelled, in the panes' order. One page uses `barOffset`;
-    /// a split moves only the pane whose page scrolled, so the others keep their strips (#359).
+    /// In a split, each pane's own offset, in the panes' order.
     private(set) var paneBarOffsets: [CGFloat] = []
     var autohidePaneCount: Int { max(1, tiles?.regions.count ?? 1) }
-    /// The furthest the bar can travel: its usual top to just above the window, the whole of its top edge going so a
-    /// framed bar that starts at the card's inset leaves the window too (#359).
+    /// The bar's whole travel: until its bottom edge leaves the window's top.
     var maxBarOffset: CGFloat { showsTopBar ? topBarFrame.maxY : 0 }
-    /// The bar is away for now (Autohide, scrolled down). In a split, only when every pane's own bar is away. The
-    /// page has its room; the bar sits just above the window.
+    /// Autohide has the bar fully away; in a split, every pane's.
     var barPutAway: Bool {
         guard showsTopBar else { return false }
         if tiles != nil {
@@ -1441,9 +1433,7 @@ final class BrowserRootView: SpaceFrameView {
     }
     static let borderlessChanged = Notification.Name("BorderlessPageChanged")
 
-    /// Back, forward, reload and the address in a bar above the page instead of at the top of the sidebar, as in Arc
-    /// (#359): never there (`off`), there until you scroll down (`autohide`), or always (`always`). Until it's chosen,
-    /// the old switch's `addressAbovePage` on is an `always`.
+    /// Where back, forward, reload and the address are; the old `addressAbovePage` switch on reads as `always` (#359).
     static var addressBarPlace: AddressBarPlace {
         get { addressBarPlace(in: .standard) }
         set {
@@ -1647,9 +1637,7 @@ final class BrowserRootView: SpaceFrameView {
         cardLayout(pane, at: index).frame
     }
 
-    /// Where a pane's card goes and where its page starts: Autohide in a split takes one pane's strip's room out of
-    /// that pane alone. A strip up in the bar leaves the window and the card keeps reaching up behind it; a strip on
-    /// its card slides up inside the card, and the page grows into its room.
+    /// A pane's card frame and band, with its own Autohide offset taken out of its page's top.
     private func cardLayout(_ pane: NSRect, at index: Int) -> (frame: NSRect, band: CGFloat) {
         if tiles == nil {
             let frame = joinsBar(index) ? Self.joined(pane, barTop: topBarFrame.minY) : pane
@@ -2139,8 +2127,7 @@ final class BrowserRootView: SpaceFrameView {
         return paneBarOffsets[index]
     }
 
-    /// How far one pane's bar can travel: a strip in the shared row leaves the window as the bar does; a strip on
-    /// its own card slides out by its height.
+    /// One pane's travel: out of the window for a strip in the row, its own height for one on its card.
     func autohideTravel(at index: Int) -> CGFloat {
         guard tiles != nil else { return maxBarOffset }
         guard paneCards.indices.contains(index) else { return 0 }
@@ -2168,8 +2155,7 @@ final class BrowserRootView: SpaceFrameView {
         paneBarOffsets = Array(repeating: 0, count: count)
     }
 
-    /// The pane under a point in the window, for a scroll or a click: its own bar while a lifted card reaches up
-    /// into the row, else the pane's frame. One page is everywhere.
+    /// The pane under a point in own coordinates; one page is everywhere.
     func paneIndex(at point: NSPoint) -> Int? {
         guard tiles != nil else { return bounds.contains(point) ? 0 : nil }
         let targets = tileTargets
@@ -2201,8 +2187,7 @@ final class BrowserRootView: SpaceFrameView {
         guard showsTopBar else { return }
         let page = pageAreaFrame
         placeTopBar()
-        // Beside it, the sidebar's favorites and tabs start where the page does. With Autohide putting the bar away,
-        // they stay where the bar was, so the sidebar's rows don't jump under the pointer.
+        // Beside it, the sidebar's favorites and tabs start under the bar's place, wherever Autohide has it.
         let content = showsTopBar && barHoldsAddress ? topBarFrame.maxY : page.minY
         if sidebarVisible { sidebarContainer.sidebar.contentTop = content - sidebarFrame.minY }
     }
@@ -2216,9 +2201,7 @@ final class BrowserRootView: SpaceFrameView {
     private func placeTopBar() {
         let bar = topBarSlideFrame ?? topBarPlacementFrame
         topBar.frame = bar
-        // While the sidebar slides, the bar is held over both its old and new places, and its controls sit where the
-        // bar will be. Put away for Autohide, the bar takes its controls with it, at its own top, so none stays behind
-        // in the row it left.
+        // Mid-slide the controls sit where the bar will be; moved by Autohide, they go with the bar.
         topBar.rowTop = barOffset > 0 ? 0 : topBarFrame.minY - bar.minY
         (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
         // Center the site pill over the page, as in split panes.
@@ -2325,8 +2308,7 @@ final class BrowserRootView: SpaceFrameView {
 
     func setSidebarVisible(_ visible: Bool, animated: Bool) {
         guard visible != sidebarVisible else { return }
-        // Autohide away, the bar comes back with the sidebar: its toggle is how the sidebar comes and goes, and the
-        // lights have to have a line to sit on while it slides (#359).
+        // An Autohide bar comes back with the sidebar, so the lights have their line while it slides (#359).
         if barOffset > 0 || paneBarOffsets.contains(where: { $0 > 0.01 }) { setBarPutAway(false, animated: false) }
         let oldSidebar = sidebarContainer.frame
         let oldBar = topBar.frame, oldControls = topBar.controlPositions

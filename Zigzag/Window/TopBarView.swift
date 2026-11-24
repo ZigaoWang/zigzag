@@ -256,8 +256,7 @@ final class TopBarView: NSView {
     private var stripPanes: [ClosedRange<CGFloat>] = []
     /// How far in from its pane's edges a strip keeps: the bar's own inset from the page's (`edgeInset`).
     var stripInset: CGFloat = 0 { didSet { if stripInset != oldValue { needsLayout = true } } }
-    /// Autohide in a split: how far up each strip has slid out of the row, in the panes' order. 0 is fully there;
-    /// the strip's own pane takes the room it leaves.
+    /// In a split, how far Autohide has moved each strip up out of the row, in the panes' order.
     var stripOffsets: [CGFloat] = [] { didSet { if stripOffsets != oldValue { needsLayout = true } } }
 
     /// Takes the panes' strips into the row, over these panes (none: the row is the bar's own again). The bar's own

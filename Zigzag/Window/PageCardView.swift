@@ -44,8 +44,7 @@ final class PageCardView: NSView {
     var headerAlpha: CGFloat { isUnfocusedPane ? Tokens.Color.unfocusedPaneAlpha : 1 }
     /// Whether the header takes the top of the card.
     private var headerOnCard: Bool { showsHeader && !liftsHeader }
-    /// Autohide in a split: how far this pane's own strip has slid up out of its card, 0 while it's there. The page
-    /// starts that much higher, so the strip and the page move as one; the card itself stays where it is.
+    /// How far Autohide has slid this pane's strip up out of its card; the page starts that much higher.
     var headerOffset: CGFloat = 0 { didSet { if headerOffset != oldValue { needsLayout = true } } }
     /// The part of the strip that's still on the card, as it slides out.
     private var shownHeaderOffset: CGFloat { min(max(headerOffset, 0), PaneHeaderView.height) }
@@ -69,8 +68,7 @@ final class PageCardView: NSView {
                 animator().frame = toFrame
             }
         }
-        // The clip and the header were laid out at the new band. Start them where they were, in the clip's own
-        // (unflipped) coordinates, and let both travel the difference on the same curve as the bar.
+        // Laid out at the new band: the clip and header start where they were and slide on the bar's curve.
         let shift = target - oldBand
         guard abs(shift) > 0.5 else { return }
         for view in [clip, header] {

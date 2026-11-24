@@ -643,10 +643,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func displayOptionsChanged() { applySpaceColor(animated: false) }
 
-    /// Settings › Appearance › Address bar above the page: Off, Autohide, or Always (#359). The sidebar's own back,
-    /// forward, reload and address move to the bar above the page, or back. The same views, so everything that hangs
-    /// from them follows; what was open from them is put away first. At once: a setting you change, not a layout you
-    /// watch.
+    /// Settings › Appearance › Address bar above the page: the sidebar's own back, forward, reload and address move
+    /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
+    /// from them is put away first. At once: a setting you change, not a layout you watch.
     @objc func placeAddress() {
         let place = BrowserRootView.addressBarPlace
         let above = place != .off
@@ -768,8 +767,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if tab !== shownTab {
             // So is Capture.
             capture.cancel()
-            // Each tab starts over: its page is wherever that tab was left, so the bar is there, not away for the
-            // page you were reading a moment ago (#359).
+            // Each tab shows with its bar there (#359).
             resetAutohide(animated: false)
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && (tab.map { tabManager.partners(of: $0) } ?? []).contains { $0 === readerTab }
@@ -1197,8 +1195,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         paintTopBar()
     }
 
-    /// One pane's Autohide state (#359). A split scrolls one page at a time: each pane's bar follows its own page,
-    /// and one pane's gesture can't move another pane's strip.
+    /// One pane's Autohide state: each pane's bar follows its own page (#359).
     private struct AutohidePaneState {
         var tab: ObjectIdentifier?
         var lastScrollY: CGFloat = 0
@@ -1251,8 +1248,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Autohide follows the person's own page scrolls; a locked close waits for a new gesture. `delta`, when the page
-    /// sends it, is its own movement since the last report.
+    /// A page's scroll report; `delta` is its own movement since the last one, when the page sends it.
     func pageScrolled(to y: CGFloat, by delta: CGFloat? = nil, trusted: Bool, editing: Bool, dragging: Bool = false, key: Bool = false,
                       inPane index: Int = 0, tab: Tab? = nil) {
         let pane = max(0, min(index, root.autohidePaneCount - 1))
@@ -2955,8 +2951,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         #if DEBUG
         if event.type == .scrollWheel, sidebarContains(event) { DebugBridge.recordScroll(event) }
         #endif
-        // The page's scroll gesture, for Autohide: AppKit's phases tell a new swipe from the rest of one, so a
-        // gesture that closed the bar doesn't reopen it on the way back.
+        // Autohide tells a new swipe from the rest of one by its phases.
         if event.type == .scrollWheel, event.window === window,
            root.cardFrame.contains(root.convert(event.locationInWindow, from: nil)), !sidebarContains(event) {
             let point = root.convert(event.locationInWindow, from: nil)
