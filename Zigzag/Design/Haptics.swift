@@ -6,4 +6,9 @@ enum Haptics {
     static func snap() {
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
+
+    /// A finger's hold lifted something to drag.
+    static func lift() {
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+    }
 }

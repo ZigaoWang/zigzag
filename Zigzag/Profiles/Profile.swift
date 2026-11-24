@@ -20,6 +20,7 @@ final class Profile {
         let store: WKWebsiteDataStore = isDefault ? .default() : WKWebsiteDataStore(forIdentifier: id)
         WebKitSetup.allowCrossSiteCookies(in: store)
         madeStore = store
+        SessionCookies.watch(self)
         return store
     }
     /// Its store if anything has used it since Zigzag started, without making it.

@@ -67,3 +67,17 @@ struct SitePanelTests {
         #expect(link.topSlack + link.bottomSlack < PanelLinkRow.height - Tokens.TypeSize.body / 2)
     }
 }
+
+/// Site Controls says when it closes, so Settings' list of sites shows what was chosen in it.
+@MainActor
+struct SitePanelClosingTests {
+    @Test func closingSaysSo() throws {
+        let tab = Tab(url: try #require(URL(string: "https://example.com/")), title: "Example", spaceID: UUID())
+        let panel = try #require(SitePanel.forTesting(tab: tab))
+        var heard = 0
+        let token = SitePanel.closed.observe { heard += 1 }
+        defer { token.cancel() }
+        panel.close()
+        #expect(heard == 1)
+    }
+}

@@ -494,6 +494,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
     }
 
+    /// Where the bar is, and which PDF it last searched (`panestate`).
+    var debugFrame: String { isVisible ? "\(NSStringFromRect(panel.frame)) pdf=\(searchedPDF?.url.lastPathComponent ?? "-")" : "hidden" }
+
     /// Same as clicking a tick (`findtick`).
     func debugPickTick(_ index: Int) { search(backwards: false, toMatch: index) }
     #endif
@@ -879,6 +882,8 @@ final class ToastView: FloatingPanelView {
     /// Puts an offer away before it goes on its own ("This page is in French"), as the other offers at the top of
     /// the page are put away.
     let closeButton = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Not Now", comment: "Tooltip of the close button on a toast that offers something, like translating the page."))
+    /// More choices for an offer, in a menu: the translate offer's Always and Never.
+    let optionsButton = IconButton(symbol: "ellipsis", size: .compact, toolTip: String(localized: "More", comment: "Tooltip of the … button in the site panel."))
     /// Something under way ("Writing report…"): the ribbon turns where the icon goes.
     let spinner = Spinner()
 
@@ -890,8 +895,10 @@ final class ToastView: FloatingPanelView {
         addSubview(spinner)
         addSubview(label)
         addSubview(actionButton)
+        addSubview(optionsButton)
         addSubview(closeButton)
         actionButton.isHidden = true
+        optionsButton.isHidden = true
         closeButton.isHidden = true
         onLayout = { [weak self] in self?.layoutContent() }
     }
@@ -911,6 +918,7 @@ final class ToastView: FloatingPanelView {
             return icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + (Tokens.Metric.favicon - Tokens.Symbol.row) / 2
         }
         var width = actionButton.isHidden ? 0 : Tokens.Space.x3 + actionButton.fittingWidth
+        if !optionsButton.isHidden { width += Tokens.Space.x1 + optionsButton.frame.width }
         if !closeButton.isHidden { width += (actionButton.isHidden ? Tokens.Space.x3 : Tokens.Space.x1) + closeButton.frame.width }
         return width + (Self.height - (closeButton.isHidden ? Tokens.Metric.toastButtonHeight : closeButton.frame.height)) / 2
     }
@@ -946,6 +954,11 @@ final class ToastView: FloatingPanelView {
             let side = closeButton.frame.width
             closeButton.frame.origin = NSPoint(x: bounds.width - (Self.height - side) / 2 - side, y: (bounds.height - side) / 2)
             right = closeButton.frame.minX - Tokens.Space.x1
+        }
+        if !optionsButton.isHidden {
+            let side = optionsButton.frame.width
+            optionsButton.frame.origin = NSPoint(x: right - side, y: (bounds.height - side) / 2)
+            right = optionsButton.frame.minX - Tokens.Space.x1
         }
         if !actionButton.isHidden {
             // Inset evenly from the toast's edge, top, bottom and right alike, so the pill runs with the capsule. The
@@ -1018,10 +1031,10 @@ enum Toast {
     /// `closes` adds a close button, for offers. `owner`: for `hide(for:in:)`. `onClose`: runs when closed by its
     /// button.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     actionMenu: (() -> NSMenu?)? = nil,
+                     actionMenu: (() -> NSMenu?)? = nil, options: (() -> [MenuPanel.Entry])? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, announces: Bool = true,
                      onClose: (() -> Void)? = nil, in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, actionMenu: actionMenu, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller),
+        show(text, symbol: symbol, action: action, actionMenu: actionMenu, options: options, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller),
              announces: announces, onClose: onClose)
         state(for: controller.root.overlay).owner = owner
     }
@@ -1084,7 +1097,7 @@ enum Toast {
 
     /// Shows a toast at the top center of `area` in any flipped view (also used by Passwords).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     actionMenu: (() -> NSMenu?)? = nil,
+                     actionMenu: (() -> NSMenu?)? = nil, options: (() -> [MenuPanel.Entry])? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
                      announces: Bool = true, onClose: (() -> Void)? = nil) {
         let state = state(for: host)
@@ -1111,7 +1124,7 @@ enum Toast {
             // chevron, for someone who never learnt that ⇧ asks first.
             toast.actionButton.title = ""
             toast.actionButton.symbol = "chevron.down"
-            toast.actionButton.setAccessibilityLabel(String(localized: "Where It's Pinned", comment: "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to."))
+            toast.actionButton.setAccessibilityLabel(String(localized: "Where It’s Pinned", comment: "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to."))
             toast.actionButton.onClick = { [weak toast] _ in
                 guard let toast, let menu = actionMenu() else { return }
                 // The toast stays until a place is chosen or the menu is put away; the menu is over the page, where
@@ -1131,6 +1144,11 @@ enum Toast {
                 action.run()
                 toast?.dismiss()
             }
+        }
+        toast.optionsButton.isHidden = options == nil
+        toast.optionsButton.onClick = { [weak toast] _ in
+            guard let toast, let options else { return }
+            MenuPanel.show(options(), from: toast.optionsButton, placement: .below)
         }
         // A toast with something to do (Undo, Pin This Page) can be put away at once, as a notification can.
         toast.closeButton.isHidden = !(closes || action != nil || actionMenu != nil)
@@ -1160,7 +1178,8 @@ enum Toast {
         @MainActor func hideWhenClear(_ toast: ToastView?) {
             // Shown again since (a repeat toast): that showing decides when it goes.
             guard let toast, toast.superview != nil, state.hideWork == nil else { return }
-            if action != nil || actionMenu != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
+            let menuOpen = MenuPanel.current?.anchor?.isDescendant(of: toast) == true
+            if action != nil || actionMenu != nil, menuOpen || toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak toast] in hideWhenClear(toast) }
                 return
             }

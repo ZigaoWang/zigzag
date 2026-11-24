@@ -1120,6 +1120,17 @@ final class TabManager {
         // Pinned pages stop being a pinned split (separated, one made a favorite, undo, another window): the split on
         // screen ends with it.
         let splitCount = splits.count
+        // A page that left its pinned split in another window: the rest close up around its place, as they did there.
+        for index in splits.indices.reversed() where splits[index].isGroup {
+            let pages = splits[index].ids.compactMap { tab(with: $0) }
+            let marks = pages.compactMap(\.bookmarkID)
+            guard marks.count == pages.count, marks.count == splits[index].count, !groupFits(pages) else { continue }
+            guard let kept = marks.lazy.compactMap({ Library.shared.pinnedSplit(containing: $0) })
+                .first(where: { Set($0.ids).isStrictSubset(of: marks) }) else { continue }
+            for (page, mark) in zip(pages, marks) where !kept.contains(mark) && splits.indices.contains(index) && splits[index].contains(page.id) {
+                _ = closeUp(index, without: page)
+            }
+        }
         // A tile group of more is ordinary tabs of one space or one pinned group's pages, or it ends too.
         splits.removeAll { pair in
             guard let left = tab(with: pair.left), let right = tab(with: pair.right) else { return false }
@@ -1199,6 +1210,25 @@ final class TabManager {
         return !members.isEmpty && members.allSatisfy { $0.url != nil }
     }
 
+    /// Whether pinning this tab pins only pages that can be pinned (#472): its own, and the group's or split's pages
+    /// that would be pinned with it. Zigzag's own views never go into Pinned or the favorites.
+    func canPin(_ tab: Tab, keepingGroup: Bool = true) -> Bool {
+        guard tab.bookmarkID == nil else { return true }
+        let pinnable: (Tab) -> Bool = { $0.url.map(SavePath.Page.isPinnable) ?? false }
+        guard pinnable(tab) else { return false }
+        if keepingGroup, pinsGroup(tab), let groupID = tab.groupID { return tabs(inGroup: groupID).allSatisfy(pinnable) }
+        let partners = split(for: tab)?.ids.compactMap { self.tab(with: $0) } ?? []
+        return partners.filter { $0.bookmarkID == nil && $0.url != nil }.allSatisfy(pinnable)
+    }
+
+    /// Whether pinning this tab pins its split view or tile group with it, every page side by side: all its pages
+    /// are tabs with a page, two of them or four.
+    func pinsSplit(_ tab: Tab) -> Bool {
+        guard tab.bookmarkID == nil, let pair = split(for: tab) else { return false }
+        let pages = pair.ids.compactMap { self.tab(with: $0) }
+        return pages.count == pair.count && pages.allSatisfy { $0.bookmarkID == nil && $0.url != nil }
+    }
+
     /// Pins a whole tab group (#325) as one folder at a place among the pinned pages; nil if it can't be pinned whole.
     @discardableResult
     func pinGroup(_ id: UUID, at index: Int? = nil, in spaceID: UUID? = nil) -> BookmarkFolder? {
@@ -1247,8 +1277,8 @@ final class TabManager {
             structureChanged()
             return
         }
-        if let pair = split(for: tab), case let pages = pair.ids.compactMap({ self.tab(with: $0) }), pages.count == pair.count,
-           pages.allSatisfy({ $0.bookmarkID == nil && $0.url != nil }) {
+        if pinsSplit(tab), let pair = split(for: tab) {
+            let pages = pair.ids.compactMap { self.tab(with: $0) }
             let marks = pages.map { page in
                 let mark = Bookmark(url: page.url ?? url, title: Self.bookmarkTitle(page.displayTitle, url: page.url ?? url), icon: page.customIcon)
                 removeFromList(page)
@@ -1280,16 +1310,23 @@ final class TabManager {
     /// A tab dropped on a pinned page: it's pinned beside it as a pinned split, where the page is and in its folder.
     /// The page keeps its pin as it is, and the two open side by side.
     func pinSplit(_ tab: Tab, with bookmarkID: UUID, tabOnRight: Bool) {
-        guard let url = tab.url, let space = Library.shared.spaceID(ofBookmark: bookmarkID),
-              Self.canSplit(splitSide(of: tab), onto: splitSide(ofBookmark: bookmarkID)) else { return }
+        guard let space = Library.shared.spaceID(ofBookmark: bookmarkID),
+              Self.canSplit(splitSide(of: tab), onto: splitSide(ofBookmark: bookmarkID)),
+              let mark = pinInPlace(tab, in: space) else { return }
+        Library.shared.pinBeside(mark, bookmarkID, onRight: tabOnRight)
+        openBookmark(mark)
+    }
+
+    /// A tab out of the list as the live page of a new pinned page of `space`, which the caller puts in the library.
+    private func pinInPlace(_ tab: Tab, in space: UUID) -> Bookmark? {
+        guard let url = tab.url else { return nil }
         let mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon)
         removeFromList(tab)
         tab.bookmarkID = mark.id
         tab.settleLandingIfLoading()
         tab.setSpace(space)
         bookmarkTabs[mark.id] = tab
-        Library.shared.pinBeside(mark, bookmarkID, onRight: tabOnRight)
-        openBookmark(mark)
+        return mark
     }
 
     /// A pinned page dropped on another in the same space: the two become one pinned split where the other is, in its
@@ -1963,11 +2000,62 @@ final class TabManager {
         return tab.bookmarkID == nil && panes.count == pair.count && panes.allSatisfy { $0.bookmarkID == nil && $0.spaceID == current.spaceID }
     }
 
+    /// A sidebar row a page is dropped on, or the page dropped: a tab's, or a pinned page's.
+    enum RowPage: Equatable {
+        case tab(UUID)
+        case pinned(UUID)
+    }
+
     /// How `tab` joins `target`'s split when dropped on its sidebar row (`onRight`: right half); nil if not a split,
     /// full, or the page can't tile.
     func joining(_ tab: Tab, onto target: Tab, onRight: Bool) -> TileDrop.Kind? {
-        guard let pair = split(for: target), canTile(tab, beside: target) else { return nil }
-        return TileShape.joining(pair.shape.regions, onRight: onRight)
+        joining(.tab(tab.id), onto: .tab(target.id), onRight: onRight)
+    }
+
+    /// How a page joins the split a sidebar row shows when dropped on it (`onRight`: right half), up to four pages: a
+    /// tab into a split of tabs; a tab or a pinned page of that space on its own into a pinned split, pinned there.
+    /// Nil if the row isn't a split, it's full, or the page can't come in.
+    func joining(_ page: RowPage, onto target: RowPage, onRight: Bool) -> TileDrop.Kind? {
+        switch (page, target) {
+        case let (.tab(id), .tab(targetID)):
+            guard let tab = self.tab(with: id), let other = self.tab(with: targetID), let pair = split(for: other), canTile(tab, beside: other) else { return nil }
+            return TileShape.joining(pair.shape.regions, onRight: onRight)
+        case (_, .pinned(let targetID)):
+            guard !isPrivate, let pinned = Library.shared.pinnedSplit(containing: targetID), !Library.shared.isFavorite(targetID),
+                  let space = Library.shared.spaceID(ofBookmark: targetID) else { return nil }
+            switch page {
+            case .tab(let id):
+                guard let tab = self.tab(with: id), tab.bookmarkID == nil, tab.url != nil, split(for: tab) == nil, canPin(tab, keepingGroup: false) else { return nil }
+            case .pinned(let id):
+                guard !pinned.contains(id), Library.shared.spaceID(ofBookmark: id) == space, !Library.shared.isFavorite(id),
+                      !splitSide(ofBookmark: id).inSplit else { return nil }
+            }
+            return TileShape.joining(pinned.shape.regions, onRight: onRight)
+        case (.pinned, .tab):
+            return nil
+        }
+    }
+
+    /// A page dropped on a split's sidebar row joins it where `joining` said: a tab tiles in among tabs; into a pinned
+    /// split, a tab is pinned there and a pinned page moves there, and the whole split opens side by side.
+    func join(_ page: RowPage, onto target: RowPage, _ kind: TileDrop.Kind) {
+        switch (page, target) {
+        case let (.tab(id), .tab(targetID)):
+            guard let tab = self.tab(with: id), let other = self.tab(with: targetID) else { return }
+            tile(tab, beside: other, kind)
+        case (_, .pinned(let targetID)):
+            guard let space = Library.shared.spaceID(ofBookmark: targetID) else { return }
+            let mark: Bookmark?
+            switch page {
+            case .tab(let id): mark = self.tab(with: id).flatMap { pinInPlace($0, in: space) }
+            case .pinned(let id): mark = Library.shared.bookmark(id)
+            }
+            guard let mark else { return }
+            Library.shared.joinPinnedSplit(mark, onto: targetID, kind)
+            if let page = Library.shared.bookmark(mark.id) { openBookmark(page) }
+        case (.pinned, .tab):
+            return
+        }
     }
 
     /// `tab` into the group on screen with `current`, where `drop` puts it (`TileDrop`): beside a page alone, the two
@@ -1998,22 +2086,50 @@ final class TabManager {
     func leaveGroup(_ tab: Tab, notify: Bool = true) -> Tab? {
         guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return nil }
         let pair = splits[index]
-        // A pinned group's pages keep their places: the rest stays open, each on its own, as a pinned split's other
-        // half does.
-        guard pair.isGroup, tab.bookmarkID == nil, let rest = pair.removing(tab.id) else {
+        // A group of three or four closes up around its place, pinned or not; a split of two ends.
+        guard pair.isGroup else {
             unsplit(tab, notify: notify)
             return pair.ids.first { $0 != tab.id }.flatMap { self.tab(with: $0) }
         }
-        splits[index] = rest
+        let taker = closeUp(index, without: tab)
         if notify {
             structureChanged()
             selectionChanged()
         }
+        return taker
+    }
+
+    /// Split `index` without `tab`, the rest closed up around its place (a split of two ends); the page that grew
+    /// over its room is returned.
+    private func closeUp(_ index: Int, without tab: Tab) -> Tab? {
+        let pair = splits[index]
+        guard let rest = pair.removing(tab.id) else {
+            splits.remove(at: index)
+            return pair.ids.first { $0 != tab.id }.flatMap { self.tab(with: $0) }
+        }
+        splits[index] = rest
         // The page that grew over its room: the one whose place now covers part of where it was.
         let gone = pair.shape.regions[pair.ids.firstIndex(of: tab.id) ?? 0].cells
         let shape = rest.shape
         let taker = rest.ids.indices.first { shape.regions[$0].cells & gone != 0 } ?? 0
         return self.tab(with: rest.ids[taker])
+    }
+
+    /// One pinned page out of its pinned split, as `leaveGroup` takes a tab out of a group of tabs: it stays pinned on
+    /// its own, and the rest stay one pinned split, closed up around its place, on screen too; of two, the other is a
+    /// pinned page on its own. The page that grew over its room on screen is returned.
+    @discardableResult
+    func leavePinnedGroup(_ bookmarkID: UUID) -> Tab? {
+        guard Library.shared.pinnedSplit(containing: bookmarkID) != nil else { return nil }
+        // On screen first, so the group there still matches its pinned one once the library changes.
+        var taker: Tab?
+        if let tab = bookmarkTabs[bookmarkID], let index = splits.firstIndex(where: { $0.contains(tab.id) }) {
+            taker = closeUp(index, without: tab)
+        }
+        Library.shared.removeFromPinnedSplit(bookmarkID)
+        structureChanged()
+        selectionChanged()
+        return taker
     }
 
     /// Two to four tabs of one space side by side as a tile group laid out as `shape`, ending any splits they were in
@@ -2029,14 +2145,14 @@ final class TabManager {
         select(tabs[tabs.count - 1])
     }
 
-    /// Whether a tile group's pages may stay side by side: ordinary tabs of one space, or every page of one pinned or
-    /// favorite group.
+    /// Whether a tile group's pages may stay side by side: ordinary tabs of one space, or pages of one pinned or
+    /// favorite group (some may be unloaded, the rest closed up).
     private func groupFits(_ pages: [Tab]) -> Bool {
         guard let first = pages.first else { return false }
         if pages.allSatisfy({ $0.bookmarkID == nil }) { return pages.allSatisfy { $0.spaceID == first.spaceID } }
         let marks = pages.compactMap(\.bookmarkID)
         guard marks.count == pages.count, let pinned = Library.shared.pinnedSplit(containing: marks[0]) else { return false }
-        return Set(pinned.ids) == Set(marks) && pinned.ids.count == marks.count
+        return Set(marks).count == marks.count && Set(marks).isSubset(of: pinned.ids)
     }
 
     /// Ordinary tabs split, the two pinned pages of a pinned split, and a pinned page with a tab: the pinned page's
@@ -2149,6 +2265,8 @@ final class TabManager {
         splits[index].ratio = 1 - pair.ratio
         rememberPinnedLayout(splits[index])
         structureChanged()
+        // The panes on screen trade places too, or clicks and find go to the page that was there.
+        selectionChanged()
     }
 
     /// Where the lines between a tile group's pages are (shares of the width and height); a split of two takes the

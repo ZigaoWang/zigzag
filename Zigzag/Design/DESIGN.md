@@ -45,13 +45,37 @@ to touch. Warm and friendly, never techy: no monospace, no capitals for effect, 
 The soul of the window. A space's color fills the sidebar and the frame around the page completely, by day and at
 night (`SpaceColor`, `Tokens.Frame`).
 
-- **Curated colors**: white, sky, lavender, rose, peach, sand, sage, mint and graphite. The hues sit at one OKLCH
-  lightness (0.915) and one gentle chroma (0.045) by day, and at a deep, quiet tint (0.27, 0.04) at night, so any two
-  look right side by side and each is colored enough to tell at a glance. A curated space follows the Mac between
-  its two shades. A new space takes the next curated color no other space has.
+- **Palette** (`SpaceColor.palette`, `SpaceColor.PaletteLook`): seventeen colors on clear glass, the desktop showing
+  through and the color a tint in it, never paint. Neutral first, in the editor's row with solid white: Slate (a
+  barely cool gray), Stone (barely warm) and Smoke (deep graphite). Then the washes (`SpaceColor.washes`), near-white
+  glass with only a faint tint, as a custom color looks with Shade near white: Mist (cool blue), Dew (mint), Shell
+  (warm peach, not beige) and Orchid (lilac). Then cool: Azure, Navy, Seafoam, Pine, Fern. Warm: Citron, Coral, Red.
+  Last, one violet and one pink: Iris, Pink. At most two blues among the colors, no brown or beige. Gradients are
+  only a drift of one hue a little deeper toward the bottom, 20° of OKLCH hue at most: Iris, Coral, Navy. Lively
+  colors go past a custom color's tint (`SpaceColor.maxTint`) so they read as color on glass, not chalk. All but
+  Smoke and Navy are light tints by day, the desktop plainly visible through them. Their glass is the palette's clear
+  glass (`SpaceInfo.clearTint`): the color tints it as it is, where a custom color on glass leans toward its dot and
+  grays a light color into haze, and it covers 0.475 (see-through 0.7) by day, 0.43 for the washes (0.76), and at
+  least 0.68 in a dark window (`Tokens.Frame.clearNightCover`), as little as keeps text at 4.5:1 over a desktop that
+  works against it. Smoke and Navy keep the window dark with light text. A few carry a finish, kept as the space's
+  grain (`PaletteLook.grain`, `texture`): Stone a fine linen (`MaterialImages.linen`), Smoke and Coral a light film
+  grain; picking a plain preset takes it off. A space saved in a beta's earlier look of these
+  (`SpaceColor.earlierLook`) takes the clear glass when it loads, keeping grain of its own. A new space takes the next of
+  `SpaceColor.newSpaceOrder` no other space has, Slate first, in its following version (`SpaceColor.defaultLook`): the
+  same glass, following the Mac between the color's own day and night depths (`SpaceInfo.dayDepth`, `nightDepth`), so
+  a fresh window is light on a light Mac and deep on a dark one; Smoke stays dark, and Citron and Coral stay
+  light, since a deep yellow or coral reads as brown. The washes are never given to a new space; their night depths
+  are a deep glass of the same tint, Shell nearly black so it never reads as brown. Use Default Colors gives that back;
+  the presets in the row keep their own depth, a choice made on purpose. The 0.9.4 betas' palette names read as the
+  nearest of these (`SpaceColor.renamed`), Lagoon as Slate.
+- **Editor's swatches**: Use Default Colors (the color the space was made with, always first), the presets, the
+  picture and Custom, seven to a row (`SpaceLookEditor.columns`), three whole rows with no gap at the end.
+- **Older colors**: white, sky, lavender, rose, peach, sand, sage, mint and graphite, at 0.915 and 0.045 by day and
+  0.27 and 0.04 at night, solid. Spaces that have them keep them exactly, Use Default Colors included, and profiles
+  still take their colors from these.
 - **Custom**: any hue and depth from the wheel, mixed in OKLCH (`SpaceColor.paint`); a deep one turns the window dark.
 - **Effects**, all optional: a second color for a gradient and its direction, see-through (the frosted desktop under
-  a thinner coat of the color), and grain.
+  a thinner coat of the color), and grain, fine or linen as a preset gave it.
 - **Ink**: on the frame, row titles and quiet words take the space's own ink (`Theme.rowInk`, `quietInk`), a deep or
   pale tone of its hue, checked against every curated color under the hover and card washes: titles at least 11.7:1
   by day and 7.5:1 at night, quiet words 5.2:1 and 4.8:1. Each space's inks are checked against its own frame (both
@@ -135,7 +159,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 |---|---|
 | Toolbar | 14pt glyphs in 26pt buttons (`Sidebar.glyph`, `button`), no fill at rest, a radius-6 hover fill; every glyph's ink on the traffic lights' center line (midway down to the address, 20; `Sidebar.lightsCenter`, 22, with the address in the bar), reload's ink as far from the right edge as the lights from the left |
 | Address | 30pt soft field, radius 8, `Chrome.field` and no line, the host at 13pt 10pt in, its buttons 26pt with 14pt glyphs; up to 3 pinned extensions before Site Controls, dragged to reorder as the space icons are (the pin stays faint in its place, a see-through copy follows the pointer, a 2pt accent line marks the gap), hiding from the left before the host or the prompt is cut (and never below 72pt for it), each pin the same 26pt button as Reader and Site Controls with the extension's icon at 16pt in the middle, 2pt between every button; a count is a 12pt dark pill with 9pt semibold white figures in the button's bottom-right corner, 1pt inside it (the same pill, 3pt in, on a Site Controls tile); in Site Controls a 16pt round pin button (control fill, hairline, 9pt glyph, 20pt target) 2pt inside the tile's top-right corner, the top-left when the tile has a count: always there and filled (pin.fill) while pinned, an outline pin on hover otherwise, dimmed at the limit, and Pin to Address in the tile's menu; the accent ring from the keyboard |
-| Favorites | As many to a row as fit 56pt wide (3 at the usual width), or 2, 3 or 4 as chosen in Settings; 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is loaded (not while it sleeps or waits since a relaunch), the card while it's the one you're on; the × chip 14pt, 3pt inside the corner |
+| Favorites | As many to a row as fit 56pt wide (3 at the usual width), or 2, 3 or 4 as chosen in Settings; 36pt soft tiles 6pt apart, 18pt icons, radius 8, `Chrome.field`; a fine `Chrome.openEdge` while the page is loaded (not while it sleeps or waits since a relaunch), the card while it's the one you're on; the × chip 14pt on a solid `Color.surface` disc, one per tile, a split's too, hangs on the tile's top-right corner, 1pt in from centered so it stays inside the sidebar's edge, clear of every icon; a split's unloads all its pages |
 | Space name | As typed, its ink on the icon column: 13 semibold in a 30pt slot; large, 26 light (`Font.spaceName`), kern -0.6, 36pt slot |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36; a pinned page that's open has a fine `Chrome.openEdge`, as a favorite does, only while its page is loaded. A tab whose page isn't running looks the same however it got there (put to sleep, or not loaded yet since Zigzag reopened, #205): in the Tabs list, a split's parts, the ⌃Tab switcher and Show All Tabs, the sleeping ring (a hairline of even dashes in `textTertiary`, 1.5pt out, the icon at 85% inside it); a pinned page or favorite that isn't running has no edge and no ring, as one never opened. Its hover card, or a favorite's tooltip, says why: asleep, and what that freed, put to sleep by you (Suspend Page), or not loaded since Zigzag reopened |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
@@ -201,8 +225,10 @@ One look for each state, everywhere:
 - Selected / current: in the sidebar the light card of the space's color (`Chrome.card`, `cardEdge`, a shadow-sm);
   on a panel a clear neutral fill, `selectedFill`, with a 1px `selectedEdge` and `setLifted(true)`'s shadow-sm
   (`applyRowStyle`). In a list of places
-  (Settings' sections) and for a keyboard-chosen result: the accent at `Color.selectionAlpha`.
-- Keyboard highlight in a floating list: `Color.highlight`.
+  (Settings' sections) and for a chosen result (the command bar's): the accent at `Color.selectionAlpha`,
+  `selectionPressedAlpha` pressed.
+- Keyboard highlight in a floating list: `Color.highlight`, one pill gliding between rows (the menus, the password
+  menu).
 - Focus: never the system's blue. A field shows the accent at `focusAlpha` (60%), 1.5pt, while typing. A drawn
   control reached with Tab (Full Keyboard Access) shows a ring in the accent at 60%, `Metric.focusRing` (2pt) wide,
   `Metric.focusGap` (2pt) outside it, following its shape. Only the keyboard brings it; a click never does.
@@ -329,11 +355,15 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   speaker right after that title. Where a part is narrower than its icon, the gaps and a few letters
   (`TabRowView.segmentMinWidth`, 56 at Medium), every part shows its icon alone in its middle, hairlines still between.
   In the split you're on, the page you're in has its title in the row's ink and the others in `quietInk`; with icons
-  alone, the page you're in has the hover wash under its part. The close button comes as a tab's does, over the last
-  title's faded end, so nothing moves under the pointer; its room is kept, at rest too, where it would cover too much (icons
-  alone, a speaker in the last part, or the last part's whole title), decided by the row's width, never its state. A pinned page split beside a tab carries the pair in its own row, so each page
-  shows once and one row is lit. Pointing at a part names its page, and a double-click renames that page (over its
-  title, or the row for the moment when the part shows no title).
+  alone, the page you're in has the hover wash under its part. Each part has its own ×, closing that page alone (a
+  pinned one's unloads it, as on its own row): pointing at a part lights it with the hover wash and puts its × at the
+  part's end, the size and inset of a tab's, over its title's faded end, so nothing moves under the pointer; on the
+  split of tabs you're on, the page you're in shows it at rest. A part with only its icon and no room beside it shows a
+  favorite's small × in its corner. Close Split View in the menu closes them all. A pinned page split beside a tab carries the pair in its own row, so each page
+  shows once and one row is lit. A pinned split of two, three or four is the same row (`TabRowView`) in Pinned. A
+  double-click renames the part's page (over its
+  title, or the row for the moment when the part shows no title). No row shows the system's tooltip with a title: the
+  hover card names the pages.
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size
   (`Sidebar.spaceIcon`: a favorite's icon, 16, 18, 20), each in a 26pt key (28 at Large, `Sidebar.spaceTarget`).
@@ -513,6 +543,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   or one of its web apps). Back in front of that tab, it goes back in its page; back on another tab or window, it
   plays on until you go to its tab. Picture in Picture or full screen you started, a mini player already showing, a
   video the page won't let float (`disablePictureInPicture`), and Zigzag Mini's page are left alone.
+  Leaving the window in view on another display isn't leaving it (#496): the video moves once that window is covered,
+  minimized, hidden or its desktop goes away, after the same 0.8 s.
 - **Capture** (`PageCapture`, `CapturePreview`, #457): ⇧⌘2, Site Controls or the command bar dims the page (or its
   pane) in `Color.captureScrim`, fading in and out like a sheet's scrim, its corners the page card's. Area: a drag
   draws the clear part with a hairline in `captureEdge`, round grips on its corners and sides (`captureHandle`), the
@@ -522,7 +554,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Element (the chosen one the soft card), a hairline, Full Page and Visible, Capture (the one prominent pill, once an
   area is drawn) and ×, names dropped for icons alone in a narrow pane; keys in the tooltips (A, E, F, V, Return,
   Esc). After it, the card in the page's bottom right, `capturePreviewWidth`, growing out of that corner: the picture
-  (a tall one from its top) to drag out, then Copied, Save and Share as Site Controls' captioned tiles. It goes after
+  (all of it at its own shape, a thin strip centered on `fieldFill`, a full page's top fading out below) to drag out, an × on a dark disc in its corner
+  while the pointer is on it, then Copied, Save and Share as Site Controls' captioned tiles. It goes after
   six seconds unless the pointer is on it, or at a click elsewhere or Esc.
 - **Full screen in the page** (`PageFullScreen`, #168): with Settings › Tabs › Full screen videos fill set to The Page,
   or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)
@@ -549,9 +582,14 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   shape of its own on white with room around it, or the name's first letter on the site's color.
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
+- **A search that finds nothing** says so in one line, "No tabs match “x”.", what was typed in quotes: body type in
+  `textSecondary`, centered, `EmptyState.noMatchTop` (96) below where the results start, or in the middle of a
+  smaller area (`noMatchY`), with no wordmark. Settings, Show All Tabs, the icon grid's emoji, Passwords, History
+  and the Archive. A search inside a list (a pane's sites, Feature Flags) says it in the list's place instead.
 - **A space with no page open** (`EmptyPage`): the page card stays, in the space's wash (`Theme.wash`, the sidebar's
   color a few steps lighter by day, deep and calm at night), with the wordmark engraved in its middle. White, grays,
-  black and private windows keep the plain card. A picture chosen in the space's editor (Background) fills the card
+  black and private windows keep the plain card. A palette look on glass takes a fainter tint (`Frame.glassPage…`), so the
+  window reads as one piece of glass. A picture chosen in the space's editor (Background) fills the card
   instead, aspect fill and centered, read only while the page is empty; on it the wordmark is laid on in white with
   one soft shadow (`Color.markOnPicture`), since an engraving can't read over every picture.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
@@ -563,13 +601,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Panel radius, a crisp hairline edge, one soft small shadow, 12pt padding, `CardRow`-style rows inset 4pt. It grows
   out of what opened it. Command bar, space editor, icon picker, site panel, find, downloads, previews, and the
   Control-Tab switcher, which centers on the page beside the sidebar.
-- **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of swatches: Default (the
-  colors it was made with), six presets in light and deep pairs, Background (the empty page's picture, a dashed slot
+- **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then two rows of nine swatches: Default (the
+  colors it was made with), the palette's fourteen, solid White, Background (the empty page's picture, a dashed slot
   until there is one, then its thumbnail with a × on hover) and Custom, ringed when the colors are none of the
   others, which unfolds the wheel and Shade. Under the pointer a swatch shows a faint ring (`Color.swatchHoverRing`)
   and keeps its size, as Reader's do. Under them Effects, folded under a disclosure (`DisclosureRow`): a
   second color and its direction, See-through, Glass (Clear or Frosted, for a see-through space), Grain. While
-  Clear shows as frosted on battery or in Low Power Mode, a line in the explanation style under Glass says so. Effects opens by itself when the space uses any of them. Last,
+  Clear shows as frosted on battery or in Low Power Mode, a line in the explanation style under Glass says so. Effects opens by itself when the space uses any of them, a palette look's own glass and gradient aside. A glass look's swatch is a piece of it: its color over a faint checkerboard, lit along the top. Last,
   under a hairline, Profile: a dropdown of the profiles, with New Profile at its end (a profile of the space's own,
   named after it and following its name while you type it, in one step with no sheet); its tooltip says spaces on
   the same profile share sign-ins, history and extensions. The
@@ -589,9 +627,11 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   sidebar's empty space opens the same items, with Edit Space…, under the pointer. Keys: Up and Down,
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu
   of menu items and speaks the item the keys reach. A click outside closes it and goes no further. Panels under it
-  leave Esc and that click to it (`MenuPanel.current`). The HTML pages' `.menu` matches it.
+  leave Esc and that click to it (`MenuPanel.current`). The HTML pages' `.menu` matches it. A help button's few
+  lines (a space rule's match types) open the same way as a `.note`, read by VoiceOver as a popover; Zigzag shows
+  no system popover of its own.
 - **A row's right-click menu** (`SidebarMenus`, #327): first what only this row has (Back to Pinned Page and Set
-  Current Page as Pinned while a pinned page or favorite is off its address; Separate Split View, and Remove from
+  Current Page as Pinned while a pinned page or favorite is off its address; Separate Tabs, and Remove from
   Split View for one page of three or four; Mute Tab while it plays), then the page (Reload Page, Suspend Page while a
   tab's page runs, Duplicate Tab, Copy
   Link), where it's kept (Pin, Favorites, Group, Folder, Move to Space), where it's shown (Open in Split View, Move
@@ -613,10 +653,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - **Row** (`CardRow`): icon, title, quiet trailing detail; states above.
 - **A row's delete** (`RowDelete`): the compact trash, 8pt before the row's last control, shown while the row is
   pointed at or has keyboard focus, and always with VoiceOver on. Hidden, it keeps its room, so nothing moves.
+  The trash deletes a thing after asking (an extension, a profile, a download rule); a compact × always shown takes
+  one entry off a list at once (a site, a language, a remembered answer, a shortcut's keys).
 - **Tile** (`GlassTile`): soft glass, `Radius.tile`; a fine darker edge (`openEdge`) when its page is open.
 - **Pill button** (`PillButton`): capsule, `.plain` on `fieldFill`, `.quiet` fill on hover only, `.prominent` in
-  the accent, one per surface; `isDestructive` for what can't be undone. `PrimaryButton` and `TextButton` remain
-  in Settings and a few panels until rebuilt.
+  the accent, one per surface; `isDestructive` for what can't be undone. The welcome and Import use it too, in the
+  brand's colors (`customFill`, `customInk`, `customEdge`) where they sit on its blue. The icon choices' Choose Image…
+  and Use Site Icon are `.quiet` pills.
 - **Dialog** (`Tokens.Dialog`): `DialogHeader` (a picture, the question in the heading's weight, a quiet line under
   it), the explaining text, then `DialogButtons` (the answers at the trailing end, the main one last and filled; a
   quiet choice alone at the leading end). Confirmations, page dialogs, extension and save-password prompts use it.
@@ -625,14 +668,14 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   space editor's `LookSwatch`), or its name typed to remove it. Return confirms once it can be, never what's
   destructive; Tab stays within it.
 - **Buttons** (`ButtonLook`, `applyButtonLook`), capsules `Metric.controlHeight` (28) tall, `Font.control()`:
-  - Secondary (`PillButton` `.plain`, `TextButton.form`): `controlFill` (white; a lighter step of the surface in
+  - Secondary (`PillButton` `.plain`): `controlFill` (white; a lighter step of the surface in
     dark mode), a hairline `controlEdge` and a faint `controlShadow` (1.5pt, 0.5 down). A symbol may lead the title.
-  - Primary (`PillButton` `.prominent`, `PrimaryButton`): the one thing to do on a surface, a pill filled with the
+  - Primary (`PillButton` `.prominent`): the one thing to do on a surface, a pill filled with the
     space's accent (`Brand.Theme.accent`) and its `onAccent` text, a step lighter under the pointer and deeper
     pressed, as a switch that's on; red only for what can't be undone. `Color.primaryFill` (dark, light at night) is
     left only for the plain `ButtonLook.primary` with no tint.
   - Quiet (`.quiet`): no fill until the pointer is over it.
-  `PrimaryButton` and `TextButton` draw the same looks for the forms that still use them; new code uses `PillButton`.
+  Every button is a `PillButton`; `TextButton` is no longer drawn anywhere.
 - **Switch** (`Toggle`): a slide switch, 34 by 20: a matte recessed track (shade under its upper lip, a hairline
   around it) and a small round 14pt knob. Off, a porcelain knob on the left of a neutral track; on, the knob slides
   right, turns white, and the track fills with the space's accent (`Switch.knobOn`, `edgeOn`), a step deeper under
@@ -640,7 +683,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   4pt while held; the track's color fades over the same time. Reduce Motion: the knob jumps, the color fades.
 - **Field** (`FilledField`): soft fill, accent ring while typing; `.isPill` for a field on its own in a panel;
   `.isOutlined` for the page look, white with a hairline and a faint shadow like the buttons beside it, which a
-  page's header gives its search; `FilledField.search` with the magnifying glass.
+  page's header gives its search; `FilledField.search` with the magnifying glass; `.isOnFrame` for one on the
+  window's colored frame, in the sidebar address's `Chrome.field` (Show All Tabs' search).
 
 ## Materials
 
@@ -674,7 +718,8 @@ calm: things drawn as objects under one light straight above. `Materials.swift` 
   pale blue, beveled, by night; a glint follows the pointer only while it's over the mark.
 - **Your Zigzag Card** (`CardStage`, About's hero): a bank card that turns up to `Keepsake.tilt` (8°) toward the
   pointer and settles back on a soft spring; a click turns it over to the wordmark alone. Four finishes, picked with
-  round swatches under it: Space, Holographic, Graphite, Paper. Each has its grain made at the size it's drawn,
+  round swatches under it (`SwatchRing`, the chosen one in the accent ring, as Reader's colors): Space, Holographic,
+  Graphite, Paper. Each has its grain made at the size it's drawn,
   small ribbon Zs pressed into it and the wordmark stamped in foil; only the foil, the sheen and the wordmark's shine
   move with the light. The saved picture is the same drawing at `Keepsake.exportScale`, lit at rest.
 - **A brand moment's words**: the wordmark, one headline (`Material.headline`, semibold) saying plainly what Zigzag

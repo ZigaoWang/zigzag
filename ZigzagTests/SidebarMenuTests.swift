@@ -37,6 +37,15 @@ struct SidebarMenuTests {
         #expect(SidebarMenus.title(of: .editSpace).hasSuffix("…"))
     }
 
+    @Test func aShortcutIsFoundAsTheFullListFindsIt() {
+        let items = Shortcuts.allItems
+        #expect(!items.isEmpty)
+        for action in Set(items.compactMap(\.action)) {
+            #expect(Shortcuts.item(for: action) === items.first { $0.action == action }, "\(action)")
+        }
+        #expect(Shortcuts.item(for: #selector(NSObject.description)) == nil)
+    }
+
     // MARK: The drawn menu
 
     private func host() -> (NSWindow, NSView) {
@@ -264,6 +273,7 @@ struct SidebarMenuTests {
             case .item(let item): titles.append(item.title); items.append(item)
             case .header(let text): titles.append("# " + text)
             case .separator: titles.append("-")
+            case .note: titles.append("note")
             }
         }
         #expect(titles == ["# Profile", "Reload Page", "-", "Delete Space", "-", "Move To", "Large Space Names", "Close Tab"])
@@ -277,6 +287,36 @@ struct SidebarMenuTests {
         items.first { $0.title == "Reload Page" }?.action()
         work.action()
         #expect(ran == ["reload", "work"])
+    }
+
+    /// A help button's lines open in the drawn menu's panel, not a system popover: wrapped to its width, read as a
+    /// popover, closed by Esc or the button again.
+    @Test func aNoteOpensInTheDrawnPanel() throws {
+        let (window, anchor) = host()
+        let text = NSAttributedString(string: String(repeating: "Matches pages on the exact hostname you enter. ", count: 4))
+        let menu = try #require(MenuPanel.show([.note(text)], from: anchor, minWidth: 300))
+        #expect(MenuPanel.current === menu)
+        #expect(menu.accessibilityRole() == .popover)
+        #expect(menu.itemTitles.isEmpty)
+        #expect(menu.frame.width >= 300)
+        // Several lines, all inside it.
+        #expect(menu.frame.height > Tokens.Page.controlHeight * 2)
+        #expect(menu.handleKey(key(53, "\u{1b}", in: window)))
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func theMatchTypeHelpTogglesItsPanel() throws {
+        let (window, anchor) = host()
+        let help = SiteRouteSheet.matchHelpButton()
+        help.frame = anchor.frame
+        anchor.superview?.addSubview(help)
+        #expect(help.accessibilityPerformPress())
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === help)
+        #expect(menu.accessibilityRole() == .popover)
+        #expect(help.accessibilityPerformPress())
+        #expect(MenuPanel.current == nil)
+        _ = window
     }
 }
 
@@ -316,7 +356,7 @@ struct SidebarRowMenuTests {
     @Test func aTabsMenuIsGroupedWithCloseLast() throws {
         try inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
-            #expect(titles(menu) == ["Reload Page", "Duplicate Tab", "Copy Link", "-",
+            #expect(titles(menu) == ["Reload Page", "Duplicate Tab", "Mute Tab", "Copy Link", "-",
                                      "Pin Tab", "Add to Favorites", "New Group with Tab", "-",
                                      "Open in Split View", "Move To", "-",
                                      "Rename", "Change Icon…", "-",
@@ -328,8 +368,9 @@ struct SidebarRowMenuTests {
             let places = try #require(menu.items.first { $0.title == "Move To" }?.submenu)
             #expect(Array(titles(places).prefix(3)) == ["New Window", "Zigzag Mini", "-"])
             #expect(places.items.count > 3)
-            // Not the tab you're on: the menu bar's keys would act on another, so none show.
-            #expect(menu.items.allSatisfy { $0.keyEquivalent.isEmpty })
+            // Every tab's menu shows the menu bar's keys, the one you're on or not.
+            #expect(menu.items.first { $0.title == "Reload Page" }?.keyEquivalent == "r")
+            #expect(menu.items.first { $0.title == "Close Tab" }?.keyEquivalent == "w")
         }
     }
 
@@ -344,6 +385,32 @@ struct SidebarRowMenuTests {
             #expect(tabs[1].isAsleep && !tabs[1].isLoaded)
             #expect(tabs[1].notLoadedNote == "You put it to sleep. Loads when you click it.")
             #expect(controller.tabManager.selectedTab === tabs[0])
+        }
+    }
+
+    @Test func aTabCanBeMutedBeforeItPlays() throws {
+        try inWindow(["A", "B", "C"], local: true) { controller, tabs, space in
+            // Not running and silent: Mute Tab is with the page's actions.
+            let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
+            #expect(Array(titles(menu).prefix(3)) == ["Reload Page", "Duplicate Tab", "Mute Tab"])
+            try run(menu.items.first { $0.title == "Mute Tab" })
+            #expect(tabs[1].isMuted)
+            // Muted, Unmute Tab leads the menu as it always has.
+            #expect(Array(titles(SidebarMenus.tabMenu(for: tabs[1], controller: controller)).prefix(2)) == ["Unmute Tab", "-"])
+            // Its page starts muted, and stays muted after a reload and after sleeping.
+            let webView = tabs[1].ensureWebView()
+            #expect(webView.pageMutedState.map(WKWebView.isAudioMuted) == true)
+            tabs[1].reload()
+            #expect(webView.pageMutedState.map(WKWebView.isAudioMuted) == true)
+            controller.suspendWithToast([tabs[1]])
+            #expect(tabs[1].isAsleep && tabs[1].isMuted)
+            #expect(tabs[1].ensureWebView().pageMutedState.map(WKWebView.isAudioMuted) == true)
+            // A pinned page that's open has it too.
+            controller.tabManager.bookmarkTab(tabs[2], in: space)
+            let pin = try #require(tabs[2].bookmarkID.flatMap(Library.shared.bookmark))
+            try run(SidebarMenus.bookmarkMenu(for: pin, controller: controller).items.first { $0.title == "Mute Tab" })
+            #expect(tabs[2].isMuted)
+            #expect(SidebarMenus.bookmarkMenu(for: pin, controller: controller).items.first?.title == "Unmute Tab")
         }
     }
 
@@ -460,7 +527,7 @@ struct SidebarRowMenuTests {
             let id = try #require(tabs[0].bookmarkID)
             controller.tabManager.select(tabs[1])
             let menu = SidebarMenus.bookmarkMenu(for: try #require(Library.shared.bookmark(id)), controller: controller)
-            #expect(titles(menu) == ["Copy Link", "-",
+            #expect(titles(menu) == ["Mute Tab", "Copy Link", "-",
                                      "Unpin Tab", "Add to Favorites", "Add to New Folder", "Move to Space", "-",
                                      "Open in Split View", "-",
                                      "Rename", "Change Icon…", "-",
@@ -488,7 +555,7 @@ struct SidebarRowMenuTests {
             manager.makeSplit(tabs[0], with: tabs[1])
             // The right half of the row: its own menu, not the left page's.
             let menu = try #require(controller.listMenu(for: .tab(tabs[0].id), page: tabs[1]))
-            #expect(Array(titles(menu).prefix(2)) == ["Separate Split View", "-"])
+            #expect(Array(titles(menu).prefix(2)) == ["Separate Tabs", "-"])
             #expect(titles(menu).contains("Pin Split View"))
             #expect(!titles(menu).contains("Remove from Split View"))
             #expect(!titles(menu).contains("Open in Split View"))
@@ -506,7 +573,7 @@ struct SidebarRowMenuTests {
             manager.tile(tabs[2], beside: tabs[0], .place(region: .bottomRight, regions: placed))
             #expect(manager.split(for: tabs[2])?.isGroup == true)
             let menu = SidebarMenus.tabMenu(for: tabs[2], controller: controller)
-            #expect(Array(titles(menu).prefix(3)) == ["Remove from Split View", "Separate Split View", "-"])
+            #expect(Array(titles(menu).prefix(3)) == ["Remove from Split View", "Separate Tabs", "-"])
             try run(menu.items.first)
             #expect(manager.split(for: tabs[2]) == nil)
             #expect(manager.split(for: tabs[0])?.ids.count == 2)
@@ -525,6 +592,24 @@ struct SidebarRowMenuTests {
             #expect(titles(SidebarMenus.tabMenu(for: tabs[0], controller: controller)).contains("Remove from Group"))
             let header = SidebarMenus.groupMenu(for: try #require(manager.group(group)), controller: controller)
             #expect(titles(header) == ["Collapse Group", "-", "Ungroup", "Move to Space", "-", "Rename", "-", "Close Group"])
+        }
+    }
+
+    /// A tab whose group can't be pinned whole (Settings is in it) still adds to Favorites from its menu, as the menu
+    /// bar and the command bar offer.
+    @Test func aTabOfAnUnpinnableGroupStillAddsToFavorites() throws {
+        try inWindow(["A"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            manager.adopt([settings], in: space)
+            _ = try #require(manager.makeGroup(with: [tabs[0], settings], name: "Mixed"))
+            manager.select(tabs[0])
+            let menu = titles(SidebarMenus.tabMenu(for: tabs[0], controller: controller))
+            #expect(!menu.contains("Pin Group") && !menu.contains("Pin Tab"))
+            #expect(menu.contains("Add to Favorites"))
+            #expect(CommandRanker.context(for: manager).canFavorite)
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.addToFavorites(_:)), keyEquivalent: "")
+            #expect(controller.validateMenuItem(item))
         }
     }
 
@@ -648,13 +733,55 @@ struct SidebarRowMenuTests {
         }
     }
 
-    /// The tab you're on shows the menu bar's keys in its drawn menu, as they are now.
+    /// Every tab's drawn menu shows the menu bar's keys, as they are now.
     @Test func theDrawnMenuShowsTheMenuBarsKeys() throws {
         try inWindow(["A", "B"]) { controller, tabs, _ in
             let close = item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[0], controller: controller))
             #expect(close?.shortcut == Shortcuts.keys(for: #selector(BrowserWindowController.closeTab(_:))))
             #expect(close?.shortcut.isEmpty == false)
-            #expect(item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[1], controller: controller))?.shortcut == "")
+            #expect(item("Close Tab", in: SidebarMenus.tabMenu(for: tabs[1], controller: controller))?.shortcut == close?.shortcut)
+        }
+    }
+
+    /// Every drawn sidebar menu shows the menu bar's keys on an item for the same action: a tab's, a pinned page's
+    /// (loaded or not), a favorite's, a space's, picked rows' and the +'s.
+    @Test func everySidebarMenuShowsTheMenuBarsKeysForTheSameAction() throws {
+        try inWindow(["A", "B", "C"]) { controller, tabs, space in
+            typealias C = BrowserWindowController
+            let manager = controller.tabManager
+            manager.bookmarkTab(tabs[2], in: space)
+            let pin = try #require(tabs[2].bookmarkID.flatMap { Library.shared.bookmark($0) })
+            let resting = Library.shared.addBookmark(url: URL(string: "https://example.com/menu/resting")!, title: "Resting", to: space)
+            let favorite = Library.shared.addFavorite(url: URL(string: "https://example.com/menu/favorite")!, title: "Favorite", in: manager.profile.id)
+            let actions: [String: Selector] = [
+                "Reload Page": #selector(C.reloadPage(_:)), "Duplicate Tab": #selector(C.duplicateTab(_:)), "Suspend Page": #selector(C.suspendPage(_:)),
+                "Mute Tab": #selector(C.toggleMute(_:)), "Unmute Tab": #selector(C.toggleMute(_:)), "Copy Link": #selector(C.copyPageURL(_:)),
+                "Pin Tab": #selector(C.toggleBookmark(_:)), "Unpin Tab": #selector(C.toggleBookmark(_:)), "Move to Tabs": #selector(C.toggleBookmark(_:)),
+                "Add to Favorites": #selector(C.addToFavorites(_:)), "Close Tab": #selector(C.closeTab(_:)), "Close Tabs Below": #selector(C.closeTabsBelow(_:)),
+                "Close Other Tabs": #selector(C.closeOtherTabs(_:)), "Edit Space…": #selector(C.renameSpace(_:)), "New Space": #selector(C.newSpace(_:)),
+                "New Tab": #selector(C.newTab(_:)),
+            ]
+            var menus: [[MenuPanel.Entry]] = [
+                SidebarMenus.tabMenu(for: tabs[0], controller: controller), SidebarMenus.tabMenu(for: tabs[1], controller: controller),
+                SidebarMenus.bookmarkMenu(for: pin, controller: controller), SidebarMenus.favoriteMenu(for: favorite, controller: controller),
+                SidebarMenus.spaceMenu(for: space, controller: controller),
+                SidebarMenus.markedMenu(for: [.tab(tabs[0].id), .tab(tabs[1].id)], controller: controller),
+            ].map(MenuPanel.entries(from:))
+            if let resting { menus.append(MenuPanel.entries(from: SidebarMenus.bookmarkMenu(for: resting, controller: controller))) }
+            menus += [SidebarMenus.addPanel(controller: controller), SidebarMenus.blankPanel(controller: controller)]
+            @MainActor func items(_ entries: [MenuPanel.Entry]) -> [MenuPanel.Item] {
+                entries.flatMap { entry -> [MenuPanel.Item] in
+                    guard case .item(let item) = entry else { return [] }
+                    return [item] + items(item.submenu ?? [])
+                }
+            }
+            var checked = Set<String>()
+            for item in menus.flatMap(items) {
+                guard let action = actions[item.title] else { continue }
+                #expect(item.shortcut == Shortcuts.keys(for: action), "\(item.title)")
+                checked.insert(item.title)
+            }
+            #expect(checked.isSuperset(of: ["Copy Link", "Unpin Tab", "Move to Tabs", "Close Tab", "New Tab", "Edit Space…"]))
         }
     }
 

@@ -26,6 +26,18 @@ final class Updater {
         }
     }
 
+    /// Sparkle's own setting, kept in defaults; Info.plist turns it on.
+    private static let automaticKey = "SUAutomaticallyUpdate"
+
+    /// Updates download and install on their own (#492). Off, Zigzag still checks and offers what it finds on the card.
+    static var installsAutomatically: Bool {
+        get { UserDefaults.standard.object(forKey: automaticKey) as? Bool ?? (Bundle.main.object(forInfoDictionaryKey: automaticKey) as? Bool ?? true) }
+        set {
+            if let updater = shared.updater { updater.automaticallyDownloadsUpdates = newValue } else { UserDefaults.standard.set(newValue, forKey: automaticKey) }
+            shared.automaticChanged(newValue)
+        }
+    }
+
     /// This copy of Zigzag is a beta (0.5.0-beta.1).
     static var isBeta: Bool { (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "").contains("-beta") }
 
@@ -46,11 +58,18 @@ final class Updater {
         didSet { if activity?.differsVisibly(from: oldValue) ?? (oldValue != nil) { Self.changed.send() } }
     }
 
-    /// What the update card shows, if anything: an update coming in that you asked for, or one that's ready.
+    /// Found with automatic installs off, not downloaded yet.
+    private(set) var offer = UpdateOffer() {
+        didSet { if offer.available != oldValue.available { Self.changed.send() } }
+    }
+
+    /// What the update card shows, if anything: an update coming in that you asked for, one that's ready, or one on
+    /// offer.
     var cardState: UpdateCardState? {
         if let activity { return activity }
-        guard readiness.showsCard, let staged = readiness.staged else { return nil }
-        return .ready(version: staged.version)
+        if readiness.showsCard, let staged = readiness.staged { return .ready(version: staged.version) }
+        if readiness.isDismissed { return nil }
+        return offer.available.map { .available(version: $0.version) }
     }
 
     /// With the sidebar hidden, the card floats for a manual update, and once when an update is ready, until closed,
@@ -85,6 +104,8 @@ final class Updater {
     #if DEBUG
     /// Set by `updateready`: Restart only logs.
     private var stagedForDebug = false
+    /// Set by `updateoffer`: Update only logs.
+    private var offeredForDebug = false
     #endif
 
     func start() {
@@ -161,6 +182,45 @@ final class Updater {
         }
     }
 
+    /// Update on the card while automatic installs are off: downloads it, then restarts into it.
+    func getUpdate() {
+        #if DEBUG
+        if offeredForDebug, let offered = offer.available {
+            say(String(localized: "Zigzag would download \(VersionName.display(offered.version)) and restart now.",
+                       comment: "Debug builds only: toast after Update on a pretend update. The placeholder is its version."), symbol: "arrow.down.circle")
+            return
+        }
+        #endif
+        guard let updater, offer.available != nil, restart == .none else { return }
+        restart = .waiting
+        whenSparkleIsFree { [weak self] in
+            guard let self, self.restart == .waiting else { return }
+            guard updater.canCheckForUpdates else { self.failed(); self.restart = .none; return }
+            self.restart = .running
+            // Found again as a manual check, then downloaded and installed at once (`found`).
+            updater.checkForUpdates()
+        }
+    }
+
+    /// Skip This Version: the card goes; a newer version is still offered, and Check for Updates… still finds this one.
+    func skipOffered() {
+        cardFloats = false
+        offer.skip()
+        // Sparkle keeps the skip once a background check finds the build again.
+        whenSparkleIsFree { [weak self] in
+            guard let self, self.offer.skipping != nil, self.restart == .none else { return }
+            self.updater?.checkForUpdatesInBackground()
+        }
+    }
+
+    /// On again: what was offered downloads in the background as before. Off: nothing staged is touched.
+    private func automaticChanged(_ on: Bool) {
+        guard on else { Self.changed.send(); return }
+        offer.clear()
+        if let updater, !updater.sessionInProgress { updater.checkForUpdatesInBackground() }
+        Self.changed.send()
+    }
+
     /// Hides the card for this version until relaunch; it still installs on quit.
     func dismissCard() {
         cardFloats = false
@@ -185,11 +245,19 @@ final class Updater {
         found = update
         if item.isInformationOnlyUpdate { reply(.dismiss); return }
         guard state.stage == .installing else {
-            // Manual, or Restart refetching a vanished staged update: the card replaces the toast.
-            if manualCheck || restart == .running {
-                downloadBegins(update.version)
+            switch offer.found(update, automatic: Self.installsAutomatically, getting: restart == .running, background: !state.userInitiated) {
+            case .install:
+                // Manual, or Restart or Update fetching it: the card replaces the toast.
+                if manualCheck || restart == .running {
+                    downloadBegins(update.version)
+                }
+                reply(.install)
+            case .skip:
+                reply(.skip)
+            case .offer:
+                reply(.dismiss)
+                showOffer(update.build)
             }
-            reply(.install)
             return
         }
         if restart == .running { reply(.install); return }
@@ -226,6 +294,7 @@ final class Updater {
     /// No newer version, so nothing is staged. Sparkle tells both the driver (`manual`) and the delegate; toast once.
     fileprivate func noUpdate(manual: Bool) {
         readiness.clear()
+        offer.clear()
         activity = nil
         if manual {
             say(String(localized: "Zigzag is up to date.", comment: "Toast after Check for Updates… finds no newer version."), symbol: "checkmark.circle")
@@ -255,12 +324,20 @@ final class Updater {
     private func stage(_ update: UpdateReadiness.Staged) {
         let asked = manualCheck || activity != nil
         activity = nil
+        offer.clear()
         readiness.stage(version: update.version, build: update.build)
         if asked { showReady() } else if floatedBuild != update.build {
             // Background update ready: float once with the sidebar hidden.
             floatedBuild = update.build
             cardFloats = true
         }
+    }
+
+    /// An update on offer floats once per build with the sidebar hidden, and always for a check you asked for.
+    private func showOffer(_ build: String) {
+        if manualCheck { hideWorkingToast() } else if floatedBuild == build { return }
+        floatedBuild = build
+        cardFloats = true
     }
 
     /// Manual check: show the card, not a toast.
@@ -357,6 +434,20 @@ final class Updater {
         activity = nil
         readiness = shown
         if version == nil { cardFloats = false; floatedBuild = nil }
+    }
+
+    /// `updateoffer <version>`: a pretend update on offer, as with automatic installs off; `off` removes it.
+    func debugOffer(_ version: String?) {
+        offeredForDebug = version != nil
+        activity = nil
+        offer.clear()
+        if let version {
+            _ = offer.found(.init(version: version, build: version), automatic: false, getting: false, background: true)
+            floatedBuild = version
+            cardFloats = true
+        } else {
+            cardFloats = false
+        }
     }
 
     /// Bumped per `updatesim` run so a new one cancels the last.

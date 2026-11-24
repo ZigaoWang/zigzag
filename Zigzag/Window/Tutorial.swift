@@ -38,7 +38,7 @@ enum Tutorial {
                  title: String(localized: "Pin this page", comment: "A step's title in the getting-started guide, a card in the window."),
                  keys: pinKeys,
                  note: pinKeys.isEmpty
-                    ? String(localized: "Right-click its tab, then Pin Tab", comment: "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.")
+                    ? String(localized: "Right-click its tab, then choose Pin Tab", comment: "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.")
                     : String(localized: "Pinned tabs stay, even after you quit", comment: "Under a step's title in the getting-started guide, a card in the window."),
                  done: String(localized: "Pinned", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: String(localized: "It stays at the top of this space", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
@@ -71,8 +71,8 @@ enum Tutorial {
                  title: String(localized: "Make a space", comment: "A step's title in the getting-started guide, a card in the window."),
                  keys: newSpaceKeys,
                  note: newSpaceKeys.isEmpty
-                    ? String(localized: "Click + in the sidebar, then New Space", comment: "Under the new space step's title in the getting-started guide, a card in the window. New Space is an item in the menu of the sidebar's +.")
-                    : String(localized: "Or click + in the sidebar, then New Space", comment: "Under the new space step's title in the getting-started guide, a card in the window, after the keys that make a space. New Space is an item in the menu of the sidebar's +."),
+                    ? String(localized: "Click + in the sidebar, then choose New Space", comment: "Under the new space step's title in the getting-started guide, a card in the window. New Space is an item in the menu of the sidebar's +.")
+                    : String(localized: "Or click + in the sidebar, then choose New Space", comment: "Under the new space step's title in the getting-started guide, a card in the window, after the keys that make a space. New Space is an item in the menu of the sidebar's +."),
                  done: String(localized: "Your new space", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: String(localized: "Its own tabs and pinned tabs, in its own color", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
             Task(id: "switch",

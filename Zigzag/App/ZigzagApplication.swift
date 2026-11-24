@@ -7,6 +7,8 @@ final class ZigzagApplication: NSApplication {
     /// way to the menus, as keys do. It stops here: it never runs a Zigzag shortcut or reaches anything but the page.
     override func sendEvent(_ event: NSEvent) {
         if MCPKeyDelivery.stopsOnTheWayBack(event) { return }
+        // Your own clicks and keys, for a page's pop-up that WebKit didn't count as clicked.
+        PopupNotice.noteInput(event)
         super.sendEvent(event)
     }
 

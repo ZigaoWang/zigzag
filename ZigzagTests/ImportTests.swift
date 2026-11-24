@@ -387,7 +387,7 @@ struct ImportLayoutTests {
             // Scrolled rows run under the buttons clipped, so they're checked laid out whole.
             let shown = Self.laidOut(view, height: height)
             if height == 2000 { Self.expectNothingPiled(shown) }
-            let primary = try #require(view.subviews.first { $0 is PrimaryButton })
+            let primary = try #require(view.subviews.first { ($0 as? PillButton)?.style == .prominent })
             let scroll = try #require(view.subviews.first { $0 is NSScrollView } as? NSScrollView)
             let content = try #require(scroll.documentView)
             #expect(!primary.isHidden)
@@ -454,7 +454,7 @@ struct ImportLayoutTests {
 
     /// Onboarding's unpicked answer keeps its outline through hover and press, which redraw the button's look.
     @Test func outlinedButtonKeepsItsEdge() {
-        let button = PrimaryButton(title: "Show Ads")
+        let button = PillButton(title: "Show Ads", style: .prominent)
         button.customFill = .clear
         button.customEdge = .white
         button.stateDidChange(animated: false)

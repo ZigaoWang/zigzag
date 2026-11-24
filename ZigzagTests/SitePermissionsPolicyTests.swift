@@ -436,6 +436,64 @@ import WebKit
         #expect(PopupNotice.heldOutcome(for: "deny", sized: true) == .discard)
     }
 
+    /// A pop-up within a second of your own input in its page, window key, main frame, counts as clicked.
+    @Test func aPopUpRightAfterYourInputCountsAsClicked() {
+        #expect(PopupNotice.countsAsClicked(sinceInput: 0.3, windowIsKey: true, fromMainFrame: true))
+        #expect(PopupNotice.countsAsClicked(sinceInput: 1, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: 1.5, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: nil, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: -0.1, windowIsKey: true, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: 0.3, windowIsKey: false, fromMainFrame: true))
+        #expect(!PopupNotice.countsAsClicked(sinceInput: 0.3, windowIsKey: true, fromMainFrame: false))
+        #expect(PopupNotice.countedNote(sinceInput: 0.34) == "counted as clicked: input 0.3 s before")
+    }
+
+    /// Input is kept per page: a click in one doesn't count for another's pop-up.
+    @MainActor @Test func yourInputCountsOnlyForItsOwnPage() throws {
+        let clicked = WKWebView(), other = WKWebView()
+        PopupNotice.noteInput(in: clicked, at: 100)
+        let since = try #require(PopupNotice.sinceInput(in: clicked, now: 100.4))
+        #expect(abs(since - 0.4) < 0.001)
+        #expect(PopupNotice.sinceInput(in: other, now: 100.4) == nil)
+        #expect(!PopupNotice.countsAsClicked(sinceInput: PopupNotice.sinceInput(in: other, now: 100.4), windowIsKey: true, fromMainFrame: true))
+    }
+
+    /// Esc, which puts the pop-up question away, never counts as input for the page's next pop-up.
+    @Test func escIsNeverCountedAsInput() {
+        #expect(PopupNotice.countsAsInput(.leftMouseDown, keyCode: nil))
+        #expect(PopupNotice.countsAsInput(.leftMouseUp, keyCode: nil))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 0))
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 53))
+        #expect(!PopupNotice.countsAsInput(.mouseMoved, keyCode: nil))
+        #expect(!PopupNotice.countsAsInput(.scrollWheel, keyCode: nil))
+    }
+
+    /// A key with ⌘ or ⌃ held is a browser shortcut and doesn't count; plain typing, ⇧, ⌥ and Return do.
+    @Test func shortcutsAreNeverCountedAsInput() {
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 37, modifiers: .command))
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 17, modifiers: [.command, .shift]))
+        #expect(!PopupNotice.countsAsInput(.keyDown, keyCode: 48, modifiers: .control))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 0, modifiers: .shift))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 0, modifiers: .option))
+        #expect(PopupNotice.countsAsInput(.keyDown, keyCode: 36, modifiers: []))
+        #expect(PopupNotice.countsAsInput(.leftMouseDown, keyCode: nil, modifiers: .command))
+    }
+
+    /// A click on one page doesn't count for the next page's pop-up in the same web view.
+    @MainActor @Test func aNewPageDoesntCountInputOnThePageBefore() {
+        let webView = WKWebView()
+        PopupNotice.noteInput(in: webView, at: 100)
+        PopupNotice.forgetInput(in: webView)
+        #expect(PopupNotice.sinceInput(in: webView, now: 100.4) == nil)
+    }
+
+    /// The diagnostics line for an unclicked pop-up says where it was and whether you had just used a page.
+    @Test func anUnclickedPopUpNotesWhereAndYourLastInput() {
+        #expect(PopupNotice.unclickedNote(inMini: true, sinceInput: 0.34) == "in Zigzag Mini, a click or key in a page 0.3 s before")
+        #expect(PopupNotice.unclickedNote(inMini: false, sinceInput: 12) == "in a window, no click or key in a page for 5 s")
+        #expect(PopupNotice.unclickedNote(inMini: false, sinceInput: -1) == "in a window, no click or key in a page for 5 s")
+    }
+
     /// A legacy popup `true` becomes "automatic", not the viewer; other subjects' `true` is "allow".
     @Test func aLegacyPopupYesKeepsTheOrdinaryRouting() throws {
         try withDefaults { defaults in

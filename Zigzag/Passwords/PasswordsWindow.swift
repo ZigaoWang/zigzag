@@ -365,6 +365,7 @@ final class PasswordsView: NSView {
         detail.isHidden = nothing
         guard nothing else { return }
         empty.showsAction = false
+        empty.isNoMatch = !isLoadingVault && !readFailed && !query.isEmpty
         empty.action = readFailed ? tryAgain : importPasswords
         if isLoadingVault {
             empty.text = String(localized: "Opening your passwords…", comment: "Shown in the Passwords window while the saved passwords are read.")
@@ -529,6 +530,8 @@ private final class PageEmptyView: NSView {
         didSet { oldValue?.removeFromSuperview(); action.map { addSubview($0) }; needsLayout = true }
     }
     var showsAction = true { didSet { action?.isHidden = !showsAction; needsLayout = true } }
+    /// A search that found nothing: the line sits where the results would start, as every search's does.
+    var isNoMatch = false { didSet { needsLayout = true } }
     var text: String {
         get { label.stringValue }
         set { label.stringValue = newValue; needsLayout = true }
@@ -586,7 +589,8 @@ private final class PageEmptyView: NSView {
         let showsButton = action != nil && showsAction
         let total = markHeight + Tokens.EmptyState.markGap + textHeight + (showsButton ? Tokens.EmptyState.actionGap + Tokens.Page.controlHeight : 0)
         // A little above the middle, where the eye rests.
-        var y = round((bounds.height - total) / 2.3)
+        var y = isNoMatch ? Tokens.EmptyState.noMatchY(in: bounds, lineHeight: textHeight) - markHeight - Tokens.EmptyState.markGap
+            : round((bounds.height - total) / 2.3)
         markHolder.frame = NSRect(x: round((bounds.width - Self.markWidth) / 2), y: y, width: Self.markWidth, height: markHeight)
         mark.frame = markHolder.bounds
         y = markHolder.frame.maxY + Tokens.EmptyState.markGap

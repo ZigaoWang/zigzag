@@ -386,6 +386,15 @@ struct SpaceLook {
     var angle: Double = 90
     var seeThrough: Double = 0
     var grain: Double = 0
+    /// The grain's texture (`SpaceInfo.texture`): nil for fine film grain.
+    var texture: String? = nil
+    /// A palette look, on the palette's clear glass (`SpaceInfo.clearTint`).
+    var clearTint = false
+    /// Set: the hues follow the Mac, light by day and deep at night, this strong (`SpaceInfo.intensity`); `depth` unused.
+    var following: Double? = nil
+    /// With `following`, a palette color's own depths by day and at night (`SpaceInfo.dayDepth`, `nightDepth`).
+    var day: Double? = nil
+    var night: Double? = nil
 
     /// How it looks as a space.
     var space: SpaceInfo {
@@ -395,14 +404,18 @@ struct SpaceLook {
     }
 
     /// A curated color, as a preset: light by day and deep at night with the Mac, with any see-through and grain.
+    /// A palette color gives its glass following the Mac, the look a new space gets.
     static func curated(_ color: SpaceColor, name: String? = nil, seeThrough: Double = 0, grain: Double = 0) -> SpaceLook {
-        SpaceLook(name: name ?? color.name, curated: color, depth: 0, seeThrough: seeThrough, grain: grain)
+        if let look = color.defaultLook { return look }
+        return SpaceLook(name: name ?? color.name, curated: color, depth: 0, seeThrough: seeThrough, grain: grain)
     }
 
     /// A preset is the whole look: its see-through and grain come with it, and one without them is solid and smooth.
     func apply(to space: inout SpaceInfo) {
         space.glass = nil
         space.grain = grain > 0 ? grain : nil
+        space.texture = grain > 0 ? texture : nil
+        space.clearTint = clearTint && seeThrough > 0 ? true : nil
         if let curated {
             space.color = curated
             space.hue = nil
@@ -413,7 +426,26 @@ struct SpaceLook {
             space.tint2 = nil
             space.intensity2 = nil
             space.brightness2 = nil
+            space.dayDepth = nil
+            space.nightDepth = nil
             space.translucency = seeThrough > 0 ? seeThrough : nil
+            space.appearance = nil
+            return
+        }
+        if let following {
+            space.hue = hue
+            space.tint = abs(tint - 1) < 0.005 ? nil : tint
+            space.intensity = following
+            space.brightness = nil
+            space.dayDepth = day
+            space.nightDepth = night
+            space.hue2 = hue2
+            space.tint2 = hue2 == nil || abs(tint - 1) < 0.005 ? nil : tint
+            space.intensity2 = hue2 == nil ? nil : following
+            space.brightness2 = nil
+            space.angle = hue2 == nil ? nil : angle
+            space.translucency = seeThrough > 0 ? seeThrough : nil
+            if seeThrough > 0 { space.clearGlass = nil }
             space.appearance = nil
             return
         }
@@ -423,24 +455,37 @@ struct SpaceLook {
             space.tint = 0
         } else {
             space.hue = hue
-            space.tint = tint > 0.995 ? nil : tint
+            space.tint = abs(tint - 1) < 0.005 ? nil : tint
         }
         space.intensity = nil
         space.brightness = depth
+        space.dayDepth = nil
+        space.nightDepth = nil
         space.hue2 = hue2
-        // The second color as quiet as the first.
-        space.tint2 = hue2 == nil || tint > 0.995 ? nil : tint
+        // The second color as quiet (or as rich) as the first.
+        space.tint2 = hue2 == nil || abs(tint - 1) < 0.005 ? nil : tint
         space.intensity2 = nil
         space.brightness2 = hue2 == nil ? nil : depth2
         if hue2 != nil { space.angle = angle }
         space.translucency = seeThrough > 0 ? seeThrough : nil
+        // A glass look is clear glass.
+        if seeThrough > 0 { space.clearGlass = nil }
     }
 
     func matches(_ space: SpaceInfo) -> Bool {
-        guard abs((space.grain ?? 0) - grain) < 0.01 else { return false }
+        guard abs((space.grain ?? 0) - grain) < 0.01, (grain > 0 ? texture : nil) == ((space.grain ?? 0) > 0.01 ? space.texture : nil),
+              (space.clearTint == true) == (clearTint && seeThrough > 0) else { return false }
         if let curated {
             return space.hue == nil && space.color == curated && space.brightness == nil && space.hue2 == nil
                 && abs(space.seeThrough - seeThrough) < 0.01 && (curated.isNeutral || space.tintAmount > 0.99)
+        }
+        if let following {
+            guard space.brightness == nil, space.brightness2 == nil, let h = space.hue, abs(h - hue) < 0.002, abs(space.tintAmount - tint) < 0.01,
+                  abs((space.intensity ?? -1) - following) < 0.005, abs(space.seeThrough - seeThrough) < 0.01,
+                  space.dayDepth == day, space.nightDepth == night else { return false }
+            guard let hue2 else { return space.hue2 == nil }
+            guard let h2 = space.hue2, abs(h2 - hue2) < 0.002 else { return false }
+            return true
         }
         // A space saved as the old white or black (no Shade of its own) is the White or Black here.
         if space.brightness == nil, space.hue == nil, space.hue2 == nil, hue2 == nil, tint < 0.005, seeThrough == 0, !space.isSeeThrough,
@@ -455,23 +500,42 @@ struct SpaceLook {
         }
         guard let hue2 else { return space.hue2 == nil }
         guard let h2 = space.hue2, abs(h2 - hue2) < 0.002, abs((space.brightness2 ?? b) - depth2) < 0.005,
-              abs(space.tintAmount2 - min(tint, 1)) < 0.01 else { return false }
+              abs(space.tintAmount2 - tint) < 0.01 else { return false }
         return true
     }
 
-    /// Preset looks in light and deep pairs. Each is reachable from Custom too.
-    static let presets: [SpaceLook] = [
-        SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0),
-        SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1),
-        SpaceLook(name: String(localized: "Paper", comment: "Tooltip and accessibility label of a preset look in the space editor."), hue: 0.11, tint: 0.55, depth: 0.1, grain: 0.5),
-        fade(String(localized: "Espresso", comment: "Tooltip and accessibility label of a preset look in the space editor."), 0.07, 0.8, 0.07, 0.93, tint: 0.45),
-        fade(String(localized: "Sky", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale blue."), 0.6, 0.04, 0.6, 0.34, tint: 0.6),
-        fade(String(localized: "Slate", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray."), 0.62, 0.76, 0.62, 0.9, tint: 0.35),
-    ]
+    static let white = SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0)
+    static let black = SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1)
+    /// The palette's glass with solid white after its neutrals. Each is reachable from Custom too, black included.
+    static let presets: [SpaceLook] = {
+        let looks = SpaceColor.palette.compactMap(\.look)
+        let neutrals = SpaceColor.neutrals.count
+        return Array(looks.prefix(neutrals)) + [white] + looks.dropFirst(neutrals)
+    }()
+}
 
-    /// A top-to-bottom gradient from a color to a shade of it.
-    private static func fade(_ name: String, _ hue: Double, _ depth: Double, _ hue2: Double, _ depth2: Double, tint: Double) -> SpaceLook {
-        SpaceLook(name: name, hue: hue, tint: tint, depth: depth, hue2: hue2, depth2: depth2, angle: 90)
+extension SpaceColor {
+    /// A palette color's look, on clear glass, at its own depth day and night: the preset. Nil for the older colors.
+    var look: SpaceLook? { paletteLook.map { SpaceLook.palette(self, $0, following: false) } }
+
+    /// What a new space of a palette color gets: the same hues on the same glass, following the Mac between its own
+    /// day and night depths, so a fresh window is light on a light Mac and deep on a dark one. Nil for the older colors.
+    /// `following` is what a Zigzag from before the day and night depths shows instead.
+    var defaultLook: SpaceLook? { paletteLook.map { SpaceLook.palette(self, $0, following: true) } }
+}
+
+extension SpaceLook {
+    /// A palette color's look: picked in the editor at its own depth, or following the Mac as a new space has it. Its
+    /// clear glass and finish come with it; `clear` false for the betas' looks from before it.
+    static func palette(_ color: SpaceColor, _ p: SpaceColor.PaletteLook, following: Bool, clear: Bool = true) -> SpaceLook {
+        var look = following
+            ? SpaceLook(name: color.name, hue: p.hue, tint: p.tint, depth: 0, hue2: p.hue2, angle: 90, seeThrough: p.seeThrough,
+                        following: p.tint < 1 ? Tokens.Frame.softFollowingIntensity : Tokens.Frame.followingIntensity, day: p.day, night: p.night)
+            : SpaceLook(name: color.name, hue: p.hue, tint: p.tint, depth: p.depth, hue2: p.hue2, depth2: p.depth2 ?? p.depth, angle: 90, seeThrough: p.seeThrough)
+        look.grain = p.grain
+        look.texture = p.texture
+        look.clearTint = clear
+        return look
     }
 }
 
@@ -507,14 +571,17 @@ enum SwatchRing {
     }
 }
 
-/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard,
-/// a grainy one with its grain. Without a look it's Custom, painted with the hues around the wheel.
+/// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one is a piece of its glass:
+/// the color over a faint checkerboard, lit along its top. A grainy one shows its grain. Without a look it's Custom,
+/// painted with the hues around the wheel.
 final class LookSwatch: InteractiveView {
     let look: SpaceLook?
     private let fill = CAGradientLayer()
     private let checker = CALayer()
     private let grain = CALayer()
     private let ring = CALayer()
+    /// The glass's light along its top edge.
+    private let shine = CAGradientLayer()
 
     init(look: SpaceLook?, name: String? = nil) {
         self.look = look
@@ -524,12 +591,19 @@ final class LookSwatch: InteractiveView {
         layer?.addSublayer(fill)
         fill.masksToBounds = true
         checker.masksToBounds = true
-        checker.isHidden = (look?.seeThrough ?? 0) == 0
+        let glass = (look?.seeThrough ?? 0) > 0
+        checker.isHidden = !glass
         checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
+        checker.opacity = 0.45
+        shine.isHidden = !glass
+        shine.colors = [NSColor.white.withAlphaComponent(0.55).cgColor, NSColor.white.withAlphaComponent(0).cgColor]
+        shine.startPoint = CGPoint(x: 0.5, y: 0)
+        shine.endPoint = CGPoint(x: 0.5, y: 0.55)
         grain.isHidden = (look?.grain ?? 0) == 0
-        grain.backgroundColor = MaterialImages.grain.cgColor
-        grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.5))
+        grain.backgroundColor = MaterialImages.texture(look?.texture).cgColor
+        grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.3))
         fill.addSublayer(grain)
+        fill.addSublayer(shine)
         if look == nil {
             fill.type = .conic
             fill.startPoint = CGPoint(x: 0.5, y: 0.5)
@@ -568,13 +642,16 @@ final class LookSwatch: InteractiveView {
                 // Each color at its own strength (the space's dot), so the row reads as distinct colors even in dark
                 // mode, where every frame color is deep; white, grays and black as they are.
                 // A designed look (a gradient, smoke) shows its real frame colors.
-                let start = space.isNeutral || look.curated == nil ? space.frameColor : space.swatch
-                // See-through shows the checkerboard through the color, as the window shows the desktop.
-                let alpha = 1 - 0.45 * look.seeThrough
-                fill.colors = [start, space.frameColor2 ?? start].map { $0.withAlphaComponent(alpha).cgColor }
+                let glass = look.seeThrough > 0
+                // Glass shows its color as the window does, a gradient top to bottom; the checkerboard shows through.
+                let start = glass ? space.background : space.isNeutral || look.curated == nil ? space.frameColor : space.swatch
+                let end = glass ? space.background2 ?? start : space.frameColor2 ?? start
+                let alpha = glass ? 0.8 : 1
+                fill.colors = [start, end].map { $0.withAlphaComponent(alpha).cgColor }
                 grain.frame = fill.bounds
-                fill.startPoint = CGPoint(x: 0.2, y: 0.1)
-                fill.endPoint = CGPoint(x: 0.8, y: 0.9)
+                shine.frame = fill.bounds
+                fill.startPoint = glass ? CGPoint(x: 0.5, y: 0) : CGPoint(x: 0.2, y: 0.1)
+                fill.endPoint = glass ? CGPoint(x: 0.5, y: 1) : CGPoint(x: 0.8, y: 0.9)
             }
         }
         setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
@@ -1309,7 +1386,10 @@ final class SpaceLookEditor: NSView {
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
         let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, glassNote, grainLabel, grainSlider, effects]
-        showsEffects = space.hue2 != nil || space.isSeeThrough || (space.grain ?? 0) > 0.01
+        // A palette look's own glass and gradient aren't effects chosen.
+        let ownGlass = (SpaceLook.presets.contains { $0.seeThrough > 0 && $0.matches(space) }
+            || SpaceColor.palette.contains { $0.defaultLook?.matches(space) == true }) && space.clearGlass != false
+        showsEffects = !ownGlass && (space.hue2 != nil || space.isSeeThrough) || (space.grain ?? 0) > 0.01
         (tiles + views + chips).forEach { addSubview($0) }
 
         wheel.onChange = { [weak self] index, spot, final in
@@ -1324,6 +1404,10 @@ final class SpaceLookEditor: NSView {
             }
             self.draft.intensity = nil
             self.draft.intensity2 = nil
+            self.draft.dayDepth = nil
+            self.draft.nightDepth = nil
+            // A color from the wheel is custom, on a custom color's glass, as `Library.setHue` has it.
+            self.draft.clearTint = nil
             self.colorChosen = true
             self.changed(final: final, animated: false)
         }
@@ -1347,7 +1431,14 @@ final class SpaceLookEditor: NSView {
                 guard let self, let look = swatch?.look else { return }
                 look.apply(to: &self.draft)
                 self.selected = 0
-                self.colorChosen = true
+                if look.curated != nil {
+                    // A palette color follows the Mac, as the default colors do.
+                    self.original = self.draft
+                    self.draft.brightness = Self.startingDepth(self.draft, dark: self.isDark)
+                    self.colorChosen = false
+                } else {
+                    self.colorChosen = true
+                }
                 self.changed(final: true, animated: true)
             }
         }
@@ -1420,6 +1511,7 @@ final class SpaceLookEditor: NSView {
         if space.hue == nil, space.brightness == nil, space.color == .snow { return 0 }
         if space.hue == nil, space.brightness == nil, space.color == .ink { return 1 }
         if space.isNeutral { return dark ? 0.9 : 0.06 }
+        if let day = space.dayDepth, let night = space.nightDepth { return dark ? night : day }
         let strength = space.intensity ?? SpaceColor.defaultIntensity
         return dark ? 0.86 : 0.06 + 0.2 * strength
     }
@@ -1475,6 +1567,8 @@ final class SpaceLookEditor: NSView {
             draft.brightness = first + delta
             draft.brightness2 = second + delta
         }
+        draft.dayDepth = nil
+        draft.nightDepth = nil
         colorChosen = true
         changed(final: final, animated: false)
     }
@@ -1498,6 +1592,8 @@ final class SpaceLookEditor: NSView {
             selected = 0
         }
         draft.intensity = nil
+        draft.dayDepth = nil
+        draft.nightDepth = nil
         colorChosen = true
         changed(final: true, animated: true)
     }
@@ -1507,7 +1603,7 @@ final class SpaceLookEditor: NSView {
         let fresh = draft.withDefaultColors(defaultColor)
         original = fresh
         draft = fresh
-        draft.brightness = Self.startingDepth(fresh, dark: isDark)
+        if fresh.brightness == nil { draft.brightness = Self.startingDepth(fresh, dark: isDark) }
         colorChosen = false
         selected = 0
         changed(final: true, animated: true)
@@ -1559,10 +1655,10 @@ final class SpaceLookEditor: NSView {
     private func sync(animated: Bool) {
         let space = draft
         if space.hue2 == nil { selected = 0 }
-        var spots = [ColorWheel.Spot(hue: space.baseHue, amount: space.tintAmount)]
+        var spots = [ColorWheel.Spot(hue: space.baseHue, amount: min(space.tintAmount, 1))]
         var depths = [depth(0)]
         if let hue2 = space.hue2 {
-            spots.append(ColorWheel.Spot(hue: hue2, amount: space.tintAmount2))
+            spots.append(ColorWheel.Spot(hue: hue2, amount: min(space.tintAmount2, 1)))
             depths.append(depth(1))
         }
         wheel.show(spots, depths: depths, selected: selected, animated: animated)
@@ -1640,8 +1736,16 @@ final class SpaceLookEditor: NSView {
     var wheelHeight: CGFloat = ColorWheel.fullHeight { didSet { needsLayout = true } }
     var showsWheel: Bool { showsCustom }
 
+    /// Swatches in each row of the grid: Default, the presets, picture and Custom come out to whole rows of seven.
+    static let columns = 7
+    /// How many swatches the grid has.
+    static var tileCount: Int { 1 + SpaceLook.presets.count + 2 }
+    private var swatchRows: Int { (tiles.count + Self.columns - 1) / Self.columns }
+    /// The swatch grid's height.
+    private var swatchesHeight: CGFloat { CGFloat(swatchRows) * swatchSize + CGFloat(swatchRows - 1) * Tokens.Space.x2 }
+
     var preferredHeight: CGFloat {
-        var h = swatchSize + Tokens.Space.x1 + disclosureHeight
+        var h = swatchesHeight + Tokens.Space.x1 + disclosureHeight
         if showsCustom { h += customHeight }
         if showsEffects { h += Tokens.Space.x2 + dialSize + Tokens.Space.x3 + (sliderHeight + Tokens.Space.x3) * 2 - Tokens.Space.x3 }
         if showsGlass { h += sliderHeight + Tokens.Space.x3 }
@@ -1672,11 +1776,13 @@ final class SpaceLookEditor: NSView {
         let width = bounds.width
         var y: CGFloat = 0
         let tiles = self.tiles
-        let gap = (width - CGFloat(tiles.count) * swatchSize) / CGFloat(tiles.count - 1)
+        let columns = CGFloat(Self.columns)
+        let gap = (width - columns * swatchSize) / (columns - 1)
         for (i, tile) in tiles.enumerated() {
-            tile.frame = NSRect(x: round(CGFloat(i) * (swatchSize + gap)), y: y, width: swatchSize, height: swatchSize)
+            let column = CGFloat(i % Self.columns), row = CGFloat(i / Self.columns)
+            tile.frame = NSRect(x: round(column * (swatchSize + gap)), y: y + row * (swatchSize + Tokens.Space.x2), width: swatchSize, height: swatchSize)
         }
-        y += swatchSize
+        y += swatchesHeight
         // Laid out while folded too, so they fade in place.
         wheel.frame = NSRect(x: 0, y: y + Tokens.Space.x3, width: width, height: wheelHeight)
         row(shadeLabel, shadeSlider, y: wheel.frame.maxY + Tokens.Space.x3, height: sliderHeight)
@@ -1973,7 +2079,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     var onClose: (() -> Void)?
 
     private func startMonitoring() {
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             // The Profile menu, and a question asked from it, sit outside the panel: a click or key there is theirs.
             if MenuPanel.current != nil || self.isAsking { return event }
@@ -2157,7 +2263,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
 
     func close() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         if !cancelled { commitName() }
         if edited, !cancelled { (controller ?? BrowserWindowController.undoTarget)?.recordLibraryUndo(String(localized: "Edit Space", comment: "Undo action name, shown in Edit › Undo."), before: before) }

@@ -140,8 +140,14 @@ extension BrowserWindowController {
     /// A pane dragged by its strip onto a sidebar's tab list: it leaves its group, which closes up, and is a tab of
     /// its own there, as a tab dragged into the list lands. Another window's list: it leaves the group here and moves
     /// to that window as a tab moved there does (#167), whose ⌘Z sends it back; ⌘Z here then puts it back in the group.
-    func movePaneToList(_ tab: Tab, of target: BrowserWindowController, at index: Int) {
-        guard tab.bookmarkID == nil, tabManager.split(for: tab) != nil else { return }
+    /// A pinned page leaves its pinned split and lands as its own row would: pinned there, or a tab among the tabs.
+    func movePaneToList(_ tab: Tab, of target: BrowserWindowController, at place: (section: SidebarListView.Section, index: Int, folder: UUID?)) {
+        guard canMovePane(tab, toListOf: target) else { return }
+        if let id = tab.bookmarkID {
+            movePinnedPaneToList(tab, id, at: place)
+            return
+        }
+        let index = place.index
         guard target !== self else {
             let space = tabManager.currentSpaceID
             pageChange(Self.moveTabName) { [tabManager] in
@@ -159,6 +165,27 @@ extension BrowserWindowController {
             guard let self, let target else { return }
             self.leaveGroupWithUndo(tab)
             self.move([tab], to: target, at: index)
+        }
+    }
+
+    /// A pinned pane out of its pinned split, the rest closing up as Remove from Split View leaves them, then onto the
+    /// list as its row dropped there: moved among the pinned pages, or unpinned into the tabs. One step to undo.
+    private func movePinnedPaneToList(_ tab: Tab, _ id: UUID, at place: (section: SidebarListView.Section, index: Int, folder: UUID?)) {
+        let space = tabManager.currentSpaceID
+        pageChange(Self.moveTabName) { [weak self] in
+            guard let self else { return }
+            // The list counted this page where it sat in its split; once out, the place after it is one less.
+            let was = Library.shared.bookmarks(in: space).firstIndex { $0.id == id }
+            // A pinned page split with a plain tab has no saved pinned split: it leaves the one on screen.
+            let saved = Library.shared.pinnedSplit(containing: id) != nil
+            if let rest = saved ? tabManager.leavePinnedGroup(id) : tabManager.leaveGroup(tab) { tabManager.select(rest) }
+            switch place.section {
+            case .bookmarks:
+                let index = was.map { place.index > $0 ? place.index - 1 : place.index } ?? place.index
+                listMoveBookmark(id, to: index, in: space, folder: place.folder)
+            case .tabs:
+                listUnbookmark(id, to: place.index)
+            }
         }
     }
 
@@ -181,6 +208,14 @@ extension BrowserWindowController {
     func leaveGroupWithUndo(_ tab: Tab) {
         pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in the Edit menu as Undo Separate Tabs.")) { [tabManager] in
             if let rest = tabManager.leaveGroup(tab) { tabManager.select(rest) }
+        }
+    }
+
+    /// A pinned page out of its pinned group of three or four, undoably; the rest stay one pinned group.
+    func leavePinnedGroupWithUndo(_ bookmarkID: UUID) {
+        guard !tabManager.isPrivate else { return }
+        pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
+            tabManager.leavePinnedGroup(bookmarkID)
         }
     }
 
@@ -222,11 +257,13 @@ extension BrowserWindowController {
 
     /// A tab (and a split's other half) into the favorites at a tile's place (nil: the end).
     func favoriteWithUndo(_ tab: Tab, at index: Int? = nil) {
+        guard tabManager.canPin(tab, keepingGroup: false) else { return }
         pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteTab(tab, at: index) }
     }
 
     /// A tab or pinned page dropped on a favorite's middle: the two become one favorite, side by side.
     func joinFavoriteWithUndo(_ tab: Tab, onto favoriteID: UUID, onRight: Bool) {
+        guard tabManager.canPin(tab, keepingGroup: false) else { return }
         pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in tabManager.joinFavorite(tab, onto: favoriteID, onRight: onRight) }
     }
 

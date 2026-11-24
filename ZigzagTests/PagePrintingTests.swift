@@ -131,10 +131,51 @@ struct PageCaptureGeometryTests {
         #expect(CaptureGeometry.pixelAligned(NSRect(x: 10.3, y: 0.26, width: 100.1, height: 50), scale: 1) == NSRect(x: 10, y: 0, width: 100, height: 50))
     }
 
-    @Test func theCardShowsATallPictureFromItsTop() {
-        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 1000, height: 500), width: 216, maxHeight: 160) == NSSize(width: 216, height: 108))
-        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 1000, height: 10_000), width: 216, maxHeight: 160) == NSSize(width: 216, height: 160))
-        #expect(CaptureGeometry.thumbnailSize(for: NSSize(width: 2000, height: 50), width: 216, maxHeight: 160).height == Tokens.Space.x8)
+    @Test func theCardShowsTheWholePictureAtItsShape() {
+        func size(_ w: CGFloat, _ h: CGFloat) -> NSSize { CaptureGeometry.thumbnailSize(for: NSSize(width: w, height: h), width: 216, maxHeight: 160) }
+        #expect(size(1000, 500) == NSSize(width: 216, height: 108))
+        #expect(size(1000, 1000) == NSSize(width: 160, height: 160))
+        #expect(size(1000, 1400) == NSSize(width: 114, height: 160))
+        // A banner: short and full width, not stretched taller.
+        #expect(size(1400, 150) == NSSize(width: 216, height: 23))
+        // Thinner than the least the card shows: that much, the picture centered in it.
+        #expect(size(2000, 50) == NSSize(width: 216, height: Tokens.Space.x6))
+    }
+
+    @Test func aFullPageShowsItsTopAtTheCardsWidth() {
+        for image in [NSSize(width: 1400, height: 9000), NSSize(width: 600, height: 1800), NSSize(width: 100, height: 20_000), NSSize(width: 333, height: 777)] {
+            let box = CaptureGeometry.thumbnailSize(for: image, width: 216, maxHeight: 160)
+            #expect(box == NSSize(width: 216, height: 160), "\(image)")
+            #expect(CaptureGeometry.thumbnailShowsTop(for: image, in: box), "\(image)")
+            let drawn = CaptureGeometry.thumbnailPicture(for: image, in: box)
+            #expect(drawn.origin == .zero && drawn.width == box.width, "\(image)")
+            #expect(abs(drawn.width / drawn.height - image.width / image.height) < 1e-9, "\(image)")
+            // The top of the capture, all its width, at the frame's shape.
+            let source = CaptureGeometry.thumbnailSource(for: image, in: box)
+            #expect(source.origin == .zero && abs(source.width - image.width) < 1e-6, "\(image)")
+            #expect(abs(source.width / source.height - box.width / box.height) < 1e-9, "\(image)")
+        }
+    }
+
+    @Test func theCardsPictureIsNeverStretched() {
+        let images: [NSSize] = [NSSize(width: 1000, height: 500), NSSize(width: 1400, height: 150), NSSize(width: 1000, height: 1000),
+                                NSSize(width: 1000, height: 1400), NSSize(width: 3000, height: 7), NSSize(width: 1, height: 1)]
+        for image in images {
+            let box = CaptureGeometry.thumbnailSize(for: image, width: 216, maxHeight: 160)
+            #expect(!CaptureGeometry.thumbnailShowsTop(for: image, in: box), "\(image)")
+            let drawn = CaptureGeometry.thumbnailPicture(for: image, in: box)
+            #expect(abs(drawn.width / drawn.height - image.width / image.height) < 1e-9 * image.width / image.height, "\(image)")
+            // The whole capture shows.
+            let source = CaptureGeometry.thumbnailSource(for: image, in: box)
+            #expect(source.width > image.width - image.width / box.width && source.height > image.height - image.height / box.height, "\(image)")
+            // Within the frame but for under a point of rounding, and centered in it.
+            #expect(drawn.width - box.width < 1 && drawn.height - box.height < 1, "\(image)")
+            #expect(abs(drawn.midX - box.width / 2) < 1e-9 && abs(drawn.midY - box.height / 2) < 1e-9, "\(image)")
+            // The frame hugs the picture unless the picture is thinner than the least the card shows.
+            if box.width > Tokens.Space.x6, box.height > Tokens.Space.x6 {
+                #expect(abs(drawn.width - box.width) < 1 && abs(drawn.height - box.height) < 1, "\(image)")
+            }
+        }
     }
 
     @Test func theFileIsNamedAfterThePageAndTheTime() {
@@ -145,5 +186,49 @@ struct PageCaptureGeometryTests {
         #expect(CaptureGeometry.fileName(title: "  ", date: date) == "Capture 2026-11-21 at 14.03.22.png")
         let long = CaptureGeometry.fileName(title: String(repeating: "x", count: 200), date: date)
         #expect(long.hasPrefix(String(repeating: "x", count: 80) + " 2026"))
+    }
+}
+
+@MainActor struct PageCaptureKeysTests {
+    private func key(_ characters: String, code: UInt16, flags: NSEvent.ModifierFlags = []) throws -> NSEvent {
+        try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                                      characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
+    }
+
+    /// ⇧⌘2 then ⌘T: the bar takes the typing, so Capture ends; a key Capture has no use for goes on (#457).
+    @Test func theCommandBarEndsCaptureAndCaptureKeepsItsKeys() throws {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "http://127.0.0.1:9/capture")!, title: "Capture", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        controller.capture.begin()
+        #expect(controller.capture.isActive)
+        #expect(controller.capture.handle(try key("x", code: 7)))
+        #expect(controller.capture.handle(try key("1", code: 18)))
+        #expect(!controller.capture.handle(try key("f", code: 3, flags: .command)))
+        #expect(controller.capture.isActive)
+        controller.commandBarWillShow()
+        #expect(!controller.capture.isActive)
+        controller.capture.begin()
+        #expect(controller.capture.handle(try key("\u{1b}", code: 53)))
+        #expect(!controller.capture.isActive)
+    }
+
+    /// Russian types "ф" on the A key and "у" on E: the key picks the mode. AZERTY's A key types "q", which picks none.
+    @Test func modeKeysWorkOnLayoutsWithoutLatinLetters() {
+        #expect(PageCapture.mode(typed: "ф", keyCode: 0) == .area)
+        #expect(PageCapture.mode(typed: "у", keyCode: 14) == .element)
+        #expect(PageCapture.mode(typed: "а", keyCode: 3) == .fullPage)
+        #expect(PageCapture.mode(typed: "м", keyCode: 9) == .visible)
+        #expect(PageCapture.mode(typed: "ы", keyCode: 1) == nil)
+        #expect(PageCapture.mode(typed: "A", keyCode: 0) == .area)
+        #expect(PageCapture.mode(typed: "q", keyCode: 0) == nil)
+        #expect(PageCapture.mode(typed: "a", keyCode: 12) == .area)
+        #expect(PageCapture.mode(typed: "", keyCode: 0) == nil)
     }
 }

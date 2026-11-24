@@ -9,6 +9,8 @@
   Test: TabCloseSelectionTests.closingAPinnedPageOrFavoriteUnloadsItAndKeepsIt
 - ⌘W on the last tab of a space → the space's most recent page, else the space shows empty.
   Test: TabCloseSelectionTests.closingTheLastTabGoesToTheSpacesRecentPageElseEmpty
+- Close a tab → its page is let go at once, so WebKit can end its process; ⇧⌘T loads it again with its history.
+  Test: PageReleaseTests.aClosedTabLetsGoOfItsPageAndItself
 
 ## Reopening
 - ⇧⌘T → whatever closed last comes back, app-wide: a tab, a tab of a closed window, or a whole window.
@@ -19,6 +21,17 @@
   Test: ReopenLastClosedTests.aTabOfAClosedWindowComesBackOnItsOwn
 - ⇧⌘T in an everyday window → never a private tab; private windows reopen only their own.
   Test: ReopenLastClosedTests.aPrivateTabNeverComesBackInAnEverydayWindow
+
+## Relaunching
+- Quit and open again with On launch set to Continue where you left off → sites' session cookies come back with the tabs, before any page asks for anything (YouTube's theater mode, sign-ins that use them).
+  Test: SessionCookiesTests.onlySessionCookiesComeBackAsTheyWere
+  Test: SessionCookiesTests.theyreBackBeforeThePageAsksForAnything
+- The same with Open a new window → they're gone, as before.
+  Test: SessionCookiesTests.openANewWindowDropsThemUnread
+- A private window → none are kept.
+  Test: SessionCookiesTests.privateWindowsKeepNone
+- Clear a site's cookies or website data, or every site's → its kept session cookies go too.
+  Test: SessionCookiesTests.clearingASiteTakesItsSavedCookies
 
 ## New tabs
 - ⌘T → the command bar opens centered on the window, near the top of the page.
@@ -51,10 +64,16 @@
   Test: TabSleepTests.typedTextAndTabsInUseNeverSleep
 - Suspend Page on a running tab → it sleeps now, and you move to its opener or a neighbor.
   Test: SidebarRowMenuTests.theTabYoureOnGoesOutOfSightAsItSleeps
+- A tab goes to sleep → its page is let go, not paused, so WebKit can end its process.
+  Test: PageReleaseTests.aSleepingTabLetsGoOfItsPage
 - A sleeping tab in the tab list → its icon wears a dashed ring.
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.
   Test: UnloadedTabTests.aSleepingTabClickedLoadsAgainWhereItWas
+- A sleeping tab woken, or one restored after a relaunch → its page plays nothing with sound until you use it.
+  Test: UnloadedTabTests.aWokenOrRestoredPageStartsNoSoundOnItsOwn
+- A sleeping tab woken, or one restored after a relaunch → its page is the site's page now, not a copy kept from before.
+  Test: UnloadedTabTests.aRestoredPageIsTheSitesPageNowNotWebKitsOldCopy
 
 ## Handoff
 - The key window's tab on an http or https page → offered to your other devices; never a private window, Zigzag's own pages, a file, an error page or this Mac's own address.
@@ -63,8 +82,16 @@
 ## Sound
 - A tab playing sound or muted → a speaker after its title; clicking it mutes or unmutes that page.
   Test: RowSpeakerTests.theSpeakerMutesAndUnmutesItsPage
+- A tab's menu, or an open pinned page's or favorite's → Mute Tab or Unmute Tab, even before it plays; it stays muted through a reload and sleep.
+  Test: SidebarRowMenuTests.aTabCanBeMutedBeforeItPlays
 - Pause the video or audio a tab's sound came from → its speaker goes away after a moment, even if WebKit still says it plays.
   Test: MiniPlayerPageTests.aSoundFromAVideoEndsOnceItStops
+
+## Mini player when you leave
+- Show a mini player when you leave Zigzag on, and switch to another app with the window covered, minimized, hidden or on a desktop no longer showing → after a moment the watched video moves into the mini player.
+  Test: AutoPictureInPictureTests.movesOnlyOnceTheWindowIsOutOfSight
+- The same, with the window still in view on another display → the video stays in its page until that window goes out of sight.
+  Test: AutoPictureInPictureTests.aWindowInViewOnAnotherDisplayKeepsItsVideo
 
 ## Picked rows
 - ⌫, ⌦ or ⌘⌫ with two or more rows picked → picked tabs close and picked pinned pages are removed, once per press.
@@ -75,3 +102,81 @@
   Test: OwnWindowTabsTests.aMovedTabLeavesOneWindowForTheOtherAsItIs
 - Drag a split to another window → it moves whole and stays a split.
   Test: OwnWindowTabsTests.aSplitMovesWholeAndStaysASplit
+
+## Touch
+- Touch and hold a row → its menu opens where the finger is, the same one a right-click opens.
+  Test: TouchGesturesTests.aHeldFingerOpensTheMenuARightClickOpens
+- Tap a row → its × and other hover-only buttons show until a finger lands outside the sidebar, another row is tapped, or the pointer moves over it.
+  Test: TouchGesturesTests.aTapShowsARowsButtonsUntilThePointerOrAFingerElsewhere
+- Tap just beside a row's showing × → the tab closes; a mouse click there is still the row's.
+  Test: TouchGesturesTests.aFingerNearTheCloseButtonCloses
+- Tap an open favorite → its × shows, as hovering shows it, until a finger lands outside the sidebar, something else is tapped, or the pointer moves over it.
+  Test: TouchGesturesTests.aTapShowsAnOpenFavoritesClose
+- Tap the Tabs label above today's tabs → Clear shows, as hovering the list shows it, until a finger lands outside the sidebar or the pointer comes over the list.
+  Test: TouchGesturesTests.aTapShowsClearAboveTheTabs
+- Two taps on a tab, a space's dot or a resize edge → what a double-click there does (rename, edit the space, the usual width or even tiles).
+  Test: TouchMovesTests.twoTapsOnAControlAreADoubleClick
+- Taps on different tabs one after another → each selects its tab; two taps count as a double-click only on the same tab.
+  Test: TouchMovesTests.tapsOnTabRowsSelectThem
+- Two taps with a finger on the title bar strip's empty space, beside the traffic lights or the sidebar's buttons → what a double-click there does, once.
+  Test: TouchMovesTests.theTitlebarHearsADoubleTapAndZooms
+- Touch a page, then it opens a pop-up → the pop-up counts as clicked, as after a mouse click.
+  Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
+- Touch and hold a row, slide onto its menu without lifting → the item under the finger lights; lift on it → it runs.
+  Test: TouchMovesTests.slidingOntoTheMenuAndLiftingChooses
+- Touch and hold a row, lift off its menu → the menu stays open, to be tapped.
+  Test: TouchMovesTests.liftingOffTheMenuLeavesItOpen
+- Touch and hold a row, then move away from its menu, or before it shows → the row is picked up and drags as with the mouse.
+  Test: TouchMovesTests.movingAwayFromTheMenuPicksItUp
+- Touch and hold a row, a favorite or a space's dot for about a third of a second → it lifts under the finger at once; move a few points → it's picked up and drags, and its menu doesn't open in the way.
+  Test: TouchMovesTests.aHeldRowLiftsAndAMovingFingerKeepsTheMenuAway
+- Touch and hold a row and keep still a moment after it lifts → its menu opens; let go → the row settles back.
+  Test: TouchMovesTests.aStillLiftedRowOpensItsMenu
+- Once a row has lifted under a finger, the list's scrolling can't take the finger; before that, moving scrolls the list at once.
+  Test: TouchMovesTests.scrollingCantCancelAHoldOnceRecognized
+- A row carried by a finger near the top or bottom of the list → the list scrolls that way, faster nearer the edge.
+  Test: TouchMovesTests.theListScrollsNearItsEdgesFasterNearer
+- A finger and the mouse drag a row the same way: reorder, into a folder, a split, another space.
+  Test: TouchMovesTests.theMouseAndAFingerDriveTheSameDrag
+- A row carried by a finger out over the page → it keeps following the finger there until it lifts.
+  Test: SplitDragTests.theWindowFollowsTheFingerOverThePage
+- One finger sideways across the sidebar → the previous or next space, as two fingers on the trackpad; up and down scrolls.
+  Test: TouchMovesTests.aFingerAcrossTheSidebarSwitchesSpaces
+- Pinch in on a page at its usual size → Show All Tabs; zoomed in, or pinching out, the page zooms. Pinch out on a card → it opens.
+  Test: TouchMovesTests.pinchingInAtTheUsualSizeOpensTheOverview
+- Two fingers sideways on a page → Back or Forward with the trackpad swipe's arrow, when the Mac's touch setting and Zigzag's allow swiping.
+  Test: TouchMovesTests.twoFingersOnAPageGoBackAndForward
+- One finger on a page is the page's, two go back or forward; each decides only after the fingers have moved ten points.
+  Test: TouchMovesTests.fingersOnAPageRouteByCount
+- Three fingers on a page are left to macOS, which takes them for switching desktops.
+  Test: TouchMovesTests.threeFingersRouteNowhere
+- Two fingers sideways across the sidebar → the previous or next space, as one does.
+  Test: TouchMovesTests.theSwipesAreTouchOnly
+- Sidebar hidden, a finger in from the page's edge → the sidebar slides out under it; let go a third of the way out or with a flick and it stays, otherwise it slides back.
+  Test: TouchMovesTests.aFingerFromTheEdgePullsOutTheSidebar
+- A finger landing on the window's outer 12 points is left to macOS, which resizes the window there; the pull starts from 12 to 40 points in from the page's edge.
+  Test: TouchMovesTests.theEdgeRules
+- Sidebar hidden, no bar above the page, and a finger used in the window in the last 15 minutes → a sidebar toggle can show; the pointer moving, the sidebar shown or the bar above the page shown hides it. Over a page nothing shows by default; right after the sidebar hides with a finger in use it shows for 2 seconds, then fades.
+  Test: TouchMovesTests.theGrabberShowsForARecentFinger
+- Over a page, a finger's tap along the window's top from its edge on the sidebar's side to 16 points past the toggle (52 points down) shows the toggle with the traffic lights, and that tap does nothing else. Shown, it goes 3 seconds after the last finger there, at once when a finger lands elsewhere (that tap is the page's), or when the pointer moves.
+  Test: TouchMovesTests.aTapWhereTheGroupSitsShowsItAWhile
+  Test: TouchMovesTests.theTapThatShowsTheGroupClicksNothing
+  Test: TouchMovesTests.theGroupGoesAfterItsTime
+- Over a page, that toggle shows with the traffic lights as one group on the title bar's material, light or dark as the page's top, where the docked sidebar has its lights and toggle, left or right. In full screen, where the lights come down with the menu bar, it shows there on its own. A finger takes it anywhere in 44 points around it, clear of the lights.
+  Test: TouchMovesTests.theGrabberSitsWhereTheSidebarsToggleDoes
+- In split view with the panes' strips along the top of the page, it is a button in the top pane's strip on the sidebar's side instead, like the strip's own: before Back on the left, after the close button on the right.
+  Test: TouchMovesTests.theGrabberJoinsTheTopPanesStrip
+- Tap it → the sidebar shows in the window, as a click on the sidebar toggle does; drag from it → the sidebar follows the finger and stays or slides back as from the edge.
+  Test: TouchMovesTests.aTapOnTheGrabberBringsTheSidebarOutToStay
+- A finger's tap or pull that brings the sidebar out does only that: the sidebar now under the finger takes neither its click nor its tap; a mouse click there after is the sidebar's.
+  Test: TouchMovesTests.aTapThatOpensTheSidebarDoesNothingElse
+- Tap the sidebar toggle in the bar above the page with the sidebar hidden or out by touch → it docks, as a click does.
+  Test: TouchMovesTests.aTapOnTheBarsToggleDocksTheSidebar
+- Out by a finger, the sidebar stays until a tap on the page, a tab is picked, a finger on the page swipes it back, or the pointer moves.
+  Test: TouchMovesTests.theEdgeRules
+- Tap just beside the sidebar toggle in the bar above the page → it shows the sidebar; a mouse click there is still the bar's.
+  Test: TouchMovesTests.theBarsToggleTakesAFingerBesideIt
+- A finger dragging a page sideways → it scrolls, never Back or Forward.
+  Test: TouchMovesTests.aFingerDraggingThePageIsNotATrackpadSwipe
+- The trackpad's swipes, the pointer at the window's edge and the sidebar toggles work as before alongside all of it.
+  Test: TouchMovesTests.theTrackpadsScrollsAreNotClaimed

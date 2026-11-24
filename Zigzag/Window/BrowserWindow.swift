@@ -41,6 +41,17 @@ final class BrowserWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
+    /// Fingers skip `sendEvent`; the whole frame is watched for them (`TouchPress`).
+    override var contentView: NSView? {
+        didSet { TouchPress.watch(self) }
+    }
+
+    /// AppKit's drag by an empty space stays off in full screen (#483).
+    override var isMovableByWindowBackground: Bool {
+        get { super.isMovableByWindowBackground && dragMovesWindow }
+        set { super.isMovableByWindowBackground = newValue }
+    }
+
     /// Browser shortcuts win over the page: the menu bar sees key equivalents before the web view does.
     /// The last ⌘← or ⌘→ answered, to know it when WebKit hands it back.
     private var lastArrow: (timestamp: TimeInterval, keyCode: UInt16)?
@@ -118,12 +129,14 @@ final class BrowserWindow: NSWindow {
     /// quitting and hiding, the sidebar and the tab overview, and Zigzag's own windows. Everything else a page may use
     /// for its document first, as in Safari and Chrome.
     static let browserActions: Set<String> = [
-        "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:",
+        "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:", "quitFromMenu:",
         "newTab:", "newWindow:", "newPrivateWindow:", "openLocation:", "closeTab:", "closeOtherTabs:", "performClose:",
         "reopenClosedTab:", "selectNextTab:", "selectPreviousTab:", "selectTabByNumber:",
         "nextSpace:", "previousSpace:", "selectSpaceByNumber:", "showSpaceSwitcher:", "newSpace:", "reloadPage:", "reloadPageFromOrigin:", "stopLoading:",
         "performMiniaturize:", "toggleFullScreen:", "toggleBrowserSidebar:", "toggleDeskView:", "showWebInspector:",
         "showDownloads:", "showHistory:", "hideWebApp:", "quitWebApp:",
+        // ⇧⌘C copies the page's link, as in Arc, even where the page has its own (GitHub copies a file's raw text).
+        "copyPageURL:", "copyPageURLAsMarkdown:",
     ]
 
     /// Whether the menu item these keys belong to is one the browser keeps (`browserActions`). Keys no item has are
@@ -203,14 +216,10 @@ final class BrowserWindow: NSWindow {
             UndoClock.lastPageInput = Date()
             sidebarHasTheClick = false
         }
+        if dropsSpentClick(event) { return }
         if event.type == .leftMouseDown {
-            let hit = contentView?.hitTest(event.locationInWindow)
-            sidebarHasTheClick = sidebar.map { hit?.isDescendant(of: $0) == true } ?? false
-        }
-        // A click in a page counts too: a web app (Figma, Docs) keeps its own undo, which a click can change.
-        if event.type == .leftMouseDown, contentView?.hitTest(event.locationInWindow).map(Self.isInPage) == true {
-            UndoClock.lastPageEdit = Date()
-            UndoClock.lastPageInput = Date()
+            lastLeftMouseDown = ProcessInfo.processInfo.systemUptime
+            notePress(at: event.locationInWindow)
         }
         if let eventInterceptor, eventInterceptor(event) { return }
         if let side = SideButton(event.type, button: event.buttonNumber) {
@@ -222,6 +231,59 @@ final class BrowserWindow: NSWindow {
         if routeTitlebarEvent(event) { return }
         if swallowsPanelPress(event) { return }
         super.sendEvent(event)
+    }
+
+    /// AppKit's click from a finger whose tap already did its one thing, and the window's tap from it (`TouchPress`).
+    private var spentClick = TouchSwallow()
+    private var spentTap = TouchSwallow()
+    private var spentAt: TimeInterval = 0
+    /// The click dropped went down: its drags and lift go too.
+    private var dropsClick = false
+
+    /// The finger at `points` (window coordinates) has done what it does: the click AppKit makes from it, unless
+    /// that's what is running now (`clickToCome` false), and its tap go nowhere else.
+    func spendTouch(at points: [NSPoint], clickToCome: Bool = true) {
+        spentAt = ProcessInfo.processInfo.systemUptime
+        if clickToCome { spentClick.arm(at: points) }
+        spentTap.arm(at: points)
+    }
+
+    /// A finger's click on chrome did its tap's one thing: the tap that follows goes nowhere.
+    func spendFingerClick(_ event: NSEvent?) {
+        guard let event, event.windowNumber == windowNumber, isFingerClick(event) else { return }
+        spendTouch(at: [event.locationInWindow], clickToCome: false)
+    }
+
+    private func isFingerClick(_ event: NSEvent) -> Bool {
+        TouchPress.fingerDown || TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt)
+            || ProcessInfo.processInfo.systemUptime - spentAt < 0.3
+    }
+
+    private func dropsSpentClick(_ event: NSEvent) -> Bool {
+        switch event.type {
+        case .leftMouseDown:
+            dropsClick = isFingerClick(event) && spentClick.takes(at: event.locationInWindow)
+            if dropsClick { TouchLog.note("dropped a spent click at \(Int(event.locationInWindow.x)),\(Int(event.locationInWindow.y))") }
+            return dropsClick
+        case .leftMouseDragged:
+            return dropsClick
+        case .leftMouseUp:
+            defer { dropsClick = false }
+            return dropsClick
+        default:
+            return false
+        }
+    }
+
+    /// A press at `point`: whether the sidebar has the click, and a click in a page for its own undo.
+    private func notePress(at point: NSPoint) {
+        let hit = contentView?.hitTest(point)
+        sidebarHasTheClick = sidebar.map { hit?.isDescendant(of: $0) == true } ?? false
+        // A click in a page counts too: a web app (Figma, Docs) keeps its own undo, which a click can change.
+        if hit.map(Self.isInPage) == true {
+            UndoClock.lastPageEdit = Date()
+            UndoClock.lastPageInput = Date()
+        }
     }
 
     /// Side buttons go back and forward in every page window, as in Chrome; on release, with the press taken too (#345).
@@ -271,7 +333,7 @@ final class BrowserWindow: NSWindow {
             updateMoveHand(flags: event.modifierFlags, at: event.locationInWindow)
             return false
         case .leftMouseDown:
-            guard Self.isMoveChord(event.modifierFlags), isInContent(event.locationInWindow) else { return false }
+            guard Self.isMoveChord(event.modifierFlags), dragMovesWindow, isInContent(event.locationInWindow) else { return false }
             // Twice, as on a title bar: the window zooms.
             if event.clickCount == 2 { performZoom(nil) } else { trackMove(from: event) }
             return true
@@ -301,7 +363,7 @@ final class BrowserWindow: NSWindow {
 
     /// The open hand while ⌥⌘ is held over the window, so it's clear a drag will move the window.
     private func updateMoveHand(flags: NSEvent.ModifierFlags, at point: NSPoint) {
-        let wanted = isKeyWindow && Self.isMoveChord(flags) && isInContent(point)
+        let wanted = isKeyWindow && Self.isMoveChord(flags) && dragMovesWindow && isInContent(point)
         guard wanted != showsMoveHand else { if wanted { NSCursor.openHand.set() }; return }
         showsMoveHand = wanted
         if wanted { NSCursor.openHand.push() } else { NSCursor.pop() }
@@ -309,6 +371,8 @@ final class BrowserWindow: NSWindow {
 
     /// The PDF under the pointer, when one is: its scrolls go to its swipe before the pages' scroll view.
     private func pdfView(at point: NSPoint) -> ZigzagPDFView? {
+        // No viewer in this window: no hit test for every scroll.
+        guard ZigzagPDFView.isShown(in: self) else { return nil }
         var view = contentView?.hitTest(contentView?.convert(point, from: nil) ?? .zero)
         while let current = view, !(current is ZigzagPDFView) { view = current.superview }
         return view as? ZigzagPDFView
@@ -317,12 +381,64 @@ final class BrowserWindow: NSWindow {
     /// Our controls sit in the title bar area, where AppKit sends presses to the title bar first, so presses on them
     /// are delivered directly.
     private weak var pressTarget: NSView?
+    /// When a press last went to one of them that way, so a tap there isn't clicked twice.
+    private var lastTitlebarPress: TimeInterval = 0
+    /// When the window last got a left mouse-down, so a finger's tap can tell whether AppKit's click came.
+    private var lastLeftMouseDown: TimeInterval = 0
+    /// A finger's last tap on the strip's empty space, for a double tap.
+    private var lastTitlebarTap: (time: TimeInterval, point: NSPoint)?
+
+    /// A finger's two taps on the title bar strip's empty space. AppKit's title bar is what a finger there lands on,
+    /// so it's watched there; the window's own watch never hears those touches.
+    private(set) var titlebarDoubleTap: NSClickGestureRecognizer?
+    private let titlebarTouchOnly = TouchOnly()
+
+    /// On the title bar AppKit has now, again after it makes a new one (full screen).
+    func attachTitlebarDoubleTap() {
+        guard TouchGestures.isAvailable, let container = standardWindowButton(.closeButton)?.superview?.superview,
+              container.window === self, titlebarDoubleTap?.view !== container else { return }
+        let tap = titlebarDoubleTap ?? {
+            let tap = NSClickGestureRecognizer(target: self, action: #selector(titlebarDoubleTapped(_:)))
+            tap.numberOfClicksRequired = 2
+            TouchGestures.configure(tap, titlebarTouchOnly)
+            titlebarTouchOnly.simultaneous = true
+            titlebarTouchOnly.accepts = { [weak self, weak tap] point in
+                guard let self, let view = tap?.view else { return false }
+                return self.isOnEmptyTitlebar(view.convert(point, to: nil))
+            }
+            titlebarDoubleTap = tap
+            return tap
+        }()
+        tap.view?.removeGestureRecognizer(tap)
+        container.addGestureRecognizer(tap)
+    }
+
+    @objc private func titlebarDoubleTapped(_ tap: NSClickGestureRecognizer) {
+        titlebarDoubleTapped(at: tap.location(in: nil))
+    }
+
+    /// Two taps at `point` (window coordinates) on the strip: what a double-click there does.
+    func titlebarDoubleTapped(at point: NSPoint) {
+        guard isOnEmptyTitlebar(point), let event = TouchPress.mouseDown(at: point, in: self) else { return }
+        lastTitlebarTap = nil
+        titleBarMouseDown(event, clicks: 2)
+    }
+
+    /// Whether `point` is on the title bar strip, off the window's own buttons and ours.
+    func isOnEmptyTitlebar(_ point: NSPoint) -> Bool {
+        guard let container = standardWindowButton(.closeButton)?.superview?.superview, container.frame.contains(point) else { return false }
+        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            if let b = standardWindowButton(button), !b.isHidden, b.convert(b.bounds, to: nil).insetBy(dx: -4, dy: -4).contains(point) { return false }
+        }
+        return control(at: point) == nil
+    }
 
     private func routeTitlebarEvent(_ event: NSEvent) -> Bool {
         switch event.type {
         case .leftMouseDown, .rightMouseDown:
             guard let target = control(at: event.locationInWindow) else { return false }
             pressTarget = target
+            lastTitlebarPress = ProcessInfo.processInfo.systemUptime
             if event.type == .leftMouseDown {
                 makeKeyAndOrderFront(nil)
                 target.mouseDown(with: event)
@@ -381,6 +497,7 @@ final class BrowserWindow: NSWindow {
 
     /// Moves the system buttons into our top row. AppKit re-lays them out on resize, so this runs often.
     func layoutTrafficLights() {
+        attachTitlebarDoubleTap()
         guard let origin = trafficLightOrigin else { return }
         // AppKit moves the title bar between the window and the full screen bar meanwhile; resizing it then could
         // leave full screen half made (#401). The controller lays them out once it's done.
@@ -541,10 +658,24 @@ extension NSWindow {
         (0..<3).map { NSPoint(x: origin.x + CGFloat($0) * step, y: titlebarHeight - origin.y - buttonHeight) }
     }
 
+    /// A full screen window stays put, also on its way in or out (#483).
+    static func dragMovesWindow(fullScreen: Bool, phase: FullScreenPhase) -> Bool {
+        !fullScreen && !phase.isMoving
+    }
+
+    var dragMovesWindow: Bool {
+        Self.dragMovesWindow(fullScreen: styleMask.contains(.fullScreen),
+                             phase: (self as? BrowserWindow)?.fullScreenPhase ?? .windowed)
+    }
+
     /// A press on chrome that stands in for the title bar (the sidebar, the bar above the page): a drag moves the
     /// window, and a double-click zooms it, or does whatever the Mac's title bar double-click is set to do.
-    func titleBarMouseDown(_ event: NSEvent) {
-        guard event.clickCount == 2 else { performDrag(with: event); return }
+    func titleBarMouseDown(_ event: NSEvent, clicks: Int? = nil) {
+        guard (clicks ?? TouchDoubleTap.clickCount(for: event)) == 2 else { if dragMovesWindow { performDrag(with: event) }; return }
+        // One finger double tap can reach both the title bar strip and the view under it; it acts once.
+        let now = ProcessInfo.processInfo.systemUptime
+        guard event.clickCount >= 2 || now - TitleBarAction.lastAt > 0.5 else { return }
+        TitleBarAction.lastAt = now
         switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
         case "Minimize": miniaturize(nil)
         case "None": break
@@ -559,5 +690,58 @@ enum QuietKeys {
     static func passQuietly(_ selector: Selector, _ event: NSEvent?) -> Bool {
         guard selector == #selector(NSResponder.keyDown(with:)), let event, event.type == .keyDown else { return false }
         return !event.modifierFlags.contains(.command)
+    }
+}
+
+/// When chrome standing in for the title bar last zoomed or minimized the window.
+enum TitleBarAction {
+    static var lastAt: TimeInterval = 0
+}
+
+extension BrowserWindow: TouchPress.Handling {
+    /// A finger landing: the press hooks `sendEvent` runs for a mouse-down (the window controller's included).
+    func touchPressed(_ event: NSEvent) {
+        notePress(at: event.locationInWindow)
+        _ = eventInterceptor?(event)
+    }
+
+    /// A tap on one of our controls in the title bar strip, where AppKit's click from it went to the title bar and
+    /// never reached `routeTitlebarEvent`: the control is clicked.
+    func touchTapped(_ event: NSEvent, downAt time: TimeInterval) {
+        let point = event.locationInWindow
+        if spentTap.takes(at: point) { return }
+        // Two taps on the title bar strip's empty space: AppKit's own title bar takes them as single clicks.
+        if isOnEmptyTitlebar(point) {
+            let previous = lastTitlebarTap
+            lastTitlebarTap = (time, point)
+            if TouchDoubleTap.isSecondTap(after: previous, at: time, point: point, interval: NSEvent.doubleClickInterval) {
+                lastTitlebarTap = nil
+                titleBarMouseDown(event, clicks: 2)
+            }
+            return
+        }
+        if lastLeftMouseDown < time, clickWithoutItsClick(event) { return }
+        guard lastTitlebarPress < time, let target = control(at: point) as? InteractiveView, target.isEnabled,
+              let frame = contentView?.superview, let hit = frame.hitTest(point), !hit.isDescendant(of: target) else { return }
+        target.onClick?(event)
+        // Clicked from here, there's no click of its own to come.
+        spentTap.disarm()
+    }
+
+    /// A tap AppKit made no click from: the drawn control under it gets its click all the same, and a late click is dropped.
+    private func clickWithoutItsClick(_ event: NSEvent) -> Bool {
+        let point = event.locationInWindow
+        guard let content = contentView, var view = content.hitTest(content.superview?.convert(point, from: nil) ?? point) else { return false }
+        while !(view is InteractiveView) {
+            guard !(view is WKWebView), let parent = view.superview, parent !== content else { return false }
+            view = parent
+        }
+        guard let target = view as? InteractiveView, target.isEnabled, let onClick = target.onClick else { return false }
+        TouchLog.note("tap with no click: clicked \(type(of: target))")
+        // Only a late click is dropped: the next tap, even on the row next to it, still counts.
+        spentAt = ProcessInfo.processInfo.systemUptime
+        spentClick.arm(at: [point])
+        onClick(event)
+        return true
     }
 }

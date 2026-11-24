@@ -60,7 +60,7 @@ enum Shortcuts {
         return result
     }
 
-    private static func combo(of item: NSMenuItem) -> Combo {
+    static func combo(of item: NSMenuItem) -> Combo {
         Combo(key: item.keyEquivalent, modifiers: item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask).rawValue)
     }
 
@@ -72,7 +72,7 @@ enum Shortcuts {
     /// Call once the menu bar is built: remembers the shipped shortcuts, then applies yours. An item whose new
     /// shipped keys you'd already given to something else comes in without them, so your choice stands.
     static func apply() {
-        var saved = overrides
+        var saved = renamed(overrides)
         let items = allItems
         for item in items {
             guard let id = id(item) else { continue }
@@ -90,6 +90,19 @@ enum Shortcuts {
             }
         }
         if saved != overrides { overrides = saved }
+    }
+
+    /// Items whose action was renamed, old id to new: what you gave the old one stays yours.
+    static let renamedIDs = ["terminate:#0": "quitFromMenu:#0"]
+
+    /// Your changes under the ids their items have now.
+    static func renamed(_ saved: [String: Combo]) -> [String: Combo] {
+        var saved = saved
+        for (old, new) in renamedIDs {
+            guard let combo = saved.removeValue(forKey: old) else { continue }
+            if saved[new] == nil { saved[new] = combo }
+        }
+        return saved
     }
 
     /// Items with no change of yours whose shipped keys you gave to another item.
@@ -236,7 +249,22 @@ enum Shortcuts {
 
     /// The menu item's shortcut as it is now, one key per cap, or none.
     static func caps(for action: Selector) -> [String] {
-        allItems.first { $0.action == action }.map { caps($0) } ?? []
+        item(for: action).map { caps($0) } ?? []
+    }
+
+    /// The first of `allItems` doing `action`, found without listing them all.
+    static func item(for action: Selector) -> NSMenuItem? {
+        func walk(_ menu: NSMenu) -> NSMenuItem? {
+            for item in menu.items {
+                if let sub = item.submenu {
+                    if let found = walk(sub) { return found }
+                } else if item.action == action, id(item) != nil {
+                    return item
+                }
+            }
+            return nil
+        }
+        return NSApp.mainMenu.flatMap(walk)
     }
 
     private static func name(of key: String) -> String {

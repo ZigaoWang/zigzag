@@ -298,7 +298,7 @@ extension ExtensionBridgeTests {
             streamController.close();
             await streaming;
             const cases = [
-              [other, { credentials: 'omit' }], [other, { credentials: 'include', method: 'PROPFIND' }],
+              [other, { credentials: 'include', method: 'PROPFIND' }],
               [other, { credentials: 'include', mode: 'same-origin' }], [other, { credentials: 'include', mode: 'no-cors' }],
               [other, { credentials: 'include', integrity: 'sha256-test' }],
               [other, { credentials: 'include', redirect: 'manual' }], [other, { credentials: 'include', keepalive: true }],
@@ -716,6 +716,179 @@ extension ExtensionBridgeTests {
         #expect(try await fetched(.all) == #"200 {"signedIn":false}"#)
     }
 
+    /// Litewarden (#478): a fetch with credentials: 'omit' and its own headers, to a server that sends no CORS headers.
+    /// With host access it goes natively, without the profile's cookies, with its headers; without, it stays WebKit's,
+    /// bound by CORS.
+    @Test func omitFetchWithHostAccessGetsPastCORSWithoutCookies() async throws {
+        let server = try SessionTestServer()
+        let target = try await server.start().appendingPathComponent("headers")
+        defer { server.listener.cancel() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["<all_urls>"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("<!doctype html><title>page</title>".utf8).write(to: folder.appendingPathComponent("page.html"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        // The profile has a session cookie for the server; omit must not send it.
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/"])))
+
+        func fetched(granted: Bool, bridged: Bool) async throws -> String {
+            let controller = WKWebExtensionController(configuration: .nonPersistent())
+            let context = WKWebExtensionContext(for: ext)
+            try controller.load(context)
+            defer { try? controller.unload(context) }
+            if granted { context.setPermissionStatus(.grantedExplicitly, for: .allURLs()) }
+            let configuration = try #require(context.webViewConfiguration)
+            let door = HostAccessFetchDoor(context: context, store: store)
+            configuration.userContentController.addScriptMessageHandler(door, contentWorld: .page, name: "door")
+            let page = WKWebView(frame: .zero, configuration: configuration)
+            page.load(URLRequest(url: context.baseURL.appendingPathComponent("page.html")))
+            for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(100)) }
+            #expect(page.title == "page")
+            if bridged {
+                // The page's policy allows no eval: the bridge runs as a script of its own, as Zigzag runs it.
+                _ = try await page.callAsyncJavaScript("""
+                    const runtime = { id: 'test', getManifest: () => ({}),
+                      sendNativeMessage: (host, message) => window.webkit.messageHandlers.door.postMessage(message)
+                        .then((value) => ({ value }), (error) => ({ error: String(error && error.message || error) })) };
+                    Object.defineProperty(globalThis, 'chrome', { value: { runtime }, configurable: true, writable: true });
+                    """, in: nil, contentWorld: .page)
+                _ = try await page.callAsyncJavaScript(ExtensionBridgeScript.source, in: nil, contentWorld: .page)
+            }
+            return try await page.callAsyncJavaScript("""
+                try {
+                  const response = await fetch(target, { credentials: 'omit', cache: 'no-store',
+                    headers: { 'Bitwarden-Client-Name': 'web', 'Device-Type': '9' } });
+                  const text = (await response.text()).toLowerCase();
+                  return [response.status, response.headers.get('content-type'), text.includes('bitwarden-client-name: web'),
+                          text.includes('device-type: 9'), text.includes('origin: chrome-extension://test'), text.includes('cookie:')].join(' ');
+                } catch (error) { return error.name; }
+                """, arguments: ["target": target.absoluteString], in: nil, contentWorld: .page) as? String ?? ""
+        }
+        // The cause: WebKit's own fetch is past CORS for a simple request only, not one it asks the server about first.
+        #expect(try await fetched(granted: true, bridged: true) == "200 application/octet-stream true true true false")
+        #expect(try await fetched(granted: false, bridged: true) == "TypeError")
+        #expect(try await fetched(granted: false, bridged: false) == "TypeError")
+        // Nothing the server set came back into the profile.
+        #expect(await store.httpCookieStore.allCookies().map(\.name) == ["session"])
+    }
+
+    /// Omit goes natively with no cookie out and none kept, its headers, method and body as sent and its answer's
+    /// status, headers and body as they came; default credentials without SameSite cookies stay WebKit's.
+    @Test func omitRequestsSendTheirHeadersAndBodyWithoutCookies() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/", .init("SameSite"): "Lax"])))
+        let requests = ExtensionFetchRequests()
+        func send(_ options: [String: Any], _ path: String) async throws -> [String: Any] {
+            try #require(try await requests.withHostAccess(options, url: url.appendingPathComponent(path), extensionID: "test", store: store,
+                                                           keepsSameSiteCookies: { false }, authorize: { _ in true }) as? [String: Any])
+        }
+        func text(_ answer: [String: Any]) -> String {
+            String(decoding: Data(base64Encoded: answer["body"] as? String ?? "") ?? Data(), as: UTF8.self)
+        }
+        let headers = try await send(["credentials": "omit", "method": "GET", "cache": "no-store",
+                                      "headers": [["bitwarden-client-name", "web"], ["device-type", "9"]]], "headers")
+        #expect(headers["status"] as? Int == 200)
+        let sent = text(headers).lowercased()
+        #expect(sent.hasPrefix("get /headers "))
+        #expect(sent.contains("bitwarden-client-name: web") && sent.contains("device-type: 9"))
+        #expect(sent.contains("origin: chrome-extension://test"))
+        #expect(!sent.contains("cookie:"))
+        let answered = try #require(headers["headers"] as? [[String]])
+        #expect(answered.contains(["content-type", "application/octet-stream"]))
+        #expect(answered.contains(["cache-control", "public, max-age=3600"]))
+        #expect(!answered.contains { $0[0] == "set-cookie" })
+        for method in ["POST", "PUT", "DELETE"] {
+            let echo = try await send(["credentials": "omit", "method": method, "body": #"{"email":"a@b.c"}"#,
+                                       "headers": [["content-type", "application/json"]]], "echo")
+            #expect(text(echo) == #"{"email":"a@b.c"}"#)
+        }
+        let binary = try await send(["credentials": "omit", "method": "POST", "body": "AP8=", "encoding": "base64",
+                                     "headers": [["content-type", "application/octet-stream"]]], "echo")
+        #expect(Data(base64Encoded: binary["body"] as? String ?? "") == Data([0, 255]))
+        #expect(text(try await send(["credentials": "omit", "method": "GET"], "me")) == #"{"signedIn":false}"#)
+        // Nothing the server set came back into the profile.
+        #expect(await store.httpCookieStore.allCookies().map(\.name) == ["session"])
+        // A read too big to carry whole is WebKit's to stream, as with other credentials.
+        #expect(try await send(["credentials": "omit", "method": "GET"], "huge")["fallback"] as? Bool == true)
+        let before = server.requests.withLock { $0 }
+        #expect(try await send(["credentials": "same-origin", "method": "GET"], "me")["fallback"] as? Bool == true)
+        #expect(server.requests.withLock { $0 } == before)
+    }
+
+    /// A body goes out with the Content-Type the extension's request had, or none: never URLSession's own form type,
+    /// which Chrome doesn't send for bytes (Hotspot Shield's protobuf sign-in, #475).
+    @Test func aBodySendsOnlyTheContentTypeItWasGiven() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        let requests = ExtensionFetchRequests()
+        func sentTypes(_ headers: [[String]], body: String = "CiAIAA==", encoding: String? = "base64") async throws -> [String] {
+            var options: [String: Any] = ["credentials": "omit", "method": "POST", "body": body, "headers": headers]
+            if let encoding { options["encoding"] = encoding }
+            let answer = try #require(try await requests.withHostAccess(options, url: url.appendingPathComponent("headers"), extensionID: "test", store: store,
+                                                                        keepsSameSiteCookies: { false }, authorize: { _ in true }) as? [String: Any])
+            let sent = String(decoding: Data(base64Encoded: answer["body"] as? String ?? "") ?? Data(), as: UTF8.self)
+            return sent.components(separatedBy: "\r\n").map { $0.lowercased() }.filter { $0.hasPrefix("content-type:") }
+        }
+        // Bytes, as an ArrayBuffer, a typed array or a Blob without a type: no type. CFNetwork always writes the line,
+        // so it goes empty, which servers read as none.
+        let none = try await sentTypes([])
+        #expect(none == ["content-type: "], "\(none)")
+        // What the request carried, as fetch derived it (a string's, a form's boundary) or the extension set it.
+        #expect(try await sentTypes([["content-type", "text/plain;charset=UTF-8"]], body: "hi", encoding: nil) == ["content-type: text/plain;charset=utf-8"])
+        #expect(try await sentTypes([["content-type", "multipart/form-data; boundary=----x"]]) == ["content-type: multipart/form-data; boundary=----x"])
+        #expect(try await sentTypes([["Content-Type", "application/x-protobuf"]]) == ["content-type: application/x-protobuf"])
+    }
+
+    /// bridge.js hands omit to Zigzag like the other credentials, with what the request carries, and reads the answer
+    /// as sent; Zigzag's fallback answer, as without host access, leaves it to WebKit.
+    @Test func omitFetchGoesToZigzag() async throws {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let page = WKWebView(frame: .zero, configuration: configuration)
+        let result = try await page.callAsyncJavaScript("""
+            const calls = [], normal = [];
+            if (!crypto.randomUUID) crypto.randomUUID = () => '00000000-0000-4000-8000-000000000000';
+            globalThis.chrome = { runtime: {
+              id: 'test', getManifest: () => ({}),
+              sendNativeMessage: async (host, message) => {
+                calls.push(message);
+                const options = message.args[0];
+                if (options.url.includes('unapproved.example')) return { value: { fallback: true } };
+                return { value: { status: 201, statusText: '', headers: [['content-type', 'application/json'], ['x-server', 'yes']],
+                                  body: btoa('{"ok":true}'), url: options.url, redirected: false } };
+              }
+            } };
+            globalThis.fetch = async (input, init) => { normal.push([input, init]); return new Response('webkit'); };
+            eval(bridge);
+            const api = 'https://vault.example/api/config';
+            const answer = await fetch(api, { credentials: 'omit', cache: 'no-store', headers: { 'Bitwarden-Client-Name': 'web', 'Device-Type': '9' } });
+            const first = calls[0] && calls[0].args[0];
+            const sentHeaders = new Map(first ? first.headers : []);
+            const native = !!first && first.credentials === 'omit' && first.cache === 'no-store' && first.method === 'GET'
+              && sentHeaders.get('bitwarden-client-name') === 'web' && sentHeaders.get('device-type') === '9';
+            const answered = answer.status === 201 && answer.headers.get('x-server') === 'yes' && (await answer.json()).ok === true;
+            await fetch(api, { credentials: 'omit', method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"a":1}' });
+            await fetch(api, { credentials: 'omit' });
+            const posted = calls.length === 3 && calls[1].args[0].body === '{"a":1}' && calls[1].args[0].method === 'POST'
+              && calls[2].args[0].credentials === 'omit' && normal.length === 0;
+            await fetch('https://unapproved.example/api', { credentials: 'omit', headers: { 'Device-Type': '9' } });
+            const declined = calls.length === 4 && normal.length === 1;
+            return { native, answered, posted, declined };
+            """, arguments: ["bridge": ExtensionBridgeScript.source], in: nil, contentWorld: .page) as? [String: Any]
+        let value = try #require(result)
+        for key in ["native", "answered", "posted", "declined"] {
+            #expect(value[key] as? Bool == true, "Failed: \(key)")
+        }
+    }
+
     @Test func siteAccessChoicesGrantWhatTheySay() throws {
         let required = try WKWebExtension.MatchPattern(string: "https://api.example/*")
         let optional: Set = [try WKWebExtension.MatchPattern(string: "*://*/*")]
@@ -989,6 +1162,31 @@ struct ExtensionNotificationKeyTests {
     @Test func whatIsntAnExtensionsIsRefused() {
         #expect(ExtensionNotificationKey("site|example.com|1") == nil)
         #expect(ExtensionNotificationKey("ext|\(rabby)") == nil)
+    }
+}
+
+/// The bridge's extensionFetch for a test extension page: host access as BridgeExtensionFetch checks it, then the
+/// same routing, with a store of the test's own.
+@MainActor
+private final class HostAccessFetchDoor: NSObject, WKScriptMessageHandlerWithReply {
+    let context: WKWebExtensionContext
+    let store: WKWebsiteDataStore
+    let requests = ExtensionFetchRequests()
+    init(context: WKWebExtensionContext, store: WKWebsiteDataStore) { self.context = context; self.store = store }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
+        guard let body = message.body as? [String: Any], let options = (body["args"] as? [Any])?.first as? [String: Any],
+              let url = (options["url"] as? String).flatMap(URL.init(string:)) else { return replyHandler(nil, "Invalid request.") }
+        guard BridgeExtensionFetch.allows(url, context: context) else { return replyHandler(["fallback": true], nil) }
+        let context = context
+        Task { @MainActor in
+            do {
+                let answer = try await requests.withHostAccess(options, url: url, extensionID: "test", store: store, keepsSameSiteCookies: { false },
+                                                               authorize: { BridgeExtensionFetch.allows($0, context: context) })
+                replyHandler(answer, nil)
+            } catch { replyHandler(nil, (error as? BridgeError)?.message ?? "\(error)") }
+        }
     }
 }
 
@@ -1371,5 +1569,175 @@ extension ExtensionBridgeTests {
         // Allowed there, it lists them.
         context.hasAccessToPrivateData = true
         #expect(privateWindow.tabs(for: context).compactMap { ($0 as? Tab)?.displayTitle } == ["Private"])
+    }
+}
+
+/// A large content script for many sites is held once, not once per site, and still runs once where it matches (#485).
+@MainActor
+struct ContentScriptCopiesTests {
+    private static func footprint() -> Int64 {
+        var usage = rusage_info_v4()
+        let result = withUnsafeMutablePointer(to: &usage) {
+            $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(getpid(), RUSAGE_INFO_V4, $0) }
+        }
+        return result == 0 ? Int64(usage.ri_phys_footprint) : 0
+    }
+
+    @Test func aLargeScriptForManySitesIsHeldOnce() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sites = (0..<60).map { "http://site\($0).example/*" } + ["http://localhost/*"]
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "Probe", "version": "1.0",
+                                       "content_scripts": [["matches": sites, "js": ["cs.js"], "run_at": "document_start"]]]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: folder.appendingPathComponent("manifest.json"))
+        // About 1 MB, with a character outside Latin-1 so WebKit holds it as UTF-16, as uBlacklist's is.
+        let padding = String(repeating: "var padding = 'padding padding padding padding padding padding';\n", count: 16_000)
+        let script = "// \u{2014}\n" + padding + "document.documentElement.dataset.cs = String(Number(document.documentElement.dataset.cs || 0) + 1);"
+        try Data(script.utf8).write(to: folder.appendingPathComponent("cs.js"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        let controller = WKWebExtensionController(configuration: .nonPersistent())
+        let context = WKWebExtensionContext(for: ext)
+        ExtensionHost.applySiteAccess(nil, approved: Array(ext.allRequestedMatchPatterns), sites: [], offSites: [], approvesActiveTab: false, to: context)
+        #expect(context.grantedPermissionMatchPatterns.count == sites.count)
+
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController = WKUserContentController()
+        configuration.webExtensionController = controller
+        let page = WKWebView(frame: .zero, configuration: configuration)
+        func load() async throws -> String? {
+            page.loadHTMLString("<!doctype html><title>t</title>", baseURL: URL(string: "http://localhost:8123/")!)
+            for _ in 0..<100 where page.isLoading || page.title != "t" { try await Task.sleep(for: .milliseconds(50)) }
+            return try await page.evaluateJavaScript("document.documentElement.dataset.cs || ''") as? String
+        }
+        // The page's process is running before the extension loads, as a restored tab's is at launch.
+        _ = try await load()
+        let before = Self.footprint()
+        try controller.load(context)
+        defer { try? controller.unload(context) }
+        var runs: String?
+        for _ in 0..<40 {
+            runs = try await load()
+            if runs == "1" { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        #expect(runs == "1")
+        // One copy per granted site would be about 120 MB.
+        let grown = Self.footprint() - before
+        #expect(grown < 40_000_000, "grew \(grown / 1_000_000) MB")
+    }
+}
+
+/// chrome.sessions lists what History › Recently Closed brings back (#486).
+@MainActor
+struct ExtensionSessionsTests {
+    private let mine = UUID(), other = UUID()
+    private let home = UUID(), away = UUID()
+
+    private func closed(_ title: String, at seconds: TimeInterval, space: UUID? = nil, url: String? = "https://example.com/") -> TabManager.ClosedTab {
+        TabManager.ClosedTab(url: url.flatMap(URL.init(string:)), title: title, spaceID: space ?? home, index: 3, interactionState: nil,
+                             closedAt: Date(timeIntervalSince1970: seconds))
+    }
+
+    private func window(space: UUID, pages: [String]) -> SessionState.WindowState {
+        let tabs = pages.map { SessionState.TabState(id: UUID(), url: URL(string: "https://\($0).example/"), title: $0,
+                                                     lastActivated: Date(), createdAt: Date()) }
+        return SessionState.WindowState(frame: [0, 0, 800, 600], sidebarVisible: true, sidebarWidth: 240, currentSpaceID: space,
+                                        spaces: [SessionState.SpaceTabs(spaceID: space, tabs: tabs, selectedTabID: tabs.first?.id)], bookmarkTabs: [])
+    }
+
+    private func profileOf(_ space: UUID) -> UUID { space == home ? mine : other }
+
+    @Test func newestFirstOnlyThisProfilesAndOnlyPages() {
+        let a = closed("A", at: 100), b = closed("B", at: 300), elsewhere = closed("Elsewhere", at: 400, space: away)
+        let blank = closed("Blank", at: 500, url: nil)
+        let windowID = UUID()
+        let entries = BridgeSessions.mine(tabs: [a, b, elsewhere, blank, a],
+                                          windows: [(windowID, window(space: home, pages: ["one", "two"]), Date(timeIntervalSince1970: 200)),
+                                                    (UUID(), window(space: away, pages: ["three"]), Date(timeIntervalSince1970: 600))],
+                                          profile: mine, profileOf: profileOf)
+        let sessions = BridgeSessions.recentlyClosed(entries, maxResults: nil).map(BridgeSessions.session)
+        #expect(sessions.map { $0["lastModified"] as? Int } == [300, 200, 100])
+        let tab = sessions[0]["tab"] as? [String: Any]
+        #expect(tab?["sessionId"] as? String == "t:\(b.id)")
+        #expect(tab?["title"] as? String == "B")
+        #expect(tab?["url"] as? String == "https://example.com/")
+        #expect(tab?["index"] as? Int == 3)
+        #expect(tab?["incognito"] as? Bool == false)
+        let shown = sessions[1]["window"] as? [String: Any]
+        #expect(shown?["sessionId"] as? String == "w:\(windowID)")
+        #expect((shown?["tabs"] as? [[String: Any]])?.map { $0["title"] as? String } == ["one", "two"])
+        #expect((shown?["tabs"] as? [[String: Any]])?.map { $0["index"] as? Int } == [0, 1])
+        #expect(JSONSerialization.isValidJSONObject(sessions))
+    }
+
+    @Test func maxResultsDefaultsToAndStopsAt25() {
+        let entries = (0..<40).map { BridgeSessions.Entry.tab(closed("\($0)", at: TimeInterval($0))) }
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: nil).count == 25)
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: 100).count == 25)
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: -1).isEmpty)
+        #expect(BridgeSessions.recentlyClosed(entries, maxResults: 3).map { BridgeSessions.session($0)["lastModified"] as? Int } == [39, 38, 37])
+    }
+
+    @Test func aTieGoesToTheOneClosedLater() {
+        let first = closed("First", at: 100), second = closed("Second", at: 100)
+        #expect(BridgeSessions.newestFirst([.tab(first), .tab(second)]).map(\.sessionID) == ["t:\(second.id)", "t:\(first.id)"])
+    }
+
+    @Test func needsTheSessionsPermission() {
+        #expect(BridgeSessions.permission == "sessions")
+        #expect(ExtensionBridge.handlerNames.contains("sessions"))
+        #expect(ExtensionBridgeScript.permissions.contains("sessions"))
+        let now = Date()
+        let granted = [WKWebExtension.Permission(rawValue: "sessions"): now.addingTimeInterval(60)]
+        #expect(ExtensionBridge.allows("sessions", declared: (["sessions"], []), granted: granted, now: now))
+        #expect(!ExtensionBridge.allows("sessions", declared: ([], []), granted: granted, now: now))
+        #expect(!ExtensionBridge.allows("sessions", declared: (["sessions"], []), granted: [:], now: now))
+    }
+
+    @Test func aPrivateWindowsClosingTellsNoOne() {
+        var heard = 0
+        let token = WindowManager.recentlyClosedChanged.observe { heard += 1 }
+        defer { token.cancel() }
+        let secret = TabStore(isPrivate: true)
+        secret.closedTabs.append(closed("Private", at: 100))
+        #expect(heard == 0)
+        let everyday = TabStore()
+        everyday.closedTabs.append(closed("Everyday", at: 100))
+        #expect(heard == 1)
+    }
+}
+
+/// bookmarks.onChildrenReordered fires for a sort-like reorder, not a single move (#487).
+struct BookmarkReorderTests {
+    @Test func aSortIsAReorder() {
+        let sorted = BridgeBookmarks.reordered(before: ["s:1": ["d", "c", "b", "a"], "s:2": ["x", "y"]],
+                                               after: ["s:1": ["a", "b", "c", "d"], "s:2": ["x", "y"]])
+        #expect(sorted.map(\.parent) == ["s:1"])
+        #expect(sorted.first?.childIds == ["a", "b", "c", "d"])
+    }
+
+    @Test func oneMoveAddOrRemoveIsNot() {
+        #expect(BridgeBookmarks.reordered(before: ["1": ["a", "b", "c"]], after: ["1": ["b", "a", "c"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: ["1": ["c", "a", "b"]], after: ["1": ["a", "b", "c"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: ["1": ["a", "b", "c"]], after: ["1": ["c", "b", "a", "d"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: ["1": ["a", "b", "c"]], after: ["1": ["c", "a"]]).isEmpty)
+        #expect(BridgeBookmarks.reordered(before: [:], after: ["1": ["b", "a", "c"]]).isEmpty)
+        #expect(BridgeBookmarks.isOneMove(["a", "b", "c", "d"], ["b", "c", "d", "a"]))
+        #expect(!BridgeBookmarks.isOneMove(["a", "b", "c", "d"], ["b", "a", "d", "c"]))
+    }
+
+    @MainActor @Test func anImportIsBracketed() {
+        let library = Library.shared, profile = UUID()
+        var heard: [(started: Bool, profile: UUID)] = []
+        let token = library.bookmarkImport.observe { heard.append($0) }
+        defer { token.cancel() }
+        let value = library.importing(into: profile) { () -> Int in
+            #expect(heard.map(\.started) == [true])
+            return 7
+        }
+        #expect(value == 7)
+        #expect(heard.map(\.started) == [true, false])
+        #expect(heard.allSatisfy { $0.profile == profile })
     }
 }

@@ -546,4 +546,278 @@ struct PageLanguageChoiceTests {
         #expect(missing != PageTranslator.failureMessage(notDownloaded: nil))
         #expect(PageTranslator.failureMessage(notDownloaded: nil) == String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails."))
     }
+
+    // MARK: Always and Never
+
+    private func withChoices(_ body: (PageTranslator.Choices) throws -> Void) rethrows {
+        let name = "PageTranslatorTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        try body(PageTranslator.Choices(defaults: defaults))
+    }
+
+    @Test func alwaysAndNeverDecideWhatHappensOnTheirOwn() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR")
+            @MainActor func automatic(site: String = "lemonde.fr", translatedHere: Bool = false, neverHere: Set<String> = [],
+                           offers: Bool = true, declined: Bool = false) -> PageTranslator.Automatic {
+                choices.automatic(language: french, site: site, translatedHere: translatedHere, neverHere: neverHere, offers: offers, declined: declined)
+            }
+            // Nothing chosen: offered on each page until closed for the site, and not at all with the offer off.
+            #expect(automatic() == .offer)
+            #expect(automatic(declined: true) == .nothing)
+            #expect(automatic(offers: false) == .nothing)
+            // Always French translates on every site, by language code, even with the offer off.
+            choices.setAlways(true, "fr")
+            #expect(automatic(offers: false) == .translate)
+            #expect(automatic(site: "liberation.fr", declined: true) == .translate)
+            // Never French replaces Always French.
+            choices.setNever(true, "fr")
+            #expect(choices.alwaysLanguages.isEmpty)
+            #expect(automatic() == .nothing)
+            choices.setAlways(true, "fr")
+            #expect(choices.neverLanguages.isEmpty)
+            // Never This Site beats Always, whether kept or only for a private window.
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            #expect(automatic() == .nothing)
+            #expect(automatic(site: "liberation.fr") == .translate)
+            #expect(automatic(site: "liberation.fr", neverHere: ["liberation.fr"]) == .nothing)
+            // A site translated a moment ago keeps translating as you browse it, unless it's a Never site.
+            #expect(automatic(site: "liberation.fr", translatedHere: true, offers: false) == .translate)
+            #expect(automatic(translatedHere: true) == .nothing)
+        }
+    }
+
+    @Test func theAddressBarButtonSaysATranslationIsRunning() {
+        let address = AddressView()
+        address.setTranslation(available: true, translated: false, translating: true)
+        #expect(!address.translateButton.isSelected)
+        #expect(address.translateButton.toolTip == String(localized: "Translating Page…", comment: "Tooltip of the address bar's translate button while the page is being translated."))
+        address.setTranslation(available: true, translated: true)
+        #expect(address.translateButton.isSelected)
+        #expect(address.translateButton.tint == Tokens.Color.icon)
+    }
+
+    @Test func aPageLoadedAgainIsNoLongerTranslated() throws {
+        let tab = Tab(url: URL(string: "http://127.0.0.1:1/a.html"), spaceID: UUID())
+        _ = tab.ensureWebView()
+        tab.isTranslated = true
+        tab.webView(try #require(tab.webView), didCommit: nil)
+        #expect(!tab.isTranslated)
+    }
+
+    @Test func aTranslationIsRememberedForItsLanguagesOnly() {
+        let memory = TranslationMemory()
+        let french = Locale.Language(identifier: "fr"), dutch = Locale.Language(identifier: "nl"), english = Locale.Language(identifier: "en")
+        memory[.init("Aide", from: french, to: english)] = "Help"
+        #expect(memory[.init("Aide", from: french, to: english)] == "Help")
+        #expect(memory[.init("Aide", from: dutch, to: english)] == nil)
+    }
+
+    /// A Never chosen while a site was translated this session wins at once: the site, or every site translated from
+    /// that language, no longer translates its next page on its own.
+    @Test func aNeverChoiceStopsASiteTranslatedThisSession() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR"), german = Locale.Language(identifier: "de")
+            let sites: [String: Locale.Language] = ["lemonde.fr": french, "liberation.fr": french, "spiegel.de": german]
+            @MainActor func automatic(_ site: String, _ translated: [String: Locale.Language]) -> PageTranslator.Automatic {
+                choices.automatic(language: translated[site] ?? french, site: site, translatedHere: translated[site] != nil,
+                                  offers: true, declined: true)
+            }
+            #expect(automatic("lemonde.fr", sites) == .translate)
+            // Never This Site, from another tab of the site: only that site stops.
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            let afterSite = PageTranslator.translated(sites, neverSite: "lemonde.fr")
+            #expect(afterSite.keys.sorted() == ["liberation.fr", "spiegel.de"])
+            #expect(automatic("lemonde.fr", afterSite) == .nothing)
+            #expect(automatic("liberation.fr", afterSite) == .translate)
+            // Never French: every site translated from French stops, German ones go on.
+            choices.setNever(true, "fr")
+            let afterLanguage = PageTranslator.translated(afterSite, neverLanguage: "fr")
+            #expect(afterLanguage.keys.sorted() == ["spiegel.de"])
+            #expect(automatic("liberation.fr", afterLanguage) == .nothing)
+            #expect(choices.automatic(language: german, site: "spiegel.de", translatedHere: afterLanguage["spiegel.de"] != nil,
+                                      offers: true, declined: true) == .translate)
+        }
+    }
+
+    /// A Never chosen in one window, or in Settings, holds in a window that still counts the site as translated.
+    @Test func aNeverChoiceBeatsASiteTranslatedInAnotherWindow() {
+        withChoices { choices in
+            let french = Locale.Language(identifier: "fr-FR")
+            @MainActor func automatic(_ site: String = "lemonde.fr") -> PageTranslator.Automatic {
+                choices.automatic(language: french, site: site, translatedHere: true, offers: true, declined: true)
+            }
+            #expect(automatic() == .translate)
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            #expect(automatic() == .nothing)
+            #expect(automatic("liberation.fr") == .translate)
+            choices.setNever(true, "fr")
+            #expect(automatic("liberation.fr") == .nothing)
+        }
+    }
+
+    @Test func aPrivateWindowKeepsNoSites() {
+        withChoices { choices in
+            #expect(!choices.setNeverSite(true, "lemonde.fr", isPrivate: true))
+            #expect(choices.neverSites.isEmpty)
+            #expect(choices.defaults.object(forKey: "TranslateNeverSites") == nil)
+            // What was chosen in a normal window still counts there.
+            #expect(choices.setNeverSite(true, "lemonde.fr", isPrivate: false))
+            #expect(!choices.setNeverSite(false, "lemonde.fr", isPrivate: true))
+            #expect(choices.neverSites == ["lemonde.fr"])
+            #expect(choices.automatic(language: Locale.Language(identifier: "fr"), site: "lemonde.fr", translatedHere: false,
+                                      offers: true, declined: false) == .nothing)
+        }
+    }
+
+    @Test func settingsListsTheChoicesAndRemovesOne() {
+        withChoices { choices in
+            let names = ["fr": "French", "de": "German", "ja": "Japanese", "es": "Spanish"]
+            choices.setAlways(true, "ja")
+            choices.setAlways(true, "fr")
+            choices.setNever(true, "es")
+            choices.setNever(true, "de")
+            choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+            let listed = choices.entries { names[$0] ?? $0 }
+            #expect(listed.always == [.always("fr"), .always("ja")])
+            #expect(listed.never == [.neverLanguage("de"), .neverLanguage("es"), .neverSite("lemonde.fr")])
+            choices.remove(.always("fr"))
+            choices.remove(.neverSite("lemonde.fr"))
+            let after = choices.entries { names[$0] ?? $0 }
+            #expect(after.always == [.always("ja")])
+            #expect(after.never == [.neverLanguage("de"), .neverLanguage("es")])
+            #expect(choices.defaults.object(forKey: "TranslateNeverSites") == nil)
+            // Kept in the existing setting, so Always choices made before this still show.
+            #expect(choices.defaults.stringArray(forKey: "TranslateAlways") == ["ja"])
+        }
+    }
+}
+
+extension PageTranslatorTests {
+    /// A page in a language or on a site set to Never gets no translate button; a translated one keeps it.
+    @Test func neverHidesTheTranslateButton() {
+        #expect(PageTranslator.offersButton(foreign: true, translated: false, never: false))
+        #expect(!PageTranslator.offersButton(foreign: true, translated: false, never: true))
+        #expect(PageTranslator.offersButton(foreign: true, translated: true, never: true))
+        #expect(!PageTranslator.offersButton(foreign: false, translated: false, never: false))
+    }
+}
+
+extension PageTranslatorTests {
+    /// Every Always or Never choice says it changed, so each window's translate button and Settings › Translation
+    /// follow one made anywhere.
+    @MainActor @Test func everyChoiceSaysItChanged() {
+        let name = "PageTranslatorTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let choices = PageTranslator.Choices(defaults: defaults)
+        var heard = 0
+        let token = PageTranslator.choicesChanged.observe { heard += 1 }
+        defer { token.cancel() }
+        choices.setNever(true, "fr")
+        #expect(heard > 0)
+        heard = 0
+        choices.setNeverSite(true, "lemonde.fr", isPrivate: false)
+        #expect(heard > 0)
+        heard = 0
+        choices.remove(.neverSite("lemonde.fr"))
+        #expect(heard > 0)
+        heard = 0
+        choices.setAlways(true, "ja")
+        #expect(heard > 0)
+    }
+}
+
+/// What a page is read as for the translate offer: English pages, however they're marked or whatever else they show,
+/// are English, and a language list or a few odd lines never make a page Hindi or Marathi.
+extension PageTranslatorTests {
+    private func language(_ html: String) async -> Locale.Language? {
+        let (webView, loading) = await page(html)
+        defer { _ = loading }
+        return await PageTranslator.pageLanguage(of: webView)
+    }
+
+    private static let article = """
+    <h1>Release notes for the spring update</h1>
+    <p>This update makes opening tabs faster and fixes a crash that could happen when a window was closed while a page was still loading.</p>
+    <p>Thanks to everyone who sent in reports. If something still looks wrong, open an issue and tell us what you were doing when it happened.</p>
+    """
+
+    /// A site's language picker, each language in its own script, in a plain div rather than a nav or footer.
+    private static let indicPicker = "<div>हिंदी मराठी বাংলা தமிழ் తెలుగు ಕನ್ನಡ മലയാളം ગુજરાતી ਪੰਜਾਬੀ ଓଡ଼ିଆ অসমীয়া नेपाली संस्कृतम्</div>"
+
+    @Test func anEnglishPageMarkedEnINIsEnglish() async {
+        #expect(await language("<html lang=\"en-IN\"><body>\(Self.article)</body></html>")?.languageCode == .english)
+        #expect(PageTranslator.language(declared: "en-IN")?.languageCode == .english)
+    }
+
+    @Test func anEnglishPageWithNoLangIsEnglish() async {
+        #expect(await language("<html><body>\(Self.article)</body></html>")?.languageCode == .english)
+    }
+
+    @Test func anEnglishPageWithAFewHindiAndChineseWordsIsEnglish() async {
+        let html = """
+        <html><body>\(Self.article)<p>Namaste and 你好 to our readers: <span>नमस्ते</span>, thanks for reading.</p>
+        <p>हिन्दी में पढ़ें</p><p>阅读中文版</p></body></html>
+        """
+        #expect(await language(html)?.languageCode == .english)
+    }
+
+    @Test func aWrongLangOnAnEnglishPageIsNotBelieved() async {
+        for lang in ["hi", "hi-IN", "IN", "in", "mr"] {
+            #expect(await language("<html lang=\"\(lang)\"><body>\(Self.article)</body></html>")?.languageCode == .english, "\(lang)")
+        }
+    }
+
+    @Test func aChinesePageOfEnglishPostsIsEnglish() async {
+        let html = """
+        <html lang="zh-CN"><body><nav>首页 最新 热门 类别</nav>
+        <div>回复</div><div>3 天前</div>\(Self.article)<div>分享</div><div>书签</div></body></html>
+        """
+        #expect(await language(html)?.languageCode == .english)
+    }
+
+    @Test func aLanguagePickerOnAShortEnglishPageIsNotHindi() async {
+        let html = "<html><body><h1>Sign in</h1><p>Use your account to keep reading.</p><p>Choose your language</p>\(Self.indicPicker)</body></html>"
+        let seen = await language(html)
+        #expect(seen == nil || seen?.languageCode == .english, "\(String(describing: seen))")
+    }
+
+    @Test func aLanguagePickerNamesNoLanguage() {
+        let picker = "हिंदी मराठी বাংলা தமிழ் తెలుగు ಕನ್ನಡ മലയാളം ગુજરાતી ਪੰਜਾਬੀ ଓଡ଼ିଆ অসমীয়া नेपाली संस्कृतम्"
+        #expect(PageTranslator.pageLanguage(blocks: [picker, picker], declared: nil) == nil)
+        let english = "Use your account to keep reading the articles you saved and the newsletters you follow, on any device."
+        #expect(PageTranslator.pageLanguage(blocks: [picker, picker, english], declared: nil)?.languageCode == .english)
+        #expect(PageTranslator.dominantLanguage(of: String(repeating: picker + " ", count: 3)) == nil)
+    }
+
+    @Test func shortLinesTheRecognizerGuessesAtDontDecide() {
+        // Place names read as Indonesian at about half confidence; the English around them is the page.
+        let blocks = ["Mumbai Delhi Bangalore Chennai Kolkata Hyderabad Pune",
+                      "Mumbai Delhi Bangalore Chennai Kolkata Hyderabad Pune",
+                      "ok ok ok lol lmao haha yes yes yes yes",
+                      "Our offices are open on weekdays."]
+        #expect(PageTranslator.pageLanguage(blocks: blocks, declared: nil)?.languageCode != .indonesian)
+    }
+
+    @Test func aPageInAnyOfYourLanguagesIsntForeign() {
+        let readers = ["zh-Hans-CN", "en-US"].map { Locale.Language(identifier: $0) }
+        #expect(!PageTranslator.isForeign(Locale.Language(identifier: "en"), readers: readers, always: []))
+        #expect(!PageTranslator.isForeign(Locale.Language(identifier: "en-IN"), readers: readers, always: []))
+        #expect(!PageTranslator.isForeign(Locale.Language(identifier: "zh-Hant"), readers: readers, always: []))
+        #expect(PageTranslator.isForeign(Locale.Language(identifier: "hi"), readers: readers, always: []))
+        #expect(PageTranslator.isForeign(Locale.Language(identifier: "en"), readers: [Locale.Language(identifier: "zh-Hans")], always: []))
+        // Always Translate English still translates it.
+        #expect(PageTranslator.isForeign(Locale.Language(identifier: "en"), readers: readers, always: ["en"]))
+    }
+
+    @Test func aLanguageMustBeWrittenInTheTextsScript() {
+        #expect(PageTranslator.fits(Locale.Language(identifier: "hi"), "हिन्दी में पढ़ें और सुनें"))
+        #expect(!PageTranslator.fits(Locale.Language(identifier: "mr"), "हिंदी मराठी বাংলা தமிழ் తెలుగు ಕನ್ನಡ മലയാളം"))
+        #expect(!PageTranslator.fits(Locale.Language(identifier: "hi"), "Read this page in Hindi"))
+        #expect(PageTranslator.fits(Locale.Language(identifier: "en"), "Read this in Hindi: हिन्दी"))
+        #expect(PageTranslator.fits(Locale.Language(identifier: "ja"), "東京の天気はとても良いです"))
+        #expect(PageTranslator.fits(Locale.Language(identifier: "zh-Hans"), "上海是一座城市"))
+    }
 }

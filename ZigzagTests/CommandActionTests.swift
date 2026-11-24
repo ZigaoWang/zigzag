@@ -106,7 +106,7 @@ struct CommandActionTests {
     @Test func aFirstLetterNeverRunsOne() {
         // "s" then Return searches for s, it doesn't save; the app's own commands still match as before.
         #expect(!titles("s", onATab).contains("Pin Tab"))
-        #expect(titles("s", onATab).contains("Settings"))
+        #expect(titles("s", onATab).contains("Settings…"))
         #expect(!titles("sa", onATab).contains("Pin Tab"))
         #expect(!titles("cl", onATab).contains("Close Other Tabs"))
         #expect(titles("save", onATab).contains("Pin Tab"))

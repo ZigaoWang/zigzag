@@ -27,6 +27,7 @@ final class FavoritesView: NSView {
         didSet {
             guard oldValue != isDropTarget else { return }
             if !isDropTarget {
+                scrollNearEdge(at: nil)
                 dropIndex = nil
                 showSplit(nil)
                 dropBar.isHidden = true
@@ -47,7 +48,56 @@ final class FavoritesView: NSView {
     /// split (nil: it can't open beside a favorite).
     func hoverDrop(at windowPoint: NSPoint, carrying: TabManager.SplitSide?) {
         aim(at: convert(windowPoint, from: nil), carried: carrying, moving: nil)
+        scrollNearEdge(at: windowPoint) { [weak self] in
+            guard let self, self.isDropTarget else { return }
+            self.aim(at: self.convert(windowPoint, from: nil), carried: carrying, moving: nil)
+        }
     }
+
+    /// How close to the grid's top or bottom a carried item scrolls it, while it's taller than its room.
+    static let edgeScrollZone: CGFloat = 16
+    private var edgeScrollTimer: Timer?
+
+    /// Held near the top or bottom of a grid that scrolls: it scrolls that way, a step a frame, `moved` after each.
+    /// Nil, or away from the edges: stops.
+    func scrollNearEdge(at windowPoint: NSPoint?, _ moved: @escaping () -> Void = {}) {
+        // What shows of the grid, without the room above it for a corner ×.
+        let top = enclosingScrollView?.contentInsets.top ?? 0
+        let visible = enclosingScrollView.map { scroll in
+            let clip = scroll.contentView.bounds
+            return NSRect(x: clip.minX, y: clip.minY + top, width: clip.width, height: clip.height - top)
+        } ?? visibleRect
+        var direction: CGFloat = 0
+        if let windowPoint, let clip = enclosingScrollView?.contentView, bounds.height > visible.height + 1 {
+            let y = convert(windowPoint, from: nil).y
+            let zone = Self.edgeScrollZone
+            if y < visible.minY + zone, y > visible.minY - zone, visible.minY > 0 { direction = -1 }
+            if y > visible.maxY - zone, y < visible.maxY + zone, visible.maxY < bounds.height { direction = 1 }
+            if direction != 0 {
+                guard edgeScrollTimer == nil else { edgeScrollDirection = direction; edgeScrollMoved = moved; return }
+                edgeScrollDirection = direction
+                edgeScrollMoved = moved
+                let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self, weak clip] _ in
+                    MainActor.assumeIsolated {
+                        guard let self, let clip, let scroll = self.enclosingScrollView else { return }
+                        let limit = max(-top, self.bounds.height - clip.bounds.height)
+                        let y = min(max(clip.bounds.minY + self.edgeScrollDirection * 4, -top), limit)
+                        guard y != clip.bounds.minY else { self.scrollNearEdge(at: nil); return }
+                        clip.scroll(to: NSPoint(x: 0, y: y))
+                        scroll.reflectScrolledClipView(clip)
+                        self.edgeScrollMoved()
+                    }
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                edgeScrollTimer = timer
+                return
+            }
+        }
+        edgeScrollTimer?.invalidate()
+        edgeScrollTimer = nil
+    }
+    private var edgeScrollDirection: CGFloat = 0
+    private var edgeScrollMoved: () -> Void = {}
 
     /// Where something carried over the grid would go, from a point in this view: beside a favorite as a split, or
     /// between two. `moving`: a favorite of this grid being moved, which stays where it is meanwhile.
@@ -183,6 +233,13 @@ final class FavoritesView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// A favorite's × hangs past its tile's corner, and past this grid's edge in the top row or last column.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        for tile in tiles.reversed() { if let badge = tile.badgeHit(at: convert(local, to: tile)) { return badge } }
+        return super.hitTest(point)
+    }
+
     private var tileCount: Int { tiles.count + (isDropTarget && tiles.isEmpty ? 1 : 0) }
 
     /// How tall the grid is at its own width.
@@ -228,6 +285,7 @@ final class FavoritesView: NSView {
                     self.drag(tile, favorite: favorite, event: event)
                     return true
                 }
+                tile.dragsByTouch = true
                 addSubview(tile)
                 if animated {
                     tile.alphaValue = 0
@@ -243,7 +301,10 @@ final class FavoritesView: NSView {
         for tile in tiles {
             guard let id = tile.bookmark?.id else { continue }
             let ids = [id] + tile.partners.map(\.id)
+            let wasSelected = tile.isSelected
             tile.isSelected = selectedID.map(ids.contains) ?? false
+            // Opened from a key or the menu while scrolled out of the grid's room: it comes into view.
+            if tile.isSelected, !wasSelected { tile.scrollToVisible(tile.bounds) }
             tile.track(tabs[id], partners: tile.partners.map { tabs[$0.id] })
             tile.refreshIcon()
         }
@@ -264,7 +325,7 @@ final class FavoritesView: NSView {
     private func drag(_ tile: FavoriteTile, favorite: Bookmark, event: NSEvent) {
         guard let window, let from = tiles.firstIndex(where: { $0 === tile }) else { return }
         let start = window.convertPoint(toScreen: event.locationInWindow)
-        let row = CarriedRow(favorite, icon: tile.iconImage, partners: tile.partners, partnerIcons: tile.partnerIconImages)
+        let row = TabRowView.carried(favorite, icon: tile.iconImage, partners: tile.partners, partnerIcons: tile.partnerIconImages)
         let rowSize = NSSize(width: bounds.width, height: Tokens.Sidebar.rowHeight)
         // As a row it's held just past its icon, as if it had been picked up there.
         let rowGrab = NSPoint(x: Tokens.Sidebar.rowInset + Tokens.Sidebar.favicon + Tokens.Space.x1, y: rowSize.height / 2)
@@ -275,39 +336,47 @@ final class FavoritesView: NSView {
         let carried = TabManager.SplitSide(kind: .favorite, inSplit: !tile.partners.isEmpty)
         var last = start
         var inside = true
-        let released = CarriedCopy.track(in: window) { event in
+        CarriedCopy.carry(in: window, moved: { event in
             last = window.convertPoint(toScreen: event.locationInWindow)
             copy.follow(last)
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
-            inside = self.bounds.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
+            inside = self.visibleRect.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
             if inside { self.aim(at: local, carried: carried, moving: tile) } else { self.clearAim() }
-            copy.showsAlternate = self.onDragMove?(favorite, last) ?? false
-        }
-        let split = splitTarget, index = dropIndex
-        clearAim()
-        var landing: NSView? = tile
-        if released == nil {
-            copy.showsAlternate = false
-        } else if inside {
-            if let split {
-                onJoin?(favorite, split.id, split.onRight)
-            } else {
-                // The bar counts the carried favorite where it is; past it, everything is one place earlier.
-                var slot = index ?? from
-                if slot > from { slot -= 1 }
-                if slot != from { onReorder?(favorite, slot) }
+            let point = window.convertPoint(fromScreen: last)
+            self.scrollNearEdge(at: inside ? point : nil) { [weak self] in
+                guard let self, let window = self.window else { return }
+                self.aim(at: self.convert(window.convertPoint(fromScreen: last), from: nil), carried: carried, moving: tile)
             }
-            copy.showsAlternate = false
-            layoutSubtreeIfNeeded()
-            landing = self.tile(for: favorite.id)
-        } else if let dropped = onDrop?(favorite, last), dropped.handled {
-            landing = dropped.landing
-        } else {
-            copy.showsAlternate = false
+            copy.showsAlternate = self.onDragMove?(favorite, last) ?? false
+        }) { released in
+            self.scrollNearEdge(at: nil)
+            let split = self.splitTarget, index = self.dropIndex
+            self.clearAim()
+            var landing: NSView? = tile
+            if released == nil {
+                copy.showsAlternate = false
+            } else if inside {
+                if let split {
+                    self.onJoin?(favorite, split.id, split.onRight)
+                } else {
+                    // The bar counts the carried favorite where it is; past it, everything is one place earlier.
+                    var slot = index ?? from
+                    if slot > from { slot -= 1 }
+                    if slot != from { self.onReorder?(favorite, slot) }
+                }
+                copy.showsAlternate = false
+                self.layoutSubtreeIfNeeded()
+                landing = self.tile(for: favorite.id)
+                landing?.scrollToVisible(landing?.bounds ?? .zero)
+            } else if let dropped = self.onDrop?(favorite, last), dropped.handled {
+                landing = dropped.landing
+            } else {
+                copy.showsAlternate = false
+            }
+            self.onDragEnd?(released == nil)
+            tile.alphaValue = 1
+            copy.land(on: landing)
         }
-        onDragEnd?(released == nil)
-        tile.alphaValue = 1
-        copy.land(on: landing)
     }
 
     /// While true, tiles already in place slide to their new places instead of jumping there.
@@ -429,9 +498,9 @@ final class FavoriteTile: InteractiveView {
     }
     var onClose: (() -> Void)?
     /// Shown under the pointer on every favorite that's open, the one you're on too, as a tab's is: a small ×
-    /// tucked into the tile's top-right corner, clear of the icon even four to a row, and never past the tile's edge.
+    /// hanging on the tile's top-right corner, clear of every icon even four to a row.
     private static let closeSide = Tokens.Sidebar.favoriteClose
-    /// From the tile's top and right edges to the button: inside the tile's rounded corner, not on it.
+    /// From the tile's top and right edges to the number hint: inside the tile's rounded corner, not on it.
     private static let closeInset = Tokens.Sidebar.favoriteCloseInset
     private lazy var closeButton: IconButton = {
         let button = IconButton(symbol: "xmark", size: Self.closeSide, symbolSize: Tokens.Sidebar.favoriteCloseGlyph, toolTip: String(localized: "Unload Page", comment: "Tooltip of a favorite's close button: unloads its page; the favorite stays."))
@@ -447,6 +516,92 @@ final class FavoriteTile: InteractiveView {
         addSubview(button)
         return button
     }()
+
+    /// How far the × hangs past its tile's corner: nearly half of it, as far as the sidebar's edge allows.
+    static let badgeOverhang = min(Tokens.Sidebar.favoriteClose / 2, Tokens.Sidebar.edge)
+
+    /// Every favorite's ×, a split's too: one for the whole tile, on its top-right corner, clear of every icon.
+    static func badgeFrame(in bounds: NSRect, flipped: Bool) -> NSRect {
+        let side = closeSide, out = badgeOverhang
+        return NSRect(x: bounds.maxX - side + out, y: flipped ? bounds.minY - out : bounds.maxY - side + out, width: side, height: side)
+    }
+
+    /// The × while it shows and `point` (in this tile) is on it, outside the tile too.
+    func badgeHit(at point: NSPoint) -> NSView? {
+        !closeButton.isHidden && closeButton.frame.contains(point) ? closeButton : nil
+    }
+
+    /// Whether the × shows: on an open favorite under the pointer or tapped, not over a number hint or a placeholder.
+    nonisolated static func showsClose(open: Bool, hovered: Bool, numbered: Bool, placeholder: Bool) -> Bool {
+        open && hovered && !numbered && !placeholder
+    }
+
+    private func refreshClose() {
+        closeButton.isHidden = !Self.showsClose(open: isOpen, hovered: isHovered || touchRevealed, numbered: number != nil, placeholder: isPlaceholder)
+        let backed = !closeButton.isHidden
+        if backed, closeBacking == nil {
+            let disc = ColorView(color: Tokens.Color.surface)
+            disc.layer?.cornerRadius = Self.closeSide / 2
+            disc.frame = closeButton.frame
+            addSubview(disc, positioned: .below, relativeTo: closeButton)
+            closeBacking = disc
+        }
+        closeBacking?.isHidden = !backed
+    }
+
+    /// Under the ×, which sits partly off the tile: a solid disc, so it reads the same over the sidebar.
+    private var closeBacking: ColorView?
+
+    /// The part of the × outside the tile keeps it hovered.
+    private var badgeTracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let badgeTracking { removeTrackingArea(badgeTracking) }
+        badgeTracking = nil
+        let area = NSTrackingArea(rect: Self.badgeFrame(in: bounds, flipped: isFlipped), options: [.mouseEnteredAndExited, .activeInActiveApp], owner: self)
+        addTrackingArea(area)
+        badgeTracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        // Only the tile itself lights up; the × past its corner shows once it does.
+        if let badgeTracking, event.trackingArea === badgeTracking { return }
+        TouchReveal.pointerMoved(over: self)
+        super.mouseEntered(with: event)
+    }
+
+    // MARK: Touch
+
+    /// Shown by a tap as hovering shows it: the × of an open favorite (`TouchReveal`).
+    private(set) var touchRevealed = false {
+        didSet { if oldValue != touchRevealed { refreshClose() } }
+    }
+
+    /// A tap on the tile, once AppKit's click from it has gone through: its × shows as if hovered.
+    func touchTapped() {
+        touchRevealed = true
+        var area: NSView? = superview
+        while let current = area, !(current is SidebarView) { area = current.superview }
+        TouchReveal.reveal(self, keptWithin: area) { [weak self] in self?.touchRevealed = false }
+    }
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onTap = { [weak self] _ in self?.touchTapped() }
+        addGestureRecognizer(watch)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if isHovered, bounds.contains(point) || badgeHit(at: point) != nil { return }
+        super.mouseExited(with: event)
+    }
+
+    #if DEBUG
+    var debugCloseButton: IconButton { closeButton }
+    #endif
+
     /// While its page plays sound, or is muted: a small speaker badge on the icon's bottom corner (`SpeakerBadge`), as
     /// a status sits on an avatar. Clicking it mutes the page, or unmutes it.
     private lazy var audioButton: IconButton = {
@@ -536,6 +691,7 @@ final class FavoriteTile: InteractiveView {
         addSubview(dropHalf, positioned: .below, relativeTo: icon)
         setAccessibilityRole(.button)
         describe()
+        if TouchGestures.isAvailable { addTouchWatch() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -624,6 +780,7 @@ final class FavoriteTile: InteractiveView {
         let live = livePages
         for (page, view) in zip(live, pageIcons) { view.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true) }
         isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: live.compactMap { $0?.isLoaded })
+        refreshClose()
         refreshAway()
         let name = self.name
         // Favorites have no hover card, so the tooltip explains an unloaded page (asleep and memory freed, or not loaded since
@@ -719,8 +876,8 @@ final class FavoriteTile: InteractiveView {
             let size = icon.image.map { IconChoice.isPageIcon($0) || FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Sidebar.favicon
             icon.frame = backingAlignedRect(NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size), options: .alignAllEdgesNearest)
         }
-        let side = Self.closeSide, edge = Self.closeInset
-        closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
+        closeButton.frame = Self.badgeFrame(in: bounds, flipped: isFlipped)
+        closeBacking?.frame = closeButton.frame
         if !audioButton.isHidden { layoutSpeaker() }
         layoutNumber()
     }
@@ -728,7 +885,7 @@ final class FavoriteTile: InteractiveView {
     /// The speaker badge on the icon's bottom corner, its button centered on it.
     private func layoutSpeaker() { SpeakerBadge.place(audioButton, on: icon) }
 
-    /// The number tucked into the top-right corner, as far in as the ×: the digit alone, as the × is one mark, so it
+    /// The number tucked into the top-right corner: the digit alone, one mark as the × is, so it
     /// stays clear of the icon however narrow the tile.
     private func layoutNumber() {
         guard let hint = numberHint, number != nil else { return }
@@ -753,7 +910,7 @@ final class FavoriteTile: InteractiveView {
             layer?.borderWidth = Tokens.Metric.dropEdge
             return
         }
-        closeButton.isHidden = !(isOpen && isHovered) || number != nil
+        refreshClose()
         let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
         for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
         // Space-tinted tile, lighter on hover; brighter with a fine edge while loaded. The current one uses the selected card.
@@ -774,35 +931,17 @@ final class FavoriteTile: InteractiveView {
     private static var iconSide: CGFloat { Tokens.Sidebar.favoriteIcon }
 }
 
-/// The row a carried favorite turns into over the tab list: its page, or a split's or tile group's pages side by side
-/// with a hairline between each, as the row will look there.
-final class CarriedRow: NSView {
-    private let parts: [SidebarRowView]
-    private let dividers: [ColorView]
-
-    init(_ favorite: Bookmark, icon: NSImage?, partners: [Bookmark], partnerIcons: [NSImage?]) {
-        parts = ([favorite] + partners).map { _ in SidebarRowView() }
-        dividers = partners.map { _ in ColorView(color: Tokens.Color.separator) }
-        super.init(frame: .zero)
-        let icons = [icon] + partnerIcons
-        for (i, (part, page)) in zip(parts, [favorite] + partners).enumerated() {
-            // Three or four parts are too narrow for names: their icons alone, as the row shows them.
-            part.title.stringValue = parts.count > 2 ? "" : page.title
-            part.icon.image = icons.indices.contains(i) ? icons[i] : nil
-            addSubview(part)
-        }
-        dividers.forEach(addSubview)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func layout() {
-        super.layout()
-        let width = bounds.width / CGFloat(parts.count)
-        for (i, part) in parts.enumerated() {
-            let x = floor(width * CGFloat(i))
-            part.frame = NSRect(x: x, y: 0, width: floor(width * CGFloat(i + 1)) - x, height: bounds.height)
-            if i > 0 { dividers[i - 1].frame = NSRect(x: x, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4) }
-        }
+/// The row a carried favorite turns into over the tab list: the same row a tab or pinned page has there, a split's or
+/// tile group's pages in its parts.
+extension TabRowView {
+    static func carried(_ favorite: Bookmark, icon: NSImage?, partners: [Bookmark], partnerIcons: [NSImage?]) -> TabRowView {
+        let row = TabRowView()
+        row.bookmarkIcon = icon
+        row.fixedTitle = favorite.title
+        row.configure(tab: nil)
+        row.configure(parts: partners.enumerated().map { i, page in
+            Part(page: nil, name: page.title, icon: partnerIcons.indices.contains(i) ? partnerIcons[i] : nil)
+        })
+        return row
     }
 }

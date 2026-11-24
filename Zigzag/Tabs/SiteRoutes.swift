@@ -303,6 +303,18 @@ enum SiteRoutes {
         return route.spaceID
     }
 
+    /// Whether a page's request for a new window is a link you clicked, routed as one. A clicked `window.open` counts
+    /// only from an embed, a frame from another site than its page (YouTube's Watch on YouTube): its opener is the
+    /// embed, never the page, while the page's own pop-ups keep theirs.
+    static func newWindowIsClickedLink(linkActivated: Bool, userInitiated: Bool, fromMainFrame: Bool,
+                                       frameHost: String?, pageHost: String?) -> Bool {
+        guard userInitiated else { return false }
+        if linkActivated { return true }
+        guard !fromMainFrame, let frame = frameHost?.lowercased(), !frame.isEmpty,
+              let page = pageHost?.lowercased(), !page.isEmpty else { return false }
+        return frame != page && (PublicSuffix.registrableDomain(frame) ?? frame) != (PublicSuffix.registrableDomain(page) ?? page)
+    }
+
     /// A sign-in page by address (`Tab.isSignIn`), or one with a return URL.
     static func isSignIn(_ url: URL) -> Bool {
         if Tab.isSignIn(url) { return true }

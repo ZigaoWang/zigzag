@@ -92,11 +92,36 @@ struct FormSheetTests {
         #expect(confirm.isEnabled)
         #expect(confirm.toolTip == nil)
     }
+
+    /// A field on the window's frame takes the sidebar address's fill, and the accent ring while typing, as every field.
+    @Test func aFieldOnTheFrameKeepsTheSharedRing() throws {
+        let field = FilledField.search("Search tabs")
+        field.isOnFrame = true
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 200), styleMask: [.titled], backing: .buffered, defer: true)
+        window.contentView?.addSubview(field)
+        field.frame = NSRect(x: 20, y: 20, width: 300, height: Tokens.Metric.controlHeight)
+        let fill = try #require(field.layer?.backgroundColor)
+        field.effectiveAppearance.performAsCurrentDrawingAppearance {
+            #expect(fill == Tokens.Chrome.field.cgColor)
+        }
+        #expect((field.layer?.borderColor?.alpha ?? 0) == 0)
+        #expect(window.makeFirstResponder(field.field))
+        #expect((field.layer?.borderColor?.alpha ?? 0) > 0)
+        #expect(field.layer?.borderWidth == 1.5)
+    }
 }
 
 extension NSView {
     /// Finds controls in a sheet so tests can exercise them through their normal actions.
     func selfAndDescendants<T: NSView>(of kind: T.Type) -> [T] {
         ((self as? T).map { [$0] } ?? []) + subviews.flatMap { $0.selfAndDescendants(of: kind) }
+    }
+
+    /// A search that finds nothing says so where the results start, or in the middle of a small area.
+    @Test func noMatchSitsWhereTheResultsStart() {
+        let tall = NSRect(x: 0, y: 40, width: 600, height: 800)
+        #expect(Tokens.EmptyState.noMatchY(in: tall, lineHeight: 20) == 40 + Tokens.EmptyState.noMatchTop)
+        let short = NSRect(x: 0, y: 0, width: 300, height: 120)
+        #expect(Tokens.EmptyState.noMatchY(in: short, lineHeight: 20) == 50)
     }
 }

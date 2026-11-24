@@ -160,3 +160,40 @@ struct PageWindowFrameTests {
         #expect(!popup.isClosed)
     }
 }
+
+/// A sign-in pop-up opens where you can see it: over a window kept on top (Zigzag Mini often is) and over a full-screen
+/// app's Space, never behind its page.
+@MainActor struct PopupOverParentTests {
+    private func parent(keptOnTop: Bool, overFullScreen: Bool = false) -> NSWindow {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        if overFullScreen { window.collectionBehavior.insert(.fullScreenAuxiliary) }
+        if keptOnTop { KeepOnTop.set(true, for: window) }
+        return window
+    }
+
+    @Test func aPopupFromAWindowKeptOnTopIsKeptOnTop() throws {
+        let owner = parent(keptOnTop: true)
+        defer { KeepOnTop.set(false, for: owner) }
+        let popup = PopupWindowController.asking(configuration: WKWebViewConfiguration(), features: WKWindowFeatures(), parent: owner, opener: nil)
+        defer { popup.discardHeldPage() }
+        let window = try #require(popup.window)
+        #expect(KeepOnTop.isOn(window))
+    }
+
+    @Test func aPopupFromAnOrdinaryWindowIsOrdinary() throws {
+        let popup = PopupWindowController.asking(configuration: WKWebViewConfiguration(), features: WKWindowFeatures(), parent: parent(keptOnTop: false), opener: nil)
+        defer { popup.discardHeldPage() }
+        let window = try #require(popup.window)
+        #expect(!KeepOnTop.isOn(window))
+        #expect(!window.collectionBehavior.contains(.fullScreenAuxiliary))
+    }
+
+    @Test func aPopupFromAWindowOverAFullScreenAppStaysInItsSpace() throws {
+        let popup = PopupWindowController.asking(configuration: WKWebViewConfiguration(), features: WKWindowFeatures(),
+                                                 parent: parent(keptOnTop: false, overFullScreen: true), opener: nil)
+        defer { popup.discardHeldPage() }
+        let window = try #require(popup.window)
+        #expect(window.collectionBehavior.contains(.fullScreenAuxiliary))
+    }
+}

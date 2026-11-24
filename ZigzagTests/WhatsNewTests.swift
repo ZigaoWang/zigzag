@@ -377,7 +377,7 @@ struct SpacePresetTests {
 
     @Test func oldWhiteAndBlackAreThePresets() {
         let white = SpaceLook.presets.first { $0.name == "White" }!
-        let black = SpaceLook.presets.first { $0.name == "Black" }!
+        let black = SpaceLook.black
         #expect(white.matches(SpaceInfo(name: "Old", color: .snow)))
         #expect(black.matches(SpaceInfo(name: "Old", color: .ink)))
     }

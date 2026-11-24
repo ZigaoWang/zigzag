@@ -18,6 +18,15 @@ enum WebKitSetup {
     /// The whole user agent a page here sends, for a request made outside a web view.
     static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \(applicationNameForUserAgent)"
 
+    /// WebKit otherwise copies a user script's source into every page process once per granted match pattern; Safari
+    /// opts into sharing one copy, and so does Zigzag (#485). On macOS 27.2 the call changes nothing else.
+    static func shareUserScriptSources() {
+        // Sharing is new in macOS 27's WebKit; on older ones the call would only change other behaviors.
+        guard #available(macOS 27, *), let pool = NSClassFromString("WKProcessPool") as AnyObject? else { return }
+        let share = NSSelectorFromString("_setLinkedOnOrAfterEverything")
+        if pool.responds(to: share) { _ = pool.perform(share) }
+    }
+
     /// What a page in this profile is made with: the profile's website data and its extensions.
     static func makeConfiguration(for profile: Profile) -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
@@ -33,6 +42,13 @@ enum WebKitSetup {
         guard let own = configuration.preferences.copy() as? WKPreferences else { return }
         PageStyles.set(true, in: own)
         configuration.preferences = own
+    }
+
+    /// This page's media with sound waits for a click or key in it; muted media still plays. WebKit's per-page policy
+    /// (`_WKWebsiteAutoplayPolicyAllowWithoutSound`), what Safari's Stop Media with Sound sets.
+    static func autoplayWithoutSound(_ preferences: WKWebpagePreferences) {
+        guard preferences.responds(to: NSSelectorFromString("_setAutoplayPolicy:")) else { return }
+        preferences.setValue(2, forKey: "autoplayPolicy")
     }
 
     /// Sets a private WebKit preference by KVC key (`_set<Key>:`) if it exists and differs (reading only where the

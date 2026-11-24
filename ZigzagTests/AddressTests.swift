@@ -441,6 +441,59 @@ struct AddressTests {
         #expect(address.pinButton(for: "a")?.accessibilityCustomActions()?.first !== action)
     }
 
+    private func fieldInWindow() -> (AddressView, NSWindow) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 100), styleMask: [.borderless], backing: .buffered, defer: true)
+        let address = field()
+        window.contentView?.addSubview(address)
+        return (address, window)
+    }
+
+    /// A space switch onto a page without Reader: the new host is placed at once at its full width, never drawn at the
+    /// old page's width ("…eloper.apple.com").
+    @Test func aNewHostIsPlacedAtOnce() {
+        let (address, window) = fieldInWindow()
+        address.setReader(available: true, active: false)
+        address.show(url: URL(string: "https://example.com/"), notSecure: false)
+        address.layoutSubtreeIfNeeded()
+        let narrow = address.labelFrame
+        address.show(url: URL(string: "https://developer.apple.com/"), notSecure: false)
+        #expect(address.labelFrame == narrow)
+        address.setReader(available: false, active: false)
+        #expect(address.labelFrame.width == narrow.width + AddressView.buttonSide + 2)
+        _ = window
+    }
+
+    /// Reader coming and going on the same page: the host takes its new width at once, never cut by the old width
+    /// nor running under the new button.
+    @Test func aButtonOnTheSamePageNeverCutsOrCoversTheHost() {
+        let (address, window) = fieldInWindow()
+        address.show(url: URL(string: "https://developer.apple.com/"), notSecure: false)
+        address.layoutSubtreeIfNeeded()
+        let wide = address.labelFrame
+        address.setReader(available: true, active: false)
+        #expect(address.labelFrame.maxX <= address.readerButton.frame.minX)
+        address.setReader(available: false, active: false)
+        #expect(address.labelFrame == wide)
+        _ = window
+    }
+
+    /// The not-secure mark appearing before the same host: it glides right with its end already in place.
+    @Test func onlyTheSameHostMovingRightGlides() {
+        let old = NSRect(x: 10, y: 5, width: 150, height: 20), right = NSRect(x: 26, y: 5, width: 134, height: 20)
+        #expect(AddressView.labelGlideStart(from: old, to: right, sameText: true) == old)
+        #expect(AddressView.labelGlideStart(from: old, to: right, sameText: false) == nil)
+        #expect(AddressView.labelGlideStart(from: right, to: old, sameText: true) == nil)
+        #expect(AddressView.labelGlideStart(from: old, to: NSRect(x: 10, y: 5, width: 120, height: 20), sameText: true) == nil)
+        let (address, window) = fieldInWindow()
+        address.show(url: URL(string: "https://developer.apple.com/"), notSecure: false)
+        address.layoutSubtreeIfNeeded()
+        let before = address.labelFrame
+        address.show(url: URL(string: "http://developer.apple.com/"), notSecure: true)
+        #expect(address.labelFrame.minX == before.minX)
+        #expect(address.labelFrame.maxX == before.maxX)
+        _ = window
+    }
+
     @Test func searches() {
         #expect(CommandRanker.url(from: "node.js") == nil)
         #expect(CommandRanker.url(from: "main.swiftui") == nil)

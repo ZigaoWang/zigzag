@@ -29,9 +29,7 @@ enum ArcImporter {
     private static func problem(reading part: Part, _ error: Error, retries: Int = 2 | 8 | 64) -> ImportProblem {
         let ns = error as NSError
         log.error("Arc import: couldn't read \(part.rawValue, privacy: .public): \(ns.domain, privacy: .public) \(ns.code)")
-        let denied = (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
-            || (ns.underlyingErrors.first as NSError?).map { $0.domain == NSPOSIXErrorDomain && ($0.code == Int(EPERM) || $0.code == Int(EACCES)) } ?? false
-        if denied {
+        if isDenied(error) {
             let message = switch part {
             case .history: String(localized: "macOS didn’t let Zigzag read Arc’s history. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Arc, then try again.",
                                   comment: "Problem in the Import window. Arc is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.")
@@ -45,6 +43,13 @@ enum ArcImporter {
         case .sidebar: String(localized: "Zigzag couldn’t read Arc’s spaces and pinned tabs. Try again.", comment: "Problem in the Import window. Arc is a browser's name.")
         }
         return ImportProblem(message: message, fix: .retry, retries: retries)
+    }
+
+    /// Whether a file error is macOS refusing access, which Files & Folders fixes.
+    static func isDenied(_ error: Error) -> Bool {
+        let ns = error as NSError
+        return (ns.domain == NSCocoaErrorDomain && ns.code == NSFileReadNoPermissionError)
+            || (ns.underlyingErrors.first as NSError?).map { $0.domain == NSPOSIXErrorDomain && ($0.code == Int(EPERM) || $0.code == Int(EACCES)) } ?? false
     }
 
     nonisolated static var arcSupport: URL {
@@ -156,7 +161,7 @@ enum ArcImporter {
                 targets[folder] = here.id
             } else if create {
                 let library = Library.shared
-                targets[folder] = library.addProfile(name: name, color: SpaceColor.next(unused: library.profiles.map { library.color(of: $0) })).id
+                targets[folder] = library.addProfile(name: name, color: SpaceColor.legacyNext(unused: library.profiles.map { library.color(of: $0) })).id
             }
         }
         return targets
@@ -205,33 +210,7 @@ enum ArcImporter {
         var merged = 0
         newSpaces = newSpaces.filter { incoming in
             guard let existing = match(incoming, in: library.spaces, wants: wants(incoming.id), profileOf: library.profileID(ofSpace:)) else { return true }
-            let folders = incoming.folders ?? []
-            func path(of id: UUID) -> [String] {
-                var names: [String] = []
-                var folder = folders.first { $0.bookmarkIDs.contains(id) }
-                while let current = folder, names.count < 8 {
-                    names.insert(current.name, at: 0)
-                    folder = current.parentID.flatMap { parent in folders.first { $0.id == parent } }
-                }
-                return names
-            }
-            var known: [String: Bookmark] = [:]
-            for bookmark in existing.bookmarks { known[TabManager.normalize(bookmark.url)] = known[TabManager.normalize(bookmark.url)] ?? bookmark }
-            let filedAlready = Set((existing.folders ?? []).flatMap(\.bookmarkIDs))
-            var new: [(url: URL, title: String)] = [], newPaths: [[String]] = []
-            var loose: [UUID] = [], loosePaths: [[String]] = []
-            for bookmark in incoming.bookmarks {
-                if let mine = known[TabManager.normalize(bookmark.url)] {
-                    if !filedAlready.contains(mine.id), !loose.contains(mine.id), case let p = path(of: bookmark.id), !p.isEmpty {
-                        loose.append(mine.id); loosePaths.append(p)
-                    }
-                } else {
-                    new.append((bookmark.url, bookmark.title)); newPaths.append(path(of: bookmark.id))
-                    known[TabManager.normalize(bookmark.url)] = bookmark
-                }
-            }
-            Library.shared.fileBookmarks(loose, paths: loosePaths, in: existing.id)
-            merged += Library.shared.appendBookmarks(new, to: existing.id, folders: newPaths).count
+            merged += merge(incoming, into: existing.id)
             return false
         }
         result.spaces = newSpaces.count
@@ -250,6 +229,62 @@ enum ArcImporter {
         result.tabs = openInWindow(plan.openTabs)
         log.notice("Arc import: \(result.spaces) spaces, \(result.bookmarks) bookmarks, \(result.tabs) open tabs, \(result.problems.count) problems")
         return (result, newSpaces.first?.id)
+    }
+
+    /// Importing an Arc space again into `existingID`: only the pages it doesn't have yet are added, in their Arc
+    /// folders; pages there but in no folder move into theirs; split views whose pages are all there, side by side in
+    /// one folder and in no split, are pinned as splits. Returns how many pages were added.
+    @discardableResult
+    static func merge(_ incoming: SpaceInfo, into existingID: UUID) -> Int {
+        guard let existing = Library.shared.space(existingID) else { return 0 }
+        let folders = incoming.folders ?? []
+        func path(of id: UUID) -> [String] {
+            var names: [String] = []
+            var folder = folders.first { $0.bookmarkIDs.contains(id) }
+            while let current = folder, names.count < Library.folderDepthLimit {
+                names.insert(current.name, at: 0)
+                folder = current.parentID.flatMap { parent in folders.first { $0.id == parent } }
+            }
+            return names
+        }
+        var known: [String: Bookmark] = [:]
+        for bookmark in existing.bookmarks { known[TabManager.normalize(bookmark.url)] = known[TabManager.normalize(bookmark.url)] ?? bookmark }
+        let filedAlready = Set((existing.folders ?? []).flatMap(\.bookmarkIDs))
+        var new: [(url: URL, title: String)] = [], newPaths: [[String]] = []
+        var loose: [UUID] = [], loosePaths: [[String]] = []
+        for bookmark in incoming.bookmarks {
+            if let mine = known[TabManager.normalize(bookmark.url)] {
+                if !filedAlready.contains(mine.id), !loose.contains(mine.id), case let p = path(of: bookmark.id), !p.isEmpty {
+                    loose.append(mine.id); loosePaths.append(p)
+                }
+            } else {
+                new.append((bookmark.url, bookmark.title)); newPaths.append(path(of: bookmark.id))
+                known[TabManager.normalize(bookmark.url)] = bookmark
+            }
+        }
+        Library.shared.fileBookmarks(loose, paths: loosePaths, in: existing.id)
+        let added = Library.shared.appendBookmarks(new, to: existing.id, folders: newPaths).count
+        if let splits = incoming.pinnedSplits, !splits.isEmpty, let now = Library.shared.space(existing.id) {
+            var local: [String: UUID] = [:]
+            for bookmark in now.bookmarks { local[TabManager.normalize(bookmark.url)] = local[TabManager.normalize(bookmark.url)] ?? bookmark.id }
+            let urls = Dictionary(incoming.bookmarks.map { ($0.id, TabManager.normalize($0.url)) }, uniquingKeysWith: { a, _ in a })
+            var paired = Set((now.pinnedSplits ?? []).flatMap(\.ids))
+            let order = Dictionary(now.bookmarks.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+            func folder(of id: UUID) -> UUID? { now.folders?.first { $0.bookmarkIDs.contains(id) }?.id }
+            var gained: [PinnedSplit] = []
+            for split in splits {
+                let ids = split.ids.compactMap { urls[$0].flatMap { local[$0] } }
+                // Only pages next to each other in one folder, so none is moved.
+                let places = ids.compactMap { order[$0] }
+                guard ids.count == split.ids.count, Set(ids).count == ids.count, paired.isDisjoint(with: ids),
+                      places.count == ids.count, zip(places, places.dropFirst()).allSatisfy({ $1 == $0 + 1 }),
+                      Set(ids.map(folder(of:))).count == 1, let layout = split.pair(of: ids) else { continue }
+                paired.formUnion(ids)
+                gained.append(PinnedSplit(layout: layout))
+            }
+            Library.shared.addPinnedSplits(gained, in: existing.id)
+        }
+        return added
     }
 
     // MARK: Sidebar
@@ -451,8 +486,15 @@ enum ArcImporter {
             if let pinnedID, let pinned = items[pinnedID] {
                 // Arc's pinned folders come over as folders, nested as they were.
                 var folders: [BookmarkFolder] = []
+                var splits: [PinnedSplit] = []
+                /// A split view's pages, pinned side by side as in Arc, up to the four a split holds.
+                func splitPages(_ id: String) -> [Bookmark] {
+                    let pages = bookmarks(under: id)
+                    if pages.count > 1, let pair = splitPair(pages.prefix(TileShape.maxPanes).map(\.id)) { splits.append(PinnedSplit(layout: pair)) }
+                    return pages
+                }
                 func addFolder(_ id: String, parent: UUID?, depth: Int) {
-                    guard depth < 8, let node = items[id] else { return }
+                    guard depth < Library.folderDepthLimit, let node = items[id] else { return }
                     var folder = BookmarkFolder(name: (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                                                 ?? String(localized: "Folder", comment: "Name of an imported folder that had none."))
                     folder.parentID = parent
@@ -462,9 +504,9 @@ enum ArcImporter {
                     folders.append(folder)
                     for child in node["childrenIds"] as? [String] ?? [] {
                         guard let inner = items[child], let data = inner["data"] as? [String: Any] else { continue }
-                        if data["tab"] != nil || data["splitView"] != nil {
-                            // A page, or a split view's pages, pinned in this folder.
-                            let pages = data["tab"] != nil ? tabPage(inner) : bookmarks(under: child)
+                        if data["tab"] != nil || data["splitView"] != nil || depth + 1 >= Library.folderDepthLimit {
+                            // A page, a split view, or a folder past the depth kept: its pages go in this folder.
+                            let pages = data["tab"] != nil ? tabPage(inner) : data["splitView"] != nil ? splitPages(child) : bookmarks(under: child)
                             info.bookmarks += pages
                             folders[at].bookmarkIDs += pages.map(\.id)
                         } else {
@@ -474,24 +516,20 @@ enum ArcImporter {
                 }
                 for child in pinned["childrenIds"] as? [String] ?? [] {
                     guard let node = items[child] else { continue }
-                    let isTab = (node["data"] as? [String: Any])?["tab"] != nil
-                    let inside = isTab ? [] : bookmarks(under: child)
-                    if isTab {
-                        if let data = node["data"] as? [String: Any], let tab = data["tab"] as? [String: Any],
-                           let urlString = tab["savedURL"] as? String, let url = URL(string: urlString), url.scheme == "http" || url.scheme == "https" {
-                            let title = (node["title"] as? String) ?? (tab["savedTitle"] as? String) ?? url.host() ?? urlString
-                            info.bookmarks.append(Bookmark(url: url, title: TabManager.bookmarkTitle(title, url: url)))
-                        }
-                    } else if (node["data"] as? [String: Any])?["splitView"] != nil {
-                        // A split view isn't a folder: its pages are pinned on their own.
-                        info.bookmarks += inside
-                    } else if !inside.isEmpty {
+                    let data = node["data"] as? [String: Any]
+                    if data?["tab"] != nil {
+                        info.bookmarks += tabPage(node)
+                    } else if data?["splitView"] != nil {
+                        // A split view isn't a folder: its pages are pinned side by side.
+                        info.bookmarks += splitPages(child)
+                    } else if !bookmarks(under: child).isEmpty {
                         addFolder(child, parent: nil, depth: 0)
                     }
                 }
                 // A folder with no pages anywhere inside it doesn't come over.
                 folders = folders.filter { !folders.pages(in: $0.id).isEmpty }
                 if !folders.isEmpty { info.folders = folders }
+                if !splits.isEmpty { info.pinnedSplits = splits }
             }
             if let folder = arcProfile(space["profile"]) { profiles[info.id] = folder }
             spaces.append(info)
@@ -629,7 +667,7 @@ enum ArcImporter {
         let color = NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
         if color.saturationComponent < 0.15 { return .graphite }
         let hue = color.hueComponent
-        let candidates = SpaceColor.allCases.filter { !$0.isNeutral }
+        let candidates = SpaceColor.legacy
         return candidates.min { a, b in
             hueDistance(hue, (a.swatch.usingColorSpace(.sRGB)?.hueComponent ?? 0)) < hueDistance(hue, (b.swatch.usingColorSpace(.sRGB)?.hueComponent ?? 0))
         } ?? .sky

@@ -16,19 +16,10 @@ protocol TabHost: AnyObject {
     func tabWantsFocus(_ tab: Tab)
     /// True when a route (#286) opened the link in another space. Only browser windows route.
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool
-    /// Its page went in or out of full screen in the window (#462).
-    func tab(_ tab: Tab, pageFullScreenChanged on: Bool)
-    /// Whether the page's own full screen can be promoted to The Whole Screen: a windowed page, or a pane in a split.
-    func tabShowsFullScreenExpand(_ tab: Tab) -> Bool
-    /// The expand button over a page-filled page: take it to The Whole Screen.
-    func tabDidAskToExpandFullScreen(_ tab: Tab)
 }
 
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
-    func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {}
-    func tabShowsFullScreenExpand(_ tab: Tab) -> Bool { false }
-    func tabDidAskToExpandFullScreen(_ tab: Tab) {}
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
     /// Loads an address with no sender: page links and every caller except a rule.
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
@@ -50,7 +41,7 @@ enum OpenDisposition {
 /// A tab can be suspended (web view released, state kept) and restored without the user noticing.
 final class Tab: NSObject {
     enum Change {
-        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language
+        case title, url, favicon, loading, progress, navigation, audio, themeColor, activity, snapshot, webView, capture, reader, language, document
         /// You renamed it (it also sends `.title`).
         case renamed
         /// Its PDF viewer came or went.
@@ -247,20 +238,13 @@ final class Tab: NSObject {
     /// Its video is playing in the window's mini player, its page with it.
     var isInMiniPlayer = false
     /// Its page fills the page's area with something in full screen, as Settings › Tabs › Full screen videos fill
-    /// The Page has it (PageFullScreen), or a split's page fills its pane, so Esc in the window leaves it. The expand
-    /// button takes it to The Whole Screen (#257, #462).
+    /// The Page has it (PageFullScreen), so Esc in the window leaves it.
     var isInPageFullScreen = false {
         didSet {
             guard isInPageFullScreen != oldValue else { return }
-            pageHolder?.onExpand = { [weak self] in self?.expandPageFullScreen() }
-            pageHolder?.showsExpand = isInPageFullScreen && (host?.tabShowsFullScreenExpand(self) ?? false)
-            host?.tab(self, pageFullScreenChanged: isInPageFullScreen)
+            pageHolder?.onExpand = { [weak self] in self.map(PageFullScreen.expand) }
+            pageHolder?.showsExpand = isInPageFullScreen
         }
-    }
-
-    /// The expand button over a page-filled video: the window takes it to The Whole Screen.
-    private func expandPageFullScreen() {
-        host?.tabDidAskToExpandFullScreen(self)
     }
     /// What you answered the page's questions (camera, location, notifications) while it's open: asked again once
     /// it loads another page or reloads, as a site set to Ask is.
@@ -302,6 +286,9 @@ final class Tab: NSObject {
     private(set) var pageState: PageState?
     /// The page is loading again after it slept or stopped: once it's here, `pageState` puts it back.
     private var restoresPageState = false
+    /// Its history was just restored, so WebKit's cached copy of its page is loaded again once it commits.
+    private enum RestoredPage { case waiting, reloads }
+    private var restoredPage: RestoredPage?
     /// The host whose certificate warning this tab last showed: the only one its "Visit anyway" link may trust.
     private var certificateWarningHost: String?
     /// The certificate that warning was about: the one "Visit anyway" trusts.
@@ -355,7 +342,7 @@ final class Tab: NSObject {
         self.id = id
         // A web view WebKit made for a page's new window shows no address until its first page arrives: the page
         // that opened it can write into it while a load that never finishes would name another site over it.
-        self.url = configuration == nil ? url : nil
+        self.url = configuration == nil ? url.map(Self.extensionPageAddress) : nil
         self.title = title ?? (SettingsPage.isSettings(self.url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : self.url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
         self.spaceID = spaceID
         // A page WebKit made for another page's new window is in that page's profile, whatever space it lands in.
@@ -386,6 +373,9 @@ final class Tab: NSObject {
     /// Came back with the session after a relaunch and hasn't loaded since: its hover card says so, rather than
     /// that it was put to sleep.
     var isRestored = false
+    /// Its page came back on its own (`TabSleep.startsQuietly`): it starts no sound until you use it. Ends as that
+    /// page arrives, or with a page you load.
+    private(set) var startsQuietly = false
     /// Why its page isn't running, for its hover card or a favorite's tooltip; nil while it is. Only a tab put to
     /// sleep tells of memory it freed.
     var notLoadedNote: String? {
@@ -544,10 +534,11 @@ final class Tab: NSObject {
     @discardableResult
     func ensureWebView() -> BrowserWebView {
         if let webView { return webView }
+        let fromWebKit = pendingConfiguration != nil
+        let quiet = TabSleep.startsQuietly(restored: isRestored, asleep: sleepCause != nil, openedByPage: fromWebKit)
         sleepCause = nil
         isRestored = false
         freedMemory = nil
-        let fromWebKit = pendingConfiguration != nil
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
         pendingConfiguration = nil
@@ -615,7 +606,7 @@ final class Tab: NSObject {
         if let pageHolder { pageHolder.hold(webView) } else { pageHolder = PageHolder(holding: webView) }
         observe(webView)
         DarkPages.attach(to: webView)
-        PageFullScreen.attach(to: webView, fill: PageFullScreen.fills(for: url))
+        PageFullScreen.attach(to: webView)
         PageImages.join(webView)
         // A page opened by another inherits its Disable Images (`shareImagesChoice`).
         if fromWebKit, !developer.imagesOff,
@@ -624,7 +615,7 @@ final class Tab: NSObject {
         }
         // What you chose for this tab with the developer tools comes with a new web view, before its first page is
         // asked for: it's asked for as the browser chosen, and starts with the look chosen.
-        if !developer.isUnchanged { applyDeveloperState() }
+        if !developer.isUnchanged { applyDeveloperState() } else { applyUserAgent() }
 
         if Self.isExtensionPage(url), let url {
             // Extension pages always load fresh: their saved history state can come back as a blank page, and one
@@ -632,6 +623,7 @@ final class Tab: NSObject {
             pendingInteractionState = nil
             loadOwn(url, in: webView)
         } else if let state = pendingInteractionState {
+            restoredPage = .waiting
             restoreState(state, in: webView)
             pendingInteractionState = nil
             restoresPageState = pageState?.belongs(to: webView.url ?? url) == true
@@ -640,6 +632,7 @@ final class Tab: NSObject {
         } else if let url, !fromWebKit {
             loadFirst(url, in: webView)
         }
+        startsQuietly = quiet
         // A new web view starts with sound and playing; carry over what you'd set on the old one.
         if isMuted { setMuted(true) }
         // A development tab's pages are listened to for the count of their errors.
@@ -866,6 +859,7 @@ final class Tab: NSObject {
     /// `httpFallback`: `url` is https chosen for a scheme-less address; retry once over http if unreachable
     /// (`CommandRanker.Destination`).
     func load(_ url: URL, by sender: LoadSender = .zigzag, httpFallback: Bool = false) {
+        let url = Self.extensionPageAddress(url)
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
@@ -910,7 +904,7 @@ final class Tab: NSObject {
         let scheme = url.scheme?.lowercased() ?? ""
         if ["http", "https", "about", "blob"].contains(scheme) { return .load }
         if scheme == "file" { return page?.isFileURL == true ? .load : .refuse }
-        if scheme.isEmpty || ["javascript", "data", "webkit-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
+        if scheme.isEmpty || ["javascript", "data", "webkit-extension", "chrome-extension", HistoryPage.scheme].contains(scheme) { return .refuse }
         return .app
     }
 
@@ -992,6 +986,20 @@ final class Tab: NSObject {
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
+    /// Chrome's address for an extension's page, chrome-extension://<id>/<path>, as Zigzag's own: each extension's
+    /// pages are at webkit-extension://<id>/ (ExtensionHost). Any other address comes back as it was.
+    nonisolated static func extensionPageAddress(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "chrome-extension", var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let id = parts.host?.lowercased(), !id.isEmpty else { return url }
+        parts.scheme = "webkit-extension"
+        parts.host = id
+        parts.user = nil
+        parts.password = nil
+        parts.port = nil
+        if parts.percentEncodedPath.isEmpty { parts.percentEncodedPath = "/" }
+        return parts.url ?? url
+    }
+
     /// What a page may open in a new window or tab (window.open, target=_blank, Open Link in New Tab): anything but
     /// Zigzag's own pages, which open from Zigzag.
     static func mayOpenInNewWebView(_ url: URL?) -> Bool { url?.scheme?.lowercased() != HistoryPage.scheme }
@@ -1040,6 +1048,7 @@ final class Tab: NSObject {
     /// `httpFallback`: retry once over http if https is unreachable. Without it, a pending fallback holds only for the
     /// same address (a reload).
     private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender, httpFallback: Bool = false) {
+        startsQuietly = false
         ownLoadPending = sender == .page ? nil : OwnLoad(sender: sender, url: url)
         if httpFallback {
             pendingHTTPFallback = Self.overHTTP(url).map { HTTPFallback(secure: url, plain: $0, sender: sender) }
@@ -1121,8 +1130,8 @@ final class Tab: NSObject {
         let profile = Self.profile(of: webView)
         if isExtensionPage(url), extensionConfiguration(for: url, in: profile) == nil {
             // Opened by an extension that's still loading (1Password's welcome page, right after it installs):
-            // wait for it, briefly, before saying the page is unavailable.
-            if #available(macOS 15.4, *) {
+            // wait for it, briefly, before saying the page is unavailable. One that isn't installed says so at once.
+            if #available(macOS 15.4, *), url.host().map(profile.installs.hasRecord) == true {
                 var token: SignalToken?
                 var waited = false
                 token = profile.extensions.changed.observe { [weak webView] in
@@ -1209,6 +1218,9 @@ final class Tab: NSObject {
     }
     func reload() {
         guard let webView else { ensureWebView(); return }
+        startsQuietly = false
+        // A reload isn't asked for again (`asksAgain`), so a user agent chosen since goes on first.
+        applyUserAgent()
         if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
     }
     func reloadFromOrigin() { webView?.reloadFromOrigin() }
@@ -1687,6 +1699,9 @@ extension Tab: WKNavigationDelegate {
     nonisolated static func skipsDownloadQuestion(kept: Bool?) -> Bool { kept != false }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
+        // The last session's session cookies go back in before its first request.
+        let dataStore = webView.configuration.websiteDataStore
+        if SessionCookies.isRestoring(dataStore) { await SessionCookies.ready(dataStore) }
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
         // own.
@@ -1695,6 +1710,13 @@ extension Tab: WKNavigationDelegate {
         let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
+            // WebKit brings a restored page back from its cache, however old.
+            if restoredPage == .waiting {
+                restoredPage = Self.revalidatesRestoredPage(url: navigationAction.request.url, method: navigationAction.request.httpMethod,
+                                                            type: navigationAction.navigationType) ? .reloads : nil
+            } else {
+                restoredPage = nil
+            }
             // A click on AMO's file, read from the page it was made on; any navigation to something else ends it.
             if let click = ExtensionStore.AddonsClick(target: navigationAction.request.url, page: webView.url ?? url, userInitiated: userInitiated) {
                 addonsClick = click
@@ -1753,15 +1775,22 @@ extension Tab: WKNavigationDelegate {
         // page, as WebKit decides per frame. Zigzag's error pages keep their own.
         SiteJavaScript.apply(to: preferences, for: decidesMainFrame ? url : webView.url, here: javaScriptHere,
                              errorPage: decidesMainFrame && ErrorPage.pending.contains(webView))
+        // A page that came back on its own plays no sound until you use it (#493); a click into another page may.
+        if decidesMainFrame {
+            if TabSleep.autoplaysWithoutSound(startsQuietly: startsQuietly, userInitiated: userInitiated) {
+                WebKitSetup.autoplayWithoutSound(preferences)
+            } else {
+                startsQuietly = false
+            }
+        }
         // JavaScript turned off with the developer tools is off for a development page: decided for the page being
         // gone to, so one anywhere else never loads without its scripts.
         if decidesMainFrame, developerInEffect(at: url).javaScriptOff { preferences.allowsContentJavaScript = false }
         // The page is asked for as the browser it's to be told it's in (the developer tools' User Agent): a request
         // made as another is made again, so no page off the list is asked for as one you chose for your own site.
         if decidesMainFrame {
-            // addons.mozilla.org shows Add to Firefox only to Firefox.
-            let storeAgent = Self.addonsPage(url) != nil ? DeveloperState.UserAgent.firefox.string : nil
-            let wanted = storeAgent ?? developerInEffect(at: url).userAgent.string
+            // addons.mozilla.org shows Add to Firefox only to Firefox; then a site's kept choice (#392).
+            let wanted = userAgent(at: url)
             let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
                                        type: navigationAction.navigationType)
             if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }
@@ -1809,6 +1838,18 @@ extension Tab: WKNavigationDelegate {
         if url.scheme?.lowercased() == HistoryPage.scheme,
            !Self.mayGoToInternalPage(ownLoad: ownLoad, ownHistory: ownHistory, isBackForward: navigationAction.navigationType == .backForward,
                                      fromInternalPage: navigationAction.sourceFrame.securityOrigin.protocol == HistoryPage.scheme) {
+            return (.cancel, preferences)
+        }
+        // Chrome's address for an extension's page: opened from Zigzag or that extension's own pages, refused from others.
+        if url.scheme?.lowercased() == "chrome-extension" {
+            let page = Self.extensionPageAddress(url)
+            let source = navigationAction.sourceFrame.securityOrigin
+            let ownPage = source.protocol == "webkit-extension" && source.host.lowercased() == page.host()
+            if Self.isExtensionPage(page), navigationAction.targetFrame?.isMainFrame ?? true, ownSender != nil || ownPage {
+                DispatchQueue.main.async { [weak self] in self?.load(page, by: ownSender ?? .page) }
+            } else {
+                Diagnostics.note("Refused a page's link", site: webView.url?.host(), "chrome-extension:", isPrivate: isPrivate)
+            }
             return (.cancel, preferences)
         }
         if ExternalLinks.isExternal(url) {
@@ -1952,6 +1993,12 @@ extension Tab: WKNavigationDelegate {
     static func isClickOnWarning(targetsMainFrame: Bool, sourceIsMainFrame: Bool, sameWebView: Bool, userInitiated: Bool,
                                  pageHost: String?, warnedHost: String?) -> Bool {
         targetsMainFrame && sourceIsMainFrame && sameWebView && userInitiated && warnedHost != nil && pageHost == warnedHost
+    }
+
+    /// Whether a restored page is loaded again: a web page fetched with GET, so a form is never sent twice.
+    nonisolated static func revalidatesRestoredPage(url: URL?, method: String?, type: WKNavigationType) -> Bool {
+        guard type == .backForward, (method ?? "GET").uppercased() == "GET", let scheme = url?.scheme?.lowercased() else { return false }
+        return scheme == "http" || scheme == "https"
     }
 
     /// Whether a navigation may land on one of Zigzag's own pages: Zigzag's own load, Back or Forward, or a link
@@ -2226,6 +2273,15 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
+        DarkPages.pageCommitted(in: webView)
+        // A reload asks the site again and keeps the restored history.
+        let reloadsRestored = restoredPage == .reloads
+        if reloadsRestored {
+            restoredPage = nil
+            webView.reload()
+        }
+        // The reload starts as quietly as the restored page would have.
+        if !reloadsRestored { startsQuietly = false }
         // Page committed: no fallback needed.
         pendingHTTPFallback = nil
         // The rule-opened page arrived, so its links and downloads are normal again.
@@ -2234,13 +2290,16 @@ extension Tab: WKNavigationDelegate {
         ruleDeclinedURL = nil
         declinedRuleDownload = false
         forgetPageErrors()
+        // A new document, even at the same address: nothing translated is in it.
+        isTranslated = false
+        changed.send(.document)
+        // A click on the page before doesn't let this one open a pop-up.
+        PopupNotice.forgetInput(in: webView)
         // The new page is here: its address shows.
         addressWaitsForCommit = false
         // Before the address updates, so a pinned page isn't marked as moved on.
         noteLanding(webView.url)
         if webView.url != url { followAddress(of: webView) }
-        // The page that landed follows this address's full screen choice, whatever the one before it did (#462).
-        PageFullScreen.pageCommitted(webView)
         // The page that landed is the page the door is for: it stays for an allowed origin, and a page that went
         // somewhere else has it taken out, so the dev page it became keeps its own fetch, XHR and HMR socket.
         if let landed = webView.url {
@@ -2373,6 +2432,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLeavingPage = false
+        restoredPage = nil
         addressWaitsForCommit = false
         // Failed load: clear rule-opened and declined state.
         openedByRule = false
@@ -2476,6 +2536,7 @@ extension Tab: WKNavigationDelegate {
         guard reloadWhenShown, let webView else { return }
         reloadWhenShown = false
         if webView.url == nil, let url { loadOwn(url, in: webView) } else { webView.reload() }
+        startsQuietly = true
     }
 
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
@@ -2488,8 +2549,16 @@ extension Tab: WKNavigationDelegate {
 
 extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        let made = newWebView(for: webView, configuration: configuration, navigationAction: navigationAction, windowFeatures: windowFeatures)
+        // The new window's first request goes as the site's chosen browser, not asked for twice (#392).
+        SiteUserAgents.prepare(made, for: navigationAction.request.url)
+        return made
+    }
+
+    private func newWebView(for webView: WKWebView, configuration: WKWebViewConfiguration, navigationAction: WKNavigationAction,
+                            windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Zigzag Mini always opens; a page's own request needs a click or your say.
-        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
+        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isClicked(navigationAction, in: webView, isPrivate: isPrivate) {
             // Page pop-up: a saved destination for the site opens without asking, else the banner asks and nothing
             // opens yet. Zigzag pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
@@ -2545,6 +2614,10 @@ extension Tab: WKUIDelegate {
                                  "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             }
+            // For Report a Problem: whether you had just clicked or typed in a page, which WebKit didn't count.
+            Diagnostics.note("Pop-up without a click", site: url?.host(),
+                             PopupNotice.unclickedNote(inMini: host is MiniWindowController, sinceInput: Date().timeIntervalSince(UndoClock.lastPageInput)),
+                             isPrivate: isPrivate)
             return PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost,
                                    configuration: configuration, features: windowFeatures)
         }

@@ -110,6 +110,18 @@ struct MiniWindowTests {
         #expect(!MiniWindowController.needsLinksNote(in: defaults))
     }
 
+    // MARK: Open in
+
+    @Test func openInPrefersAWindowOnThisDesktop() {
+        // The window last used is on another desktop: the front one here takes the page.
+        #expect(MiniWindowController.window(front: "elsewhere", frontToBack: ["elsewhere", "here", "also here"]) { $0.contains("here") && $0 != "elsewhere" } == "here")
+        // The one in front is here: it keeps the page.
+        #expect(MiniWindowController.window(front: "also here", frontToBack: ["here", "also here"]) { $0.contains("here") } == "also here")
+        // None here: nothing chosen, so the one in front is used and Zigzag switches to it.
+        #expect(MiniWindowController.window(front: "elsewhere", frontToBack: ["elsewhere", "full screen"]) { _ in false } == nil)
+        #expect(MiniWindowController.window(front: nil, frontToBack: ["here"]) { _ in true } == "here")
+    }
+
     // MARK: Its size
 
     @Test func opensAtTheSizeLastLeftAt() {
@@ -279,6 +291,9 @@ struct MiniFromPageTests {
             #expect(!store.isPersistent)
             #expect(store === controller.tabManager.privateStore)
             #expect(mini.savedForRelaunch == nil)
+            // Open in names the private window, not a space the page won't go to.
+            let place = String(localized: "Private", comment: "The heading at the top of a private window's sidebar, where a space's name would be.")
+            #expect(mini.debugState["open"] as? String == String(localized: "Open in \(place)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name."))
         }
     }
 
@@ -299,6 +314,28 @@ struct MiniFromPageTests {
             #expect(manager.selectedTab === page)
             // The same live page, never reloaded.
             #expect(page.webView != nil && !page.isClosed)
+        }
+    }
+
+    /// Minimized or hidden, the window it came from still takes its pages, its new tabs and its translating.
+    @Test func aHiddenSourceWindowStillTakesItsPages() async throws {
+        try await inWindow(isPrivate: true) { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            controller.window?.orderOut(nil)
+            #expect(controller.window?.isVisible == false)
+            #expect(mini.browserTarget === controller)
+            #expect(mini.translator === controller)
+            #expect(mini.browserTarget.tabManager.privateStore === mini.tab.privateStore)
+        }
+        try await inWindow { controller, source in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: source, in: controller)
+            defer { mini.window?.close() }
+            controller.window?.orderOut(nil)
+            #expect(mini.browserTarget === controller)
+            // Closed, it's no longer where the pages go.
+            controller.window?.close()
+            #expect(mini.translator !== controller)
         }
     }
 

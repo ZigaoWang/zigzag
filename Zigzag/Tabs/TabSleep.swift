@@ -68,6 +68,17 @@ nonisolated enum TabSleep {
         if out.isEmpty, let keptAwake { out.append(keptAwake) }
         return out
     }
+
+    /// A page that comes back without you loading it then (restored after a relaunch, woken from sleep, reloaded after
+    /// it stopped out of sight) starts without sound until you use it, as in Chrome and Safari (#493).
+    static func startsQuietly(restored: Bool, asleep: Bool, openedByPage: Bool) -> Bool {
+        (restored || asleep) && !openedByPage
+    }
+
+    /// Whether a main-frame navigation goes without autoplaying sound: a quiet start's, never one you clicked.
+    static func autoplaysWithoutSound(startsQuietly: Bool, userInitiated: Bool) -> Bool {
+        startsQuietly && !userInitiated
+    }
 }
 
 /// Sites whose tabs stay awake in the background, chosen in the site controls (Settings › Privacy › Sites lists

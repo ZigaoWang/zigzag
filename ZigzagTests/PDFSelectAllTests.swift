@@ -150,3 +150,30 @@ extension PDFDarkPagesTests {
         #expect(ZigzagPDFView.run(from: -3, to: 2, length: 10) == 0..<2)
     }
 }
+
+/// The PDF viewer's tile ranges never trap (#507).
+struct PDFChunkRangeTests {
+    /// A sliver thinner than the edge allowance made the end of the range come before its start.
+    @Test func aSliverOfAPageGivesOneTileNotACrash() throws {
+        let range = try #require(ZigzagPDFView.chunkRange(of: CGRect(x: 512, y: 100, width: 0.0004, height: 0.0004),
+                                                          pageSize: CGSize(width: 612, height: 792), side: 256))
+        #expect(range.columns == 2...2)
+        #expect(range.rows == 0...0)
+    }
+
+    @Test func aPageCoveredWholeGivesEveryTile() throws {
+        let range = try #require(ZigzagPDFView.chunkRange(of: CGRect(x: 0, y: 0, width: 612, height: 792),
+                                                          pageSize: CGSize(width: 612, height: 792), side: 256))
+        #expect(range.columns == 0...2)
+        #expect(range.rows == 0...3)
+    }
+
+    @Test func aSizeThatIsntRealGivesNothing() {
+        let page = CGSize(width: 612, height: 792), rect = CGRect(x: 0, y: 0, width: 100, height: 100)
+        #expect(ZigzagPDFView.chunkRange(of: rect, pageSize: page, side: 0) == nil)
+        #expect(ZigzagPDFView.chunkRange(of: rect, pageSize: page, side: CGFloat.nan) == nil)
+        #expect(ZigzagPDFView.chunkRange(of: rect, pageSize: page, side: CGFloat.infinity) == nil)
+        _ = ZigzagPDFView.chunkRange(of: CGRect(x: CGFloat.nan, y: 0, width: 10, height: 10), pageSize: page, side: 256)
+        #expect(ZigzagPDFView.chunkRange(of: CGRect(x: 700, y: 0, width: 10, height: 10), pageSize: page, side: 256) == nil)
+    }
+}

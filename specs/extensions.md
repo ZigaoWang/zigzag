@@ -19,6 +19,8 @@
   Test: AddonsMozillaPageTests.aCheckedClickAsksOnlyInTheInstallSheet
 - Install from File… in Settings › Extensions → takes a .xpi file or a folder with a manifest.json.
   Test: FirefoxInstallTests.installingAnXPIRecordsItsKindGeckoIDAndOpaqueID
+- A .xpi that asks for the proxy permission → its sheet and its row in Settings say Firefox's proxy API won't work in Zigzag.
+  Test: FirefoxLimitTests.aFirefoxProxyExtensionSaysItsProxyWontWork
 
 ## Updates
 - Extensions from the Chrome Web Store → checked once a day; ones from a .xpi or a folder aren't.
@@ -39,6 +41,10 @@
   Test: SiteAccessContentScriptTests.contentScriptsFollowSiteAccess
 - Extensions off for a site in Site Controls → their scripts stay out there at once, no restart, and the extension keeps running elsewhere.
   Test: SiteAccessContentScriptTests.anOffSiteNeedsNoRestart
+- An extension asking for a site its site access doesn't cover (`permissions.request`) right after you used it → the more-access sheet asks; Allow grants it, Don't Allow or no recent use answers false.
+  Test: ExtensionPermissionRequestTests.sitesOutsideAccessAreAskedAbout
+- A site you allowed it → kept under any site access, until the extension removes it or you choose another site access; a site where extensions are off stays off.
+  Test: ExtensionPermissionRequestTests.allowedSitesAreGrantedUnderAnySiteAccess
 
 ## Private windows
 - A new extension → off in private windows until Allow in private windows is on for it in Settings › Extensions.
@@ -55,6 +61,10 @@
   Test: SiteExtensionsTests.thePinMarkFollowsThePins
 - Pinning → up to three; a new pin goes to the left of the others.
   Test: AddressTests.atMostThreeExtensionsArePinned
+- A chrome-extension://<id>/… address, typed or given by an extension → opens that extension's page; an extension that isn't installed → "This extension isn't here".
+  Test: ChromeExtensionAddressTests.chromesAddressBecomesZigzagsOwn
+- A website's link to a chrome-extension:// address → goes nowhere; only Zigzag and the extension's own pages open them.
+  Test: ChromeExtensionAddressTests.aWebsiteCantSendATabThere
 
 ## Keywords
 - Type an extension's keyword and a space → the address bar hands what follows to that extension.
@@ -67,3 +77,7 @@
 ## Background
 - A page's message to an extension unanswered after 3 seconds → Zigzag starts that extension's background, at most once every 10 seconds.
   Test: ExtensionStormTests.anUnansweredMessageAsksForTheBackgroundOnce
+- A message to a tab or frame where no content script listens → fails with "Could not establish connection. Receiving end does not exist.", as in Chrome; one a listener heard and didn't answer → undefined, no error.
+  Test: ExtensionScriptTests.aTabMessageNothingHearsFails
+- A content script's or page's message that none of the extension's pages listens for → fails the same way.
+  Test: ExtensionScriptTests.aRuntimeMessageNothingHearsFails

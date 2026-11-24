@@ -354,4 +354,53 @@ struct DarkPagesTests {
             #expect(webView.appearance?.name == .aqua)
         }
     }
+
+    // MARK: A page on its way
+
+    private final class OnItsWay: NSObject, WKNavigationDelegate {
+        var started: (() -> Void)?
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { started?(); started = nil }
+        // As Tab's own delegate does.
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { DarkPages.pageCommitted(in: webView) }
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    /// A page whose look changed while it loaded in a process of its own (another site's) gets that look: WebKit
+    /// told only the page before it, which left the new one light under a dark web view.
+    @Test func aLookChangedWhileAPageIsOnItsWayReachesIt() async throws {
+        let name = "DarkPagesTests-\(UUID().uuidString)"
+        let saved = DarkPages.defaults
+        DarkPages.defaults = UserDefaults(suiteName: name)!
+        defer {
+            DarkPages.defaults.removePersistentDomain(forName: name)
+            DarkPages.defaults = saved
+            DarkPages.refreshAll()
+        }
+        DarkPages.mode = .off
+        let there = URL(string: "https://on-its-way.test/")!
+        DarkPages.setSiteChoice(.off, for: there)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+        DarkPages.attach(to: webView)
+        let loading = OnItsWay()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<p>Before</p>", baseURL: URL(string: "https://before.test/"))
+        }
+        // The site turned on once its page is on its way.
+        loading.started = { DarkPages.setSiteChoice(.on, for: there) }
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<p>After</p>", baseURL: there)
+        }
+        #expect(webView.appearance?.name == .darkAqua)
+        let dark = try await webView.callAsyncJavaScript("return matchMedia('(prefers-color-scheme: dark)').matches", arguments: [:], in: nil, contentWorld: .page)
+        #expect(dark as? Bool == true)
+        try await Task.sleep(for: .milliseconds(300))
+        let state = try await webView.callAsyncJavaScript("return window.__zigzagDark.state()", arguments: [:], in: nil, contentWorld: DarkPages.world)
+        #expect((state as? [String: Any])?["wanted"] as? Bool == true)
+    }
 }

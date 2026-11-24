@@ -155,6 +155,17 @@ struct PageIconTests {
         #expect(IconGrid.toggled("star.fill", from: nil) == "star.fill")
         #expect(IconGrid.toggled("star.fill", from: "🍕") == "star.fill")
     }
+
+    /// Choose Image… and Use Site Icon are the panels' quiet pill, as the downloads panel's Clear is.
+    @MainActor @Test func thePickersButtonsAreQuietPills() {
+        let panel = IconPickerPanel(noneSymbol: "globe", selected: "star.fill", onChooseImage: {}) { _ in }
+        func all(_ view: NSView) -> [NSView] { view.subviews + view.subviews.flatMap(all) }
+        let views = all(panel)
+        let pills = views.compactMap { $0 as? PillButton }
+        #expect(pills.count == 2)
+        #expect(pills.allSatisfy { $0.style == .quiet })
+        #expect(!views.contains { $0 is TextButton })
+    }
 }
 
 /// Site-wide icon from Site Controls (#310): under a tab's own, per site with subdomains, removable in Settings, per window in private ones.

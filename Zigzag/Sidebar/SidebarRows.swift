@@ -8,6 +8,7 @@ class SidebarRowView: InteractiveView {
     var freshness: CGFloat = 1 { didSet { if oldValue != freshness { applyFreshness() } } }
     /// While lifted for dragging, the row draws as selected-ish with a shadow.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
+    override func touchLiftChanged() { isLifted = isTouchLifted }
     /// On its way out of the list: it takes no more clicks while it folds away.
     var isLeaving = false
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
@@ -408,12 +409,20 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func refreshUnloaded() { isUnloaded = isBookmark && !Self.showsOpenEdge(pinned: true, loaded: pages.map(\.isLoaded)) }
 
-    /// The other half of a split: shown in the same row, to the right.
-    private(set) var partner: Tab?
-    /// A pinned split's other page, by its pinned name and icon: there whether or not its page is open.
-    private var pinnedPartner: (title: String, icon: NSImage?, unloaded: Bool)?
-    /// Two pages in one row: a split of tabs, or a pinned split.
-    var isSplit: Bool { partner != nil || pinnedPartner != nil }
+    /// One of the row's other pages, after its own: its page while open, and for a pinned page its pinned name and
+    /// icon, there whether or not the page is. Tab rows and pinned rows give the same parts.
+    struct Part {
+        var page: Tab?
+        var name: String? = nil
+        var icon: NSImage? = nil
+    }
+    /// The row's other pages in the group's order: a split's other half, or a tile group's other two or three.
+    private(set) var parts: [Part] = []
+    private var partTokens: [SignalToken] = []
+    /// The second part's page.
+    var partner: Tab? { parts.first?.page }
+    /// Two to four pages in one row: a split or tile group, of tabs or of pinned pages.
+    var isSplit: Bool { !parts.isEmpty }
     /// Which page you're working in, when split (0 = this row's own, 1 = its partner).
     var focusedHalf = 0 { didSet { if oldValue != focusedHalf { refreshTitleColor(); refreshAccessories() } } }
     /// The part whose page is zoomed over the rest of its split or group (`half(at:)`'s numbering), lit; nil for none.
@@ -450,7 +459,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
     /// The partner is on the left of the page, so it's on the left of the row too (a pinned page beside a tab).
     var partnerLeads = false { didSet { if oldValue != partnerLeads { needsLayout = true } } }
-    private var partnerToken: SignalToken?
     private let partnerIcon = FaviconView()
     private let partnerTitle: Label = {
         let label = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
@@ -458,10 +466,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return label
     }()
     private let divider = ColorView(color: Tokens.Color.separator)
-    /// A tile group's third and fourth pages, after the partner (#160): each its own part of the row, as the
-    /// partner's half is, with its icon, its title while there's room for it, and its speaker.
-    private(set) var extraPartners: [Tab] = []
-    private var extraTokens: [SignalToken] = []
+    /// A tile group's third and fourth parts' views (#160): each its own part of the row, as the partner's half is,
+    /// with its icon, its title while there's room for it, and its speaker.
     private typealias ExtraViews = (icon: FaviconView, title: Label, divider: ColorView, audio: IconButton)
     /// Made the first time the row shows a group of more than two.
     private var extraViews: [ExtraViews]?
@@ -486,19 +492,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
     /// Every page the row shows, its own first, in the group's order.
     var pages: [Tab] { ([tab, partner] + extraPages).compactMap { $0 } }
-    /// A pinned group's third and fourth pages (#203), by their pinned names and icons, with their pages while open.
-    private var pinnedExtras: [(title: String, icon: NSImage?, page: Tab?)] = []
     /// The third and fourth parts' pages, in order: nil for a pinned page that isn't open.
-    var extraPages: [Tab?] { pinnedExtras.isEmpty ? extraPartners.map { Optional($0) } : pinnedExtras.map(\.page) }
+    var extraPages: [Tab?] { parts.dropFirst().map(\.page) }
     /// The third and fourth parts' names.
-    private var extraTitles: [String] { pinnedExtras.isEmpty ? extraPartners.map(\.displayTitle) : pinnedExtras.map(\.title) }
+    private var extraTitles: [String] { parts.dropFirst().map(Self.name) }
     /// How many parts the row has after its own and its partner's.
-    private var extraCount: Int { pinnedExtras.isEmpty ? extraPartners.count : pinnedExtras.count }
+    private var extraCount: Int { max(0, parts.count - 1) }
+    /// A part's name: its pinned one, else its page's.
+    private static func name(_ part: Part) -> String { part.name ?? part.page?.displayTitle ?? "" }
     /// How many parts the row is split into: one, two halves, or a tile group's three or four.
     private var segmentCount: Int { isSplit ? 2 + extraCount : 1 }
 
-    /// A row of several tabs whose × closes one page (#404): the part pointed at, else the one you're in.
-    var closesPart = false { didSet { if oldValue != closesPart { refreshAccessories(); needsLayout = true } } }
+    /// A row of several pages, tabs or pinned, whose × closes one page (#404): the part pointed at, else the one you're in.
+    var closesPart: Bool { isSplit && !isAway }
     /// The part under the pointer, in `half(at:)`'s numbering; nil while it's elsewhere.
     private var pointedPart: Int? { didSet { if oldValue != pointedPart { stateDidChange(animated: false); needsLayout = true } } }
     /// Whether the × sits in one part of the row, which it closes: the part under the pointer, or the one you're in.
@@ -534,15 +540,26 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The part the × is on, in `half(at:)`'s numbering.
     var closePart: Int {
         guard closesPart, isSplit else { return 0 }
+        if let voicedPart { return voicedPart }
         if let pointedPart, pointedPart < segmentCount { return pointedPart }
         if isSelected { return min(focusedHalf, segmentCount - 1) }
         return extraCount == 0 && partnerLeads ? 0 : segmentCount - 1
     }
-    /// The page the × closes: one part's with `closesPart`, else the row's own.
+    /// The page the × closes: one part's with `closesPart` (nil for a pinned part that isn't open), else the row's own.
     var closingPage: Tab? {
+        guard closesPart else { return tab }
         let pages = [tab, partner] + extraPages
-        return closesPart && pages.indices.contains(closePart) ? pages[closePart] ?? tab : tab
+        return pages.indices.contains(closePart) ? pages[closePart] : nil
     }
+    /// Whether the part's page has a × of its own: a tab always, a pinned page while it's loaded, as on its own row.
+    private func partCloses(_ page: Tab?) -> Bool {
+        guard let page else { return false }
+        return page.bookmarkID == nil || page.isLoaded
+    }
+    #if DEBUG
+    /// The debug bridge's pointer over one part of the row (`half(at:)`'s numbering).
+    func debugPoint(atPart part: Int?) { pointedPart = part }
+    #endif
     private var moveTracking: NSTrackingArea?
 
     override func updateTrackingAreas() {
@@ -555,12 +572,34 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
+        TouchReveal.pointerMoved(over: self)
         trackPointer(event)
     }
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
+        TouchReveal.pointerMoved(over: self)
         trackPointer(event)
+    }
+
+    // MARK: Touch
+
+    /// Shown by a tap as hovering shows it, the × of a pinned tab or a split's part included (`TouchReveal`).
+    private(set) var touchRevealed = false {
+        didSet { if oldValue != touchRevealed { stateDidChange(animated: false) } }
+    }
+
+    /// A tap at `point` (own coordinates): the row's buttons show as if hovered, on the part tapped.
+    func touchReveal(at point: NSPoint) {
+        if closesPart, isSplit, bounds.contains(point) { pointedPart = half(at: point) }
+        touchRevealed = true
+        var area: NSView? = superview
+        while let current = area, !(current is SidebarView) { area = current.superview }
+        TouchReveal.reveal(self, keptWithin: area) { [weak self] in
+            guard let self else { return }
+            self.touchRevealed = false
+            if !self.isHovered { self.pointedPart = nil }
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -573,6 +612,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let point = convert(event.locationInWindow, from: nil)
         pointedPart = bounds.contains(point) ? half(at: point) : nil
     }
+
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
     /// 0 = would open on the left, 1 = on the right, nil = not a drop target.
@@ -620,43 +660,96 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         addSubview(audioButton)
         addSubview(partnerAudioButton)
         addSubview(closeButton)
+        if TouchGestures.isAvailable { addTouchWatch() }
     }
 
-    func configure(partner: Tab?) {
-        guard partner !== self.partner else { return }
-        self.partner = partner
-        partnerToken = partner?.changed.observe { [weak self] change in
-            // `.webView`: it went to sleep or woke, which its icon shows.
-            if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer { self?.refreshPartner() }
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onDown = { [weak self] point in self?.touchDown(at: point) }
+        watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
+        addGestureRecognizer(watch)
+    }
+
+    /// A finger landing near the × but off it (`closeTouchBox`): the click AppKit makes from it is the ×'s.
+    private enum CloseTouch { case none, armed(NSPoint, TimeInterval), taken }
+    private var closeTouch = CloseTouch.none
+    /// The press the × took over from the row, until it lifts.
+    private var closePress: NSEvent?
+
+    /// The × is 20 points; a finger takes it anywhere in `TouchGestures.target` around it, within the row.
+    var closeTouchBox: NSRect { TouchGestures.box(around: closeButton.frame).intersection(bounds) }
+
+    /// A finger landed, in window coordinates.
+    func touchDown(at windowPoint: NSPoint) {
+        let point = convert(windowPoint, from: nil)
+        let nearClose = !closeButton.isHidden && !closeButton.frame.contains(point) && closeTouchBox.contains(point)
+        closeTouch = nearClose ? .armed(windowPoint, ProcessInfo.processInfo.systemUptime) : .none
+    }
+
+    /// A tap, in window coordinates, once AppKit's click from it has gone through.
+    func touchTapped(at windowPoint: NSPoint) {
+        TouchLog.note("row tap \(tab?.displayTitle.prefix(20) ?? "") close=\(closeTouch) selected=\(isSelected) seen by \(TouchLog.recognizers(from: self))")
+        switch closeTouch {
+        case .armed:
+            // No click came from it: the tap is the ×'s all the same.
+            closeTouch = .none
+            let event = NSEvent.mouseEvent(with: .leftMouseUp, location: windowPoint, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
+            if let event { closeButton.onClick?(event) }
+        case .taken:
+            closeTouch = .none
+        case .none:
+            touchReveal(at: convert(windowPoint, from: nil))
+        }
+    }
+
+    /// Whether a mouse-down is the click AppKit made from a finger near the ×.
+    private func takesCloseTouch(_ event: NSEvent) -> Bool {
+        guard case .armed(let point, let time) = closeTouch, ProcessInfo.processInfo.systemUptime - time < 1,
+              hypot(event.locationInWindow.x - point.x, event.locationInWindow.y - point.y) < TouchGestures.tapSlop else { return false }
+        closeTouch = .taken
+        return true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let closes = takesCloseTouch(event)
+        if TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) {
+            TouchLog.note("row press \(tab?.displayTitle.prefix(20) ?? "") clicks=\(event.clickCount) to×=\(closes)")
+        }
+        if closes { closePress = event; return }
+        super.mouseDown(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if closePress != nil { return }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard let press = closePress else { return super.mouseUp(with: event) }
+        closePress = nil
+        let moved = hypot(event.locationInWindow.x - press.locationInWindow.x, event.locationInWindow.y - press.locationInWindow.y)
+        if moved < TouchGestures.tapSlop { closeButton.onClick?(event) }
+    }
+
+    /// The row's other pages after its own, in order (none: a row of one page). The only way a row becomes a split
+    /// or tile group's row, in the tab list and among the pinned pages alike.
+    func configure(parts new: [Part]) {
+        let new = Array(new.prefix(3))
+        let samePages = new.count == parts.count && zip(new, parts).allSatisfy { $0.page === $1.page }
+        guard !samePages || zip(new, parts).contains(where: { $0.name != $1.name || $0.icon !== $1.icon }) else { return }
+        parts = new
+        if !samePages {
+            partTokens = new.enumerated().compactMap { i, part in
+                part.page?.changed.observe { [weak self] change in
+                    // `.webView`: it went to sleep or woke, which its icon shows.
+                    guard change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer else { return }
+                    if i == 0 { self?.refreshPartner() } else { self?.refreshExtras() }
+                }
+            }
         }
         [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
         refreshPartner()
-    }
-
-    /// A split's other page or a tile group's other pages, in order: the first is the partner, any more follow it.
-    func configure(partners: [Tab]) {
-        configure(partner: partners.first)
-        let more = Array(partners.dropFirst().prefix(2))
-        guard more.count != extraPartners.count || zip(more, extraPartners).contains(where: { $0 !== $1 }) else { return }
-        extraPartners = more
-        extraTokens = more.map { page in
-            page.changed.observe { [weak self] change in
-                if change == .title || change == .favicon || change == .loading || change == .url || change == .audio || change == .webView || change == .developer { self?.refreshExtras() }
-            }
-        }
-        refreshExtras()
-    }
-
-    /// A pinned group's third and fourth pages, each by its pinned name and icon, with its page where it's open;
-    /// none for a row of one or two.
-    func configure(pinnedExtras parts: [(title: String, icon: NSImage?, page: Tab?)]) {
-        guard !(parts.isEmpty && pinnedExtras.isEmpty) else { return }
-        pinnedExtras = Array(parts.prefix(2))
-        extraTokens = pinnedExtras.compactMap(\.page).map { page in
-            page.changed.observe { [weak self] change in
-                if change == .favicon || change == .loading || change == .audio || change == .webView || change == .developer { self?.refreshExtras() }
-            }
-        }
         refreshExtras()
     }
 
@@ -666,8 +759,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         for (i, views) in extras.enumerated() {
             let shown = i < extraCount
             let page = pages.indices.contains(i) ? pages[i] : nil
-            let pinned = pinnedExtras.indices.contains(i) ? pinnedExtras[i] : nil
-            views.icon.image = page?.displayIcon ?? pinned?.icon
+            let part = parts.indices.contains(i + 1) ? parts[i + 1] : nil
+            views.icon.image = page?.displayIcon ?? part?.icon
             views.icon.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true)
             views.icon.isUnloaded = showsUnloaded(page)
             views.title.stringValue = titles.indices.contains(i) ? titles[i] : ""
@@ -683,17 +776,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         needsLayout = true
     }
 
-    func configure(pinnedPartner title: String?, icon: NSImage?, unloaded: Bool) {
-        // Not a pinned split, and wasn't: nothing to redo.
-        guard title != nil || pinnedPartner != nil else { return }
-        pinnedPartner = title.map { ($0, icon, unloaded) }
-        [partnerIcon, partnerTitle, divider].forEach { $0.isHidden = !isSplit }
-        refreshPartner()
-    }
-
     private func refreshPartner() {
-        partnerTitle.stringValue = pinnedPartner?.title ?? partner?.displayTitle ?? ""
-        partnerIcon.image = partner?.displayIcon ?? pinnedPartner?.icon
+        partnerTitle.stringValue = parts.first.map(Self.name) ?? ""
+        partnerIcon.image = partner?.displayIcon ?? parts.first?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
         partnerIcon.isUnloaded = showsUnloaded(partner)
         Self.showSpeaker(partnerAudioButton, muted: partner?.isMuted == true)
@@ -719,18 +804,43 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             return name.map { String(localized: "\($0) playing audio", comment: "Spoken by VoiceOver after a tab row's name, for one page of a split: that page's title, then that it plays sound.") }
                 ?? String(localized: "playing audio", comment: "Spoken by VoiceOver after a tab row's name: the tab plays sound.")
         }
-        let split = partner != nil
+        let split = isSplit
         let development = showsDeveloperMode ? DeveloperTool.modeName : nil
         // What its ring shows: its page isn't running.
         let unloaded = showsUnloaded(tab) ? String(localized: "not loaded", comment: "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.") : nil
         let waiting = ([tab, partner] + extraPages).compactMap { $0 }.contains { PendingQuestions.hasPending(tabID: $0.id) }
-            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.")
+            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name: a question is waiting for that page.")
             : nil
         let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, waiting, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + zip(extraPages, extraTitles).map { sound($0, $1) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
         setAccessibilitySelected(isSelected)
+        refreshCloseActions()
+    }
+
+    /// The part VoiceOver's close action is for, while it runs.
+    private var voicedPart: Int?
+
+    /// VoiceOver closes each page of a split with its own action, as its part's × does.
+    private func refreshCloseActions() {
+        guard closesPart else { setAccessibilityCustomActions(nil); return }
+        let pages = [tab, partner] + extraPages
+        let names = partTitles.map(\.stringValue)
+        let actions = pages.indices.compactMap { i -> NSAccessibilityCustomAction? in
+            guard partCloses(pages[i]), names.indices.contains(i) else { return nil }
+            let name = pages[i]?.bookmarkID != nil
+                ? String(localized: "Unload \(names[i])", comment: "VoiceOver action on a split view's row in the sidebar: unloads one pinned page of it. The name is that page's title.")
+                : String(localized: "Close \(names[i])", comment: "VoiceOver action on a split view's row in the sidebar: closes one page of it. The name is that page's title.")
+            return NSAccessibilityCustomAction(name: name) { [weak self] in
+                guard let self else { return false }
+                self.voicedPart = i
+                defer { self.voicedPart = nil }
+                self.onClose?()
+                return true
+            }
+        }
+        setAccessibilityCustomActions(actions)
     }
 
     /// Which page the point is over: 0 for this row's own, 1 for its partner, 2 and 3 for a tile group's others.
@@ -756,37 +866,18 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The title labels of the row's parts, in `half(at:)`'s order: its own, the partner's, a group's others.
     private var partTitles: [Label] { [title, partnerTitle] + (extraViews ?? []).map(\.title) }
 
-    /// Pointing at a part of a row of several pages names that page, as its title may be cut short or not shown.
-    private var showsPartTips = false
-
-    private func refreshPartTips() {
-        guard isSplit || showsPartTips else { return }
-        removeAllToolTips()
-        showsPartTips = isSplit
-        guard isSplit else { return }
-        for (start, end) in partSpans where end > start {
-            addToolTip(NSRect(x: start, y: 0, width: end - start, height: bounds.height), owner: self, userData: nil)
-        }
-    }
-
-    @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
-        let index = half(at: point)
-        let name = partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
-        // A part in Developer Mode says so under its name, with its host.
-        let pages = [tab, partner] + extraPages
-        let described = developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
-        // Mark parts with a waiting question so it isn't missed in a background tab.
-        if pages.indices.contains(index), let page = pages[index], PendingQuestions.hasPending(tabID: page.id) {
-            return "\(described)\n\(String(localized: "needs your answer", comment: "Shown in a tab row's tooltip, and spoken by VoiceOver after its name: a question is waiting for that page."))"
-        }
-        return described
-    }
-
     /// The page the point is over.
     func page(at point: NSPoint) -> Tab? {
         let pages = [tab, partner] + extraPages
         let index = half(at: point)
         return pages.indices.contains(index) ? pages[index] ?? tab : tab
+    }
+
+    /// The open page of the part the point is over; nil for a pinned part that isn't open.
+    func partPage(at point: NSPoint) -> Tab? {
+        let pages = [tab, partner] + extraPages
+        let index = half(at: point)
+        return pages.indices.contains(index) ? pages[index] : nil
     }
 
     /// Splits a row of `count` pages into equal whole-point parts up to `end`, meeting at hairlines.
@@ -908,16 +999,18 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func refreshAccessories() {
         // A pinned tab you're on stays clean, as Arc's does: its button (unload, or back to its page) comes with the
         // pointer. A plain tab you're on keeps its close button in view.
-        let pointing = closesInPart ? isHovered && pointedPart != nil : isHovered
+        let hovering = isHovered || touchRevealed
+        let pointing = closesInPart ? hovering && pointedPart != nil : hovering
         // A part too narrow for its icon and the × beside it keeps its icon until you point at it.
         let resting = isSelected && !isBookmark && (!closesInPart || closeFitsBesideIcon(part: closePart))
-        let showClose = (pointing || resting) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil && number == nil
+        // In a split, each part's × is that page's own: none on a pinned part that isn't loaded.
+        let unloaded = closesInPart ? !partCloses(closingPage) : isBookmark && isUnloaded
+        let showClose = (pointing || resting) && !isLifted && !unloaded && renameField == nil && number == nil
         if closesPart, closeButton.isHidden == showClose { needsLayout = true }
         closeButton.isHidden = !showClose
-        let closesPinned = isBookmark && (!closesPart || closingPage?.bookmarkID != nil)
+        let closesPinned = closesInPart ? closingPage?.bookmarkID != nil : isBookmark
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
             : closesPinned ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.")
-            : closesInPart ? String(localized: "Close \(closingPage?.displayTitle ?? "")", comment: "Tooltip of the close button on one page's part of a split view's row in the sidebar. The name is that page's title.")
             : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         refreshDeveloperMode()
@@ -943,8 +1036,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         for (i, view) in icons.enumerated() {
             let on = badged.contains(i)
             view.developerBadge = on ? color : nil
-            // A row of several pages names each in its own tooltip; a row of one says it on its icon.
-            view.toolTip = on && !isSplit ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
+            // Each page in it says so on its own icon, with its host.
+            view.toolTip = on ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
         }
     }
 
@@ -1024,7 +1117,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         refreshAccessibilityLabel()
     }
 
-
     override func layout() {
         super.layout()
         layoutButtonsAndHalves()
@@ -1101,10 +1193,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             end = nestedButton.frame.minX - Self.buttonGap
         }
         layoutDropHalf()
-        defer {
-            refreshPartTips()
-            layoutZoomMark()
-        }
+        defer { layoutZoomMark() }
 
         guard isSplit else {
             partEdges = []
@@ -1191,7 +1280,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 // favorite's small × in its top corner, its icon and speaker staying, the part's wash saying whose it is.
                 let end = part.end - edge - size.width
                 let fits = titles || end >= icon.frame.maxX + Self.buttonGap
-                if !fits, !(isHovered && pointedPart != nil) { closeButton.isHidden = true }
+                if !fits, !((isHovered || touchRevealed) && pointedPart != nil) { closeButton.isHidden = true }
                 if fits {
                     closeButton.frame.origin.x = end
                 } else {
@@ -1628,8 +1717,8 @@ final class SeparatorRowView: NSView {
     }
     var showsClear = false { didSet { if showsClear != oldValue { refreshClear() } } }
     var hasTabs = false { didSet { if hasTabs != oldValue { refreshClear() } } }
-    /// Shown under the pointer, or while Tab has brought keyboard focus to it.
-    private var clearShown: Bool { (showsClear || clearButton.hasKeyboardFocus) && hasTabs }
+    /// Shown under the pointer, after a tap on the label's row, or while Tab has brought keyboard focus to it.
+    private var clearShown: Bool { (showsClear || touchRevealed || clearButton.hasKeyboardFocus) && hasTabs }
     /// When Clear last came into view. A click right as it appears was meant for whatever was under the pointer
     /// a moment before (New Tab, just below), so it counts only once Clear has been there a beat.
     private var clearShownAt = Date.distantPast
@@ -1655,6 +1744,26 @@ final class SeparatorRowView: NSView {
         }
         clearButton.hoverChanged = { [weak self] _ in self?.previewChanged() }
         addSubview(clearButton)
+        if TouchGestures.isAvailable { addTouchWatch() }
+    }
+
+    // MARK: Touch
+
+    /// Shown by a tap as hovering the list shows it (`TouchReveal`).
+    private(set) var touchRevealed = false { didSet { if touchRevealed != oldValue { refreshClear() } } }
+
+    /// A tap on the row, once AppKit's click from it has gone through: Clear shows, as over the list.
+    func touchTapped() {
+        touchRevealed = true
+        var area: NSView? = superview
+        while let current = area, !(current is SidebarView) { area = current.superview }
+        TouchReveal.reveal(self, keptWithin: area) { [weak self] in self?.touchRevealed = false }
+    }
+
+    private func addTouchWatch() {
+        let watch = TouchWatch()
+        watch.onTap = { [weak self] _ in self?.touchTapped() }
+        addGestureRecognizer(watch)
     }
 
     required init?(coder: NSCoder) { fatalError() }

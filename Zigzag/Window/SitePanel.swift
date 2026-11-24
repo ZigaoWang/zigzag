@@ -27,6 +27,8 @@ final class SitePanel: FloatingPanelView {
     /// The open panel, for debugging.
     static var shown: SitePanel? { current }
     static func closeCurrent() { current?.close() }
+    /// A panel closed: what was chosen in it is settled, for lists of those choices to read again.
+    static let closed = Signal<Void>()
 
     private weak var controller: BrowserWindowController?
     /// Opened in Zigzag Mini (#225) or an installed app's window (#356): its one page, with what a page's own settings
@@ -88,8 +90,14 @@ final class SitePanel: FloatingPanelView {
         return label
     }()
     private var permissionsRow: PanelLinkRow?
-    /// Zapped element count, with Restore All.
+    /// Zapped element count; opens the list of them.
     private var zappedRow: PanelLinkRow?
+    /// The zapped elements, newest first, each with ×, and Restore All under them (#498).
+    private let zapsGroup = PanelGroup()
+    private var restoreAllRow: PanelLinkRow?
+    /// The zaps `zapsGroup` was built from, in zap order.
+    private var listedZaps: [String] = []
+    private let zapsHeader = PanelPageHeader(String(localized: "Zapped Elements", comment: "Title of the site panel's page that lists the elements hidden on the site with Zap Element."))
     /// The site's custom CSS, if any; opens Edit Style.
     private var styleRow: PanelLinkRow?
     private let permissionsGroup = PanelGroup()
@@ -115,11 +123,12 @@ final class SitePanel: FloatingPanelView {
     private var zoomStepper: ZoomStepper?
 
     /// The panel's pages: the site at a glance, and one each for what's behind its rows.
-    enum Page: String { case main, connection, permissions }
+    enum Page: String { case main, connection, permissions, zapped }
     private(set) var page = Page.main
     var showsSubpage: Bool { page != .main }
     private let mainBox = FlippedView()
     private let permissionsBox = FlippedView()
+    private let zapsBox = FlippedView()
 
     /// The panel's content, in a sheet that scrolls when the window is too short for it.
     private let scroll = NSScrollView()
@@ -188,10 +197,11 @@ final class SitePanel: FloatingPanelView {
         scroll.documentView = content
         addSubview(scroll)
         // A page's header is the panel's own, over the sheet that scrolls: its way back and its title stay put (#220).
-        [permissionsHeader, certificateHeader, headerEdge].forEach { addSubview($0) }
-        [mainBox, permissionsBox].forEach { content.addSubview($0) }
+        [permissionsHeader, zapsHeader, certificateHeader, headerEdge].forEach { addSubview($0) }
+        [mainBox, permissionsBox, zapsBox].forEach { content.addSubview($0) }
         contentReady = true
         permissionsHeader.onBack = { [weak self] in self?.show(.main) }
+        zapsHeader.onBack = { [weak self] in self?.show(.main) }
         certificateHeader.onBack = { [weak self] in self?.show(.main) }
         scroll.contentView.postsBoundsChangedNotifications = true
         scrollToken = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main) { [weak self] _ in
@@ -312,7 +322,7 @@ final class SitePanel: FloatingPanelView {
         opener.isSelected = true
         current = panel
         // Only its own window: keys and clicks in Settings or another window are theirs.
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+        panel.monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { return event }
             return panel.handle(event)
         }
@@ -344,7 +354,7 @@ final class SitePanel: FloatingPanelView {
         panel.present(arrival: .pop)
         button.isSelected = true
         current = panel
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
+        panel.monitor = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak panel] event in
             guard let panel else { return event }
             return panel.handle(event)
         }
@@ -384,10 +394,11 @@ final class SitePanel: FloatingPanelView {
         scrollToken = nil
         extensionsToken = nil
         opener?.isSelected = false
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         if Self.current === self { Self.current = nil }
         dismiss()
+        Self.closed.send()
     }
 
     // MARK: Content
@@ -398,8 +409,8 @@ final class SitePanel: FloatingPanelView {
         // Zigzag Mini and an app's window (`pageHost`) have the page's own actions: sharing, the link and Picture in Picture.
         guard controller != nil || pageHost != nil else { return }
         let readerOn = controller?.isShowingReader ?? false
-        // (symbol, caption, full name for the tooltip and VoiceOver, on, action)
-        var specs: [(String, String, String, Bool, () -> Void)] = []
+        // (symbol, caption, full name for the tooltip and VoiceOver, on, action, the menu bar item whose keys the tooltip shows)
+        var specs: [(String, String, String, Bool, () -> Void, Selector?)] = []
         let share = String(localized: "Share", comment: "Action in the site panel: shares the page.")
         specs.append(("square.and.arrow.up", share, share, false, { [weak self] in
             guard let self else { return }
@@ -408,22 +419,22 @@ final class SitePanel: FloatingPanelView {
             if let controller = self.controller { controller.sharePage(nil); return }
             guard let opener else { return }
             NSSharingServicePicker(items: [CleanLink.clean(url) as NSURL]).show(relativeTo: opener.bounds, of: opener, preferredEdge: .minY)
-        }))
+        }, #selector(BrowserWindowController.sharePage(_:))))
         let copyLink = String(localized: "Copy Link", comment: "Action in the site panel: copies the page's address.")
         specs.append(("link", copyLink, copyLink, false, { [weak self] in
             guard let self else { return }
             if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.pageHost?.copyPageURL(nil) }
             self.close()
-        }))
+        }, #selector(BrowserWindowController.copyPageURL(_:))))
         if let controller, controller.capture.canBegin, !readerOn {
             specs.append(("camera.viewfinder",
                           String(localized: "Capture", comment: "Action in the site panel, under its icon: takes a screenshot of the whole page."),
-                          String(localized: "Capture an Area, an Element or the Whole Page (⇧⌘2)", comment: "Tooltip of the Capture action in the site panel."),
+                          String(localized: "Capture an Area, an Element or the Whole Page", comment: "Tooltip of the Capture action in the site panel; its keyboard shortcut follows."),
                           false, { [weak self] in
                 guard let self, let controller = self.controller else { return }
                 self.close()
                 controller.capture.begin()
-            }))
+            }, #selector(BrowserWindowController.takePageScreenshot(_:))))
         }
         // Always here, as in the menu, for when the offer went by or never came: a page that's already in your
         // language says so, and a translated one goes back to its original.
@@ -431,12 +442,12 @@ final class SitePanel: FloatingPanelView {
         if controller != nil { specs.append(("translate",
                       tab.isTranslated ? String(localized: "Original", comment: "Action in the site panel, under its icon: shows the translated page as it was.") : translate,
                       tab.isTranslated ? String(localized: "Show Original", comment: "Tooltip of the Original action in the site panel.") : translate,
-                      tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() })) }
+                      tab.isTranslated, { [weak self] in self?.controller?.translatePage(); self?.close() }, #selector(BrowserWindowController.translatePage(_:)))) }
         if controller != nil, tab.isArticle || readerOn {
             specs.append(("doc.plaintext", String(localized: "Reader", comment: "Action in the site panel, under its icon: opens or closes Reader."),
                           readerOn ? String(localized: "Hide Reader", comment: "Tooltip of the Reader action in the site panel, while Reader is on.")
                                    : String(localized: "Show Reader", comment: "Tooltip of the Reader action in the site panel."),
-                          readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }))
+                          readerOn, { [weak self] in self?.controller?.toggleReader(); self?.close() }, #selector(BrowserWindowController.toggleReader(_:))))
         }
         let floating = tab.webView?.isPictureInPictureActive ?? false
         if floating || tab.webView?.canTogglePictureInPicture ?? false {
@@ -447,12 +458,12 @@ final class SitePanel: FloatingPanelView {
                 guard let self else { return }
                 if let controller = self.controller { controller.togglePictureInPicture(nil) } else { self.tab.webView?.togglePictureInPicture() }
                 self.close()
-            }))
+            }, controller != nil ? #selector(BrowserWindowController.togglePictureInPicture(_:)) : nil))
         }
-        actionTiles = specs.map { symbol, caption, title, on, run in
-            // The panel's own short action words; the tooltip and VoiceOver keep the full name.
+        actionTiles = specs.map { symbol, caption, title, on, run, action in
+            // The panel's own short action words; the tooltip and VoiceOver keep the full name, the tooltip with its keys.
             let tile = PanelTile(symbol: symbol, caption: caption)
-            tile.toolTip = title
+            tile.toolTip = action.map { Shortcuts.tooltip(title, for: $0) } ?? title
             tile.setAccessibilityLabel(title)
             tile.isOn = on
             tile.onClick = { _ in run() }
@@ -566,7 +577,7 @@ final class SitePanel: FloatingPanelView {
         applyPage()
         resize()
         scroll.contentView.scroll(to: .zero)
-        let shown: [NSView?] = [mainBox, permissionsBox, certificatePage, pinnedHeader]
+        let shown: [NSView?] = [mainBox, permissionsBox, zapsBox, certificatePage, pinnedHeader]
         for view in shown.compactMap({ $0 }) where !view.isHidden && view.superview != nil {
             Tokens.Motion.present(view, from: .inPlace, entering: true)
         }
@@ -577,6 +588,8 @@ final class SitePanel: FloatingPanelView {
         mainBox.isHidden = page != .main
         permissionsBox.isHidden = page != .permissions
         permissionsHeader.isHidden = page != .permissions
+        zapsBox.isHidden = page != .zapped
+        zapsHeader.isHidden = page != .zapped
         certificateHeader.isHidden = page != .connection
         refreshHeaderEdge()
     }
@@ -587,6 +600,7 @@ final class SitePanel: FloatingPanelView {
         switch page {
         case .main: nil
         case .permissions: permissionsHeader
+        case .zapped: zapsHeader
         case .connection: certificateHeader
         }
     }
@@ -680,7 +694,9 @@ final class SitePanel: FloatingPanelView {
     /// As tall as its content, up to `maxHeight`.
     fileprivate var fittedHeight: CGFloat {
         let band = headerBand
-        return SitePanelSizing.fit(band: band, body: layoutContent(dryRun: true) - band, maxHeight: maxHeight).height
+        // A long list of zaps scrolls under its header instead of growing the panel to the window's bottom.
+        let most = page == .zapped ? min(maxHeight, band + SitePanelSizing.zapListHeight) : maxHeight
+        return SitePanelSizing.fit(band: band, body: layoutContent(dryRun: true) - band, maxHeight: most).height
     }
 
     /// The site at a glance goes in its own page; the other pages add theirs where they're built.
@@ -694,6 +710,10 @@ final class SitePanel: FloatingPanelView {
         // sitepage zap | restore: Zap Element in ⋯, or Restore All.
         if arg == "zap" { startZapping(); return }
         if arg == "restore" { restoreZaps(); return }
+        // sitepage unzap <index>: × on the zapped element at that row, newest first.
+        if arg.hasPrefix("unzap "), let index = Int(arg.dropFirst(6)), boost.zaps.reversed().indices.contains(index) {
+            unzap(Array(boost.zaps.reversed())[index]); return
+        }
         if arg == "style" { editStyle(); return }
         if arg == "icon" { MenuPanel.current?.close(animated: false); chooseSiteIcon(); return }
         if arg == "more" { showMoreMenu(); return }
@@ -709,7 +729,7 @@ final class SitePanel: FloatingPanelView {
         ["site": site, "page": page.rawValue, "certificate": certificatePage?.debugState ?? [:],
          "connection": connectionLine?.debugText ?? "",
          "links": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
-         "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle),
+         "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle), "zaps": zapsGroup.rows.map(\.debugTitle),
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
          "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY],
@@ -755,6 +775,14 @@ final class SitePanel: FloatingPanelView {
         let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
         guard f.count == 2, let index = Int(f[0]), let row = rows.first(where: { $0.debugTitle.hasPrefix(f[1] + ":") }) else { return }
         row.debugChoose(index)
+    }
+
+    /// <row title>: opens that This Site row's dropdown; "action <row title>" runs its first action instead (Custom…).
+    func debugRowMenu(_ arg: String) {
+        let action = arg.hasPrefix("action ")
+        let title = action ? String(arg.dropFirst(7)) : arg
+        guard let dropdown = rows.first(where: { $0.debugTitle.hasPrefix(title + ":") })?.debugDropdown else { return }
+        if action { MenuPanel.current?.close(animated: false); dropdown.actions.first?.run() } else { dropdown.openMenu() }
     }
     #endif
 
@@ -948,6 +976,7 @@ final class SitePanel: FloatingPanelView {
         context.localApps = context.isWeb && !isPrivate && origin != nil && LocalReceivers.isEnabled
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         context.manySpaces = Library.shared.spaces.count > 1 && SiteRoutes.site(of: url) != nil
+        context.userAgent = Tab.addonsPage(url) == nil
         return context
     }
 
@@ -1041,6 +1070,8 @@ final class SitePanel: FloatingPanelView {
                 }
                 keepCookiesRow = row
                 rows.append(row)
+            case .userAgent:
+                rows.append(userAgentRow())
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
                 rows.append(.toggle(Self.fullScreenTitle,
@@ -1087,6 +1118,22 @@ final class SitePanel: FloatingPanelView {
         if siteLabel.superview == nil { addSubview(siteLabel) }
         buildPermissions()
         buildBoostRows()
+    }
+
+    /// The browser the site is told it's in (#392): Default, a preset, or one typed in Custom…; choosing reloads.
+    private func userAgentRow() -> PanelRow {
+        let tab = tab, url = url
+        let now = SiteUserAgents.choice(for: url)
+        let choices = SiteUserAgents.offered(with: now)
+        let custom = DropdownButton.Action(title: now?.isCustom == true ? SiteUserAgents.editCustomAction : SiteUserAgents.customAction, symbol: nil) { [weak self] in
+            guard let self, let host = (self.controller?.window ?? self.pageHost?.window)?.contentView else { return }
+            self.close()
+            SiteUserAgents.showCustomSheet(for: url, in: host, tab: tab)
+        }
+        return PanelRow.choice(SiteUserAgents.title, options: choices.map { $0?.title ?? SiteUserAgents.defaultTitle },
+                               selected: choices.firstIndex(of: now) ?? 0, actions: [custom]) { index in
+            SiteUserAgents.choose(choices[index], for: url, in: tab)
+        }
     }
 
     /// Permissions page: a row per permission asked this session or with a saved answer, with Ask, Allow and Block.
@@ -1237,14 +1284,20 @@ final class SitePanel: FloatingPanelView {
         SiteStyleSheet.show(for: tab, in: controller)
     }
 
-    /// "3 zapped" with Restore All, and Custom style, once the site has them.
+    /// "3 zapped", which opens the list of them with Restore All, and Custom style, once the site has them.
     private func buildBoostRows() {
         guard canBoost else { return }
         if zappedRow == nil {
-            let row = PanelLinkRow("", value: Self.restoreAllTitle) { [weak self] in self?.restoreZaps() }
+            let row = PanelLinkRow("", goes: true) { [weak self] in self?.show(.zapped) }
             addSubview(row)
             zappedRow = row
         }
+        if restoreAllRow == nil {
+            let row = PanelLinkRow(Self.restoreAllTitle) { [weak self] in self?.restoreZaps() }
+            zapsBox.addSubview(row)
+            restoreAllRow = row
+        }
+        if zapsGroup.superview == nil { zapsBox.addSubview(zapsGroup) }
         if styleRow == nil {
             let row = PanelLinkRow(String(localized: "Custom style", comment: "Row in the site panel, there while the site has CSS of your own: opens Edit Style. Its value says Edit…."),
                                    value: String(localized: "Edit…", comment: "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.")) { [weak self] in self?.editStyle() }
@@ -1254,13 +1307,17 @@ final class SitePanel: FloatingPanelView {
         refreshBoostRows()
     }
 
-    static let restoreAllTitle = String(localized: "Restore All", comment: "At the end of the row in the site panel that counts the elements zapped on the site: shows them all again.")
+    static let restoreAllTitle = String(localized: "Restore All", comment: "Under the list of elements zapped on the site, on its page in the site panel: shows them all again.")
 
     private func refreshBoostRows() {
-        let zaps = boost.zaps.count
-        zappedRow?.titleText = SiteBoosts.zapped(zaps)
-        zappedRow?.isHidden = zaps == 0
+        let zaps = boost.zaps
+        zappedRow?.titleText = SiteBoosts.zapped(zaps.count)
+        zappedRow?.isHidden = zaps.isEmpty
         styleRow?.isHidden = !boost.hasStyle
+        if zappedRow != nil, listedZaps != zaps {
+            listedZaps = zaps
+            zapsGroup.rows = zaps.reversed().map { selector in PanelRow.zap(selector) { [weak self] in self?.unzap(selector) } }
+        }
         needsLayout = true
     }
 
@@ -1269,7 +1326,16 @@ final class SitePanel: FloatingPanelView {
         SiteBoosts.restoreZaps(forSite: site, privateStore: tab.privateStore)
         PageBoosts.refresh(tab)
         refreshBoostRows()
-        resize()
+        // Nothing left to list.
+        if page == .zapped { show(.main) } else { resize() }
+    }
+
+    /// × on one zapped element: shows it again on the page now and on later visits.
+    private func unzap(_ selector: String) {
+        guard let site = SiteBoosts.site(of: url) else { return }
+        ZapPicker.unzap(selector, site: site, in: tab)
+        refreshBoostRows()
+        if boost.zaps.isEmpty, page == .zapped { show(.main) } else { resize() }
     }
 
     /// Permissions of the Permissions page rows, top to bottom.
@@ -1305,7 +1371,7 @@ final class SitePanel: FloatingPanelView {
         }
         scroll.frame = NSRect(x: 0, y: band, width: bounds.width, height: max(0, bounds.height - band))
         content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(body, scroll.frame.height))
-        for box in [mainBox, permissionsBox] { box.frame = content.bounds }
+        for box in [mainBox, permissionsBox, zapsBox] { box.frame = content.bounds }
         refreshHeaderEdge()
     }
 
@@ -1340,7 +1406,7 @@ final class SitePanel: FloatingPanelView {
         }
         func finish() -> CGFloat { headerBand + y - gapAfter - slack + pad }
         // A page's box covers the panel, so what's in it is placed in the panel's own terms.
-        for box in [mainBox, permissionsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
+        for box in [mainBox, permissionsBox, zapsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
         func group(_ group: PanelGroup) {
             place(group, NSRect(x: pad, y: y, width: inner, height: group.height))
             y += group.height
@@ -1362,6 +1428,15 @@ final class SitePanel: FloatingPanelView {
                 y += Tokens.Space.x2
                 link(resetPermissions)
                 end(0, slack: resetPermissions.bottomSlack)
+            }
+            return finish()
+        case .zapped:
+            group(zapsGroup)
+            if !zapsGroup.rows.isEmpty { end(0, slack: zapsGroup.bottomSlack) }
+            if let restoreAllRow {
+                y += Tokens.Space.x2
+                link(restoreAllRow)
+                end(0, slack: restoreAllRow.bottomSlack)
             }
             return finish()
         case .main, .connection:
@@ -1767,9 +1842,11 @@ final class PanelRow: NSView {
 
     /// A name and a dropdown of choices: a permission's Ask, Allow or Block. With `status`, what the choice means
     /// right now sits under the name, read again once a choice has been made (Dark page's "On, following Settings").
-    static func choice(_ title: String, options: [String], selected: Int, status: ((Int) -> String?)? = nil, chose: @escaping (Int) -> Void) -> PanelRow {
+    static func choice(_ title: String, options: [String], selected: Int, actions: [DropdownButton.Action] = [], status: ((Int) -> String?)? = nil,
+                       chose: @escaping (Int) -> Void) -> PanelRow {
         let dropdown = DropdownButton()
         dropdown.options = options.map { DropdownButton.Option(title: $0) }
+        dropdown.actions = actions
         dropdown.selectedIndex = selected
         dropdown.setAccessibilityLabel(title)
         let row = PanelRow(title, control: dropdown, value: status.map { $0(selected) ?? "" })
@@ -1787,6 +1864,25 @@ final class PanelRow: NSView {
     /// A name and a control of the panel's own (the zoom stepper).
     static func custom(_ title: String, control: NSView) -> PanelRow { PanelRow(title, control: control) }
 
+    /// A zapped element: its short name, its selector under it cut in the middle (whole on hover and to VoiceOver),
+    /// and × to show it again.
+    static func zap(_ selector: String, remove: @escaping () -> Void) -> PanelRow {
+        let name = SiteBoosts.label(forZap: selector)
+        let button = IconButton(symbol: "xmark", size: .compact, toolTip: SiteBoosts.restoreTitle)
+        button.setAccessibilityLabel(SiteBoosts.restoreLabel(name))
+        button.onClick = { _ in remove() }
+        let row = PanelRow(name, control: button, value: selector)
+        row.value?.lineBreakMode = .byTruncatingMiddle
+        // A selector that is its own name ("div.banner") says it once.
+        row.value?.isHidden = name == selector
+        row.toolTip = selector
+        row.setAccessibilityElement(true)
+        row.setAccessibilityRole(.group)
+        row.setAccessibilityLabel(name)
+        row.setAccessibilityValue(selector)
+        return row
+    }
+
     #if DEBUG
     /// Its name, and what its dropdown or switch is set to.
     var debugTitle: String {
@@ -1802,6 +1898,8 @@ final class PanelRow: NSView {
         let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         return ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0)) + Tokens.Space.x2 + wanted.width
     }
+
+    var debugDropdown: DropdownButton? { control as? DropdownButton }
 
     /// choose <index>: picks that choice in the row's dropdown, as its menu would.
     func debugChoose(_ index: Int) {
@@ -1824,6 +1922,8 @@ final class PanelRow: NSView {
 
     override func layout() {
         super.layout()
+        // Not placed yet: a control sized by its frame (an icon button) would be squeezed to nothing for good.
+        guard bounds.width > 0 else { return }
         let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         // Shorter titles keep only their own width, so they never squeeze the control.
         let named = ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0))
@@ -2134,7 +2234,7 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
     /// was aimed.
     private func watchClicksOutside() {
         stopWatchingClicksOutside()
-        outsideClick = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+        outsideClick = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
             guard let self, !self.typedField.isHidden else { return event }
             let point = self.typedField.convert(event.locationInWindow, from: nil)
             if !self.typedField.bounds.contains(point) { self.endTyping(commit: true) }
@@ -2143,7 +2243,7 @@ final class ZoomStepper: NSView, NSTextFieldDelegate {
     }
 
     private func stopWatchingClicksOutside() {
-        if let outsideClick { NSEvent.removeMonitor(outsideClick) }
+        if let outsideClick { TouchPress.removeMonitor(outsideClick) }
         outsideClick = nil
     }
 
@@ -2308,6 +2408,9 @@ enum SitePanelSizing {
         max(PanelLinkRow.height * 4, overlayHeight - top - Tokens.Metric.cardInset)
     }
 
+    /// The most a list of zapped elements shows before it scrolls: seven rows and half of the next.
+    static var zapListHeight: CGFloat { PanelRow.height * 7.5 + Tokens.Space.x2 + PanelLinkRow.height + Tokens.Space.x4 }
+
     /// The top a page's header keeps: the panel's padding, the header, and the room under it.
     static func headerBand(pad: CGFloat, header: CGFloat) -> CGFloat { pad + header + Tokens.Space.x3 }
 
@@ -2323,7 +2426,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, localApps, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2356,6 +2459,8 @@ enum SitePanelRows {
         var styled = false
         /// The master setting for reaching apps on this Mac is on, so this site can be switched on for it.
         var localApps = false
+        /// A user agent can be chosen: not on addons.mozilla.org, which is always asked for as Firefox.
+        var userAgent = true
     }
 
     static func rows(_ c: Context) -> [Row] {
@@ -2367,6 +2472,7 @@ enum SitePanelRows {
             rows.append(.darkPage)
             rows.append(.keepAwake)
             if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
+            if c.isWeb, c.userAgent { rows.append(.userAgent) }
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }

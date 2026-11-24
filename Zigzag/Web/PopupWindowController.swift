@@ -126,6 +126,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         showWindow(nil)
         if let heldRequest {
             self.heldRequest = nil
+            webView.customUserAgent = SiteUserAgents.agent(for: heldRequest.url)
             webView.load(heldRequest)
         }
         if #available(macOS 15.4, *), !isPrivate { ExtensionCenter.popupOpened(self) }
@@ -191,6 +192,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                                pageSize: Tokens.Metric.popupDefaultSize, origin: nil, parent: parent)
         controller.openedByRule = sender == .rule
         Self.open.insert(controller)
+        controller.webView.customUserAgent = SiteUserAgents.agent(for: url)
         controller.webView.load(URLRequest(url: url))
         controller.showWindow(nil)
         if #available(macOS 15.4, *), !controller.isPrivate { ExtensionCenter.popupOpened(controller) }
@@ -218,8 +220,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
-        // From a full-screen window, a sign-in popup opens over it in the same Space, not off in another one.
-        if parent?.styleMask.contains(.fullScreen) == true { window.collectionBehavior.insert(.fullScreenAuxiliary) }
+        // From a full-screen window, or Zigzag Mini over a full-screen app, it opens over it in the same Space.
+        if let parent, parent.styleMask.contains(.fullScreen) || parent.collectionBehavior.contains(.fullScreenAuxiliary) {
+            window.collectionBehavior.insert(.fullScreenAuxiliary)
+        }
         window.setFrameOrigin(origin)
         window.placeTrafficLights()
         super.init(window: window)
@@ -265,6 +269,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             guard let window else { return }
             KeepOnTop.toggle(window)
         }
+        // From a window kept on top, the pop-up is kept on top too, or it would open behind it.
+        if let parent, KeepOnTop.isOn(parent) { KeepOnTop.set(true, for: window) }
         KeepOnTop.refresh(pinButton, for: window)
         keepOnTopToken = NotificationCenter.default.addObserver(forName: KeepOnTop.changed, object: window, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -499,7 +505,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         guard Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
         // Unclicked pop-ups open only via a kept destination, or ask.
-        if !PopupNotice.isUserInitiated(navigationAction) {
+        if !PopupNotice.isClicked(navigationAction, in: webView, isPrivate: isPrivate) {
             // Any kind of window: a page in Zigzag Mini or an installed app also asks there. Looking up only browser
             // windows dropped those pop-ups silently.
             let parent = WindowManager.shared.promptHost(for: parentWindow) ?? (opener?.host as? PromptHost)
@@ -635,9 +641,28 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
            await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, wasClicked: true) { return .cancel }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
+        // Chrome's address for a page of the extension showing here goes to Zigzag's own for it (Tab.extensionPageAddress).
+        if let url = navigationAction.request.url, url.scheme?.lowercased() == "chrome-extension" {
+            let page = Tab.extensionPageAddress(url)
+            let source = navigationAction.sourceFrame.securityOrigin
+            if navigationAction.targetFrame?.isMainFrame ?? true, source.protocol == "webkit-extension", source.host.lowercased() == page.host() {
+                DispatchQueue.main.async { [weak webView] in webView?.load(URLRequest(url: page)) }
+            }
+            return .cancel
+        }
         // Set WebRTC for the destination before its page is made, as in a tab.
         if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url, !ExternalLinks.isExternal(url) {
             WebRTCProtection.apply(to: webView, for: url, here: webRTCChoices)
+            // The site's user agent, as in a tab (#392): a request made as another browser is made again.
+            let wanted = SiteUserAgents.agent(for: url)
+            let again = Tab.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
+                                      type: navigationAction.navigationType)
+            if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }
+            if again {
+                let request = navigationAction.request
+                DispatchQueue.main.async { [weak webView] in webView?.load(request) }
+                return .cancel
+            }
         }
         if let url = navigationAction.request.url, ExternalLinks.isExternal(url), url.scheme?.lowercased() != "file" {
             ExternalLinks.open(url, isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
@@ -651,6 +676,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         openedByRule = false
+        // A click on the page before doesn't let this one open a pop-up.
+        PopupNotice.forgetInput(in: webView)
         PageDialogs.pageLoaded(webView)
         shownURL = webView.url
         errorShownFor = ErrorPage.consume(webView) ? webView.url : nil
@@ -884,6 +911,11 @@ private final class PopupWindow: NSWindow {
         TrafficLightKeeper.install(in: self) { [weak self] in self?.placeTrafficLights() }
     }
 
+    /// Fingers skip `sendEvent`; the whole frame is watched for them (`TouchPress`).
+    override var contentView: NSView? {
+        didSet { TouchPress.watch(self) }
+    }
+
     /// Centered on the header, same left inset as the browser window.
     func placeTrafficLights() {
         guard !styleMask.contains(.fullScreen), let close = standardWindowButton(.closeButton) else { return }
@@ -1085,7 +1117,7 @@ private final class AddressHit: NSView {
             }
             let p = next.locationInWindow
             if hypot(p.x - start.x, p.y - start.y) > 3 {
-                window.performDrag(with: event)
+                if window.dragMovesWindow { window.performDrag(with: event) }
                 return
             }
         }
@@ -1119,7 +1151,7 @@ final class PopupTab: NSObject, WKWebExtensionTab {
     func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { true }
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        popup?.webView.load(URLRequest(url: url))
+        popup?.webView.load(URLRequest(url: Tab.extensionPageAddress(url)))
         completionHandler(nil)
     }
 

@@ -4,7 +4,8 @@ import WebKit
 /// Moves the front tab's playing video into the mini player (`MiniPlayer`) when you switch to another app or desktop
 /// (#238), and back when you return to that tab. Off unless enabled in Settings › Tabs › Show a mini player when you
 /// leave Zigzag. Only for a real switch: Zigzag must stay in the background for `AutoPictureInPictureModel.delay`,
-/// with a regular app in front (not a system prompt, Spotlight, menu bar, Notification Center or a Zigzag web app).
+/// with a regular app in front (not a system prompt, Spotlight, menu bar, Notification Center or a Zigzag web app),
+/// and the window out of sight (`AutoPictureInPictureModel.isOutOfSight`, #496).
 /// Muted, paused or offscreen videos stay, as do ones already in Picture in Picture or full screen, and an existing
 /// mini player isn't replaced. If the mini player can't take the video, nothing happens; Picture in Picture never
 /// starts automatically.
@@ -44,6 +45,14 @@ final class AutoPictureInPicture {
                                                                             queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.spaceChanged() }
         })
+        observers.append(center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main) { [weak self] note in
+            let window = (note.object as? NSWindow).map(ObjectIdentifier.init)
+            MainActor.assumeIsolated { self?.sightChanged(window) }
+        })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil,
+                                                                            queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sightChanged(nil) }
+        })
     }
 
     // MARK: Leaving
@@ -60,8 +69,51 @@ final class AutoPictureInPicture {
         guard Self.isOn, let (tab, controller) = Self.front() else { return }
         leaving = tab
         leavingIn = controller
-        // Still in the background after the delay, with a regular app in front.
-        scheduleLeave { !NSApp.isActive && AutoPictureInPictureModel.isRealSwitch(to: Self.frontApp()) }
+        scheduleAway()
+    }
+
+    /// After the delay: away, a regular app in front, the window out of sight; else the tab keeps waiting.
+    private func scheduleAway() {
+        scheduleLeave(keepIfNot: true) { [weak self] in
+            guard !NSApp.isActive, AutoPictureInPictureModel.isRealSwitch(to: Self.frontApp()) else { return false }
+            guard let window = self?.leavingIn?.window else { return false }
+            let out = AutoPictureInPictureModel.isOutOfSight(Self.sight(of: window))
+            if !out { debugLog("autopip: window still in view on another display, waiting") }
+            return out
+        }
+    }
+
+    /// Zigzag in the background with a tab waiting: a window's sight or the front app changed.
+    private func sightChanged(_ window: ObjectIdentifier?) {
+        guard !NSApp.isActive, leaving != nil, let candidate = leavingIn?.window else { return }
+        if let window, window != ObjectIdentifier(candidate) { return }
+        scheduleAway()
+    }
+
+    private static func sight(of window: NSWindow) -> AutoPictureInPictureModel.Sight {
+        .init(isHidden: NSApp.isHidden, isMinimized: window.isMiniaturized,
+              isInView: window.isVisible && window.occlusionState.contains(.visible),
+              windowDisplay: window.screen.flatMap(display(of:)), focusDisplay: focusDisplay())
+    }
+
+    private static func display(of screen: NSScreen) -> UInt32? {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+
+    /// The display of the front app's frontmost window, else the one under the pointer.
+    private static func focusDisplay() -> UInt32? {
+        if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+           let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
+            for info in list where (info[kCGWindowOwnerPID as String] as? pid_t) == pid && (info[kCGWindowLayer as String] as? Int) == 0 {
+                guard let dict = info[kCGWindowBounds as String] as? NSDictionary,
+                      let bounds = CGRect(dictionaryRepresentation: dict as CFDictionary), bounds.width > 1, bounds.height > 1 else { continue }
+                var id: CGDirectDisplayID = 0
+                var count: UInt32 = 0
+                if CGGetDisplaysWithPoint(CGPoint(x: bounds.midX, y: bounds.midY), 1, &id, &count) == .success, count > 0 { return id }
+            }
+        }
+        let mouse = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }.flatMap(display(of:))
     }
 
     /// Another desktop came up while Zigzag stays active (none of its windows there).
@@ -84,15 +136,18 @@ final class AutoPictureInPicture {
                      isZigzagWebApp: !own.isEmpty && id.hasPrefix(own + ".app."), isRegular: app.activationPolicy == .regular)
     }
 
-    private func scheduleLeave(while stillAway: @escaping () -> Bool) {
+    /// `keepIfNot` keeps the tab waiting when `stillAway` fails, for `sightChanged` to try again.
+    private func scheduleLeave(keepIfNot: Bool = false, while stillAway: @escaping () -> Bool) {
         leaveWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 let tab = self.leaving, controller = self.leavingIn
+                let away = stillAway()
+                if !away && keepIfNot && !NSApp.isActive { return }
                 self.leaving = nil
                 self.leavingIn = nil
-                guard stillAway(), let tab, let controller else { return }
+                guard away, let tab, let controller else { return }
                 self.take(tab, in: controller)
             }
         }
@@ -175,6 +230,24 @@ nonisolated struct AutoPictureInPictureModel {
         /// The page itself shows it in Picture in Picture or full screen.
         var isPresentingItself: Bool
         var isMiniPlayerBusy: Bool
+    }
+
+    /// Where the window is while Zigzag is in the background.
+    struct Sight {
+        var isHidden: Bool
+        var isMinimized: Bool
+        /// Visible and at least partly uncovered, on a desktop that's showing.
+        var isInView: Bool
+        var windowDisplay: UInt32?
+        /// The display of the app you switched to.
+        var focusDisplay: UInt32?
+    }
+
+    /// Hidden, minimized, out of view, or in view only on the display you switched on (#496).
+    static func isOutOfSight(_ sight: Sight) -> Bool {
+        if sight.isHidden || sight.isMinimized || !sight.isInView { return true }
+        guard let window = sight.windowDisplay, let focus = sight.focusDisplay else { return true }
+        return window == focus
     }
 
     struct FrontApp {

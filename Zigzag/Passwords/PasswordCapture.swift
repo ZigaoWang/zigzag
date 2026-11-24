@@ -635,6 +635,17 @@ enum PasswordManagers {
     /// With several on, the first by name, so the answer doesn't change from one time to the next.
     static func active(among ids: [String]) -> String? { ids.compactMap { known[$0] }.sorted().first }
 
+    /// The ones the Password manager choice lists by name after iCloud Passwords: known, other than iCloud, sorted by name.
+    static func listed(among ids: [String]) -> [String] {
+        ids.filter { known[$0] != nil && $0 != PasswordFiller.iCloudExtensionID }.sorted { known[$0]! < known[$1]! }
+    }
+
+    /// Installed and turned on in a profile, as listed.
+    static func listed(in profile: Profile) -> [String] {
+        guard #available(macOS 15.4, *) else { return [] }
+        return listed(among: known.keys.filter { profile.installs.isEnabled($0) && profile.installs.isInstalled($0) })
+    }
+
     /// Whether Zigzag itself saves or fills in a profile: what you chose there; until you choose, yes, unless a
     /// password manager is on there. `imported`: passwords were brought over from another browser, which are
     /// there to be filled even so.
@@ -665,12 +676,29 @@ nonisolated enum PasswordFiller: String {
 
     /// Turns Zigzag's saving and filling off, remembering them.
     static func useICloud(in profile: UUID, saves: Bool, fills: Bool, defaults: UserDefaults = .standard) {
-        if chosen(in: profile, defaults: defaults) != .iCloud {
+        if chosen(in: profile, defaults: defaults) != .iCloud && chosenManager(in: profile, defaults: defaults) == nil {
             defaults.set([saves, fills], forKey: ProfileKey.passwordsBeforeICloud.name(in: profile))
         }
         defaults.set(false, forKey: ProfileKey.offersToSavePasswords.name(in: profile))
         defaults.set(false, forKey: ProfileKey.fillsPasswords.name(in: profile))
+        defaults.removeObject(forKey: ProfileKey.passwordManager.name(in: profile))
         defaults.set(PasswordFiller.iCloud.rawValue, forKey: ProfileKey.passwordFiller.name(in: profile))
+    }
+
+    /// The password manager extension chosen in Settings, by ID; nil until one is.
+    static func chosenManager(in profile: UUID, defaults: UserDefaults = .standard) -> String? {
+        defaults.string(forKey: ProfileKey.passwordManager.name(in: profile))
+    }
+
+    /// Hands passwords to a password manager extension: Zigzag's saving and filling off, remembered as for iCloud.
+    static func useManager(_ id: String, in profile: UUID, saves: Bool, fills: Bool, defaults: UserDefaults = .standard) {
+        if chosen(in: profile, defaults: defaults) != .iCloud && chosenManager(in: profile, defaults: defaults) == nil {
+            defaults.set([saves, fills], forKey: ProfileKey.passwordsBeforeICloud.name(in: profile))
+        }
+        defaults.set(false, forKey: ProfileKey.offersToSavePasswords.name(in: profile))
+        defaults.set(false, forKey: ProfileKey.fillsPasswords.name(in: profile))
+        defaults.set(id, forKey: ProfileKey.passwordManager.name(in: profile))
+        defaults.set(PasswordFiller.zigzag.rawValue, forKey: ProfileKey.passwordFiller.name(in: profile))
     }
 
     /// Restores saving and filling as they were before iCloud, set explicitly so the still-installed extension doesn't
@@ -682,6 +710,7 @@ nonisolated enum PasswordFiller: String {
         defaults.set(saves, forKey: ProfileKey.offersToSavePasswords.name(in: profile))
         defaults.set(fills, forKey: ProfileKey.fillsPasswords.name(in: profile))
         defaults.removeObject(forKey: ProfileKey.passwordsBeforeICloud.name(in: profile))
+        defaults.removeObject(forKey: ProfileKey.passwordManager.name(in: profile))
         defaults.set(PasswordFiller.zigzag.rawValue, forKey: ProfileKey.passwordFiller.name(in: profile))
     }
 
@@ -695,6 +724,24 @@ nonisolated enum PasswordFiller: String {
     static func offersSwitch(chosen: PasswordFiller?, zigzagHandles: Bool, offered: Bool) -> Bool {
         chosen == nil && zigzagHandles && !offered
     }
+}
+
+/// What the Password manager choice in Settings shows checked: Zigzag, iCloud Passwords, or a password manager
+/// extension by ID.
+nonisolated enum PasswordManagerChoice: Equatable {
+    case zigzag
+    case iCloud
+    case manager(String)
+
+    /// A listed extension once Zigzag neither saves nor fills: the one chosen, else the first listed.
+    static func current(filler: PasswordFiller, chosenManager: String?, listed: [String], zigzagSaves: Bool, zigzagFills: Bool) -> PasswordManagerChoice {
+        if filler == .iCloud { return .iCloud }
+        guard !zigzagSaves && !zigzagFills, let first = listed.first else { return .zigzag }
+        return .manager(chosenManager.flatMap { listed.contains($0) ? $0 : nil } ?? first)
+    }
+
+    /// The choices in order: Zigzag, iCloud Passwords, then each listed extension.
+    static func all(listed: [String]) -> [PasswordManagerChoice] { [.zigzag, .iCloud] + listed.map { .manager($0) } }
 }
 
 /// Switches a profile's passwords to iCloud Passwords and back.
@@ -723,4 +770,16 @@ enum ICloudPasswords {
     }
 
     static func useZigzag(in profile: Profile) { PasswordFiller.useZigzag(in: profile.id) }
+
+    /// What the Password manager choice shows checked in the profile.
+    static func choice(in profile: Profile) -> PasswordManagerChoice {
+        PasswordManagerChoice.current(filler: filler(in: profile), chosenManager: PasswordFiller.chosenManager(in: profile.id),
+                                      listed: PasswordManagers.listed(in: profile),
+                                      zigzagSaves: PasswordCapture.offersToSave(in: profile), zigzagFills: Autofill.isOn(in: profile))
+    }
+
+    static func useManager(_ id: String, in profile: Profile) {
+        PasswordFiller.useManager(id, in: profile.id, saves: PasswordCapture.offersToSave(in: profile), fills: Autofill.isOn(in: profile))
+        Autofill.shared.hide()
+    }
 }

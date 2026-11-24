@@ -987,16 +987,8 @@ private final class CardFinishSwatch: InteractiveView {
         let look = CardLook.of(finish, palette: palette, dark: effectiveAppearance.isDark)
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                ring.frame = bounds
-                ring.cornerRadius = bounds.width / 2
-                ring.borderWidth = 2
-                // Chosen, it sits inside a fine ring; under the pointer a faint ring shows and nothing moves.
-                ring.borderColor = (isSelected ? Tokens.Color.textPrimary.withAlphaComponent(0.85) : isHovered ? Tokens.Color.swatchHoverRing : .clear).cgColor
-                let inset: CGFloat = isSelected ? 3.5 : 2
-                fill.frame = bounds.insetBy(dx: inset, dy: inset)
-                fill.cornerRadius = fill.frame.width / 2
-                fill.borderWidth = Tokens.Metric.hairline
-                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
+                // Chosen, an accent ring with a gap, as Reader's colors; under the pointer a faint ring, nothing moving.
+                SwatchRing.draw(ring: ring, fill: fill, in: bounds, selected: isSelected, hovered: isHovered, chosen: Tokens.Color.accent)
                 fill.type = look.holo > 0 ? .conic : .axial
                 fill.colors = look.swatch.map(\.cgColor)
                 fill.startPoint = look.holo > 0 ? CGPoint(x: 0.5, y: 0.5) : CGPoint(x: 0.2, y: 0.9)

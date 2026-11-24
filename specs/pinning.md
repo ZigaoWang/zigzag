@@ -5,6 +5,8 @@
   Test: SavePathTests.aQuickSaveFromEachPathLandsAtTheEndOfPinned
 - ⌘D or the star on a page that's pinned → it's unpinned; the star shows which at once.
   Test: SavePathTests.theQuickSaveTogglesAndTheStarFollows
+- Pin or unpin from a tab's menu, by a drag or with ⌘Z → the star shows it at once too.
+  Test: SavePathTests.theStarFollowsAPinMadeFromTheRow
 - Pin a page that's already pinned → it's filed where asked, never a second copy.
   Test: SavePathTests.savingAgainNeverMakesASecondCopy
 - Pin Link in a link's right-click menu → the link is pinned at the end of Pinned without being opened.
@@ -13,6 +15,8 @@
   Test: PinnedGroupTests.commandDSavesTheWholeGroupAndUndoes
 - Pin Split View on a page of a split → both pages are pinned and stay a split.
   Test: SavePathTests.aSplitViewMovesAsOne
+- Pin Tab or Pin Tab to Folder… in the menu bar on Settings or History → off, as the star isn't there.
+  Test: SavePathTests.theMenuBarsPinFollowsTheStarsRule
 
 ## Asking where
 - ⇧ on the star, on a menu's Pin, on Pin Link, or ⇧⌘D → a sheet asks for the folder and the name.
@@ -42,11 +46,35 @@
 - Collapse All Folders / Expand All Folders in a space's menu → all of that space's folders at once.
   Test: FolderBulkTests.aSpacesFoldersFoldAtOnceWithTheMenuOfferingOnlyWhatChanges
 
+## Importing from Arc
+- Arc's folders inside folders → the same tree in Pinned, in Arc's order with their names, shut; empty ones stay behind.
+  Test: ArcFolderTests.nestedFoldersKeepTheirTreeAndOrder
+- A split view pinned in Arc, at the top or in a folder → a pinned split view of the same pages, up to four.
+  Test: ArcFolderTests.pinnedSplitViewsStaySplit
+- Folders nested deeper than eight levels → their pages go in the eighth folder; none is left out.
+  Test: ArcFolderTests.foldersDeeperThanTheLimitKeepTheirPages
+- Importing again into a space from an earlier import → its pages still side by side in one folder become Arc's split views again; nothing is added twice.
+  Test: ArcFolderTests.importingAgainGainsSplitViews
+- Importing again where those pages were moved apart or into another folder → they stay where they are, not split.
+  Test: ArcFolderTests.importingAgainLeavesMovedPagesApart
+
+## Importing from Dia
+- Spaces and Pinned Tabs and Bookmarks from Dia → each Dia profile's pinned tabs are pinned in the space its bookmarks go in, in Dia's order; its favorites become favorites.
+  Test: DiaImportTests.pinnedTabsAndFavoritesComeOver
+- A split view pinned in Dia → a pinned split view of the same pages, up to four.
+  Test: DiaImportTests.splitTabsStaySplit
+- Tabs that aren't web pages and parts of Dia's sidebar Zigzag doesn't know → stay behind; the rest still comes over.
+  Test: DiaImportTests.unknownPartsStayBehind
+- Importing from Dia again → nothing is added twice.
+  Test: DiaImportTests.importingAgainAddsNothingTwice
+
 ## Favorites
 - Add to Favorites on a pinned page → it shows in Favorites in every space of its profile, as the same page, not a copy.
   Test: SavePathTests.inEverySpaceIsATickOnASavedPage
 - A favorite moved into a space's Pinned or a folder → it leaves Favorites; a page is never both.
   Test: SavePathTests.aFavoriteFiledInASpaceLeavesFavorites
+- A tab's menu in a group that can't be pinned whole (Settings is in it) → still offers Add to Favorites, as the menu bar and the command bar do.
+  Test: SidebarRowMenuTests.aTabOfAnUnpinnableGroupStillAddsToFavorites
 - Move to Tabs on a favorite → it becomes a tab of the space you're in; Remove from Favorites → it's gone and its page closes.
   No test yet.
 

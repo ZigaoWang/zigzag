@@ -505,13 +505,21 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// "Open in Work": what the button and ⌘O's menu item say, with the space the page goes to.
     private var openTitle: String {
-        String(localized: "Open in \(space.name)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
+        String(localized: "Open in \(placeName)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
+    }
+
+    /// Where Open in takes the page: its space, or Private as a private window's sidebar heads itself.
+    private var placeName: String {
+        isPrivate ? String(localized: "Private", comment: "The heading at the top of a private window's sidebar, where a space's name would be.") : space.name
     }
 
     private func refreshStrip() {
         strip.title.show(tab)
-        strip.spaceChip.show(space)
+        strip.spaceChip.show(space, name: isPrivate ? placeName : nil)
+        // A private page keeps to its window's space: nothing to choose.
+        strip.spaceChip.isEnabled = !isPrivate
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
+        strip.refreshTips()
         strip.openButton.isEnabled = tab.url != nil
         strip.copyButton.isEnabled = tab.url != nil
         strip.siteButton.isEnabled = tab.url != nil
@@ -679,18 +687,48 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Moving into Zigzag
 
-    /// The browser window this one's pages go to: the front everyday window, else the session brought back, else a
-    /// new one. Never a private window: Zigzag Mini isn't private.
+    /// The browser window this one's pages go to: the front everyday window on this desktop, else the front one
+    /// anywhere, else the session brought back, else a new one. Never a private window: Zigzag Mini isn't private.
     static func browserWindow() -> BrowserWindowController {
         let manager = WindowManager.shared
         let key = manager.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
-        return key ?? manager.controllers.last { !$0.tabManager.isPrivate } ?? manager.restoreIfNoWindows()
-            ?? manager.newWindow(showCommandBar: false)
+        let everyday = manager.controllers.filter { !$0.tabManager.isPrivate }
+        let frontToBack = NSApp.orderedWindows.compactMap { window in everyday.first { $0.window === window } }
+        let here = Self.window(front: key, frontToBack: frontToBack) { controller in
+            guard let window = controller.window else { return false }
+            return window.isOnActiveSpace && window.isVisible && !window.isMiniaturized
+        }
+        return here ?? key ?? everyday.last ?? manager.restoreIfNoWindows() ?? manager.newWindow(showCommandBar: false)
+    }
+
+    /// The window in front when it's on this desktop, else the frontmost one that is; nil when none is.
+    nonisolated static func window<W>(front: W?, frontToBack: [W], isHere: (W) -> Bool) -> W? {
+        if let front, isHere(front) { return front }
+        return frontToBack.first(where: isHere)
+    }
+
+    /// Zigzag comes forward with the window the page went to, switching to its desktop when it's on another one.
+    private static func bringForward(_ target: BrowserWindowController) {
+        guard let window = target.window else { return }
+        if NSApp.isHidden { NSApp.unhide(nil) }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        if !NSApp.isActive {
+            // Only this window comes up, not every browser window held for a link.
+            MiniLinkWake.activatingForOneWindow()
+        }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    /// The window it came from while that's open, minimized or hidden too: its pages and private store stay with it.
+    private var openSource: BrowserWindowController? {
+        guard let source, source.window != nil, !source.windowClosed else { return nil }
+        return source
     }
 
     /// Where this one's pages go: from a page, the window it came from while it's open; private, only a private window.
-    private var browserTarget: BrowserWindowController {
-        if let source, source.window?.isVisible == true { return source }
+    var browserTarget: BrowserWindowController {
+        if let openSource { return openSource }
         if isPrivate {
             return WindowManager.shared.controllers.last { $0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false, isPrivate: true)
         }
@@ -704,6 +742,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// `then`: runs in the browser window the page went to.
     private func moveOut(then: ((BrowserWindowController) -> Void)? = nil) {
         guard tab.url != nil, !movedOut, !isLeaving else { return }
+        // You're going to Zigzag, not back to the app the link came from.
+        returnTo = nil
         commandBar.dismiss(restoringFocus: false)
         linkStatus.hide()
         fadeAway { [weak self] in
@@ -724,7 +764,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             window?.close()
             target.tabManager.switchToSpace(routed)
             target.tabManager.newTab(url: url, spaceID: routed, by: .zigzag)
-            target.window?.makeKeyAndOrderFront(nil)
+            Self.bringForward(target)
             target.toastRouted(to: routed)
             return target
         }
@@ -735,7 +775,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         let placed = fromPage && routed == nil && target === source && sourceTab.map { target.tabManager.insert(tab, after: $0) } == true
         if !placed { target.tabManager.insertAsNewTab(tab) }
         window?.close()
-        target.window?.makeKeyAndOrderFront(nil)
+        Self.bringForward(target)
         if let routed { target.toastRouted(to: routed) }
         return target
     }
@@ -811,8 +851,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// The browser window that translates this page, with its toasts over this one: the window it came from, else an
     /// open one of the same privacy.
-    private var translator: BrowserWindowController? {
-        if let source, source.window?.isVisible == true { return source }
+    var translator: BrowserWindowController? {
+        if let openSource { return openSource }
         return WindowManager.shared.controllers.last { $0.tabManager.isPrivate == isPrivate }
     }
 
@@ -1211,13 +1251,23 @@ final class MiniStripView: NSView {
     /// The narrowest the address field opens: below this between the space and the buttons, it takes more of the strip.
     static let narrowestField: CGFloat = 160
     /// Back, forward and reload: the browser window's own three, with its tooltips, at a pane strip's size.
-    let backButton = MiniStripView.button("chevron.left", toolTip: Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))))
-    let forwardButton = MiniStripView.button("chevron.right", toolTip: Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))))
+    let backButton = MiniStripView.button("chevron.left", toolTip: MiniStripView.backTip)
+    let forwardButton = MiniStripView.button("chevron.right", toolTip: MiniStripView.forwardTip)
     let reloadButton = MiniStripView.button("arrow.clockwise", toolTip: SidebarView.reloadTip(loading: false))
     let spaceChip = MiniSpaceChip()
     let title = MiniTitleView()
-    let copyButton = MiniStripView.button("link", toolTip: Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."),
-                                                                            for: #selector(MiniWindowController.copyPageURL(_:))))
+    let copyButton = MiniStripView.button("link", toolTip: MiniStripView.copyTip)
+
+    private static var backTip: String { Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))) }
+    private static var forwardTip: String { Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))) }
+    private static var copyTip: String { Shortcuts.tooltip(String(localized: "Copy Link", comment: "Edit menu item."), for: #selector(MiniWindowController.copyPageURL(_:))) }
+
+    /// The tooltips with the keys as Settings › Shortcuts has them now.
+    func refreshTips() {
+        backButton.toolTip = Self.backTip
+        forwardButton.toolTip = Self.forwardTip
+        copyButton.toolTip = Self.copyTip
+    }
     /// Window › Keep on Top for this window: a pin, filled while it's on.
     let pinButton = MiniStripView.button("pin", toolTip: KeepOnTop.title)
     /// Site Controls, as by a browser window's address: the site panel for this page (#225).
@@ -1367,11 +1417,11 @@ final class MiniSpaceChip: InteractiveView {
         space.icon.map { IconChoice.image($0, size: size) }
     }
 
-    func show(_ space: SpaceInfo) {
-        picture.image = Self.picture(of: space, size: Self.side)
+    func show(_ space: SpaceInfo, name: String? = nil) {
+        picture.image = name == nil ? Self.picture(of: space, size: Self.side) : nil
         picture.isHidden = picture.image == nil
-        label.stringValue = space.name
-        setAccessibilityValue(space.name)
+        label.stringValue = name ?? space.name
+        setAccessibilityValue(label.stringValue)
         needsLayout = true
     }
 
@@ -1391,9 +1441,10 @@ final class MiniSpaceChip: InteractiveView {
     override func stateDidChange(animated: Bool) {
         // Plain on the strip at rest; under the pointer and while its menu is open, the buttons' neutral wash, which
         // shows on the page's color whatever it is. Its ink is the strip's, light or dark for that color.
-        let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
+        let lit = isEnabled && (isHovered || isSelected)
+        let fill: NSColor? = isEnabled && isPressed ? Tokens.Color.pressedFill : lit ? Tokens.Color.hoverFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
-        let ink = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        let ink = lit ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         label.textColor = ink
         picture.contentTintColor = ink
     }
@@ -1676,8 +1727,14 @@ enum AppSwitching {
 final class MiniLinksNote: FloatingPanelView {
     private let title = Label(String(localized: "Links from other apps open here", comment: "Title of the note shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. The note points at the Open in button."),
                               font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
-    private let line = Label(String(localized: "Glance, then get back to what you were doing. To keep the page, use this button or press ⌘O.", comment: "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like ⌘O) moves the page into a tab of a browser window."),
+    private let line = Label(MiniLinksNote.text(keys: Shortcuts.keys(for: #selector(MiniWindowController.openDocument(_:)))),
                              font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+
+    /// The note's line, with Open in's keys as Settings › Shortcuts has them, or without when it has none.
+    static func text(keys: String) -> String {
+        keys.isEmpty ? String(localized: "Glance, then get back to what you were doing. To keep the page, use this button.", comment: "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which moves the page into a tab of a browser window.")
+            : String(localized: "Glance, then get back to what you were doing. To keep the page, use this button or press \(keys).", comment: "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like its keys, such as ⌘O) moves the page into a tab of a browser window.")
+    }
     private let buttons = DialogButtons()
     private let useTabs = PillButton(title: String(localized: "Use Tabs Instead", comment: "Button on the note shown the first time a link from another app opens in Zigzag Mini: links from other apps open as tabs from now on, and this page moves into a tab."), style: .quiet)
     private let gotIt = PillButton(title: String(localized: "Got It", comment: "Button on the note shown the first time a link from another app opens in Zigzag Mini: puts the note away and keeps using Zigzag Mini."), style: .prominent)

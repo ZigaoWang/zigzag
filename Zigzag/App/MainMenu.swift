@@ -101,7 +101,7 @@ enum MainMenu {
             item(String(localized: "About Zigzag", comment: "Zigzag menu item."), #selector(AppDelegate.showAbout(_:)), ""),
             item(String(localized: "Check for Updates…", comment: "Zigzag menu item."), #selector(AppDelegate.checkForUpdates(_:)), ""),
             .separator(),
-            item(String(localized: "Settings…", comment: "Zigzag menu item."), #selector(AppDelegate.showSettings(_:)), ","),
+            item(String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar."), #selector(AppDelegate.showSettings(_:)), ","),
             item(String(localized: "Passwords", comment: "Zigzag menu item."), #selector(AppDelegate.showPasswords(_:)), "k", [.command, .option]),
             item(String(localized: "Set as Default Browser", comment: "Zigzag menu item."), #selector(AppDelegate.makeDefaultBrowser(_:)), ""),
             .separator(),
@@ -111,7 +111,7 @@ enum MainMenu {
             item(String(localized: "Hide Others", comment: "Zigzag menu item."), #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
             item(String(localized: "Show All", comment: "Zigzag menu item."), #selector(NSApplication.unhideAllApplications(_:)), ""),
             .separator(),
-            item(String(localized: "Quit Zigzag", comment: "Zigzag menu item."), #selector(NSApplication.terminate(_:)), "q"),
+            item(String(localized: "Quit Zigzag", comment: "Zigzag menu item."), #selector(AppDelegate.quitFromMenu(_:)), "q"),
         ]))
 
         main.addItem(submenu(String(localized: "File", comment: "A menu in the menu bar."), [
@@ -154,7 +154,7 @@ enum MainMenu {
             item(String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge."), #selector(C.toggleSidebarSide(_:)), ""),
             item(String(localized: "Show All Tabs", comment: "View menu item."), #selector(C.toggleDeskView(_:)), "\\", [.command, .shift]),
             item(String(localized: "Stack Vertically", comment: "View menu item."), #selector(C.toggleSplitOrientation(_:)), ""),
-            item(String(localized: "Separate Tabs", comment: "View menu item."), #selector(C.closeSplitView(_:)), "\\", [.command, .option]),
+            item(String(localized: "Separate Tabs", comment: "View menu item."), #selector(C.closeSplitView(_:)), "\\", [.control, .command]),
             item(PaneHeaderView.zoomTitle(false), #selector(C.zoomPane(_:)), "\r", [.command, .shift]),
             .separator(),
             item(String(localized: "Back", comment: "View menu item."), #selector(C.goBack(_:)), "["),
@@ -270,7 +270,7 @@ enum MainMenu {
         let servicesItem = NSMenuItem(title: services.title, action: nil, keyEquivalent: "")
         servicesItem.submenu = services
         main.addItem(submenu(name, [
-            item(String(localized: "Settings…", comment: "Zigzag menu item."), #selector(AppDelegate.showSettings(_:)), ","),
+            item(String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar."), #selector(AppDelegate.showSettings(_:)), ","),
             .separator(),
             servicesItem,
             .separator(),

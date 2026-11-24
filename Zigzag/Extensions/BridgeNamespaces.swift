@@ -97,6 +97,138 @@ final class BridgeTopSites: BridgeNamespace {
     }
 }
 
+// MARK: - sessions
+
+/// `chrome.sessions`, over the tabs and windows History › Recently Closed and ⇧⌘T bring back, newest first. Only the
+/// extension's own profile's, and never a private window's. Zigzag doesn't sync, so there are no other devices.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeSessions: BridgeNamespace {
+    static let name = "sessions"
+    static let permission = "sessions"
+    /// Chrome's MAX_SESSION_RESULTS: the default and the most getRecentlyClosed returns.
+    static let maxResults = 25
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
+    private var watching: SignalToken?
+    private let announce = Coalescer()
+    /// The session ids last told about, so another profile's closing never reaches this one's extensions.
+    private var lastSeen: [String] = []
+
+    /// One closed tab or window, as `getRecentlyClosed` lists it.
+    enum Entry {
+        case tab(TabManager.ClosedTab)
+        case window(id: UUID, state: SessionState.WindowState, closedAt: Date)
+
+        var closedAt: Date {
+            switch self {
+            case .tab(let tab): return tab.closedAt
+            case .window(_, _, let closedAt): return closedAt
+            }
+        }
+
+        var sessionID: String {
+            switch self {
+            case .tab(let tab): return "t:\(tab.id)"
+            case .window(let id, _, _): return "w:\(id)"
+            }
+        }
+    }
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "getRecentlyClosed":
+            let wanted = args.object(0).number("maxResults").map { Int(saturating: $0) }
+            return Self.recentlyClosed(closed(), maxResults: wanted).map(Self.session)
+        case "getDevices":
+            return [Any]()
+        case "restore":
+            let all = Self.newestFirst(closed())
+            let wanted = args.string(0)
+            guard let entry = wanted.map({ id in all.first { $0.sessionID == id } }) ?? all.first else {
+                throw BridgeError(wanted.map { "Invalid session id: \"\($0)\"." } ?? "There are no sessions to restore.")
+            }
+            let session = Self.session(entry)
+            switch entry {
+            case .tab(let tab):
+                guard WindowManager.shared.reopenClosedTab(tab.id) else { throw BridgeError("Couldn't restore the tab") }
+            case .window(let id, _, _):
+                WindowManager.shared.reopenClosedWindow(id)
+            }
+            return session
+        default:
+            throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+
+    func startEvents() {
+        guard watching == nil else { return }
+        lastSeen = Self.newestFirst(closed()).map(\.sessionID)
+        watching = WindowManager.recentlyClosedChanged.observe { [weak self] in
+            self?.announce.schedule { [weak self] in self?.announceChanges() }
+        }
+    }
+
+    private func announceChanges() {
+        let now = Self.newestFirst(closed()).map(\.sessionID)
+        guard now != lastSeen else { return }
+        lastSeen = now
+        host.bridge.emit("sessions.onChanged", [])
+    }
+
+    /// This profile's closed tabs and windows, from every everyday window.
+    private func closed() -> [Entry] {
+        let found = WindowManager.shared.recentlyClosed
+        return Self.mine(tabs: found.tabs, windows: found.windows, profile: host.profile.id, profileOf: Library.shared.profileID(ofSpace:))
+    }
+
+    /// The tabs with a page and the windows on `profile`, each tab once.
+    static func mine(tabs: [TabManager.ClosedTab], windows: [(id: UUID, state: SessionState.WindowState, closedAt: Date)],
+                     profile: UUID, profileOf: (UUID) -> UUID) -> [Entry] {
+        var seen = Set<UUID>()
+        let kept = tabs.filter { $0.url != nil && profileOf($0.spaceID) == profile && seen.insert($0.id).inserted }.map(Entry.tab)
+        return kept + windows.filter { profileOf($0.state.currentSpaceID) == profile }.map { Entry.window(id: $0.id, state: $0.state, closedAt: $0.closedAt) }
+    }
+
+    /// Newest first; a tie goes to the one listed later, as it closed after.
+    static func newestFirst(_ all: [Entry]) -> [Entry] {
+        all.enumerated().sorted { a, b in
+            a.element.closedAt != b.element.closedAt ? a.element.closedAt > b.element.closedAt : a.offset > b.offset
+        }.map(\.element)
+    }
+
+    /// What getRecentlyClosed returns: newest first, at most `maxResults` (Chrome's default and cap, 25).
+    static func recentlyClosed(_ all: [Entry], maxResults wanted: Int?) -> [Entry] {
+        Array(newestFirst(all).prefix(max(0, min(wanted ?? maxResults, maxResults))))
+    }
+
+    /// Chrome's `Session`: when it closed, in seconds, and the tab or window.
+    static func session(_ entry: Entry) -> [String: Any] {
+        let seconds = Int(entry.closedAt.timeIntervalSince1970)
+        switch entry {
+        case .tab(let closed):
+            return ["lastModified": seconds,
+                    "tab": tab(sessionID: entry.sessionID, url: closed.url, title: closed.customTitle ?? closed.title, index: closed.index)]
+        case .window(_, let state, _):
+            let pages = state.spaces.flatMap(\.tabs) + state.bookmarkTabs.map(\.tab)
+            let tabs = pages.filter { $0.url != nil }.enumerated().map { index, page in
+                tab(sessionID: "\(entry.sessionID)/\(page.id)", url: page.url, title: page.customTitle ?? page.title, index: index)
+            }
+            return ["lastModified": seconds,
+                    "window": ["sessionId": entry.sessionID, "tabs": tabs, "focused": false, "incognito": false, "alwaysOnTop": false,
+                               "type": "normal", "state": state.isFullScreen == true ? "fullscreen" : "normal"] as [String: Any]]
+        }
+    }
+
+    /// A closed tab as Chrome's `Tab`. It's in no open window, so windowId is WINDOW_ID_NONE.
+    private static func tab(sessionID: String, url: URL?, title: String, index: Int) -> [String: Any] {
+        ["sessionId": sessionID, "url": url?.absoluteString ?? "", "title": title, "index": index, "windowId": -1,
+         "active": false, "highlighted": false, "selected": false, "pinned": false, "incognito": false,
+         "discarded": false, "autoDiscardable": true, "groupId": -1]
+    }
+}
+
 // MARK: - notifications
 
 /// `chrome.notifications`, shown by macOS under Zigzag, titled with the extension's name. A click opens nothing on
@@ -1002,7 +1134,7 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
 
 /// WebKit leaves SameSite cookies out of extension fetches even with host access. With credentials: 'include', reads
 /// use a blank page at the target origin; writes, and every request with the default credentials, use a temporary
-/// native session that keeps the sender's Chrome extension Origin.
+/// native session that keeps the sender's Chrome extension Origin, as does credentials: 'omit', with no cookies.
 /// Both use the owning profile's cookies. Live host permission authorizes requests, with no vendor allowlist.
 @available(macOS 15.4, *)
 @MainActor
@@ -1072,12 +1204,9 @@ final class BridgeExtensionFetch: BridgeNamespace {
         guard Self.allows(url, context: context) else { return ["fallback": true] }
         // Each hop of a redirect is checked against the extension's access as it is then.
         let authorize: @MainActor @Sendable (URL) -> Bool = { hop in host.context(for: extensionID) === context && Self.allows(hop, context: context) }
-        if options.string("credentials") == "same-origin" {
-            // With default credentials WebKit's own fetch sends every cookie but SameSite ones, so it needs no help without them.
-            guard await sameSiteCookies.has(url, in: host.profile.store) else { return ["fallback": true] }
-            return try await requests.direct(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID, authorize: authorize)
-        }
-        return try await requests.response(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID, authorize: authorize)
+        let store = host.profile.store, sameSiteCookies = sameSiteCookies
+        return try await requests.withHostAccess(options, url: url, extensionID: extensionID, store: store, requestID: requestID,
+                                                 keepsSameSiteCookies: { await sameSiteCookies.has(url, in: store) }, authorize: authorize)
     }
 
     private let sameSiteCookies = SameSiteCookieCheck()
@@ -1229,10 +1358,32 @@ final class ExtensionFetchRequests {
                                                   in: nil, contentWorld: .page)
     }
 
+    /// A request to a site the extension may reach, by its credentials. Omit: sent here with no cookies, as WebKit's own
+    /// fetch can still hold it to the site's CORS answer, which Chrome never asks for (#478); a read too big to carry
+    /// is safe to send again and goes to WebKit. Default: sent here when WebKit would leave SameSite cookies out.
+    /// Include: always here, with every cookie.
+    func withHostAccess(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore, requestID: UUID = UUID(),
+                        keepsSameSiteCookies: @MainActor () async -> Bool, authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
+        switch options["credentials"] as? String {
+        case "omit":
+            do {
+                return try await direct(options, url: url, extensionID: extensionID, store: store, requestID: requestID, authorize: authorize)
+            } catch let error as BridgeError where error.message == ExtensionWriteTransfer.tooLarge
+                        && ["GET", "HEAD"].contains((options["method"] as? String ?? "GET").uppercased()) {
+                return ["fallback": true]
+            }
+        case "same-origin":
+            guard await keepsSameSiteCookies() else { return ["fallback": true] }
+            return try await direct(options, url: url, extensionID: extensionID, store: store, requestID: requestID, authorize: authorize)
+        default:
+            return try await response(options, url: url, extensionID: extensionID, store: store, requestID: requestID, authorize: authorize)
+        }
+    }
+
     /// A request with default credentials, sent here rather than by WebKit, which leaves SameSite cookies out. All of
     /// it is decided before anything is sent, so nothing is sent twice: what this can't carry goes to WebKit's fetch
     /// from the start. Redirects are followed one hop at a time like WebKit's: a site the extension may reach gets its
-    /// cookies, any other gets none and must allow the extension by CORS.
+    /// cookies, any other gets none and must allow the extension by CORS. With credentials: 'omit', no hop gets cookies.
     func direct(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
                 requestID id: UUID = UUID(), authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
         let key = RequestKey(extensionID: extensionID, id: id)
@@ -1247,7 +1398,8 @@ final class ExtensionFetchRequests {
               url.scheme == "https" || Self.isLoopback(url), !streams, fits,
               options["body"] == nil || options["body"] is NSNull || body != nil, body == nil || !["GET", "HEAD"].contains(method)
         else { return ["fallback": true] }
-        let request = try Self.writeRequest(options, body: body, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        var request = try Self.writeRequest(options, body: body, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        request.sendsCookies = options["credentials"] as? String != "omit"
         return try await send(request, key: key, store: store, followsOtherOrigins: true, authorize: authorize)
     }
 
@@ -1255,11 +1407,12 @@ final class ExtensionFetchRequests {
     private func send(_ request: ExtensionWrite.Request, key: RequestKey, store: WKWebsiteDataStore, followsOtherOrigins: Bool = false,
                       authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
         // Every cookie, scoped to each hop's host off the main thread: one for another path of the site goes too.
-        let every: @MainActor @Sendable (URL) async -> [HTTPCookie] = { _ in await store.httpCookieStore.allCookies() }
+        let sendsCookies = request.sendsCookies
+        let every: @MainActor @Sendable (URL) async -> [HTTPCookie] = { _ in sendsCookies ? await store.httpCookieStore.allCookies() : [] }
         let cookies = followsOtherOrigins ? every : nil
         let task = Task {
             // The profile's proxy, set by an extension through chrome.proxy, carries these as it carries its pages.
-            try await ExtensionWrite.send(request, cookies: await store.httpCookieStore.allCookies(), proxies: store.proxyConfigurations,
+            try await ExtensionWrite.send(request, cookies: sendsCookies ? await store.httpCookieStore.allCookies() : [], proxies: store.proxyConfigurations,
                                           otherOrigins: cookies, authorize: authorize) { set, deleted in
                 for cookie in deleted { await store.httpCookieStore.deleteCookie(cookie) }
                 for cookie in set { await store.httpCookieStore.setCookie(cookie) }
@@ -1401,6 +1554,8 @@ nonisolated enum ExtensionWrite {
         let cache: String?
         let redirect: String?
         let origin: String
+        /// False for credentials: 'omit': no cookie goes out, and none an answer sets is kept.
+        var sendsCookies = true
     }
 
     /// Whether a page's script could set this header, by the Fetch standard's forbidden request headers. An
@@ -1460,9 +1615,9 @@ nonisolated enum ExtensionWrite {
         configuration.timeoutIntervalForResource = 600
         configuration.proxyConfigurations = proxies
         let jar = configuration.httpCookieStorage!
-        jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
+        jar.cookieAcceptPolicy = input.sendsCookies ? .onlyFromMainDocumentDomain : .never
         // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.
-        jar.setCookies(scoped(cookies, to: url), for: url, mainDocumentURL: url)
+        if input.sendsCookies { jar.setCookies(scoped(cookies, to: url), for: url, mainDocumentURL: url) }
         try Task.checkCancellation()
         guard await authorize(url) else { throw BridgeError("The extension can no longer access this URL.") }
         let transfer = ExtensionWriteTransfer(limit: ExtensionFetchRequests.responseLimit)
@@ -1478,6 +1633,8 @@ nonisolated enum ExtensionWrite {
         default: break
         }
         for header in input.headers where mayBeSet(header[0], header[1]) { request.setValue(header[1], forHTTPHeaderField: header[0]) }
+        // URLSession gives a body without one application/x-www-form-urlencoded; CFNetwork can't leave the line out, so it's empty.
+        if input.body != nil, request.value(forHTTPHeaderField: "Content-Type") == nil { request.setValue("", forHTTPHeaderField: "Content-Type") }
         request.setValue(input.origin, forHTTPHeaderField: "Origin")
         var redirected = false
         // Whether this hop goes to a site the extension may reach; one it may not gets no cookies and needs CORS.
@@ -1490,9 +1647,9 @@ nonisolated enum ExtensionWrite {
                 reached = true
             } else if let otherOrigins {
                 reached = await authorize(hop)
-                if reached { jar.setCookies(scoped(await otherOrigins(hop), to: hop), for: hop, mainDocumentURL: hop) }
+                if reached, input.sendsCookies { jar.setCookies(scoped(await otherOrigins(hop), to: hop), for: hop, mainDocumentURL: hop) }
             }
-            request.httpShouldHandleCookies = reached
+            request.httpShouldHandleCookies = reached && input.sendsCookies
             request.mainDocumentURL = hop
             let before = jar.cookies ?? []
             let (data, raw) = try await transfer.run(request, in: session)
@@ -1564,6 +1721,8 @@ nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionData
 
     init(limit: Int) { self.limit = limit }
 
+    static let tooLarge = "The response is too large for an extension request."
+
     func run(_ request: URLRequest, in session: URLSession) async throws -> (Data, URLResponse) {
         let task = session.dataTask(with: request)
         return try await withTaskCancellationHandler {
@@ -1611,7 +1770,7 @@ nonisolated private final class ExtensionWriteTransfer: NSObject, URLSessionData
             defer { done = nil }
             return (done, self.data, self.response, self.tooLarge)
         }
-        if tooLarge { continuation?.resume(throwing: BridgeError("The response is too large for an extension request.")) }
+        if tooLarge { continuation?.resume(throwing: BridgeError(Self.tooLarge)) }
         else if let error { continuation?.resume(throwing: error) }
         else if let response { continuation?.resume(returning: (data, response)) }
         else { continuation?.resume(throwing: BridgeError("Invalid extension response.")) }

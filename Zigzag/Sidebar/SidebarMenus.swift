@@ -83,7 +83,7 @@ enum SidebarMenus {
 
     /// The menu bar's shortcut for `action`, as it is now, shown on the item.
     static func withShortcut(_ item: NSMenuItem, of action: Selector) -> NSMenuItem {
-        guard let bar = Shortcuts.allItems.first(where: { $0.action == action }), !bar.keyEquivalent.isEmpty else { return item }
+        guard let bar = Shortcuts.item(for: action), !bar.keyEquivalent.isEmpty else { return item }
         item.keyEquivalent = bar.keyEquivalent
         item.keyEquivalentModifierMask = bar.keyEquivalentModifierMask
         return item
@@ -115,7 +115,7 @@ enum SidebarMenus {
     }
 
     static var separateSplitTitle: String {
-        String(localized: "Separate Split View", comment: "Item at the top of the context menu of a tab, pinned tab or favorite in a split view, in the sidebar: ends the split view, each page a tab of its own again.")
+        String(localized: "Separate Tabs", comment: "View menu item.")
     }
 
     static var removeFromSplitTitle: String {
@@ -187,10 +187,11 @@ enum SidebarMenus {
             })
         }
         if !rows.isEmpty {
-            close.append(Item(rows.count == 1 ? String(localized: "Close Tab", comment: "Menu item")
+            // ⌘W closes the picked rows too, so the item shows it.
+            close.append(withShortcut(Item(rows.count == 1 ? String(localized: "Close Tab", comment: "Menu item")
                               : String(localized: "Close \(rows.count) Tabs", comment: "Menu item for several picked tabs"), symbol: Symbol.close) {
                 controller.closeManyWithUndoToast(controller.markedTabs(items))
-            })
+            }, of: #selector(BrowserWindowController.closeTab(_:))))
         }
         if !pins.isEmpty, !isPrivate {
             close.append(Item(Self.removePinsTitle(pins.count), symbol: Symbol.remove) { controller.removePinnedWithUndo(pins) })
@@ -233,9 +234,8 @@ enum SidebarMenus {
         typealias C = BrowserWindowController
         let manager = controller.tabManager
         let isPrivate = manager.isPrivate
-        // The menu bar's keys act on the tab you're on, so only its menu shows them.
-        let isCurrent = tab === manager.selectedTab
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { isCurrent ? withShortcut(item, of: action) : item }
+        // Every tab's menu shows the menu bar's keys, as Chrome's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
 
         var context: [NSMenuItem] = []
         if let split = manager.split(for: tab) {
@@ -243,9 +243,10 @@ enum SidebarMenus {
             if split.isGroup, tab.bookmarkID == nil { context.append(Item(removeFromSplitTitle, symbol: Symbol.leaveSplit) { controller.leaveGroupWithUndo(tab) }) }
             context.append(keyed(Item(separateSplitTitle, symbol: Symbol.separateSplit) { controller.unsplitWithUndo(tab) }, #selector(C.closeSplitView(_:))))
         }
-        if tab.isPlayingAudio || tab.isMuted {
-            context.append(keyed(Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: tab.isMuted ? Symbol.unmute : Symbol.mute) { tab.setMuted(!tab.isMuted) }, #selector(C.toggleMute(_:))))
-        }
+        let mute = keyed(Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: tab.isMuted ? Symbol.unmute : Symbol.mute) { tab.setMuted(!tab.isMuted) }, #selector(C.toggleMute(_:)))
+        // At the top while it plays or is muted; with the page's actions otherwise, to mute it before it plays (#490).
+        let soundsNow = tab.isPlayingAudio || tab.isMuted
+        if soundsNow { context.append(mute) }
 
         var page: [NSMenuItem] = []
         if tab.url != nil {
@@ -255,6 +256,7 @@ enum SidebarMenus {
             page.append(keyed(Item(suspendTitle(1), symbol: Symbol.suspend) { controller.suspendWithToast([tab]) }, #selector(C.suspendPage(_:))))
         }
         page.append(keyed(Item(String(localized: "Duplicate Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: Symbol.duplicate) { controller.duplicate(tab) }, #selector(C.duplicateTab(_:))))
+        if !soundsNow { page.append(mute) }
         if let url = tab.url {
             page.append(keyed(Item(String(localized: "Copy Link", comment: "Item in a tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(url, title: tab.displayTitle) }, #selector(C.copyPageURL(_:))))
         }
@@ -262,8 +264,8 @@ enum SidebarMenus {
         var organize: [NSMenuItem] = []
         // Save at the end of Pinned, or with ⇧ held where the picker says (#326). A whole group or a split view saves
         // as one, so the item says which. Pinned pages are shared by every window: a private one's tabs stay out.
-        if !isPrivate, tab.bookmarkID == nil, tab.url != nil {
-            let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
+        if !isPrivate, tab.bookmarkID == nil, tab.url != nil, manager.canPin(tab) {
+            let pinsPair = manager.pinsSplit(tab)
             let saveTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is pinned as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
                 : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar: pins the page into Pinned, and with ⇧ held, asks which folder.")
@@ -271,6 +273,9 @@ enum SidebarMenus {
                 // ⇧ held asks where, as ⇧⌘D does.
                 if C.shiftHeld { controller.save(tab, request: .picker) } else { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
             }, #selector(C.toggleBookmark(_:))))
+        }
+        // By its own rule, as the menu bar and the command bar have it: a tab of a group favorites alone.
+        if !isPrivate, tab.bookmarkID == nil, tab.url != nil, manager.canPin(tab, keepingGroup: false) {
             organize.append(keyed(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar."), symbol: Symbol.favorite) { controller.favoriteWithUndo(tab) }, #selector(C.addToFavorites(_:))))
         }
         if tab.bookmarkID == nil { organize += groupItems(for: tab, controller: controller) }
@@ -326,8 +331,8 @@ enum SidebarMenus {
         let isPrivate = manager.isPrivate
         let live = manager.bookmarkTab(for: bookmark.id)
         let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
-        // The menu bar's keys act on the page you're on, so only its menu shows them.
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { live != nil && live === manager.selectedTab ? withShortcut(item, of: action) : item }
+        // Every page's menu shows the menu bar's keys, as a tab's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
 
         var context: [NSMenuItem] = []
         if let live, let url = live.url, manager.isAway(bookmark.id) {
@@ -341,6 +346,8 @@ enum SidebarMenus {
             context.append(Item(String(localized: "Separate from Pinned Tab", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own."), symbol: Symbol.separate) { manager.separateBookmarkTab(bookmark.id) })
         }
         if let pinned {
+            // One page of three or four can leave, as from a group of tabs; the rest stay one pinned group.
+            if pinned.isGroup, !isPrivate { context.append(Item(removeFromSplitTitle, symbol: Symbol.leaveSplit) { controller.leavePinnedGroupWithUndo(bookmark.id) }) }
             // Both stay pinned, each in a row of its own.
             context.append(Item(separateSplitTitle, symbol: Symbol.separateSplit) {
                 let open = pinned.ids.compactMap(manager.bookmarkTab(for:)).first { manager.split(for: $0) != nil }
@@ -354,8 +361,13 @@ enum SidebarMenus {
             // Split beside a tab, its row carries the pair, so it ends the split here as a tab's row does.
             context.append(keyed(Item(separateSplitTitle, symbol: Symbol.separateSplit) { controller.unsplitWithUndo(live) }, #selector(BrowserWindowController.closeSplitView(_:))))
         }
+        // At the top while it plays or is muted; with the page's actions otherwise.
+        let mute = pinned == nil ? live.map { live in keyed(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar."), symbol: live.isMuted ? Symbol.unmute : Symbol.mute) { live.setMuted(!live.isMuted) }, #selector(BrowserWindowController.toggleMute(_:))) } : nil
+        let soundsNow = live.map { $0.isPlayingAudio || $0.isMuted } ?? false
+        if soundsNow, let mute { context.append(mute) }
 
-        let page = [Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(bookmark.url, title: bookmark.title) }]
+        var page = [keyed(Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.copyLink) { controller.copyLink(bookmark.url, title: bookmark.title) }, #selector(BrowserWindowController.copyPageURL(_:)))]
+        if !soundsNow, let mute { page.insert(mute, at: 0) }
 
         var organize: [NSMenuItem] = []
         // Pins are shared by every window: a private one leaves them as they are.
@@ -363,11 +375,11 @@ enum SidebarMenus {
             let unpin = Library.shared.pinnedGroup(containing: bookmark.id) != nil ? unpinGroupTitle
                 : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
                 : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
-            organize.append(Item(unpin, symbol: Symbol.unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
-            organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.favorite) {
+            organize.append(keyed(Item(unpin, symbol: Symbol.unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) }, #selector(BrowserWindowController.toggleBookmark(_:))))
+            organize.append(keyed(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar."), symbol: Symbol.favorite) {
                 controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
                 live?.isFavorite = true
-            })
+            }, #selector(BrowserWindowController.addToFavorites(_:))))
         }
         // Folders of this space's pinned pages.
         let folder = Library.shared.folderID(containing: bookmark.id)
@@ -509,8 +521,8 @@ enum SidebarMenus {
         let isPrivate = manager.isPrivate
         let live = manager.bookmarkTab(for: favorite.id)
         let pair = Library.shared.pinnedSplit(containing: favorite.id)
-        // The menu bar's keys act on the page you're on, so only its menu shows them.
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { live != nil && live === manager.selectedTab ? withShortcut(item, of: action) : item }
+        // Every page's menu shows the menu bar's keys, as a tab's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
 
         var context: [NSMenuItem] = []
         if let pair {
@@ -531,13 +543,15 @@ enum SidebarMenus {
             }
             context.append(Item(String(localized: "Separate from Favorite", comment: "Item in a favorite's context menu. The page wandered off; this opens it as a tab of its own."), symbol: Symbol.separate) { manager.separateBookmarkTab(favorite.id) })
         }
-        if pair == nil, let live, live.isPlayingAudio || live.isMuted {
-            context.append(keyed(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu."), symbol: live.isMuted ? Symbol.unmute : Symbol.mute) { live.setMuted(!live.isMuted) }, #selector(BrowserWindowController.toggleMute(_:))))
-        }
+        // At the top while it plays or is muted; with the page's actions otherwise.
+        let mute = pair == nil ? live.map { live in keyed(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu."), symbol: live.isMuted ? Symbol.unmute : Symbol.mute) { live.setMuted(!live.isMuted) }, #selector(BrowserWindowController.toggleMute(_:))) } : nil
+        let soundsNow = live.map { $0.isPlayingAudio || $0.isMuted } ?? false
+        if soundsNow, let mute { context.append(mute) }
 
-        let page = [Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu."), symbol: Symbol.copyLink) { controller.copyLink(favorite.url, title: favorite.title) }]
+        var page = [keyed(Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu."), symbol: Symbol.copyLink) { controller.copyLink(favorite.url, title: favorite.title) }, #selector(BrowserWindowController.copyPageURL(_:)))]
+        if !soundsNow, let mute { page.insert(mute, at: 0) }
         // Favorites are shared by every window: a private one doesn't take them away.
-        let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in."), symbol: Symbol.toTabs) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
+        let organize = isPrivate ? [] : [keyed(Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in."), symbol: Symbol.toTabs) { controller.unfavoriteWithUndo(favorite.id, to: 0) }, #selector(BrowserWindowController.toggleBookmark(_:)))]
 
         // Not a split favorite: a new name or icon would only reach its left page.
         var edit: [NSMenuItem] = []
@@ -568,9 +582,9 @@ enum SidebarMenus {
         // Its profile on top once there's more than one, as the Move to Space menus head each profile's spaces.
         if let profile = Library.shared.directory.shownName(ofSpace: id, spaceName: space.name) { menu.addItem(.sectionHeader(title: profile)) }
         typealias C = BrowserWindowController
-        // The menu bar's Edit Space… and folder items act on the space you're in, so only its menu shows their keys.
         let isCurrent = id == controller.tabManager.currentSpaceID
-        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { isCurrent ? withShortcut(item, of: action) : item }
+        // Every space's menu shows the menu bar's keys, as a tab's does.
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { withShortcut(item, of: action) }
         menu.addItem(keyed(Item(String(localized: "Edit Space…", comment: "Item in a space's context menu."), symbol: Symbol.edit) {
             controller.openSpaceEditor(id, anchor: anchor ?? controller.sidebar.list.headerView)
         }, #selector(C.renameSpace(_:))))
@@ -760,7 +774,7 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
         panel.present()
         controller.window?.makeFirstResponder(panel.field.field)
         panel.field.field.currentEditor()?.selectAll(nil)
-        panel.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in
+        panel.monitor = TouchPress.addMonitor(matching: [.keyDown, .leftMouseDown]) { [weak panel] event in
             guard let panel, event.window === panel.window else { return event }
             if event.type == .keyDown {
                 // Mid-word in a Chinese or Japanese input method, Return and Esc belong to it.
@@ -798,7 +812,7 @@ final class RenamePanel: FloatingPanelView, NSTextFieldDelegate {
 
     private func close(commit: Bool) {
         if commit, name.isEmpty { return }
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         if commit { done?(name) }
         done = nil
@@ -880,7 +894,7 @@ extension BrowserWindowController {
             Library.shared.together {
                 for item in items {
                     switch item {
-                    case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.favoriteTab(tab) }
+                    case .tab(let id): if let tab = tabManager.tab(with: id), tabManager.canPin(tab, keepingGroup: false) { tabManager.favoriteTab(tab) }
                     case .bookmark(let id):
                         Library.shared.makeFavorite(id, in: tabManager.profile.id)
                         tabManager.bookmarkTab(for: id)?.isFavorite = true

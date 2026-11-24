@@ -4,9 +4,9 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// Full screen in the page (#168, #462): the page script on a real page: the element fills the viewport, the page is
-/// told it's in full screen as WebKit would tell it, Esc and exitFullscreen leave, and everything is given back as it
-/// was. Only a click or key starts it, and a frame only where it's allowed full screen.
+/// Full screen in the page (#168): where a site's full screen goes (the setting, a site's own choice), and the page
+/// script on a real page: the element fills the viewport, the page is told it's in full screen as WebKit would tell
+/// it, Esc and exitFullscreen leave, and everything is given back as it was.
 @MainActor
 @Suite(.serialized)
 struct PageFullScreenTests {
@@ -61,6 +61,7 @@ struct PageFullScreenTests {
             #expect(PageFullScreen.screenSites == ["example.com"])
             #expect(PageFullScreen.fills(for: URL(string: "https://example.com/")) == .screen)
             #expect(PageFullScreen.fills(for: URL(string: "https://example.org/")) == .page)
+            // The other way, the site's choice moves from one list to the other.
             PageFullScreen.fill = .screen
             PageFullScreen.setChoice(.page, for: URL(string: "https://example.com/"))
             #expect(PageFullScreen.screenSites.isEmpty)
@@ -82,95 +83,53 @@ struct PageFullScreenTests {
     @Test func offeredOnWebPagesOutsidePrivateWindows() {
         #expect(PageFullScreen.isOffered(for: URL(string: "https://youtube.com/"), isPrivate: false))
         #expect(!PageFullScreen.isOffered(for: URL(string: "https://youtube.com/"), isPrivate: true))
-        #expect(!PageFullScreen.isOffered(for: URL(fileURLWithPath: "/tmp/a.html"), isPrivate: false))
+        #expect(!PageFullScreen.isOffered(for: URL(string: "file:///tmp/a.html"), isPrivate: false))
         #expect(!PageFullScreen.isOffered(for: nil, isPrivate: false))
     }
 
     // MARK: The script
 
-    /// The page script is ours, in every frame, before the page runs, with the fill it is given.
-    @Test func theScriptIsOurs() {
-        let source = PageFullScreen.source(fill: .page)
+    @Test func theScriptCarriesTheChoices() throws {
+        let config = PageFullScreen.config(fill: .page, pageSites: ["youtube.com", "a.com"], screenSites: ["b.org"])
+        let source = PageFullScreen.source(config: config)
         #expect(source.hasPrefix(PageFullScreen.scriptMark))
-        #expect(source.contains("requestFullscreen"))
-        #expect(source.contains("'page'"))
-        #expect(PageFullScreen.source(fill: .screen).contains("'screen'"))
-        let script = PageFullScreen.script(fill: .page)
+        #expect(!source.contains("__CONFIG__"))
+        // The page-world script gets only the setting, never the per-site list.
+        #expect(source.contains(#"{"fill":"page"}"#))
+        #expect(!source.contains("youtube.com") && !source.contains("b.org"))
+        let choices = PageFullScreen.choiceSource(config: config)
+        #expect(choices.contains(#"{"fill":"page","page":["a.com","youtube.com"],"screen":["b.org"]}"#))
+        let script = PageFullScreen.script(config: config)
         #expect(PageFullScreen.isOurs(script))
         #expect(!script.isForMainFrameOnly)
         #expect(script.injectionTime == .atDocumentStart)
+        #expect(PageFullScreen.isOurs(PageFullScreen.choiceScript(config: config)))
         #expect(!PageFullScreen.isOurs(WKUserScript(source: "1", injectionTime: .atDocumentStart, forMainFrameOnly: true)))
+        #expect(PageFullScreen.applyCall(config).contains("__zigzagFullScreenChoice"))
     }
 
-    /// WebKit's own requestFullscreen, captured by the page script before the page runs: a test can see whether a
-    /// request was left to WebKit or filled by the script.
-    private static let nativeProbe = """
-    window.__nativeFullScreenRequests = 0;
-    Element.prototype.requestFullscreen = function () {
-      window.__nativeFullScreenRequests++;
-      return Promise.reject(new Error('WebKit\\'s own full screen'));
-    };
-    window.__probeRequest = Element.prototype.requestFullscreen;
-    """
-
-    /// The Whole Screen is WebKit's own, as in Safari and Chrome: the script installs nothing over the Fullscreen
-    /// API, and a request goes to WebKit with the page left exactly as it was (#464).
-    @Test func theWholeScreenLeavesFullScreenToWebKit() async throws {
-        let webView = await load(Self.page, fill: .screen, probe: Self.nativeProbe)
-        let result = try await page("""
-        const native = Element.prototype.requestFullscreen;
-        try { await document.getElementById('player').requestFullscreen(); } catch (e) {}
-        return [window.__nativeFullScreenRequests, native === window.__probeRequest,
-                document.getElementById('player').hasAttribute('data-zigzag-fullscreen'),
-                document.fullscreenElement, document.webkitFullscreenElement]
-        """, in: webView) as? [Any]
-        let values = try #require(result)
-        #expect(values[0] as? Int == 1)
-        #expect(values[1] as? Bool == true)
-        #expect(values[2] as? Bool == false)
-        #expect(values[3] is NSNull)
-        #expect(values[4] is NSNull)
-    }
-
-    /// The Page is still the page script's: its request is filled by the script, and WebKit never sees it (#464).
-    @Test func thePageStillUsesTheFillScript() async throws {
-        let webView = await load(Self.page, fill: .page, probe: Self.nativeProbe)
-        let result = try await page("""
-        const native = Element.prototype.requestFullscreen;
+    @Test func thePageCantReadTheSitesChoices() async throws {
+        let webView = await load(Self.page, fill: .screen, sites: ["videos.test", "secret.example"])
+        let seen = try await page("""
+        const seen = [];
+        const some = Array.prototype.some, endsWith = String.prototype.endsWith;
+        Array.prototype.some = function (...a) { seen.push(JSON.stringify(this)); return some.apply(this, a); };
+        String.prototype.endsWith = function (...a) { seen.push(String(a[0])); return endsWith.apply(this, a); };
         await document.getElementById('player').requestFullscreen();
-        return [window.__nativeFullScreenRequests, native !== window.__probeRequest,
-                document.getElementById('player').hasAttribute('data-zigzag-fullscreen'),
-                document.fullscreenElement && document.fullscreenElement.id]
+        await new Promise(r => setTimeout(r, 10));
+        dispatchEvent(new Event('zigzag-fullscreen-ask'));
+        Array.prototype.some = some; String.prototype.endsWith = endsWith;
+        return [seen.join(' '), typeof window.__zigzagFullScreenChoice, document.fullscreenElement && document.fullscreenElement.id]
         """, in: webView) as? [Any]
-        let values = try #require(result)
-        #expect(values[0] as? Int == 0)
-        #expect(values[1] as? Bool == true)
-        #expect(values[2] as? Bool == true)
-        #expect(values[3] as? String == "player")
-    }
-
-    /// A page open while its fill choice changes follows the new choice at once: The Page's fill leaves and the
-    /// Fullscreen API goes back to WebKit; The Whole Screen's is never filled by the script (#464).
-    @Test func aPageFollowsAFillChoiceChangedWhileItsOpen() async throws {
-        let webView = await load(Self.page, fill: .page, probe: Self.nativeProbe)
-        _ = try await page("await document.getElementById('player').requestFullscreen()", in: webView)
-        #expect(try await page("return document.getElementById('player').hasAttribute('data-zigzag-fullscreen')", in: webView) as? Bool == true)
-        _ = try await webView.runOwnScript(PageFullScreen.fillCall(.screen), world: .page)
-        let after = try await page("""
-        const left = [document.getElementById('player').hasAttribute('data-zigzag-fullscreen'),
-                      document.fullscreenElement, Element.prototype.requestFullscreen === window.__probeRequest];
-        try { await document.getElementById('player').requestFullscreen(); } catch (e) {}
-        return left.concat([window.__nativeFullScreenRequests])
-        """, in: webView) as? [Any]
-        let values = try #require(after)
-        #expect(values[0] as? Bool == false)
-        #expect(values[1] is NSNull)
-        #expect(values[2] as? Bool == true)
-        #expect(values[3] as? Int == 1)
+        let values = try #require(seen)
+        #expect(!(values[0] as? String ?? "").contains("secret.example"))
+        #expect(values[1] as? String == "undefined")
+        // The page's own choice still holds.
+        #expect(values[2] as? String == "player")
     }
 
     @Test func fillingThePageNeedsAClick() async throws {
-        let webView = await load(Self.page)
+        let webView = await load(Self.page, fill: .page)
         // Without a user gesture WebKit refuses and the page isn't filled.
         _ = try? await webView.runOwnScript("try { await document.getElementById('player').requestFullscreen(); } catch (e) {} await new Promise(r => setTimeout(r, 10)); return 0",
                                             asFunction: true, world: .page)
@@ -184,7 +143,7 @@ struct PageFullScreenTests {
         let html = """
         <html><body style="margin:0"><iframe id="f" style="width:300px;height:150px" srcdoc="\(inner.replacingOccurrences(of: "'", with: "&#39;"))"></iframe></body></html>
         """
-        let webView = await load(html)
+        let webView = await load(html, fill: .page)
         let result = try await page("""
         const f = document.getElementById('f');
         await new Promise(r => { if (f.contentDocument && f.contentDocument.readyState === 'complete') r(); else f.onload = r; });
@@ -223,13 +182,12 @@ struct PageFullScreenTests {
     <div class="bar">Bar</div><div class="label">Label</div></div></div></body></html>
     """
 
-    private func load(_ html: String, fill: PageFullScreen.Fill = .page, probe: String? = nil, heard: Heard? = nil) async -> WKWebView {
+    private func load(_ html: String, fill: PageFullScreen.Fill, sites: Set<String> = [], heard: Heard? = nil) async -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = true
-        if let probe {
-            configuration.userContentController.addUserScript(WKUserScript(source: probe, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
-        }
-        configuration.userContentController.addUserScript(PageFullScreen.script(fill: fill))
+        let config = PageFullScreen.config(fill: fill, pageSites: sites, screenSites: [])
+        configuration.userContentController.addUserScript(PageFullScreen.choiceScript(config: config))
+        configuration.userContentController.addUserScript(PageFullScreen.script(config: config))
         if let heard { configuration.userContentController.add(heard, contentWorld: .page, name: PageFullScreen.messageName) }
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700), configuration: configuration)
         let loading = Loading()
@@ -248,7 +206,7 @@ struct PageFullScreenTests {
 
     @Test func theElementFillsThePageAndThePageIsTold() async throws {
         let heard = Heard()
-        let webView = await load(Self.page, heard: heard)
+        let webView = await load(Self.page, fill: .page, heard: heard)
         let before = try await page("return document.documentElement.outerHTML", in: webView) as? String
         let entered = try await page("""
         window.events = [];
@@ -295,7 +253,7 @@ struct PageFullScreenTests {
     }
 
     @Test func escLeavesAndSoDoesZigzag() async throws {
-        let webView = await load(Self.page)
+        let webView = await load(Self.page, fill: .page)
         let viaEsc = try await page("""
         await document.getElementById('player').webkitRequestFullScreen();
         let heard = false;
@@ -314,7 +272,7 @@ struct PageFullScreenTests {
     }
 
     @Test func aVideosOwnFullScreenFillsThePageToo() async throws {
-        let webView = await load(Self.page)
+        let webView = await load(Self.page, fill: .page)
         let result = try await page("""
         const v = document.querySelector('video');
         const events = [];
@@ -334,13 +292,33 @@ struct PageFullScreenTests {
         #expect(values[5] as? String == "begin,end")
     }
 
+    @Test func theWholeScreenLeavesItToWebKit() async throws {
+        let webView = await load(Self.page, fill: .screen)
+        let result = try await page("""
+        try { await document.getElementById('player').requestFullscreen(); } catch (e) {}
+        await new Promise(r => setTimeout(r, 10));
+        return document.getElementById('player').hasAttribute('data-zigzag-fullscreen')
+        """, in: webView) as? Bool
+        #expect(result == false)
+    }
+
+    @Test func aSitesChoiceAndAChangeReachThePage() async throws {
+        // The page is videos.test: its own choice fills the page though the setting is the whole screen.
+        let webView = await load(Self.page, fill: .screen, sites: ["videos.test"])
+        try await page("await document.getElementById('player').requestFullscreen()", in: webView)
+        #expect(try await page("return document.fullscreenElement && document.fullscreenElement.id", in: webView) as? String == "player")
+        // The choice taken back: the page leaves, and the next request is WebKit's again.
+        _ = try await webView.evaluateJavaScript(PageFullScreen.applyCall(PageFullScreen.config(fill: .screen, pageSites: [], screenSites: [])), in: nil, contentWorld: PageFullScreen.world)
+        #expect(try await page("return document.getElementById('player').hasAttribute('data-zigzag-fullscreen')", in: webView) as? Bool == false)
+    }
+
     @Test func aFrameFillsThePageWithItself() async throws {
         let inner = "<html><body style='margin:0'><div id='p' style='width:200px;height:100px'>video</div></body></html>"
         let html = """
         <html><body style="margin:0"><div style="transform:translateZ(0);margin:50px"><iframe id="f" allowfullscreen style="width:300px;height:150px"
         srcdoc="\(inner.replacingOccurrences(of: "'", with: "&#39;"))"></iframe></div></body></html>
         """
-        let webView = await load(html)
+        let webView = await load(html, fill: .page)
         let result = try await page("""
         const f = document.getElementById('f');
         await new Promise(r => { if (f.contentDocument && f.contentDocument.readyState === 'complete') r(); else f.onload = r; });
@@ -359,24 +337,5 @@ struct PageFullScreenTests {
         #expect((values[3] as? Double) == 1000 && (values[4] as? Double) == 700)
         #expect(values[5] is NSNull)
         #expect(values[6] is NSNull)
-    }
-}
-
-/// The layout rules around The Whole Screen (#462): an expanded split pane keeps the space, and the address stays
-/// in the bar while a page has it.
-@MainActor
-struct WholeScreenLayoutTests {
-    @Test func anExpandedSplitPaneStaysInTheWholeScreen() {
-        #expect(!BrowserWindowController.wholeScreenEnds(selectedIsFull: true, inSplit: true, expandedZoom: true))
-        #expect(BrowserWindowController.wholeScreenEnds(selectedIsFull: true, inSplit: true, expandedZoom: false))
-        #expect(!BrowserWindowController.wholeScreenEnds(selectedIsFull: true, inSplit: false, expandedZoom: false))
-        #expect(BrowserWindowController.wholeScreenEnds(selectedIsFull: false, inSplit: false, expandedZoom: false))
-    }
-
-    @Test func theAddressStaysInTheBarWhileThePageHasTheWholeScreen() {
-        #expect(BrowserWindowController.addressBelongsInBar(abovePage: false, wholeScreen: true))
-        #expect(BrowserWindowController.addressBelongsInBar(abovePage: true, wholeScreen: true))
-        #expect(!BrowserWindowController.addressBelongsInBar(abovePage: false, wholeScreen: false))
-        #expect(BrowserWindowController.addressBelongsInBar(abovePage: true, wholeScreen: false))
     }
 }

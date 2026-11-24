@@ -92,6 +92,46 @@ struct RelaunchIgnoresLaunchChoiceTests {
                                                                   miniOnly: false, webAppOnly: false),
                                         relaunch: nil, choice: .fresh))
     }
+
+    @Test func aRelaunchFromAnUnusedFreshStartStartsFreshAgain() {
+        let now = Date()
+        let saved = UpdateRelaunch.Saved(at: now, browserWindowsOpen: true, minis: [], startsFresh: true)
+        let plan = UpdateRelaunch.plan(relaunch: saved, now: now, needsOnboarding: false, miniOnly: false, webAppOnly: false)
+        #expect(UpdateRelaunch.startsFresh(plan: plan, relaunch: saved, choice: .fresh))
+        #expect(!UpdateRelaunch.resumes(plan: plan, relaunch: saved, choice: .fresh))
+        // Set to reopen meanwhile: the session comes back, as before.
+        #expect(UpdateRelaunch.resumes(plan: plan, relaunch: saved, choice: .resume))
+        #expect(!UpdateRelaunch.startsFresh(plan: plan, relaunch: saved, choice: .resume))
+    }
+
+    @Test func aNoteFromBeforeReadsAsNotFresh() throws {
+        let data = Data(#"{"at":0,"browserWindowsOpen":true,"minis":[]}"#.utf8)
+        let saved = try JSONDecoder().decode(UpdateRelaunch.Saved.self, from: data)
+        #expect(saved.startsFresh == nil)
+        let plan = UpdateRelaunch.Plan(restoresSession: true, sessionWaiting: false, restoresMinis: false)
+        #expect(UpdateRelaunch.resumes(plan: plan, relaunch: saved, choice: .fresh))
+    }
+
+    @Test func aLaunchForZigzagMiniStillStartsFresh() {
+        let plan = UpdateRelaunch.plan(relaunch: nil, now: Date(), needsOnboarding: false, miniOnly: true, webAppOnly: false)
+        #expect(plan.sessionWaiting)
+        #expect(UpdateRelaunch.startsFresh(plan: plan, relaunch: nil, choice: .fresh))
+        #expect(!UpdateRelaunch.startsFresh(plan: plan, relaunch: nil, choice: .resume))
+        // Onboarding first: neither.
+        let onboarding = UpdateRelaunch.plan(relaunch: nil, now: Date(), needsOnboarding: true, miniOnly: false, webAppOnly: false)
+        #expect(!UpdateRelaunch.startsFresh(plan: onboarding, relaunch: nil, choice: .fresh))
+    }
+
+    @Test func anUnusedFreshStartNeverRestoresTheSessionItPassedOver() {
+        let manager = WindowManager.shared
+        let was = manager.startingFresh
+        defer { manager.startingFresh = was }
+        guard !manager.sessionWasUsed else { return }
+        manager.startingFresh = true
+        manager.sessionWaiting = true
+        #expect(!manager.restoreSession())
+        #expect(!manager.sessionWaiting)
+    }
 }
 
 /// A fresh start keeps the session it passed over where saving the new one can't reach it, and the copy is made
@@ -204,6 +244,47 @@ struct LastSessionKeptTests {
         let space = Library.shared.spaces[0].id
         guard JSONStore.save(session(tabIDs: [], space: space), to: kept) else { return }
         #expect(!manager.hasSessionToReopen(at: kept))
+    }
+}
+
+/// Reopen Last Session brings back only the kept windows not open again, never a tab that's already open (#433).
+@MainActor
+struct ReopenLastSessionTests {
+    private let space = UUID()
+
+    private func window(_ ids: [UUID]) -> SessionState.WindowState {
+        SessionState.WindowState(
+            frame: [], sidebarVisible: true, sidebarWidth: 240, currentSpaceID: space,
+            spaces: [SessionState.SpaceTabs(spaceID: space, tabs: ids.map { id in
+                SessionState.TabState(id: id, url: URL(string: "https://kept.example/\(id)"), title: "Kept",
+                                      lastActivated: Date(), createdAt: Date())
+            }, selectedTabID: ids.first)],
+            bookmarkTabs: [])
+    }
+
+    private func tabIDs(_ windows: [SessionState.WindowState]) -> [UUID] { windows.flatMap { $0.spaces.flatMap { $0.tabs.map(\.id) } } }
+
+    @Test func sharedTabsWindowsAreBackWithTheWindowHoldingTheTabs() {
+        let a = UUID(), b = UUID()
+        let saved = SessionState(windows: [window([a, b]), window([]), window([])])
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: true).count == 3)
+        #expect(WindowManager.windowsToReopen(saved, open: [a], shares: true).isEmpty)
+    }
+
+    @Test func onlyWindowsNotOpenAgainComeBack() {
+        let a = UUID(), b = UUID(), c = UUID()
+        let saved = SessionState(windows: [window([a]), window([b, c])])
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: false).count == 2)
+        // One reopened window closed again: only it comes back, the open one isn't made twice.
+        let again = WindowManager.windowsToReopen(saved, open: [b, c], shares: false)
+        #expect(tabIDs(again) == [a])
+        #expect(WindowManager.windowsToReopen(saved, open: [a, b], shares: false).isEmpty)
+    }
+
+    @Test func aSessionWithNoTabsHasNothingToReopen() {
+        let saved = SessionState(windows: [window([]), window([])])
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: true).isEmpty)
+        #expect(WindowManager.windowsToReopen(saved, open: [], shares: false).isEmpty)
     }
 }
 

@@ -26,15 +26,15 @@ class SpaceFrameView: ColorView {
         let (color, end, clear) = Self.frameColors(of: space, isPrivate: isPrivate)
         // See-through: the frosted desktop shows through, and the space's color washes over it, thinner the more shows.
         // Only clear glass needs a see-through window, which macOS shows at 80 Hz on a 120 Hz display (#394).
-        let seeThroughWindow = clear && space.usesClearGlass
+        let (seeThroughWindow, liquid) = Self.glassKind(clear: clear, space)
         window?.isOpaque = !seeThroughWindow
         window?.backgroundColor = seeThroughWindow ? .clear : .windowBackgroundColor
-        setGlass(clear, clear: space.usesClearGlass, tint: space.frameColor)
+        setGlass(clear, clear: liquid, tint: space.frameColor)
         // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
         // sits under it and would be hidden); a single color washes as a gradient of itself.
         setColor(clear ? .clear : color, animated: animated, duration: Tokens.Motion.large)
         setGradient(from: color, to: clear ? end ?? color : end, angle: space.gradientAngle, animated: animated)
-        setGrain(isPrivate ? 0 : space.grain ?? 0, animated: animated)
+        setGrain(isPrivate ? 0 : space.grain ?? 0, texture: space.texture, animated: animated)
         return (color, end)
     }
 
@@ -60,15 +60,25 @@ class SpaceFrameView: ColorView {
         layer?.removeAnimation(forKey: "backgroundColor")
         gradientLayer.removeAllAnimations()
         grainLayer.removeAllAnimations()
-        if a.clear { setGlass(true, clear: space.usesClearGlass, tint: SpaceInfo.mix(space.frameColor, next.frameColor, by: share)) }
+        if a.clear { setGlass(true, clear: Self.glassKind(clear: true, space).liquid, tint: SpaceInfo.mix(space.frameColor, next.frameColor, by: share)) }
         setColor(a.clear ? .clear : color, animated: false)
         setGradient(from: color, to: a.clear ? end ?? color : end, angle: share < 0.5 ? space.gradientAngle : next.gradientAngle, animated: false)
         let t = Double(min(max(share, 0), 1))
-        setGrain((space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t, animated: false)
+        setGrain((space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t, texture: t < 0.5 ? space.texture : next.texture, animated: false)
         return (color, end)
     }
 
     // MARK: Glass
+
+    /// Whether the window is see-through and the glass is Liquid Glass, for a space that shows the desktop (`clear`).
+    private static func glassKind(clear: Bool, _ space: SpaceInfo) -> (seeThrough: Bool, liquid: Bool) {
+        let shipped = (seeThrough: clear && space.usesClearGlass, liquid: space.usesClearGlass)
+        #if DEBUG
+        return shipped.seeThrough ? GlassVariant.now.window : shipped
+        #else
+        return shipped
+        #endif
+    }
 
     /// Frosted glass behind the frame, for spaces that want the desktop to show through: blurred, so what's behind
     /// reads as soft shapes and never as text under the sidebar's own. The sidebar's material, the clearest there is.
@@ -124,6 +134,9 @@ class SpaceFrameView: ColorView {
         clearGlass?.isHidden = true
         glassView.isHidden = !on
         glassView.material = .sidebar
+        #if DEBUG
+        if let material = GlassVariant.now.material { glassView.material = material }
+        #endif
         if on { glassView.frame = glassFrame }
     }
 
@@ -254,9 +267,22 @@ class SpaceFrameView: ColorView {
         return grain
     }()
 
+    /// The grain's texture now (`SpaceInfo.texture`).
+    private var grainTexture: String?
+
     /// 0 is smooth; 1 is as much as reads as texture without becoming noise.
-    func setGrain(_ amount: Double, animated: Bool) {
+    func setGrain(_ amount: Double, texture: String? = nil, animated: Bool) {
+        #if DEBUG
+        let amount = GlassVariant.now.dropsGrain ? 0 : amount
+        #endif
         let target = Float(min(max(amount, 0), 1) * 0.18)
+        if texture != grainTexture {
+            grainTexture = texture
+            Tokens.Motion.withoutAnimation {
+                grainLayer.backgroundColor = MaterialImages.texture(texture).cgColor
+                glassGrain.backgroundColor = MaterialImages.texture(texture).cgColor
+            }
+        }
         guard grainLayer.opacity != target || glassGrain.opacity != target else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
@@ -280,3 +306,58 @@ struct WindowGlass: Equatable {
     var isClear: Bool
     var tint: NSColor?
 }
+
+#if DEBUG
+/// Debug only: other ways to build a clear glass window, to compare frame rates on a 120 Hz display (#394). Set with
+/// `-ZZGlassVariant <name>` at launch, `glassvariant <name>` or Debug › Glass Variant; never saved.
+enum GlassVariant: String, CaseIterable {
+    /// As shipped.
+    case current
+    /// No grain in the frame, the clear glass or the sidebar.
+    case noGrain
+    /// No shadows under the page cards.
+    case noCardShadow
+    case noGrainNoShadow
+    /// See-through window and Liquid Glass as shipped, with an opaque layer under each page card.
+    case opaqueUnderPage
+    /// Opaque window, Liquid Glass kept.
+    case opaqueGlass
+    /// See-through window, frosted glass instead of Liquid Glass.
+    case frostedSeeThrough
+    /// Opaque window, `NSVisualEffectView` behind the window (`-ZZGlassMaterial`, under-window background by default).
+    case visualEffect
+
+    static var now: GlassVariant = {
+        let args = ProcessInfo.processInfo.arguments
+        let name = args.firstIndex(of: "-ZZGlassVariant").flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil }
+        return name.flatMap(GlassVariant.init(rawValue:)) ?? .current
+    }()
+
+    /// For a clear glass space: whether the window stays see-through, and whether the glass is Liquid Glass.
+    var window: (seeThrough: Bool, liquid: Bool) {
+        switch self {
+        case .opaqueGlass: (false, true)
+        case .frostedSeeThrough: (true, false)
+        case .visualEffect: (false, false)
+        default: (true, true)
+        }
+    }
+
+    var dropsGrain: Bool { self == .noGrain || self == .noGrainNoShadow }
+    var dropsCardShadow: Bool { self == .noCardShadow || self == .noGrainNoShadow }
+    var backsPageOpaque: Bool { self == .opaqueUnderPage }
+
+    /// The frosting's material, when this variant picks one.
+    var material: NSVisualEffectView.Material? {
+        guard self == .visualEffect else { return nil }
+        let args = ProcessInfo.processInfo.arguments
+        let name = args.firstIndex(of: "-ZZGlassMaterial").flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil }
+        let materials: [String: NSVisualEffectView.Material] = [
+            "sidebar": .sidebar, "underWindowBackground": .underWindowBackground, "hudWindow": .hudWindow, "fullScreenUI": .fullScreenUI,
+            "headerView": .headerView, "windowBackground": .windowBackground, "menu": .menu, "popover": .popover, "titlebar": .titlebar,
+            "contentBackground": .contentBackground, "sheet": .sheet, "toolTip": .toolTip, "underPageBackground": .underPageBackground,
+        ]
+        return name.flatMap { materials[$0] } ?? .underWindowBackground
+    }
+}
+#endif

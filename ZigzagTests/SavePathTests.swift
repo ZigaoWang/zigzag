@@ -444,6 +444,58 @@ import Testing
         }
     }
 
+    /// Pinned or unpinned some other way than the star or ⌘D (the row's menu, a drag, ⌘Z): the star shows it too.
+    @Test func theStarFollowsAPinMadeFromTheRow() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let tab = Tab(url: URL(string: "https://example.com/row")!, spaceID: space)
+            manager.adopt([tab], in: space)
+            manager.select(tab)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            #expect(!controller.sidebar.address.isSaved)
+
+            controller.bookmarkWithUndo(tab, at: nil, in: space)
+            #expect(tab.bookmarkID != nil)
+            #expect(controller.sidebar.address.isSaved)
+
+            controller.sidebarUndo.undo()
+            #expect(tab.bookmarkID == nil)
+            #expect(!controller.sidebar.address.isSaved)
+
+            controller.bookmarkWithUndo(tab, at: nil, in: space)
+            controller.unbookmarkWithUndo(try #require(tab.bookmarkID), to: 0)
+            let unpinned = try #require(manager.selectedTab)
+            #expect(unpinned.bookmarkID == nil)
+            #expect(!controller.sidebar.address.isSaved)
+        }
+    }
+
+    /// Pin Tab and Pin Tab to Folder… in the menu bar are offered by the rule the star and the tab's menu use: not on
+    /// Zigzag's own views.
+    @Test func theMenuBarsPinFollowsTheStarsRule() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            let page = Tab(url: try #require(URL(string: "https://example.com/menu")), title: "Page", spaceID: space)
+            manager.adopt([settings, page], in: space)
+            manager.select(settings)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let pin = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleBookmark(_:)), keyEquivalent: "")
+            let folder = NSMenuItem(title: "", action: #selector(BrowserWindowController.savePageToFolder(_:)), keyEquivalent: "")
+            #expect(!AddressView.canSave(for: settings))
+            #expect(!controller.validateMenuItem(pin))
+            #expect(!controller.validateMenuItem(folder))
+            manager.select(page)
+            #expect(AddressView.canSave(for: page))
+            #expect(controller.validateMenuItem(pin))
+            #expect(controller.validateMenuItem(folder))
+        }
+    }
+
     // MARK: Names
 
     /// A page saved is called what the page says, with a home page shaved down to its site; the picker's name wins.
@@ -529,5 +581,73 @@ import Testing
         #expect(!address.saveButton.isHidden)
         address.setSaved(true, canSave: SavePath.Page(tab: settings) != nil)
         #expect(address.saveButton.isHidden)
+    }
+
+    /// A pinned tab gone to a Zigzag view or about:blank still unpins with ⌘D and keeps its filled star; a new pin of
+    /// one is still refused (#472).
+    @Test func aPinnedTabShowingAZigzagViewStillUnpins() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let blank = Tab(url: try #require(URL(string: "about:blank")), title: "Blank", spaceID: space)
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            manager.adopt([blank, settings], in: space)
+            manager.select(blank)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            #expect(!controller.save(settings, request: .quick))
+            #expect(settings.bookmarkID == nil)
+            #expect(!AddressView.canSave(for: blank))
+
+            let pinned = SavePath.Page(url: try #require(URL(string: "https://example.com/pinned")), title: "Pinned", tab: blank)
+            let saved = try #require(SavePath.save(pinned, to: SavePath.quickPlace(in: space), in: manager))
+            #expect(blank.bookmarkID == saved.id)
+            #expect(AddressView.canSave(for: blank))
+            let address = AddressView()
+            address.setSaved(true, canSave: AddressView.canSave(for: blank))
+            #expect(!address.saveButton.isHidden)
+            #expect(address.saveButton.symbol == "star.fill")
+
+            #expect(controller.save(blank, request: .quick))
+            #expect(blank.bookmarkID == nil)
+            #expect(library.bookmark(saved.id) == nil)
+        }
+    }
+
+    /// Dragged into Pinned, onto a folder or a pinned page, into the favorites, or from the command bar, a Zigzag view
+    /// stays a tab (#472). A page split beside one doesn't take it along either.
+    @Test func zigzagsOwnViewsCannotBeDraggedIntoPinned() throws {
+        try scratch { space, _, folder in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let settings = Tab(url: try #require(URL(string: "zigzag://settings")), title: "Settings", spaceID: space)
+            let page = Tab(url: try #require(URL(string: "https://example.com/drag")), title: "Example", spaceID: space)
+            manager.adopt([settings, page], in: space)
+            manager.select(settings)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let pinned = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/pinned")!, title: "Pinned", to: space))
+            let before = Library.shared.bookmarks(in: space).count
+            #expect(!manager.canPin(settings))
+            #expect(!SidebarListView.pinnable([.tab(settings.id)], in: manager))
+            #expect(!SidebarListView.pinnable([.tab(page.id), .tab(settings.id)], in: manager))
+            #expect(SidebarListView.pinnable([.tab(page.id), .bookmark(pinned.id), .folder(folder.id)], in: manager))
+            controller.listBookmark(settings, at: 0, in: space)
+            controller.listPinSplit(settings, onto: pinned.id, tabOnRight: true)
+            controller.favoriteWithUndo(settings)
+            controller.fileMarked([.tab(settings.id)], in: folder.id)
+            #expect(settings.bookmarkID == nil && !settings.isFavorite)
+            #expect(Library.shared.bookmarks(in: space).count == before)
+            let actions = CommandRanker.contextActions(CommandRanker.context(for: manager)).map(\.id)
+            #expect(!actions.contains("pin") && !actions.contains("pin-to-folder") && !actions.contains("favorite"))
+            // Split beside Settings, the page would bring it into Pinned with it.
+            manager.select(page)
+            #expect(CommandRanker.contextActions(CommandRanker.context(for: manager)).map(\.id).contains("pin"))
+            try #require(manager.canSplit(page, with: settings))
+            manager.makeSplit(page, with: settings)
+            #expect(!manager.canPin(page))
+            controller.bookmarkWithUndo(page, at: nil, in: space)
+            #expect(page.bookmarkID == nil && settings.bookmarkID == nil)
+        }
     }
 }

@@ -8,6 +8,12 @@ import WebKit
 /// The page's text is read and written back in Zigzag's own script world, so the page's scripts can't see
 /// or interfere; the original words are kept so "Show Original" puts them back exactly.
 enum PageTranslator {
+    /// The address bar's translate button shows for a foreign page, not one whose language or site is never
+    /// translated; a translated page keeps it, to show the original.
+    nonisolated static func offersButton(foreign: Bool, translated: Bool, never: Bool) -> Bool {
+        translated || (foreign && !never)
+    }
+
     /// The language pages are translated into: chosen in Settings, or the system's first language.
     static var readerLanguage: Locale.Language {
         if let chosen = UserDefaults.standard.string(forKey: "TranslateInto") { return Locale.Language(identifier: chosen) }
@@ -28,18 +34,98 @@ enum PageTranslator {
 
     /// Languages translated without asking, by language code ("zh", "ja").
     static var alwaysLanguages: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: "TranslateAlways") ?? []) }
-        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: "TranslateAlways") }
+        get { Choices().alwaysLanguages }
+        set { Choices().alwaysLanguages = newValue }
     }
 
     nonisolated static func code(of language: Locale.Language) -> String { language.languageCode?.identifier ?? language.minimalIdentifier }
 
     static func translatesAlways(_ language: Locale.Language) -> Bool { alwaysLanguages.contains(code(of: language)) }
 
-    static func setTranslatesAlways(_ always: Bool, _ language: Locale.Language) {
-        var set = alwaysLanguages
-        if always { set.insert(code(of: language)) } else { set.remove(code(of: language)) }
-        alwaysLanguages = set
+    static func setTranslatesAlways(_ always: Bool, _ language: Locale.Language) { Choices().setAlways(always, code(of: language)) }
+
+    /// An Always or Never choice changed, from the translate menu or Settings, in any window.
+    static let choicesChanged = Signal<Void>()
+
+    /// Always and Never Translate choices, by language code and by site.
+    struct Choices {
+        var defaults: UserDefaults = .standard
+
+        var alwaysLanguages: Set<String> {
+            get { read("TranslateAlways") }
+            nonmutating set { write(newValue, "TranslateAlways") }
+        }
+        var neverLanguages: Set<String> {
+            get { read("TranslateNever") }
+            nonmutating set { write(newValue, "TranslateNever") }
+        }
+        var neverSites: Set<String> {
+            get { read("TranslateNeverSites") }
+            nonmutating set { write(newValue, "TranslateNeverSites") }
+        }
+
+        private func read(_ key: String) -> Set<String> { Set(defaults.stringArray(forKey: key) ?? []) }
+        private func write(_ value: Set<String>, _ key: String) {
+            if value.isEmpty { defaults.removeObject(forKey: key) } else { defaults.set(value.sorted(), forKey: key) }
+            PageTranslator.choicesChanged.send()
+        }
+
+        /// A language is either always or never translated, not both.
+        func setAlways(_ on: Bool, _ code: String) {
+            if on { alwaysLanguages.insert(code); neverLanguages.remove(code) } else { alwaysLanguages.remove(code) }
+        }
+
+        func setNever(_ on: Bool, _ code: String) {
+            if on { neverLanguages.insert(code); alwaysLanguages.remove(code) } else { neverLanguages.remove(code) }
+        }
+
+        /// A private window keeps no list of sites: returns false and writes nothing there.
+        @discardableResult
+        func setNeverSite(_ on: Bool, _ site: String, isPrivate: Bool) -> Bool {
+            guard !isPrivate else { return false }
+            if on { neverSites.insert(site) } else { neverSites.remove(site) }
+            return true
+        }
+
+        /// One line of the lists in Settings › Translation.
+        enum Entry: Hashable {
+            case always(String), neverLanguage(String), neverSite(String)
+        }
+
+        /// Always first, then Never: languages by name, then sites.
+        func entries(name: (String) -> String) -> (always: [Entry], never: [Entry]) {
+            func byName(_ codes: Set<String>) -> [String] { codes.sorted { name($0).localizedStandardCompare(name($1)) == .orderedAscending } }
+            return (byName(alwaysLanguages).map(Entry.always),
+                    byName(neverLanguages).map(Entry.neverLanguage) + neverSites.sorted().map(Entry.neverSite))
+        }
+
+        func remove(_ entry: Entry) {
+            switch entry {
+            case .always(let code): alwaysLanguages.remove(code)
+            case .neverLanguage(let code): neverLanguages.remove(code)
+            case .neverSite(let site): neverSites.remove(site)
+            }
+        }
+
+        /// What happens on its own when a page in `language` opens on `site`. Never beats everything, in every window;
+        /// a site translated this session keeps translating; then Always; otherwise the offer, on each page until
+        /// it's closed for the site (`declined`).
+        func automatic(language: Locale.Language, site: String, translatedHere: Bool, neverHere: Set<String> = [],
+                       offers: Bool, declined: Bool) -> Automatic {
+            if neverSites.contains(site) || neverHere.contains(site) { return .nothing }
+            let code = PageTranslator.code(of: language)
+            if neverLanguages.contains(code) { return .nothing }
+            if translatedHere || alwaysLanguages.contains(code) { return .translate }
+            return offers && !declined ? .offer : .nothing
+        }
+    }
+
+    enum Automatic: Equatable { case translate, offer, nothing }
+
+    /// The sites translated this session, after a Never choice: the site chosen, or every site translated from the
+    /// language chosen, stops translating its pages on its own, so the Never holds at once.
+    static func translated(_ sites: [String: Locale.Language], neverSite site: String? = nil, neverLanguage code: String? = nil) -> [String: Locale.Language] {
+        sites.filter { entry in entry.key != site && (code == nil || self.code(of: entry.value) != code) }
     }
 
     /// Languages Apple can translate into on this Mac, by name, for the Settings menu.
@@ -65,10 +151,21 @@ enum PageTranslator {
         await foreign(await pageLanguage(of: webView))
     }
 
-    /// The language, when it isn't the reader's and Apple can translate it.
+    /// The language, when it isn't one the reader reads and Apple can translate it.
     static func foreign(_ language: Locale.Language?) async -> Locale.Language? {
-        guard let language, language.languageCode != readerLanguage.languageCode else { return nil }
+        guard let language, isForeign(language, readers: readerLanguages, always: alwaysLanguages) else { return nil }
         return await canTranslate(from: language, to: readerLanguage) ? language : nil
+    }
+
+    /// The language pages are translated into, then every language in the system's list.
+    static var readerLanguages: [Locale.Language] {
+        [readerLanguage] + Locale.preferredLanguages.map { Locale.Language(identifier: $0) }
+    }
+
+    /// Not one of `readers` by base language (en-IN is English), unless it's set to Always Translate.
+    nonisolated static func isForeign(_ language: Locale.Language, readers: [Locale.Language], always: Set<String>) -> Bool {
+        if always.contains(code(of: language)) { return true }
+        return !readers.contains { code(of: $0) == code(of: language) }
     }
 
     /// "Translate to English", for the page's right-click menu and a tab's in the sidebar; "Show Original" once
@@ -146,7 +243,8 @@ enum PageTranslator {
 
     private nonisolated static let legacyCodes = ["iw": "he", "in": "id", "ji": "yi", "no": "nb"]
 
-    /// Text amount per language, and in total; blocks too short or too uncertain are skipped.
+    /// Text amount per language, and in total; blocks too short, too uncertain or not in the language's script are
+    /// skipped.
     private nonisolated static func tally(_ blocks: [String]) -> (amounts: [NLLanguage: Int], total: Int) {
         var amounts: [NLLanguage: Int] = [:]
         var total = 0
@@ -157,11 +255,49 @@ enum PageTranslator {
             recognizer.reset()
             recognizer.processString(String(block.prefix(600)))
             guard let (code, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, code != .undetermined,
-                  confidence >= 0.5 else { continue }
+                  confidence >= neededConfidence(block), fits(Locale.Language(identifier: code.rawValue), block) else { continue }
             amounts[code, default: 0] += amount
             total += amount
         }
         return (amounts, total)
+    }
+
+    /// A short line of Latin letters (names, a menu) is often guessed at about half confidence, so it needs more.
+    private nonisolated static func neededConfidence(_ text: String) -> Double {
+        let letters = text.unicodeScalars.filter(\.properties.isAlphabetic)
+        return letters.count < 60 && letters.allSatisfy(isLatin) ? 0.8 : 0.5
+    }
+
+    /// Whether the text is mostly in the language's script: a list of language names in many scripts isn't Marathi.
+    nonisolated static func fits(_ language: Locale.Language, _ text: String) -> Bool {
+        guard let script = script(of: language) else { return true }
+        let letters = text.unicodeScalars.filter(\.properties.isAlphabetic)
+        if script == "Latn" { return letters.filter(isLatin).count * 2 >= letters.count }
+        let accepted = scriptsWriting[script] ?? [script]
+        guard !accepted.isDisjoint(with: scriptRanges.map(\.script) + ["Hani"]) else { return true }
+        let others = letters.compactMap(scriptName(of:)).filter { $0 != "Latn" }
+        return !others.isEmpty && others.filter(accepted.contains).count * 5 >= others.count * 4
+    }
+
+    private nonisolated static let scriptsWriting: [String: Set<String>] = ["Hans": ["Hani"], "Hant": ["Hani"], "Jpan": ["Hani", "Kana"], "Kore": ["Hang", "Hani"]]
+
+    /// ISO 15924 codes of the scripts told apart here, by code point.
+    private nonisolated static let scriptRanges: [(range: ClosedRange<UInt32>, script: String)] = [
+        (0x0370...0x03FF, "Grek"), (0x1F00...0x1FFF, "Grek"), (0x0400...0x052F, "Cyrl"), (0x1C80...0x1C8F, "Cyrl"),
+        (0x0530...0x058F, "Armn"), (0x0590...0x05FF, "Hebr"), (0xFB1D...0xFB4F, "Hebr"), (0x0600...0x06FF, "Arab"),
+        (0x0750...0x077F, "Arab"), (0x08A0...0x08FF, "Arab"), (0xFB50...0xFDFF, "Arab"), (0xFE70...0xFEFF, "Arab"),
+        (0x0900...0x097F, "Deva"), (0x0980...0x09FF, "Beng"), (0x0A00...0x0A7F, "Guru"), (0x0A80...0x0AFF, "Gujr"),
+        (0x0B00...0x0B7F, "Orya"), (0x0B80...0x0BFF, "Taml"), (0x0C00...0x0C7F, "Telu"), (0x0C80...0x0CFF, "Knda"),
+        (0x0D00...0x0D7F, "Mlym"), (0x0D80...0x0DFF, "Sinh"), (0x0E00...0x0E7F, "Thai"), (0x0E80...0x0EFF, "Laoo"),
+        (0x0F00...0x0FFF, "Tibt"), (0x1000...0x109F, "Mymr"), (0x10A0...0x10FF, "Geor"), (0x1200...0x139F, "Ethi"),
+        (0x1780...0x17FF, "Khmr"), (0x3040...0x30FF, "Kana"), (0x31F0...0x31FF, "Kana"), (0xFF66...0xFF9F, "Kana"),
+        (0x1100...0x11FF, "Hang"), (0x3130...0x318F, "Hang"), (0xA960...0xA97F, "Hang"), (0xAC00...0xD7AF, "Hang"),
+    ]
+
+    private nonisolated static func scriptName(of scalar: Unicode.Scalar) -> String? {
+        if isLatin(scalar) { return "Latn" }
+        if scalar.properties.isIdeographic { return "Hani" }
+        return scriptRanges.first { $0.range.contains(scalar.value) }?.script
     }
 
     /// How much text this is, an ideograph, kana or hangul syllable counting as a few letters (each is about a
@@ -189,7 +325,7 @@ enum PageTranslator {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(sample)
         guard let (code, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, confidence > 0.8,
-              code != .undetermined else { return nil }
+              code != .undetermined, fits(Locale.Language(identifier: code.rawValue), sample) else { return nil }
         return Locale.Language(identifier: code.rawValue)
     }
 
@@ -607,6 +743,33 @@ extension PageTranslator {
     static func isInView(_ tab: AnyObject, selected: AnyObject?) -> Bool { selected === tab }
 }
 
+/// Translations made so far, kept until Zigzag quits, so text met again (a site's menus on its next page, a page
+/// translated again) goes straight in. A private tab keeps its own, gone with its translation.
+final class TranslationMemory {
+    static let shared = TranslationMemory()
+
+    struct Key: Hashable {
+        let source: String, target: String, text: String
+
+        init(_ text: String, from source: Locale.Language, to target: Locale.Language) {
+            self.source = source.minimalIdentifier
+            self.target = target.minimalIdentifier
+            self.text = text
+        }
+    }
+
+    private static let limit = 5000
+    private var known: [Key: String] = [:]
+
+    subscript(key: Key) -> String? {
+        get { known[key] }
+        set {
+            if known.count >= Self.limit { known.removeAll() }
+            known[key] = newValue
+        }
+    }
+}
+
 /// The Translation framework hands out sessions through a SwiftUI task, so each translation keeps an invisible host
 /// for it, in its window. It also gives macOS a window to show its own "download this language?" prompt on.
 @MainActor
@@ -627,11 +790,12 @@ final class TranslationHost {
 
     /// Translates the pieces of the page in a web view, a language at a time, into `target`. `pieces` are the
     /// page's text as `PageTranslator.text(in:)` read it, and each group names the pieces in one language.
+    /// Text in `memory` goes straight in, and other text is translated once however often it's on the page.
     /// Calls back with what happened.
     func translate(_ webView: WKWebView, pieces: [String], shown: Set<Int> = [], groups: [PageTranslator.Group], into target: Locale.Language,
-                   progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
+                   memory: TranslationMemory = TranslationMemory(), progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let first = groups.first else { completion(.success(())); return }
-        model.job = Job(webView: webView, url: webView.url, pieces: pieces, shown: shown, groups: groups, target: target,
+        model.job = Job(webView: webView, url: webView.url, pieces: pieces, shown: shown, groups: groups, target: target, memory: memory,
                         total: groups.reduce(0) { $0 + $1.pieces.count }, progress: progress, completion: completion)
         model.start(from: first.source, to: target)
     }
@@ -647,6 +811,7 @@ final class TranslationHost {
         let shown: Set<Int>
         let groups: [PageTranslator.Group]
         let target: Locale.Language
+        let memory: TranslationMemory
         let total: Int
         /// The group being translated now, and how many pieces are done before it.
         var current = 0
@@ -675,10 +840,29 @@ final class TranslationHost {
             self.job = nil
             guard let webView = job.webView, webView.url == job.url else { job.completion(.failure(Cancelled())); return }
             let group = job.groups[job.current]
+            let key = { [job] (text: String) in TranslationMemory.Key(text, from: group.source, to: job.target) }
+            // Text already translated goes in now; the rest is asked for once, for every place it's in.
+            var known: [Int: String] = [:]
+            var places: [String: [Int]] = [:]
+            var asking: [Int] = []
+            for index in group.pieces where index < job.pieces.count {
+                let text = job.pieces[index]
+                if let translation = job.memory[key(text)] {
+                    known[index] = translation
+                } else {
+                    if places[text] == nil { asking.append(index) }
+                    places[text, default: []].append(index)
+                }
+            }
+            var finished = known.count
+            if !known.isEmpty {
+                await PageTranslator.apply(known, in: webView)
+                if isCancelled { return }
+                job.progress(Double(job.done + finished) / Double(max(job.total, 1)))
+            }
             do {
                 // On-screen text first, in small batches, each put in the page as it comes back.
-                var finished = 0
-                for chunk in PageTranslator.batches(group.pieces, pieces: job.pieces, shown: job.shown) {
+                for chunk in PageTranslator.batches(asking, pieces: job.pieces, shown: job.shown) {
                     // The framework hands the session to this task alone, and it's used one batch at a time;
                     // its types just aren't marked as safe to pass to the framework's own executor.
                     nonisolated(unsafe) let requests = chunk.compactMap { index in
@@ -687,12 +871,17 @@ final class TranslationHost {
                     nonisolated(unsafe) let session = session
                     let responses = try await session.translations(from: requests)
                     var translated: [Int: String] = [:]
-                    for response in responses { if let id = response.clientIdentifier.flatMap(Int.init) { translated[id] = response.targetText } }
+                    for response in responses {
+                        guard let id = response.clientIdentifier.flatMap(Int.init), id < job.pieces.count else { continue }
+                        let text = job.pieces[id]
+                        job.memory[key(text)] = response.targetText
+                        for place in places[text] ?? [] { translated[place] = response.targetText }
+                    }
                     // Cancelled meanwhile: quietly, with nothing more put in the page.
                     if isCancelled { return }
                     guard webView.url == job.url else { throw Cancelled() }
                     await PageTranslator.apply(translated, in: webView)
-                    finished += chunk.count
+                    finished += chunk.reduce(0) { $0 + (places[job.pieces[$1]]?.count ?? 0) }
                     job.progress(Double(job.done + finished) / Double(max(job.total, 1)))
                 }
             } catch {

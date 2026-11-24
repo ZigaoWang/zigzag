@@ -641,6 +641,24 @@ import WebKit
         #expect(dark > 0 && dark < 12, "\(dark) dark pictures asked for")
     }
 
+    /// A window looks for a viewer under its scrolls only while one is in it.
+    @Test @MainActor func aWindowKnowsWhetherAViewerIsInIt() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
+        let other = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        other.isReleasedWhenClosed = false
+        let view = ZigzagPDFView()
+        #expect(!ZigzagPDFView.isShown(in: window))
+        window.contentView?.addSubview(view)
+        #expect(ZigzagPDFView.isShown(in: window))
+        #expect(!ZigzagPDFView.isShown(in: other))
+        other.contentView?.addSubview(view)
+        #expect(!ZigzagPDFView.isShown(in: window))
+        #expect(ZigzagPDFView.isShown(in: other))
+        view.removeFromSuperview()
+        #expect(!ZigzagPDFView.isShown(in: other))
+    }
+
     // MARK: Find
 
     @Test func findLooksThroughEveryPageAndAnOlderSearchStops() async {

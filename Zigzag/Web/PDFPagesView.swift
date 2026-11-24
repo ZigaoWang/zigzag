@@ -496,11 +496,23 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
 
     /// The pieces of a page that cover `rect` (in its points) at `level`.
     private func chunkRange(page: Int, level: Int, covering rect: CGRect) -> (columns: ClosedRange<Int>, rows: ClosedRange<Int>)? {
-        let clipped = rect.intersection(CGRect(origin: .zero, size: pageSizes[page]))
-        guard !clipped.isNull, clipped.width > 0, clipped.height > 0 else { return nil }
-        let side = pointsPerChunk(level)
-        let columns = Int(floor(clipped.minX / side))...Int(floor((clipped.maxX - 0.001) / side))
-        let rows = Int(floor(clipped.minY / side))...Int(floor((clipped.maxY - 0.001) / side))
+        guard pageSizes.indices.contains(page) else { return nil }
+        return Self.chunkRange(of: rect, pageSize: pageSizes[page], side: pointsPerChunk(level))
+    }
+
+    /// The columns and rows of `side`-point pieces of a `pageSize` page that `rect` covers; nil for nothing, or a
+    /// rect or side that isn't a real size (#507: a sliver thinner than the edge allowance made a backwards range).
+    nonisolated static func chunkRange(of rect: CGRect, pageSize: CGSize, side: CGFloat) -> (columns: ClosedRange<Int>, rows: ClosedRange<Int>)? {
+        guard side.isFinite, side > 0 else { return nil }
+        let clipped = rect.intersection(CGRect(origin: .zero, size: pageSize))
+        guard !clipped.isNull, clipped.width > 0, clipped.height > 0,
+              [clipped.minX, clipped.maxX, clipped.minY, clipped.maxY].allSatisfy(\.isFinite) else { return nil }
+        func span(_ low: CGFloat, _ high: CGFloat) -> ClosedRange<Int>? {
+            let first = (low / side).rounded(.down), last = ((high - 0.001) / side).rounded(.down)
+            guard first.magnitude < 1e9, last.magnitude < 1e9 else { return nil }
+            return Int(first)...max(Int(first), Int(last))
+        }
+        guard let columns = span(clipped.minX, clipped.maxX), let rows = span(clipped.minY, clipped.maxY) else { return nil }
         return (columns, rows)
     }
 
@@ -545,8 +557,18 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if window == nil { Self.inWindows.remove(self) } else { Self.inWindows.add(self) }
         // A tab in the back keeps only a little of what it drew; back in front, it asks again.
         if window == nil { trimChunks(to: Self.chunkLimitAway) } else { refreshLayers(); refresh() }
+    }
+
+    /// Viewers in a window now, so a window without one skips looking for one under each scroll.
+    private static let inWindows = NSHashTable<ZigzagPDFView>.weakObjects()
+
+    /// Whether a viewer is in `window`.
+    static func isShown(in window: NSWindow) -> Bool {
+        guard inWindows.count > 0 else { return false }
+        return inWindows.allObjects.contains { $0.window === window }
     }
 
     private func darkChanged() {

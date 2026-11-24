@@ -1580,3 +1580,271 @@ struct ServiceWorkerRegistrationTests {
         #expect(scripts(at: file) == ["https://example.com/sw.js"])
     }
 }
+
+/// A message nothing listens for fails as in Chrome ("Receiving end does not exist"), where WebKit answers undefined.
+extension ExtensionScriptTests {
+    /// A fake background for bridge.js: WebKit's tabs.sendMessage answers `__answer` (undefined, as WebKit answers
+    /// when nothing listens), and each frame in `__frames` says whether it listens when the receivers file runs there
+    /// (null: executeScript refuses).
+    private static func receiverWorld(version: Int = 3) -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        let file = ExtensionBridgeScript.receiversFile, mark = ExtensionBridgeScript.receiversMark
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var console = { log: () => {}, warn: () => {}, error: () => {} };
+        const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false });
+        var __sent = [], __injected = [], __answer, __frames = [false], __registered = [];
+        const ran = (details) => {
+          __injected.push(details);
+          if (__frames === null) return Promise.reject(new Error('Cannot access contents of the page'));
+          const files = details.files || (details.file ? [details.file] : ['code']);
+          const out = [];
+          __frames.forEach((listens, frameId) => { for (const file of files) out.push({ frameId, result: file === '\(file)' ? '\(mark)' + listens : 'ran ' + file }); });
+          return Promise.resolve(out);
+        };
+        var chrome = {
+          runtime: { id: 'x', getManifest: () => ({ manifest_version: \(version), permissions: ['tabs', 'scripting'] }),
+                     sendNativeMessage: () => Promise.resolve({ value: null }),
+                     connectNative: () => ({ onMessage: event(), onDisconnect: event(), postMessage: () => {} }) },
+          tabs: { sendMessage: (...args) => { __sent.push(args); return Promise.resolve(__answer); } },
+        };
+        if (\(version) === 3) chrome.scripting = {
+          executeScript: (injection) => ran(injection),
+          registerContentScripts: (scripts) => { __registered = scripts; return Promise.resolve(); },
+          updateContentScripts: (scripts) => { __registered = scripts; return Promise.resolve(); },
+          getRegisteredContentScripts: () => Promise.resolve(__registered),
+        };
+        else chrome.tabs.executeScript = (tabId, details) => (typeof tabId === 'object' ? ran(tabId) : ran(details));
+        var browser = chrome;
+        """)
+        context.evaluateScript(ExtensionBridgeScript.source)
+        return context
+    }
+
+    private static func settle(_ context: JSContext) { for _ in 0..<5 { context.evaluateScript("0") } }
+
+    @Test func aTabMessageNothingHearsFails() {
+        let context = Self.receiverWorld()
+        let none = ExtensionBridgeScript.noReceiver
+        // No frame listens: the promise fails with Chrome's error.
+        context.evaluateScript("__frames = [false, false]; chrome.tabs.sendMessage(1, { a: 1 }).then((v) => { globalThis.__one = 'answered ' + v; }, (e) => { globalThis.__one = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__one").toString() == none)
+        #expect(context.evaluateScript("JSON.stringify(__injected[0])").toString() == #"{"target":{"tabId":1,"allFrames":true},"files":["\#(ExtensionBridgeScript.receiversFile)"]}"#)
+        // A callback gets nothing, and runtime.lastError says why while it runs.
+        context.evaluateScript("chrome.tabs.sendMessage(1, {}, (v) => { globalThis.__two = [v === undefined, chrome.runtime.lastError && chrome.runtime.lastError.message]; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__two[0]").toBool() == true)
+        #expect(context.evaluateScript("__two[1]").toString() == none)
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool() == true)
+        // A frame it names, or a document: only that one is asked; a frame that isn't there fails too.
+        context.evaluateScript("__frames = []; chrome.tabs.sendMessage(1, {}, { frameId: 5 }).catch((e) => { globalThis.__three = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__three").toString() == none)
+        #expect(context.evaluateScript("JSON.stringify(__injected[__injected.length - 1].target)").toString() == #"{"tabId":1,"frameIds":[5]}"#)
+        context.evaluateScript("chrome.tabs.sendMessage(1, {}, { documentId: 'd' }).catch(() => {});")
+        Self.settle(context)
+        #expect(context.evaluateScript("JSON.stringify(__injected[__injected.length - 1].target)").toString() == #"{"tabId":1,"documentIds":["d"]}"#)
+        // The options go on to WebKit as they were.
+        #expect(context.evaluateScript("JSON.stringify(__sent[__sent.length - 1])").toString() == #"[1,{},{"documentId":"d"}]"#)
+    }
+
+    @Test func aTabMessageHeardButUnansweredIsUndefined() {
+        let context = Self.receiverWorld()
+        // A frame listens and gives no answer: undefined, no error, either way.
+        context.evaluateScript("""
+        __frames = [false, true];
+        chrome.tabs.sendMessage(2, {}).then((v) => { globalThis.__one = v === undefined ? 'undefined' : v; }, (e) => { globalThis.__one = e.message; });
+        """)
+        Self.settle(context)
+        #expect(context.evaluateScript("__one").toString() == "undefined")
+        // Found lately: not asked again.
+        context.evaluateScript("var __asked = __injected.length; chrome.tabs.sendMessage(2, {}, (v) => { globalThis.__two = chrome.runtime.lastError ? 'error' : 'none'; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__two").toString() == "none")
+        #expect(context.evaluateScript("__injected.length === __asked").toBool() == true)
+        // An answer is the answer, and nothing is asked.
+        context.evaluateScript("__answer = 'hi'; chrome.tabs.sendMessage(3, {}).then((v) => { globalThis.__three = v; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__three").toString() == "hi")
+        #expect(context.evaluateScript("__injected.length === __asked").toBool() == true)
+        // Where the frames can't be asked, it stays WebKit's undefined.
+        context.evaluateScript("__answer = undefined; __frames = null; chrome.tabs.sendMessage(4, {}).then((v) => { globalThis.__four = v === undefined ? 'undefined' : v; }, (e) => { globalThis.__four = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__four").toString() == "undefined")
+    }
+
+    @Test func injectedAndRegisteredFilesAreCounted() {
+        let context = Self.receiverWorld()
+        let file = ExtensionBridgeScript.receiversFile
+        // The receivers file goes first; the extension is told only of its own files.
+        context.evaluateScript("__frames = [false, false]; chrome.scripting.executeScript({ target: { tabId: 1, allFrames: true }, files: ['a.js', 'b.js'] }).then((r) => { globalThis.__one = r.map((x) => x.frameId + ':' + x.result).join(); });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__one").toString() == "0:ran a.js,0:ran b.js,1:ran a.js,1:ran b.js")
+        #expect(context.evaluateScript("__injected[0].files.join()").toString() == "\(file),a.js,b.js")
+        context.evaluateScript("chrome.scripting.executeScript({ target: { tabId: 1 }, files: ['a.js'] }, (r) => { globalThis.__two = r.length; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__two").toInt32() == 2)
+        // The page's own world is left alone; a function gets the file just before it, in the same frames.
+        context.evaluateScript("chrome.scripting.executeScript({ target: { tabId: 1 }, files: ['m.js'], world: 'MAIN' }); chrome.scripting.executeScript({ target: { tabId: 1, frameIds: [2] }, func: () => 1 });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__injected[2].files.join()").toString() == "m.js")
+        #expect(context.evaluateScript("JSON.stringify(__injected[3])").toString() == #"{"target":{"tabId":1,"frameIds":[2]},"files":["\#(file)"]}"#)
+        #expect(context.evaluateScript("__injected[4].files === undefined && typeof __injected[4].func === 'function'").toBool() == true)
+        context.evaluateScript("chrome.scripting.executeScript({ target: { tabId: 1 }, func: () => 1, world: 'MAIN' });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__injected.length").toInt32() == 6)
+        // Registered scripts: registered with the file first, shown as the extension registered them.
+        context.evaluateScript("""
+        chrome.scripting.registerContentScripts([{ id: 'a', matches: ['<all_urls>'], js: ['c.js'] }, { id: 'm', matches: ['<all_urls>'], js: ['m.js'], world: 'MAIN' }, { id: 'css', matches: ['<all_urls>'], css: ['c.css'] }]);
+        """)
+        Self.settle(context)
+        #expect(context.evaluateScript("__registered.map((s) => (s.js || []).join('+')).join()").toString() == "\(file)+c.js,m.js,")
+        context.evaluateScript("chrome.scripting.getRegisteredContentScripts().then((list) => { globalThis.__three = list.map((s) => (s.js || []).join('+')).join(); });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__three").toString() == "c.js,m.js,")
+        context.evaluateScript("chrome.scripting.updateContentScripts([{ id: 'a', js: ['d.js'] }, { id: 'm', matches: ['https://example.com/*'] }]);")
+        Self.settle(context)
+        #expect(context.evaluateScript("__registered.map((s) => (s.js || []).join('+')).join()").toString() == "\(file)+d.js,")
+    }
+
+    @Test func manifestV2TabsAskWithTabsExecuteScript() {
+        let context = Self.receiverWorld(version: 2)
+        let file = ExtensionBridgeScript.receiversFile
+        context.evaluateScript("chrome.tabs.sendMessage(1, {}).catch((e) => { globalThis.__one = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__one").toString() == ExtensionBridgeScript.noReceiver)
+        #expect(context.evaluateScript("JSON.stringify(__injected[0])").toString() == #"{"file":"\#(file)","allFrames":true}"#)
+        // Its injections: the file is run just before, in the same frames.
+        context.evaluateScript("chrome.tabs.executeScript(1, { file: 'a.js', frameId: 3 }); chrome.tabs.executeScript({ code: '1' });")
+        Self.settle(context)
+        #expect(context.evaluateScript("JSON.stringify(__injected.slice(1))").toString()
+                == #"[{"file":"\#(file)","frameId":3},{"file":"a.js","frameId":3},{"file":"\#(file)"},{"code":"1"}]"#)
+    }
+
+    /// The content-script world's part: its onMessage listeners counted, and runtime.sendMessage checked.
+    private static func contentWorld() -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        const event = () => { const l = []; return { addListener: (f) => { if (!l.includes(f)) l.push(f); }, removeListener: (f) => { const i = l.indexOf(f); if (i >= 0) l.splice(i, 1); }, hasListener: (f) => l.includes(f) }; };
+        var __answer, __probe, __sent = [];
+        var chrome = { runtime: { id: 'x', onMessage: event(),
+          sendMessage: (...args) => { __sent.push(args); return Promise.resolve(args[0] && args[0].\(ExtensionBridgeScript.receiverProbe) ? __probe : __answer); } } };
+        var browser = chrome;
+        """)
+        return context
+    }
+
+    @Test func contentScriptsCountTheirListeners() {
+        let context = Self.contentWorld()
+        let mark = ExtensionBridgeScript.receiversMark
+        #expect(context.evaluateScript(ExtensionBridgeScript.receivers).toString() == mark + "false")
+        context.evaluateScript("var __f = () => {}; chrome.runtime.onMessage.addListener(__f);")
+        #expect(context.evaluateScript(ExtensionBridgeScript.receivers).toString() == mark + "true")
+        // Once per world: run again, it keeps the count it had.
+        context.evaluateScript("chrome.runtime.onMessage.removeListener(__f);")
+        #expect(context.evaluateScript(ExtensionBridgeScript.receivers).toString() == mark + "false")
+        #expect(context.evaluateScript("chrome.runtime.onMessage.hasListener(__f)").toBool() == false)
+        // The whole prelude for content scripts carries it.
+        #expect(ExtensionStore.contentScriptsFirst.contains(ExtensionBridgeScript.receivers))
+    }
+
+    @Test func aRuntimeMessageNothingHearsFails() {
+        let context = Self.contentWorld()
+        context.evaluateScript(ExtensionBridgeScript.receivers)
+        let none = ExtensionBridgeScript.noReceiver
+        // Unanswered, and no page of the extension listens.
+        context.evaluateScript("chrome.runtime.sendMessage({ a: 1 }).then(() => { globalThis.__one = 'answered'; }, (e) => { globalThis.__one = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__one").toString() == none)
+        context.evaluateScript("chrome.runtime.sendMessage({ a: 1 }, (v) => { globalThis.__two = [v === undefined, chrome.runtime.lastError && chrome.runtime.lastError.message]; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__two[1]").toString() == none)
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool() == true)
+        // To its own ID, the same.
+        context.evaluateScript("chrome.runtime.sendMessage('x', {}).catch((e) => { globalThis.__three = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__three").toString() == none)
+        // To another extension: left as WebKit has it.
+        context.evaluateScript("chrome.runtime.sendMessage('other', {}).then((v) => { globalThis.__four = v === undefined ? 'undefined' : v; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__four").toString() == "undefined")
+        // A page listens and gives no answer: undefined, no error; then trusted for a while.
+        context.evaluateScript("__probe = true; chrome.runtime.sendMessage({}).then((v) => { globalThis.__five = v === undefined ? 'undefined' : v; }, (e) => { globalThis.__five = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__five").toString() == "undefined")
+        context.evaluateScript("__probe = undefined; var __count = __sent.length; chrome.runtime.sendMessage({}, () => { globalThis.__six = chrome.runtime.lastError ? 'error' : 'none'; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__six").toString() == "none")
+        #expect(context.evaluateScript("__sent.length - __count").toInt32() == 1)
+        // An answer is the answer.
+        context.evaluateScript("__answer = 'hi'; chrome.runtime.sendMessage({}, (v) => { globalThis.__seven = v; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__seven").toString() == "hi")
+    }
+
+    @Test func extensionPagesSayWhetherTheyListen() {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        let probe = ExtensionBridgeScript.receiverProbe
+        context.evaluateScript("var __background = true, __page = null;")
+        context.evaluateScript(Self.fakeWorld)
+        context.evaluateScript("var __probe; chrome.runtime.sendMessage = (m) => Promise.resolve(m && m.\(probe) ? __probe : undefined);")
+        context.evaluateScript(ExtensionBridgeScript.differences)
+        // Nothing listens here: no answer to the question.
+        context.evaluateScript("var __replies = []; var __ask = () => chrome.runtime.onMessage.fire({ \(probe): true }, { id: 'x' }, (v) => __replies.push(v)); __ask();")
+        #expect(context.evaluateScript("__replies.length").toInt32() == 0)
+        // A listener: yes, and the listener never sees the question.
+        context.evaluateScript("var __heard = []; var __l = (m) => { __heard.push(m); }; chrome.runtime.onMessage.addListener(__l); __ask();")
+        #expect(context.evaluateScript("__replies.join()").toString() == "true")
+        #expect(context.evaluateScript("__heard.length").toInt32() == 0)
+        context.evaluateScript("chrome.runtime.onMessage.removeListener(__l); __ask();")
+        #expect(context.evaluateScript("__replies.length").toInt32() == 1)
+        // The page's own runtime.sendMessage, unanswered with nothing listening elsewhere, fails.
+        context.evaluateScript("chrome.runtime.sendMessage({}).catch((e) => { globalThis.__one = e.message; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__one").toString() == ExtensionBridgeScript.noReceiver)
+        context.evaluateScript("__probe = true; chrome.runtime.sendMessage({}).then((v) => { globalThis.__two = v === undefined ? 'undefined' : v; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__two").toString() == "undefined")
+    }
+
+    @Test func aCallbackHearsTheErrorWhereLastErrorCantBeDefinedOver() {
+        // In a background WebKit's runtime keeps its own lastError: the global chrome stands in while the callback runs.
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var console = { log: () => {}, warn: () => {}, error: () => {} };
+        const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false });
+        const base = { id: 'x', getManifest: () => ({ manifest_version: 3, permissions: ['scripting'] }),
+                       sendNativeMessage: () => Promise.resolve({ value: null }), getURL: (p) => 'webkit-extension://x/' + p,
+                       connectNative: () => ({ onMessage: event(), onDisconnect: event(), postMessage: () => {} }) };
+        Object.defineProperty(base, 'lastError', { value: null, enumerable: true, configurable: true });
+        // As WebKit's: defining lastError over it is taken and changes nothing.
+        const runtime = new Proxy(base, { defineProperty: () => true });
+        const api = { runtime, tabs: { sendMessage: () => Promise.resolve() }, scripting: { executeScript: () => Promise.resolve([{ frameId: 0, result: '\(ExtensionBridgeScript.receiversMark)false' }]) } };
+        Object.defineProperty(globalThis, 'chrome', { value: api, configurable: true, writable: true });
+        """)
+        context.evaluateScript(ExtensionBridgeScript.source)
+        context.evaluateScript("chrome.tabs.sendMessage(1, {}, () => { globalThis.__seen = chrome.runtime.lastError && chrome.runtime.lastError.message; globalThis.__id = chrome.runtime.id; });")
+        Self.settle(context)
+        #expect(context.evaluateScript("__seen").toString() == ExtensionBridgeScript.noReceiver)
+        #expect(context.evaluateScript("__id").toString() == "x")
+        #expect(context.evaluateScript("chrome === api && chrome.runtime.lastError === null").toBool() == true)
+    }
+
+    @Test func theScriptsAgreeOnTheReceiversNames() {
+        #expect(ExtensionBridgeScript.source.contains("'\(ExtensionBridgeScript.receiversFile)'"))
+        #expect(ExtensionBridgeScript.source.contains("'\(ExtensionBridgeScript.receiversMark)'"))
+        #expect(ExtensionBridgeScript.source.contains("'\(ExtensionBridgeScript.noReceiver)'"))
+        #expect(ExtensionBridgeScript.differences.contains("'\(ExtensionBridgeScript.receiverProbe)'"))
+        #expect(ExtensionBridgeScript.differences.contains("'\(ExtensionBridgeScript.noReceiver)'"))
+    }
+}

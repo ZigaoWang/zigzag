@@ -40,6 +40,7 @@ final class PageHolder: NSView {
         webView.autoresizingMask = [.width, .height]
         addSubview(webView)
         page = webView
+        if TouchGestures.isAvailable, pageSwipe == nil { addTouchGestures() }
         if let pageObserver { NotificationCenter.default.removeObserver(pageObserver) }
         // WebKit moves the page as the inspector docks, leaves or is dragged wider: said once the room really changed.
         // WebKit takes the page to a window of its own for an element's full screen, and puts it back here after.
@@ -91,6 +92,145 @@ final class PageHolder: NSView {
         page.setFrameSize(size)
     }
 
+    // MARK: Touch
+
+    /// Two fingers sideways go back or forward; one is the page's own.
+    private(set) var pageSwipe: TouchSwipeRecognizer?
+    /// Two fingers pinched in on the page at its usual size open Show All Tabs; the page still zooms as before.
+    private(set) var overviewPinch: TouchPinchRecognizer?
+    /// The fingers on the page decided on back or forward.
+    private var swiping = false
+    private var pinchStartZoom: CGFloat = 1
+    private var pinchFired = false
+
+    private func addTouchGestures() {
+        let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.pageSwipeChanged(swipe) }
+        swipe.maxFingers = 2
+        swipe.landed = { [weak self] swipe in self?.fingersLanded(swipe) }
+        swipe.ruledOut = { [weak self] swipe in self?.swipeRuledOut(swipe) ?? true }
+        swipe.waits = { [weak self] swipe in self?.swipeWaits(swipe) ?? false }
+        swipe.decides = { [weak self] swipe in self?.swipeDecides(swipe) ?? false }
+        // WebKit's touch scrolling takes one or two fingers from their first point of movement and gives its own
+        // recognizers precedence: it waits until the swipe has decided.
+        swipe.touchOnly.outranks = { [weak self] other in self?.isPageScrolling(other) ?? false }
+        addGestureRecognizer(swipe)
+        pageSwipe = swipe
+
+        let pinch = TouchPinchRecognizer { [weak self] pinch in self?.pinchChanged(pinch) }
+        addGestureRecognizer(pinch)
+        overviewPinch = pinch
+    }
+
+    /// Whether fingers going `dx` this way may go back or forward: the Mac's touch setting, Zigzag's and the page's
+    /// history allow it.
+    func takesBackForward(dx: CGFloat) -> Bool {
+        (page as? BrowserWebView)?.swipeNavigator.takesTouchSwipe(dx > 0 ? -1 : 1) == true
+    }
+
+    /// WebKit's pan on the page, which turns fingers into scrolling and sends it straight to the page, never
+    /// through `scrollWheel`.
+    func isPageScrolling(_ recognizer: NSGestureRecognizer) -> Bool {
+        recognizer is NSPanGestureRecognizer && recognizer.view === page
+    }
+
+    private func fingersLanded(_ swipe: TouchSwipeRecognizer) {
+        guard let page = page as? BrowserWebView else { return }
+        let canGo = takesBackForward(dx: 1) || takesBackForward(dx: -1)
+        TouchLog.note("landed fingers=\(swipe.fingers) canGo=\(canGo) seen by \(TouchLog.recognizers(from: page))")
+        if canGo { page.swipeNavigator.touchLanded(at: page.convert(swipe.start, from: self)) }
+    }
+
+    func swipeRuledOut(_ swipe: TouchSwipeRecognizer) -> Bool {
+        let moved = hypot(swipe.translation.x, swipe.translation.y), since = swipe.eventAt - swipe.landedAt
+        let out = TouchSwipe.ruledOutOnPage(fingers: swipe.fingers, spread: swipe.spread, moved: moved, sinceLanding: since,
+                                            canGoEitherWay: takesBackForward(dx: 1) || takesBackForward(dx: -1))
+        if out {
+            let lone = TouchSwipe.isLoneFinger(fingers: swipe.fingers, moved: moved, sinceLanding: since)
+            TouchLog.note("ruled out\(lone ? " (one finger)" : "") fingers=\(swipe.fingers) spread=\(Int(swipe.spread)) "
+                          + "moved=\(Self.describe(swipe.translation)) after=\(Int(since * 1000))ms")
+        }
+        return out
+    }
+
+    /// Sideways and taken so far, with the page yet to say whether it keeps the spot: asked again on the next move.
+    func swipeWaits(_ swipe: TouchSwipeRecognizer) -> Bool {
+        guard TouchSwipe.goesBackOrForward(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread),
+              let navigator = (page as? BrowserWebView)?.swipeNavigator else { return false }
+        let waits = navigator.touchPageLeaves(swipe.translation.x > 0 ? -1 : 1) == nil
+        if waits { TouchLog.note("waiting for the page") }
+        return waits
+    }
+
+    func swipeDecides(_ swipe: TouchSwipeRecognizer) -> Bool {
+        let wanted = swipe.translation.x > 0 ? -1 : 1
+        let shape = TouchSwipe.goesBackOrForward(fingers: swipe.fingers, translation: swipe.translation, spread: swipe.spread)
+        let open = shape && takesBackForward(dx: swipe.translation.x)
+        let leaves = open ? (page as? BrowserWebView)?.swipeNavigator.touchPageLeaves(wanted) ?? false : false
+        TouchLog.note("decided \(leaves ? (wanted < 0 ? "back" : "forward") : "page") fingers=\(swipe.fingers) moved=\(Self.describe(swipe.translation)) "
+                      + "spread=\(Int(swipe.spread)) shape=\(shape) open=\(open) room=\(String(describing: (page as? BrowserWebView)?.swipeNavigator.touchRoom)) "
+                      + "seen by \(TouchLog.recognizers(from: page))")
+        return leaves
+    }
+
+    private static func describe(_ point: NSPoint) -> String { "\(Int(point.x)),\(Int(point.y))" }
+
+    private func pageSwipeChanged(_ swipe: TouchSwipeRecognizer) {
+        let x = swipe.translation.x
+        switch swipe.state {
+        case .began:
+            touchSwipeBegan(dx: x)
+        case .changed:
+            touchSwipeMoved(dx: x)
+        case .ended:
+            touchSwipeEnded(cancelled: false)
+        case .cancelled, .failed:
+            touchSwipeEnded(cancelled: true)
+        default:
+            break
+        }
+    }
+
+    /// The fingers decided, `dx` points sideways so far (positive to the right): the arrow comes, as for two fingers
+    /// on the trackpad.
+    func touchSwipeBegan(dx: CGFloat) {
+        guard let swipe = (page as? BrowserWebView)?.swipeNavigator else { return }
+        swiping = true
+        swipe.touchBegan(direction: dx > 0 ? -1 : 1)
+        swipe.touchMoved(dx: dx, at: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// The fingers are `dx` points sideways from where they landed.
+    func touchSwipeMoved(dx: CGFloat) {
+        guard swiping else { return }
+        (page as? BrowserWebView)?.swipeNavigator.touchMoved(dx: dx, at: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// Lifted, or called off.
+    func touchSwipeEnded(cancelled: Bool) {
+        guard swiping else { return }
+        swiping = false
+        (page as? BrowserWebView)?.swipeNavigator.touchEnded(at: ProcessInfo.processInfo.systemUptime, cancelled: cancelled)
+    }
+
+    private func pinchChanged(_ pinch: TouchPinchRecognizer) {
+        switch pinch.state {
+        case .began:
+            pinchStartZoom = page?.magnification ?? 1
+            pinchFired = false
+        case .changed:
+            guard !pinchFired, TouchPinch.opensOverview(magnification: pinch.magnification, startZoom: pinchStartZoom) else { return }
+            pinchFired = true
+            touchPinchedIn()
+        default: break
+        }
+    }
+
+    /// Pinched in far enough: Show All Tabs, in a browser window.
+    func touchPinchedIn() {
+        guard let controller = window?.windowController as? BrowserWindowController, !controller.desk.isVisible else { return }
+        controller.desk.show()
+    }
+
     // MARK: Into real full screen
 
     /// On a page-filled video (Full screen videos fill: The Page), a top-corner button that sends it to real full
@@ -125,9 +265,19 @@ final class PageHolder: NSView {
         let tip = String(localized: "Enter Full Screen", comment: "Tooltip of the button over a video that fills the page: puts it in the screen's own full screen.")
         let button = MiniPlayerView.overlayButton("arrow.up.left.and.arrow.down.right", side: Self.expandSide, glyph: 15, tip: tip)
         button.alphaValue = 0
-        button.onClick = { [weak self] _ in self?.onExpand?() }
+        button.onClick = { [weak self] _ in
+            guard let self, !self.touchSwallow.takes() else { return }
+            self.onExpand?()
+        }
         addSubview(button)
         expandButton = button
+        if TouchGestures.isAvailable, touchWatch == nil {
+            let watch = TouchWatch()
+            watch.onDown = { [weak self] point in self?.touchDown(at: point) }
+            watch.onTap = { [weak self] point in self?.touchTapped(at: point) }
+            addGestureRecognizer(watch)
+            touchWatch = watch
+        }
         let tracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
         addTrackingArea(tracking)
         expandTracking = tracking
@@ -153,6 +303,22 @@ final class PageHolder: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
+        if showsExpand { revealExpand() }
+    }
+
+    private var touchWatch: TouchWatch?
+    /// The click from a tap on the faded-out button: the tap only shows it.
+    private var touchSwallow = TouchSwallow()
+
+    func touchDown(at windowPoint: NSPoint) {
+        guard showsExpand, let button = expandButton, button.alphaValue < 0.5,
+              button.frame.contains(convert(windowPoint, from: nil)) else { return }
+        touchSwallow.arm()
+    }
+
+    /// A tap on the page brings the button back, as moving the pointer does.
+    func touchTapped(at windowPoint: NSPoint) {
+        touchSwallow.disarm()
         if showsExpand { revealExpand() }
     }
 

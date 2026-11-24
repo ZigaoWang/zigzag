@@ -11,6 +11,12 @@
   Test: PermissionPromptTests.theAppQuestionPutsCancelFirstAndOpenLast
 - A pop-up the page opens without a click → asks where: this tab, a new tab or Zigzag Mini, or not at all; a clicked one opens at once.
   Test: SitePermissionsPolicyTests.everyPopupActionIsADistinctStandingAnswer
+- The pop-up question's filled answer → one click (or Return) answers with the choice it shows.
+  Test: PermissionPromptTests.aClickOnTheMainPartAnswersWithTheShownChoice
+- The chevron beside it → opens the other choices without answering; one click on a choice answers with it.
+  Test: PermissionPromptTests.aChoiceFromTheMenuAnswersWithIt
+- Either part in the question's first half second → takes no click.
+  Test: PermissionPromptTests.theFirstHalfSecondTakesNoClickOnEitherPart
 - A download → no question by default; with asking turned on in Settings, a site's first download asks.
   Test: SitePermissionsPolicyTests.askingBeforeADownloadIsOffByDefault
 
@@ -67,3 +73,27 @@
   Test: CertificateTrustTests.anExceptionRunsOut
 - Visit anyway on a local server (this Mac, a .local name, a home network address) → kept across launches in Settings › Developer, per port, until its certificate changes or you remove it; never from a private window.
   Test: CertificateTrustTests.aLocalServersCertificateIsRemembered
+
+## User agent
+- Nothing chosen for a site → its pages get Zigzag's own user agent, as before.
+  Test: SiteUserAgentsTests.nothingChosenLeavesZigzagsOwn
+- User agent in Site Controls → Default, Safari, Chrome, Firefox, then Custom… to type one.
+  Test: SiteUserAgentsTests.theChoicesAreDefaultSafariChromeFirefox
+- A choice for a site → its pages are sent that from their first load, in new tabs, Zigzag Mini and installed apps too; the open tab reloads with it.
+  Test: SiteUserAgentsTests.aKeptChoiceIsSentFromTheFirstLoad
+- A choice for a site → a page's new window or pop-up on it is sent that from its first request.
+  Test: SiteUserAgentsTests.aNewWindowStartsWithTheSitesChoice
+- A choice for a site → covers its subdomains; a subdomain's own choice wins, Safari included.
+  Test: SiteUserAgentsTests.aSiteCoversItsSubdomainsAndTheMostSpecificWins
+- Back to Default, or × in Settings › Privacy › Sites → the site gets Zigzag's own again.
+  Test: SiteUserAgentsTests.removalRestoresTheDefault
+- A choice → kept across launches and listed in Settings › Privacy › Sites.
+  Test: SiteUserAgentsTests.choicesReadBack
+- Custom… → the typed agent is trimmed to one line; an empty one, or one with characters a header can't carry, can't be used.
+  Test: SiteUserAgentsTests.aTypedAgentIsTrimmedAndNeverEmpty
+- Chrome and Firefox → named at a current version, one more every four weeks.
+  Test: SiteUserAgentsTests.browserVersionsMoveOn
+- Site Controls in a private window → no User agent row; its pages follow a choice kept for the site.
+  Test: SiteUserAgentsTests.privateWindowsFollowKeptChoicesWithoutTheRow
+- addons.mozilla.org → still asked for as Firefox, whatever is chosen.
+  Test: SiteUserAgentsTests.theAddonsStoreIsStillAskedForAsFirefox

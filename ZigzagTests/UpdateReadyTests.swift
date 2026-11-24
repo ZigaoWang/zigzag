@@ -123,6 +123,125 @@ struct UpdateReadyTests {
         #endif
     }
 
+    // MARK: Automatic installs off (#492)
+
+    private let found = UpdateReadiness.Staged(version: "0.9.5", build: "120")
+    private let newer = UpdateReadiness.Staged(version: "0.9.6", build: "121")
+
+    @Test func withAutomaticInstallsOnEveryFindDownloads() {
+        var offer = UpdateOffer()
+        #expect(offer.found(found, automatic: true, getting: false, background: true) == .install)
+        #expect(offer.found(found, automatic: true, getting: false, background: false) == .install)
+        #expect(offer.available == nil)
+    }
+
+    @Test func withAutomaticInstallsOffAFindIsOfferedNotDownloaded() {
+        var offer = UpdateOffer()
+        #expect(offer.found(found, automatic: false, getting: false, background: true) == .offer)
+        #expect(offer.available == found)
+        // A check you asked for offers it too.
+        var asked = UpdateOffer()
+        #expect(asked.found(found, automatic: false, getting: false, background: false) == .offer)
+        #expect(asked.available == found)
+    }
+
+    @Test func updateOnTheCardDownloadsIt() {
+        var offer = UpdateOffer()
+        _ = offer.found(found, automatic: false, getting: false, background: true)
+        #expect(offer.found(found, automatic: false, getting: true, background: false) == .install)
+    }
+
+    @Test func skippingTakesItOffTheCardAndSparkleSkipsThatBuild() {
+        var offer = UpdateOffer()
+        _ = offer.found(found, automatic: false, getting: false, background: true)
+        offer.skip()
+        #expect(offer.available == nil)
+        #expect(offer.skipping == "120")
+        // The next background check finds it: Sparkle is told to skip it, and it stays off the card.
+        #expect(offer.found(found, automatic: false, getting: false, background: true) == .skip)
+        #expect(offer.available == nil)
+        #expect(offer.skipping == nil)
+    }
+
+    @Test func aNewerBuildIsOfferedAfterASkip() {
+        var offer = UpdateOffer()
+        _ = offer.found(found, automatic: false, getting: false, background: true)
+        offer.skip()
+        #expect(offer.found(newer, automatic: false, getting: false, background: true) == .offer)
+        #expect(offer.available == newer)
+        #expect(offer.skipping == nil)
+    }
+
+    @Test func checkForUpdatesStillOffersASkippedBuild() {
+        var offer = UpdateOffer()
+        _ = offer.found(found, automatic: false, getting: false, background: true)
+        offer.skip()
+        #expect(offer.found(found, automatic: false, getting: false, background: false) == .offer)
+        #expect(offer.available == found)
+    }
+
+    @Test func clearingTheOfferForgetsTheSkipToo() {
+        var offer = UpdateOffer()
+        _ = offer.found(found, automatic: false, getting: false, background: true)
+        offer.skip()
+        offer.clear()
+        #expect(offer == UpdateOffer())
+        // Skipping with nothing offered does nothing.
+        offer.skip()
+        #expect(offer.skipping == nil)
+    }
+
+    @Test func anAvailableUpdateIsATwoLineCardWithItsVersion() {
+        let state = UpdateCardState.available(version: "0.9.5")
+        #expect(!state.isBusy)
+        #expect(!state.isReady)
+        #expect(state.version == "0.9.5")
+        #expect(UpdateCard.height(for: state) == Tokens.Sidebar.updateCardHeight)
+        #expect(UpdateCard.height(for: .downloading(version: "0.9.5", received: 0, total: 0)) == Tokens.Sidebar.updateCardBusyHeight)
+    }
+
+    @MainActor @Test func settingsSaysWhichVersionIsAvailable() {
+        let running = VersionName.display(VersionName.running)
+        #expect(SettingsVersionRow.detail(ready: nil, available: "0.9.5-beta.2")
+                == String(localized: "Version \(VersionName.display("0.9.5-beta.2")) is available. You have \(running).",
+                          comment: "Under Zigzag's name in Settings › General while automatic installs are off and an update was found, beside Update. The placeholders are the new version and the one running."))
+        // A ready update wins.
+        #expect(SettingsVersionRow.detail(ready: "0.9.5", available: "0.9.5") == SettingsVersionRow.detail(ready: "0.9.5"))
+    }
+
+    @MainActor @Test func anOfferedUpdateShowsOnTheCardUntilSkipped() {
+        #if DEBUG
+        let updater = Updater.shared
+        updater.debugStage(nil)
+        updater.debugOffer("0.9.5")
+        #expect(updater.cardState == .available(version: "0.9.5"))
+        #expect(updater.cardFloats)
+        // A ready update takes the card's place.
+        updater.debugStage("0.9.5")
+        #expect(updater.cardState == .ready(version: "0.9.5"))
+        updater.debugStage(nil)
+        updater.debugOffer("0.9.5")
+        updater.skipOffered()
+        #expect(updater.cardState == nil)
+        #expect(!updater.cardFloats)
+        updater.debugOffer(nil)
+        #endif
+    }
+
+    @MainActor @Test func theAvailableCardOffersUpdateAndSkip() {
+        let card = UpdateCard(frame: NSRect(x: 0, y: 0, width: 208, height: Tokens.Sidebar.updateCardHeight))
+        card.show(.available(version: "0.9.5"))
+        card.layoutSubtreeIfNeeded()
+        #expect(!card.updateButton.isHidden && !card.skipButton.isHidden)
+        #expect(card.restartButton.isHidden && card.hideButton.isHidden)
+        // Skip ends where close does; Update sits before it.
+        #expect(card.skipButton.frame.maxX == card.bounds.width - SidebarRowView.buttonEdge)
+        #expect(card.updateButton.frame.maxX < card.skipButton.frame.minX)
+        card.show(.ready(version: "0.9.5"))
+        #expect(card.updateButton.isHidden && card.skipButton.isHidden)
+        #expect(!card.restartButton.isHidden)
+    }
+
     @Test func versionsReadAsPeopleSayThem() {
         #expect(VersionName.display("0.9.2-beta.1") == "0.9.2 beta 1")
         #expect(VersionName.display("1.0.0-beta.12") == "1.0.0 beta 12")

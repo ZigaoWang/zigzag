@@ -215,7 +215,7 @@ nonisolated enum CompatibilityText {
                           comment: "A Chrome extension feature Zigzag cannot provide: reading a cookie's partition key.")
         case "extension.limit.hostAccessRequests":
             return String(localized: "extension.limit.hostAccessRequests", defaultValue: "Site access requests",
-                          comment: "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.")
+                          comment: "A Chrome extension feature Zigzag cannot provide: permissions.addHostAccessRequest, a request for a site's access shown on the extension's button.")
         case "extension.limit.storage":
             return String(localized: "extension.limit.storage", defaultValue: "Stored extension settings",
                           comment: "A Chrome extension feature Zigzag emulates: managed extension storage.")
@@ -291,6 +291,9 @@ nonisolated enum CompatibilityText {
         case "extension.limit.proxyScripts":
             return String(localized: "extension.limit.proxyScripts", defaultValue: "Proxy scripts (PAC)",
                           comment: "A Chrome extension feature Zigzag cannot provide: proxy auto-config scripts, which choose a proxy for each site.")
+        case "extension.limit.firefoxProxy":
+            return String(localized: "extension.limit.firefoxProxy", defaultValue: "Setting a proxy (Firefox’s proxy API)",
+                          comment: "A Firefox extension feature Zigzag cannot provide: Firefox's own proxy API, which VPN and proxy extensions built for Firefox use to send pages through their servers.")
         case "extension.limit.deprecatedChannel":
             return String(localized: "extension.limit.deprecatedChannel", defaultValue: "Deprecated Google APIs",
                           comment: "A Chrome extension feature Chrome removed: its old Google messaging channels.")

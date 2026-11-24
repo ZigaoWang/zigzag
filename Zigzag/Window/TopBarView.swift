@@ -136,6 +136,26 @@ final class TopBarView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
+    /// A finger's click just beside the sidebar's toggle is the toggle's: a finger takes it anywhere in
+    /// `TouchGestures.target` around it. The mouse's clicks land where they always did.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        guard let event = NSApp.currentEvent, event.type == .leftMouseDown else { return hit }
+        let finger = TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt)
+        // The press lifts inside as far out as it may land.
+        let toggle = sidebarButton.frame, box = TouchGestures.box(around: toggle)
+        let dx = toggle.minX - box.minX, dy = toggle.minY - box.minY
+        sidebarButton.pressOutset = finger ? NSEdgeInsets(top: dy, left: dx, bottom: dy, right: dx) : NSEdgeInsets()
+        guard finger, hit === self, !sidebarButton.isHidden,
+              Self.fingerTakesToggle(at: convert(point, from: superview), toggle: toggle) else { return hit }
+        return sidebarButton
+    }
+
+    /// Whether a finger at `point`, on the bar and not on anything in it, is on the toggle at `toggle`.
+    nonisolated static func fingerTakesToggle(at point: NSPoint, toggle: NSRect) -> Bool {
+        TouchGestures.box(around: toggle).contains(point)
+    }
+
     /// Takes the sidebar's buttons and address, in order; here the address shows only its buttons and the pill shows
     /// the site (the sidebar restores its field when it takes it back).
     func hold(buttons: [NSView], address: NSView, pin: NSView? = nil) {

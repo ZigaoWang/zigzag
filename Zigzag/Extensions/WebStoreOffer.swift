@@ -94,7 +94,7 @@ final class WebStoreOffer: FloatingPanelView {
                 self.add.isHidden = true
                 self.done.isHidden = false
                 self.name.stringValue = added.isEmpty ? shown : added
-                self.line.stringValue = String(localized: "Added. Find it in site controls, by the address.", comment: "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address.")
+                self.line.stringValue = String(localized: "Added. Find it in Site Controls, by the address.", comment: "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address.")
                 self.line.textColor = Tokens.Color.textSecondary
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) { Self.hide() }
             case .failed(let message):

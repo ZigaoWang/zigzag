@@ -25,8 +25,7 @@ import Testing
         row.isBookmark = true
         row.fixedTitle = "Page"
         row.configure(tab: nil)
-        if parts > 1 { row.configure(pinnedPartner: "Second", icon: nil, unloaded: true) }
-        row.configure(pinnedExtras: (2..<max(parts, 2)).map { ("Page \($0)", nil, nil) })
+        row.configure(parts: (1..<max(parts, 1)).map { TabRowView.Part(page: nil, name: $0 == 1 ? "Second" : "Page \($0)") })
         row.layoutSubtreeIfNeeded()
         return row
     }
@@ -87,17 +86,17 @@ extension SplitRowAlignmentTests {
         #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 1)
     }
 
-    /// When the close button would hide the last title, its room is reserved even at rest, so nothing shifts on hover.
-    @Test func aNarrowLastPartKeepsTheCloseButtonsRoom() {
+    /// Each part has its own ×, which comes over its faded title, so no room is kept at the row's end: the parts run
+    /// to it in equal widths.
+    @Test func aNarrowRowsPartsRunToItsEnd() {
         let parts = 3
         let r = row(parts: parts, width: 228)
         let shown = titles(of: r)
         #expect(shown.count == parts)
-        #expect((shown.last?.frame.maxX ?? .infinity) <= r.closeButton.frame.minX)
         let lines = lines(of: r)
-        let starts = [0] + lines.map(\.midX) + [r.closeButton.frame.minX]
+        let starts = [0] + lines.map(\.midX) + [r.bounds.width]
         let widths = zip(starts.dropFirst(), starts).map { $0 - $1 }
-        #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 3)
+        #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 1)
     }
 
     @Test func withoutTitlesEachIconIsCenteredInItsPart() {
@@ -269,8 +268,7 @@ extension SplitRowAlignmentTests {
         for (i, tab) in tabs.enumerated() { tab.debugShowSound(playing: i % 2 == 0, muted: i % 2 == 1) }
         let row = TabRowView(frame: NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.rowHeight))
         row.configure(tab: tabs[0])
-        row.configure(partners: Array(tabs.dropFirst()))
-        row.closesPart = parts > 1
+        row.configure(parts: tabs.dropFirst().map { TabRowView.Part(page: $0) })
         row.layoutSubtreeIfNeeded()
         return row
     }
@@ -301,7 +299,7 @@ extension SplitRowAlignmentTests {
 
     /// Too narrow for the title and the speaker after it, the title stays and the speaker goes on the icon.
     @Test func aPartTooShortForBothKeepsItsTitle() {
-        let row = row(parts: 3, width: 228)
+        let row = row(parts: 3, width: 210)
         let shown = speakers(of: row)
         #expect(shown.count == 3 && shown.allSatisfy { SpeakerBadge.isBadge($0) })
         #expect(row.subviews.compactMap { $0 as? Label }.filter { !$0.isHidden && $0.frame.width > 0 }.count == 3)
@@ -310,8 +308,7 @@ extension SplitRowAlignmentTests {
     /// Back to one page, the row's own speaker is a row button again and its icon whole.
     @Test func leavingTheSplitRestoresTheRowSpeaker() {
         let row = row(parts: 4, width: 228)
-        row.closesPart = false
-        row.configure(partners: [])
+        row.configure(parts: [])
         row.layoutSubtreeIfNeeded()
         #expect(!SpeakerBadge.isBadge(row.audioButton) && row.audioButton.frame.width == Tokens.Sidebar.rowButton)
         #expect(row.icon.speakerCut == nil)

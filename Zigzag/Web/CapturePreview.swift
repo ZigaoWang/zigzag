@@ -19,6 +19,12 @@ final class CapturePreview: FloatingPanelView {
     private let copyTile: PanelTile
     private let saveTile: PanelTile
     private let shareTile: PanelTile
+    /// An × in the corner while the pointer is on the card, white on a dark disc so it reads over any picture; at 13pt
+    /// its ink sits on the disc's middle.
+    private let closeButton = IconButton(symbol: "xmark", size: CapturePreview.closeSide, symbolSize: 13,
+                                         toolTip: String(localized: "Close", comment: "Tooltip of the × on the card a capture leaves in the page's corner: puts the card away."))
+    private let closeDisc = ColorView(color: NSColor(white: 0, alpha: 0.62))
+    private var tracking: NSTrackingArea?
     private var monitors: [Any] = []
     private var hideWork: DispatchWorkItem?
     private var closed = false
@@ -46,12 +52,28 @@ final class CapturePreview: FloatingPanelView {
         thumbnail.toolTip = String(localized: "Drag into Another App", comment: "Tooltip of a capture's picture on the card after Capture.")
         thumbnail.setAccessibilityLabel(String(localized: "Captured picture", comment: "VoiceOver name of a capture's picture on the card after Capture."))
         [thumbnail, copyTile, saveTile, shareTile].forEach { addSubview($0) }
+        closeButton.tint = .white
+        closeButton.isHidden = true
+        closeDisc.wantsLayer = true
+        closeDisc.isHidden = true
+        closeDisc.layer?.shadowColor = NSColor.black.cgColor
+        closeDisc.layer?.shadowOpacity = 0.25
+        closeDisc.layer?.shadowRadius = 3
+        closeDisc.layer?.shadowOffset = .zero
+        closeButton.onClick = { [weak self] _ in self?.close() }
         if let note {
             note.usesSingleLineMode = false
             note.maximumNumberOfLines = 2
             note.lineBreakMode = .byWordWrapping
             note.cell?.wraps = true
             addSubview(note)
+        }
+        [closeDisc, closeButton].forEach { addSubview($0) }
+        if TouchGestures.isAvailable {
+            // A tap on it shows its ×, as the pointer over it does.
+            let watch = TouchWatch()
+            watch.onTap = { [weak self] _ in self?.showClose(true) }
+            addGestureRecognizer(watch)
         }
         copyTile.onClick = { [weak self] _ in self?.copyAgain() }
         saveTile.onClick = { [weak self] _ in self?.onSave?() }
@@ -69,6 +91,15 @@ final class CapturePreview: FloatingPanelView {
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel(String(localized: "Screenshot copied", comment: "Toast after taking a screenshot of the whole page."))
+        setAccessibilityCustomActions([
+            NSAccessibilityCustomAction(name: closeButton.toolTip ?? "") { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return false }
+                    self.close()
+                    return true
+                }
+            },
+        ])
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
@@ -78,6 +109,9 @@ final class CapturePreview: FloatingPanelView {
 
     private static let pad = Tokens.Space.x3
     private static let rowInset = Tokens.Space.x1
+    /// The ×'s disc, concentric with the card's corner.
+    private static let closeSide: CGFloat = 20
+    private static var closeInset: CGFloat { Tokens.Radius.panel - closeSide / 2 }
     private var pictureWidth: CGFloat { Tokens.Metric.capturePreviewWidth - Self.pad * 2 }
     private var pictureSize: NSSize {
         CaptureGeometry.thumbnailSize(for: image.size, width: pictureWidth, maxHeight: Tokens.Metric.capturePreviewMaxImage)
@@ -106,6 +140,27 @@ final class CapturePreview: FloatingPanelView {
         for (i, tile) in tiles.enumerated() {
             tile.frame = NSRect(x: Self.rowInset + CGFloat(i) * (width + Tokens.Space.x1), y: y, width: width, height: PanelTile.captionedHeight)
         }
+        let side = Self.closeSide, inset = Self.closeInset
+        closeButton.frame = NSRect(x: bounds.width - inset - side, y: inset, width: side, height: side)
+        closeButton.radius = side / 2
+        closeDisc.frame = closeButton.frame
+        closeDisc.layer?.cornerRadius = side / 2
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { showClose(true) }
+    override func mouseExited(with event: NSEvent) { showClose(false) }
+
+    private func showClose(_ shown: Bool) {
+        closeButton.isHidden = !shown
+        closeDisc.isHidden = !shown
     }
 
     private func copyAgain() {
@@ -118,7 +173,7 @@ final class CapturePreview: FloatingPanelView {
         growsFrom = CGPoint(x: 1, y: 1)
         layoutSubtreeIfNeeded()
         present(arrival: .pop)
-        let clicks = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        let clicks = TouchPress.addMonitor(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, !self.holds, event.window === self.window else { return event }
             if !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.close() }
             return event
@@ -156,7 +211,7 @@ final class CapturePreview: FloatingPanelView {
         guard !closed else { return }
         closed = true
         hideWork?.cancel()
-        monitors.forEach { NSEvent.removeMonitor($0) }
+        monitors.forEach { TouchPress.removeMonitor($0) }
         monitors = []
         dismiss()
         onClose?()
@@ -177,7 +232,15 @@ final class CapturePreview: FloatingPanelView {
     private func beginDrag(_ event: NSEvent) -> Bool {
         let promise = CaptureFilePromise(data: data, name: name)
         let item = NSDraggingItem(pasteboardWriter: promise)
-        item.setDraggingFrame(thumbnail.bounds, contents: image)
+        if thumbnail.showsTop, let rep = thumbnail.bitmapImageRepForCachingDisplay(in: thumbnail.bounds) {
+            // The top it shows, as it looks on the card.
+            thumbnail.cacheDisplay(in: thumbnail.bounds, to: rep)
+            let shown = NSImage(size: thumbnail.bounds.size)
+            shown.addRepresentation(rep)
+            item.setDraggingFrame(thumbnail.bounds, contents: shown)
+        } else {
+            item.setDraggingFrame(thumbnail.picture, contents: image)
+        }
         holds = true
         thumbnail.beginDraggingSession(with: [item], event: event, source: thumbnail)
         return true
@@ -205,7 +268,8 @@ final class SharingWatch: NSObject, NSSharingServicePickerDelegate {
     func sharingServicePicker(_ picker: NSSharingServicePicker, didChoose service: NSSharingService?) { done?() }
 }
 
-/// The capture on the card: its top when it's tall, in a softly rounded frame, picked up to drag out.
+/// The capture on the card, never stretched, in a softly rounded frame, picked up to drag out: all of it, or a full
+/// page's top fading out below.
 final class CaptureThumbnail: InteractiveView, NSDraggingSource {
     private let image: NSImage
     /// When a drag ends: whether somewhere took it.
@@ -231,14 +295,53 @@ final class CaptureThumbnail: InteractiveView, NSDraggingSource {
 
     private func refreshEdge() { layer?.borderColor = cgColor(Tokens.Color.cardEdge) }
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        // A page's top draws its own edge, so it fades with the picture.
+        layer?.borderWidth = showsTop ? 0 : Tokens.Metric.hairline
+        needsDisplay = true
+    }
+
+    /// Showing only a full page's top.
+    var showsTop: Bool { CaptureGeometry.thumbnailShowsTop(for: image.size, in: bounds.size) }
+
+    /// How far up a page's top fades out.
+    private static let fade = Tokens.Space.x8
+
     override func stateDidChange(animated: Bool) {}
+
+    /// Where the picture is drawn in the frame.
+    var picture: NSRect { CaptureGeometry.thumbnailPicture(for: image.size, in: bounds.size) }
 
     override func draw(_ dirtyRect: NSRect) {
         guard image.size.width > 0, image.size.height > 0, bounds.width > 0 else { return }
-        // As wide as the frame; a picture taller than it shows from its top.
-        let shown = min(image.size.height, image.size.width * bounds.height / bounds.width)
-        let source = NSRect(x: 0, y: image.size.height - shown, width: image.size.width, height: shown)
-        image.draw(in: bounds, from: source, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high.rawValue])
+        let rect = picture
+        // A strip thinner than the frame sits on a quiet backdrop.
+        if rect.width < bounds.width - 0.5 || rect.height < bounds.height - 0.5 {
+            Tokens.Color.fieldFill.setFill()
+            bounds.fill()
+        }
+        let hints: [NSImageRep.HintKey: Any] = [.interpolation: NSImageInterpolation.high.rawValue]
+        guard showsTop, let context = NSGraphicsContext.current?.cgContext else {
+            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: hints)
+            return
+        }
+        let hairline = Tokens.Metric.hairline
+        context.saveGState()
+        NSBezierPath(roundedRect: bounds, xRadius: Tokens.Radius.small, yRadius: Tokens.Radius.small).addClip()
+        // Drawn as one group, so the fade clears only the picture and its edge.
+        context.beginTransparencyLayer(auxiliaryInfo: nil)
+        image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: hints)
+        let edge = NSBezierPath(roundedRect: bounds.insetBy(dx: hairline / 2, dy: hairline / 2), xRadius: Tokens.Radius.small, yRadius: Tokens.Radius.small)
+        edge.lineWidth = hairline
+        Tokens.Color.cardEdge.setStroke()
+        edge.stroke()
+        // The page goes on: its foot fades into the card.
+        context.setBlendMode(.destinationOut)
+        let band = NSRect(x: 0, y: bounds.height - Self.fade, width: bounds.width, height: Self.fade)
+        NSGradient(colorsAndLocations: (.clear, 0), (NSColor(white: 0, alpha: 0.4), 0.5), (.black, 1))?.draw(in: band, angle: 90)
+        context.endTransparencyLayer()
+        context.restoreGState()
     }
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }

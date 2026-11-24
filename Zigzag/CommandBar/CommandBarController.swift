@@ -95,10 +95,10 @@ final class CommandRowView: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        // The chosen row in the neutral highlight, as a menu's; hover moves the choice, so it has no fill of its own.
-        // The chosen row on a soft wash of the space's accent, its title in the space's ink; the rest stay plain.
+        // The chosen row takes the shared selection wash, as Settings' sections do.
         let theme = Brand.Theme.for(self)
-        let fill: NSColor? = isSelected ? theme.accent.withAlphaComponent(isPressed ? 0.26 : 0.18) : nil
+        let alpha = isPressed ? Tokens.Color.selectionPressedAlpha : Tokens.Color.selectionAlpha
+        let fill: NSColor? = isSelected ? theme.accent.withAlphaComponent(alpha) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         styleTitle(ink: isSelected ? theme.rowInk : Tokens.Color.textPrimary)
         needsLayout = true

@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Always Translate %@" : {
+      "comment" : "Item in the translate menu: pages in this language are translated as they open. The name is a language's, like French.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总是翻译%@"
+          }
+        }
+      }
+    },
     "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
       "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
       "localizations" : {
@@ -8,6 +19,211 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
+          }
+        }
+      }
+    },
+    "Citron" : {
+      "comment" : "Name of a curated space color, in the space editor. A pale lemon yellow.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "柠檬黄"
+          }
+        }
+      }
+    },
+    "site.user-agent" : {
+      "comment" : "Row in the site panel's This Site group and in Settings › Privacy › Sites: the browser this site's pages are told they're in.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "User agent"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户代理"
+          }
+        }
+      }
+    },
+    "Custom User Agent" : {
+      "comment" : "Title of the sheet from Custom… in the site panel's User agent dropdown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定用户代理"
+          }
+        }
+      }
+    },
+    "Pages on %@ are sent this in place of Zigzag’s own." : {
+      "comment" : "Under the title of the Custom User Agent sheet. The placeholder is the site's name, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向 %@ 的网页发送它，代替 Zigzag 自己的用户代理。"
+          }
+        }
+      }
+    },
+    "Stone" : {
+      "comment" : "Name of a curated space color, in the space editor. A clear, barely warm gray glass.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "岩灰"
+          }
+        }
+      }
+    },
+    "Navy" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep navy blue.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "藏青"
+          }
+        }
+      }
+    },
+    "Fern" : {
+      "comment" : "Name of a curated space color, in the space editor. A fresh leaf green.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蕨绿"
+          }
+        }
+      }
+    },
+    "Slate" : {
+      "comment" : "Name of a curated space color, in the space editor. A clear, barely cool gray glass.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "石板灰"
+          }
+        }
+      }
+    },
+    "Mist" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint cool blue tint.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "雾蓝"
+          }
+        }
+      }
+    },
+    "Dew" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint mint green tint.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "露绿"
+          }
+        }
+      }
+    },
+    "Shell" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint warm peach tint, like a seashell.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "贝壳"
+          }
+        }
+      }
+    },
+    "Orchid" : {
+      "comment" : "Name of a curated space color, in the space editor. A near-white glass with a faint lilac tint.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兰紫"
+          }
+        }
+      }
+    },
+    "Languages and sites you never translate show up here." : {
+      "comment" : "Under Never Translate in Settings › Translation, when there's no language or site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译的语言和网站会显示在这里。"
+          }
+        }
+      }
+    },
+    "Iris" : {
+      "comment" : "Name of a curated space color, in the space editor. A blue violet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鸢尾紫"
+          }
+        }
+      }
+    },
+    "Smoke" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep smoked graphite glass.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "烟灰"
+          }
+        }
+      }
+    },
+    "Never Translate" : {
+      "comment" : "A heading in Settings › Translation, over the languages and sites never offered or translated on their own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译"
+          }
+        }
+      }
+    },
+    "Never Translate %@" : {
+      "comment" : "Item in the translate menu: pages in this language are never offered or translated on their own. The name is a language's, like French.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译%@"
+          }
+        }
+      }
+    },
+    "Never Translate This Site" : {
+      "comment" : "Item in the translate menu: pages on this site are never offered or translated on their own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永不翻译此网站"
           }
         }
       }
@@ -34,6 +250,28 @@
         }
       }
     },
+    "Pine" : {
+      "comment" : "Name of a curated space color, in the space editor. A deep pine green.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "松绿"
+          }
+        }
+      }
+    },
+    "Seafoam" : {
+      "comment" : "Name of a curated space color, in the space editor. A soft mint green.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海沫"
+          }
+        }
+      }
+    },
     "Since %@" : {
       "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
       "localizations" : {
@@ -45,6 +283,17 @@
         }
       }
     },
+    "Azure" : {
+      "comment" : "Name of a curated space color, in the space editor. A clear sky blue.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蔚蓝"
+          }
+        }
+      }
+    },
     "That’s Zigzag Mini" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window: a shift-clicked link opened in Zigzag Mini, the small window for one page. Keep Zigzag Mini in Latin letters.",
       "localizations" : {
@@ -52,6 +301,111 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这就是 Zigzag Mini"
+          }
+        }
+      }
+    },
+    "Translated" : {
+      "comment" : "Tooltip of the address bar's translate button on a translated page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已翻译"
+          }
+        }
+      }
+    },
+    "Translation Settings…" : {
+      "comment" : "Item in the translate menu: opens Settings › Translation.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译设置…"
+          }
+        }
+      }
+    },
+    "Coral" : {
+      "comment" : "Name of a curated space color, in the space editor. A warm coral orange.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "珊瑚"
+          }
+        }
+      }
+    },
+    "user-agent.default" : {
+      "comment" : "First choice in the User agent dropdown of the site panel: the site gets Zigzag's own user agent, as any site.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认"
+          }
+        }
+      }
+    },
+    "user-agent.custom" : {
+      "comment" : "Choice in the User agent dropdown of the site panel and Settings › Privacy › Sites: the site is sent a user agent you typed.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Custom"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定"
+          }
+        }
+      }
+    },
+    "user-agent.custom-action" : {
+      "comment" : "Item at the end of the User agent dropdown in the site panel: opens a sheet to type the user agent this site is sent.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Custom…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定…"
+          }
+        }
+      }
+    },
+    "user-agent.edit-custom-action" : {
+      "comment" : "Item at the end of the User agent dropdown in the site panel, once the site has a typed user agent: opens the sheet to change it.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Edit Custom…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑自定…"
           }
         }
       }
@@ -1289,7 +1643,7 @@
         }
       }
     },
-    "Choose for a single site in its site controls." : {
+    "Choose for a single site in its Site Controls." : {
       "comment" : "Explanation under “Full screen videos fill” in Settings › Tabs. Site controls is the panel by the address.",
       "localizations" : {
         "en" : {
@@ -2326,7 +2680,7 @@
       }
     },
     "%lld zapped" : {
-      "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.",
+      "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel that opens the list of them, and a choice made for a site in Settings › Privacy › Sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2584,7 +2938,7 @@
         }
       }
     },
-    "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its site controls." : {
+    "A tab you’re not using that keeps working hard sleeps until you open it again. To keep a site’s tabs awake, turn on Keep tabs awake in its Site Controls." : {
       "comment" : "Explanation under “Put busy background tabs to sleep” in Settings › Tabs. Keep tabs awake is the row in the site panel; site controls is the panel by the address.",
       "localizations" : {
         "zh-Hans" : {
@@ -3035,7 +3389,7 @@
         }
       }
     },
-    "Added. Find it in site controls, by the address." : {
+    "Added. Find it in Site Controls, by the address." : {
       "comment" : "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address.",
       "localizations" : {
         "zh-Hans" : {
@@ -3625,7 +3979,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用"
+            "value" : "App"
           }
         }
       }
@@ -4357,7 +4711,7 @@
         }
       }
     },
-    "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls." : {
+    "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its Site Controls." : {
       "comment" : "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.",
       "localizations" : {
         "zh-Hans" : {
@@ -5550,13 +5904,13 @@
         }
       }
     },
-    "Capture an Area, an Element or the Whole Page (⇧⌘2)" : {
-      "comment" : "Tooltip of the Capture action in the site panel.",
+    "Capture an Area, an Element or the Whole Page" : {
+      "comment" : "Tooltip of the Capture action in the site panel; its keyboard shortcut follows.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "截取区域、元素或整个页面（⇧⌘2）"
+            "value" : "截取区域、元素或整个页面"
           }
         }
       }
@@ -5941,7 +6295,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择文件夹…"
+            "value" : "选取文件夹…"
           }
         }
       }
@@ -5974,7 +6328,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择脚本…"
+            "value" : "选取脚本…"
           }
         }
       }
@@ -5985,7 +6339,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选取应用…"
+            "value" : "选取 App…"
           }
         }
       }
@@ -5996,7 +6350,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选取应用…"
+            "value" : "选取 App…"
           }
         }
       }
@@ -6073,7 +6427,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择…"
+            "value" : "选取…"
           }
         }
       }
@@ -6353,13 +6707,13 @@
         }
       }
     },
-    "Click + in the sidebar, then New Space" : {
+    "Click + in the sidebar, then choose New Space" : {
       "comment" : "Under the new space step's title in the getting-started guide, a card in the window. New Space is an item in the menu of the sidebar's +.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按边栏中的 +，然后点按“新建空间”"
+            "value" : "点按边栏中的 +，然后选取“新建空间”"
           }
         }
       }
@@ -6392,13 +6746,13 @@
         }
       }
     },
-    "Click New Space" : {
+    "Choose New Space" : {
       "comment" : "A hint in the middle of a step in the getting-started guide, a card in the window, while the menu of the sidebar's + is open. New Space is an item in that menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按“新建空间”"
+            "value" : "选取“新建空间”"
           }
         }
       }
@@ -6470,7 +6824,7 @@
       }
     },
     "Close" : {
-      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.\nTooltip of the × on a notice over the page, like a script's while it runs.",
+      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.\nTooltip of the × on a notice over the page, like a script's while it runs.\nTooltip of the × on the card a capture leaves in the page's corner: puts the card away.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6481,7 +6835,7 @@
       }
     },
     "Close %@" : {
-      "comment" : "Tooltip of the close button on one page's part of a split view's row in the sidebar. The name is that page's title.",
+      "comment" : "VoiceOver action on a split view's row in the sidebar: closes one page of it. The name is that page's title.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6896,7 +7250,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收起分组"
+            "value" : "折叠分组"
           }
         }
       }
@@ -8111,6 +8465,24 @@
         }
       }
     },
+    "extension.limit.firefoxProxy" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: Firefox's own proxy API, which VPN and proxy extensions built for Firefox use to send pages through their servers.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Setting a proxy (Firefox’s proxy API)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置代理（Firefox 的代理 API）"
+          }
+        }
+      }
+    },
     "extension.limit.fontSettings" : {
       "comment" : "A Chrome extension feature Zigzag cannot provide: the fontSettings API.",
       "extractionState" : "extracted_with_value",
@@ -8148,7 +8520,7 @@
       }
     },
     "extension.limit.hostAccessRequests" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.",
+      "comment" : "A Chrome extension feature Zigzag cannot provide: permissions.addHostAccessRequest, a request for a site's access shown on the extension's button.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
@@ -8745,17 +9117,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "列出这条规则要匹配的文件扩展名，例如 pdf、epub。"
-          }
-        }
-      }
-    },
-    "No archived tab matches “%@”." : {
-      "comment" : "On the Archive page when a search finds nothing. The placeholder is what was typed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有与“%@”匹配的已归档标签页。"
           }
         }
       }
@@ -9811,17 +10172,6 @@
         }
       }
     },
-    "Espresso" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "浓缩咖啡"
-          }
-        }
-      }
-    },
     "Every download is saved to the folder above, whatever kind of file it is." : {
       "comment" : "Under “No file types yet” in Settings › Downloads.",
       "localizations" : {
@@ -10376,13 +10726,13 @@
         }
       }
     },
-    "Find your extensions in site controls, by the address. You can bring more over anytime from Settings." : {
+    "Find your extensions in Site Controls, by the address. You can bring more over anytime from Settings." : {
       "comment" : "Import window when the import is done and only extensions came over. Site controls is the panel by the address.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的扩展在地址旁的网站控制中。你随时可以从设置中导入更多内容。"
+            "value" : "你的扩展在地址旁的网站设置中。你随时可以从设置中导入更多内容。"
           }
         }
       }
@@ -10833,13 +11183,24 @@
         }
       }
     },
-    "Glance, then get back to what you were doing. To keep the page, use this button or press ⌘O." : {
-      "comment" : "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like ⌘O) moves the page into a tab of a browser window.",
+    "Glance, then get back to what you were doing. To keep the page, use this button or press %@." : {
+      "comment" : "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like its keys, such as ⌘O) moves the page into a tab of a browser window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "看完就能回去。\n想留下这个网页，点这个按钮或按 ⌘O。"
+            "value" : "看完就能回去。\n想留下这个网页，点这个按钮或按 %@。"
+          }
+        }
+      }
+    },
+    "Glance, then get back to what you were doing. To keep the page, use this button." : {
+      "comment" : "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which moves the page into a tab of a browser window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看完就能回去。\n想留下这个网页，点这个按钮。"
           }
         }
       }
@@ -12565,6 +12926,17 @@
         }
       }
     },
+    "More Choices" : {
+      "comment" : "VoiceOver name of the chevron beside a filled answer, like where a pop-up opens: opens a menu of the other choices.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多选项"
+          }
+        }
+      }
+    },
     "More Developer Tools" : {
       "comment" : "Tooltip of the ⋯ button among the developer tools above a development site's page: opens a menu with the rest of the tools.",
       "localizations" : {
@@ -13507,7 +13879,18 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有应用能打开这个网址。"
+            "value" : "没有 App 能打开这个网址。"
+          }
+        }
+      }
+    },
+    "No archived tabs match “%@”." : {
+      "comment" : "On the Archive page when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有与“%@”匹配的已归档标签页。"
           }
         }
       }
@@ -13523,13 +13906,13 @@
         }
       }
     },
-    "No emoji found" : {
-      "comment" : "In the icon choices, when no emoji's name matches what's typed in the field under them.",
+    "No emoji match “%@”." : {
+      "comment" : "In the icon choices, when no emoji's name matches what's typed in the field under them; what was typed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未找到表情符号"
+            "value" : "没有与“%@”匹配的表情符号。"
           }
         }
       }
@@ -13618,6 +14001,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在这台 Mac 上没有找到有可导入内容的其他浏览器。"
+          }
+        }
+      }
+    },
+    "No pages in your history match “%@”." : {
+      "comment" : "On the History page when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录中没有与“%@”匹配的页面。"
           }
         }
       }
@@ -13721,13 +14115,13 @@
         }
       }
     },
-    "No tabs match" : {
-      "comment" : "In the tab overview (all spaces' tabs as cards), when no tab matches the search.",
+    "No tabs match “%@”." : {
+      "comment" : "In the tab overview (all spaces' tabs as cards), when no tab matches the search; what was typed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有匹配的标签页"
+            "value" : "没有与“%@”匹配的标签页。"
           }
         }
       }
@@ -13970,17 +14364,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "历史记录中没有匹配项"
-          }
-        }
-      }
-    },
-    "Nothing in your history matches “%@”." : {
-      "comment" : "On the History page when a search finds nothing. The placeholder is what was typed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "历史记录中没有与“%@”匹配的内容。"
           }
         }
       }
@@ -14477,7 +14860,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开应用"
+            "value" : "打开 App"
           }
         }
       }
@@ -14966,13 +15349,13 @@
         }
       }
     },
-    "Or click + in the sidebar, then New Space" : {
+    "Or click + in the sidebar, then choose New Space" : {
       "comment" : "Under the new space step's title in the getting-started guide, a card in the window, after the keys that make a space. New Space is an item in the menu of the sidebar's +.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "或者点按边栏中的 +，然后点按“新建空间”"
+            "value" : "或者点按边栏中的 +，然后选取“新建空间”"
           }
         }
       }
@@ -15291,17 +15674,6 @@
         }
       }
     },
-    "Pages in these languages are translated as soon as they open." : {
-      "comment" : "Under the list of languages in Settings › Translation.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些语言的页面一打开就会被翻译。"
-          }
-        }
-      }
-    },
     "Pages load a little slower the first time you open them again. You stay signed in." : {
       "comment" : "Message of the sheet that asks before clearing every site's cache.\nMessage of the sheet that clears the cache.",
       "localizations" : {
@@ -15369,7 +15741,7 @@
       }
     },
     "Paper" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor.\nFinish of Your Zigzag Card in About: warm linen paper.",
+      "comment" : "Finish of Your Zigzag Card in About: warm linen paper.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15682,7 +16054,7 @@
         }
       }
     },
-    "Pick Up Where You Left Off" : {
+    "Continue where you left off" : {
       "comment" : "A choice for “On launch” in Settings › General: the last session's windows come back.",
       "localizations" : {
         "zh-Hans" : {
@@ -15693,13 +16065,13 @@
         }
       }
     },
-    "Pick Up Where You Left Off brings the windows and tabs you had back. Start Fresh opens one new window and keeps the last session for History › Reopen Last Session." : {
+    "Continue where you left off brings back the windows and tabs you had. Open a new window starts with one window and keeps the last session in History › Reopen Last Session." : {
       "comment" : "Explanation under “On launch” in Settings › General.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“全新开始”只打开一个新窗口，上次的会话留给你在“历史记录 › 重新打开上次会话”里找回。"
+            "value" : "“接着上次继续”会带回你之前的窗口和标签页。“打开一个新窗口”只打开一个窗口，上次的会话可以在“历史记录 › 重新打开上次会话”里找回。"
           }
         }
       }
@@ -15822,7 +16194,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "固定这个页面"
+            "value" : "固定此页面"
           }
         }
       }
@@ -15839,7 +16211,7 @@
       }
     },
     "Pink" : {
-      "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
+      "comment" : "Name of a curated space color, in the space editor. A clear pink.\nVoiceOver, in the space editor's color wheel: a color's family.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15937,7 +16309,7 @@
         }
       }
     },
-    "Point your phone's camera at the code to open this page there." : {
+    "Point your phone’s camera at the code to open this page there." : {
       "comment" : "Under the title of the Open on Your Phone sheet of the developer tools.",
       "localizations" : {
         "zh-Hans" : {
@@ -16554,7 +16926,7 @@
       }
     },
     "Red" : {
-      "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
+      "comment" : "Name of a curated space color, in the space editor. A true red.\nVoiceOver, in the space editor's color wheel: a color's family.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17357,7 +17729,7 @@
       }
     },
     "Restore" : {
-      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.",
+      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17368,7 +17740,7 @@
       }
     },
     "Restore All" : {
-      "comment" : "At the end of the row in the site panel that counts the elements zapped on the site: shows them all again.",
+      "comment" : "Under the list of elements zapped on the site, on its page in the site panel: shows them all again.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17510,13 +17882,13 @@
         }
       }
     },
-    "Right-click its tab, then Pin Tab" : {
+    "Right-click its tab, then choose Pin Tab" : {
       "comment" : "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "右键点按它的标签页，然后点按“固定标签页”"
+            "value" : "右键点按它的标签页，然后选取“固定标签页”"
           }
         }
       }
@@ -18440,17 +18812,6 @@
         }
       }
     },
-    "Separate Split View" : {
-      "comment" : "Item at the top of the context menu of a tab, pinned tab or favorite in a split view, in the sidebar: ends the split view, each page a tab of its own again.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "结束分屏浏览"
-          }
-        }
-      }
-    },
     "Separate Tabs" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item.",
       "localizations" : {
@@ -18584,7 +18945,7 @@
       }
     },
     "Settings" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in an extension's menu: opens the extension's own settings page.\nThe address bar's name for Zigzag's Settings page.\nThe name of the tab showing Zigzag's Settings.\nTitle of the Settings page, also its tab's name.",
+      "comment" : "Item in an extension's menu: opens the extension's own settings page.\nThe address bar's name for Zigzag's Settings page.\nThe name of the tab showing Zigzag's Settings.\nTitle of the Settings page, also its tab's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18595,7 +18956,7 @@
       }
     },
     "Settings…" : {
-      "comment" : "Zigzag menu item.",
+      "comment" : "Zigzag menu item, and a command in the command bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18925,7 +19286,7 @@
       }
     },
     "Show Sidebar" : {
-      "comment" : "Menu bar item: shows the sidebar.\nTooltip of the sidebar button while the sidebar is hidden.",
+      "comment" : "Accessibility label of the touch grabber that shows the hidden sidebar.\nMenu bar item: shows the sidebar.\nTooltip of the sidebar button while the sidebar is hidden.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19321,23 +19682,12 @@
       }
     },
     "Sky" : {
-      "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale blue.",
+      "comment" : "Name of a curated space color, in the space editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "天蓝"
-          }
-        }
-      }
-    },
-    "Slate" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "石板灰"
           }
         }
       }
@@ -19694,13 +20044,13 @@
         }
       }
     },
-    "Start Fresh" : {
+    "Open a new window" : {
       "comment" : "A choice for “On launch” in Settings › General: one new window, the last session left for History › Reopen Last Session.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全新开始"
+            "value" : "打开一个新窗口"
           }
         }
       }
@@ -20422,7 +20772,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "该应用已不在了。"
+            "value" : "该 App 已不在了。"
           }
         }
       }
@@ -21340,13 +21690,13 @@
         }
       }
     },
-    "To always translate a language, choose it in a page’s site controls." : {
-      "comment" : "Under Always Translate in Settings › Translation.",
+    "To always translate a language, choose it from the translate button in the address bar." : {
+      "comment" : "Under Always Translate in Settings › Translation, when there's no language. The translate button is in the address bar on pages in another language.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要始终翻译一种语言，请在页面的网站设置中选择它。"
+            "value" : "要始终翻译一种语言，请在地址栏的翻译按钮里选择它。"
           }
         }
       }
@@ -21611,6 +21961,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在从%@翻译… %lld%%"
+          }
+        }
+      }
+    },
+    "Translating Page…" : {
+      "comment" : "Tooltip of the address bar's translate button while the page is being translated.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在翻译网页…"
           }
         }
       }
@@ -21967,6 +22328,17 @@
         }
       }
     },
+    "Unload %@" : {
+      "comment" : "VoiceOver action on a split view's row in the sidebar: unloads one pinned page of it. The name is that page's title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卸载“%@”"
+          }
+        }
+      }
+    },
     "Unload %lld Pages" : {
       "comment" : "Menu item for several picked pinned pages",
       "localizations" : {
@@ -22231,6 +22603,100 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要更新密码吗？"
+          }
+        }
+      }
+    },
+    "Install updates automatically" : {
+      "comment" : "A setting in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动安装更新"
+          }
+        }
+      }
+    },
+    "Skip This Version" : {
+      "comment" : "Tooltip and VoiceOver action of Skip on the sidebar's update card: this version isn't offered again; a newer one is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过这个版本"
+          }
+        }
+      }
+    },
+    "Update available" : {
+      "comment" : "Title of the sidebar's update card for an update found while automatic installs are off: Update downloads it and restarts.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用更新"
+          }
+        }
+      }
+    },
+    "Version %@ is available. You have %@." : {
+      "comment" : "Under Zigzag's name in Settings › General while automatic installs are off and an update was found, beside Update. The placeholders are the new version and the one running.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ is available. You have %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %1$@ 可供更新，当前是 %2$@。"
+          }
+        }
+      }
+    },
+    "When off, Zigzag still checks and asks before downloading an update." : {
+      "comment" : "Explanation under “Install updates automatically” in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后，Zigzag 仍会检查更新，下载前会先问你。"
+          }
+        }
+      }
+    },
+    "Zigzag %@ is available. Update downloads it and restarts Zigzag." : {
+      "comment" : "VoiceOver label of the sidebar's update card while automatic installs are off. The placeholder is the version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag %@ 可供更新。点按“更新”会下载它并重新启动 Zigzag。"
+          }
+        }
+      }
+    },
+    "Zigzag would download %@ and restart now." : {
+      "comment" : "Debug builds only: toast after Update on a pretend update. The placeholder is its version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 现在会下载 %@ 并重新启动。"
+          }
+        }
+      }
+    },
+    "automatic updates download install skip version" : {
+      "comment" : "Words that find the Install updates automatically setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动更新 下载 安装 跳过 版本 automatic updates download install skip version"
           }
         }
       }
@@ -23770,6 +24236,17 @@
         }
       }
     },
+    "Zigzag couldn’t read Dia’s pinned tabs. Try again." : {
+      "comment" : "Problem in the Import window. Dia is a browser's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 未能读取 Dia 的已固定标签页。请再试一次。"
+          }
+        }
+      }
+    },
     "Zigzag couldn’t read the passwords it already has, so it didn’t add any. Try again." : {
       "comment" : "Problem in the Import window.",
       "localizations" : {
@@ -24799,6 +25276,24 @@
         }
       }
     },
+    "import.dia-profile" : {
+      "comment" : "Name of the space for a Dia profile whose name couldn't be found: Profile 2.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Profile %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人资料 %lld"
+          }
+        }
+      }
+    },
     "import.short-list" : {
       "comment" : "Joins the items of a short list in the Import window, like “6 passwords, history”.",
       "extractionState" : "extracted_with_value",
@@ -24864,6 +25359,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 不允许 Zigzag 读取 Arc 的空间和已固定标签页。请在“系统设置 › 隐私与安全性 › 文件与文件夹”中找到 Zigzag，打开 Arc，然后再试一次。"
+          }
+        }
+      }
+    },
+    "macOS didn’t let Zigzag read Dia’s pinned tabs. In System Settings › Privacy & Security › Files & Folders, find Zigzag and turn on Dia, then try again." : {
+      "comment" : "Problem in the Import window. Dia is a browser's name; System Settings › Privacy & Security › Files & Folders is macOS's own wording.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 不允许 Zigzag 读取 Dia 的已固定标签页。请在“系统设置 › 隐私与安全性 › 文件与文件夹”中找到 Zigzag，打开 Dia，然后再试一次。"
           }
         }
       }
@@ -25007,7 +25513,7 @@
       }
     },
     "needs your answer" : {
-      "comment" : "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.",
+      "comment" : "Spoken by VoiceOver after a tab row's name: a question is waiting for that page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -25481,7 +25987,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自定义…"
+            "value" : "自定…"
           }
         }
       }
@@ -25616,7 +26122,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "网页是否可以运行自己的脚本。你在网站控制中改过的网站会保留各自的选择。"
+            "value" : "网页是否可以运行自己的脚本。你在网站设置中改过的网站会保留各自的选择。"
           }
         }
       }
@@ -25951,7 +26457,7 @@
         }
       }
     },
-    "Where It's Pinned" : {
+    "Where It’s Pinned" : {
       "comment" : "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to.",
       "localizations" : {
         "zh-Hans" : {
@@ -26035,6 +26541,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "卡面"
+          }
+        }
+      }
+    },
+    "Zapped Elements" : {
+      "comment" : "Title of the site panel's page that lists the elements hidden on the site with Zap Element.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏的元素"
+          }
+        }
+      }
+    },
+    "Restore %@" : {
+      "comment" : "VoiceOver name of the × on one zapped element's row in the site panel and Settings › Privacy › Sites. The placeholder is the element's short name, like div.banner.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复 %@"
+          }
+        }
+      }
+    },
+    "%lld more" : {
+      "comment" : "Under the newest five zapped elements of a site in Settings › Privacy › Sites, beside Show All: how many more there are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另外 %lld 个"
           }
         }
       }

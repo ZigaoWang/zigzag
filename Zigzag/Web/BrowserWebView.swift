@@ -10,6 +10,9 @@ final class BrowserWebView: WKWebView {
     /// unless it can still scroll that way (`room`).
     func handleSwipe(_ event: NSEvent, room: (left: Bool, right: Bool)) -> Bool { swipe.handle(event, room: room) }
 
+    /// Back and forward by a finger in from the page's edge (`PageHolder`).
+    var swipeNavigator: SwipeNavigator { swipe }
+
     /// The page, in some frame, kept a sideways scroll from `at` (wall-clock ms) for itself, or left it (SwipeAnswers).
     func pageAnsweredSwipe(kept: Bool, at: Double) { swipe.pageAnswered(kept: kept, at: at) }
 
@@ -84,7 +87,7 @@ final class BrowserWebView: WKWebView {
 
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
-        if swipe.handle(event) { return }
+        if TouchSwipeRecognizer.claims(event) || swipe.handle(event) { return }
         owner?.scrolledSinceSave = true
         super.scrollWheel(with: event)
     }

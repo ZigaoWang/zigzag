@@ -11,6 +11,8 @@ final class SidebarContainer: NSView {
     /// and the grain, so sliding it out never strips them.
     var gradient: (end: NSColor, angle: Double)? { didSet { refresh() } }
     var grain: Double = 0 { didSet { refresh() } }
+    /// The grain's texture (`SpaceInfo.texture`).
+    var texture: String? { didSet { if texture != oldValue { grainLayer.backgroundColor = MaterialImages.texture(texture).cgColor } } }
     /// The window's own glass, while its space is see-through: floating, the sidebar is the same glass over the page,
     /// so it's the same color slid out as docked. Nil: a solid space, the page blurred under its color.
     var windowGlass: WindowGlass? { didSet { if windowGlass != oldValue { refresh() } } }
@@ -186,10 +188,13 @@ final class SidebarContainer: NSView {
         glass.frame = bounds
     }
 
-    /// Floating as glass, Liquid Glass where the Mac has it, unless the window's see-through glass is the frosting:
-    /// then the frosting, as the docked sidebar shows.
+    /// Floating as glass, Liquid Glass only where the window's own glass is clear; frosted and solid spaces get the
+    /// frosting, as the docked sidebar shows. A solid space used to get Liquid Glass here too, and the glass view stays
+    /// in the window while the sidebar is tucked off its edge: Liquid Glass anywhere in a window holds the whole
+    /// window to 80 frames a second on a ProMotion display, so a solid space stuttered with the sidebar on hover and
+    /// was smooth with it docked (#394).
     static func usesLiquidGlass(isGlass: Bool, windowGlass: WindowGlass?, hasClearGlass: Bool = SpaceInfo.hasClearGlass) -> Bool {
-        isGlass && hasClearGlass && windowGlass?.isClear != false
+        isGlass && hasClearGlass && windowGlass?.isClear == true
     }
 
     /// The space's color as it lies over the glass: at the floating cover, see-through spaces too. Docked, a
@@ -281,7 +286,7 @@ final class ResizeHandle: NSView {
         grab = (isVertical ? point.y : point.x) - line
         pressedAt = event.locationInWindow
         onBegin?()
-        if event.clickCount == 2 { onDoubleClick?() }
+        if onDoubleClick != nil, TouchDoubleTap.clickCount(for: event, on: self) == 2 { onDoubleClick?() }
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -297,11 +302,78 @@ final class ResizeHandle: NSView {
     nonisolated static func dragged(_ pointer: CGFloat, grab: CGFloat) -> CGFloat { pointer - grab }
 
     override func mouseUp(with event: NSEvent) { onEnd?(event.modifierFlags.contains(.shift)) }
+
+    // MARK: Touch
+
+    /// A finger dragging it, from `BrowserRootView`'s touch pan: what a press, drag and release do, in window
+    /// coordinates. Shift is the keyboard's.
+    func touchBegan(at windowPoint: NSPoint) {
+        let point = convert(windowPoint, from: nil)
+        grab = (isVertical ? point.y : point.x) - line
+        pressedAt = windowPoint
+        onBegin?()
+    }
+
+    func touchMoved(to windowPoint: NSPoint) {
+        let shift = NSEvent.modifierFlags.contains(.shift)
+        if let onDragPoint {
+            onDragPoint(windowPoint, shift)
+        } else {
+            onDrag?(Self.dragged(isVertical ? windowPoint.y : windowPoint.x, grab: grab), shift)
+        }
+    }
+
+    func touchEnded() { onEnd?(NSEvent.modifierFlags.contains(.shift)) }
+
+    /// Whether a finger moving by `translation` drags it rather than scrolling past it.
+    nonisolated static func touchDrags(_ translation: NSPoint, vertical: Bool, bothWays: Bool) -> Bool {
+        if bothWays { return true }
+        return vertical ? abs(translation.y) >= abs(translation.x) : abs(translation.x) >= abs(translation.y)
+    }
 }
 
 /// The line shown at the middle while a tile divider comes near even: a guide, never a control, so it takes no pointer.
 final class TileSnapGuide: ColorView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// The traffic lights and the sidebar toggle as one group in the title bar, while the sidebar is hidden and touch is
+/// in use (`TouchSidebarGrabber`): on the title bar's material so it reads over any page, as the lights do in full
+/// screen (#462). AppKit draws the lights over its leading end.
+final class SidebarGrabber: NSView {
+    /// A tap, a click or VoiceOver's press: the sidebar comes out.
+    var onOpen: ((NSEvent) -> Void)?
+    let button = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false),
+                                          toolTip: String(localized: "Show Sidebar", comment: "Tooltip of the sidebar button while the sidebar is hidden."))
+    private let backing = NSVisualEffectView()
+    var onRight = false { didSet { if onRight != oldValue { button.symbol = SidebarView.toggleSymbol(onRight: onRight) } } }
+    /// The toggle's frame in the group, at its trailing end.
+    var toggleFrame: NSRect {
+        let side = SidebarView.toolbarButton, inset = TouchSidebarGrabber.inset
+        return NSRect(x: bounds.maxX - inset - side, y: inset, width: side, height: side)
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        backing.material = .titlebar
+        backing.blendingMode = .withinWindow
+        backing.state = .followsWindowActiveState
+        backing.wantsLayer = true
+        backing.layer?.cornerCurve = .continuous
+        addSubview(backing)
+        button.onClick = { [weak self] event in self?.onOpen?(event) }
+        addSubview(button)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        backing.frame = bounds
+        // Concentric with the toggle's hover box.
+        backing.layer?.cornerRadius = button.radius + TouchSidebarGrabber.inset
+        button.frame = toggleFrame
+    }
 }
 
 /// The window's content: one continuous tinted background, the sidebar, and the page card.
@@ -566,46 +638,13 @@ final class BrowserRootView: SpaceFrameView {
     var showsTopBar = false {
         didSet {
             guard oldValue != showsTopBar else { return }
-            topBar.isHidden = !chromeBarShown
+            topBar.isHidden = !showsTopBar
             needsLayout = true
             refreshGlassFrame()
             refreshGlassOcclusion()
+            refreshGrabber()
         }
     }
-    /// Full screen in the window (#462): a page fills the window and the chrome gets out of its way. The bar is laid
-    /// out but hidden until the pointer reaches the top; the sidebar tucks away but its edge still brings it out.
-    var isImmersive = false {
-        didSet {
-            guard oldValue != isImmersive else { return }
-            if isImmersive { sidebarRevealed = false }
-            topBarRevealed = false
-            topBar.isHidden = !chromeBarShown
-            needsLayout = true
-            refreshGlassFrame()
-            refreshGlassOcclusion()
-        }
-    }
-    /// True while the bar is down over the page in full screen: an overlay, so the page doesn't move for it.
-    private(set) var topBarRevealed = false {
-        didSet {
-            guard oldValue != topBarRevealed else { return }
-            topBar.isHidden = !chromeBarShown
-            needsLayout = true
-            refreshGlassFrame()
-            refreshGlassOcclusion()
-        }
-    }
-    /// Puts the bar away again, as leaving the window does while it's down in full screen.
-    func hideTopBar() {
-        topBarRevealed = false
-    }
-
-    /// The sidebar as the window shows it: hidden in The Whole Screen's full screen.
-    var chromeSidebarShown: Bool { sidebarVisible && !isImmersive }
-    /// The bar as the window shows it: in The Whole Screen only when it comes down from the top edge.
-    var chromeBarShown: Bool { isImmersive ? topBarRevealed : showsTopBar }
-    /// The bar is laid out in full screen even while hidden, ready to come down.
-    private var laysOutBar: Bool { showsTopBar || isImmersive }
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
     /// The band over the sidebar's edge, on the card's inner edge while the sidebar is out over the page (#431).
@@ -618,6 +657,8 @@ final class BrowserRootView: SpaceFrameView {
     private let snapGuideRow = TileSnapGuide(color: Tokens.Color.accent)
     /// Glow on the sidebar edge while a question waits that this window can't show.
     private let attentionEdge = AttentionEdge()
+    /// The sidebar toggle in the title bar while the sidebar is hidden and touch is in use (`TouchSidebarGrabber`).
+    let grabber = SidebarGrabber()
     private var attentionToken: SignalToken?
     /// Floating surfaces (command bar, previews) live here, above everything.
     let overlay = PassthroughView()
@@ -701,8 +742,7 @@ final class BrowserRootView: SpaceFrameView {
         attentionEdge.isHidden = true
         attentionEdge.onClick = { [weak self] in
             guard let self else { return }
-            // In full screen the sidebar is out of the layout: its edge brings it out.
-            if self.isImmersive { self.reveal(true) } else { self.setSidebarVisible(true, animated: true) }
+            self.setSidebarVisible(true, animated: true)
             // Select the tab the question is for so its banner shows.
             if let waiting = self.waitingTabs.first,
                let tabs = (self.window?.windowController as? BrowserWindowController)?.tabManager {
@@ -710,6 +750,19 @@ final class BrowserRootView: SpaceFrameView {
             }
         }
         addSubview(attentionEdge)
+        grabber.isHidden = true
+        grabber.alphaValue = 0
+        grabber.onOpen = { [weak self] event in
+            self?.openFromGrabber()
+            (self?.window as? BrowserWindow)?.spendFingerClick(event)
+        }
+        for pane in paneCards {
+            pane.header.sidebarButton.onClick = { [weak self] event in
+                self?.openFromGrabber()
+                (self?.window as? BrowserWindow)?.spendFingerClick(event)
+            }
+        }
+        addSubview(grabber)
         addSubview(sidebarContainer)
         // Over the sidebar, so the part of its edge's band inside the sidebar takes the pointer too (#362).
         addSubview(resizeHandle)
@@ -738,7 +791,7 @@ final class BrowserRootView: SpaceFrameView {
             // opens again. Closed this way it keeps the width it had, for when it opens next.
             let closesAt = Tokens.Metric.sidebarMinWidth / 2
             // Out over the page, the edge sets the width and nothing else: it stays out until the pointer leaves.
-            if self.sidebarRevealed, !self.chromeSidebarShown {
+            if self.sidebarRevealed, !self.sidebarVisible {
                 // The card floats a frame's inset in from the window edge, so the width is the pointer's reach less it.
                 let reach = x - Tokens.Metric.cardInset
                 let width = Tokens.Space.snap(min(max(reach, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
@@ -748,12 +801,12 @@ final class BrowserRootView: SpaceFrameView {
                 self.layoutSubtreeIfNeeded()
                 return
             }
-            if self.chromeSidebarShown, x < closesAt {
+            if self.sidebarVisible, x < closesAt {
                 self.sidebarWidth = self.widthBeforeDrag
                 self.setSidebarVisible(false, animated: true)
                 return
             }
-            if !self.chromeSidebarShown {
+            if !self.sidebarVisible {
                 guard x >= closesAt else { return }
                 self.sidebarWidth = Tokens.Metric.sidebarMinWidth
                 self.setSidebarVisible(true, animated: true)
@@ -789,9 +842,492 @@ final class BrowserRootView: SpaceFrameView {
         pageDropRing.cornerCurve = .continuous
         pageDropRing.zPosition = 50
         layer?.addSublayer(pageDropRing)
+        if TouchGestures.isAvailable {
+            addHandlePan()
+            addSidebarPull()
+            touchListener = TouchPress.listen { [weak self] event in self?.touchLanded(event) }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: Touch
+
+    /// The resize strips are 8 points wide: a finger takes one anywhere in `TouchGestures.target` around it.
+    private var touchedHandle: ResizeHandle?
+
+    private func addHandlePan() {
+        let pan = TouchPanRecognizer { [weak self] pan in self?.handlePan(pan) }
+        pan.touchOnly.accepts = { [weak self] point in self?.resizeHandle(atTouch: point) != nil }
+        pan.touchOnly.shouldBegin = { [weak self] recognizer in
+            guard let self, let pan = recognizer as? NSPanGestureRecognizer else { return false }
+            let moved = pan.translation(in: self)
+            let start = NSPoint(x: pan.location(in: self).x - moved.x, y: pan.location(in: self).y - moved.y)
+            guard let handle = self.resizeHandle(atTouch: start) else { return false }
+            return ResizeHandle.touchDrags(moved, vertical: handle.isVertical, bothWays: handle.dragsBothWays)
+        }
+        addGestureRecognizer(pan)
+    }
+
+    private func handlePan(_ pan: NSPanGestureRecognizer) {
+        let now = pan.location(in: self), moved = pan.translation(in: self)
+        switch pan.state {
+        case .began:
+            let start = NSPoint(x: now.x - moved.x, y: now.y - moved.y)
+            guard let handle = resizeHandle(atTouch: start) else { return }
+            touchedHandle = handle
+            handle.touchBegan(at: convert(start, to: nil))
+            handle.touchMoved(to: convert(now, to: nil))
+        case .changed:
+            touchedHandle?.touchMoved(to: convert(now, to: nil))
+        case .ended, .cancelled, .failed:
+            touchedHandle?.touchEnded()
+            touchedHandle = nil
+        default:
+            break
+        }
+    }
+
+    /// The resize strip a finger at `point` (own coordinates) takes: the nearest whose touch box holds it.
+    func resizeHandle(atTouch point: NSPoint) -> ResizeHandle? {
+        var handles: [ResizeHandle] = []
+        func collect(_ view: NSView) {
+            for child in view.subviews where !child.isHidden {
+                if let handle = child as? ResizeHandle { handles.append(handle) } else { collect(child) }
+            }
+        }
+        collect(self)
+        let frames = handles.map { convert($0.bounds, from: $0) }
+        return Self.touchTarget(frames, at: point).map { handles[$0] }
+    }
+
+    /// Of `frames`, the one whose touch box holds `point` with its middle nearest; nil when none does.
+    nonisolated static func touchTarget(_ frames: [NSRect], at point: NSPoint) -> Int? {
+        let hits = frames.indices.filter { TouchGestures.box(around: frames[$0]).contains(point) }
+        return hits.min { hypot(frames[$0].midX - point.x, frames[$0].midY - point.y) < hypot(frames[$1].midX - point.x, frames[$1].midY - point.y) }
+    }
+
+    // MARK: Touch: the hidden sidebar from the window's edge
+
+    /// One finger in from the page's edge pulls the hidden sidebar out with it, the overlay the pointer's edge shows;
+    /// held out that way, a finger on the page swipes it back, and a tap there sends it back.
+    private(set) var sidebarPull: TouchSwipeRecognizer?
+    /// While a finger has the card: how far its far edge reaches in from the window's edge on its side.
+    private var touchReach: CGFloat?
+    /// What the finger that has it is doing, and where the card reached when it took it.
+    private var pullTake: TouchSidebarPull.Take?
+    private var pullBase: CGFloat = 0
+    /// Out by a finger: it stays until a tap on the page, a tab is picked, it's swiped back, or the pointer moves.
+    private(set) var isTouchHeld = false
+    /// A finger has the card (true) or let it go: the window keeps the traffic lights' picture on it meanwhile.
+    var onTouchPull: ((Bool) -> Void)?
+
+    /// From the window's edge on the sidebar's side to `x`.
+    private func fromEdge(_ x: CGFloat) -> CGFloat { sidebarOnRight ? bounds.maxX - x : x - bounds.minX }
+
+    /// How far a card at `frame` reaches in from that edge, hidden and out.
+    private func reach(of frame: NSRect) -> CGFloat { fromEdge(sidebarOnRight ? frame.minX : frame.maxX) }
+    private var hiddenReach: CGFloat {
+        reach(of: Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: false, onRight: sidebarOnRight))
+    }
+    private var outReach: CGFloat {
+        reach(of: Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: sidebarOnRight))
+    }
+
+    /// What a finger landing at `point` does to the sidebar, if anything.
+    private func touchTake(at point: NSPoint) -> TouchSidebarPull.Take? {
+        guard !sidebarVisible, window != nil, bounds.contains(point) else { return nil }
+        if grabberTakes(point) { return .pull }
+        guard resizeHandle(atTouch: point) == nil else { return nil }
+        let page = pageAreaFrame
+        let pageEdge = fromEdge(sidebarOnRight ? page.maxX : page.minX)
+        let onCard = sidebarContainer.frame.insetBy(dx: -Tokens.Space.x1, dy: -Tokens.Space.x1).contains(point)
+        let take = TouchSidebarPull.take(atX: fromEdge(point.x), pageEdge: pageEdge, revealed: sidebarRevealed, held: isTouchHeld, onCard: onCard)
+        if take == .pull, blocksEdgeReveal?() == true { return nil }
+        return take
+    }
+
+    private func addSidebarPull() {
+        let swipe = makeSidebarPull()
+        addGestureRecognizer(swipe)
+        sidebarPull = swipe
+    }
+
+    /// A pull for fingers on this view, or with `onlyGrabber` on the title bar, where they start only on the grabber.
+    private func makeSidebarPull(onlyGrabber: Bool = false) -> TouchSwipeRecognizer {
+        let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.sidebarPullChanged(swipe) }
+        swipe.touchOnly.accepts = { [weak self, weak swipe] point in
+            guard let self, let view = swipe?.view else { return false }
+            let here = self.convert(point, from: view)
+            return onlyGrabber ? self.grabberTakes(here) : self.touchTake(at: here) != nil
+        }
+        swipe.decides = { [weak self] swipe in
+            guard let self else { return false }
+            let start = self.pullStart(swipe)
+            guard let take = self.touchTake(at: start) else { return false }
+            let moved = NSPoint(x: self.sidebarOnRight ? -swipe.translation.x : swipe.translation.x, y: swipe.translation.y)
+            guard TouchSidebarPull.goes(take, moved) else { return false }
+            self.pullTake = take
+            self.pullBase = take == .pull ? self.fromEdge(start.x) : self.outReach
+            return true
+        }
+        // A tap on the page while it's held out by touch sends it back; scrolling the page leaves it be.
+        swipe.failed = { [weak self, weak swipe] in
+            guard let self, let swipe, TouchSidebarPull.isTap(fingers: swipe.fingers, translation: swipe.translation) else { return }
+            let start = self.pullStart(swipe)
+            if self.grabberTapTakes(start) {
+                self.grabberTapped(at: start)
+            } else if self.isTouchHeld {
+                self.endTouchHold()
+            }
+        }
+        return swipe
+    }
+
+    /// Where a pull's fingers landed, in own coordinates.
+    private func pullStart(_ swipe: TouchSwipeRecognizer) -> NSPoint {
+        guard let view = swipe.view, view !== self else { return swipe.start }
+        return convert(swipe.start, from: view)
+    }
+
+    /// The pull from the grabber, on AppKit's title bar, which takes the fingers landing there.
+    private(set) var titlebarPull: TouchSwipeRecognizer?
+
+    /// Puts it on the title bar AppKit has now, again after it makes a new one (full screen).
+    func attachTitlebarPull() {
+        guard TouchGestures.isAvailable, let window, let container = window.standardWindowButton(.closeButton)?.superview?.superview,
+              container.window === window, titlebarPull?.view !== container else { return }
+        let swipe = titlebarPull ?? makeSidebarPull(onlyGrabber: true)
+        titlebarPull = swipe
+        swipe.view?.removeGestureRecognizer(swipe)
+        container.addGestureRecognizer(swipe)
+    }
+
+    private func sidebarPullChanged(_ swipe: TouchSwipeRecognizer) {
+        let dx = sidebarOnRight ? -swipe.translation.x : swipe.translation.x
+        switch swipe.state {
+        case .began:
+            guard let take = pullTake else { return }
+            touchPullBegan(take, base: pullBase)
+            touchPullMoved(by: dx)
+        case .changed:
+            touchPullMoved(by: dx)
+        case .ended:
+            touchPullEnded(velocity: sidebarOnRight ? -swipe.velocity.x : swipe.velocity.x, cancelled: false)
+            // The card now under the lifted finger doesn't take its click.
+            let start = pullStart(swipe)
+            if sidebarRevealed { spendTouch(at: [start, NSPoint(x: start.x + swipe.translation.x, y: start.y + swipe.translation.y)]) }
+        case .cancelled, .failed:
+            touchPullEnded(velocity: 0, cancelled: true)
+        default:
+            break
+        }
+    }
+
+    /// A finger took the card (`take`), its far edge `base` in from the window's edge.
+    func touchPullBegan(_ take: TouchSidebarPull.Take, base: CGFloat) {
+        guard !sidebarVisible else { return }
+        pullTake = take
+        pullBase = base
+        // From where it is on screen: a slide under way stops where it is.
+        sidebarContainer.layer?.removeAnimation(forKey: "slide")
+        sidebarContainer.layer?.removeAnimation(forKey: Self.revealFadeKey)
+        touchReach = base
+        onTouchPull?(true)
+        refreshGrabber()
+        placePulledSidebar()
+    }
+
+    /// The finger is `dx` points from where it decided, positive away from the window's edge.
+    func touchPullMoved(by dx: CGFloat) {
+        guard touchReach != nil else { return }
+        touchReach = TouchSidebarPull.reach(base: pullBase, travel: dx, hidden: hiddenReach, out: outReach)
+        placePulledSidebar()
+    }
+
+    private func placePulledSidebar() {
+        Tokens.Motion.withoutAnimation { sidebarContainer.frame = sidebarFrame }
+    }
+
+    /// Let go going `velocity` points a second away from the edge: out it stays, or back it slides, from where the
+    /// finger left it. Called off, it goes back to how it was.
+    func touchPullEnded(velocity: CGFloat, cancelled: Bool) {
+        guard let reach = touchReach else { return }
+        let wasOut = pullTake == .push
+        var keep = cancelled ? wasOut : TouchSidebarPull.keeps(reach: reach, out: outReach, velocity: velocity, wasOut: wasOut)
+        // Something it opened keeps it out.
+        if !keep, wasOut, isHeld { keep = true }
+        let old = sidebarContainer.frame
+        touchReach = nil
+        pullTake = nil
+        if keep != sidebarRevealed {
+            isTouchHeld = keep
+            reveal(keep)
+        } else {
+            let target = sidebarFrame
+            let curve = keep ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
+            let duration = Self.together {
+                Tokens.Motion.withoutAnimation { sidebarContainer.frame = target }
+                return Tokens.Motion.slide(sidebarContainer, fromOffsetX: old.minX - target.minX, curve: curve)
+            }
+            onSlide?(duration, curve.timing)
+        }
+        onTouchPull?(false)
+        refreshGrabber()
+    }
+
+    /// The finger at `points` (own coordinates) did its one thing: what slid under it takes neither its click nor
+    /// its tap.
+    func spendTouch(at points: [NSPoint]) {
+        (window as? BrowserWindow)?.spendTouch(at: points.map { convert($0, to: nil) })
+    }
+
+    /// Sends a sidebar held out by touch back: a tab was picked, or the page tapped.
+    func endTouchHold() {
+        guard isTouchHeld else { return }
+        isTouchHeld = false
+        reveal(false)
+    }
+
+    // MARK: Touch: the grabber
+
+    private var touchListener: Int?
+    /// When a finger last landed in this window, and when the pointer last moved in it.
+    private(set) var touchedAt: TimeInterval?
+    private(set) var pointerMovedAt: TimeInterval?
+    private var grabberHideWork: DispatchWorkItem?
+    private(set) var isGrabberShown = false
+    /// Shown with the lights by a tap in its zone or as a hint, until `grabberRevealWork` runs.
+    private(set) var isGrabberRevealed = false
+    private var grabberRevealWork: DispatchWorkItem?
+    /// Where the tap that showed it landed, own coordinates: that tap doesn't press it.
+    private var revealTapPoint: NSPoint?
+    private var hadSidebarShown: Bool?
+
+    /// Hidden in the window: not docked, not out, not under a finger.
+    private var sidebarShown: Bool { sidebarVisible || sidebarRevealed || touchReach != nil }
+
+    private func touchLanded(_ event: NSEvent) {
+        guard let window, event.windowNumber == window.windowNumber else { return }
+        noteTouch(at: event.timestamp)
+        fingerLanded(at: convert(event.locationInWindow, from: nil))
+    }
+
+    /// The zone a tap shows the group with the lights from, own coordinates.
+    var grabberRevealZone: NSRect {
+        if !isGrabberShown { placeGrabber() }
+        var group = grabber.frame
+        if !isFlipped { group.origin.y = bounds.height - group.maxY }
+        var zone = TouchSidebarGrabber.revealZone(group: group, width: bounds.width, onRight: sidebarOnRight)
+        if !isFlipped { zone.origin.y = bounds.height - zone.maxY }
+        return zone
+    }
+
+    /// Whether the group can show with the lights now: the sidebar hidden, no bar, no strip on top, a finger in use.
+    private var grabberCanReveal: Bool {
+        TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
+                                  now: ProcessInfo.processInfo.systemUptime) && topStrip == nil && window?.styleMask.contains(.fullScreen) != true
+    }
+
+    /// A finger landed at `point` (own coordinates): in the zone it shows the group, swallowing the tap; elsewhere
+    /// it hides it, and the tap is the page's.
+    func fingerLanded(at point: NSPoint) {
+        revealTapPoint = nil
+        switch TouchSidebarGrabber.landing(inZone: grabberRevealZone.contains(point), revealed: isGrabberRevealed, available: grabberCanReveal) {
+        case .reveal:
+            revealTapPoint = point
+            revealGrabber(for: TouchSidebarGrabber.revealFor)
+            spendTouch(at: [point])
+        case .keep: revealGrabber(for: TouchSidebarGrabber.revealFor)
+        case .hide: concealGrabber()
+        case .none: break
+        }
+    }
+
+    /// Shows the group with the lights for `duration`, then fades it.
+    func revealGrabber(for duration: TimeInterval) {
+        grabberRevealWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.concealGrabber() } }
+        grabberRevealWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+        isGrabberRevealed = true
+        refreshGrabber()
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil { concealGrabber() }
+    }
+
+    /// Hides the group with the lights now.
+    func concealGrabber() {
+        grabberRevealWork?.cancel()
+        grabberRevealWork = nil
+        guard isGrabberRevealed else { return }
+        isGrabberRevealed = false
+        refreshGrabber()
+    }
+
+    /// Whether a tap at `start` presses the toggle: not the tap that showed it.
+    func grabberTapTakes(_ start: NSPoint) -> Bool {
+        if let tap = revealTapPoint, hypot(tap.x - start.x, tap.y - start.y) <= TouchGestures.target { return false }
+        return grabberTakes(start)
+    }
+
+    /// A finger landed at `time`: the grabber shows, until `TouchSidebarGrabber.recent` has passed.
+    func noteTouch(at time: TimeInterval) {
+        touchedAt = time
+        grabberHideWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.refreshGrabber() } }
+        grabberHideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + TouchSidebarGrabber.recent, execute: work)
+        refreshGrabber()
+    }
+
+    /// The pointer moved at `time`: the mouse or trackpad is in use, so the grabber goes.
+    func notePointerMoved(at time: TimeInterval) {
+        pointerMovedAt = time
+        grabberRevealWork?.cancel()
+        grabberRevealWork = nil
+        isGrabberRevealed = false
+        refreshGrabber()
+    }
+
+    /// Where it shows now, nil while hidden.
+    private(set) var grabberPlace: TouchSidebarGrabber.Place?
+    /// The strip showing it, while it's in one.
+    private(set) weak var grabberStrip: PaneHeaderView?
+    /// Where the lights end in the group, in own coordinates; nil with no lights in it (full screen).
+    private var grabberLightsMaxX: CGFloat?
+    /// The group with the lights moved or came or went: the window puts the lights with it.
+    var onGrabberMoved: (() -> Void)?
+
+    /// The strip at the top of the page area on the sidebar's side: in split view, with the strips on the cards.
+    private var topStrip: PaneHeaderView? {
+        guard tiles != nil else { return nil }
+        let cards = paneCards.filter { !$0.isHidden && $0.showsHeader && !$0.liftsHeader }
+        if let zoomed = zoomedPane, paneCards.indices.contains(zoomed), cards.contains(where: { $0 === paneCards[zoomed] }) {
+            return paneCards[zoomed].header
+        }
+        let frames = cards.map { isFlipped ? NSRect(x: $0.frame.minX, y: bounds.height - $0.frame.maxY, width: $0.frame.width, height: $0.frame.height) : $0.frame }
+        return TouchSidebarGrabber.stripPane(frames, onRight: sidebarOnRight).map { cards[$0].header }
+    }
+
+    /// The toggle's finger target with the lights, in own coordinates.
+    var grabberTarget: NSRect { TouchSidebarGrabber.target(around: convert(grabber.toggleFrame, from: grabber), clearOf: grabberLightsMaxX) }
+
+    /// A finger takes it anywhere in its target, off the strip's other buttons.
+    private func grabberTakes(_ point: NSPoint) -> Bool {
+        switch grabberPlace {
+        case .strip?: grabberStrip.map { $0.fingerTakesSidebarButton(at: $0.convert(point, from: self)) } ?? false
+        case .lights?: grabberTarget.contains(point)
+        case nil: false
+        }
+    }
+
+    /// Where the docked sidebar has its lights and toggle, on the lights' line.
+    func placeGrabber() {
+        let sidebar = sidebarContainer.sidebar
+        let mirrored = sidebarOnRight && !sidebar.holdsAddress
+        let row = SidebarView.topRowFrames(width: sidebarWidth, trafficLightsWidth: sidebar.trafficLightsWidth, onRight: sidebarOnRight,
+                                           mirrored: mirrored)
+        let side = SidebarView.toolbarButton
+        let toggle = NSRect(x: row.toggle.minX, y: sidebar.trafficLightCenterY - side / 2, width: side, height: side)
+        let sidebarMinX = sidebarOnRight ? bounds.width - sidebarWidth : 0
+        let lightsMinX = sidebar.trafficLightsWidth > 0 && !mirrored ? sidebarMinX + SidebarView.trafficLightsX : nil
+        var frame = TouchSidebarGrabber.groupFrame(toggle: TouchSidebarGrabber.frame(toggle: toggle, sidebarMinX: sidebarMinX), lightsMinX: lightsMinX)
+        if !isFlipped { frame.origin.y = bounds.height - frame.maxY }
+        grabber.frame = frame
+        grabberLightsMaxX = lightsMinX.map { $0 + sidebar.trafficLightsWidth }
+        grabber.onRight = sidebarOnRight
+        // Light or dark as the page's top is, so it reads as that page's title bar.
+        grabber.appearance = PageBar.inkAppearance(on: pageColor).flatMap(NSAppearance.init(named:))
+    }
+
+    /// Shows or hides the grabber as `TouchSidebarGrabber.shows` says: in the top strip, or with the lights while
+    /// revealed, fading.
+    func refreshGrabber() {
+        let show = TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
+                                             now: ProcessInfo.processInfo.systemUptime)
+        // Just hidden with a finger in use: shown a moment so it can be found.
+        let hadShown = hadSidebarShown
+        hadSidebarShown = sidebarShown
+        if hadShown == true, !sidebarShown, show, !isGrabberRevealed {
+            revealGrabber(for: TouchSidebarGrabber.hintFor)
+            return
+        }
+        if !show, isGrabberRevealed {
+            isGrabberRevealed = false
+            grabberRevealWork?.cancel()
+            grabberRevealWork = nil
+        }
+        let strip = show ? topStrip : nil
+        if strip !== grabberStrip {
+            grabberStrip?.showsSidebarButton = false
+            strip?.showsSidebarButton = true
+            grabberStrip = strip
+        }
+        grabberStrip?.sidebarOnRight = sidebarOnRight
+        // In full screen it stays as the lights do there, down with the menu bar.
+        let withLights = isGrabberRevealed || window?.styleMask.contains(.fullScreen) == true
+        let place: TouchSidebarGrabber.Place? = !show ? nil : strip != nil ? .strip : withLights ? .lights : nil
+        isGrabberShown = place != nil
+        guard place != grabberPlace else { return }
+        let lights = place == .lights, hadLights = grabberPlace == .lights
+        grabberPlace = place
+        if lights {
+            placeGrabber()
+            grabber.isHidden = false
+        }
+        onGrabberMoved?()
+        guard lights != hadLights else { return }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade : lights ? Tokens.Motion.enter : Tokens.Motion.exit
+            grabber.animator().alphaValue = lights ? 1 : 0
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.grabberPlace != .lights else { return }
+                self.grabber.isHidden = true
+            }
+        })
+    }
+
+    /// A tap on the grabber: the sidebar comes out and stays, as after a finger's pull.
+    func openFromGrabber() {
+        guard !sidebarVisible else { return }
+        // The same button as the docked sidebar's toggle: it shows the sidebar in the window, as a click does.
+        if let controller = window?.windowController as? BrowserWindowController {
+            controller.toggleBrowserSidebar(nil)
+        } else {
+            setSidebarVisible(true, animated: true)
+        }
+        // Gone at once, not left over the sliding sidebar.
+        refreshGrabber()
+    }
+
+    /// A finger's tap on the grabber at `point`: the sidebar comes out, and what slides under the finger takes
+    /// neither AppKit's click from it nor its tap.
+    func grabberTapped(at point: NSPoint) {
+        openFromGrabber()
+        spendTouch(at: [point])
+    }
+
+    #if DEBUG
+    var isPullingSidebar: Bool { touchReach != nil }
+
+    /// As if a finger had just landed in the window.
+    func debugTouchedRecently() {
+        pointerMovedAt = nil
+        noteTouch(at: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// As if a finger had just tapped the middle of the zone that shows the group with the lights.
+    func debugRevealTap() {
+        debugTouchedRecently()
+        let zone = grabberRevealZone
+        fingerLanded(at: NSPoint(x: zone.midX, y: zone.midY))
+    }
+    #endif
 
     private let pageDropRing = CALayer()
 
@@ -817,8 +1353,7 @@ final class BrowserRootView: SpaceFrameView {
     /// With the sidebar hidden, the page is the whole window, no frame around it; the sidebar that slides out from
     /// the edge is what moves and zooms the window. With the sidebar showing, the page floats in its frame.
     var isEdgeToEdge: Bool {
-        if isImmersive { return true }
-        return !sidebarVisible && (Self.isBorderless || window?.styleMask.contains(.fullScreen) == true)
+        !sidebarVisible && (Self.isBorderless || window?.styleMask.contains(.fullScreen) == true)
     }
 
     /// With the sidebar hidden, the page runs to the window's edges. On unless turned off in Settings.
@@ -874,7 +1409,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     var topBarFrame: NSRect {
-        Self.topBarFrame(in: bounds, sidebarVisible: chromeSidebarShown, sidebarWidth: sidebarWidth, inset: topBarInset, onRight: sidebarOnRight)
+        Self.topBarFrame(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth, inset: topBarInset, onRight: sidebarOnRight)
     }
 
     /// Framed, the bar is the top of the page's card; borderless or edge to edge, it starts at the window's top.
@@ -897,8 +1432,8 @@ final class BrowserRootView: SpaceFrameView {
 
     /// The page area as a whole, before a side panel takes its share.
     private var pageAreaFrame: NSRect {
-        Self.pageArea(in: bounds, sidebarVisible: chromeSidebarShown, sidebarWidth: sidebarWidth, edgeToEdge: isEdgeToEdge,
-                      borderless: Self.isBorderless, topBar: isImmersive ? false : showsTopBar, barInset: topBarInset, onRight: sidebarOnRight)
+        Self.pageArea(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth, edgeToEdge: isEdgeToEdge,
+                      borderless: Self.isBorderless, topBar: showsTopBar, barInset: topBarInset, onRight: sidebarOnRight)
     }
 
     /// Where the pages go. With the bar above the page, they start under it: framed, the bar stands in for the gap
@@ -992,14 +1527,14 @@ final class BrowserRootView: SpaceFrameView {
     /// the bar is still the top of the page's card rather than a strip on the glass with the card floating under it.
     private var barColor: NSColor? { pageColor ?? (topBarInset > 0 ? Tokens.Color.cardBackground : nil) }
 
-    private var paintsTopBar: Bool { chromeBarShown && barColor != nil && tiles == nil && !isEmpty }
+    private var paintsTopBar: Bool { showsTopBar && barColor != nil && tiles == nil && !isEmpty }
 
     /// Framed in split view under the bar, each pane whose strip is up in the bar's row is one card with it, as a page
     /// alone is with the bar: its card reaches up to the bar's top, its own ground (its page's color, or the card's)
     /// behind its strip, so no strip floats on the glass over a card. Between the panes the glass shows down to the
     /// window's frame, and the bar has no fill of its own across them. Borderless and edge to edge, the panes meet the
     /// bar in a straight line as before.
-    private var splitJoinsBar: Bool { chromeBarShown && tiles != nil && topBarInset > 0 && !isEmpty }
+    private var splitJoinsBar: Bool { showsTopBar && tiles != nil && topBarInset > 0 && !isEmpty }
 
     /// Whether the card of the pane at `index` reaches up under the bar: a page alone under a bar in its color, or in
     /// split view framed, a pane whose strip is up in the bar (not one enlarged over the rest).
@@ -1030,7 +1565,7 @@ final class BrowserRootView: SpaceFrameView {
         card.frame = left
         card.band = left.height - frames[0].height
         topBar.pageColor = paintsTopBar ? barColor : nil
-        let attached = chromeSidebarShown && Self.isBorderless
+        let attached = sidebarVisible && Self.isBorderless
         squareCorners(of: card)
         card.isAttached = attached
         for (i, extra) in extraCards.enumerated() {
@@ -1057,7 +1592,7 @@ final class BrowserRootView: SpaceFrameView {
             let frame = sidePanelFrame
             sidePanel.frame = frame
             // Shaped like a page pane: all four corners at its radius.
-            let attached = chromeSidebarShown && Self.isBorderless
+            let attached = sidebarVisible && Self.isBorderless
             sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius(in: window) : Tokens.Radius.card, squareRight: (false, false))
         }
     }
@@ -1288,7 +1823,12 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     var sidebarFrame: NSRect {
-        Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: chromeSidebarShown, revealed: sidebarRevealed, onRight: sidebarOnRight)
+        let frame = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: sidebarVisible, revealed: sidebarRevealed, onRight: sidebarOnRight)
+        guard let touchReach, !sidebarVisible else { return frame }
+        // Under a finger: the card's far edge where the finger has it.
+        let out = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: false)
+        let pulled = NSRect(x: bounds.minX + touchReach - sidebarWidth, y: out.minY, width: sidebarWidth, height: out.height)
+        return Self.mirrored(pulled, in: bounds, if: sidebarOnRight)
     }
 
     /// The sidebar's frame: docked along the window's edge, floating a frame's inset in from it while slid out, or
@@ -1342,11 +1882,11 @@ final class BrowserRootView: SpaceFrameView {
     /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
     override var glassFrame: NSRect {
         // Edge to edge under the bar above the page, only the bar shows the frame, as in Zigzag Mini.
-        if chromeBarShown, isEdgeToEdge, !card.isHidden { return topBarFrame }
+        if showsTopBar, isEdgeToEdge, !card.isHidden { return topBarFrame }
         // Beside the sidebar too, the frame shows along the top and the side: glass under all of it.
-        if chromeBarShown { return bounds }
+        if showsTopBar { return bounds }
         // A split view's seam between its two pages shows the frame: glass under all of it then.
-        guard chromeSidebarShown, card.isAttached, !card.isHidden,
+        guard sidebarVisible, card.isAttached, !card.isHidden,
               extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
         return Self.mirrored(NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + max(Tokens.Radius.attached, PageCardView.attachedRadius(in: window)) * 2), height: bounds.height),
                              in: bounds, if: sidebarOnRight)
@@ -1363,7 +1903,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// Nothing to see through: the page runs edge to edge, or the tab overview covers the window with its own glass.
-    override var glassIsCovered: Bool { (isEdgeToEdge && (!chromeBarShown || paintsTopBar) && !card.isHidden) || glassCovered }
+    override var glassIsCovered: Bool { (isEdgeToEdge && (!showsTopBar || paintsTopBar) && !card.isHidden) || glassCovered }
 
     override func layout() {
         super.layout()
@@ -1371,7 +1911,7 @@ final class BrowserRootView: SpaceFrameView {
         layoutCards()
         layoutTopBar()
         sidebarContainer.frame = sidebarFrame
-        sidebarContainer.isFloating = !chromeSidebarShown && !leavesDocked
+        sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         // The popout's inner edge takes the pointer too: its card is inset, so the band follows the card (#431).
@@ -1379,13 +1919,15 @@ final class BrowserRootView: SpaceFrameView {
             ? Self.revealedResizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
             : Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
         resizeHandle.line = Self.resizeHandleLine(onRight: sidebarOnRight)
-        resizeHandle.isHidden = !(chromeSidebarShown || sidebarRevealed || isDraggingSidebarEdge)
+        resizeHandle.isHidden = !sidebarVisible && !sidebarRevealed && !isDraggingSidebarEdge
         // With the sidebar hidden, the glow goes on the window edge, not at the resize handle, which would sit inside
         // the page.
         attentionEdge.frame = Self.attentionEdgeFrame(in: bounds, onRight: sidebarOnRight)
         let waiting = waitingTabs
         attentionEdge.waiting = waiting.count
-        attentionEdge.isHidden = chromeSidebarShown || waiting.isEmpty
+        attentionEdge.isHidden = sidebarVisible || waiting.isEmpty
+        if isGrabberShown { placeGrabber() }
+        refreshGrabber()
         overlay.frame = bounds
         onLayoutChange?()
     }
@@ -1406,16 +1948,15 @@ final class BrowserRootView: SpaceFrameView {
     /// where the frame comes and goes with the sidebar: there the row would move as the sidebar is shown, and its
     /// toggle, the one thing you reach for in that corner, stays where it is with the sidebar hidden.
     var sidebarTopRowDrop: CGFloat {
-        chromeBarShown && barHoldsAddress && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
+        showsTopBar && barHoldsAddress && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
     }
 
     private func layoutTopBar() {
-        guard laysOutBar else { topBar.isHidden = true; return }
+        guard showsTopBar else { return }
         let page = pageAreaFrame
         placeTopBar()
-        topBar.isHidden = !chromeBarShown
         // Beside it, the sidebar's favorites and tabs start where the page does.
-        if chromeSidebarShown { sidebarContainer.sidebar.contentTop = page.minY - sidebarFrame.minY }
+        if sidebarVisible { sidebarContainer.sidebar.contentTop = page.minY - sidebarFrame.minY }
     }
 
     /// The address's end is over the page's card, the bar being its top: not beside an extension's side panel, where
@@ -1449,7 +1990,7 @@ final class BrowserRootView: SpaceFrameView {
     /// Stacked, the top pane's goes up; the bottom one keeps its own on its card. In a tile group, the panes along
     /// the top, left to right. A pane enlarged over the rest takes its strip with it, on its card.
     private var cardsForBar: [PageCardView] {
-        guard chromeBarShown, tiles != nil else { return [] }
+        guard showsTopBar, tiles != nil else { return [] }
         let frames = tileFrames, top = cardFrame.minY
         return frames.indices.filter { frames[$0].minY <= top + 0.5 && $0 != zoomedPane }.sorted { frames[$0].minX < frames[$1].minX }.map { paneCards[$0] }
     }
@@ -1464,7 +2005,7 @@ final class BrowserRootView: SpaceFrameView {
     private func placeStrips(animated: Bool) {
         let cards = cardsForBar
         // A split's pages each have their own controls: the bar's stay out the whole time, zoomed or not.
-        let stepsAside = chromeBarShown && tiles != nil
+        let stepsAside = showsTopBar && tiles != nil
         guard cards != liftedCards || stepsAside != stripsInBar else { return }
         let entering = stepsAside && !stripsInBar, leaving = !stepsAside && stripsInBar
         liftedCards = cards
@@ -1534,6 +2075,8 @@ final class BrowserRootView: SpaceFrameView {
         let slide = topBarSlides
         sidebarVisible = visible
         sidebarRevealed = false
+        isTouchHeld = false
+        touchReach = nil
         watchPointer(false)
         leavesDocked = !visible && showsTopBar && animated && !Tokens.Motion.reduceMotion
         sidebarContainer.isFloating = !visible && !leavesDocked
@@ -1638,7 +2181,7 @@ final class BrowserRootView: SpaceFrameView {
         // The bar's strip at the window's left edge holds the traffic lights while the sidebar is hidden: reaching
         // for them there leaves the sidebar be, so they don't move off into it under the pointer. (A sidebar on the
         // right comes out at the other edge, clear of them.)
-        let lights = chromeBarShown && !chromeSidebarShown && !sidebarOnRight ? topBarFrame.maxY : 0
+        let lights = showsTopBar && !sidebarVisible && !sidebarOnRight ? topBarFrame.maxY : 0
         let out = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: sidebarOnRight)
         return SidebarEdgeZone(bounds: bounds, sidebar: out, onRight: sidebarOnRight, reservedTop: lights)
     }
@@ -1666,9 +2209,12 @@ final class BrowserRootView: SpaceFrameView {
         let elapsed = event.timestamp - lastMoveTime
         lastMoveSpeed = elapsed > 0 && elapsed < 0.1 ? (sidebarOnRight ? event.deltaX : -event.deltaX) / max(elapsed, 1.0 / 240) : 0
         lastMoveTime = event.timestamp
-        let point = convert(event.locationInWindow, from: nil)
-        if edgeZone.opens(at: point) { pointerAtEdge(at: event.timestamp, speed: lastMoveSpeed) }
-        revealTopBar(near: point)
+        // Out by a finger, the pointer moving takes it over: from here it keeps the sidebar out as hovering does.
+        if !TouchPress.isTouchScroll(at: event.timestamp) {
+            if isTouchHeld { isTouchHeld = false }
+            notePointerMoved(at: event.timestamp)
+        }
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: lastMoveSpeed) }
     }
 
     /// The speed of the last moved event, if it came just now: entering and leaving carry none of their own.
@@ -1679,28 +2225,12 @@ final class BrowserRootView: SpaceFrameView {
     /// goes in the moment after decides (`pointerAtEdge`): nothing more comes from out there.
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        let point = convert(event.locationInWindow, from: nil)
-        if edgeZone.meetsLeaving(at: point) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
-        if topBarRevealed { topBarRevealed = false }
+        if edgeZone.meetsLeaving(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
     }
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        let point = convert(event.locationInWindow, from: nil)
-        if edgeZone.opens(at: point) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
-        revealTopBar(near: point)
-    }
-
-    /// In full screen, the pointer at the window's top brings the bar down over the page without moving it, and
-    /// leaving the bar puts it away again (#462).
-    private func revealTopBar(near point: NSPoint) {
-        guard isImmersive else { return }
-        let bar = topBarFrame
-        if point.y <= Tokens.Space.x2 || (topBarRevealed && bar.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(point)) {
-            if !topBarRevealed { topBarRevealed = true }
-        } else if topBarRevealed, point.y > bar.maxY + Tokens.Space.x2 {
-            topBarRevealed = false
-        }
+        if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
     }
 
     /// Looks at the pointer every frame in the moment after it meets the edge, outside the window too, where no
@@ -1718,7 +2248,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func pointerAtEdge(at time: TimeInterval, speed: CGFloat) {
-        guard !chromeSidebarShown, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
+        guard !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
         if case .hidden = edgeReveal.phase, let p = pointer {
             Self.edgeLog.notice("met x=\(Int(p.x), privacy: .public) y=\(Int(p.y), privacy: .public) speed=\(Int(speed), privacy: .public) w=\(Int(self.bounds.width), privacy: .public) screenEdge=\(self.windowMeetsScreenEdge, privacy: .public)")
         }
@@ -1736,7 +2266,7 @@ final class BrowserRootView: SpaceFrameView {
     private func decideEdge() {
         // Something may have opened over the window in the meantime (⌘L with the pointer resting here).
         let open: Bool?
-        if let point = pointer, !chromeSidebarShown, !sidebarRevealed, blocksEdgeReveal?() != true {
+        if let point = pointer, !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true {
             open = edgeReveal.decide(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone)
         } else {
             open = false
@@ -1777,7 +2307,7 @@ final class BrowserRootView: SpaceFrameView {
     private func pacePointer() {
         pointerTimer?.invalidate()
         pointerTimer = nil
-        guard let window, !chromeSidebarShown, sidebarRevealed, window.occlusionState.contains(.visible) else { return }
+        guard let window, !sidebarVisible, sidebarRevealed, window.occlusionState.contains(.visible) else { return }
         // Every frame only once the pointer has left, to time the hide exactly; while it rests on the sidebar a tenth of
         // a second is quick enough to notice it leave, and doesn't wake the Mac sixty times a second meanwhile.
         let attentive = NSApp.isActive && window.isKeyWindow
@@ -1797,14 +2327,17 @@ final class BrowserRootView: SpaceFrameView {
         edgeTimer?.invalidate()
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
+        if let touchListener { TouchPress.stopListening(touchListener) }
+        grabberHideWork?.cancel()
+        grabberRevealWork?.cancel()
     }
 
     private func followPointer() {
         // A drag on the edge is not the pointer leaving: the band reaches past the card, and the width follows it.
         guard !isDraggingSidebarEdge else { return }
-        guard let point = pointer, !chromeSidebarShown, sidebarRevealed else { watchPointer(false); return }
+        guard let point = pointer, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
         let wasLeaving = edgeReveal.isLeaving
-        let held = isHeld || NSEvent.pressedMouseButtons != 0
+        let held = isHeld || isTouchHeld || NSEvent.pressedMouseButtons != 0
         if edgeReveal.follow(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone, held: held) {
             let zone = edgeZone
             Self.edgeLog.notice("tuck at x=\(Int(point.x), privacy: .public) y=\(Int(point.y), privacy: .public) keeps=\(zone.keeps(at: point), privacy: .public) past=\(zone.isPast(point), privacy: .public) sidebar=\(Int(zone.sidebar.minX), privacy: .public)-\(Int(zone.sidebar.maxX), privacy: .public) active=\(NSApp.isActive, privacy: .public)")
@@ -1815,7 +2348,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     func reveal(_ show: Bool) {
-        guard !chromeSidebarShown, show != sidebarRevealed else { return }
+        guard !sidebarVisible, show != sidebarRevealed else { return }
         if !show && isHeld { return }
         Self.edgeLog.notice("reveal \(show ? "out" : "in", privacy: .public)")
         let old = sidebarContainer.frame
@@ -1823,6 +2356,8 @@ final class BrowserRootView: SpaceFrameView {
         revealMeter.begin(show ? "out" : "in", in: self)
         #endif
         sidebarRevealed = show
+        if !show { isTouchHeld = false }
+        refreshGrabber()
         // The edge handle follows the card, and only layout moves it.
         needsLayout = true
         let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
@@ -1893,7 +2428,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// True while the sidebar is in its floating, slid-in state.
-    var isSidebarFloatingVisible: Bool { !chromeSidebarShown && sidebarRevealed }
+    var isSidebarFloatingVisible: Bool { !sidebarVisible && sidebarRevealed }
 
     #if DEBUG
     /// Testing builds: how evenly the frames come while the sidebar slides out or back (debug.log).
@@ -2087,32 +2622,63 @@ final class PassthroughView: NSView {
 }
 
 /// Shown while a tab is dragged over the page: where it would open, beside what's there (`TileDrop`): a half or a
-/// quarter of the page, or in place of a page that can't split again.
+/// quarter of the page, or in place of a page that can't split again. The place is shaded in the accent, and a card in
+/// it names the page coming in and what the drop does; it glides from place to place and fades in and out.
 final class SplitDropHint: NSView {
     private let zone = ColorView()
-    /// What the hint says, on a toast's pill so it reads over any page, kept clear of what the pointer carries.
-    private let pill = FloatingPanelView()
+    /// The page coming in and what the drop does, on a panel's surface so it reads over any page.
+    private let card = FloatingPanelView()
+    private let icon = FaviconView()
+    private let name = Label("", font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
     private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
-    /// The pointer, in this view's terms, while something is carried over the page: the label keeps out from under
-    /// the picture that hangs below it.
+    /// The pointer, in this view's terms, while something is carried over the page: the card keeps out from under it
+    /// (and from under a finger, which hides more than a pointer does).
     private var pointer: CGPoint?
     /// Where a drop now would go, in this view's terms (it covers the page area); nil while it's not over the page.
     private(set) var drop: TileDrop?
+    /// Whether a place shows; while it fades out it no longer does.
+    private(set) var isShowing = false
+
+    /// The page being carried: its icon and title show in the card. Nil: the card says only what the drop does.
+    var incoming: (icon: NSImage?, title: String)? {
+        didSet {
+            guard incoming?.title != oldValue?.title || incoming?.icon !== oldValue?.icon else { return }
+            icon.image = incoming?.icon
+            name.stringValue = incoming?.title ?? ""
+            let solo = incoming == nil
+            icon.isHidden = solo
+            name.isHidden = solo
+            label.font = solo ? Tokens.Font.body(.medium) : Tokens.Font.small()
+            label.textColor = solo ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            if isShowing { place(animated: false) }
+        }
+    }
+
+    /// Room kept clear round the pointer: about a fingertip and what hangs below it.
+    nonisolated static let pointerClearance: CGFloat = 44
+    private static let iconSide: CGFloat = 20
+    /// A long title is cut at this width rather than stretching the card across the page.
+    static let maxCardWidth: CGFloat = 320
+    private static let padding = NSEdgeInsets(top: Tokens.Space.x2 + 2, left: Tokens.Space.x3, bottom: Tokens.Space.x2 + 2, right: Tokens.Space.x3)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        wantsLayer = true
         zone.wantsLayer = true
         zone.layer?.cornerRadius = Tokens.Radius.card
         zone.layer?.cornerCurve = .continuous
         zone.layer?.borderWidth = 2
         addSubview(zone)
-        pill.radius = Tokens.Metric.toastHeight / 2
-        // Laid out with the pill, inside its surface, as a toast lays out its label.
-        pill.onLayout = { [weak self] in self?.layoutLabel() }
-        pill.addSubview(label)
-        addSubview(pill)
-        label.alignment = .center
+        card.radius = Tokens.Radius.panel
+        // Laid out with the card, inside its surface, as a toast lays out its label.
+        card.onLayout = { [weak self] in self?.layoutCard() }
+        icon.isHidden = true
+        name.isHidden = true
+        [icon, name, label].forEach(card.addSubview)
+        addSubview(card)
         isHidden = true
+        alphaValue = 0
+        setAccessibilityElement(false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -2138,49 +2704,126 @@ final class SplitDropHint: NSView {
         present(move?.frame, title: move.map { Self.title(forMove: $0.kind) })
     }
 
+    /// The zone for a place: inside the page's edges, so the page's own corners still show round it.
+    static func zoneFrame(for place: CGRect) -> CGRect { place.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2) }
+
     private func present(_ frame: CGRect?, title: String?) {
-        isHidden = frame == nil
-        guard let frame else { return }
-        let target = frame.insetBy(dx: Tokens.Space.x2, dy: Tokens.Space.x2)
-        zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
-        zone.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.6))
-        label.stringValue = title ?? ""
-        let place = labelFrame(in: target)
-        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) {
-            self.zone.animator().frame = target
-            self.pill.animator().frame = place
+        guard let frame else {
+            hide()
+            return
         }
-        if zone.frame.isEmpty { zone.frame = target }
-        if pill.frame.isEmpty { pill.frame = place }
-        pill.needsLayout = true
+        let target = Self.zoneFrame(for: frame)
+        zone.color = Tokens.Color.accent.withAlphaComponent(0.16)
+        zone.edgeColor = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha)
+        label.stringValue = title ?? ""
+        let arriving = !isShowing
+        isShowing = true
+        if arriving {
+            // Fades in growing a little into its place, rather than flying in from where it last was.
+            isHidden = false
+            Tokens.Motion.withoutAnimation {
+                zone.frame = target.insetBy(dx: min(12, target.width / 8), dy: min(12, target.height / 8))
+                card.frame = cardFrame(in: target)
+            }
+        }
+        let cardPlace = cardFrame(in: target)
+        card.needsLayout = true
+        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) {
+            self.animator().alphaValue = 1
+            self.zone.animator().frame = target
+            self.card.animator().frame = cardPlace
+        }
     }
 
-    /// The pointer moved (a window point; nil: nothing carried): the label moves out of its way if it has to.
+    private func hide() {
+        guard isShowing else { return }
+        isShowing = false
+        Tokens.Motion.animate(Tokens.Motion.change, { self.animator().alphaValue = 0 }, completion: { [weak self] in
+            // Shown again meanwhile: it stays.
+            guard let self, !self.isShowing else { return }
+            self.isHidden = true
+        })
+    }
+
+    /// Lays the card out again where it is now.
+    private func place(animated: Bool) {
+        guard isShowing, !zone.frame.isEmpty else { return }
+        let target = cardFrame(in: zone.frame)
+        card.needsLayout = true
+        if animated {
+            Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.card.animator().frame = target }
+        } else {
+            Tokens.Motion.withoutAnimation { card.frame = target }
+        }
+    }
+
+    /// The pointer moved (a window point; nil: nothing carried): the card moves out of its way if it has to.
     func follow(_ windowPoint: NSPoint?) {
         pointer = windowPoint.map { convert($0, from: nil) }
-        guard !isHidden, !zone.frame.isEmpty else { return }
-        let place = labelFrame(in: zone.frame)
-        guard place != pill.frame else { return }
-        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.pill.animator().frame = place }
+        guard isShowing, !zone.frame.isEmpty else { return }
+        let target = cardFrame(in: zone.frame)
+        guard target != card.frame else { return }
+        Tokens.Motion.animate(Tokens.Motion.feedback, moves: true) { self.card.animator().frame = target }
     }
 
-    /// The label's pill in `zone`: centered across it, near its top, or near its bottom while the pointer is in its
-    /// upper half, as what's carried hangs below the pointer.
-    private func labelFrame(in zone: CGRect) -> CGRect {
-        let h = Tokens.Metric.toastHeight, inset = Tokens.Space.x4
-        // A few points in hand, as a field's text keeps before it cuts.
-        let w = min(ceil(label.inkWidth) + Tokens.Space.x2 + inset * 2, max(0, zone.width - inset * 2))
+    /// The card's size for what it says, at most `width` wide.
+    private func cardSize(fitting width: CGFloat) -> CGSize {
+        let p = Self.padding
+        let text: CGFloat
+        let height: CGFloat
+        if incoming == nil {
+            text = ceil(label.inkWidth) + Tokens.Space.x2
+            height = Tokens.Metric.toastHeight
+            // A pill, as before: even ends.
+            return CGSize(width: min(text + Tokens.Space.x4 * 2, width), height: height)
+        }
+        text = max(ceil(name.inkWidth), ceil(label.inkWidth)) + 1
+        height = p.top + Self.iconSide + 1 + label.lineHeight + p.bottom
+        return CGSize(width: min(p.left + Self.iconSide + Tokens.Space.x2 + text + p.right, width, Self.maxCardWidth), height: height)
+    }
+
+    /// The card in `zone`: in its middle, or, while the pointer is on or near the middle, near its top or bottom,
+    /// whichever is further from the pointer.
+    private func cardFrame(in zone: CGRect) -> CGRect {
+        let inset = Tokens.Space.x4
+        let size = cardSize(fitting: max(0, zone.width - inset * 2))
+        return Self.cardFrame(size: size, in: zone, pointer: pointer)
+    }
+
+    /// Where a card of `size` sits in `zone` with the pointer at `pointer` (all in the hint's top-down terms).
+    static func cardFrame(size: CGSize, in zone: CGRect, pointer: CGPoint?) -> CGRect {
+        let inset = Tokens.Space.x4
         // Clear of a pane's strip at the top, so the pane's address still shows.
         let top = zone.minY + Tokens.Pane.height + Tokens.Space.x3
-        let high = pointer.map { $0.y < zone.midY } ?? false
-        let y = high ? max(top, zone.maxY - inset - h) : min(top, max(zone.minY, zone.maxY - inset - h))
-        return CGRect(x: round(zone.midX - w / 2), y: round(y), width: w, height: h)
+        let bottom = zone.maxY - inset - size.height
+        let x = round(zone.midX - size.width / 2)
+        var y = round(zone.midY - size.height / 2)
+        if let pointer {
+            let clear = Self.pointerClearance
+            let middle = CGRect(x: x, y: y, width: size.width, height: size.height).insetBy(dx: -clear, dy: -clear)
+            if middle.contains(pointer) {
+                y = pointer.y < zone.midY ? max(top, bottom) : min(top, bottom)
+            }
+        }
+        return CGRect(x: x, y: round(max(zone.minY, y)), width: size.width, height: size.height)
     }
 
-    private func layoutLabel() {
-        let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x4 - Label.inset, y: (pill.bounds.height - h) / 2,
-                             width: max(0, pill.bounds.width - Tokens.Space.x4 * 2 + Label.inset * 2), height: h)
+    private func layoutCard() {
+        let p = Self.padding
+        if incoming == nil {
+            let h = label.lineHeight
+            label.alignment = .center
+            label.frame = NSRect(x: Tokens.Space.x4 - Label.inset, y: (card.bounds.height - h) / 2,
+                                 width: max(0, card.bounds.width - Tokens.Space.x4 * 2 + Label.inset * 2), height: h)
+            return
+        }
+        label.alignment = .left
+        let side = Self.iconSide
+        icon.frame = NSRect(x: p.left, y: p.top, width: side, height: side)
+        let textX = icon.frame.maxX + Tokens.Space.x2 - Label.inset
+        let textWidth = max(0, card.bounds.width - textX - p.right + Label.inset)
+        name.frame = NSRect(x: textX, y: p.top + name.centeredY(in: side), width: textWidth, height: name.lineHeight)
+        label.frame = NSRect(x: textX, y: p.top + side + 1, width: textWidth, height: label.lineHeight)
     }
 
     /// What the hint says over where the page would open.

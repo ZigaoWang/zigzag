@@ -75,3 +75,11 @@
   Test: PageShortcutsTests.theSpaceKeysStayTheBrowsers
 - Close Tabs Below in Settings › Shortcuts → listed, though it has no menu bar line or keys, and takes keys of yours.
   Test: SettingsSearchTests.closeTabsBelowCanHaveAShortcut
+
+## Menus
+- An item in a sidebar menu, the + or the sidebar's empty space that the menu bar also has → it shows the menu bar's keys, as Settings › Shortcuts has them now.
+  Test: SidebarRowMenuTests.everySidebarMenuShowsTheMenuBarsKeysForTheSameAction
+- The menu bar as Zigzag ships it, the developer tools' items included → no two items share keys.
+  Test: MenuShortcutsTests.noTwoMenuBarItemsShareKeys
+- A command in the command bar that the menu bar also has → it has the menu bar item's name.
+  Test: MenuShortcutsTests.theCommandBarsCommandsAreNamedAsInTheMenuBar

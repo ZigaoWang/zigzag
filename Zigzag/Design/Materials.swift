@@ -210,6 +210,30 @@ enum MaterialImages {
         return NSColor(patternImage: NSImage(cgImage: image, size: NSSize(width: side / 2, height: side / 2)))
     }()
 
+    /// Linen's threads both ways (`CardTexture.linen`), light and dark with their own transparency as `grain` has, so
+    /// it lies over a space's color the same way.
+    static let linen: NSColor = {
+        let side = 512
+        guard let tile = CardTexture.linen.image(size: CGSize(width: side, height: side), scale: 1),
+              let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = context.data else { return .clear }
+        context.draw(tile, in: CGRect(x: 0, y: 0, width: side, height: side))
+        let bytes = data.assumingMemoryBound(to: UInt8.self)
+        for i in stride(from: 0, to: side * side * 4, by: 4) {
+            // Away from middle gray: lighter threads white, darker ones black, as strong as they stand out.
+            let v = Int(bytes[i])
+            let a = UInt8(min(255, abs(v - 128) * 2))
+            let c: UInt8 = v >= 128 ? a : 0
+            bytes[i] = c; bytes[i + 1] = c; bytes[i + 2] = c; bytes[i + 3] = a
+        }
+        guard let image = context.makeImage() else { return .clear }
+        return NSColor(patternImage: NSImage(cgImage: image, size: NSSize(width: side / 2, height: side / 2)))
+    }()
+
+    /// A space's grain in its texture.
+    static func texture(_ name: String?) -> NSColor { name == "linen" ? linen : grain }
+
     /// A symbol drawn in one color, for a tile that has no picture of its own.
     static func symbol(_ name: String, color: NSColor, size: CGFloat) -> NSImage? {
         let config = NSImage.SymbolConfiguration(pointSize: size, weight: .medium).applying(.init(paletteColors: [color]))

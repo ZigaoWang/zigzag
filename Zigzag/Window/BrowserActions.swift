@@ -525,17 +525,18 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// so the row is told directly here (#326).
     private func refreshSavedState(of tab: Tab) {
         guard tab === tabManager.selectedTab else { return }
-        sidebar.update(tab: tab)
+        refreshAddress(for: tab)
     }
 
     /// Every save ends here (#326), so no two ways in can drift: `request` says whether it was the quick save or the
     /// picker, and both land in `SavePath.save` as one ⌘Z.
     @discardableResult
     func save(_ tab: Tab, request: SavePath.Request, at index: Int? = nil, then done: (() -> Void)? = nil) -> Bool {
-        guard !tabManager.isPrivate, let page = SavePath.Page(tab: tab) else { return false }
+        guard !tabManager.isPrivate else { return false }
+        // A saved page's quick save is its unsave, as the star and ⌘D have always toggled, whatever it shows now.
+        if request != .picker, tab.bookmarkID != nil { return toggleSavedState(of: tab) }
+        guard let page = SavePath.Page(tab: tab) else { return false }
         guard request == .picker else {
-            // A saved page's quick save is its unsave, as the star and ⌘D have always toggled.
-            if tab.bookmarkID != nil { return toggleSavedState(of: tab) }
             // A tab in a group saves as the group, as it has since #325: one folder, one undo.
             if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
                 bookmarkWithUndo(tab, at: index, in: tab.spaceID)
@@ -708,7 +709,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func addToFavorites(_ sender: Any?) {
         // Favorites are shared by every window: a private one adds none, pinned or not.
-        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate else { return }
+        guard let tab = selectedTab, tab.url != nil, !tab.isFavorite, !tabManager.isPrivate, tabManager.canPin(tab, keepingGroup: false) else { return }
         favoriteWithUndo(tab)
         Toast.show(String(localized: "Added to Favorites", comment: "Toast after the tab is added to Favorites."), symbol: "heart.fill", in: self)
     }
@@ -913,6 +914,13 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     // MARK: Validation
 
+    /// Pin Tab and Pin Tab to Folder…: by the rule the tab's menu and the command bar use, so Zigzag's own views
+    /// (Settings, History) don't offer a pin that does nothing.
+    func canPinFromMenu(_ tab: Tab?) -> Bool {
+        guard let tab, tab.url != nil, !tabManager.isPrivate else { return false }
+        return tabManager.canPin(tab)
+    }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let tab = selectedTab
         // ⌘← and ⌘→ (the hidden Back and Forward) in a text field or a page: BrowserWindow decides whether they move
@@ -972,20 +980,21 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(toggleBookmark(_:)):
             // Same names as the sidebar menus.
-            let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
+            let pinsPair = tab.map(tabManager.pinsSplit) ?? false
             item.title = tab?.isFavorite == true ? String(localized: "Move to Tabs", comment: "Menu bar item: moves the favorite back to the tabs.")
                 : tab?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil ? String(localized: "Unpin Group", comment: "Menu bar item: unpins the whole pinned group the tab is in.")
+                : tab?.bookmarkID.flatMap(Library.shared.pinnedSplit(containing:)) != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
                 : tab?.bookmarkID != nil ? String(localized: "Unpin Tab", comment: "Menu bar item: unpins the tab.")
                 : tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
                 : String(localized: "Pin Tab", comment: "Menu bar item: pins the tab.")
-            return tab?.url != nil && !tabManager.isPrivate
+            return canPinFromMenu(tab)
         case #selector(savePageToFolder(_:)):
             // ⇧⌘D: the same save, asking where in the space it goes. One word for the verb, everywhere.
             item.title = String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.")
-            return tab?.url != nil && !tabManager.isPrivate
+            return canPinFromMenu(tab)
         case #selector(addToFavorites(_:)):
-            return tab?.url != nil && tab?.isFavorite != true && !tabManager.isPrivate
+            return tab?.url != nil && tab.map { tabManager.canPin($0, keepingGroup: false) } == true && tab?.isFavorite != true && !tabManager.isPrivate
         case #selector(toggleDevelopmentSite(_:)):
             item.title = DeveloperTool.siteTitle(listed: DevelopmentSites.covers(tab?.url))
             return DeveloperTool.site.isOffered(for: tab, isPrivate: tabManager.isPrivate)

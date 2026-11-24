@@ -9,7 +9,7 @@ privately.
 
 ## Build and run
 
-You need macOS 15.4 or later, Xcode 26 or later and XcodeGen. Before the first build, set your own
+You need macOS 15.4 or later, Xcode 27 or later and XcodeGen. Before the first build, set your own
 `DEVELOPMENT_TEAM` and Debug `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`, as the README's "Build from source"
 says.
 

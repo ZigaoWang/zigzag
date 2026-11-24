@@ -327,6 +327,33 @@ struct SiteRoutesTests {
         #expect(target("https://github.com/zigzag", .linkClick) == work)
     }
 
+    private func clickedLink(linkActivated: Bool = false, userInitiated: Bool = true, mainFrame: Bool = false,
+                             frame: String? = "www.youtube.com", page: String? = "www.noemamag.com") -> Bool {
+        SiteRoutes.newWindowIsClickedLink(linkActivated: linkActivated, userInitiated: userInitiated, fromMainFrame: mainFrame,
+                                          frameHost: frame, pageHost: page)
+    }
+
+    @Test func anEmbedsClickedNewWindowIsRoutedLikeALink() {
+        // YouTube's Watch on YouTube: a click in the embed that calls window.open.
+        #expect(clickedLink())
+        #expect(clickedLink(frame: "www.youtube-nocookie.com"))
+        // A target="_blank" link you click, from any frame.
+        #expect(clickedLink(linkActivated: true, mainFrame: true, frame: "www.noemamag.com"))
+        #expect(clickedLink(linkActivated: true, frame: "www.noemamag.com"))
+    }
+
+    @Test func aPagesOwnPopUpKeepsItsOpener() {
+        // The page's own window.open, or one from a frame on its own site.
+        #expect(!clickedLink(mainFrame: true, frame: "www.noemamag.com"))
+        #expect(!clickedLink(frame: "www.noemamag.com"))
+        #expect(!clickedLink(frame: "cdn.noemamag.com"))
+        #expect(!clickedLink(frame: nil))
+        #expect(!clickedLink(page: nil))
+        // Without your click, nothing counts.
+        #expect(!clickedLink(userInitiated: false))
+        #expect(!clickedLink(linkActivated: true, userInitiated: false))
+    }
+
     // MARK: Keeping them
 
     @Test func legacyDomainsMigrateInStoredOrderWithSubdomainsFirst() throws {

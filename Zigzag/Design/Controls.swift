@@ -163,9 +163,12 @@ class InteractiveView: NSView {
 
     var onClick: ((NSEvent) -> Void)?
     var onDoubleClick: (() -> Void)?
-    var onRightClick: ((NSEvent) -> NSMenu?)?
+    var onRightClick: ((NSEvent) -> NSMenu?)? { didSet { updateTouchMenu() } }
     /// Called once the mouse moves far enough while pressed. Return true to take over the drag.
-    var onDragStart: ((NSEvent) -> Bool)?
+    var onDragStart: ((NSEvent) -> Bool)? { didSet { updateTouchMenu() } }
+    /// A finger held and moved picks it up too, through `onDragStart`: only for drags run by `CarriedCopy.carry`,
+    /// which a finger can drive.
+    var dragsByTouch = false { didSet { updateTouchMenu() } }
     /// Only sideways movement starts a drag, for something that moves along a row: a wobble up or down stays a click.
     var dragsHorizontally = false
     /// Fires the click on mouse down instead of mouse up (tabs feel faster this way).
@@ -245,7 +248,9 @@ class InteractiveView: NSView {
             if let menu = onRightClick(event) { showDrawnMenu(menu, at: event.locationInWindow) }
             return
         }
-        if event.clickCount == 2, let onDoubleClick {
+        // A finger's two taps count too: AppKit's click from each comes as a single click.
+        if let onDoubleClick, TouchDoubleTap.clickCount(for: event, on: self) == 2 {
+            TouchLog.note("double click on \(type(of: self)) clicks=\(event.clickCount)")
             onDoubleClick()
             return
         }
@@ -307,7 +312,130 @@ class InteractiveView: NSView {
     }
 
     /// The right-click menu as Zigzag's own (`MenuPanel`) rather than the system's: the sidebar's rows and buttons.
-    var drawsMenu = false
+    var drawsMenu = false { didSet { updateTouchMenu() } }
+
+    /// A finger held on a control with a drawn menu opens it (AppKit already does this for system menus), and held
+    /// then moved, drags it (`dragsByTouch`).
+    private var touchMenu: TouchPressRecognizer?
+
+    private func updateTouchMenu() {
+        let wanted = TouchGestures.isAvailable && ((drawsMenu && onRightClick != nil) || (dragsByTouch && onDragStart != nil))
+        if wanted, touchMenu == nil {
+            let press = TouchPressRecognizer { [weak self] press in self?.touchHoldChanged(press) }
+            press.touchOnly.accepts = { [weak self] point in self?.ownsTouchMenu(at: point) ?? false }
+            addGestureRecognizer(press)
+            touchMenu = press
+        } else if !wanted, let touchMenu {
+            removeGestureRecognizer(touchMenu)
+            self.touchMenu = nil
+        }
+        touchMenu?.liftsSooner(dragsByTouch && onDragStart != nil)
+    }
+
+    /// The finger's on this control's menu, not a nested control's own.
+    private func ownsTouchMenu(at point: NSPoint) -> Bool {
+        isEnabled && !TouchGestures.controlHasMenu(at: point, in: self)
+    }
+
+    /// A finger held at `point` (own coordinates): the menu a right-click there opens. Not while a menu is open
+    /// (AppKit's own right-click from the hold).
+    @discardableResult
+    func touchHeld(at point: NSPoint) -> Bool {
+        guard isEnabled, drawsMenu, let onRightClick, let window, MenuPanel.current == nil else { return false }
+        let windowPoint = convert(point, to: nil)
+        guard let event = TouchGestures.rightMouseDown(at: windowPoint, in: window) else { return false }
+        if let menu = onRightClick(event) { showDrawnMenu(menu, at: windowPoint) }
+        return true
+    }
+
+    private func touchHoldChanged(_ press: TouchPressRecognizer) {
+        let point = press.location(in: nil)
+        switch press.state {
+        case .began:
+            TouchLog.note("hold recognized, needs \(Int(press.minimumPressDuration * 1000)) ms (AppKit's \(Int(press.standardDuration * 1000)))")
+            beginTouchHold(at: point)
+        case .changed: TouchHold.current?.pressMoved(to: point)
+        case .ended: TouchHold.current?.pressLifted(at: point)
+        case .cancelled, .failed: TouchHold.current?.pressCancelled()
+        default: break
+        }
+    }
+
+    /// A finger held at `windowPoint`: the menu opens there a moment later, and moving off it picks the control up.
+    @discardableResult
+    func beginTouchHold(at windowPoint: NSPoint) -> TouchHold? {
+        guard isEnabled, window != nil else { return nil }
+        let point = convert(windowPoint, from: nil)
+        let menu: (() -> MenuPanel?)? = drawsMenu && onRightClick != nil ? { [weak self] in
+            guard let self, self.touchHeld(at: point) else { return nil }
+            return MenuPanel.current?.anchor === self ? MenuPanel.current : nil
+        } : nil
+        let drag: ((NSPoint) -> Bool)? = dragsByTouch && onDragStart != nil ? { [weak self] start in
+            guard let self, let window = self.window, let onDragStart = self.onDragStart,
+                  let event = TouchPress.mouseDown(at: start, in: window) else { return false }
+            self.isPressed = false
+            return onDragStart(event)
+        } : nil
+        guard menu != nil || drag != nil else { return nil }
+        isPressed = true
+        return TouchHold.begin(on: self, at: windowPoint, openMenu: menu, startDrag: drag) { [weak self] in self?.isPressed = false }
+    }
+
+    #if DEBUG
+    var touchMenuRecognizer: TouchPressRecognizer? { touchMenu }
+    #endif
+
+    // MARK: Lifted by a finger
+
+    /// Held by a finger to be dragged: it rises a little off what it's on and follows the finger until picked up.
+    private(set) var isTouchLifted = false
+    /// How far the finger has moved it meanwhile, in its superview's terms.
+    private(set) var touchLiftOffset = CGSize.zero
+
+    func setTouchLifted(_ lifted: Bool, animated: Bool = true) {
+        guard lifted != isTouchLifted else { return }
+        isTouchLifted = lifted
+        touchLiftOffset = .zero
+        touchLiftChanged()
+        applyTouchLift(animated: animated)
+    }
+
+    /// The finger went from `start` to `point` (window coordinates) while it's lifted.
+    func followTouchLift(from start: NSPoint, to point: NSPoint) {
+        guard isTouchLifted, !Tokens.Motion.reduceMotion, let superview else { return }
+        let a = superview.convert(start, from: nil), b = superview.convert(point, from: nil)
+        touchLiftOffset = CGSize(width: b.x - a.x, height: b.y - a.y)
+        applyTouchLift(animated: false)
+    }
+
+    /// What else lifting changes in its look, for a subclass.
+    func touchLiftChanged() {}
+
+    /// How much larger it grows lifted: about six points across, at most 8%.
+    nonisolated static func touchLiftScale(width: CGFloat) -> CGFloat { 1 + min(0.08, 6 / max(width, 1)) }
+
+    private func applyTouchLift(animated: Bool) {
+        guard let layer else { return }
+        var target = CATransform3DIdentity
+        if isTouchLifted, !Tokens.Motion.reduceMotion {
+            let scale = Self.touchLiftScale(width: bounds.width)
+            // Grown about its middle, wherever its anchor is.
+            let middle = CGPoint(x: bounds.width * (0.5 - layer.anchorPoint.x), y: bounds.height * (0.5 - layer.anchorPoint.y))
+            target = CATransform3DMakeTranslation(middle.x + touchLiftOffset.width, middle.y + touchLiftOffset.height, 0)
+            target = CATransform3DScale(target, scale, scale, 1)
+            target = CATransform3DTranslate(target, -middle.x, -middle.y, 0)
+        }
+        let from = layer.presentation()?.transform ?? layer.transform
+        layer.removeAnimation(forKey: "touchLift")
+        Tokens.Motion.withoutAnimation { layer.transform = target }
+        guard animated, !Tokens.Motion.reduceMotion else { return }
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = NSValue(caTransform3D: from)
+        animation.toValue = NSValue(caTransform3D: target)
+        animation.duration = Tokens.Motion.state
+        animation.timingFunction = Tokens.Motion.easeOut
+        layer.add(animation, forKey: "touchLift")
+    }
 
     private func showDrawnMenu(_ menu: NSMenu, at windowPoint: NSPoint) {
         let entries = MenuPanel.entries(from: menu)
@@ -978,68 +1106,6 @@ extension NSScrollView {
     }
 }
 
-/// The primary action on a screen: the dark filled pill (`ButtonLook.primary`), one per screen. Kept for the forms
-/// that still build on it; new code uses `PillButton(style: .prominent)`, which looks the same.
-final class PrimaryButton: InteractiveView {
-    private let label: Label
-    /// Kept for callers from when the primary took its window's accent; the primary is dark whatever the theme.
-    var fixedTheme: Brand.Theme? { didSet { stateDidChange(animated: false) } }
-    /// For actions that can't be undone (Clear History, Delete): red, whatever the space.
-    var isDestructive = false { didSet { stateDidChange(animated: false) } }
-    /// Set both to draw the button in other colors, like a light button on the brand's blue.
-    var customFill: NSColor? { didSet { stateDidChange(animated: false) } }
-    var customInk: NSColor? { didSet { stateDidChange(animated: false) } }
-    /// A hairline in this color around it, kept through hover and press.
-    var customEdge: NSColor? { didSet { stateDidChange(animated: false) } }
-    /// Moves the title off center, to leave room for something beside it (a keycap).
-    var labelOffset: CGFloat = 0 { didSet { needsLayout = true } }
-
-    init(title: String) {
-        written = title
-        label = Label(title, font: Tokens.Font.control(), color: Tokens.Color.onPrimary)
-        super.init(frame: .zero)
-        pressScales = true
-        layer?.cornerCurve = .continuous
-        addSubview(label)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(title)
-        stateDidChange(animated: false)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private var written = ""
-    var title: String {
-        get { written }
-        set { written = newValue; label.stringValue = newValue; setAccessibilityLabel(newValue); needsLayout = true }
-    }
-
-    var fittingWidth: CGFloat { label.textWidth + Tokens.Space.x8 }
-
-    override var intrinsicContentSize: NSSize { NSSize(width: ceil(max(fittingWidth, 72)), height: Tokens.Page.controlHeight) }
-
-    override func layout() {
-        super.layout()
-        layer?.cornerRadius = bounds.height / 2
-        let h = label.lineHeight
-        label.frame = NSRect(x: Tokens.Space.x4 + labelOffset, y: label.centeredY(in: bounds.height), width: bounds.width - Tokens.Space.x8, height: h)
-        label.alignment = .center
-    }
-
-    override func stateDidChange(animated: Bool) {
-        // The space's own accent unless told otherwise, as `PillButton(.prominent)`.
-        let theme = Brand.Theme.for(self)
-        let tint = customFill ?? (isDestructive ? Tokens.Color.destructive : theme.accent)
-        label.textColor = applyButtonLook(.primary, tint: tint, ink: customInk ?? (isDestructive ? .white : customFill.map(Brand.ink(on:)) ?? theme.onAccent))
-        if let customEdge {
-            Tokens.Motion.withoutAnimation {
-                layer?.borderWidth = 1
-                layer?.borderColor = cgColor(customEdge)
-            }
-        }
-    }
-}
-
 /// A text button: quiet text that fills under the pointer ("Clear", "Skip"), or with `form` the secondary look
 /// (`ButtonLook.secondary`). Kept for the forms that still build on it; new code uses `PillButton`.
 final class TextButton: InteractiveView {
@@ -1223,9 +1289,12 @@ final class FilledField: NSView {
     /// Invalid content: the border turns the warning color, so a blocked form shows which field holds it up.
     var isInvalid = false { didSet { guard isInvalid != oldValue else { return }; updateColors() } }
 
+    /// On the window's colored frame rather than a panel: the sidebar address's soft fill (`Chrome.field`).
+    var isOnFrame = false { didSet { updateColors() } }
+
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = (isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
+            layer?.backgroundColor = (isOnFrame ? Tokens.Chrome.field : isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
             let ring = (tint ?? Brand.Theme.for(self).accent).withAlphaComponent(Tokens.Color.focusAlpha)
             layer?.borderColor = (isInvalid ? Tokens.Color.destructive
                                              : isEditing ? ring : isOutlined ? Tokens.Color.controlEdge : .clear).cgColor
@@ -1700,6 +1769,49 @@ final class DropdownButton: InteractiveView {
     }
 }
 
+/// A floating list's one highlight (`Color.highlight`, `Radius.row`): it glides from row to row under the pointer
+/// rather than each row lighting on its own. From the keyboard, arriving from nothing or with Reduce Motion it's
+/// simply there; leaving every row, it fades. Put it behind the rows.
+final class HighlightGlide: ColorView {
+    init() {
+        super.init(color: Tokens.Color.highlight)
+        wantsLayer = true
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        alphaValue = 0
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    /// Moves to `target`, or fades for nil. `wasShown`: it was on a row before this change.
+    func move(to target: NSRect?, wasShown: Bool) {
+        guard let target else {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Tokens.Motion.quick
+                context.timingFunction = Tokens.Motion.easeOut
+                animator().alphaValue = 0
+            }
+            return
+        }
+        if !wasShown || alphaValue == 0 || Tokens.Motion.isFromKey || Tokens.Motion.reduceMotion {
+            layer?.removeAllAnimations()
+            Tokens.Motion.withoutAnimation { frame = target }
+            alphaValue = 1
+        } else {
+            alphaValue = 1
+            Tokens.Motion.glide(self, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
+        }
+    }
+
+    /// Keeps it on its row through a relayout, without a glide.
+    func follow(_ target: NSRect) { Tokens.Motion.withoutAnimation { frame = target } }
+
+    /// Pressed, it darkens a step.
+    func showPressed(_ pressed: Bool) { color = pressed ? Tokens.Color.pressedFill : Tokens.Color.highlight }
+}
+
 /// What an AppKit menu item carries, as its represented object, for its row in a drawn menu: its symbol, and
 /// whether it's destructive.
 protocol MenuItemStyle: AnyObject {
@@ -1721,6 +1833,8 @@ final class MenuPanel: FloatingPanelView {
         /// A quiet heading over the items after it ("Save Downloads To").
         case header(String)
         case separator
+        /// Words that explain, wrapped to the menu's width (a help button's few lines).
+        case note(NSAttributedString)
     }
 
     struct Item {
@@ -1781,10 +1895,13 @@ final class MenuPanel: FloatingPanelView {
 
     private let entries: [Entry]
     private var rows: [Row] = []
+    private var notes: [NSTextField] = []
+    /// The width notes wrap to, set once the menu's width is known.
+    private var noteWidth: CGFloat = 0
     private let scroll = NSScrollView()
     private let list = FlippedView()
     /// One soft gray pill that glides from row to row under the pointer, rather than each row lighting on its own.
-    private let pill = ColorView(color: Tokens.Color.highlight)
+    private let pill = HighlightGlide()
     private var highlighted: Int? {
         didSet {
             rows.enumerated().forEach { $0.element.isHighlighted = $0.offset == highlighted }
@@ -1832,10 +1949,6 @@ final class MenuPanel: FloatingPanelView {
         scroll.useSlimScroller()
         scroll.documentView = list
         addSubview(scroll)
-        pill.wantsLayer = true
-        pill.layer?.cornerRadius = Tokens.Radius.row
-        pill.layer?.cornerCurve = .continuous
-        pill.alphaValue = 0
         list.addSubview(pill)
         let hasImages = entries.contains { if case .item(let item) = $0 { return item.image != nil || item.symbol != nil }; return false }
         for entry in entries {
@@ -1862,23 +1975,37 @@ final class MenuPanel: FloatingPanelView {
                 list.addSubview(Label.section(text))
             case .separator:
                 list.addSubview(ColorView(color: Tokens.Color.separator))
+            case .note(let text):
+                let note = NSTextField.dialogText("")
+                note.attributedStringValue = text
+                notes.append(note)
+                list.addSubview(note)
             }
         }
         setAccessibilityElement(true)
-        setAccessibilityRole(.menu)
+        // Only words to read: a popover, not a menu to choose from.
+        setAccessibilityRole(rows.isEmpty && !notes.isEmpty ? .popover : .menu)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private var contentHeight: CGFloat {
-        Self.pad * 2 + entries.map { entry -> CGFloat in
+        var noteIndex = 0
+        return Self.pad * 2 + entries.map { entry -> CGFloat in
             switch entry {
-            case .item: Self.rowHeight
-            case .header: Self.headerHeight
-            case .separator: Self.separatorHeight
+            case .item: return Self.rowHeight
+            case .header: return Self.headerHeight
+            case .separator: return Self.separatorHeight
+            case .note:
+                defer { noteIndex += 1 }
+                return noteHeight(notes[noteIndex])
             }
         }.reduce(0, +)
     }
+
+    private static let noteInset = Tokens.Space.x2
+
+    private func noteHeight(_ note: NSTextField) -> CGFloat { note.wrappedHeight(noteWidth) + Self.noteInset * 2 }
 
     /// The top of item `index` in the list.
     private func top(ofItem index: Int) -> CGFloat {
@@ -1891,6 +2018,7 @@ final class MenuPanel: FloatingPanelView {
                 y += Self.rowHeight
             case .header: y += Self.headerHeight
             case .separator: y += Self.separatorHeight
+            case .note: break
             }
         }
         return y
@@ -1920,6 +2048,7 @@ final class MenuPanel: FloatingPanelView {
         menu.onClose = closed
 
         let width = ceil(max(menu.fittingWidth, minWidth + Self.pad * 2))
+        menu.noteWidth = width - (Self.pad + Self.rowInset) * 2
         let a = anchor.convert(anchor.bounds, to: nil)
         let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
         let full = menu.contentHeight
@@ -2004,7 +2133,11 @@ final class MenuPanel: FloatingPanelView {
         list.frame = NSRect(x: 0, y: 0, width: width, height: contentHeight)
         var y = Self.pad, index = 0
         for view in list.subviews where view !== pill {
-            if let row = view as? Row {
+            if let note = view as? NSTextField, notes.contains(where: { $0 === note }) {
+                let h = noteHeight(note)
+                note.frame = NSRect(x: Self.pad + Self.rowInset, y: y + Self.noteInset, width: width - (Self.pad + Self.rowInset) * 2, height: h - Self.noteInset * 2)
+                y += h
+            } else if let row = view as? Row {
                 row.frame = NSRect(x: Self.pad, y: y, width: width - Self.pad * 2, height: Self.rowHeight)
                 y += Self.rowHeight
                 index += 1
@@ -2018,38 +2151,23 @@ final class MenuPanel: FloatingPanelView {
                 y += Self.separatorHeight
             }
         }
-        if let highlighted, rows.indices.contains(highlighted) { Tokens.Motion.withoutAnimation { pill.frame = rows[highlighted].frame } }
+        if let highlighted, rows.indices.contains(highlighted) { pill.follow(rows[highlighted].frame) }
     }
 
     /// The highlight glides from where it was to the row now under the pointer. From the keyboard, or arriving from
     /// nothing, it's simply there; leaving every row, it fades.
     private func movePill(from old: Int?) {
-        guard let highlighted, rows.indices.contains(highlighted) else {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = Tokens.Motion.quick
-                context.timingFunction = Tokens.Motion.easeOut
-                pill.animator().alphaValue = 0
-            }
-            return
-        }
-        let target = rows[highlighted].frame
-        if old == nil || pill.alphaValue == 0 || Tokens.Motion.isFromKey || Tokens.Motion.reduceMotion {
-            pill.layer?.removeAllAnimations()
-            Tokens.Motion.withoutAnimation { pill.frame = target }
-            pill.alphaValue = 1
-        } else {
-            pill.alphaValue = 1
-            Tokens.Motion.glide(pill, to: target, duration: Tokens.Motion.highlightGlide, timing: Tokens.Motion.easeOut)
-        }
+        let target = highlighted.flatMap { rows.indices.contains($0) ? rows[$0].frame : nil }
+        pill.move(to: target, wasShown: old != nil)
     }
 
     /// Pressed, the highlight darkens a step.
-    fileprivate func showPressed(_ pressed: Bool) { pill.color = pressed ? Tokens.Color.pressedFill : Tokens.Color.highlight }
+    fileprivate func showPressed(_ pressed: Bool) { pill.showPressed(pressed) }
 
     // MARK: Closing
 
     private func watch(_ window: NSWindow) {
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
+        monitor = TouchPress.addMonitor(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
             guard let self else { return event }
             return self.handle(event)
         }
@@ -2069,7 +2187,7 @@ final class MenuPanel: FloatingPanelView {
         if parentMenu != nil { root.close(animated: animated); return }
         closeChild(animated: false)
         guard Self.current === self || monitor != nil else { return }
-        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let monitor { TouchPress.removeMonitor(monitor) }
         monitor = nil
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
@@ -2205,9 +2323,55 @@ final class MenuPanel: FloatingPanelView {
         if let index = row(at: windowPoint) { choose(index) }
     }
 
+    // MARK: A held finger
+
+    /// Opened by a finger still held down (`TouchHold`): the clicks AppKit makes from that finger outside the menu
+    /// are its own, and neither close nor open a menu, until a moment after it lifts.
+    var isHeldByTouch = false
+    private var heldUntil: TimeInterval = 0
+
+    /// The finger lifted; a click made from the hold can still arrive a moment later.
+    func touchLifted() {
+        isHeldByTouch = false
+        heldUntil = ProcessInfo.processInfo.systemUptime + 0.3
+    }
+
+    func touchContains(_ windowPoint: NSPoint) -> Bool { contains(windowPoint: windowPoint) }
+
+    /// The held finger at `windowPoint`: the item under it lights, with a tap where the hardware gives one, and an
+    /// item with a submenu opens it.
+    func touchTrack(windowPoint: NSPoint) {
+        if let child, child.touchContains(windowPoint) {
+            keepChild()
+            child.touchTrack(windowPoint: windowPoint)
+            return
+        }
+        let index = row(at: windowPoint)
+        // Off this menu toward its open submenu's item, that item stays lit.
+        if index == nil, childIndex != nil { return }
+        guard index != highlighted else { return }
+        highlighted = index
+        if let index {
+            Haptics.snap()
+            if rows[index].item.submenu != nil { openChild(index, fromKey: false) } else { closeChild(animated: true) }
+        }
+    }
+
+    /// The held finger lifted at `windowPoint`, on the menu: the item there is chosen.
+    func touchChoose(windowPoint: NSPoint) {
+        if let child, child.touchContains(windowPoint) { child.touchChoose(windowPoint: windowPoint); return }
+        if let index = row(at: windowPoint) { choose(index) }
+    }
+
+    /// Whether a click outside the menu is one AppKit made from the finger that opened it.
+    private var takesHeldClick: Bool {
+        root.isHeldByTouch || ProcessInfo.processInfo.systemUptime < root.heldUntil
+    }
+
     private func handle(_ event: NSEvent) -> NSEvent? {
         let inSameWindow = event.window === window
         let inside = inSameWindow && contains(windowPoint: event.locationInWindow)
+        if !inside, event.type != .keyDown, event.type != .scrollWheel, takesHeldClick { return nil }
         switch event.type {
         case .keyDown:
             return handleKey(event) ? nil : event
@@ -2241,6 +2405,12 @@ final class MenuPanel: FloatingPanelView {
                                            windowNumber: window?.windowNumber ?? 0, context: nil, characters: chars,
                                            charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { return }
         _ = handleKey(event)
+    }
+
+    /// The middle of item `index`, in window coordinates.
+    func debugItemPoint(_ index: Int) -> NSPoint {
+        let row = rows[index]
+        return row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
     }
 
     /// Opens the submenu of the item with this title, as hovering it does.

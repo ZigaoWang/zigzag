@@ -20,6 +20,8 @@ enum LaunchChoice: String, CaseIterable, Sendable {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingURLs: [URL] = []
+    /// Which of `pendingURLs` were handed off from another device: those open in a tab, never Zigzag Mini (#456).
+    private var pendingHandoffs: Set<URL> = []
     /// Sites installed as apps asked for before launch finished (one opened with Zigzag not running).
     private var pendingWebApps: [URL] = []
     private var launched = false
@@ -85,6 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
+        // Every other window (Settings, a sheet's) hears fingers once it's in use.
+        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { note in
+            let window = note.object as? NSWindow
+            MainActor.assumeIsolated { if let window { TouchPress.watch(window) } }
+        }
         settleSpaceNameStyle()
         Tutorial.migrate()
         // Getting started picks up where you left off, if you'd begun and haven't ended it.
@@ -159,7 +166,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Onboarding not finished: it comes first, instead of the window that was waiting behind it. Opened for links that
         // all go to Zigzag Mini, only Zigzag Mini comes up, as Little Arc does; the windows come back when you ask.
-        let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(WindowManager.shared.opensInMini)
+        let handoffs = pendingHandoffs
+        let goesToMini = { (url: URL) in Self.pendingOpensInMini(url, handedOff: handoffs, opensInMini: WindowManager.shared.opensInMini) }
+        let miniOnly = !pendingURLs.isEmpty && !WindowManager.needsOnboarding && pendingURLs.allSatisfy(goesToMini)
         // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
         // wait until you ask for them.
         let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
@@ -170,10 +179,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WindowManager.shared.sessionWaiting = plan.sessionWaiting
         // Settings › General › On launch: a fresh start keeps the saved session for History › Reopen Last Session
         // instead of bringing it back, and doesn't write over it until the new window is used (#433). An update's
-        // relaunch is never a fresh start: it puts exactly what was open back.
+        // relaunch puts exactly what was open back, unless it interrupted a fresh start still unused.
         let resumes = UpdateRelaunch.resumes(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
-        WindowManager.shared.startingFresh = plan.restoresSession && !resumes
+        WindowManager.shared.startingFresh = UpdateRelaunch.startsFresh(plan: plan, relaunch: relaunch, choice: LaunchChoice.choice)
         if WindowManager.shared.startingFresh { WindowManager.shared.keepSessionForReopening() }
+        // Session cookies come back with the session, before any of its pages loads; otherwise they're dropped.
+        SessionCookies.start(resumes: resumes)
         let restored = resumes ? WindowManager.shared.restoreSession() : false
         if plan.restoresMinis { relaunch?.minis.forEach { MiniWindowController.reopen($0) } }
         // Opened from the disk image or a download macOS keeps apart: offered a move to Applications, so it can update.
@@ -181,11 +192,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launched = true
         if !pendingURLs.isEmpty {
             // A link for Zigzag Mini opens just that, as it would with Zigzag already running.
-            if !restored, !WindowManager.shared.opensInMini(pendingURLs[0]) {
+            if !restored, !goesToMini(pendingURLs[0]) {
                 WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false)
             }
-            pendingURLs.forEach { WindowManager.shared.openExternal($0) }
+            pendingURLs.forEach { handoffs.contains($0) ? WindowManager.shared.openHandedOff($0) : WindowManager.shared.openExternal($0) }
             pendingURLs = []
+            pendingHandoffs = []
         } else if !restored, !plan.sessionWaiting {
             WindowManager.shared.newWindow()
         }
@@ -232,10 +244,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var quitConfirmed = false
 
     /// Asks before quitting, in the window, like Zigzag's other confirmations. Never when the Mac is logging out,
-    /// restarting or shutting down, or when an update restarts Zigzag. ⌘Q again, or Return, quits.
+    /// restarting or shutting down, when an update restarts Zigzag, or for Quit chosen in the menu or the Dock: only
+    /// the Quit key asks. ⌘Q again, or Return, quits.
     static var asksBeforeQuitting: Bool {
         get { UserDefaults.standard.object(forKey: "AskBeforeQuitting") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "AskBeforeQuitting") }
+    }
+
+    /// Set while the Quit key quits: choosing Quit anywhere else is the confirmation, as in Chrome (#441).
+    private static var quittingFromKey = false
+
+    /// Whether the setting asks for this quit: only for the Quit key, or always while files download.
+    static func asks(fromKey: Bool, setting: Bool, downloading: Int) -> Bool {
+        (setting && fromKey) || downloading > 0
+    }
+
+    /// Quit Zigzag's shortcut as it is now, after Settings › Shortcuts; ⌘Q before the menu bar is built.
+    static var quitCombo: Shortcuts.Combo {
+        Shortcuts.allItems.first { $0.action == #selector(quitFromMenu(_:)) }.map(Shortcuts.combo(of:))
+            ?? Shortcuts.Combo(key: "q", modifiers: NSEvent.ModifierFlags.command.rawValue)
+    }
+
+    /// Whether the event is Quit's shortcut, the one quit the setting asks about.
+    static func isQuitKey(_ event: NSEvent?, combo: Shortcuts.Combo = quitCombo) -> Bool {
+        guard let event, event.type == .keyDown, !combo.key.isEmpty, let pressed = Shortcuts.combo(from: event) else { return false }
+        let wanted = combo.flags.intersection([.command, .option, .control, .shift])
+        // An uppercase key equivalent carries ⇧ by itself.
+        let flags = combo.key.lowercased() != combo.key ? wanted.union(.shift) : wanted
+        guard pressed.flags == flags else { return false }
+        if pressed.key == combo.key.lowercased() { return true }
+        // A layout without Latin letters (Russian, Greek, Hebrew) types its own letter there, and the menu still takes
+        // the key where the letter sits on a US keyboard: so does this.
+        guard !pressed.key.unicodeScalars.allSatisfy(\.isASCII), let code = ansiKeyCode(combo.key) else { return false }
+        return event.keyCode == code
+    }
+
+    /// Where a letter or digit sits on a US keyboard (the kVK_ANSI_ codes).
+    static func ansiKeyCode(_ key: String) -> UInt16? {
+        let codes: [Character: UInt16] = [
+            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
+            "e": 14, "r": 15, "y": 16, "t": 17, "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "9": 25, "7": 26,
+            "8": 28, "0": 29, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46,
+        ]
+        guard key.count == 1, let char = key.lowercased().first else { return nil }
+        return codes[char]
+    }
+
+    @objc func quitFromMenu(_ sender: Any?) {
+        Self.quittingFromKey = Self.isQuitKey(NSApp.currentEvent)
+        defer { Self.quittingFromKey = false }
+        NSApp.terminate(sender)
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -243,12 +301,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let downloading = DownloadManager.shared.activeCount
         // Going for good: downloads still coming in pause first, so they go on from Downloads after the next launch.
         func quitNow() -> NSApplication.TerminateReply {
-            guard downloading > 0 || !KeptCookies.profilesClearingOnQuit().isEmpty else { return .terminateNow }
+            guard downloading > 0 || !KeptCookies.profilesClearingOnQuit().isEmpty || SessionCookies.isOn else { return .terminateNow }
             Self.finishBeforeQuitting(downloading: downloading)
             return .terminateLater
         }
         // Asked already, or not asking: downloads are the one thing worth asking about anyway.
-        guard !Self.quitConfirmed, Self.asksBeforeQuitting || downloading > 0 else { return quitNow() }
+        guard !Self.quitConfirmed, Self.asks(fromKey: Self.quittingFromKey, setting: Self.asksBeforeQuitting, downloading: downloading) else { return quitNow() }
         // Logging out, restarting or shutting down: the system's own reason is on the quit event.
         if let event = NSAppleEventManager.shared().currentAppleEvent,
            event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) != nil { return quitNow() }
@@ -279,10 +337,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                      comment: "Message of the sheet that asks before quitting while files download.")
         ConfirmSheet.show(in: host, title: String(localized: "Quit Zigzag?", comment: "Title of the sheet that asks before quitting."), message: message,
                           confirmTitle: String(localized: "Quit", comment: "Button of the sheet that asks before quitting.")) { answer($0) }
-        // While it asks, ⌘Q again means yes (macOS doesn't ask the app a second time on its own).
+        // While it asks, the Quit key again means yes (macOS doesn't ask the app a second time on its own).
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                  event.charactersIgnoringModifiers?.lowercased() == "q" else { return event }
+            guard Self.isQuitKey(event) else { return event }
             host.subviews.compactMap { $0 as? ConfirmSheet }.forEach { $0.removeFromSuperview() }
             answer(true)
             return nil
@@ -290,17 +347,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
-    /// Pauses downloads and clears the cookies chosen to go at quit (#334) side by side, each bounded, then quits.
+    /// Pauses downloads and clears the cookies chosen to go at quit (#334), then saves session cookies, side by side,
+    /// each bounded, then quits.
     private static func finishBeforeQuitting(downloading: Int) {
-        let clearing = KeptCookies.profilesClearingOnQuit()
-        var left = (downloading > 0 ? 1 : 0) + (clearing.isEmpty ? 0 : 1)
+        let cookieJobs = KeptCookies.clearJobs(KeptCookies.profilesClearingOnQuit()) + SessionCookies.quitJobs()
+        var left = (downloading > 0 ? 1 : 0) + (cookieJobs.isEmpty ? 0 : 1)
         guard left > 0 else { NSApp.reply(toApplicationShouldTerminate: true); return }
         let finish = {
             left -= 1
             if left == 0 { NSApp.reply(toApplicationShouldTerminate: true) }
         }
         if downloading > 0 { DownloadManager.shared.pauseAllForQuit(then: finish) }
-        if !clearing.isEmpty { KeptCookies.clearForQuit(clearing, done: finish) }
+        if !cookieJobs.isEmpty { KeptCookies.whenDone(cookieJobs, within: KeptCookies.quitWait, done: finish) }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -372,6 +430,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
+    /// Whether a link waiting for launch goes to Zigzag Mini: as the setting says, but never a handed-off page (#456).
+    static func pendingOpensInMini(_ url: URL, handedOff: Set<URL>, opensInMini: (URL) -> Bool) -> Bool {
+        !handedOff.contains(url) && opensInMini(url)
+    }
+
     private func open(_ url: URL) {
         guard launched else { pendingURLs.append(url); return }
         // Zigzag Mini comes forward on its own, as Little Arc does: activating the whole app would bring every browser
@@ -401,7 +464,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                      restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
         guard userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL,
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return false }
-        guard launched else { pendingURLs.append(url); return true }
+        guard launched else {
+            pendingURLs.append(url)
+            pendingHandoffs.insert(url)
+            return true
+        }
         WindowManager.shared.openHandedOff(url)
         NSApp.activate()
         return true

@@ -66,7 +66,9 @@ enum CommandRanker {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
         let lower = trimmed.lowercased()
-        if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("file://") || lower.hasPrefix("about:") {
+        // An extension's page as Chrome names it opens as Zigzag's own (Tab.extensionPageAddress).
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("file://") || lower.hasPrefix("about:")
+            || lower.hasPrefix("chrome-extension://") {
             return URL(string: trimmed).map { Destination(url: $0) }
         }
         // The host is everything before the first of / ? #; the port comes off too.
@@ -198,7 +200,7 @@ enum CommandRanker {
                keywords: ["clear", "cache", "empty", "reset", "refresh"], symbol: "arrow.clockwise"),
         Action(id: "clear-cookies", title: String(localized: "Clear Cookies…", comment: "A command in the command bar, named as in the menu bar."),
                keywords: ["clear", "cookies", "sign", "out", "logout", "reset", "data"], symbol: "trash"),
-        Action(id: "settings", title: String(localized: "Settings", comment: "A command in the command bar, named as in the menu bar."),
+        Action(id: "settings", title: String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar."),
                keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
         Action(id: "archive", title: String(localized: "Show Archive", comment: "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs."),
                keywords: ["archive", "archived", "tabs", "old", "tidy", "restore"], symbol: "archivebox"),
@@ -218,6 +220,9 @@ enum CommandRanker {
         var isPrivate = false
         /// The page you're on has an address (a blank new tab doesn't).
         var hasPage = false
+        /// The page can go into Pinned, or the favorites; Zigzag's own views can't (#472).
+        var canPin = true
+        var canFavorite = true
         var isPinned = false
         /// Pin and unpin act on the whole group (#209).
         var isGroup = false
@@ -251,7 +256,7 @@ enum CommandRanker {
                 list.append(Action(id: "unpin", title: c.isGroup ? String(localized: "Unpin Group", comment: "A command in the command bar, named as in the menu bar: takes the pinned group out of Pinned.")
                                    : String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar: takes a pinned page out of Pinned."),
                                    keywords: ["save", "unsave", "unpin", "pin", "tab", "group", "remove"], symbol: "star.slash"))
-            } else {
+            } else if c.canPin {
                 list.append(Action(id: "pin", title: c.isGroup ? String(localized: "Pin Group", comment: "A command in the command bar, named as in the menu bar: pins the group of tabs as one folder.")
                                    : String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar: pins the page into Pinned."),
                                    keywords: ["save", "pin", "tab", "group", "keep", "bookmark"], symbol: "star"))
@@ -259,7 +264,7 @@ enum CommandRanker {
                                    keywords: ["save", "folder", "pin", "tab", "file"], symbol: "folder.badge.plus"))
             }
         }
-        if c.hasPage, !c.isFavorite, !c.isPrivate {
+        if c.hasPage, c.canFavorite, !c.isFavorite, !c.isPrivate {
             list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
                                keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: SidebarMenus.Symbol.favorite))
         }
@@ -370,6 +375,8 @@ enum CommandRanker {
         let tabs = manager.currentTabs
         guard let tab = manager.selectedTab else { return c }
         c.hasPage = tab.url != nil
+        c.canPin = manager.canPin(tab)
+        c.canFavorite = manager.canPin(tab, keepingGroup: false)
         c.canCapture = WindowManager.shared.controllers.first { $0.tabManager === manager }?.capture.canBegin ?? false
         c.developerTools = DeveloperTool.allCases.filter { $0.isOffered(for: tab, isPrivate: manager.isPrivate, inSplit: manager.split(for: tab) != nil) }
         c.isDevelopmentSite = DevelopmentSites.covers(tab.url)

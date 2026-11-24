@@ -1,5 +1,8 @@
 import AppKit
 import WebKit
+#if DEBUG
+import ScreenCaptureKit
+#endif
 
 /// Debug builds only: lets scripts drive the UI (for screenshots and testing) via distributed notifications.
 /// `xcrun swift -e` or the bundled `zz` script posts "app.zigzag.debug" with a command string.
@@ -34,6 +37,7 @@ enum DebugBridge {
                                                             name: .init(channel), object: nil, suspensionBehavior: .deliverImmediately)
         // ZIGZAG_DEBUG_COMMANDS: commands to run once launched, split by " ;; ", one every 1.5 s after a short wait,
         // for when the Mac doesn't pass notifications along.
+        MainActor.assumeIsolated { DebugMenu.install() }
         let script = ProcessInfo.processInfo.environment["ZIGZAG_DEBUG_COMMANDS"] ?? ""
         for (i, command) in script.components(separatedBy: " ;; ").filter({ !$0.isEmpty }).enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 4 + Double(i) * 1.5) { MainActor.assumeIsolated { run(command) } }
@@ -56,8 +60,9 @@ enum DebugBridge {
     /// minitype <text>, minimove, miniclose, minifind [text|close], minispace [name], minicopy, miniresize <w> <h>,
     /// minimenu <char> [cmd|shift|ctrl|opt...], ministate <path> (JSON), minishot <path> (PNG; web content may be
     /// blank), miniclosebrowsers, minijs <script>, miniesc, miniquit, miniask notifications, minianswer
-    /// allow|always|alternate|deny|notnow, minisave save|notnow, minieval <path> <script>, miniswipe <dx> [slow]
-    /// [noend], miniborderless on|off. Without a mini window, miniask and minianswer use the front browser window.
+    /// allow|always|alternate|deny|notnow|<action>, minisave save|notnow, minieval <path> <script>, miniswipe <dx> [slow]
+    /// [noend], miniborderless on|off, miniclick x y [real] (a click in its page; real counts it for
+    /// pop-ups), minikey on|off (taken for the key window), miniprompts on|off (questions show though it isn't key). Without a mini window, miniask and minianswer use the front browser window.
     /// pageprobe <path> [mark]: each tab's page state as JSON; `mark` tags live pages so a later probe shows which
     /// reloaded.
     /// capture [area|element|full|visible] (Capture begun in that mode, or switched to it), capture toggle (⇧⌘2),
@@ -275,6 +280,25 @@ enum DebugBridge {
         case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
         case "minisidebutton": if let window = mini?.window { sendSideButton(arg, to: window) }
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
+        case "miniprompts": MiniWindowController.debugPromptsShow = arg != "off"
+        case "miniclick":
+            // `pageclick`, in the newest Zigzag Mini (window points, top left).
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 2, let window = mini?.window else { break }
+            BrowserWebView.takesFirstMouse = true
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: NSPoint(x: f[0], y: window.frame.height - f[1]), modifierFlags: [],
+                                                  timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                  context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
+                    window.sendEvent(event)
+                }
+            }
+            BrowserWebView.takesFirstMouse = false
+            // `real`: counted as your own click for the page's pop-ups (`PopupNotice.noteInput`).
+            if arg.contains("real"), let webView = mini?.tab.webView { PopupNotice.noteInput(in: webView) }
+        case "minikey":
+            // As if Zigzag Mini were the key window (NSApp.keyWindow), for a test copy kept behind.
+            DebugKeyWindow.pretend(arg == "off" ? nil : mini?.window)
         case "miniesc": mini?.debugEscape()
         case "miniquit": NSApp.terminate(nil)
         case "miniask":
@@ -295,7 +319,9 @@ enum DebugBridge {
             case "always": answer = PermissionAnswer(action: "allow", remember: true)
             case "alternate": answer = PermissionAnswer(action: "screen", remember: false)
             case "deny": answer = PermissionAnswer(action: "deny", remember: false)
-            default: answer = nil
+            case "notnow", "": answer = nil
+            // Any other action by name, as the pop-up question's dropdown gives it (mini, thisTab, newTab).
+            default: answer = PermissionAnswer(action: arg, remember: false)
             }
             PermissionPrompt.debugAnswer(answer, in: host)
         case "minisave": SavePasswordPrompt.debugAnswer(saved: arg == "save")
@@ -472,6 +498,8 @@ enum DebugBridge {
         case "state":
             var state = popup.debugState
             state["window"] = window.windowNumber
+            state["level"] = window.level.rawValue
+            state["visible"] = window.isVisible
             state["sheet"] = window.attachedSheet.map { "\(type(of: $0))" } ?? "none"
             state["sheetWindow"] = window.attachedSheet?.windowNumber ?? 0
             state["firstResponder"] = window.firstResponder.map { "\(type(of: $0))" } ?? "nil"
@@ -752,6 +780,9 @@ enum DebugBridge {
             return
         }
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
+        if name == "fpsbench" { FrameRateBench.run(arg, in: controller); return }
+        // glassvariant <name>: draws clear glass another way (`GlassVariant`), until relaunch.
+        if name == "glassvariant" { if let variant = GlassVariant(rawValue: arg) { DebugMenu.apply(variant) }; return }
         // card [tilt <x> <y>|tilt off|finish <name>|flip|hover <n>|save <path>|shot <path>|close]: About with Your Zigzag Card, opened behind, leaning as if
         // the pointer were there (-1 to 1 from its middle, y up), its picture saved, or its window captured by number.
         // card start <yyyy-mm-dd> <version> [exact]: the kept start, replaced, for a test copy.
@@ -770,6 +801,9 @@ enum DebugBridge {
         // button; updatestate <path>: menu title and staged update (JSON).
         if name == "updateready" { Updater.shared.debugStage(arg == "off" || arg.isEmpty ? nil : arg); return }
         if name == "updatedismiss" { Updater.shared.dismissCard(); return }
+        // updateoffer <version>|off: a pretend update on offer, as with automatic installs off; updateskip: its Skip.
+        if name == "updateoffer" { Updater.shared.debugOffer(arg == "off" || arg.isEmpty ? nil : arg); return }
+        if name == "updateskip" { Updater.shared.skipOffered(); return }
         // updatesim <version> [share|preparing]: Check for Updates… with a pretend download, held at that step if
         // given.
         if name == "updatesim" {
@@ -779,7 +813,7 @@ enum DebugBridge {
         }
         if name == "updatestate" {
             let readiness = Updater.shared.readiness
-            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats,
+            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats, "offered": Updater.shared.offer.available?.version ?? "",
                                         "shown": !controller.sidebar.updateCard.isHidden, "frame": NSStringFromRect(controller.sidebar.updateCard.frame)]
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
             return
@@ -885,6 +919,20 @@ enum DebugBridge {
         case "edgepointer":
             let f = arg.split(separator: " ").compactMap { Double($0) }
             controller.root.debugEdgePointer(f.count == 2 ? NSPoint(x: f[0], y: f[1]) : nil)
+        // touchpull <x> <dx> | end <velocity>: a finger landing x in from the edge pulls the hidden sidebar dx out,
+        // held there; end lets go.
+        case "touchpull":
+            let f = arg.split(separator: " ")
+            if f.first == "end" {
+                controller.root.touchPullEnded(velocity: f.count > 1 ? Double(f[1]).map { CGFloat($0) } ?? 0 : 0, cancelled: false)
+            } else if f.count == 2, let x = Double(f[0]), let dx = Double(f[1]) {
+                controller.root.touchPullBegan(.pull, base: x)
+                controller.root.touchPullMoved(by: dx)
+            }
+        // touchrecent: as if a finger had just landed in the window, so the touch grabber shows.
+        case "touchrecent": controller.root.debugTouchedRecently()
+        // touchreveal: as if a finger had tapped where the hidden lights and sidebar toggle sit, so they show.
+        case "touchreveal": controller.root.debugRevealTap()
         case "edgestate": debugLog("edgestate \(controller.root.isSidebarFloatingVisible ? "out" : controller.root.sidebarVisible ? "docked" : "hidden")")
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
         // holding ⌃ shows them), even with the window not in front. off hides both.
@@ -953,8 +1001,9 @@ enum DebugBridge {
             } else {
                 Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", in: controller) }
             }
-        // permremember on|off [mini], permkey <keyCode> [focused] [mini], permframes [mini]: the showing question.
-        case "permremember", "permkey", "permframes":
+        // permremember on|off [mini], permkey <keyCode> [focused] [mini], permframes [mini], permmenu [mini]: the
+        // showing question (permmenu opens its answering split's menu).
+        case "permremember", "permkey", "permframes", "permmenu":
             let words = arg.split(separator: " ").map(String.init)
             let host: PromptHost = words.contains("mini") ? (MiniWindowController.all.last ?? controller) : controller
             if name == "permremember" { PermissionPrompt.debugRemember(words.first == "on", in: host) }
@@ -962,6 +1011,7 @@ enum DebugBridge {
                 PermissionPrompt.debugKey(code, focused: words.contains("focused"), in: host)
             }
             if name == "permframes" { debugLog("permframes \(PermissionPrompt.debugFrames(in: host).sorted { $0.key < $1.key })") }
+            if name == "permmenu" { PermissionPrompt.debugOpenAnswerMenu(in: host) }
         case "renamepanel": RenamePanel.show(title: "Google", in: controller) { _ in }
         case "importanim": IntoZigzag.shown?.set(arg == "done" ? .done : .importing)
         case "bartab": controller.commandBar.debugTab()
@@ -1324,6 +1374,10 @@ enum DebugBridge {
             if !controller.tab(tab, routesLink: url, arrival: newTab ? .linkNewTab : .linkClick, inBackground: f.contains("bg")) {
                 if newTab { controller.tab(tab, openURL: url, disposition: f.contains("bg") ? .backgroundTab : .foregroundTab) } else { tab.load(url, by: .page) }
             }
+        // routehelp: presses the last match-type help button in the window (Settings › Spaces, a rule's sheet).
+        case "routehelp":
+            func buttons(in view: NSView) -> [IconButton] { [view as? IconButton].compactMap { $0 } + view.subviews.flatMap(buttons) }
+            _ = controller.window?.contentView.map(buttons)?.last { $0.accessibilityLabel() == String(localized: "About Match Types", comment: "Button opening space rule help.") }?.accessibilityPerformPress()
         case "routes":
             let list = Library.shared.siteRoutes.map { "\($0.site)→\(Library.shared.space($0.spaceID)?.name ?? "?")" }
             let tabs = controller.tabManager.allTabs.map { "\(Library.shared.space($0.spaceID)?.name ?? "?"):\($0.url?.absoluteString ?? "-")" }
@@ -1340,6 +1394,14 @@ enum DebugBridge {
         case "capture": runCapture(arg, in: controller)
         case "reader": controller.toggleReader()
         case "translate": controller.translatePage()
+        // translatemenu: the address bar's translate button, as a click. translateoptions: the offer's … button.
+        // translatestub: the page marked translated, without Apple's translation.
+        case "translatemenu": controller.showTranslateMenu()
+        case "translateoptions":
+            let toast = controller.root.overlay.subviews.compactMap { $0 as? ToastView }.last
+            toast?.optionsButton.onClick?(NSEvent())
+        case "translatestub": controller.debugMarkTranslated()
+        case "translatesettings": SettingsPage.open(.translation, in: controller)
         case "split":
             // Splits the shown tab with the one at this sidebar position.
             let list = controller.tabManager.navigableTabs
@@ -1357,10 +1419,14 @@ enum DebugBridge {
                 controller.tabManager.tile(list[n], beside: current, .place(region: region, regions: placed))
             }
         case "tilehint":
-            // tilehint <x> <y>: the hint a tab dragged to that point of the page (shares of its width and height) shows;
+            // tilehint <x> <y> [n]: the hint a tab dragged to that point of the page (shares of its width and height) shows;
             // tilehint alone puts it away.
             let parts = arg.split(separator: " ").compactMap { Double($0) }
-            if parts.count == 2, let current = controller.tabManager.selectedTab {
+            if parts.count >= 2, let current = controller.tabManager.selectedTab {
+                // A third number: the tab at that sidebar position is the one carried, named in the hint.
+                let list = controller.tabManager.navigableTabs
+                controller.root.splitDropHint.incoming = parts.count == 3 && list.indices.contains(Int(parts[2]))
+                    ? controller.carried(.tab(list[Int(parts[2])].id)) : nil
                 let area = controller.root.cardFrame
                 let point = NSPoint(x: area.minX + area.width * parts[0], y: area.minY + area.height * parts[1])
                 controller.showDropHint(at: controller.root.convert(point, to: nil), beside: current)
@@ -1392,6 +1458,27 @@ enum DebugBridge {
             debugPaneDrag?.moved(to: point)
             debugPaneDragPoint = point
             debugLog("panedrag \(arg) => \(String(describing: debugPaneDrag?.target)) at \(point)")
+        case "rowdrop", "rowjoin":
+            // rowdrop <carried>|<target>|<left|right>: the row titled <carried> resting on the middle of <target>'s row
+            // (a tab's or a pinned page's), the offer it shows; rowdrop alone puts it away. rowjoin: that drop, undoably.
+            let f = arg.components(separatedBy: "|")
+            func item(_ title: String) -> SidebarItem? {
+                if let tab = controller.tabManager.currentTabs.first(where: { $0.displayTitle.contains(title) }) { return .tab(tab.id) }
+                return Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).first { $0.title.contains(title) }.map { .bookmark(SidebarListView.rowID($0.id)) }
+            }
+            let carried = f.count == 3 ? item(f[0]) : nil, target = f.count == 3 ? item(f[1]) : nil
+            if name == "rowjoin" {
+                if case .tab(let id)? = carried, let tab = controller.tabManager.tab(with: id), case .tab(let t)? = target, let other = controller.tabManager.tab(with: t), controller.tabManager.split(for: other) != nil {
+                    controller.listJoinSplit(.tab(tab.id), onto: .tab(other.id), onRight: f[2] == "right")
+                } else if let carried, case .bookmark(let t)? = target {
+                    let page: TabManager.RowPage? = switch carried { case .tab(let id): .tab(id); case .bookmark(let id): .pinned(id); default: nil }
+                    if let page { controller.listJoinSplit(page, onto: .pinned(t), onRight: f[2] == "right") }
+                }
+                controller.sidebar.list.debugOfferSplit(nil, onto: nil, onRight: false)
+                debugLog("rowjoin \(arg) done")
+            } else {
+                debugLog("rowdrop \(arg) offered=\(controller.sidebar.list.debugOfferSplit(carried, onto: target, onRight: f.count == 3 && f[2] == "right"))")
+            }
         case "rowhover":
             // rowhover <n>: the row of the tab at this place in the list as if the pointer were over it; off: none.
             let tabs = controller.tabManager.currentTabs
@@ -1481,6 +1568,16 @@ enum DebugBridge {
         case "unsplit": controller.closeSplitView(nil)
         // splitorient: side by side to stacked or back, as the split's own button does.
         case "splitorient": controller.toggleSplitOrientation(nil)
+        // swapsplit: the two pages trade places, as the strip's swap button does.
+        case "swapsplit": if let tab = controller.tabManager.selectedTab { controller.tabManager.swapSplit(for: tab) }
+        // panestate: the pane you're in, each pane's page and frame, the find bar's frame, and the keyboard's page.
+        case "panestate":
+            let m = controller.tabManager
+            let ids = m.selectedTab.flatMap { m.split(for: $0) }?.ids ?? []
+            let names = ids.map { m.tab(with: $0)?.displayTitle ?? "?" }
+            let responder = controller.window?.firstResponder as? NSView
+            let keyboard = controller.root.paneCards.firstIndex { card in responder.map { $0.isDescendant(of: card) } ?? false }
+            debugLog("panestate selected=\(m.selectedTab?.displayTitle ?? "-") panes=\(names) frames=\(controller.root.tileFrames.map(NSStringFromRect)) focused=\(NSStringFromRect(controller.focusedPaneFrame)) cards=\(controller.root.paneCards.prefix(ids.count).map { ($0.webView as? BrowserWebView)?.owner?.displayTitle ?? "-" }) keyboardCard=\(keyboard.map(String.init) ?? "-") responder=\(responder.map { String(describing: type(of: $0)) } ?? "nil") find=\(controller.findBar.debugFrame)")
         case "closetab": controller.closeTab(nil)
         case "flydownload": controller.debugFlyDownload(arg.isEmpty ? "Shanghai Guide.pdf" : arg)
         case "readerjs":
@@ -1681,6 +1778,15 @@ enum DebugBridge {
                 let look = controller.selectedWebView?.appearance?.name.rawValue ?? "none"
                 debugLog("darkstate => \(result) tab=\(String(describing: tab)) pageColor=\(color) look=\(look)")
             }
+        // lookprobe [label]: the front page's look as WebKit was asked for it and as the page sees it.
+        case "lookprobe":
+            guard let webView = controller.selectedWebView else { debugLog("lookprobe \(arg) no web view"); break }
+            let views = "view=\(webView.appearance?.name.rawValue ?? "nil") effective=\(webView.effectiveAppearance.name.rawValue) window=\(controller.window?.effectiveAppearance.name.rawValue ?? "-") app=\(NSApp.effectiveAppearance.name.rawValue) appSet=\(NSApp.appearance?.name.rawValue ?? "nil")"
+            webView.evaluateJavaScript("JSON.stringify({url: location.href, prefersDark: matchMedia('(prefers-color-scheme: dark)').matches, mode: document.documentElement.getAttribute('data-color-mode'), bg: getComputedStyle(document.body).backgroundColor})") { result, _ in
+                debugLog("lookprobe \(arg) \(views) page=\(result as? String ?? "-")")
+            }
+        // reloadtab: the front tab loads again, as ⌘R does.
+        case "reloadtab": controller.tabManager.selectedTab?.reload()
         // darkseen forget: drops the profile's sites seen dark, as clearing History does.
         case "darkseen": if arg == "forget" { DarkSeen.forget(in: controller.tabManager.profile.store) }
         case "resize":
@@ -2046,6 +2152,14 @@ enum DebugBridge {
 
             debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
+        case "seedfavorites":
+            // seedfavorites <n>: n blank favorites with symbol icons, into a test copy's own data only.
+            guard ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil else { debugLog("seedfavorites refused: not a test copy"); break }
+            let symbols = ["star", "heart", "bolt", "leaf", "flame", "moon", "sun.max", "cloud", "book", "music.note", "camera", "gift"]
+            let marks = (0..<(Int(arg) ?? 45)).compactMap { i in
+                URL(string: "about:blank#fav\(i)").map { Bookmark(url: $0, title: "Favorite \(i + 1)", icon: symbols[i % symbols.count]) }
+            }
+            debugLog("seedfavorites => \(Library.shared.appendFavorites(marks, in: controller.tabManager.profile.id))")
         case "scrolllist":
             // scrolllist <y>: scrolls the sidebar's list to that many points from its top, or as far as it goes.
             if let clip = controller.sidebar.list.enclosingScrollView?.contentView, let y = Double(arg) {
@@ -2073,6 +2187,8 @@ enum DebugBridge {
             }
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }
+        // autofillpreview [n]: the password menu with made-up logins over the page; with n, its highlight moves n rows.
+        case "autofillpreview": Autofill.shared.debugPreview(in: controller.root.overlay, move: Int(arg) ?? 0)
         case "autofillmenu":
             debugLog("autofillmenu => \(Autofill.shared.isShowing) \(Autofill.shared.debugRows)")
         case "autofillclick":
@@ -2648,6 +2764,8 @@ enum DebugBridge {
         case "copylink": controller.copyPageURL(nil)
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        // touchlog <path>: the last 50 touch decisions on pages.
+        case "touchlog": try? TouchLog.lines.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "settings": SettingsPage.open(in: controller)
         // settingsprivacy: Settings › Privacy. flipblocking: its Block ads and trackers switch, as a click does.
         case "settingsprivacy": SettingsPage.open(.privacy, in: controller)
@@ -2671,6 +2789,8 @@ enum DebugBridge {
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
         // sitepanelrow <index> <row title>: picks that choice in the open panel's This Site row.
         case "sitepanelrow": SitePanel.shown?.debugChooseRow(arg)
+        // sitepanelmenu <row title> | action <row title>: opens that row's dropdown, or runs its action.
+        case "sitepanelmenu": SitePanel.shown?.debugRowMenu(arg)
         case "panesite", "panemore":
             // panesite <pane>: that split pane's Site Controls button, as a click on it (#160). panemore <pane>: its ⋯.
             let cards = controller.root.paneCards
@@ -3675,13 +3795,15 @@ enum TrafficLightWatch {
 #if DEBUG
 /// scrollbench <path> [seconds] [js|wheel] [points per frame]: scrolls the front page and writes frame gaps (JSON), in
 /// the page (animation frames) and on the main thread (display link). `js` uses `scrollBy`; `wheel` sends synthetic
-/// trackpad events to the web view only.
+/// trackpad events to the web view only, `window` through the window and its event monitors.
 @MainActor
 enum ScrollBench {
     private final class Ticker: NSObject {
         var last: CFTimeInterval = 0
         var gaps: [Double] = []
         var tick: ((CADisplayLink) -> Void)?
+        var beat: (() -> Void)?
+        @objc func beatFired(_ timer: Timer) { beat?() }
         /// WebKit's page layers; counts display frames where any moved.
         weak var root: CALayer?
         var previous: [ObjectIdentifier: CGFloat] = [:]
@@ -3730,21 +3852,23 @@ enum ScrollBench {
         let ticker = Ticker()
         var direction = 1.0
         var sent = 0
-        if mode == "wheel" {
+        // How long each scroll took to hand over, in microseconds.
+        var dispatch: [Double] = []
+        if mode == "wheel" || mode == "window" {
+            let throughWindow = mode == "window"
             let center = NSPoint(x: webView.bounds.midX, y: webView.bounds.midY)
             let inWindow = webView.convert(center, to: nil)
             let onScreen = window.convertPoint(toScreen: inWindow)
             let flippedY = (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y
             var phaseStart = CACurrentMediaTime()
             var began = false
-            ticker.tick = { link in
-                let now = link.timestamp
+            let send: (CFTimeInterval) -> Void = { now in
                 // Alternates direction every 1.5 s.
                 if now - phaseStart > 1.5 { phaseStart = now; direction = -direction; began = false
                     if let end = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: 0, wheel3: 0) {
                         end.setIntegerValueField(.scrollWheelEventScrollPhase, value: 4)
                         end.location = CGPoint(x: onScreen.x, y: flippedY)
-                        if let e = NSEvent(cgEvent: end) { webView.scrollWheel(with: e) }
+                        if let e = NSEvent(cgEvent: end) { if throughWindow { window.sendEvent(e) } else { webView.scrollWheel(with: e) } }
                     }
                 }
                 let dy = Int32(-direction * step)
@@ -3757,7 +3881,21 @@ enum ScrollBench {
                 cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
                 cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
                 began = true
-                if let event = NSEvent(cgEvent: cg) { webView.scrollWheel(with: event); sent += 1 }
+                if let event = NSEvent(cgEvent: cg) {
+                    let start = CACurrentMediaTime()
+                    if throughWindow { window.sendEvent(event) } else { webView.scrollWheel(with: event) }
+                    dispatch.append((CACurrentMediaTime() - start) * 1_000_000)
+                    sent += 1
+                }
+            }
+            // Through the window, on a clock of its own: a display link stops while the window is covered.
+            if throughWindow {
+                ticker.beat = { send(CACurrentMediaTime()) }
+                let clock = Timer(timeInterval: 1.0 / 120, target: ticker, selector: #selector(Ticker.beatFired(_:)), userInfo: nil, repeats: true)
+                RunLoop.main.add(clock, forMode: .common)
+                DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { clock.invalidate() }
+            } else {
+                ticker.tick = { link in send(link.timestamp) }
             }
         }
         ticker.root = webView.layer
@@ -3802,12 +3940,266 @@ enum ScrollBench {
             link.invalidate()
             result["mainThread"] = stats(ticker.gaps, frame: 1000 / Double(max(screenFPS, 60)))
             result["wheelEvents"] = sent
+            let byTime = dispatch.sorted()
+            if !byTime.isEmpty {
+                result["dispatchMicros"] = ["p50": byTime[byTime.count / 2], "p95": byTime[byTime.count * 95 / 100], "max": byTime.last!,
+                                            "mean": byTime.reduce(0, +) / Double(byTime.count)]
+            }
             result["layerMovedTicks"] = ticker.movedTicks
             result["layerTicks"] = ticker.ticks
             if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]) {
                 try? data.write(to: URL(fileURLWithPath: path))
             }
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// fpsbench [seconds] [path|-] [window|js]: scrolls the front page up and down, by trackpad-like scrolls sent through
+/// the window (`window`, 12 pt at 120 Hz) or in the page (`js`, 12 pt an animation frame), and measures how often the
+/// window's part of the screen is presented, from ScreenCaptureKit when Screen Recording is allowed, and the display
+/// link's beat. Results go to debug.log, the file if given, and a label in the window's corner while it runs.
+@MainActor
+enum FrameRateBench {
+    private static var running = false
+
+    /// Frames of the screen under one window, as ScreenCaptureKit sees them presented.
+    nonisolated private final class Presented: NSObject, SCStreamOutput, @unchecked Sendable {
+        private let lock = NSLock()
+        private var times: [Double] = []
+        private var stream: SCStream?
+        private let scale: Double = {
+            var base = mach_timebase_info_data_t()
+            mach_timebase_info(&base)
+            return Double(base.numer) / Double(base.denom) / 1_000_000
+        }()
+
+        func start(window number: Int) async throws {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            guard let window = content.windows.first(where: { $0.windowID == CGWindowID(number) }),
+                  let display = content.displays.first(where: { $0.frame.intersects(window.frame) }) else { throw CocoaError(.featureUnsupported) }
+            let config = SCStreamConfiguration()
+            // The window's part of the display, small: only when frames come matters.
+            let rect = window.frame.intersection(display.frame).offsetBy(dx: -display.frame.minX, dy: -display.frame.minY)
+            config.sourceRect = rect
+            config.width = 320
+            config.height = max(2, Int(320 * rect.height / max(rect.width, 1)))
+            config.minimumFrameInterval = CMTime(value: 1, timescale: 240)
+            config.queueDepth = 8
+            config.showsCursor = false
+            let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []), configuration: config, delegate: nil)
+            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: DispatchQueue(label: "fpsbench"))
+            try await stream.startCapture()
+            lock.withLock { self.stream = stream }
+        }
+
+        func stop() async {
+            let stream = lock.withLock { self.stream }
+            try? await stream?.stopCapture()
+        }
+
+        /// Display times of the frames so far, in ms.
+        var frames: [Double] { lock.withLock { times } }
+
+        func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
+            guard type == .screen,
+                  let attachments = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
+                  let info = attachments.first, let raw = info[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete else { return }
+            let time = (info[.displayTime] as? UInt64).map { Double($0) * scale } ?? CMSampleBufferGetPresentationTimeStamp(buffer).seconds * 1000
+            lock.withLock { times.append(time) }
+        }
+    }
+
+    private final class Beat: NSObject {
+        var times: [Double] = []
+        @objc func fire(_ link: CADisplayLink) { times.append(link.timestamp * 1000) }
+    }
+
+    private static func gaps(_ times: [Double]) -> [Double] { zip(times.dropFirst(), times).map { $0 - $1 } }
+
+    private static func summary(_ gaps: [Double]) -> (p50: Double, p95: Double, fps: Double)? {
+        guard gaps.count > 4 else { return nil }
+        let sorted = gaps.sorted()
+        let p50 = sorted[sorted.count / 2], p95 = sorted[min(sorted.count - 1, sorted.count * 95 / 100)]
+        return (p50, p95, 1000 * Double(gaps.count) / gaps.reduce(0, +))
+    }
+
+    private static func line(_ name: String, _ gaps: [Double]) -> String {
+        guard let s = summary(gaps) else { return "\(name) none" }
+        return String(format: "%@ %.0f fps  p50 %.2f ms  p95 %.2f ms", name, s.fps, s.p50, s.p95)
+    }
+
+    static func run(_ arg: String, in controller: BrowserWindowController) {
+        guard !running, let webView = controller.selectedWebView, let window = webView.window, let content = window.contentView else { return }
+        let f = arg.split(separator: " ").map(String.init)
+        let seconds = f.first.flatMap(Double.init) ?? 6
+        let path = f.count > 1 && f[1] != "-" ? f[1] : nil
+        let inPage = f.count > 2 && f[2] == "js"
+        running = true
+
+        let hud = NSTextField(labelWithString: "Measuring…")
+        hud.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        hud.textColor = .white
+        hud.drawsBackground = true
+        hud.backgroundColor = NSColor.black.withAlphaComponent(0.7)
+        hud.maximumNumberOfLines = 3
+        content.addSubview(hud)
+        func placeHUD() {
+            hud.sizeToFit()
+            hud.frame.origin = NSPoint(x: content.bounds.maxX - hud.frame.width - 12,
+                                       y: content.isFlipped ? content.bounds.maxY - hud.frame.height - 12 : 12)
+        }
+        placeHUD()
+
+        let beat = Beat()
+        let link = webView.displayLink(target: beat, selector: #selector(Beat.fire(_:)))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+        link.add(to: .main, forMode: .common)
+        let presented = Presented()
+        let allowed = CGPreflightScreenCaptureAccess()
+        let started = CACurrentMediaTime() * 1000
+        // The figure so far, twice a second.
+        let ticker = Timer(timeInterval: 0.5, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let now = CACurrentMediaTime() * 1000
+                let recent = (allowed ? presented.frames : beat.times).filter { $0 > now - 500 }
+                hud.stringValue = String(format: "%@ %.0f fps", allowed ? "presented" : "display link", Double(max(recent.count - 1, 0)) * 2)
+                placeHUD()
+            }
+        }
+        RunLoop.main.add(ticker, forMode: .common)
+        if !inPage { scrollThroughWindow(webView, seconds: seconds) }
+
+        let script = """
+        const scrolls = inPage;
+        let dir = 1, frames = 0;
+        const end = performance.now() + seconds * 1000;
+        await new Promise((done) => {
+          const frame = (t) => {
+            const max = document.scrollingElement.scrollHeight - innerHeight;
+            if (scrollY >= max - 1) dir = -1; else if (scrollY <= 0) dir = 1;
+            if (scrolls) window.scrollBy(0, dir * 12);
+            frames++;
+            if (t < end) requestAnimationFrame(frame); else done();
+          };
+          requestAnimationFrame(frame);
+        });
+        return frames;
+        """
+        Task {
+            var note = ""
+            if allowed {
+                do { try await presented.start(window: window.windowNumber) } catch { note = "capture failed: \(error)" }
+            } else {
+                note = "no Screen Recording: display link only"
+            }
+            let value = try? await webView.callAsyncJavaScript(script, arguments: ["seconds": seconds, "inPage": inPage], in: nil, contentWorld: .defaultClient)
+            let pageFrames = (value as? NSNumber)?.intValue ?? 0
+            await presented.stop()
+            ticker.invalidate()
+            link.invalidate()
+            // The first half second settles.
+            let shown = gaps(presented.frames.filter { $0 > started + 500 })
+            let beats = gaps(beat.times.filter { $0 > started + 500 })
+            let screen = window.screen?.maximumFramesPerSecond ?? 0
+            let opaque = window.isOpaque
+            let text = [note.isEmpty ? line("presented", shown) : note, line("display link", beats),
+                        "\(inPage ? "js" : "window")  \(GlassVariant.now.rawValue)  opaque \(opaque)  screen \(screen) Hz  page \(Int(Double(pageFrames) / seconds)) fps"].joined(separator: "\n")
+            debugLog("fpsbench \(text.replacingOccurrences(of: "\n", with: " | "))")
+            hud.stringValue = text
+            placeHUD()
+            if let path {
+                var result: [String: Any] = ["variant": GlassVariant.now.rawValue, "mode": inPage ? "js" : "window", "opaque": opaque, "screenFPS": screen, "seconds": seconds,
+                                             "pageFPS": Double(pageFrames) / seconds, "note": note, "key": window.isKeyWindow,
+                                             "visible": window.occlusionState.contains(.visible)]
+                if let s = summary(shown) { result["presented"] = ["p50": s.p50, "p95": s.p95, "fps": s.fps, "count": shown.count] }
+                if let s = summary(beats) { result["displayLink"] = ["p50": s.p50, "p95": s.p95, "fps": s.fps, "count": beats.count] }
+                if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: path)) }
+            }
+            running = false
+            try? await Task.sleep(for: .seconds(4))
+            hud.removeFromSuperview()
+        }
+    }
+
+    /// Trackpad-like scrolls through the window at 120 Hz, 12 pt each, turning every 1.5 s, as `scrollbench window`.
+    private static func scrollThroughWindow(_ webView: WKWebView, seconds: Double) {
+        guard let window = webView.window else { return }
+        let inWindow = webView.convert(NSPoint(x: webView.bounds.midX, y: webView.bounds.midY), to: nil)
+        let onScreen = window.convertPoint(toScreen: inWindow)
+        let at = CGPoint(x: onScreen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y)
+        func send(_ dy: Int32, phase: Int64) {
+            guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: 0, wheel3: 0) else { return }
+            cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+            cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+            cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
+            cg.location = at
+            cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+            cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+            if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
+        }
+        let start = CACurrentMediaTime()
+        var turn = start, direction: Int32 = 1, began = false
+        let clock = Timer(timeInterval: 1.0 / 120, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let now = CACurrentMediaTime()
+                guard now - start < seconds else { return }
+                if now - turn > 1.5 { turn = now; send(0, phase: 4); direction = -direction; began = false }
+                send(-direction * 12, phase: began ? 2 : 1)
+                began = true
+            }
+        }
+        RunLoop.main.add(clock, forMode: .common)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { clock.invalidate(); send(0, phase: 4) }
+    }
+}
+
+/// Debug builds only: a Debug menu in the menu bar, for what's easier to start with the mouse.
+@MainActor
+final class DebugMenu: NSObject, NSMenuItemValidation {
+    static let shared = DebugMenu()
+
+    static func install() {
+        guard let main = NSApp.mainMenu, !main.items.contains(where: { $0.title == "Debug" }) else { return }
+        let menu = NSMenu(title: "Debug")
+        let measure = NSMenuItem(title: "Measure Frame Rate", action: #selector(measure(_:)), keyEquivalent: "")
+        measure.target = shared
+        menu.addItem(measure)
+        let variants = NSMenu(title: "Glass Variant")
+        for variant in GlassVariant.allCases {
+            let item = NSMenuItem(title: variant.rawValue, action: #selector(choose(_:)), keyEquivalent: "")
+            item.target = shared
+            item.representedObject = variant.rawValue
+            variants.addItem(item)
+        }
+        let variantItem = NSMenuItem(title: "Glass Variant", action: nil, keyEquivalent: "")
+        variantItem.submenu = variants
+        menu.addItem(variantItem)
+        let top = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
+        top.submenu = menu
+        main.insertItem(top, at: max(0, main.items.count - 1))
+    }
+
+    static func apply(_ variant: GlassVariant) {
+        GlassVariant.now = variant
+        WindowManager.shared.controllers.forEach { $0.debugApplyGlassVariant() }
+        debugLog("glass variant \(variant.rawValue)")
+    }
+
+    @objc func measure(_ sender: Any?) {
+        guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        FrameRateBench.run("6", in: controller)
+    }
+
+    @objc func choose(_ sender: NSMenuItem) {
+        if let variant = (sender.representedObject as? String).flatMap(GlassVariant.init(rawValue:)) { Self.apply(variant) }
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(choose(_:)) { item.state = item.representedObject as? String == GlassVariant.now.rawValue ? .on : .off }
+        return true
     }
 }
 #endif

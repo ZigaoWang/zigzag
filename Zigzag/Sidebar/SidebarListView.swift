@@ -62,8 +62,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool
     /// A tab dropped on another tab's middle: the two open side by side.
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
-    /// A tab dropped on a split's row joins it as a third or fourth page (`TabManager.joining`).
-    func listJoinSplit(_ tab: Tab, onto other: Tab, onRight: Bool)
+    /// A tab or pinned page dropped on a split's row joins it as a third or fourth page (`TabManager.joining`).
+    func listJoinSplit(_ page: TabManager.RowPage, onto target: TabManager.RowPage, onRight: Bool)
     /// ⇧-clicked a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160).
     func listZoomPane(_ tab: Tab)
     /// A tab dropped on a pinned page's middle: a pinned split.
@@ -233,6 +233,8 @@ final class SidebarListView: NSView {
         var originGroup: UUID?
         /// Group row the dragged tab hovers; dropping adds it to that group.
         var groupTarget: UUID?
+        /// False for Zigzag's own views (#472): Pinned, its folders and the favorites don't take them.
+        var pinnable = true
     }
 
     /// Something carried in from elsewhere (another window's tab, a favorite): where the line shows it would land.
@@ -913,7 +915,11 @@ final class SidebarListView: NSView {
         hoverArea = area
     }
 
-    override func mouseEntered(with event: NSEvent) { isPointerInside = true }
+    override func mouseEntered(with event: NSEvent) {
+        isPointerInside = true
+        // Clear shown by a tap: hover takes over.
+        if let separator = rows[.separator] { TouchReveal.pointerMoved(over: separator) }
+    }
     #if DEBUG
     func debugHover(_ on: Bool) { isPointerInside = on }
     /// Hover on or off Clear dims the rows it would close. Returns the tooltip.
@@ -968,6 +974,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             return row
         case .tabGroup(let id):
             // Same as a folder: click toggles, menu renames, ungroups or closes.
@@ -982,6 +989,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             return row
         case .separator:
             let separator = SeparatorRowView()
@@ -1013,12 +1021,7 @@ final class SidebarListView: NSView {
                 guard let self, let row, let tab = row.tab else { return }
                 // ⇧-click a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160).
                 // Anywhere else ⇧ picks rows, as always.
-                let point = row.convert(event.locationInWindow, from: nil)
-                if event.modifierFlags.intersection([.shift, .command, .option, .control]) == .shift, row.pages.count > 1,
-                   let selected = self.manager?.selectedTab, row.pages.contains(where: { $0 === selected }), let page = row.page(at: point) {
-                    self.delegate?.listZoomPane(page)
-                    return
-                }
+                if self.zoomsPart(of: row, with: event) { return }
                 if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
                 self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
@@ -1027,13 +1030,13 @@ final class SidebarListView: NSView {
             // In a row of several pages, the part double-clicked is the page renamed.
             row.onDoubleClick = { [weak row] in row?.beginRename(at: Self.pointer(in: row)) }
             row.onRename = { [weak row] name in (row?.renamingPage ?? row?.tab)?.customTitle = name.isEmpty ? nil : name }
-            // A split row's × closes the page of the part it's on; the other stays open (#404).
+            // A split row's × closes the page of the part it's on, as a middle-click there does; the rest stay open (#404).
             row.onClose = { [weak self, weak row] in
                 guard let page = row?.closingPage else { return }
                 self?.delegate?.listClose(page)
             }
             row.onMiddleClick = { [weak self, weak row] in
-                guard let row, let page = Self.pointer(in: row).flatMap(row.page(at:)) ?? row.tab else { return }
+                guard let row, let page = Self.pointer(in: row).flatMap(row.partPage(at:)) ?? row.tab else { return }
                 self?.delegate?.listClose(page)
             }
             row.onToggleNested = { [weak self, weak row] in
@@ -1045,6 +1048,7 @@ final class SidebarListView: NSView {
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             observeHover(row)
             return row
         case .bookmark(let id):
@@ -1071,6 +1075,7 @@ final class SidebarListView: NSView {
             }
             row.onClick = { [weak self, weak row] event in
                 guard let self, let row else { return }
+                if self.zoomsPart(of: row, with: event) { return }
                 if self.mark(item, with: event) { return }
                 // A pinned split's or group's row: each part opens its own page, and all open side by side.
                 var opening = id
@@ -1094,20 +1099,24 @@ final class SidebarListView: NSView {
                     self.delegate?.listClose(tab)
                 }
             }
-            // Away from its page, the button says "Back to Pinned Page", and does that; a middle-click still unloads.
-            // Beside a tab, the × on the tab's part closes only that tab (#404).
+            // Away from its page, the button says "Back to Pinned Page", and does that. Otherwise the × unloads the page,
+            // in a split the part's alone, as a middle-click there does.
             row.onClose = { [weak self, weak row] in
                 if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
-                if let row, row.closesPart, let page = row.closingPage { self?.delegate?.listClose(page) } else { unload() }
+                guard let row, row.closesPart else { unload(); return }
+                if let page = row.closingPage { self?.delegate?.listClose(page) }
             }
             row.onMiddleClick = { [weak self, weak row] in
-                if let row, row.closesPart, let page = Self.pointer(in: row).flatMap(row.page(at:)) { self?.delegate?.listClose(page) } else { unload() }
+                guard let row else { return }
+                guard row.isSplit else { unload(); return }
+                if let page = Self.pointer(in: row).flatMap(row.partPage(at:)) { self?.delegate?.listClose(page) }
             }
             row.onRightClick = { [weak self, weak row] event in self?.menu(for: item, row: row, event: event) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
             }
+            row.dragsByTouch = true
             observeHover(row)
             return row
         }
@@ -1146,14 +1155,8 @@ final class SidebarListView: NSView {
             row.configure(tab: tab)
             // Both halves of a split show as open, and every page of a tile group.
             let partners = manager.partners(of: tab)
-            let partner = partners.first
-            row.configure(partners: partners)
-            row.partnerLeads = partners.count == 1 && manager.split(for: tab)?.left == partner?.id
-            row.isSelected = tab === selected || partners.contains { $0 === selected }
-            row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
-            row.closesPart = !partners.isEmpty
-            // The pane zoomed over the rest: its part of the row is lit (#160).
-            row.zoomedPart = zoomedTabID.flatMap { zoomed in row.pages.firstIndex { $0.id == zoomed } }
+            configureGroup(row, own: tab, parts: partners.map { TabRowView.Part(page: $0) },
+                           partnerLeads: partners.count == 1 && manager.split(for: tab)?.left == partners.first?.id, selected: selected)
             // A split's age for Clear is its newest page's.
             row.freshness = SiteTint.freshness(lastActivated: ([tab] + partners).map(\.lastActivated).max() ?? tab.lastActivated)
             row.isMarked = marked.contains(item)
@@ -1186,30 +1189,40 @@ final class SidebarListView: NSView {
             // A pinned split or group shows all its pages, open or not, the way a split among tabs does.
             let riders = Library.shared.pinnedSplit(containing: id).flatMap { $0.left == id ? $0.riders.compactMap(Library.shared.bookmark) : nil } ?? []
             for mark in riders where mark.displayIcon == nil { FaviconStore.shared.prefetch(for: mark.url) }
-            let pinned = riders.first
-            let partner = pinned.flatMap { manager.bookmarkTab(for: $0.id) }
-            if let pinned {
-                row.configure(pinnedPartner: pinned.title, icon: pinned.displayIcon, unloaded: partner == nil)
-            } else {
-                row.configure(pinnedPartner: nil, icon: nil, unloaded: false)
-            }
-            row.configure(pinnedExtras: riders.dropFirst().map { ($0.title, $0.displayIcon, manager.bookmarkTab(for: $0.id)) })
-            let extraPages = row.extraPages
             // Split beside a tab, it carries that tab too: the page shows once, in its own place.
-            let beside = pinned == nil ? tab.flatMap(manager.partner(of:)) : nil
-            row.configure(partner: partner ?? beside)
-            row.partnerLeads = beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id
+            let beside = riders.isEmpty ? tab.flatMap(manager.partner(of:)) : nil
+            let parts = riders.map { TabRowView.Part(page: manager.bookmarkTab(for: $0.id), name: $0.title, icon: $0.displayIcon) }
+                + [beside].compactMap { $0.map { TabRowView.Part(page: $0) } }
+            configureGroup(row, own: tab, parts: parts,
+                           partnerLeads: beside != nil && tab.flatMap(manager.split(for:))?.left == beside?.id, selected: selected)
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
-            let other = partner ?? beside
-            let parts: [Tab?] = [tab, other] + extraPages
-            let focused = selected.flatMap { selected in parts.firstIndex { $0 != nil && $0 === selected } }
-            row.isSelected = focused != nil
-            row.focusedHalf = focused ?? 0
-            row.closesPart = beside != nil && !away
             row.isMarked = marked.contains(item)
         default:
             break
         }
+    }
+
+    /// What a split's or tile group's row shows besides its own page, the same in the tab list and among the pinned
+    /// pages: its other parts, which one leads, which is lit as the page you're in, and the one zoomed over the rest.
+    private func configureGroup(_ row: TabRowView, own: Tab?, parts: [TabRowView.Part], partnerLeads: Bool, selected: Tab?) {
+        row.configure(parts: parts)
+        row.partnerLeads = partnerLeads
+        let pages = [own] + parts.map(\.page)
+        let focused = selected.flatMap { selected in pages.firstIndex { $0 != nil && $0 === selected } }
+        row.isSelected = focused != nil
+        row.focusedHalf = focused ?? 0
+        // The pane zoomed over the rest: its part of the row is lit (#160).
+        row.zoomedPart = zoomedTabID.flatMap { zoomed in pages.firstIndex { $0?.id == zoomed } }
+    }
+
+    /// ⇧-click a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160). Anywhere
+    /// else ⇧ picks rows, as always.
+    private func zoomsPart(of row: TabRowView, with event: NSEvent) -> Bool {
+        guard event.modifierFlags.intersection([.shift, .command, .option, .control]) == .shift, row.pages.count > 1,
+              let selected = manager?.selectedTab, row.pages.contains(where: { $0 === selected }),
+              let page = row.partPage(at: row.convert(event.locationInWindow, from: nil)) else { return false }
+        delegate?.listZoomPane(page)
+        return true
     }
 
     // MARK: Picking several
@@ -1949,6 +1962,7 @@ final class SidebarListView: NSView {
             drag?.originParent = manager.tab(with: id)?.parentID
             drag?.originGroup = manager.tab(with: id)?.groupID
         }
+        drag?.pinnable = Self.pinnable(together, in: manager)
         if let start = drag.map({ reorderTarget(pointerY: convert(event.locationInWindow, from: nil).y, dragging: $0) }) {
             drag?.targetSection = start.0
             drag?.targetIndex = start.1
@@ -1960,9 +1974,23 @@ final class SidebarListView: NSView {
         (rows[.separator] as? SeparatorRowView)?.showsClear = false
         for item in faint { rows[item]?.alphaValue = CarriedCopy.faint }
         copy.lift()
-        let released = CarriedCopy.track(in: window) { self.dragMoved(to: $0) }
-        endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
+        // A finger held near the list's top or bottom scrolls it on.
+        TouchCarry.starting?.autoscrolls = enclosingScrollView
+        CarriedCopy.carry(in: window, moved: { self.dragMoved(to: $0) }) { released in
+            self.endDrag(released: released.map { window.convertPoint(toScreen: $0.locationInWindow) })
+        }
         return true
+    }
+
+    /// Whether every tab carried can go into Pinned: a group as it pins, whole, and a tab on its own.
+    static func pinnable(_ items: [SidebarItem], in manager: TabManager) -> Bool {
+        items.allSatisfy { item in
+            switch item {
+            case .tab(let id): manager.tab(with: id).map { manager.canPin($0, keepingGroup: false) } ?? true
+            case .tabGroup(let id): manager.tabs(inGroup: id).first.map { manager.canPin($0) } ?? true
+            default: true
+            }
+        }
     }
 
     struct SplitDrop: Equatable {
@@ -1990,12 +2018,29 @@ final class SidebarListView: NSView {
         }
     }
 
+    /// The row as a page a split's row can take, or be: a tab's or a pinned page's.
+    private static func rowPage(_ item: SidebarItem) -> TabManager.RowPage? {
+        switch item {
+        case .tab(let id): .tab(id)
+        case .bookmark(let id): .pinned(id)
+        default: nil
+        }
+    }
+
+    /// Whether the row shows a split, of tabs or of pinned pages: a drop on it joins that split, never makes one.
+    private func isSplitRow(_ item: SidebarItem) -> Bool {
+        switch item {
+        case .tab(let id): manager?.tab(with: id).flatMap { manager?.split(for: $0) } != nil
+        case .bookmark(let id): Library.shared.pinnedSplit(containing: id) != nil
+        default: false
+        }
+    }
+
     private func canSplit(_ carried: SidebarItem, onto target: SidebarItem) -> Bool {
         guard carried != target, let a = splitSide(of: carried), let b = splitSide(of: target) else { return false }
-        // Tab onto a split's row: joins it, up to four pages.
-        if case .tab(let c) = carried, case .tab(let t) = target, let manager, let tab = manager.tab(with: c), let onto = manager.tab(with: t),
-           manager.split(for: onto) != nil {
-            return manager.joining(tab, onto: onto, onRight: true) != nil || manager.joining(tab, onto: onto, onRight: false) != nil
+        // Onto a split's row, a tab's or a pinned one's: joins it, up to four pages.
+        if isSplitRow(target), let manager, let page = Self.rowPage(carried), let onto = Self.rowPage(target) {
+            return manager.joining(page, onto: onto, onRight: true) != nil || manager.joining(page, onto: onto, onRight: false) != nil
         }
         // Pinned pages are shared by every window, so a private one makes no pinned splits and takes none apart.
         if manager?.isPrivate == true {
@@ -2012,6 +2057,8 @@ final class SidebarListView: NSView {
             guard view is TabRowView else { continue }
             let band = view.frame.insetBy(dx: 0, dy: view.frame.height * 0.22)
             guard band.contains(pointer), canSplit(item, onto: candidate) else { continue }
+            // A pinned split would pin what can't be pinned.
+            if case .bookmark = candidate, drag?.pinnable == false { continue }
             switch candidate {
             case .tab(let id), .bookmark(let id): return SplitDrop(id: id, onRight: pointer.x > view.frame.midX)
             default: continue
@@ -2099,6 +2146,22 @@ final class SidebarListView: NSView {
         placeLine()
     }
 
+    #if DEBUG
+    /// The offer a drag shows with `carried` resting on `target`'s middle, without a pointer: the carried row faint
+    /// and the half it would take lit, if `canSplit` allows it; nil puts it all away. Returns whether it's offered.
+    @discardableResult
+    func debugOfferSplit(_ carried: SidebarItem?, onto target: SidebarItem?, onRight: Bool) -> Bool {
+        for view in rows.values { view.alphaValue = 1 }
+        guard let carried, let target, canSplit(carried, onto: target) else { showSplitTarget(nil); return false }
+        rows[carried]?.alphaValue = CarriedCopy.faint
+        switch target {
+        case .tab(let id), .bookmark(let id): showSplitTarget(SplitDrop(id: id, onRight: onRight))
+        default: return false
+        }
+        return true
+    }
+    #endif
+
     private weak var externalTarget: SidebarListView?
     private var edgeDirection: Int?
     private var edgeWork: DispatchWorkItem?
@@ -2121,7 +2184,10 @@ final class SidebarListView: NSView {
                local.x > -(onRight ? inner : outer), local.x < container.bounds.width + (onRight ? outer : inner) {
                 // The sidebar's very edge and just past it, clear of the icons and close buttons in the rows.
                 let zone = Tokens.Space.x2
-                let side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                var side = local.x < zone ? -1 : local.x > container.bounds.width - zone ? 1 : nil
+                // Out over the page while it offers to open the page there, the page's offer is what's meant.
+                let overPage = onRight ? local.x < 0 : local.x > container.bounds.width
+                if overPage, root?.splitDropHint.isShowing == true { side = nil }
                 // Only once the pointer has been away from the edges, so a row picked up near one doesn't flip at once.
                 if side == nil { edgeArmed = true }
                 edge = edgeArmed ? side : nil
@@ -2170,7 +2236,7 @@ final class SidebarListView: NSView {
         }
 
         // Over this window's favorites grid: a bar shows where it would go there, and the list's line goes.
-        let overFavorites = drag.item.canBeFavorite && inWindow
+        let overFavorites = drag.item.canBeFavorite && drag.pinnable && inWindow
             ? delegate?.listDragOverFavorites(at: window.convertPoint(fromScreen: mouse), carrying: splitSide(of: drag.item)) ?? false
             : delegate?.listDragOverFavorites(at: nil, carrying: nil) ?? false
         if overFavorites, !wasOverFavorites { Haptics.snap() }
@@ -2192,7 +2258,8 @@ final class SidebarListView: NSView {
             // A page or tab goes in a folder it rests on; so does a folder, if it isn't that folder or one inside it.
             let takes: (UUID) -> Bool = { target in
                 switch drag.item {
-                case .bookmark, .tab: return true
+                case .bookmark: return true
+                case .tab: return drag.pinnable
                 case .folder(let id): return target != id && !Library.shared.subfolderIDs(of: id).contains(target)
                 default: return false
                 }
@@ -2211,6 +2278,8 @@ final class SidebarListView: NSView {
                 // line shows where it would go.
                 candidate = splitTarget(pointer: point, dragging: drag.item)
                 (section, index) = candidate == nil ? reorderTarget(pointerY: point.y, dragging: drag) : (drag.targetSection, drag.targetIndex)
+                // Over Pinned with something that can't be pinned: no line, and letting go puts it back.
+                if section == .bookmarks, !drag.pinnable { section = nil }
             }
         } else if drag.folderTarget != nil || drag.groupTarget != nil {
             drag.folderTarget = nil
@@ -2329,10 +2398,15 @@ final class SidebarListView: NSView {
         // row it was dropped on, so it shows once: on a pinned page, a pinned split; on a tab, a split among tabs.
         if let split = drag.splitTarget {
             let ontoTab = manager.tab(with: split.id)
+            // Onto a split's row: it joins that split, among tabs or among the pinned pages.
+            let onto: SidebarItem = ontoTab == nil ? .bookmark(split.id) : .tab(split.id)
+            if isSplitRow(onto), let page = Self.rowPage(drag.item), let target = Self.rowPage(onto) {
+                delegate?.listJoinSplit(page, onto: target, onRight: split.onRight)
+                if let tab { return landingView(for: tab) }
+                return rows[onto]
+            }
             if let tab {
-                if let ontoTab, manager.split(for: ontoTab) != nil {
-                    delegate?.listJoinSplit(tab, onto: ontoTab, onRight: split.onRight)
-                } else if let ontoTab { delegate?.listSplit(ontoTab, with: tab, otherOnRight: split.onRight) } else { delegate?.listPinSplit(tab, onto: split.id, tabOnRight: split.onRight) }
+                if let ontoTab { delegate?.listSplit(ontoTab, with: tab, otherOnRight: split.onRight) } else { delegate?.listPinSplit(tab, onto: split.id, tabOnRight: split.onRight) }
                 return landingView(for: tab)
             }
             if case .bookmark(let id) = drag.item, let ontoTab {
@@ -2346,7 +2420,7 @@ final class SidebarListView: NSView {
         }
 
         // Onto the favorites grid, picked rows and all.
-        if drag.item.canBeFavorite, delegate?.listDropOnFavorites(drag.together.filter(\.canBeFavorite), dragged: drag.item) == true {
+        if drag.item.canBeFavorite, drag.pinnable, delegate?.listDropOnFavorites(drag.together.filter(\.canBeFavorite), dragged: drag.item) == true {
             if let tab { return landingView(for: tab) }
             if case .bookmark(let id) = drag.item { return delegate?.listFavoriteTile(for: id) }
             return nil

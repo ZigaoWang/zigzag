@@ -30,6 +30,19 @@ final class AddressView: InteractiveView {
     let captureButton = AddressView.button("video.fill", toolTip: String(localized: "Camera and Microphone", comment: "Tooltip of the address bar's button that shows while a page uses the camera or microphone."))
     /// Shown on articles: turns Reader on and off.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
+    /// Shown on pages in another language, in the accent while translating, pressed while translated: opens the
+    /// translate menu.
+    let translateButton = AddressView.button("translate", toolTip: String(localized: "Translate", comment: "Action in the site panel: translates the page."))
+
+    func setTranslation(available: Bool, translated: Bool, translating: Bool = false) {
+        wantsTranslate = available || translated || translating
+        translateButton.isSelected = translated
+        translateButton.tint = translating ? Brand.Theme.for(self).accent : Tokens.Color.icon
+        translateButton.toolTip = translating ? String(localized: "Translating Page…", comment: "Tooltip of the address bar's translate button while the page is being translated.")
+            : translated ? String(localized: "Translated", comment: "Tooltip of the address bar's translate button on a translated page.")
+            : String(localized: "Translate", comment: "Action in the site panel: translates the page.")
+        reflow(animated: true)
+    }
 
     func setCapture(camera: Bool, microphone: Bool) {
         wantsCapture = camera || microphone
@@ -53,10 +66,10 @@ final class AddressView: InteractiveView {
     private(set) var canSave = false
 
     /// Whether the star is offered for a tab: a page with something to pin, in a window that keeps pins (#442).
-    /// The same rule the save path uses, so the star, ⌘D and the menus can't disagree.
+    /// The same rule the save path uses, so the star, ⌘D and the menus can't disagree. A pinned tab can always unpin.
     static func canSave(for tab: Tab?) -> Bool {
         guard let tab, !tab.isPrivate else { return false }
-        return SavePath.Page(tab: tab) != nil
+        return tab.bookmarkID != nil || SavePath.Page(tab: tab) != nil
     }
 
     /// The star's state for the page in the field. A page that isn't pinned, or is a private window's, keeps the star.
@@ -221,8 +234,9 @@ final class AddressView: InteractiveView {
     /// goes back.
     private func dragPin(_ entry: PinEntry, event: NSEvent) -> Bool {
         guard let window, beginPinDrag(entry.pin.id, at: event.locationInWindow) else { return false }
-        let released = CarriedCopy.track(in: window) { self.movePinDrag(to: $0.locationInWindow) }
-        endPinDrag(drop: released != nil)
+        CarriedCopy.carry(in: window, moved: { self.movePinDrag(to: $0.locationInWindow) }) { released in
+            self.endPinDrag(drop: released != nil)
+        }
         return true
     }
 
@@ -361,6 +375,7 @@ final class AddressView: InteractiveView {
                 guard let self, let entry else { return false }
                 return self.dragPin(entry, event: event)
             }
+            entry.button.dragsByTouch = true
             let id = entry.pin.id
             var actions: [NSAccessibilityCustomAction] = []
             if index > 0 { actions.append(moveAction(id, by: -1)) }
@@ -403,6 +418,8 @@ final class AddressView: InteractiveView {
         addSubview(captureButton)
         readerButton.isHidden = true
         addSubview(readerButton)
+        translateButton.isHidden = true
+        addSubview(translateButton)
         saveButton.tint = Tokens.Color.icon
         saveButton.isHidden = true
         addSubview(saveButton)
@@ -513,7 +530,7 @@ final class AddressView: InteractiveView {
 
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
+        let count = (wantsTranslate ? 1 : 0) + (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -541,9 +558,12 @@ final class AddressView: InteractiveView {
     }
 
     private var wantsReader = false
+    private var wantsTranslate = false
     private var wantsCapture = false
     /// The buttons drawn in the field, those leaving aside.
     private var drawn = Set<ObjectIdentifier>()
+    /// The host's text at the last reflow.
+    private var reflowedText: String?
 
     /// Works out what fits and puts everything in its place. The one place the field is laid out, so a button and the
     /// text beside it never disagree; when nothing changed it does nothing, as it runs throughout a page load.
@@ -552,6 +572,9 @@ final class AddressView: InteractiveView {
         if buttonsOnly, abs(buttonsWidth - bounds.width) > 0.5 { superview?.needsLayout = true }
         // While a pin is carried the places are held still; the drop catches up.
         guard bounds.width > 0, pinDrag == nil else { return }
+        // A new page's host is placed at once; it glides only on the page it was on.
+        let textChanged = label.stringValue != reflowedText
+        reflowedText = label.stringValue
         let animated = requested && window != nil && !Tokens.Motion.isFromKey
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
         // Unframed, the buttons reach the ends, like the bar's other buttons.
@@ -563,7 +586,7 @@ final class AddressView: InteractiveView {
         if !lock.isHidden { x = lockFrame.maxX + Tokens.Space.x1 }
 
         var others: [IconButton] = []
-        for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
+        for (button, wanted) in [(translateButton, wantsTranslate), (readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         // Without the site, buttons get the whole width, including a gap after the last.
@@ -598,16 +621,32 @@ final class AddressView: InteractiveView {
         // A mark appearing starts in its place rather than flying in from the corner.
         if lock.frame.width == 0 { lock.frame = lockFrame }
         guard label.frame != labelFrame || lock.frame != lockFrame else { return }
-        if animated && label.frame.width > 0 {
+        if animated, let start = Self.labelGlideStart(from: label.frame, to: labelFrame, sameText: !textChanged) {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0
+                label.animator().frame = start
+            }
             Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) {
                 self.label.animator().frame = labelFrame
                 self.lock.animator().frame = lockFrame
             }
         } else {
-            label.frame = labelFrame
-            lock.frame = lockFrame
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0
+                label.animator().frame = labelFrame
+                lock.animator().frame = lockFrame
+            }
         }
     }
+
+    /// Start of a glide to `new`, nil to place it at once: same text moving right, its end already at `new`'s.
+    static func labelGlideStart(from old: NSRect, to new: NSRect, sameText: Bool) -> NSRect? {
+        guard sameText, old.width > 0, new.minX > old.minX + 0.5 else { return nil }
+        return NSRect(x: old.minX, y: new.minY, width: new.maxX - old.minX, height: new.height)
+    }
+
+    /// The host's frame as laid out.
+    var labelFrame: NSRect { label.frame }
 
     private func place(_ button: IconButton, at frame: NSRect, animated: Bool) {
         guard drawn.insert(ObjectIdentifier(button)).inserted else {
@@ -649,7 +688,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [translateButton, readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.
@@ -830,6 +869,10 @@ final class SidebarView: NSView {
     let sidebarButton = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false), toolTip: String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows."))
     let address = AddressView()
     let favorites = FavoritesView()
+    /// Holds the grid; past its cap the grid scrolls inside it, so the list and footer keep their room.
+    let favoritesScroll = NSScrollView()
+    /// Tiles running on below the grid's cap fade out there, as tabs do at the list's foot.
+    private let favoritesFade = CAGradientLayer()
     let list = SidebarListView()
     private let scrollView = NSScrollView()
     /// Tabs running on below the bottom of the list fade out there, rather than being sliced off by the footer.
@@ -948,7 +991,24 @@ final class SidebarView: NSView {
         trafficLightsPicture.isHidden = true
         addSubview(trafficLightsPicture)
         addSubview(address)
-        addSubview(favorites)
+        favoritesScroll.drawsBackground = false
+        favoritesScroll.hasHorizontalScroller = false
+        favoritesScroll.hasVerticalScroller = true
+        favoritesScroll.scrollerStyle = .overlay
+        favoritesScroll.autohidesScrollers = true
+        favoritesScroll.horizontalScrollElasticity = .none
+        favoritesScroll.verticalScrollElasticity = .none
+        favoritesScroll.automaticallyAdjustsContentInsets = false
+        // Room above and right of the grid for a favorite's × on its corner; the tiles stay where they were.
+        let out = FavoriteTile.badgeOverhang
+        favoritesScroll.contentInsets = NSEdgeInsets(top: out, left: 0, bottom: 0, right: 0)
+        favoritesScroll.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: out)
+        favoritesScroll.contentView.postsBoundsChangedNotifications = true
+        favoritesScroll.documentView = favorites
+        favoritesScroll.wantsLayer = true
+        favoritesScroll.layer?.mask = favoritesFade
+        addSubview(favoritesScroll)
+        NotificationCenter.default.addObserver(self, selector: #selector(favoritesScrolled), name: NSView.boundsDidChangeNotification, object: favoritesScroll.contentView)
         favorites.onHeightChange = { [weak self] in self?.needsLayout = true }
         // Settings › Appearance › Sidebar size: the address and favorites take their new heights, the list moves.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
@@ -997,6 +1057,9 @@ final class SidebarView: NSView {
         newSpaceButton.onClick = { [weak self] _ in self?.showAddMenu() }
         address.onClick = { [weak self] _ in self?.delegate?.sidebarOpenCommandBar() }
         themeToken = Brand.themeChanged.observe { [weak self] in self?.tintDownloadsRing() }
+        // A finger held where a right-click opens the blank menu opens it too.
+        TouchGestures.addMenuPress(to: self) { [weak self] event in _ = self?.showBlankMenu(for: event) }
+        if TouchGestures.isAvailable { addTouchSwipe() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1042,11 +1105,12 @@ final class SidebarView: NSView {
     /// right-click. Double-click in empty tab space opens a new tab, as in Arc (#262), unless turned off.
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control), showBlankMenu(for: event) { return }
-        if event.clickCount == 2, Self.doubleClickOpensNewTab, isInList(event) {
+        let clicks = TouchDoubleTap.clickCount(for: event)
+        if clicks == 2, Self.doubleClickOpensNewTab, isInList(event) {
             delegate?.sidebarDoubleClickedBlank()
             return
         }
-        window?.titleBarMouseDown(event)
+        window?.titleBarMouseDown(event, clicks: clicks)
     }
 
     /// Settings › Appearance › Double-click the sidebar for a new tab. On by default.
@@ -1139,12 +1203,18 @@ final class SidebarView: NSView {
         // Its buttons sit as far from the bottom edge as from the side.
         let buttonInset = (bottomHeight - Tokens.Sidebar.button) / 2
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
-        let favoritesHeight = favorites.preferredHeight(for: width - pad * 2)
-        favorites.isHidden = favoritesHeight == 0
-        favorites.frame = NSRect(x: pad, y: topEdge, width: width - pad * 2, height: favoritesHeight)
-        let listTop = favoritesHeight > 0 ? favorites.frame.maxY + Tokens.Sidebar.sectionGap
-            : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         let frames = bottomFrames()
+        let gridHeight = favorites.preferredHeight(for: width - pad * 2)
+        let favoritesHeight = min(gridHeight, Self.favoritesCap(room: frames.listBottom - topEdge))
+        favorites.isHidden = gridHeight == 0
+        favoritesScroll.isHidden = gridHeight == 0
+        let out = FavoriteTile.badgeOverhang
+        favoritesScroll.frame = NSRect(x: pad, y: topEdge - out, width: width - pad * 2 + out, height: favoritesHeight + out)
+        favoritesScroll.verticalScrollElasticity = gridHeight > favoritesHeight ? .allowed : .none
+        favorites.frame = NSRect(x: 0, y: 0, width: width - pad * 2, height: gridHeight)
+        updateFavoritesFade()
+        let listTop = favoritesHeight > 0 ? favoritesScroll.frame.maxY + Tokens.Sidebar.sectionGap
+            : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         for (card, frame) in zip(nowPlayingCards, frames.nowPlaying) { card.frame = frame }
         updateCard.frame = frames.update
         let listBottom = frames.listBottom
@@ -1162,8 +1232,26 @@ final class SidebarView: NSView {
         Self.fade(bottomFade, for: scrollView, list: list)
     }
 
+    /// The most of `room` (from the grid's top to the list's foot) the favorites take: whole rows in half of it, at
+    /// least one. Past that the grid scrolls.
+    static func favoritesCap(room: CGFloat) -> CGFloat {
+        let gap = Tokens.Sidebar.favoriteGap, stride = FavoritesView.tileHeight + gap
+        let rows = max(1, Int((room / 2 + gap) / stride))
+        return CGFloat(rows) * stride - gap
+    }
+
+    private func updateFavoritesFade() {
+        // The room above the grid shows only a ×; scrolled, tiles passing under it are hidden there.
+        let top = favoritesScroll.contentInsets.top
+        Self.fade(favoritesFade, for: favoritesScroll, list: favorites, top: top, clearsTop: favoritesScroll.contentView.bounds.minY > -top + 0.5)
+    }
+
+    @objc private func favoritesScrolled() {
+        updateFavoritesFade()
+    }
+
     /// Fade tabs at the bottom of a list only; the top has the pinned space name and its hairline.
-    private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
+    private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView, top: CGFloat = 0, clearsTop: Bool = false) {
         let bounds = scrollView.bounds
         let clip = scrollView.contentView.bounds
         let moreBelow = list.frame.height - clip.maxY > 1
@@ -1173,8 +1261,9 @@ final class SidebarView: NSView {
         CATransaction.setDisableActions(true)
         mask.frame = bounds
         // Drawn top to bottom in the list's own terms; the gradient's y runs the other way in an unflipped layer.
-        mask.colors = [solid, solid, moreBelow ? clear : solid]
-        mask.locations = [0, NSNumber(value: Double(1 - fade)), 1]
+        let band = bounds.height > 0 ? Double(top / bounds.height) : 0
+        mask.colors = [clearsTop ? clear : solid, clearsTop ? clear : solid, solid, solid, moreBelow ? clear : solid]
+        mask.locations = [0, NSNumber(value: band), NSNumber(value: band), NSNumber(value: Double(1 - fade)), 1]
         let flipped = scrollView.layer?.isGeometryFlipped == true || scrollView.isFlipped
         mask.startPoint = CGPoint(x: 0.5, y: flipped ? 0 : 1)
         mask.endPoint = CGPoint(x: 0.5, y: flipped ? 1 : 0)
@@ -1257,6 +1346,7 @@ final class SidebarView: NSView {
                     guard let self, let dot else { return false }
                     return self.dragSpace(dot, event: event)
                 }
+                dot.dragsByTouch = true
                 dotStrip.addSubview(dot)
                 return dot
             }
@@ -1326,10 +1416,11 @@ final class SidebarView: NSView {
     /// bar between two dots shows where it would go. Let go on the row, it moves there; off it, or with Esc, it goes back.
     private func dragSpace(_ dot: SpaceDotView, event: NSEvent) -> Bool {
         guard let window, beginSpaceDrag(dot, at: window.convertPoint(toScreen: event.locationInWindow)) else { return false }
-        let released = CarriedCopy.track(in: window) { event in
+        CarriedCopy.carry(in: window, moved: { event in
             self.moveSpaceDrag(to: window.convertPoint(toScreen: event.locationInWindow))
+        }) { released in
+            self.endSpaceDrag(drop: released != nil)
         }
-        endSpaceDrag(drop: released != nil)
         return true
     }
 
@@ -2024,6 +2115,79 @@ final class SidebarView: NSView {
         return true
     }
 
+    // MARK: A finger across the sidebar
+
+    /// One finger sideways across the sidebar: the same swipe two fingers make on the trackpad. Up and down still
+    /// scrolls the list, which waits only until the finger has gone far enough to show which way it goes.
+    private(set) var touchSwipe: TouchSwipeRecognizer?
+    private var touchSwipeX: CGFloat = 0
+
+    private func addTouchSwipe() {
+        let swipe = TouchSwipeRecognizer { [weak self] swipe in self?.touchSwipeChanged(swipe) }
+        // Two fingers too, as on the trackpad.
+        swipe.maxFingers = 2
+        swipe.landed = { [weak self] swipe in
+            TouchLog.note("sidebar landed seen by \(TouchLog.recognizers(from: self?.hitTest(self?.superview?.convert(swipe.start, from: self) ?? .zero)))")
+        }
+        swipe.failed = { [weak swipe] in
+            TouchLog.note("sidebar swipe failed fingers=\(swipe?.fingers ?? 0) moved=\(Int(swipe?.translation.x ?? 0)),\(Int(swipe?.translation.y ?? 0))")
+        }
+        swipe.decides = { swipe in
+            TouchHold.current == nil && TouchSwipe.verdict(swipe.translation, forgiving: true) == .sideways
+        }
+        swipe.touchOnly.outranks = { [weak self] other in
+            guard let self, #available(macOS 27, *) else { return false }
+            return [self.scrollView, self.panes.left.scroll, self.panes.right.scroll].contains { $0.scrollGestureForRelationships === other }
+        }
+        addGestureRecognizer(swipe)
+        touchSwipe = swipe
+    }
+
+    private func touchSwipeChanged(_ swipe: TouchSwipeRecognizer) {
+        let x = swipe.translation.x
+        let now = ProcessInfo.processInfo.systemUptime
+        switch swipe.state {
+        case .began:
+            // From where the finger is now: the travel it took to decide counts, so nothing jumps.
+            touchSwipeX = x
+            touchSwipeBegan()
+            touchSwipeMoved(by: x, at: now)
+        case .changed:
+            touchSwipeMoved(by: x - touchSwipeX, at: now)
+            touchSwipeX = x
+        case .ended:
+            touchSwipeEnded(velocity: swipe.velocity.x, cancelled: false)
+        case .cancelled, .failed:
+            touchSwipeEnded(velocity: 0, cancelled: true)
+        default:
+            break
+        }
+    }
+
+    /// The finger is going sideways: from here the list follows it, as it follows two fingers on the trackpad.
+    func touchSwipeBegan() {
+        if swipeState == .tracking { finishSwipe(velocity: 0) }
+        beginSwipe()
+        startTracking()
+    }
+
+    /// The finger moved `dx` points (positive to the right) at `time`.
+    func touchSwipeMoved(by dx: CGFloat, at time: TimeInterval) {
+        guard swipeState == .tracking else { return }
+        swipeTravel += dx
+        swipeSamples.append((time, dx))
+        swipeSamples.removeAll { time - $0.time > SpaceSwipe.velocityWindow }
+        moveSwipe()
+    }
+
+    /// Lifted going `velocity` points a second: lands on the next space or springs home, as letting go of a trackpad
+    /// swipe does.
+    func touchSwipeEnded(velocity: CGFloat, cancelled: Bool) {
+        guard swipeState == .tracking else { return }
+        finishSwipe(velocity: velocity, cancelled: cancelled)
+        swipeState = .idle
+    }
+
     /// One turn of the wheel, however many notches or fine steps it sends, moves one space: steps closer together
     /// than a moment belong to the same turn, so a free spinning wheel never races through every space.
     private func handleWheel(_ event: NSEvent, now: TimeInterval, gap: TimeInterval) -> Bool {
@@ -2245,13 +2409,13 @@ final class SidebarView: NSView {
 /// velocities are in points, positive when the list moves right (which brings in the space on the left).
 enum SpaceSwipe {
     /// How far the fingers move before a gesture counts as sideways or up and down, for the rest of it.
-    static let axisLock: CGFloat = 4
+    nonisolated static let axisLock: CGFloat = 4
     /// Letting go past this share of the width lands on the next space: a third of the way is enough to mean it.
     static let landingShare: CGFloat = 0.35
     /// A flick at least this fast (points per second) lands, however short: an easy flick, not a hard one.
-    static let flickSpeed: CGFloat = 300
+    nonisolated static let flickSpeed: CGFloat = 300
     /// How much recent movement counts toward the speed at letting go.
-    static let velocityWindow: TimeInterval = 0.08
+    nonisolated static let velocityWindow: TimeInterval = 0.08
     /// A mouse wheel going quiet this long ends one turn of it; the next turn can move another space.
     static let wheelTurnGap: TimeInterval = 0.25
     /// Past the first or last space the list gives less the further it's pulled, up to this share of the width.

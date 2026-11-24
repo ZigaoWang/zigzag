@@ -250,6 +250,17 @@ struct BookmarkFolderTests {
                              waited: waited, overFrame: overFrame)
     }
 
+    @Test func onlyTheStartAndEndOfAScrollCanStartOrEndASwipe() {
+        #expect(!SwipeNavigator.isMidGesture(.began))
+        #expect(!SwipeNavigator.isMidGesture(.ended))
+        #expect(!SwipeNavigator.isMidGesture(.cancelled))
+        #expect(SwipeNavigator.isMidGesture(.changed))
+        #expect(SwipeNavigator.isMidGesture(.stationary))
+        #expect(SwipeNavigator.isMidGesture(.mayBegin))
+        // A wheel's turn and the glide after a gesture carry no phase.
+        #expect(SwipeNavigator.isMidGesture([]))
+    }
+
     @Test func swipeGoesBackOnAPlainPage() {
         // A scroll toward the left edge goes back (fingers to the right, with natural scrolling), once it has gone
         // far enough to tell.
@@ -1385,6 +1396,25 @@ struct ZigzagCardTests {
                         #expect(Brand.contrast(palette.ink.usingColorSpace(.sRGB)!, g) >= 7, "\(color) \(name.rawValue)")
                     }
                 }
+            }
+        }
+    }
+
+    @Test func theChosenFinishHasTheAccentRingAsReadersColorsDo() throws {
+        let swatches = CardFinishSwatches(selected: .graphite, palette: CardPalette(hue: Brand.navyHue, hue2: nil))
+        swatches.frame = NSRect(origin: .zero, size: swatches.fittingSize)
+        swatches.layoutSubtreeIfNeeded()
+        let tiles = swatches.subviews
+        #expect(tiles.count == CardFinish.allCases.count)
+        for (tile, finish) in zip(tiles, CardFinish.allCases) {
+            tile.layout()
+            let ring = try #require(tile.layer?.sublayers?.first)
+            var accent: CGColor?
+            tile.effectiveAppearance.performAsCurrentDrawingAppearance { accent = Tokens.Color.accent.cgColor }
+            if finish == .graphite {
+                #expect(ring.borderColor == accent)
+            } else {
+                #expect(ring.borderColor != accent)
             }
         }
     }

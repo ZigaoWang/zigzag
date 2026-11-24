@@ -16,7 +16,7 @@ final class DeskHeaderView: InteractiveView {
     }
     private static let dotSize = Tokens.Space.x2
     /// "Close 3 Duplicates", when the space has the same page open more than once.
-    let duplicatesButton = TextButton(title: "", font: Tokens.Font.body())
+    let duplicatesButton = PillButton(style: .quiet)
     var duplicates = 0 {
         didSet {
             duplicatesButton.title = String(localized: "Close \(duplicates) Duplicates", comment: "In the tab overview (all spaces' tabs as cards), a button beside a space's name: closes the tabs that show a page already open.")
@@ -171,6 +171,7 @@ final class DeskFrameView: NSView {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 wash.colors = [color.cgColor, (end ?? color).cgColor]
             }
+            grain.backgroundColor = MaterialImages.texture(space.texture).cgColor
             grain.opacity = Float(min(max(isPrivate ? 0 : space.grain ?? 0, 0), 1) * 0.18)
         }
     }
@@ -274,11 +275,10 @@ final class DeskController {
     /// Counts opens and closes, so one that's been taken over doesn't finish what the next one started.
     private var transition = 0
     /// Find a tab by typing: the field at the top, and typing anywhere on the desk goes into it.
-    private let searchBox = ColorView()
-    private let searchIcon = NSImageView()
-    private let searchField = PlainTextField(font: Tokens.Font.body(), placeholder: String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
+    private let searchBox = FilledField.search(String(localized: "Search tabs", comment: "In the tab overview (all spaces' tabs as cards), the search field's placeholder."))
+    private var searchField: NSTextField { searchBox.field }
     private let searchDelegate = DeskSearchDelegate()
-    private let noMatches = Label(String(localized: "No tabs match", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search."), font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let noMatches = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private var query = ""
     private static let searchHeight = Tokens.Metric.controlHeight
     private static let actionBarHeight = Tokens.Page.controlHeight + Tokens.Space.x2 + 2
@@ -331,16 +331,9 @@ final class DeskController {
         closeButton.onClick = { [weak self] _ in self?.closeSelected() }
         doneButton.onClick = { [weak self] _ in self?.hide(openingTab: nil) }
 
-        searchBox.wantsLayer = true
-        searchBox.layer?.cornerRadius = Self.searchHeight / 2
-        searchBox.layer?.cornerCurve = .continuous
-        searchIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.Symbol.inline)
-        searchIcon.imageScaling = .scaleNone
-        searchIcon.contentTintColor = Tokens.Color.textTertiary
         // The sidebar's soft field on the frame, like the address: the desk's search sits on the space's color.
-        searchBox.layer?.borderWidth = 0
-        searchBox.addSubview(searchIcon)
-        searchBox.addSubview(searchField)
+        searchBox.isPill = true
+        searchBox.isOnFrame = true
         backdrop.addSubview(searchBox)
         noMatches.isHidden = true
         canvas.addSubview(noMatches)
@@ -368,6 +361,31 @@ final class DeskController {
                 return false
             }
         }
+        if TouchGestures.isAvailable {
+            let pinch = TouchPinchRecognizer { [weak self] pinch in self?.cardPinched(pinch) }
+            canvas.addGestureRecognizer(pinch)
+        }
+    }
+
+    /// Pinched out on a card, it opens, as on an iPad's tab overview. Once a pinch.
+    private var pinchOpened = false
+
+    private func cardPinched(_ pinch: TouchPinchRecognizer) {
+        switch pinch.state {
+        case .began: pinchOpened = false
+        case .changed:
+            guard !pinchOpened, TouchPinch.opensCard(magnification: pinch.magnification) else { return }
+            pinchOpened = openCard(at: pinch.location(in: canvas))
+        default: break
+        }
+    }
+
+    /// Opens the card at `point` in the canvas; false when there's none.
+    @discardableResult
+    func openCard(at point: NSPoint) -> Bool {
+        guard isVisible, let card = cards.values.first(where: { !$0.isHidden && $0.frame.contains(point) }), let tab = card.tab else { return false }
+        hide(openingTab: tab)
+        return true
     }
 
     isolated deinit {
@@ -914,12 +932,6 @@ final class DeskController {
         let top = backdrop.isFlipped ? Tokens.Space.x6 : b.height - Tokens.Space.x6 - h
         searchBox.frame = NSRect(x: round((b.width - width) / 2), y: top, width: width, height: h)
         searchBox.autoresizingMask = [.minXMargin, .maxXMargin, backdrop.isFlipped ? .maxYMargin : .minYMargin]
-        searchBox.color = Tokens.Chrome.field
-        let icon = Tokens.Symbol.inline
-        searchIcon.frame = NSRect(x: Tokens.Space.x3, y: (h - icon) / 2, width: icon, height: icon)
-        let textHeight = ceil(searchField.intrinsicContentSize.height)
-        let x = searchIcon.frame.maxX + Tokens.Space.x2
-        searchField.frame = NSRect(x: x, y: searchField.centeredY(in: h), width: width - x - Tokens.Space.x3, height: textHeight)
         scrollView.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea : 0, width: b.width, height: b.height - Self.searchArea)
         let line = Tokens.Metric.hairline
         scrollEdge.frame = NSRect(x: 0, y: backdrop.isFlipped ? Self.searchArea - line : b.height - Self.searchArea, width: b.width, height: line)
@@ -1100,9 +1112,10 @@ final class DeskController {
         }
         noMatches.isHidden = query.isEmpty || !layout.cards.isEmpty
         if !noMatches.isHidden {
-            // In the middle of what you can see, not at the top of the canvas.
+            noMatches.stringValue = String(localized: "No tabs match “\(query)”.", comment: "In the tab overview (all spaces' tabs as cards), when no tab matches the search; what was typed.")
+            // Where the first card would be, in what you can see.
             let w = noMatches.textWidth + 4, visible = scrollView.documentVisibleRect
-            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: round(visible.midY - noMatches.lineHeight / 2),
+            noMatches.frame = NSRect(x: round((canvas.bounds.width - w) / 2), y: Tokens.EmptyState.noMatchY(in: visible, lineHeight: noMatches.lineHeight),
                                      width: w, height: noMatches.lineHeight)
         }
         for (id, card) in cards {

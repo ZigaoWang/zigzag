@@ -3,7 +3,7 @@ import AppKit
 /// Update progress at the bottom of the sidebar. A requested update shows "Downloading update" with version, amount
 /// and a bar, then "Preparing update" while Sparkle unpacks and verifies, then "Update ready" with Restart and a close
 /// button (hides it until relaunch; it still installs on quit). States change in place. While ready, clicking anywhere
-/// restarts.
+/// restarts. With automatic installs off, a found update shows "Update available" with Update and Skip.
 final class UpdateCard: InteractiveView {
     private let icon = NSImageView()
     private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
@@ -17,8 +17,13 @@ final class UpdateCard: InteractiveView {
     let restartButton = RestartPill(title: String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General."))
     /// Last, where a tab row's close is.
     let hideButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Not Now", comment: "Tooltip and VoiceOver action of the close button on the sidebar's update card: puts the card away; the update installs when Zigzag quits."))
+    /// Available only: downloads, then restarts.
+    let updateButton = RestartPill(title: String(localized: "Update", comment: "Button on the sidebar's update card and in Settings › General while automatic installs are off: downloads the update, then restarts Zigzag into it."))
+    let skipButton = RestartPill(title: String(localized: "Skip", comment: "Button on the sidebar's update card while automatic installs are off: skips this version."), quiet: true)
     var onRestart: (() -> Void)?
     var onHide: (() -> Void)?
+    var onUpdate: (() -> Void)?
+    var onSkip: (() -> Void)?
     /// Over the page with the sidebar hidden: the panel is its background, so no field of its own.
     var isFloating = false { didSet { stateDidChange(animated: false) } }
     private(set) var state: UpdateCardState?
@@ -33,13 +38,16 @@ final class UpdateCard: InteractiveView {
         title.fadesTail = true
         version.fadesTail = true
         amount.alignment = .right
-        [icon, title, version, amount, bar, restartButton, hideButton].forEach { addSubview($0) }
+        skipButton.toolTip = Self.skipName
+        [icon, title, version, amount, bar, restartButton, hideButton, updateButton, skipButton].forEach { addSubview($0) }
         onClick = { [weak self] _ in
             guard self?.state?.isReady == true else { return }
             self?.onRestart?()
         }
         restartButton.onClick = { [weak self] _ in self?.onRestart?() }
         hideButton.onClick = { [weak self] _ in self?.onHide?() }
+        updateButton.onClick = { [weak self] _ in self?.onUpdate?() }
+        skipButton.onClick = { [weak self] _ in self?.onSkip?() }
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -48,6 +56,8 @@ final class UpdateCard: InteractiveView {
                 self.amount.font = UpdateCard.amountFont
                 self.hideButton.symbolSize = Tokens.Sidebar.rowGlyph
                 self.restartButton.sizeChanged()
+                self.updateButton.sizeChanged()
+                self.skipButton.sizeChanged()
                 self.needsLayout = true
             }
         }
@@ -56,9 +66,13 @@ final class UpdateCard: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Card height for `state`: two lines when ready, plus the bar while downloading.
+    /// Card height for `state`: two lines when ready or available, plus the bar while downloading.
     static func height(for state: UpdateCardState?) -> CGFloat {
-        state?.isReady == false ? Tokens.Sidebar.updateCardBusyHeight : Tokens.Sidebar.updateCardHeight
+        state?.isBusy == true ? Tokens.Sidebar.updateCardBusyHeight : Tokens.Sidebar.updateCardHeight
+    }
+
+    private static var skipName: String {
+        String(localized: "Skip This Version", comment: "Tooltip and VoiceOver action of Skip on the sidebar's update card: this version isn't offered again; a newer one is.")
     }
 
     func show(_ state: UpdateCardState) {
@@ -81,18 +95,25 @@ final class UpdateCard: InteractiveView {
         case .ready:
             title.stringValue = String(localized: "Update ready", comment: "The sidebar's card for an update that's downloaded and ready: Restart installs it.")
             sentence = String(localized: "Zigzag \(text) is ready. Restart to update.", comment: "Tooltip and VoiceOver label of the sidebar's update card. The placeholder is the version.")
+        case .available:
+            title.stringValue = String(localized: "Update available", comment: "Title of the sidebar's update card for an update found while automatic installs are off: Update downloads it and restarts.")
+            sentence = String(localized: "Zigzag \(text) is available. Update downloads it and restarts Zigzag.",
+                              comment: "VoiceOver label of the sidebar's update card while automatic installs are off. The placeholder is the version.")
         }
         let ready = state.isReady
-        amount.isHidden = ready || amount.stringValue.isEmpty
-        bar.isHidden = ready
+        let available: Bool = if case .available = state { true } else { false }
+        amount.isHidden = !state.isBusy || amount.stringValue.isEmpty
+        bar.isHidden = !state.isBusy
         restartButton.isHidden = !ready
         hideButton.isHidden = !ready
+        updateButton.isHidden = !available
+        skipButton.isHidden = !available
         toolTip = ready ? sentence : nil
         setAccessibilityLabel(sentence)
-        setAccessibilityCustomActions(ready ? actions : [])
+        setAccessibilityCustomActions(ready ? actions : available ? offerActions : [])
         if !ready { isHovered = false }
         // New state: cross-fade the text while the bar or buttons change.
-        if let old, old.isReady != ready || Self.step(old) != Self.step(state), let layer, window != nil, !Tokens.Motion.isFromKey {
+        if let old, Self.step(old) != Self.step(state), let layer, window != nil, !Tokens.Motion.isFromKey {
             let fade = CATransition()
             fade.type = .fade
             fade.duration = Tokens.Motion.selection
@@ -108,6 +129,7 @@ final class UpdateCard: InteractiveView {
         case .downloading: 0
         case .preparing: 1
         case .ready: 2
+        case .available: 3
         }
     }
 
@@ -151,9 +173,27 @@ final class UpdateCard: InteractiveView {
         },
     ]
 
+    private lazy var offerActions: [NSAccessibilityCustomAction] = [
+        NSAccessibilityCustomAction(name: updateButton.title) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let update = self?.onUpdate else { return false }
+                update()
+                return true
+            }
+        },
+        NSAccessibilityCustomAction(name: Self.skipName) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let skip = self?.onSkip else { return false }
+                skip()
+                return true
+            }
+        },
+    ]
+
     override func layout() {
         super.layout()
-        let ready = state?.isReady != false
+        let ready = state?.isBusy != true
+        let available: Bool = if case .available = state { true } else { false }
         // Text (and the bar while downloading) centered vertically by caps: title cap top to bar bottom (or version baseline).
         let titleFont = title.font ?? Tokens.Font.sidebarRow(), detailFont = version.font ?? Self.detailFont
         let lines = titleFont.capHeight + Self.lineGap + detailFont.capHeight
@@ -169,10 +209,15 @@ final class UpdateCard: InteractiveView {
         let restart = NSRect(x: hide.minX - Self.buttonGap - pill, y: y, width: pill, height: b)
         hideButton.frame = hide
         restartButton.frame = restart
+        // Skip where close is, Update before it.
+        let skipWidth = skipButton.fittingWidth, updateWidth = updateButton.fittingWidth
+        let skip = NSRect(x: bounds.width - SidebarRowView.buttonEdge - skipWidth, y: y, width: skipWidth, height: b)
+        skipButton.frame = skip
+        updateButton.frame = NSRect(x: skip.minX - Self.buttonGap - updateWidth, y: y, width: updateWidth, height: b)
         // Text column ends at Restart (its padding is the gap), or while downloading as far from the right as the icon's art from the left.
         let x = icon.frame.maxX + SidebarRowView.titleOffset
         let art = SidebarRowView.inset + round(size * 100 / 1024 * 2) / 2
-        let end = ready ? restart.minX : bounds.width - art + Label.inset
+        let end = available ? updateButton.frame.minX : ready ? restart.minX : bounds.width - art + Label.inset
         let width = max(0, end - x)
         title.frame = NSRect(x: x, y: lineY(title, capsMiddle: top + titleFont.capHeight / 2), width: width, height: title.lineHeight)
         let detailY = top + lines - detailFont.capHeight / 2
@@ -211,7 +256,7 @@ final class UpdateCard: InteractiveView {
         amount.textColor = theme.quietInk
         bar.tint(track: theme.quietInk, fill: theme.accent)
         // Same field as the Now Playing card (space tint); hover only while clickable.
-        let ready = state?.isReady != false
+        let ready = state?.isReady ?? true
         let fill = !ready ? Tokens.Chrome.field : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         let ground = isFloating && (!ready || !isHovered) ? nil : cgColor(fill)
         layer?.set(backgroundColor: ground, animated: animated && !isHovered)
@@ -306,12 +351,15 @@ final class UpdateBar: NSView {
 }
 
 /// Restart button: accent-colored medium text, row-button height, accent wash on hover, caps-centered with equal padding.
+/// `quiet` uses the secondary ink instead, for the lesser choice beside it.
 final class RestartPill: InteractiveView {
     private let label: Label
     let title: String
+    private let quiet: Bool
 
-    init(title: String) {
+    init(title: String, quiet: Bool = false) {
         self.title = title
+        self.quiet = quiet
         label = Label(title, font: Self.font, color: Tokens.Color.onPrimary)
         super.init(frame: .zero)
         pressScales = true
@@ -346,9 +394,11 @@ final class RestartPill: InteractiveView {
     }
 
     override func stateDidChange(animated: Bool) {
-        let accent = Brand.Theme.for(self).accent
-        label.textColor = accent
+        let theme = Brand.Theme.for(self)
+        let ink = quiet ? (isHovered ? theme.rowInk : theme.quietInk) : theme.accent
+        label.textColor = ink
         let wash: CGFloat = isPressed ? 0.2 : isHovered ? 0.12 : 0
-        layer?.set(backgroundColor: wash > 0 ? cgColor(accent.withAlphaComponent(wash)) : nil, animated: false)
+        let washInk = quiet ? theme.quietInk : theme.accent
+        layer?.set(backgroundColor: wash > 0 ? cgColor(washInk.withAlphaComponent(wash)) : nil, animated: false)
     }
 }

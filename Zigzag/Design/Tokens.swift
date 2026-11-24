@@ -455,6 +455,13 @@ enum Tokens {
         static let actionGap: CGFloat = Space.x6
         /// The widest the text runs.
         static let textWidth: CGFloat = 360
+        /// A search that finds nothing: its one line this far below the top of where the results go.
+        static let noMatchTop: CGFloat = 96
+
+        /// The top of the no-match line in `area` (flipped): `noMatchTop` down, or the middle of a shorter area.
+        static func noMatchY(in area: NSRect, lineHeight: CGFloat) -> CGFloat {
+            round(min(area.minY + noMatchTop, area.midY - lineHeight / 2))
+        }
     }
 
     // MARK: - Dialogs
@@ -1559,6 +1566,23 @@ enum Tokens {
         static let chroma = 0.045
         static let darkLightness = 0.27
         static let darkChroma = 0.04
+        /// The space editor's palette: a touch richer than the colors before it, by day and at night.
+        static let paletteLightness = 0.915
+        static let paletteChroma = 0.078
+        static let paletteDarkLightness = 0.27
+        static let paletteDarkChroma = 0.05
+        /// How strong a new space's palette color is to a Zigzag from before the palette's own day and night depths
+        /// (`SpaceColor.background(hue:intensity:)`).
+        static let followingIntensity = 0.8
+        static let softFollowingIntensity = 0.5
+        /// The least a palette look's clear glass covers in a dark window (`SpaceInfo.clearTint`): its deep tint keeps
+        /// light text readable over a light desktop.
+        static let clearNightCover: CGFloat = 0.68
+        /// A blank page in a palette space on glass: fainter than `wash`, near white by day and near the page's dark at night.
+        static let glassPageLightness = 0.982
+        static let glassPageChroma = 0.012
+        static let glassPageDarkLightness = 0.228
+        static let glassPageDarkChroma = 0.018
         /// A floating panel: near white with a breath of the space by day, a deep gray of it at night.
         static let panelLightness = 0.975
         static let panelChroma = 0.02

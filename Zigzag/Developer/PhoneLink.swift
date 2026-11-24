@@ -89,7 +89,7 @@ enum PhoneLinkSheet {
                           comment: "Under the address in the Open on Your Phone sheet of the developer tools. 0.0.0.0 is a server setting, kept as is.")
         return FormSheet.show(in: host, title: String(localized: "Open on Your Phone", comment: "Title of the developer tools' sheet with a QR code of the page's address for a phone on the same network."),
                               symbol: "qrcode",
-                              message: String(localized: "Point your phone's camera at the code to open this page there.", comment: "Under the title of the Open on Your Phone sheet of the developer tools."),
+                              message: String(localized: "Point your phone’s camera at the code to open this page there.", comment: "Under the title of the Open on Your Phone sheet of the developer tools."),
                               rows: [FormSheet.Row(label: nil, view: code, height: codeSide + Tokens.Space.x2), FormSheet.Row(label: nil, view: address), .note(note)],
                               confirmTitle: String(localized: "Copy Address", comment: "Button in the Open on Your Phone sheet of the developer tools: copies the page's address for a phone.")) { confirmed in
             guard confirmed else { return }
