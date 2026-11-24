@@ -414,11 +414,16 @@ final class BrowserRootView: SpaceFrameView {
     static let minimumPaneHeight: CGFloat = 160
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
-    /// The one in-page Mini this window owns, and the dim under it. Owner-checked so a closing Mini cannot remove a
-    /// newer one opened during its fade.
+    /// The dim under the one in-page Mini this window owns. The Mini itself is a borderless child window over the page
+    /// card (`MiniWindowController`), so only its dim lives in this window's view tree. Owner-checked so a closing Mini
+    /// cannot remove a newer one opened during its fade.
     weak var inPageMiniDim: NSView?
-    weak var inPageMini: NSView?
     private weak var inPageMiniOwner: AnyObject?
+    /// True while a Mini is docked over this window's page.
+    var hasInPageMini: Bool { inPageMiniOwner != nil }
+    /// Chrome this window draws over the page card has to win over the docked Mini, which is a separate window and is
+    /// composited above everything here: the Mini is ordered out while one of these is over the card.
+    var coversInPageMini: Bool { (sidebarRevealed && !chromeSidebarShown) || topBarRevealed }
     /// Called when the page area moves or resizes, so the docked Mini keeps its place.
     var onInPageMiniLayout: ((NSRect) -> Void)?
     /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
@@ -1568,32 +1573,25 @@ final class BrowserRootView: SpaceFrameView {
         return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - paneGap, height: whole.height)
     }
 
-    /// Puts the docked Mini and its dim over the page. The sidebar stays above both, so its rows still take the pointer.
-    func showInPageMini(_ view: NSView, dim: NSView, frame: NSRect, owner: AnyObject) {
-        if inPageMini === view, inPageMiniOwner === owner {
-            view.frame = frame
+    /// Puts the dim for a Mini docked over the page. The Mini is a borderless child window; the dim is the part of the
+    /// presentation that has to live in this window, under the sidebar, so its rows still take the pointer.
+    func showInPageMiniDim(_ dim: NSView, owner: AnyObject) {
+        if inPageMiniOwner === owner, inPageMiniDim === dim {
             dim.frame = cardFrame
             return
         }
-        inPageMini?.removeFromSuperview()
         inPageMiniDim?.removeFromSuperview()
         inPageMiniOwner = owner
-        inPageMini = view
         inPageMiniDim = dim
         dim.frame = cardFrame
         addSubview(dim, positioned: .below, relativeTo: sidebarContainer)
-        addSubview(view, positioned: .above, relativeTo: dim)
-        addSubview(sidebarContainer, positioned: .above, relativeTo: view)
-        view.frame = frame
         needsLayout = true
     }
 
-    /// Takes the Mini away only if `owner` is still the one in the slot.
-    func hideInPageMini(owner: AnyObject) {
+    /// Takes the dim away only if `owner` is still the one in the slot.
+    func hideInPageMiniDim(owner: AnyObject) {
         guard inPageMiniOwner === owner else { return }
-        inPageMini?.removeFromSuperview()
         inPageMiniDim?.removeFromSuperview()
-        inPageMini = nil
         inPageMiniDim = nil
         inPageMiniOwner = nil
         needsLayout = true
@@ -2142,7 +2140,7 @@ final class BrowserRootView: SpaceFrameView {
         if isGrabberShown { placeGrabber() }
         refreshGrabber()
         overlay.frame = bounds
-        if inPageMini != nil {
+        if inPageMiniOwner != nil {
             inPageMiniDim?.frame = cardFrame
             onInPageMiniLayout?(cardFrame)
         }

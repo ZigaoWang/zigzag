@@ -40,9 +40,12 @@ final class BrowserWindow: NSWindow {
 
     /// Parked for AI apps (Headless.park): stays off screen, never key or main.
     var isParked = false
+    /// A Mini docked over a page: a borderless child of the browser window. It takes the keyboard when clicked, but it
+    /// is never the window you are "in" for the Window menu or ⌘`, and never a main window of its own.
+    var isOverlayChild = false
 
     override var canBecomeKey: Bool { !isParked }
-    override var canBecomeMain: Bool { !isParked }
+    override var canBecomeMain: Bool { !isParked && !isOverlayChild }
 
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         isParked ? frameRect : super.constrainFrameRect(frameRect, to: screen)

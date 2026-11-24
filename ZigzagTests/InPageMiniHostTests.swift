@@ -19,16 +19,62 @@ struct InPageMiniHostTests {
         try body(controller, tab)
     }
 
-    @Test func aDockedMiniEmbedsAndCloses() {
-        inWindow { browser, tab in
+    @Test func aDockedMiniIsABorderlessChildOfTheBrowserWindow() throws {
+        try inWindow { browser, tab in
             let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
                                                 in: browser, by: .page, dockedIn: browser)
+            let window = try #require(mini.window)
             #expect(mini.isDockedInPage)
-            #expect(browser.root.inPageMini === mini.root)
+            // The Mini's real window, root and page stay its own; only the presentation is a child of the browser's.
+            #expect(window.parent === browser.window)
+            #expect(window.contentView === mini.root)
+            #expect(window.styleMask == [.borderless])
+            #expect(window.canBecomeMain == false)
+            #expect(window.isExcludedFromWindowsMenu == true)
+            // The dim is the only part drawn by the browser window.
+            #expect(browser.root.hasInPageMini)
             #expect(browser.root.inPageMiniDim != nil)
+            #expect(browser.root.inPageMiniDim?.superview === browser.root)
+            // Bound to the page card, in screen coordinates.
+            let card = MiniDockLayout.frame(in: browser.root.cardFrame)
+            let expected = try #require(browser.window).convertToScreen(browser.root.convert(card, to: nil))
+            #expect(window.frame == expected)
             mini.closeInPage(animated: false)
-            #expect(browser.root.inPageMini == nil)
+            #expect(!browser.root.hasInPageMini)
             #expect(browser.root.inPageMiniDim == nil)
+        }
+    }
+
+    @Test func theDockedMiniFollowsThePageCard() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let window = try #require(mini.window)
+            let pane = NSRect(x: 40, y: 30, width: 620, height: 420)
+            mini.layoutInDock(pane: pane)
+            let card = MiniDockLayout.frame(in: pane)
+            let expected = try #require(browser.window).convertToScreen(browser.root.convert(card, to: nil))
+            #expect(window.frame == expected)
+            #expect(browser.root.inPageMiniDim?.frame == browser.root.cardFrame)
+            mini.closeInPage(animated: false)
+        }
+    }
+
+    @Test func browserChromeOverTheCardOrdersTheChildOut() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            #expect(!mini.isCoveredInDock)
+            browser.root.sidebarVisible = false
+            browser.root.reveal(true)
+            #expect(browser.root.coversInPageMini)
+            mini.layoutInDock(pane: browser.root.cardFrame)
+            #expect(mini.isCoveredInDock)
+            browser.root.reveal(false)
+            #expect(!browser.root.coversInPageMini)
+            mini.layoutInDock(pane: browser.root.cardFrame)
+            #expect(!mini.isCoveredInDock)
+            mini.closeInPage(animated: false)
         }
     }
 
@@ -41,6 +87,25 @@ struct InPageMiniHostTests {
             mini.root.pointerMoved(to: NSPoint(x: 4, y: 1))
             #expect(mini.root.chromeRevealed)
             mini.closeInPage(animated: false)
+        }
+    }
+
+    @Test func promotingTakesTheMiniOutIntoAWindowOfItsOwn() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let window = try #require(mini.window)
+            let card = window.frame
+            mini.promoteFromPage()
+            #expect(!mini.isDockedInPage)
+            #expect(window.parent == nil)
+            #expect(window.styleMask.contains(.titled))
+            #expect(window.styleMask.contains(.closable))
+            #expect(window.isExcludedFromWindowsMenu == false)
+            #expect(window.frame.height > card.height)
+            #expect(!browser.root.hasInPageMini)
+            #expect(browser.root.inPageMiniDim == nil)
+            mini.window?.close()
         }
     }
 }

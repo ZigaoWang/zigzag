@@ -3204,11 +3204,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return MiniWindowController.open(fromPage: url, configuration: configuration, opener: opener, in: self, by: sender).tab.webView
     }
 
-    /// A side button over a docked Mini goes to the Mini's own history, not the page underneath.
+    /// A side button over a docked Mini goes to the Mini's own history, not the page underneath. Visible, the Mini is
+    /// a child window and takes the button itself; this covers the moment it is ordered out under the window's chrome.
     func peekHandlesSideButton(_ side: BrowserWindow.SideButton, at point: NSPoint) -> Bool {
         guard side != .press, let record = inPageMini.record, record.controller.isDockedInPage,
-              let peekRoot = record.controller.root.superview else { return false }
-        guard peekRoot.frame.contains(root.convert(point, from: nil)) else { return false }
+              let frame = record.controller.dockedScreenFrame, let window else { return false }
+        let onScreen = window.convertToScreen(NSRect(origin: point, size: .zero)).origin
+        guard frame.contains(onScreen) else { return false }
         if side == .back { record.controller.goBack(nil) } else { record.controller.goForward(nil) }
         return true
     }
