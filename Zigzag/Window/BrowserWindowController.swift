@@ -780,6 +780,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Reader stays over its pane when you click into the other half of the split; anywhere else, it goes.
             let readerStillShown = readerTab != nil && (tab.map { tabManager.partners(of: $0) } ?? []).contains { $0 === readerTab }
             if !readerStillShown { closeReader() }
+            // A page leaving the screen gives back the browser's space first, so its video can follow you.
+            if let full = pageFullScreenTab, full !== tab { PageFullScreen.exit(full) }
             // A video playing in a page you're leaving follows you in the mini player; coming back puts it in its page.
             let before = root.paneCards.enumerated().compactMap { i, card in i == 0 || !card.isHidden ? card.webView : nil }
                 .compactMap { ($0 as? BrowserWebView)?.owner }
@@ -2647,6 +2649,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     static func wholeScreenTakesSpace(phase: FullScreenPhase, inFullScreen: Bool) -> Bool {
         phase == .windowed && !inFullScreen
     }
+
+    /// The page holds the browser's space, as WebKit's full screen would.
+    func hasWholeScreen(_ tab: Tab) -> Bool { pageFullScreenTab === tab }
 
     /// Leaving puts the chrome back. If the page took the browser into its space, leaving the page leaves the space,
     /// and macOS gives the window back; one already in a space stays there.
