@@ -534,8 +534,15 @@ final class AddressView: InteractiveView {
         return CGFloat(count) * Self.pinStep - 2
     }
 
+    /// What `show` last put up: the site's name and whether it's marked not secure.
+    private var shown: (name: String, insecure: Bool)?
+
     func show(url: URL?, notSecure: Bool) {
-        label.stringValue = Self.name(of: url)
+        // The same site as it was: a page moving its address as you scroll it (a forum's post number) redraws nothing.
+        let now = (name: Self.name(of: url), insecure: notSecure && url != nil)
+        if let shown, shown == now { return }
+        shown = now
+        label.stringValue = now.name
         label.lineBreakMode = Self.lineBreak(forName: label.stringValue)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
