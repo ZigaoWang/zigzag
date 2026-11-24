@@ -13,9 +13,9 @@
 - 儲存網頁的延伸功能（`chrome.pageCapture`）現在可以用了：可以像在 Chrome 裡一樣，把分頁儲存為一個 MHTML 檔案，連同它的樣式、圖片和框架，Chrome 等瀏覽器能把它當作網頁開啟。只適用於延伸功能可存取的網站上的網頁；網頁載入的內容中，只有圖片、樣式表和字型會存進去，和 Chrome 一樣。感謝 [OnurrUgur](https://github.com/OnurrUgur)。([#488](https://github.com/ZigaoWang/zigzag/issues/488))
 - 新增繁體中文介面。在「設定 › 一般 › 語言」選取「繁體中文」後，重新啟動 Zigzag 即可套用。感謝 [aliceric27](https://github.com/aliceric27)。([#505](https://github.com/ZigaoWang/zigzag/issues/505))
 - 開啟「設定 › 外觀」中的「從螢幕邊緣拉出側邊欄」後，側邊欄可以在你正在使用的 App 上方拉出來，就像隱藏的 Dock 一樣。把指標推到側邊欄那一側的螢幕邊緣停一下，空間、收藏、分頁和正在播放的內容就會出現在那個 App 上方。點一下分頁、收藏或新增分頁，Zigzag 會像從 Dock 打開一樣來到前面並顯示它；把指標移開，側邊欄就會收回，原本的 App 仍在前面。螢幕角落、Dock 或幕前調度所在的那一側，以及通往另一台顯示器的邊緣都不會拉出側邊欄。預設關閉。感謝 [Lakeland97](https://github.com/Lakeland97)。([#363](https://github.com/ZigaoWang/zigzag/issues/363))
+- 「檔案 › 匯出你的資料…」可以把你的空間、已固定分頁和收藏儲存成書籤檔案，Chrome、Safari、Firefox 等瀏覽器都能匯入，每個空間是一個資料夾，裡面的資料夾和網頁依側邊欄的順序排列。也可以儲存一份 Zigzag 備份，包括空間、資料夾、分割顯示、收藏、個人資料、網站設定和設定，需要的話還有開啟的分頁和瀏覽記錄；在匯入視窗中用「選取檔案…」就能在這台或另一台 Mac 上還原，已有的內容不會重複。密碼仍在「密碼」視窗中另外匯出。「設定 › 一般」和指令列中也找得到它。
 
 ### 修正
-
 - 你在「設定 › 開發者」中改過的功能旗標，開關旁邊會有「重設」按鈕，取代原本只顯示的「已更改」；Zigzag 預設值與 WebKit 不同的旗標（例如 Prefer Page Rendering Updates near 60fps）會在名稱下方註明。
 - 滑動前往上一頁或下一頁放開時，網頁不會再先彈回原位才離開，而是順著滑動方向再移動一點並稍微變暗，接著下一個網頁直接出現在原處，不用看箭頭也知道滑動已生效。沒滑到底時網頁仍會彈回；開啟「減少動態效果」時網頁不會移動。([#508](https://github.com/ZigaoWang/zigzag/issues/508))
 - 你在「設定 › 密碼 › 密碼管理器」中選取的密碼管理器延伸功能，即使 Zigzag 不認得它的名稱（例如 Litewarden），現在也會生效：Zigzag 不再提示儲存和填寫密碼，登入欄位中不顯示鑰匙圖示，通行密鑰也交給它處理。會關閉瀏覽器內建密碼儲存功能的延伸功能（例如在 Chrome 中的 Bitwarden 和 1Password）也會列在那裡並同樣生效，直到它把設定改回來，或你停用或移除它。([#513](https://github.com/ZigaoWang/zigzag/issues/513))
