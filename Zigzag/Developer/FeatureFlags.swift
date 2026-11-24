@@ -132,6 +132,7 @@ enum FeatureFlags {
         // Zigzag's defaults first so Settings changes override them.
         let listed = Set((engine.flags ?? []).map(\.key))
         for (key, on) in ownDefaults.sorted(by: { $0.key < $1.key }) where listed.contains(key) { engine.set(on, key: key, in: preferences) }
+        defer { if listed.contains(sixtyFPSKey) { FramePacing.starting(preferences) } }
         guard DeveloperTools.isOn else { return }
         let all = overrides
         guard !all.isEmpty else { return }
@@ -145,6 +146,7 @@ enum FeatureFlags {
         for (key, on) in ownDefaults.sorted(by: { $0.key < $1.key }) where listed.contains(key) {
             engine.set(DeveloperTools.isOn ? overrides[key] ?? on : on, key: key, in: preferences)
         }
+        if listed.contains(sixtyFPSKey) { FramePacing.starting(preferences) }
     }
 
     /// Whether pages start held near 60 fps: WebKit's default, or Zigzag's, or what Settings changed it to.

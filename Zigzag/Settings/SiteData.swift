@@ -171,6 +171,7 @@ final class WebKitSiteData: SiteDataSource {
         // Dark pages' sites seen dark go with the site's data, as when cookies are cleared.
         for name in Set(names.map(SiteDataListing.site(of:))) {
             DarkSeen.forget(in: store, site: name)
+            if store.isPersistent { FramePacing.forget(site: name) }
             WebsiteData.forgetConnections(in: store, site: name)
             Tab.forgetSessions(in: store, site: name)
         }
@@ -181,6 +182,7 @@ final class WebKitSiteData: SiteDataSource {
         byName = [:]
         SessionCookies.cleared(site: nil, in: store)
         DarkSeen.forget(in: store)
+        if store.isPersistent { FramePacing.forget() }
         WebsiteData.forgetConnections(in: store)
         Tab.forgetSessions(in: store)
     }
