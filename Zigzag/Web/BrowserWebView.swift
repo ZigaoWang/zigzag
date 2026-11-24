@@ -444,6 +444,14 @@ final class BrowserWebView: WKWebView {
 /// Every use checks it's there first, so if it goes away the page's own button still works (WebKitSetup turns the
 /// page-facing Picture in Picture on).
 extension WKWebView {
+    /// Bounces sideways only when the page scrolls sideways, as on an iPad and in Chrome; WebKit bounces every page.
+    func bouncesSidewaysOnlyWhenWide() {
+        let setter = NSSelectorFromString("_setAlwaysBounceHorizontal:")
+        guard responds(to: setter), let method = class_getInstanceMethod(type(of: self), setter) else { return }
+        typealias Set = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method_getImplementation(method), to: Set.self)(self, setter, false)
+    }
+
     private static let canToggle = NSSelectorFromString("_canTogglePictureInPicture")
     private static let isActive = NSSelectorFromString("_isPictureInPictureActive")
     private static let toggle = NSSelectorFromString("_togglePictureInPicture")

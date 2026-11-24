@@ -9,6 +9,25 @@ import WebKit
 /// the hooks a mouse-down does.
 @MainActor
 struct TouchGesturesTests {
+    @MainActor @Test func aPageThatFitsDoesntBounceSideways() {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        webView.bouncesSidewaysOnlyWhenWide()
+        #expect(webView.value(forKey: "_alwaysBounceHorizontal") as? Bool == false)
+        #expect(webView.value(forKey: "_alwaysBounceVertical") as? Bool == true)
+    }
+
+    @Test func aTouchSwipeGoesAtTheFingersOwnDistance() {
+        // The trackpad's distance is scrolled points; fingers on the screen go about 2 cm.
+        #expect(SwipeDecision.touchDistance < SwipeDecision.distance(forWidth: 1200))
+        func touchGoes(_ progress: CGFloat, _ speed: CGFloat) -> Bool { var a = SwipeArming(); return a.release(progress: progress, touchSpeed: speed) }
+        func trackpadGoes(_ progress: CGFloat, _ speed: CGFloat) -> Bool { var a = SwipeArming(); return a.release(progress: progress, speed: speed) }
+        #expect(touchGoes(1, 0))
+        #expect(!touchGoes(0.5, 200))
+        #expect(touchGoes(0.5, 400))
+        // The trackpad's flick still needs its own speed.
+        #expect(!trackpadGoes(0.5, 400))
+    }
+
     private func mouse(_ type: NSEvent.EventType, at point: NSPoint, window: NSWindow? = nil, clicks: Int = 1) -> NSEvent {
         NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                            windowNumber: window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)!

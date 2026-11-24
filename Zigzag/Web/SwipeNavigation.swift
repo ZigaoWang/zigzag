@@ -24,6 +24,8 @@ final class SwipeNavigator {
     private var state = State.idle
     private var dx: CGFloat = 0
     private var dy: CGFloat = 0
+    /// Fingers on the screen rather than the trackpad: their distance is real travel, not scrolled points.
+    private var byTouch = false
     /// -1: back, 1: forward, once the swipe has a direction.
     private var direction = 0
     /// What the page can scroll sideways under the pointer, once the page has answered.
@@ -51,7 +53,9 @@ final class SwipeNavigator {
     private var restMonitor: Any?
 
     /// How far to swipe before letting go navigates: a third of the page, as in Safari (#377).
-    private var threshold: CGFloat { SwipeDecision.distance(forWidth: webView?.bounds.width ?? 0) }
+    private var threshold: CGFloat {
+        byTouch ? SwipeDecision.touchDistance : SwipeDecision.distance(forWidth: webView?.bounds.width ?? 0)
+    }
 
     init(webView: BrowserWebView) {
         self.webView = webView
@@ -95,6 +99,7 @@ final class SwipeNavigator {
             if TouchPress.isTouchScroll(at: event.timestamp) { state = .ignoring; return false }
             state = .deciding
             dx = 0; dy = 0; direction = 0; arming = SwipeArming(); pageScrolls = nil; overFrame = false; samples = []
+            byTouch = false
             began = event.timestamp
             beganAt = (Date().timeIntervalSince1970 - (ProcessInfo.processInfo.systemUptime - event.timestamp)) * 1000
             gesture += 1
@@ -190,6 +195,7 @@ final class SwipeNavigator {
         stopWatchingRest()
         direction = wanted
         dx = 0; dy = 0; arming = SwipeArming(); samples = []
+        byTouch = true
         state = .tracking
         showArrow()
         update()
@@ -207,7 +213,7 @@ final class SwipeNavigator {
     /// Lifted at `time`: goes when the arrow is filled or with a flick, as letting go of the trackpad does.
     func touchEnded(at time: TimeInterval, cancelled: Bool) {
         guard state == .tracking else { return }
-        if !cancelled, arming.release(progress: progress, speed: speed(at: time)) { go() } else { cancel() }
+        if !cancelled, arming.release(progress: progress, touchSpeed: speed(at: time)) { go() } else { cancel() }
         state = .idle
     }
 
@@ -440,6 +446,12 @@ struct SwipeArming {
         _ = step(progress: progress)
         return armed || SwipeDecision.commits(progress: progress, speed: speed)
     }
+
+    /// The same, for fingers on the screen, whose flick is slower in points than a trackpad's scroll.
+    mutating func release(progress: CGFloat, touchSpeed speed: CGFloat) -> Bool {
+        _ = step(progress: progress)
+        return armed || SwipeDecision.commits(progress: progress, touchSpeed: speed)
+    }
 }
 
 /// Whether a two-finger swipe on a page goes back or forward, from how far the fingers have gone and what the page
@@ -463,6 +475,15 @@ enum SwipeDecision: Equatable {
     /// the swipe's way: all the way, or a quick flick that got well started. Pulled back, it doesn't.
     static func commits(progress: CGFloat, speed: CGFloat) -> Bool {
         progress >= 1 || (progress >= 0.4 && speed > 700)
+    }
+
+    /// How far fingers on the screen travel before letting go navigates: about the 2 cm the trackpad's distance
+    /// takes the fingers there, since a trackpad scrolls further than the fingers move.
+    static let touchDistance: CGFloat = 100
+
+    /// `commits` for fingers on the screen: a flick is measured in the points the fingers actually travel.
+    static func commits(progress: CGFloat, touchSpeed speed: CGFloat) -> Bool {
+        progress >= 1 || (progress >= 0.4 && speed > 350)
     }
 
     /// Whether a swipe already armed stays armed: a little short of the distance still counts, so fingers hovering at

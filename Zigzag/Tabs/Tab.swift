@@ -594,6 +594,7 @@ final class Tab: NSObject {
         webView.uiDelegate = self
         // Back and forward by swiping is ours (SwipeNavigator): quicker than WebKit's sliding page.
         webView.allowsBackForwardNavigationGestures = false
+        webView.bouncesSidewaysOnlyWhenWide()
         webView.allowsMagnification = true
         webView.isInspectable = true
         Self.stopsAutomaticInsets(webView)

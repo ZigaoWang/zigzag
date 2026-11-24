@@ -206,6 +206,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // Own preferences, since WebRTC is set per page.
         WebKitSetup.separatePreferences(of: configuration)
         webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.bouncesSidewaysOnlyWhenWide()
         self.opener = opener
         openerWebRTCChoices = opener?.webRTCHere ?? [:]
         openerJavaScriptChoices = opener?.javaScriptHere ?? [:]

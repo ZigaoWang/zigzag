@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- On a touch display, a two-finger swipe goes back or forward after about 2 cm of finger travel, as it feels on the trackpad, instead of twice that, and a page that fits the window no longer slides sideways under your fingers.
+
 ## [0.9.5] - 2026-11-24
 
 Touch that feels native on a touch display, with every tap counted, iPad-style dragging and two-finger back and forward, sign-ins and YouTube's theater mode kept after a relaunch, password manager extensions in Settings, and fewer wrong offers to translate.
