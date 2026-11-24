@@ -53,6 +53,11 @@
   Test: TabCloseSelectionTests.linksOpenedBehindKeepTheirOrderAndCloseToTheNextOne
 - ⌘-click or middle-click a link → a background tab; ⇧⌘-click → in front; ⇧-click → Zigzag Mini; in a frame only ⌘ and middle-click.
   Test: PageLinkTests.aClicksModifierDecidesWhereALinkOpens
+- ⌘-click or middle-click a link a page took off on purpose, its address kept in `data-zigzag-href` → opens that address as the link would; a plain, ⇧ or ⌥ click stays the page's, and only web addresses are put back.
+  Test: CommandClickedLinksTests.aCommandClickOnADelinkedAnchorOpensItsAddress
+  Test: CommandClickedLinksTests.aMiddleClickOnADelinkedAnchorOpensItsAddress
+  Test: CommandClickedLinksTests.otherClicksOnADelinkedAnchorAreThePages
+  Test: CommandClickedLinksTests.aDelinkedAnchorWithAScriptAddressStaysOff
 - ⇧-click or Open Link in Zigzag Mini → a Zigzag Mini centered over the window's page, in the page's space and profile.
   Test: MiniFromPageTests.itOpensOverTheWindowsPage
 - The same from a private window → the Mini is private: its own store, never saved to History or brought back after an update.

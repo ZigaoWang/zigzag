@@ -274,19 +274,19 @@ function recoverSolver(reason) {
     }
 
     /// The ⌘-click script is in every site's page world, but it listens only on x.com and twitter.com, and once.
-    @Test func theModifiedClickScriptActsOnlyOnItsSites() throws {
+    @Test func theCommandClickScriptActsOnlyOnItsSites() throws {
         let other = bridgePage()
         other.evaluateScript("location.hostname = 'github.com'")
-        other.evaluateScript(OldTwitterSolver.modified)
+        other.evaluateScript(OldTwitterSolver.commandClick)
         #expect(other.exception == nil)
         #expect(other.evaluateScript("__document.length")?.toInt32() == 0)
-        #expect(other.evaluateScript("window.__zigzagOldTwitterModified")?.isUndefined == true)
+        #expect(other.evaluateScript("window.__zigzagOldTwitterCommandClick")?.isUndefined == true)
 
         let x = bridgePage()
-        x.evaluateScript(OldTwitterSolver.modified)
-        x.evaluateScript(OldTwitterSolver.modified)
+        x.evaluateScript(OldTwitterSolver.commandClick)
+        x.evaluateScript(OldTwitterSolver.commandClick)
         #expect(x.exception == nil)
-        #expect(x.evaluateScript("__document.length")?.toInt32() == 2) // mousedown, click
+        #expect(x.evaluateScript("__document.length")?.toInt32() == 1) // click
     }
 
     /// The bridge leaves every other site alone.

@@ -37,6 +37,8 @@ struct CommandClickedLinksTests {
     <button id="button">button</button>
     <a id="script" href="javascript:void 0">script</a>
     <a id="file" href="https://example.com/download.zip" download>file</a>
+    <a id="quote" data-zigzag-href="/status/1">quote</a>
+    <a id="unsafe" data-zigzag-href="javascript:void 0">unsafe</a>
     <script>
       window.heard = [];
       for (const element of document.querySelectorAll('a, button')) element.addEventListener('click', (e) => {
@@ -53,9 +55,9 @@ struct CommandClickedLinksTests {
         configuration.userContentController.addUserScript(PageScripts.modifiedLinkClicks)
         let clicks = Clicks()
         configuration.userContentController.add(clicks, contentWorld: .defaultClient, name: "zigzagLinkClick")
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 800), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 600), configuration: configuration)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 800), configuration: configuration)
         window.contentView = webView
         let links = Links()
         webView.navigationDelegate = links
@@ -75,6 +77,22 @@ struct CommandClickedLinksTests {
             let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                                         windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
             if type == .leftMouseDown { webView.mouseDown(with: event) } else { webView.mouseUp(with: event) }
+        }
+        try await Task.sleep(for: .milliseconds(300))
+    }
+
+    /// A middle click `y` CSS pixels from the top.
+    private func middleClick(_ webView: WKWebView, y: Double) async throws {
+        guard let window = webView.window else { return }
+        window.makeFirstResponder(webView)
+        let point = webView.convert(NSPoint(x: 50, y: webView.isFlipped ? y : webView.bounds.height - y), to: nil)
+        for type in [NSEvent.EventType.otherMouseDown, .otherMouseUp] {
+            let made = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                       windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            let cgEvent = try #require(made.cgEvent)
+            cgEvent.setIntegerValueField(.mouseEventButtonNumber, value: 2)
+            let event = try #require(NSEvent(cgEvent: cgEvent))
+            if type == .otherMouseDown { webView.otherMouseDown(with: event) } else { webView.otherMouseUp(with: event) }
         }
         try await Task.sleep(for: .milliseconds(300))
     }
@@ -137,6 +155,49 @@ struct CommandClickedLinksTests {
         #expect(links.clicked.isEmpty)
         for y in [150.0, 250.0, 350.0, 450.0] { try await click(webView, y: y, flags: .shift) }
         #expect(clicks.reported.isEmpty)
+        withExtendedLifetime(window) {}
+    }
+
+    /// An anchor whose href was taken off on purpose keeps its address in `data-zigzag-href` (#517): a ⌘ press
+    /// puts it back for WebKit to open in a tab, and the page's own handler never hears the click.
+    @Test func aCommandClickOnADelinkedAnchorOpensItsAddress() async throws {
+        let (webView, window, links, _) = await page()
+        try await click(webView, y: 550, flags: .command)
+        #expect(try await heard(webView) == [])
+        #expect(links.clicked.map(\.url) == ["https://example.com/status/1"])
+        #expect(links.clicked.first?.flags.contains(.command) == true)
+        #expect(try await webView.evaluateJavaScript("quote.hasAttribute('data-zigzag-modified')") as? Bool == true)
+        withExtendedLifetime(window) {}
+    }
+
+    @Test func aMiddleClickOnADelinkedAnchorOpensItsAddress() async throws {
+        let (webView, window, links, _) = await page()
+        try await middleClick(webView, y: 550)
+        #expect(links.clicked.map(\.url) == ["https://example.com/status/1"])
+        #expect(try await webView.evaluateJavaScript("quote.hasAttribute('data-zigzag-modified')") as? Bool == true)
+        withExtendedLifetime(window) {}
+    }
+
+    /// A plain click stays the page's, so its own viewer opens; ⇧ and ⌥ are the page's too, with nothing put back.
+    @Test func otherClicksOnADelinkedAnchorAreThePages() async throws {
+        let (webView, window, links, clicks) = await page()
+        try await click(webView, y: 550, flags: [])
+        try await click(webView, y: 550, flags: .shift)
+        try await click(webView, y: 550, flags: .option)
+        #expect(try await heard(webView) == ["quote", "quote", "quote"])
+        #expect(links.clicked.isEmpty)
+        #expect(clicks.reported.isEmpty)
+        #expect(try await webView.evaluateJavaScript("quote.hasAttribute('href') || quote.hasAttribute('data-zigzag-modified')") as? Bool == false)
+        withExtendedLifetime(window) {}
+    }
+
+    /// Only a web address is put back: a script's stays off.
+    @Test func aDelinkedAnchorWithAScriptAddressStaysOff() async throws {
+        let (webView, window, links, _) = await page()
+        try await click(webView, y: 650, flags: .command)
+        try await middleClick(webView, y: 650)
+        #expect(links.clicked.isEmpty)
+        #expect(try await webView.evaluateJavaScript("unsafe.hasAttribute('href')") as? Bool == false)
         withExtendedLifetime(window) {}
     }
 

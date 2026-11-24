@@ -181,7 +181,7 @@ final class OldTwitterSolver: NSObject {
         }
         // Any other press ends a right press's mark before the browser acts on it.
         quote.removeAttribute("data-zigzag-menu");
-        // The page's own world has already put it back for a ⌘, ⌃ or middle press, and marked it.
+        // Zigzag's page script has already put it back for a ⌘ or middle press, and marked it.
         if (quote.hasAttribute("data-zigzag-modified")) {
           quote.setAttribute("href", href);
           return;
@@ -203,26 +203,14 @@ final class OldTwitterSolver: NSObject {
     """
 
     /// The page's own world sees the keys held on a click; the extension's own world does not always. A ⌘ or middle
-    /// press puts the quoted tweet's link back and marks it, so every handler can tell that click is the browser's.
-    static let modified = """
+    /// press on a quoted tweet is Zigzag's page script's (`PageScripts.modifiedLinkClicks`), which reads its address.
+    static let commandClick = """
     (() => {
       // It is added to every site's page world; it acts only on x.com and twitter.com.
       const host = location.hostname;
       if (host !== "x.com" && host !== "twitter.com") return;
-      if (window.__zigzagOldTwitterModified) return;
-      window.__zigzagOldTwitterModified = true;
-      document.addEventListener("mousedown", (event) => {
-        if (!event.isTrusted || !(event.metaKey || event.button === 1)) return;
-        const quote = event.target.closest && event.target.closest("a.tweet-body-quote");
-        const href = quote && quote.getAttribute("data-zigzag-href");
-        if (!href) return;
-        quote.setAttribute("href", href);
-        quote.setAttribute("data-zigzag-modified", "");
-        setTimeout(() => {
-          quote.removeAttribute("data-zigzag-modified");
-          quote.removeAttribute("href");
-        }, 2000);
-      }, true);
+      if (window.__zigzagOldTwitterCommandClick) return;
+      window.__zigzagOldTwitterCommandClick = true;
       // ⌘ on a tweet's own body is that tweet's link: it opens in a new tab, not in the extension's viewer.
       document.addEventListener("click", (event) => {
         if (!event.isTrusted || !event.metaKey) return;
@@ -336,14 +324,14 @@ final class OldTwitterSolver: NSObject {
                 guard let page = webView.url?.host(), page == "x.com" || page == "twitter.com" else { continue }
                 let world = BridgeUserScripts.contentScriptWorld(extensionID)
                 webView.callAsyncJavaScript(Self.bridge, arguments: [:], in: nil, in: world) { _ in }
-                webView.callAsyncJavaScript(Self.modified, arguments: [:], in: nil, in: .page) { _ in }
+                webView.callAsyncJavaScript(Self.commandClick, arguments: [:], in: nil, in: .page) { _ in }
             }
         }
     }
 
     /// Takes the call back out of a page that may no longer have it, from its next load.
     private func removeCall(from controller: WKUserContentController) {
-        OwnScripts.remove(from: controller) { $0.source == Self.bridge || $0.source == Self.modified }
+        OwnScripts.remove(from: controller) { $0.source == Self.bridge || $0.source == Self.commandClick }
         guard handlers.contains(controller), let extensionID else { return }
         controller.removeScriptMessageHandler(forName: Self.handlerName,
                                               contentWorld: BridgeUserScripts.contentScriptWorld(extensionID))
@@ -360,8 +348,8 @@ final class OldTwitterSolver: NSObject {
         guard !controller.userScripts.contains(where: { $0.source == Self.bridge }) else { return }
         controller.addUserScript(WKUserScript(source: Self.bridge, injectionTime: .atDocumentStart,
                                              forMainFrameOnly: false, in: world))
-        if !controller.userScripts.contains(where: { $0.source == Self.modified }) {
-            controller.addUserScript(WKUserScript(source: Self.modified, injectionTime: .atDocumentStart,
+        if !controller.userScripts.contains(where: { $0.source == Self.commandClick }) {
+            controller.addUserScript(WKUserScript(source: Self.commandClick, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: false, in: .page))
         }
     }
