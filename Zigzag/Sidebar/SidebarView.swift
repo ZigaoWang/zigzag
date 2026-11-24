@@ -141,6 +141,8 @@ final class AddressView: InteractiveView {
             pendingPins = (pins, animated)
             return
         }
+        // No extension pinned, before or after: nothing moves.
+        if pins.isEmpty, pinEntries.isEmpty { return }
         let kept = Set(pins.map(\.id))
         for gone in pinEntries where !kept.contains(gone.pin.id) { takeAway(gone.button, animated: animated, removing: true) }
         let existing = Dictionary(uniqueKeysWithValues: pinEntries.map { ($0.pin.id, $0) })
@@ -1322,12 +1324,20 @@ final class SidebarView: NSView {
 
     // MARK: Updating
 
+    /// Whether the reload button's tip says Stop (`update`).
+    private var tipLoading: Bool?
+
     func update(tab: Tab?) {
         backButton.isEnabled = tab?.canGoBackOrReturn ?? false
         forwardButton.isEnabled = tab?.canGoForward ?? false
         reloadButton.isEnabled = tab != nil
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
-        reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
+        // Worked out again only when it changes: the tip reads the menus for its shortcut.
+        let loading = tab?.isLoading ?? false
+        if loading != tipLoading {
+            tipLoading = loading
+            reloadButton.toolTip = Self.reloadTip(loading: loading)
+        }
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
     }
