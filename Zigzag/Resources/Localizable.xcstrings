@@ -9,6 +9,12 @@
             "state" : "translated",
             "value" : "AI 应用"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI App"
+          }
         }
       }
     },
@@ -19,6 +25,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI 应用正在后台使用它。请先用菜单栏中闪光图标下的“停止 AI 应用”停止它们。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI App 正在背景使用它。請先用選單列閃光圖像下的「停止 AI App」停止它們。"
           }
         }
       }
@@ -31,6 +43,12 @@
             "state" : "translated",
             "value" : "AI 应用正在使用此窗口。在它们工作期间，关闭它只会再次隐藏它。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI App 正在使用這個視窗。它們工作期間，關閉它只會再次隱藏它。"
+          }
         }
       }
     },
@@ -41,6 +59,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI 应用在后台运行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI App 正在背景執行"
           }
         }
       }
@@ -53,6 +77,12 @@
             "state" : "translated",
             "value" : "AI 应用在后台运行时使用此个人资料。它的名称无法更改。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI App 在背景執行時使用這個個人資料。它的名稱無法更改。"
+          }
         }
       }
     },
@@ -63,6 +93,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI 应用在其中工作。Zigzag 绝不会在这里存储或填写密码，也不会用“我的名片”填写表单。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI App 在這裡工作。Zigzag 絕不會在這裡儲存或填寫密碼，也不會用「我的名片」填寫表單。"
           }
         }
       }
@@ -126,6 +162,12 @@
             "state" : "translated",
             "value" : "供 AI 应用在后台使用。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "供 AI App 在背景使用。"
+          }
         }
       }
     },
@@ -136,6 +178,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "headless 后台 隐藏 窗口"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "headless 背景 隱藏 視窗"
           }
         }
       }
@@ -148,6 +196,12 @@
             "state" : "translated",
             "value" : "它的空间会一并删除。下次 AI 应用在后台运行时，Zigzag 会新建一个“AI 应用”个人资料。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的空間會一併刪除。下次 AI App 在背景執行時，Zigzag 會新增一個「AI App」個人資料。"
+          }
         }
       }
     },
@@ -158,6 +212,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此个人资料中不使用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個個人資料不使用"
           }
         }
       }
@@ -238,6 +298,12 @@
             "state" : "translated",
             "value" : "让 AI 应用在后台运行"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "讓 AI App 在背景執行"
+          }
         }
       }
     },
@@ -248,6 +314,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示 AI 应用窗口"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示 AI App 視窗"
           }
         }
       }
@@ -658,6 +730,12 @@
             "state" : "translated",
             "value" : "停止 AI 应用"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止 AI App"
+          }
         }
       }
     },
@@ -685,6 +763,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它们会在“AI 应用”个人资料中获得一个自己的隐藏窗口，看不到你的窗口和标签页。打开此项后，用 --headless 打开 Zigzag 会只为它们运行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它們會在「AI App」個人資料中獲得自己的隱藏視窗，看不到你的視窗和分頁。開啟此項後，用 --headless 開啟 Zigzag 會只為它們執行。"
           }
         }
       }
@@ -37243,6 +37327,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag：AI 应用正在后台运行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag：AI App 正在背景執行"
           }
         }
       }
