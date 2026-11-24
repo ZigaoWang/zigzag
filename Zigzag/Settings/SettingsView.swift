@@ -1652,7 +1652,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: String(localized: "Push the pointer against the edge of the screen on the sidebar’s side to bring the sidebar out over other apps, and click a tab to go to it. Not on a side the Dock or Stage Manager uses.",
                                              comment: "Explanation under “Sidebar from the screen edge” in Settings › Appearance."),
                               control: edgeSidebarToggle)
-        edgeRow.keywords = String(localized: "edge dock hover reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.") + " 边缘 拉出 悬停"
+        edgeRow.keywords = String(localized: "edge dock hover reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(edgeRow)
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),

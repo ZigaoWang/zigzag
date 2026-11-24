@@ -29391,13 +29391,19 @@
         }
       }
     },
-    "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to keep its page open." : {
+    "Push the pointer against the edge of the screen on the sidebar’s side to bring the sidebar out over other apps, and click a tab to go to it. Not on a side the Dock or Stage Manager uses." : {
       "comment" : "Explanation under “Sidebar from the screen edge” in Settings › Appearance.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将指针移到屏幕边缘，即可在其他应用上方拉出边栏。点按标签页即可让它的页面留在面板中。"
+            "value" : "把指针推到边栏那一侧的屏幕边缘，就能在其他 App 上面拉出边栏，点按标签页即可前往。程序坞或台前调度所在的那一侧不会拉出。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把指標推到側邊欄那一側的螢幕邊緣，就能在其他 App 上方拉出側邊欄，點一下分頁即可前往。Dock 或幕前調度所在的那一側不會拉出。"
           }
         }
       }
@@ -29427,16 +29433,11 @@
             "state" : "translated",
             "value" : "从屏幕边缘拉出边栏"
           }
-        }
-      }
-    },
-    "Sidebar on the right" : {
-      "comment" : "A setting in Settings › Appearance: puts the sidebar along the window's right edge.",
-      "localizations" : {
-        "zh-Hans" : {
+        },
+        "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "边栏放在右侧"
+            "value" : "從螢幕邊緣拉出側邊欄"
           }
         }
       }
@@ -37659,13 +37660,19 @@
         }
       }
     },
-    "edge dock hover peek reveal hidden sidebar over apps corner" : {
+    "edge dock hover reveal hidden sidebar over apps corner" : {
       "comment" : "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "边缘 拉出 悬停 显示 隐藏 边栏 角落 edge dock hover peek reveal hidden sidebar over apps corner"
+            "value" : "边缘 拉出 悬停 显示 隐藏 边栏 角落 程序坞 edge dock hover reveal hidden sidebar over apps corner"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "邊緣 拉出 懸停 顯示 隱藏 側邊欄 角落 Dock edge dock hover reveal hidden sidebar over apps corner"
           }
         }
       }
