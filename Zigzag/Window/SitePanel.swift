@@ -292,7 +292,7 @@ final class SitePanel: FloatingPanelView {
         let aboveThePage = anchor.isDescendant(of: controller.root.topBar)
         let inset = Tokens.Metric.cardInset
         panel.width = Self.fittingWidth(in: overlay.bounds.width)
-        if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible, !aboveThePage, !pane {
+        if controller.root.chromeSidebarShown, !controller.root.isSidebarFloatingVisible, !aboveThePage, !pane {
             // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.recedes = [controller.sidebar.list]
         }

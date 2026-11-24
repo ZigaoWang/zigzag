@@ -265,7 +265,7 @@ final class NumberHints {
     private func canShow(focused: Bool) -> Bool {
         guard let controller, let window = controller.window, window.attachedSheet == nil, !controller.desk.isVisible else { return false }
         if focused, !window.isKeyWindow || !NSApp.isActive { return false }
-        return controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible
+        return controller.root.chromeSidebarShown || controller.root.isSidebarFloatingVisible
     }
 
     /// As for the tabs' numbers, and only while there are space keys to show them on (more than one space, not in a

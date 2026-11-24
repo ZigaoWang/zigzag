@@ -96,7 +96,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
             if self.floatingDownloads.superview != nil {
-                if self.root.sidebarVisible { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
+                if self.root.chromeSidebarShown { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
             }
             self.placeFloatingUpdate()
         }
@@ -640,7 +640,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens the space panel beside the sidebar (or closes it, if it's already showing that space).
     func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
-        if !root.sidebarVisible && !root.isSidebarFloatingVisible { root.reveal(true) }
+        if !root.chromeSidebarShown && !root.isSidebarFloatingVisible { root.reveal(true) }
         previews.hide()
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
     }
@@ -1349,7 +1349,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Shows the stand-in Downloads button where the sidebar's would be, if the sidebar is hidden.
     func showFloatingDownloads() {
-        guard !(root.sidebarVisible || root.isSidebarFloatingVisible) else { return }
+        guard !(root.chromeSidebarShown || root.isSidebarFloatingVisible) else { return }
         let side = Tokens.Metric.floatingButton
         let inset = Tokens.Metric.sidebarPadding
         // In the sidebar's bottom corner, the left or the right one.
@@ -1397,7 +1397,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func placeFloatingUpdate(hiding: Bool = false) {
         let updater = Updater.shared
         let (panel, card) = floatingUpdate
-        guard let state = updater.cardState, updater.cardFloats, !root.sidebarVisible, !root.isSidebarFloatingVisible else {
+        guard let state = updater.cardState, updater.cardFloats, !root.chromeSidebarShown, !root.isSidebarFloatingVisible else {
             guard panel.superview != nil, !panel.dismissing else { return }
             panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
             panel.dismiss(instantly: hiding && Tokens.Motion.isFromKey)
@@ -1446,7 +1446,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let button = sidebar.address.siteControlsButton
             return (button, button.bounds)
         }
-        if root.sidebarVisible || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
+        if root.chromeSidebarShown || root.isSidebarFloatingVisible { return (sidebar.address, sidebar.address.bounds) }
         let card = root.cardFrame
         return (root.overlay, NSRect(x: card.minX + Tokens.Space.x3, y: card.minY + Tokens.Space.x2, width: 1, height: 1))
     }
@@ -1454,7 +1454,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Where a popup opens from: under its pinned button when it was opened from one still showing, otherwise
     /// `addressAnchor`. `id` nil for any other popup.
     func popupAnchor(forPin id: String?) -> (view: NSView, rect: NSRect) {
-        guard let id, root.sidebarVisible || root.isSidebarFloatingVisible, sidebar.address.visiblePinIDs.contains(id),
+        guard let id, root.chromeSidebarShown || root.isSidebarFloatingVisible, sidebar.address.visiblePinIDs.contains(id),
               let button = sidebar.address.pinButton(for: id) else { return addressAnchor }
         return (sidebar.address, button.frame)
     }
@@ -2387,7 +2387,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let overlay = root.overlay
         guard let host = overlay.layer, let window else { return }
         let anchor = sidebar.downloadsAnchor
-        let sidebarShown = root.sidebarVisible || root.isSidebarFloatingVisible
+        let sidebarShown = root.chromeSidebarShown || root.isSidebarFloatingVisible
         // Sidebar hidden: its Downloads button stands in at the same corner, and the download flies there.
         if !sidebarShown { showFloatingDownloads() }
         let target = sidebarShown ? anchor : floatingDownloadsButton
@@ -2894,7 +2894,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
         let container = root.sidebarContainer
-        guard root.sidebarVisible || root.isSidebarFloatingVisible,
+        guard root.chromeSidebarShown || root.isSidebarFloatingVisible,
               container.bounds.contains(container.convert(event.locationInWindow, from: nil)) else { return false }
         // Only where the sidebar is what's under the pointer: a panel over it (Site Controls, a menu) keeps its own
         // scrolls, which would otherwise switch spaces behind it (#216).
