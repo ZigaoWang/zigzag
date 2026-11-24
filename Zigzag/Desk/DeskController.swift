@@ -10,6 +10,7 @@ final class DeskHeaderView: InteractiveView {
     var name: String {
         get { label.stringValue }
         set {
+            guard newValue != label.stringValue else { return }
             label.attributedStringValue = Tokens.Font.voiceText(newValue)
             setAccessibilityLabel(newValue)
         }
@@ -19,6 +20,7 @@ final class DeskHeaderView: InteractiveView {
     let duplicatesButton = PillButton(style: .quiet)
     var duplicates = 0 {
         didSet {
+            guard duplicates != oldValue else { return }
             duplicatesButton.title = String(localized: "Close \(duplicates) Duplicates", comment: "In the tab overview (all spaces' tabs as cards), a button beside a space's name: closes the tabs that show a page already open.")
             duplicatesButton.isHidden = duplicates == 0
             needsLayout = true
@@ -338,6 +340,9 @@ final class DeskController {
         noMatches.isHidden = true
         canvas.addSubview(noMatches)
         searchField.delegate = searchDelegate
+        // A kind AutoFill has nothing for: with none, AppKit makes its one-time-code window each time the field takes
+        // the focus, on the main thread as the desk opens.
+        searchField.contentType = .dateTime
         searchDelegate.changed = { [weak self] text in self?.search(text) }
         searchDelegate.command = { [weak self] selector in
             guard let self else { return false }
@@ -411,6 +416,19 @@ final class DeskController {
         #endif
         isVisible = true
         transition += 1
+        // Opened again while still closing: the desk is there, and carries on from where it is.
+        let reopening = backdrop.superview != nil && !backdrop.isHidden
+        let zooms = !Tokens.Motion.reduceMotion && !reopening
+        // The page's picture is asked for first, so WebKit takes it while the desk is built.
+        var pageReady = false
+        var onPageReady: (() -> Void)?
+        if zooms {
+            capturePages { [weak self] in
+                let done = { pageReady = true; onPageReady?() }
+                guard let self, let manager = self.manager, let tab = manager.selectedTab else { done(); return }
+                ReadyPictures.prepare(manager.panes(of: tab).compactMap(\.snapshot), for: .full, in: self.controller?.window, completion: done)
+            }
+        }
         Tutorial.overviewOpened()
         selection = []
         controller.previews.hide()
@@ -429,18 +447,17 @@ final class DeskController {
         frameView.frame = backdrop.bounds
         frameView.paint(controller.tabManager.currentSpace, isPrivate: controller.tabManager.isPrivate)
         scrollView.autoresizingMask = [.width, .height]
-        // Opened again while still closing: the desk is there, and carries on from where it is.
-        let reopening = backdrop.superview != nil
         if !reopening { Tokens.Motion.withoutAnimation { backdrop.alphaValue = 0 } }
-        root.overlay.addSubview(backdrop)
+        // Kept in the window while closed, so it comes back without being drawn again; over anything shown since.
+        backdrop.isHidden = false
+        if root.overlay.subviews.last(where: { $0 !== flightView }) !== backdrop { root.overlay.addSubview(backdrop) }
         flightView.frame = root.overlay.bounds
-        root.overlay.addSubview(flightView)
+        if root.overlay.subviews.last !== flightView { root.overlay.addSubview(flightView) }
         query = ""
         searchField.stringValue = ""
         layoutSearch()
         // Zooming out, the cards wait for their pictures to be made ready off the main thread, out of sight until
         // they settle in, so nothing is decoded on the main thread as the desk first draws.
-        let zooms = !Tokens.Motion.reduceMotion && !reopening
         picturesWait = zooms
         cards.values.forEach { $0.waitsForReadyPictures = zooms }
         Tokens.Motion.withoutAnimation { scrollView.alphaValue = zooms ? 0 : 1 }
@@ -495,10 +512,7 @@ final class DeskController {
         let ready = { waiting -= 1; if waiting == 0 { start() } }
         let inSight = cards.values.filter { $0.frame.intersects(canvas.visibleRect) }
         preparePictures(of: inSight, then: ready)
-        capturePages { [weak self] in
-            guard let self, let manager = self.manager, let tab = manager.selectedTab else { ready(); return }
-            ReadyPictures.prepare(manager.panes(of: tab).compactMap(\.snapshot), for: .full, in: self.controller?.window, completion: ready)
-        }
+        if pageReady { ready() } else { onPageReady = ready }
         // The rest, out of sight, after: they show when they're ready, never decoded on the main thread.
         let rest = cards.values.filter { !$0.frame.intersects(canvas.visibleRect) }
         if !rest.isEmpty { preparePictures(of: rest) { [weak self] in self?.showPictures(of: rest) } }
@@ -737,8 +751,6 @@ final class DeskController {
         // The window wakes under the desk before it goes, so the page is live where it lands.
         controller.root.glassCovered = false
         actionBar.removeFromSuperview()
-        // The window's controls go back to how the sidebar has them.
-        controller.layoutTrafficLights()
         let root = controller.root
         let target = tab ?? controller.tabManager.selectedTab
         let card = target.flatMap { target in cards[cardID(for: target)] ?? cards[target.id] }
@@ -746,6 +758,8 @@ final class DeskController {
         // address bar following), so the close starts first and the switch runs after, under the flying page.
         let switchTab: @MainActor () -> Void = { [weak self, weak controller] in
             guard let controller else { return }
+            // The window's controls go back to how the sidebar has them, after the move has started.
+            if self?.transition == id { controller.layoutTrafficLights() }
             if let tab { controller.tabManager.select(tab) }
             #if DEBUG
             self?.meter.mark("tab selected")
@@ -759,8 +773,12 @@ final class DeskController {
         let finish: @MainActor () -> Void = { [weak self] in
             // Opened again before this finished: it stays.
             guard let self, self.transition == id else { return }
+            // The search field gives up the keyboard as the desk goes out of sight.
+            if let window = self.backdrop.window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: self.backdrop) {
+                window.makeFirstResponder(nil)
+            }
             Tokens.Motion.withoutAnimation {
-                self.backdrop.removeFromSuperview()
+                self.backdrop.isHidden = true
                 self.backdrop.alphaValue = 1
                 self.scrollView.alphaValue = 1
                 self.cards.values.forEach { $0.imageClip.alphaValue = 1 }
@@ -1088,8 +1106,9 @@ final class DeskController {
             // While searching, how many of them match: a split that matches is both its tabs.
             let shown = query.isEmpty ? count : cardTabs(in: id).reduce(0) { $0 + 1 + partners(of: $1).count }
             let tabs = String(localized: "\(count) tabs", comment: "In the tab overview (all spaces' tabs as cards), beside a space's name: how many tabs it has.")
-            header.count.stringValue = count == 0 ? "" : shown == count ? tabs
+            let counted = count == 0 ? "" : shown == count ? tabs
                 : String(localized: "\(shown) of \(tabs)", comment: "In the tab overview (all spaces' tabs as cards), beside a space's name while searching: how many of its tabs match, then how many it has, like “2 of 5 tabs”.")
+            if header.count.stringValue != counted { header.count.stringValue = counted }
             header.duplicates = query.isEmpty ? duplicateTabs(in: id).count : 0
             if let empty = empties[id] {
                 // Where its first card would be, as long as there's none and nothing is being dragged in.
@@ -1532,6 +1551,8 @@ final class DeskMeter: NSObject {
     private var marks: [String] = []
     private var frames: [Double] = []
     private var busy: [Double] = []
+    /// Main thread time spent before the first frame came.
+    private var busyBeforeFirstFrame: Double?
     private var awake: CFTimeInterval?
     private var link: CADisplayLink?
     private var observer: CFRunLoopObserver?
@@ -1551,6 +1572,7 @@ final class DeskMeter: NSObject {
         marks = []
         frames = []
         busy = []
+        busyBeforeFirstFrame = nil
         let link = view.displayLink(target: self, selector: #selector(tick(_:)))
         link.add(to: .main, forMode: .common)
         self.link = link
@@ -1579,6 +1601,7 @@ final class DeskMeter: NSObject {
 
     @objc private func tick(_ link: CADisplayLink) {
         let now = CACurrentMediaTime()
+        if frames.isEmpty { busyBeforeFirstFrame = busy.reduce(0, +) + (awake.map { (now - $0) * 1000 } ?? 0) }
         frames.append((now - last) * 1000)
         last = now
         if now - start > 0.6 { finish() }
@@ -1593,8 +1616,8 @@ final class DeskMeter: NSObject {
         let typical = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
         let long = sorted.filter { $0 > typical * 1.5 }.count
         let stretches = busy.filter { $0 >= 4 }.map { String(format: "%.0f", $0) }.joined(separator: " ")
-        debugLog(String(format: "%@ %@: %@; main busy %.0f ms, longest %.1f ms [%@]; first frame %.1f ms, %d frames, median %.1f ms, max %.1f ms, %d long [%@]",
-                        kind, name, marks.joined(separator: ", "), busy.reduce(0, +), busy.max() ?? 0, stretches, frames.first ?? 0, frames.count,
+        debugLog(String(format: "%@ %@: %@; main busy %.0f ms, longest %.1f ms [%@], %.1f ms before first frame; first frame %.1f ms, %d frames, median %.1f ms, max %.1f ms, %d long [%@]",
+                        kind, name, marks.joined(separator: ", "), busy.reduce(0, +), busy.max() ?? 0, stretches, busyBeforeFirstFrame ?? 0, frames.first ?? 0, frames.count,
                         typical, sorted.last ?? 0, long, frames.map { String(format: "%.0f", $0) }.joined(separator: " ")))
     }
 }

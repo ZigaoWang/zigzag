@@ -190,22 +190,28 @@ final class TabThumbnailView: InteractiveView {
             partnerRefs = []
         }
         let partner = self.partner
-        placeholder.image = tab.displayIcon
+        // Set only when changed: the desk configures every card each time it opens, and each set redraws.
+        let displayIcon = tab.displayIcon, displayTitle = tab.displayTitle
+        if placeholder.image !== displayIcon { placeholder.image = displayIcon }
         // A web page by its site; Zigzag's own pages (History) and files by their title, never a bare "history".
+        let site: String
         if let url = tab.url, ["http", "https"].contains(url.scheme), let host = url.host() {
-            siteName.stringValue = host.withoutWWW
+            site = host.withoutWWW
         } else {
-            siteName.stringValue = tab.displayTitle
+            site = displayTitle
         }
-        icon.image = tab.displayIcon
-        title.stringValue = tab.displayTitle
-        icon2.image = partner?.displayIcon
+        if siteName.stringValue != site { siteName.stringValue = site }
+        if icon.image !== displayIcon { icon.image = displayIcon }
+        if title.stringValue != displayTitle { title.stringValue = displayTitle }
+        let partnerIcon = partner?.displayIcon
+        if icon2.image !== partnerIcon { icon2.image = partnerIcon }
         // A page that isn't running wears the ring it has in the sidebar, and loses it the moment it loads (#205).
         loadTokens = [tab, partner].compactMap { $0 }.map { page in
             page.changed.observe { [weak self] change in if change == .webView { self?.refreshUnloaded() } }
         }
         refreshUnloaded()
-        title2.stringValue = partner?.displayTitle ?? ""
+        let partnerTitle = partner?.displayTitle ?? ""
+        if title2.stringValue != partnerTitle { title2.stringValue = partnerTitle }
         setAccessibilityLabel(pages.count > 1 ? Words.list(pages.map(\.displayTitle)) : tab.displayTitle)
         refreshImage()
         refreshAudio()
@@ -226,8 +232,10 @@ final class TabThumbnailView: InteractiveView {
 
     private func refreshAudio() {
         let page = audioTab
-        audioButton.symbol = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
-        audioButton.toolTip = page?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab).") : String(localized: "Mute Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab).")
+        let symbol = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
+        if audioButton.symbol != symbol { audioButton.symbol = symbol }
+        let tip = page?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab).") : String(localized: "Mute Tab", comment: "Tooltip of a button on a card in the tab switcher (Control-Tab).")
+        if audioButton.toolTip != tip { audioButton.toolTip = tip }
         needsLayout = true
     }
 
