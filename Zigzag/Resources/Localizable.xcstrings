@@ -154,6 +154,23 @@
         }
       }
     },
+    "Nest Tab" : {
+      "comment" : "View menu item: puts the tab you're on under the tab above it in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "嵌套标签页"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "巢狀分頁"
+          }
+        }
+      }
+    },
     "Not used in this profile" : {
       "comment" : "A row in Settings › Passwords, in place of the password settings, with the profile AI apps use in the background chosen.",
       "localizations" : {
@@ -303,6 +320,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它們會在「AI App」個人資料中獲得自己的隱藏視窗，看不到你的視窗和分頁。開啟此項後，用 --headless 開啟 Zigzag 會只為它們執行。"
+          }
+        }
+      }
+    },
+    "Unnest Tab" : {
+      "comment" : "View menu item: moves the tab you're on out from under the tab it's nested under in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消嵌套标签页"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消巢狀分頁"
           }
         }
       }

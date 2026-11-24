@@ -229,6 +229,12 @@ final class SidebarListView: NSView {
         let originSpace: UUID
         /// Where the pointer is across the list: set in past a folder's last page, a drop stays in the folder.
         var pointX: CGFloat = 0
+        /// Where the pointer picked the row up, and how far in that row was set: among tabs, how far the pointer has
+        /// moved across since then sets the carried row in or out (#523).
+        var grabX: CGFloat = 0
+        var grabDepth = 0
+        /// Where the carried row's start would be, set in as far as the pointer moved across.
+        var nestX: CGFloat { SidebarListView.nestX(pointer: pointX, grabbedAt: grabX, depth: grabDepth) }
         /// The tab the carried tab was under: dropped where it was but at another level, it's a move all the same.
         var originParent: UUID?
         /// The carried tab's original group, for the same reason.
@@ -805,6 +811,16 @@ final class SidebarListView: NSView {
     private var rowDepth: [SidebarItem: Int] = [:]
     /// How many pinned pages each folder holds, at any depth, in the list as last built.
     private var folderPageCounts: [UUID: Int] = [:]
+
+    /// The carried row's start, from how far across the pointer moved since it picked up a row `depth` steps in.
+    nonisolated static func nestX(pointer: CGFloat, grabbedAt: CGFloat, depth: Int) -> CGFloat {
+        indent(depth: depth) + pointer - grabbedAt
+    }
+
+    /// Whether a carried tab's start (`nestX`) is set in as far as a row `depth` steps in: past half a step short of it.
+    nonisolated static func setsIn(_ x: CGFloat, depth: Int) -> Bool {
+        x > indent(depth: depth) - folderIndent / 2
+    }
 
     /// The folder a drop at the gap would go into: right under an open folder, between two of its pages, or just
     /// after its last page with the pointer set in.
@@ -1850,7 +1866,7 @@ final class SidebarListView: NSView {
     /// The tab a drop at the gap among the tab rows (`row` rows above it, the carried ones left out) goes under: right
     /// under a tab whose nested tabs show, or between two tabs of one group, into that group; after a group's last
     /// row, set in as far as its rows to stay in it, as with a folder's pages. Nil: the top level.
-    private func tabGapParent(row: Int, pointX: CGFloat, carried: Set<SidebarItem>) -> UUID? {
+    private func tabGapParent(row: Int, nestX: CGFloat, carried: Set<SidebarItem>, nests: Bool = true) -> UUID? {
         guard let manager else { return nil }
         let (before, after) = tabGapNeighbors(row: row, carried: carried)
         // Just under a group row: its first slot, top level.
@@ -1862,8 +1878,10 @@ final class SidebarListView: NSView {
         let below: UUID? = if case .tab(let id)? = after { id } else { nil }
         // Group tabs are indented one more step.
         let inGroup = above.flatMap { manager.tab(with: $0)?.groupID } != nil ? 1 : 0
-        return TabTree.dropParent(before: above, after: below, in: nodes) { level in
-            pointX > Self.indent(depth: level + inGroup) + Tokens.Space.x2
+        // A split is one row at the top level: it goes under no tab, and none goes under it.
+        let nestsHere = nests && !(before.map(isSplitRow) ?? false) && !carried.contains(where: isSplitRow)
+        return TabTree.dropParent(before: above, after: below, in: nodes, nests: nestsHere) { level in
+            Self.setsIn(nestX, depth: level + inGroup)
         }
     }
 
@@ -1877,7 +1895,7 @@ final class SidebarListView: NSView {
 
     /// The tab group (#209) a drop between tab rows goes into: under one of its tabs, right under its row, or between its
     /// tabs; after its last tab, only when indented to its level, as with folders. Nil when none.
-    private func tabGapGroup(row: Int, pointX: CGFloat, carried: Set<SidebarItem>, parent: UUID?) -> UUID? {
+    private func tabGapGroup(row: Int, nestX: CGFloat, carried: Set<SidebarItem>, parent: UUID?) -> UUID? {
         guard let manager else { return nil }
         if let parent { return manager.tab(with: parent)?.groupID }
         let (before, after) = tabGapNeighbors(row: row, carried: carried)
@@ -1889,7 +1907,7 @@ final class SidebarListView: NSView {
         case .tab(let id)?:
             guard let group = manager.tab(with: id)?.groupID else { return nil }
             if below == group { return group }
-            return pointX > Self.indent(depth: 1) + Tokens.Space.x2 ? group : nil
+            return Self.setsIn(nestX, depth: 1) ? group : nil
         default:
             return nil
         }
@@ -1975,6 +1993,10 @@ final class SidebarListView: NSView {
             drag?.originGroup = manager.tab(with: id)?.groupID
         }
         drag?.pinnable = Self.pinnable(together, in: manager)
+        let grabX = convert(event.locationInWindow, from: nil).x
+        drag?.grabX = grabX
+        drag?.pointX = grabX
+        drag?.grabDepth = rowDepth[item] ?? 0
         if let start = drag.map({ reorderTarget(pointerY: convert(event.locationInWindow, from: nil).y, dragging: $0) }) {
             drag?.targetSection = start.0
             drag?.targetIndex = start.1
@@ -2093,21 +2115,23 @@ final class SidebarListView: NSView {
     /// The line between the rows where the carried row (or something from elsewhere) would land, set in when it
     /// would go into a folder. Hidden when it would land where it already is, or while a split is on offer.
     private func placeLine() {
-        let section: Section?, index: Int, pointX: CGFloat
+        let section: Section?, index: Int, pointX: CGFloat, nestX: CGFloat
         if let drag {
             let home = carriedRowShown && drag.targetSection == drag.originSection && drag.targetIndex == drag.originIndex
                 && (drag.targetSection != .tabs || {
-                    let parent = tabGapParent(row: drag.targetIndex, pointX: drag.pointX, carried: drag.carried)
+                    let parent = tabGapParent(row: drag.targetIndex, nestX: drag.nestX, carried: drag.carried)
                     return parent == drag.originParent
-                        && tabGapGroup(row: drag.targetIndex, pointX: drag.pointX, carried: drag.carried, parent: parent) == drag.originGroup
+                        && tabGapGroup(row: drag.targetIndex, nestX: drag.nestX, carried: drag.carried, parent: parent) == drag.originGroup
                 }())
             section = home || drag.folderTarget != nil || drag.groupTarget != nil || splitCandidate != nil || drag.splitTarget != nil ? nil : drag.targetSection
             index = drag.targetIndex
             pointX = drag.pointX
+            nestX = drag.nestX
         } else if let external {
             (section, index, pointX) = external
+            nestX = pointX
         } else {
-            section = nil; index = 0; pointX = 0
+            section = nil; index = 0; pointX = 0; nestX = 0
         }
         let carried = drag?.carried ?? []
         let placed = withPlaceholder(items.filter { !carried.contains($0) }, section: section, index: index, carried: carried)
@@ -2131,8 +2155,9 @@ final class SidebarListView: NSView {
         // under.
         let x: CGFloat
         if section == .tabs {
-            let parent = tabGapParent(row: index, pointX: pointX, carried: carried)
-            let group = tabGapGroup(row: index, pointX: pointX, carried: carried, parent: parent)
+            // From another window it lands where the drop puts it: never under the row above by being set in.
+            let parent = tabGapParent(row: index, nestX: nestX, carried: carried, nests: drag != nil)
+            let group = tabGapGroup(row: index, nestX: nestX, carried: carried, parent: parent)
             x = Self.indent(depth: (group == nil ? 0 : 1) + (parent.map { TabTree.shownLevel((tabLevels[$0] ?? 0) + 1) } ?? 0))
         } else {
             x = folderForGap(in: placed, pointX: pointX).map { Self.indent(depth: Library.shared.depth(ofFolder: $0) + 1) } ?? 0
@@ -2515,8 +2540,8 @@ final class SidebarListView: NSView {
         let moving = groupID != nil ? groupTabs.map(\.id) : tab.map { [$0.id] } ?? []
         let listIndex = tabListIndex(forRow: drag.targetIndex, carried: drag.carried, moving: Set(moving))
         // Also the parent tab among nested tabs, and the target group.
-        let gapParent = section == .tabs ? tabGapParent(row: drag.targetIndex, pointX: drag.pointX, carried: drag.carried) : nil
-        let gapGroup = section == .tabs ? tabGapGroup(row: drag.targetIndex, pointX: drag.pointX, carried: drag.carried, parent: gapParent) : nil
+        let gapParent = section == .tabs ? tabGapParent(row: drag.targetIndex, nestX: drag.nestX, carried: drag.carried) : nil
+        let gapGroup = section == .tabs ? tabGapGroup(row: drag.targetIndex, nestX: drag.nestX, carried: drag.carried, parent: gapParent) : nil
         switch (drag.item, section) {
         case (.tabGroup(let id), .tabs):
             delegate?.listMoveGroup(id, to: listIndex, in: space)

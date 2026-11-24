@@ -70,6 +70,16 @@
 - ⌘1–⌘8 → that row of the sidebar; ⌘9, or a number past the end → the last row.
   Test: NumberHintsTests.numbersGoToTheirPlaceAndNineToTheLast
 
+## Nesting
+- Drag a tab and move the pointer right past half a step → the line sets in a level and the drop puts it under the row above, as that tab's last, even one with nothing under it yet; never deeper than two levels, and never under or as a split.
+  Test: NestedTabsTests.setInPastTheRowAboveADropGoesUnderIt
+- While dragging, how far the pointer moved across since the row was picked up sets the level, the same by finger; half a step back left takes it back out.
+  Test: NestedTabsTests.movingAcrossSetsTheCarriedRowInAndOut
+- ⌃⇧→ (View › Nest Tab) → the tab you're on goes under the tab above it at its level, with the tabs under it; ⌃⇧← (Unnest Tab) → it goes a level out, just after the tab it was under and that tab's run.
+  Test: NestedTabsTests.nestTabGoesUnderTheTabAboveAtItsLevel
+- ⌘Z after nesting or unnesting → the tab is back where it was; a relaunch keeps the nesting.
+  Test: NestedTabsTests.nestAndUnnestTabUndoAndAreSaved
+
 ## Sleeping
 - Leave a tab out of sight for an hour → it sleeps.
   Test: TabSleepTests.aTabUnseenForAnHourSleeps

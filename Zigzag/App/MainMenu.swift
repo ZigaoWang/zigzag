@@ -169,6 +169,8 @@ enum MainMenu {
             item(String(localized: "Previous Tab", comment: "View menu item."), #selector(C.selectPreviousTab(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.command, .option]),
             item(String(localized: "Move Tab Up", comment: "View menu item."), #selector(C.moveTabUp(_:)), String(UnicodeScalar(NSUpArrowFunctionKey)!), [.control, .shift]),
             item(String(localized: "Move Tab Down", comment: "View menu item."), #selector(C.moveTabDown(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.control, .shift]),
+            item(String(localized: "Nest Tab", comment: "View menu item: puts the tab you're on under the tab above it in the sidebar."), #selector(C.nestTab(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.control, .shift]),
+            item(String(localized: "Unnest Tab", comment: "View menu item: moves the tab you're on out from under the tab it's nested under in the sidebar."), #selector(C.unnestTab(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.control, .shift]),
             item(String(localized: "Next Space", comment: "View menu item."), #selector(C.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option]),
             item(String(localized: "Previous Space", comment: "View menu item."), #selector(C.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option]),
             item(String(localized: "Switch Space…", comment: "View menu item: lists the spaces to pick one with the arrow keys."), #selector(C.showSpaceSwitcher(_:)), "s", [.command, .option]),

@@ -2526,6 +2526,27 @@ final class TabManager {
         return target <= start ? target : min(target + runCount, rest.count)
     }
 
+    /// Nest Tab and Unnest Tab (#523): the list with the tab a level in or out, or nil where it can't go. Never a
+    /// split, never under one, and never under a tab of another group.
+    func nestedArrangement(of tab: Tab, deeper: Bool) -> [TabTree.Node]? {
+        guard tab.bookmarkID == nil, split(for: tab) == nil else { return nil }
+        let nodes = treeNodes(in: tab.spaceID)
+        guard let result = deeper ? TabTree.nesting(tab.id, in: nodes) : TabTree.unnesting(tab.id, in: nodes) else { return nil }
+        if deeper, let parent = result.first(where: { $0.id == tab.id })?.parent.flatMap(self.tab(with:)),
+           split(for: parent) != nil || parent.groupID != tab.groupID { return nil }
+        return result
+    }
+
+    /// Puts the tab a level in, under the tab above it, or a level out (#523). False when it can't go there.
+    @discardableResult
+    func nest(_ tab: Tab, deeper: Bool) -> Bool {
+        guard let nodes = nestedArrangement(of: tab, deeper: deeper) else { return false }
+        applyTree(nodes, in: tab.spaceID)
+        unfold(tab.parentID)
+        structureChanged()
+        return true
+    }
+
     // MARK: Groups of tabs
 
     /// Tabs were added, removed or moved: normalize each group to one run (`TabGroups`), drop empty groups, then

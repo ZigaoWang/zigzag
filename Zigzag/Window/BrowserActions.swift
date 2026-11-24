@@ -734,6 +734,17 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func moveTabUp(_ sender: Any?) { if let target = tabMoveTarget(by: -1), let tab = selectedTab { moveWithUndo(tab, to: target, in: tab.spaceID) } }
     @objc func moveTabDown(_ sender: Any?) { if let target = tabMoveTarget(by: 1), let tab = selectedTab { moveWithUndo(tab, to: target, in: tab.spaceID) } }
 
+    /// ⌃⇧→ and ⌃⇧←: the tab you're on a level in, under the tab above it, or a level out (#523).
+    @objc func nestTab(_ sender: Any?) { nestSelectedTab(deeper: true) }
+    @objc func unnestTab(_ sender: Any?) { nestSelectedTab(deeper: false) }
+
+    private func nestSelectedTab(deeper: Bool) {
+        guard let tab = selectedTab, tabManager.nestedArrangement(of: tab, deeper: deeper) != nil else { return }
+        pageChange(String(localized: "Move Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Tab.")) { [weak self] in
+            self?.tabManager.nest(tab, deeper: deeper)
+        }
+    }
+
     /// Where the tab you're on goes one row up or down, or nil at the end of the list, on a pinned page, or beside a split.
     /// A nested tab moves past the tab beside it at its own level, each with the tabs under it, and stays in its group.
     func tabMoveTarget(by offset: Int) -> Int? {
@@ -1039,6 +1050,8 @@ extension BrowserWindowController: NSMenuItemValidation {
             return tab != nil
         case #selector(moveTabUp(_:)): return tabMoveTarget(by: -1) != nil
         case #selector(moveTabDown(_:)): return tabMoveTarget(by: 1) != nil
+        case #selector(nestTab(_:)): return selectedTab.flatMap { tabManager.nestedArrangement(of: $0, deeper: true) } != nil
+        case #selector(unnestTab(_:)): return selectedTab.flatMap { tabManager.nestedArrangement(of: $0, deeper: false) } != nil
         case #selector(closeOtherTabs(_:)): return !otherTabs.isEmpty
         case #selector(closeTabsBelow(_:)): return !tabsBelow.isEmpty
         case #selector(selectSpaceByNumber(_:)):

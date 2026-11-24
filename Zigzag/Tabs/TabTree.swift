@@ -211,6 +211,29 @@ nonisolated enum TabTree {
         return rest.firstIndex { $0.id == next.id } ?? rest.count
     }
 
+    /// Nest Tab: under the tab above it at its own level, as that tab's last, with everything under it. Nil with no
+    /// tab above at its level, or one already as deep as tabs are set in.
+    static func nesting(_ id: UUID, in nodes: [Node]) -> [Node]? {
+        guard let start = nodes.firstIndex(where: { $0.id == id }),
+              let above = nodes[..<start].last(where: { $0.parent == nodes[start].parent }),
+              canNestUnder(level: levels(nodes)[above.id] ?? 0) else { return nil }
+        var result = nodes
+        result[start].parent = above.id
+        return result
+    }
+
+    /// Unnest Tab: out from under its tab to just after that tab's run, a level up, with everything under it. Nil at
+    /// the top level.
+    static func unnesting(_ id: UUID, in nodes: [Node]) -> [Node]? {
+        guard let start = nodes.firstIndex(where: { $0.id == id }), let parent = nodes[start].parent else { return nil }
+        let end = subtreeEnd(at: start, in: nodes)
+        var rest = nodes
+        rest.removeSubrange(start..<end)
+        guard let at = rest.firstIndex(where: { $0.id == parent }) else { return nil }
+        let up = rest[at].parent
+        return moving(id, to: subtreeEnd(at: at, in: rest), parent: up, in: nodes)
+    }
+
     /// Move Tab Up or Down: past the tab beside it at its own level, with everything under each. The index is in the
     /// list without the tab's own run; nil at either end of its group.
     static func siblingMoveTarget(_ id: UUID, by offset: Int, in nodes: [Node]) -> Int? {
@@ -225,16 +248,22 @@ nonisolated enum TabTree {
         return subtreeEnd(at: end, in: nodes) - (end - start)
     }
 
+    /// Whether a tab at `level` can take tabs under it by a drag or Nest Tab: only where they'd show set in further.
+    static func canNestUnder(level: Int) -> Bool { level < shownLevels }
+
     /// The tab a drop at a gap goes under, from the rows shown on either side of it (without what's carried): right
-    /// under a tab whose tabs show below it, or between two tabs of the same group, it joins that group. After a
-    /// group's last row, the pointer picks how many levels out it lands, never further out than the row below:
-    /// `setIn(level)` says whether the pointer is set in as far as a row at that level, as for folders.
-    static func dropParent(before: UUID?, after: UUID?, in nodes: [Node], setIn: (Int) -> Bool) -> UUID? {
+    /// under a tab whose tabs show below it, or between two tabs of the same group, it joins that group. Set in past
+    /// the row above (`nests`), it goes under that row, as its last tab (#523). After a group's last row, the pointer
+    /// picks how many levels out it lands, never further out than the row below: `setIn(level)` says whether the
+    /// pointer is set in as far as a row at that level, as for folders.
+    static func dropParent(before: UUID?, after: UUID?, in nodes: [Node], nests: Bool = true, setIn: (Int) -> Bool) -> UUID? {
         let parents = Dictionary(nodes.map { ($0.id, $0.parent) }, uniquingKeysWith: { a, _ in a })
         let levels = self.levels(nodes)
         let below = after.flatMap { parents[$0] ?? nil }
         guard let before else { return nil }
         if let below, below == before { return before }
+        let level = levels[before] ?? 0
+        if nests, canNestUnder(level: level), setIn(level + 1) { return before }
         var candidate = parents[before] ?? nil
         var seen: Set<UUID> = []
         while let id = candidate, seen.insert(id).inserted {
