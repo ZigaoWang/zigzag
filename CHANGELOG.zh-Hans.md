@@ -15,6 +15,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 新功能
 - 把标签页往右拖，就能嵌套到上方的标签页下面，上方的标签页下面还没有标签页也可以；往左拖就会移出来。拖动时的线会显示它会落在哪一层。用键盘的话，“显示 › 嵌套标签页”（⌃⇧→）把当前标签页放到上方的标签页下面，“取消嵌套标签页”（⌃⇧←）把它移出来。感谢 [bkonia](https://github.com/bkonia) 的建议。([#523](https://github.com/ZigaoWang/zigzag/issues/523))
 
+### 修复
+- 网站或扩展为了让普通点按打开自己的查看器而特意去掉的链接，比如 Old Twitter Layout 里的引用推文，⌘-点按或中键点按照样在标签页里打开，现在由 Zigzag 里统一的一条规则处理，任何网站或扩展都能用：把地址放在 `data-zigzag-href` 里就行（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。普通点按照样打开查看器。感谢 [Lakeland97](https://github.com/Lakeland97) 的设计方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
+
 ## [0.9.5] - 2026-11-24
 
 可以导出你的数据，随时带走一切；实时文件夹；繁体中文界面；视频全屏留在浏览器里；地址栏可以自动隐藏；从屏幕边缘拉出边栏；Zigzag 在每个网页里做的事更少，滚动更流畅；网页按屏幕完整的 120 Hz 绘制；触控屏用起来更顺手；导入 Dia 时带上固定标签页；按住后退或前进可以选历史网页；重启后登录和 YouTube 影院模式都还在；设置里可以选密码管理器扩展。

@@ -12,6 +12,9 @@
 ### 新功能
 - 把分頁往右拖，就能巢狀放到上方的分頁下面，上方的分頁下面還沒有分頁也可以；往左拖就會移出來。拖動時的線會顯示它會落在哪一層。用鍵盤的話，「顯示 › 巢狀分頁」（⌃⇧→）把目前的分頁放到上方的分頁下面，「取消巢狀分頁」（⌃⇧←）把它移出來。感謝 [bkonia](https://github.com/bkonia) 的建議。([#523](https://github.com/ZigaoWang/zigzag/issues/523))
 
+### 修正
+- 網站或擴充功能為了讓一般點按打開自己的檢視器而刻意拿掉的連結，例如 Old Twitter Layout 裡的引用推文，⌘-點按或中鍵點按照樣會在分頁中打開，現在由 Zigzag 裡統一的一條規則處理，任何網站或擴充功能都能使用：把位址放在 `data-zigzag-href` 裡即可（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。一般點按照樣打開檢視器。感謝 [Lakeland97](https://github.com/Lakeland97) 的設計方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
+
 ## [0.9.5] - 2026-11-24
 
 可以匯出你的資料，隨時帶走一切；即時資料夾；繁體中文介面；影片全螢幕留在瀏覽器裡；網址列可以自動隱藏；從螢幕邊緣拉出側邊欄；Zigzag 在每個網頁裡做的事更少，捲動更順暢；網頁以螢幕完整的 120 Hz 繪製；觸控操作更順手；從 Dia 匯入時會一併帶入已固定分頁；按住上一頁或下一頁按鈕就能瀏覽記錄；重新啟動後會保留登入狀態和 YouTube 的劇院模式；設定裡可以選取密碼管理器延伸功能。
