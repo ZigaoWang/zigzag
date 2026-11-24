@@ -253,6 +253,51 @@ struct LocalizationTests {
         #expect(String.localizedStringWithFormat(updated, 5, "Chrome") == "已從 Chrome 更新 5 個密碼。")
         #expect(bundle.localizedString(forKey: "NSCameraUsageDescription", value: nil, table: "InfoPlist")
                 == "你造訪的網站可以要求使用你的相機。")
+        for mac in ["zh-TW", "zh-HK", "zh-Hant-MO"] {
+            #expect(Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: [mac]).first == language, "\(mac)")
+        }
+        #expect(Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: ["zh-CN"]).first == "zh-Hans")
+    }
+
+    /// A string with no Traditional Chinese yet reads in English, never as a raw key: a key that isn't English
+    /// text carries its English in the code, and a Traditional Chinese entry that is there is complete.
+    @Test func traditionalChineseFallsBackToEnglish() throws {
+        let language = "zh-Hant"
+        let identifier = try NSRegularExpression(pattern: #"^[a-z0-9]+([.-][A-Za-z0-9]+)+$"#)
+        var off: [String] = []
+        for name in ["Localizable", "InfoPlist"] {
+            for (key, entry) in try Self.catalog(name) {
+                let entry = entry as? [String: Any] ?? [:]
+                guard let unit = (entry["localizations"] as? [String: Any])?[language] as? [String: Any] else {
+                    let keyed = identifier.firstMatch(in: key, range: NSRange(key.startIndex..., in: key)) != nil
+                    if name == "Localizable" && keyed && entry["extractionState"] as? String != "extracted_with_value" { off.append("\(key): no English to fall back to") }
+                    continue
+                }
+                let forms = Self.forms(["localizations": [language: unit]], language)
+                if forms.isEmpty || forms.contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) { off.append("\(name) \(key): empty") }
+                if let state = (unit["stringUnit"] as? [String: Any])?["state"] as? String, state != "translated" { off.append("\(name) \(key): \(state)") }
+            }
+        }
+        #expect(off.isEmpty, "\(off.sorted().prefix(20))")
+        let bundle = try #require(Bundle(path: Bundle.main.path(forResource: language, ofType: "lproj") ?? ""))
+        #expect(bundle.localizedString(forKey: "A sentence not in the catalog.", value: nil, table: nil) == "A sentence not in the catalog.")
+        #expect(bundle.localizedString(forKey: "not.in.catalog", value: "Space", table: nil) == "Space")
+    }
+
+    /// Traditional Chinese reads as Taiwan's macOS does, not as Simplified Chinese in Traditional characters.
+    @Test func traditionalChineseAvoidsMainlandWords() throws {
+        let avoided = ["您", "賬", "標籤頁", "設置", "默認", "菜單", "窗口", "屏幕", "軟件", "信息", "用戶", "打開", "保存", "刷新", "視頻",
+                       "鼠標", "擴展程序", "地址欄", "構建", "分屏", "收藏夾", "支持", "文件夾", "網絡", "服務器"]
+        var off: [String] = []
+        for name in ["Localizable", "InfoPlist"] {
+            for (_, entry) in try Self.catalog(name) {
+                for zh in Self.forms(entry, "zh-Hant") {
+                    for word in avoided where zh.contains(word) { off.append("\(zh) says \(word)") }
+                    if zh.range(of: #"\p{Han}[,.;:?!]\s|\p{Han}[,;?!]|[“”]"#, options: .regularExpression) != nil { off.append("\(zh): half-width punctuation or “” quotes") }
+                }
+            }
+        }
+        #expect(off.isEmpty, "\(off.joined(separator: "\n"))")
     }
 
     /// A catalog entry's strings in one language: its single string, or each plural form and substitution.
