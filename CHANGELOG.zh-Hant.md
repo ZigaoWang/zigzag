@@ -14,6 +14,7 @@
 
 ### 修正
 - 網站或擴充功能為了讓一般點按打開自己的檢視器而刻意拿掉的連結，例如 Old Twitter Layout 裡的引用推文，⌘-點按或中鍵點按照樣會在分頁中打開，現在由 Zigzag 裡統一的一條規則處理，任何網站或擴充功能都能使用：把位址放在 `data-zigzag-href` 裡即可（[docs/extensions.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/extensions.md)）。一般點按照樣打開檢視器。感謝 [Lakeland97](https://github.com/Lakeland97) 的設計方案。([#517](https://github.com/ZigaoWang/zigzag/issues/517))
+- 把下載交給 App、指令碼或服務的規則，現在可以依檔案本身的類型（例如 torrent 或 pdf）來比對，而不只看網址。下載站的網址往往看不出檔案名稱，所以 .torrent 檔案現在無論網址長什麼樣子都能交給下載器。
 
 ## [0.9.5] - 2026-11-24
 

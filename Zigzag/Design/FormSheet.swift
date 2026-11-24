@@ -153,6 +153,19 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         panel.layoutSubtreeIfNeeded()
     }
 
+    /// Renames a row after the form is built, for a choice that changes what its field means (an address, or the
+    /// file extensions to catch).
+    func setLabel(_ label: String?, forRow index: Int) {
+        guard rows.indices.contains(index), rows[index].label != label else { return }
+        rows[index].label = label
+        labels[index]?.stringValue = label ?? ""
+        labels[index]?.isHidden = label == nil || rows[index].isHidden
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        panel.needsLayout = true
+        panel.layoutSubtreeIfNeeded()
+    }
+
     /// What a key does while a form is up.
     enum KeyAction: Equatable {
         case confirm, cancel

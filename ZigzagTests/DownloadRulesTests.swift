@@ -433,6 +433,38 @@ struct DownloadRuleTests {
         #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: true) == nil)
     }
 
+    /// A handoff can be chosen by the download's own type, whatever the address says: a tracker's download.php
+    /// carries no file name, so an address pattern can't catch it. Links have no name, so they never match one.
+    @Test func aFileTypeHandoffMatchesTheDownloadsNameAndNeverALink() {
+        var send = DownloadRuleAction(kind: .jsonRPC)
+        send.rpcEndpoint = "http://127.0.0.1:5000/RPC2"
+        send.rpcMethod = "load.start"
+        let type = DownloadRule(name: "Torrents", applies: .downloads, match: .fileType, pattern: "torrent", action: send)
+        let tracker = URL(string: "https://tracker.example.com/download.php?id=42")!
+
+        #expect(type.matches(tracker, filename: "Some.Movie.torrent"))
+        #expect(!type.matches(tracker))
+        #expect(!type.matches(tracker, filename: ""))
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [type], url: tracker, filename: "Some.Movie.torrent",
+                                                     appliesToLinks: false)?.id == type.id)
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [type], url: tracker, filename: "Some.Movie.torrent",
+                                                     appliesToLinks: true) == nil)
+    }
+
+    /// A file-type handoff reads as the files it catches, not as a destination with a folder.
+    @Test func aFileTypeHandoffReadsAsItsFiles() {
+        var send = DownloadRuleAction(kind: .jsonRPC)
+        send.rpcEndpoint = "http://127.0.0.1:5000/RPC2"
+        send.rpcMethod = "load.start"
+        let type = DownloadRule(name: "Torrents", applies: .downloads, match: .fileType, pattern: "torrent, pdf", action: send)
+        #expect(type.summarySentence == "Files of type torrent, pdf go to 127.0.0.1 (load.start)")
+
+        var open = DownloadRuleAction(kind: .openApp)
+        open.appPath = "/Applications/rTorrent.app"
+        let show = DownloadRule(name: "Torrents", match: .fileType, pattern: "torrent", action: open)
+        #expect(show.summarySentence == "Files of type torrent open in rTorrent")
+    }
+
     /// The first matching destination wins, in handoff order; a handoff rule for the same file isn't a destination.
     @Test func aDestinationIsTheFirstThatMatches() {
         let pdf = destination("pdf", folder: "/Users/me/Documents")
@@ -636,6 +668,28 @@ struct DownloadRuleTests {
         show.name = ""
         #expect(show.action.isComplete)
         #expect(show.name.isEmpty)
+    }
+
+    /// The editor offers every match kind to a handoff, file type included; a destination only file type.
+    @Test func theSheetOffersFileTypeToHandoffsToo() {
+        #expect(DownloadRuleSheet.matchChoices(isDestination: true) == [.fileType])
+        #expect(DownloadRuleSheet.matchChoices(isDestination: false) == DownloadRule.Match.allCases)
+        #expect(DownloadRuleSheet.matchChoices(isDestination: false).contains(.fileType))
+        // The pattern field asks for extensions or for an address, following the match.
+        #expect(DownloadRuleSheet.patternPlaceholder(for: .fileType) == "pdf, epub")
+        #expect(DownloadRuleSheet.patternPlaceholder(for: .contains) == "example.com/files/")
+    }
+
+    /// A handoff by file type needs its extensions and a name, as any handoff does.
+    @Test func aFileTypeHandoffNeedsItsExtensionsAndItsName() {
+        var mine = rule(.fileType, "", applies: .downloads)
+        mine.name = "Torrents"
+        mine.action.urlTemplate = "https://example.com/{filename}"
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).map(\.field) == [.pattern])
+        mine.pattern = "torrent"
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
+        mine.name = ""
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).map(\.field) == [.name])
     }
 
     @Test func aDestinationSurvivesItsJSON() throws {
