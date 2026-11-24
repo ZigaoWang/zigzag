@@ -88,14 +88,6 @@ final class AddressView: InteractiveView {
         reflow(animated: true)
     }
 
-    /// Whether Site Controls is offered for the page in the field. Zigzag's own pages have no site to control, so the
-    /// button goes rather than opening an empty panel.
-    func setSiteControls(showing: Bool) {
-        guard siteControlsButton.isHidden == showing else { return }
-        siteControlsButton.isHidden = !showing
-        reflow(animated: true)
-    }
-
     /// The dot on Site Controls while an extension can't work until you do something.
     func setSiteControls(needsAttention: Bool) {
         guard needsAttention != (siteControlsBadge != nil) else { return }
@@ -978,26 +970,23 @@ final class SidebarView: NSView {
             guard holdsAddress != oldValue else { return }
             // Leaving the top bar: back to the field with the site.
             if holdsAddress { address.buttonsOnly = false; addressViews.forEach(addSubview) }
-            refreshAddressButtons()
             needsLayout = true
         }
-    }
-    /// Whether back, forward and reload stay put while the address is in the bar above the page: true for the
-    /// window's sidebar, whose buttons the bar holds; false for a mirror, which keeps its address instead.
-    var hasTopBar = true { didSet { refreshAddressButtons() } }
-    /// Whether everything in it keeps its hover states while Zigzag is inactive and its panel isn't key: the sidebar
-    /// at the screen's edge, which shows over another app.
-    var hoversWhileInactive = false
-    /// Whether Zigzag's own pages hide the star and Site Controls here: the panel's mirror, not the window's sidebar.
-    var hidesSystemPageControls = false
-
-    private func refreshAddressButtons() {
-        let shows = holdsAddress || hasTopBar
-        addressButtons.forEach { $0.isHidden = !shows }
     }
     /// Where the favorites start while the address is above the page: the page's top, so the two line up under the
     /// top row (set by the window as it lays out the page).
     var contentTop: CGFloat = TopBarView.height { didSet { if contentTop != oldValue { needsLayout = true } } }
+    /// Off in the screen edge's sidebar, a list to pick from: the address row stays in the window.
+    var showsAddressRow = true {
+        didSet {
+            guard showsAddressRow != oldValue else { return }
+            holdsAddress = showsAddressRow
+            (addressViews + [sidebarButton]).forEach { $0.isHidden = !showsAddressRow }
+            contentTop = showsAddressRow ? TopBarView.height : Tokens.Space.x2
+        }
+    }
+    /// The screen edge's sidebar answers hover while another app is in front.
+    var hoversWhileInactive = false
     /// What moves to the bar above the page: the three buttons in order, then the address.
     var addressButtons: [IconButton] { [backButton, forwardButton, reloadButton] }
     private var addressViews: [NSView] { addressButtons + [address] }
@@ -1132,17 +1121,8 @@ final class SidebarView: NSView {
             delegate?.sidebarDoubleClickedBlank()
             return
         }
-        // A single click on empty space does nothing in a window's sidebar; the edge panel uses it to put itself away.
-        if event.clickCount == 1, let blankClick {
-            blankClick()
-            return
-        }
         window?.titleBarMouseDown(event, clicks: clicks)
     }
-
-    /// What a single click on empty space does, for the sidebar shown over the screen: the edge panel goes away, as it
-    /// would if the pointer had left it. Nil in a window's sidebar, where such a click only prepares a drag.
-    var blankClick: (() -> Void)?
 
     /// Settings › Appearance › Double-click the sidebar for a new tab. On by default.
     static var doubleClickOpensNewTab: Bool {
@@ -1342,12 +1322,7 @@ final class SidebarView: NSView {
         reloadButton.symbol = (tab?.isLoading ?? false) ? "xmark" : "arrow.clockwise"
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
-        let systemPage = tab.map { !EdgeLensPolicy.takesPage(url: $0.url) } ?? false
-        // A system page has no star or site to control in the panel's mirror; the window's own sidebar keeps main's.
-        let hidesSystemPage = hidesSystemPageControls && systemPage
-        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true,
-                         canSave: !hidesSystemPage && AddressView.canSave(for: tab))
-        address.setSiteControls(showing: !hidesSystemPage)
+        address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

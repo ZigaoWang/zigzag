@@ -4,7 +4,7 @@ import WebKit
 /// The glass card that shows a tab's page when you hover it in the sidebar: the picture inset a little, its corners
 /// running with the panel's, and the title and address under it. A split is one card, as in desk view: both pages
 /// where they sit on screen, and each one's title under its own side.
-final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
+final class TabPreviewView: FloatingPanelView {
     private let picture = PagePicture()
     private let placeholder = FaviconView()
     private let title = Label("", font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
@@ -18,56 +18,6 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
     private let imageClip = NSView()
     /// How a split's or tile group's pages share the picture; nil for one page.
     private var shape: TileShape?
-    /// The lens's caption: back, forward, the editable address, reload and Site Controls, in place of the detail line
-    /// while the card is the live page.
-    private let lensControls = NSView()
-    let lensBack = IconButton(symbol: "chevron.left", size: .compact, toolTip: String(localized: "Back", comment: "Tooltip of the lens's Back button."))
-    let lensForward = IconButton(symbol: "chevron.right", size: .compact, toolTip: String(localized: "Forward", comment: "Tooltip of the lens's Forward button."))
-    let lensAddress = NSTextField()
-    let lensReload = IconButton(symbol: "arrow.clockwise", size: .compact, toolTip: String(localized: "Reload", comment: "Tooltip of the lens's Reload button."))
-    let lensSiteControls = IconButton(symbol: "slider.horizontal.3", size: .compact, toolTip: String(localized: "Site Controls", comment: "Name of the button by the lens's address that opens the site panel."))
-    let lensClose = IconButton(symbol: "xmark", size: .compact, toolTip: String(localized: "Close", comment: "Tooltip of the lens's Close button."))
-    private let lensAddressBackground = ColorView(color: NSColor.labelColor.withAlphaComponent(0.07))
-    /// The live page, over the snapshot while the lens is out.
-    private let liveClip = NSView()
-    private var liveHolder: NSView?
-    private var addressBeforeEditing = ""
-
-    var onLensBack: (() -> Void)?
-    var onLensForward: (() -> Void)?
-    var onLensReload: (() -> Void)?
-    var onLensAddress: ((String) -> Void)?
-    var onLensSiteControls: ((IconButton) -> Void)?
-    var onLensClose: (() -> Void)?
-
-    /// The lens's bar: a standard strip on top of the card, the page under it. One size for every page, so a tab
-    /// brought into the lens never moves or resizes it.
-    static let lensBarHeight: CGFloat = Tokens.Space.x10
-
-    /// While the card is the lens: the controls replace the plain detail line. Off, the browser's preview is exactly
-    /// as it was.
-    var showsLensControls = false {
-        didSet {
-            refreshCaptionVisibility()
-            needsLayout = true
-        }
-    }
-
-    /// The live page's shape, width over height.
-    private(set) var pageAspect: CGFloat = 16.0 / 10.0
-
-    /// The caption height this card declared when it first appeared: a card keeps one size while it is up.
-    private(set) var declaredFooter: CGFloat?
-
-    /// Fixes the caption's height for this card and returns it; later layouts use the same height.
-    @discardableResult
-    func declareFooter(width: CGFloat) -> CGFloat {
-        if let declaredFooter { return declaredFooter }
-        let footer = footerHeight(width: width)
-        declaredFooter = footer
-        return footer
-    }
-
     static let footerHeight = Tokens.Metric.previewCaptionHeight
     /// The caption's height in a card this wide: taller by its note while a page in it is in Developer Mode or sleeps
     /// (three lines at most, when it's half of a split).
@@ -99,16 +49,7 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
         imageClip.layer?.addSublayer(picture.layer)
         addSubview(imageClip)
         addSubview(placeholder)
-        liveClip.wantsLayer = true
-        liveClip.layer?.masksToBounds = true
-        liveClip.layer?.cornerRadius = Tokens.Radius.panel - Self.inset
-        liveClip.layer?.cornerCurve = .continuous
-        liveClip.isHidden = true
-        addSubview(liveClip)
         [title, detail, note, title2, detail2, note2].forEach { addSubview($0) }
-        detail.identifier = NSUserInterfaceItemIdentifier("preview.detail")
-        configureLensControls()
-        addSubview(lensControls)
         for label in [note, note2] {
             label.usesSingleLineMode = false
             label.maximumNumberOfLines = 3
@@ -130,9 +71,11 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
         title2.stringValue = partner?.displayTitle ?? ""
         detail2.stringValue = partner?.url.map(CommandRanker.displayURL) ?? ""
         title2.isHidden = partner == nil
+        detail2.isHidden = partner == nil
         note.stringValue = Self.note(for: tab)
+        note.isHidden = note.stringValue.isEmpty
         note2.stringValue = Self.note(for: partner)
-        refreshCaptionVisibility()
+        note2.isHidden = note2.stringValue.isEmpty
         placeholder.image = tab?.displayIcon ?? bookmark?.displayIcon
         setImages([tab?.snapshot] + partners.map(\.snapshot))
         needsLayout = true
@@ -153,136 +96,6 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
         placeholder.isHidden = !empty
         Tokens.Motion.withoutAnimation { picture.layer.isHidden = empty }
         refreshColors()
-    }
-
-    /// The live page, over the snapshot while the lens is out.
-    func showLive(holder: NSView) {
-        if holder.bounds.width > 1, holder.bounds.height > 1 {
-            pageAspect = holder.bounds.width / holder.bounds.height
-        }
-        // Only a page still in the clip belongs to it. A page already put back in its tab is not taken again.
-        if liveHolder?.superview === liveClip { liveHolder?.removeFromSuperview() }
-        liveHolder = holder
-        liveClip.addSubview(holder)
-        holder.frame = liveClip.bounds
-        holder.autoresizingMask = [.width, .height]
-        liveClip.alphaValue = 0
-        liveClip.isHidden = false
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            liveClip.animator().alphaValue = 1
-        }
-    }
-
-    /// The page left: the snapshot is the card's picture again. A page the close already put back in its tab stays
-    /// there; only a page still in the live clip is taken out.
-    func endLive() {
-        if liveHolder?.superview === liveClip { liveHolder?.removeFromSuperview() }
-        liveHolder = nil
-        liveClip.isHidden = true
-    }
-
-    /// The live page's address and controls, as the browser shows them.
-    func updateLens(address: String, canGoBack: Bool, canGoForward: Bool, isLoading: Bool) {
-        if lensAddress.currentEditor() == nil { lensAddress.stringValue = address }
-        addressBeforeEditing = address
-        lensBack.isEnabled = canGoBack
-        lensForward.isEnabled = canGoForward
-        lensReload.isLoading = isLoading
-    }
-
-    @objc func submitLensAddress() {
-        onLensAddress?(lensAddress.stringValue)
-        window?.makeFirstResponder(nil)
-    }
-
-    /// ⌘L in the lens: the address is selected, ready to type over.
-    func focusLensAddress() {
-        window?.makeFirstResponder(lensAddress)
-        lensAddress.currentEditor()?.selectAll(nil)
-    }
-
-    func controlTextDidBeginEditing(_ obj: Notification) {
-        addressBeforeEditing = lensAddress.stringValue
-        lensAddress.currentEditor()?.selectAll(nil)
-    }
-
-    /// Esc in the address puts the page's address back and keeps the lens; the next Esc closes it.
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-        guard control === lensAddress else { return false }
-        guard commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
-        lensAddress.stringValue = addressBeforeEditing
-        window?.makeFirstResponder(nil)
-        return true
-    }
-
-    private func refreshCaptionVisibility() {
-        lensControls.isHidden = !showsLensControls
-        title.isHidden = showsLensControls
-        title2.isHidden = showsLensControls || title2.stringValue.isEmpty
-        detail.isHidden = showsLensControls
-        note.isHidden = showsLensControls || note.stringValue.isEmpty
-        detail2.isHidden = showsLensControls || title2.isHidden
-        note2.isHidden = showsLensControls || note2.stringValue.isEmpty
-    }
-
-    private func configureLensControls() {
-        lensControls.identifier = NSUserInterfaceItemIdentifier("preview.lensControls")
-        lensBack.identifier = NSUserInterfaceItemIdentifier("preview.lensBack")
-        lensForward.identifier = NSUserInterfaceItemIdentifier("preview.lensForward")
-        lensReload.identifier = NSUserInterfaceItemIdentifier("preview.lensReload")
-        lensSiteControls.identifier = NSUserInterfaceItemIdentifier("preview.lensSiteControls")
-        lensClose.identifier = NSUserInterfaceItemIdentifier("preview.lensClose")
-        liveClip.identifier = NSUserInterfaceItemIdentifier("preview.live")
-        lensAddress.identifier = NSUserInterfaceItemIdentifier("preview.lensAddress")
-        lensAddressBackground.layer?.cornerRadius = Tokens.Radius.field
-        lensAddressBackground.layer?.cornerCurve = .continuous
-        lensAddress.isBordered = false
-        lensAddress.drawsBackground = false
-        lensAddress.focusRingType = .none
-        lensAddress.font = .systemFont(ofSize: Tokens.Pane.addressText)
-        lensAddress.textColor = Tokens.Color.textPrimary
-        lensAddress.lineBreakMode = .byTruncatingTail
-        lensAddress.usesSingleLineMode = true
-        lensAddress.delegate = self
-        lensAddress.target = self
-        lensAddress.action = #selector(submitLensAddress)
-        [lensBack, lensForward, lensAddressBackground, lensReload, lensSiteControls, lensClose].forEach(lensControls.addSubview)
-        lensAddressBackground.addSubview(lensAddress)
-        lensBack.onClick = { [weak self] _ in
-            guard self?.lensBack.isEnabled == true else { return }
-            self?.onLensBack?()
-        }
-        lensForward.onClick = { [weak self] _ in
-            guard self?.lensForward.isEnabled == true else { return }
-            self?.onLensForward?()
-        }
-        lensReload.onClick = { [weak self] _ in self?.onLensReload?() }
-        lensSiteControls.onClick = { [weak self] _ in
-            guard let self else { return }
-            self.onLensSiteControls?(self.lensSiteControls)
-        }
-        lensClose.onClick = { [weak self] _ in self?.onLensClose?() }
-        lensControls.isHidden = true
-    }
-
-    private func layoutLensControls() {
-        let button = Tokens.Pane.button
-        let height = lensControls.bounds.height
-        let y = (height - button) / 2
-        lensBack.frame = NSRect(x: 0, y: y, width: button, height: button)
-        lensForward.frame = NSRect(x: lensBack.frame.maxX + Tokens.Space.x1, y: y, width: button, height: button)
-        lensClose.frame = NSRect(x: lensControls.bounds.width - button, y: y, width: button, height: button)
-        lensSiteControls.frame = NSRect(x: lensClose.frame.minX - button - Tokens.Space.x1, y: y,
-                                        width: button, height: button)
-        lensReload.frame = NSRect(x: lensSiteControls.frame.minX - button - Tokens.Space.x1, y: y,
-                                  width: button, height: button)
-        let addressX = lensForward.frame.maxX + Tokens.Space.x2
-        let addressRight = lensReload.frame.minX - Tokens.Space.x2
-        let addressHeight = Tokens.Pane.addressHeight
-        lensAddressBackground.frame = NSRect(x: addressX, y: (height - addressHeight) / 2,
-                                            width: max(0, addressRight - addressX), height: addressHeight)
-        lensAddress.frame = lensAddressBackground.bounds.insetBy(dx: Tokens.Space.x2, dy: 0)
     }
 
     /// With no picture yet, a soft wash of the space under the site's icon instead of a blank white page, as the tab
@@ -306,19 +119,8 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
 
     private func layoutContent() {
         let pad = Self.inset
-        // The height the card was sized with, not what its caption happens to say this pass.
-        let footer = declaredFooter ?? footerHeight(width: bounds.width)
-        if showsLensControls {
-            // The lens: the standard bar on top, the page under it, one size for every page.
-            lensControls.frame = NSRect(x: Self.textX, y: bounds.height - Self.lensBarHeight,
-                                        width: max(0, bounds.width - Self.textX * 2), height: Self.lensBarHeight)
-            layoutLensControls()
-            imageClip.frame = NSRect(x: pad, y: pad, width: max(0, bounds.width - pad * 2),
-                                     height: max(0, bounds.height - Self.lensBarHeight - pad * 2))
-        } else {
-            imageClip.frame = NSRect(x: pad, y: pad, width: bounds.width - pad * 2, height: bounds.height - footer - pad)
-        }
-        liveClip.frame = imageClip.frame
+        let footer = footerHeight(width: bounds.width)
+        imageClip.frame = NSRect(x: pad, y: pad, width: bounds.width - pad * 2, height: bounds.height - footer - pad)
         picture.layout(size: imageClip.bounds.size)
         Tokens.Motion.withoutAnimation { picture.layer.position = CGPoint(x: imageClip.bounds.midX, y: imageClip.bounds.midY) }
         let icon = Tokens.Space.x8
@@ -329,19 +131,14 @@ final class TabPreviewView: FloatingPanelView, NSTextFieldDelegate {
         let top = imageClip.frame.maxY + (Self.footerHeight - titleH - detailH) / 2
         // One title, or with a split, each page's under its own side; stacked pages share the row half and half.
         let firstWidth = firstCaptionWidth(bounds.width)
-        if !showsLensControls {
-            title.frame = NSRect(x: textX, y: top, width: firstWidth - textX * 2, height: titleH)
-            detail.frame = NSRect(x: textX, y: title.frame.maxY, width: firstWidth - textX * 2, height: detailH)
-            note.frame = NSRect(x: textX, y: detail.frame.maxY, width: firstWidth - textX * 2, height: noteH)
-            let secondX = firstWidth + textX, secondWidth = max(0, bounds.width - firstWidth - textX * 2)
-            title2.frame = NSRect(x: secondX, y: top, width: secondWidth, height: titleH)
-            detail2.frame = NSRect(x: secondX, y: title2.frame.maxY, width: secondWidth, height: detailH)
-            note2.frame = NSRect(x: secondX, y: detail2.frame.maxY, width: secondWidth, height: noteH)
-        }
+        title.frame = NSRect(x: textX, y: top, width: firstWidth - textX * 2, height: titleH)
+        detail.frame = NSRect(x: textX, y: title.frame.maxY, width: firstWidth - textX * 2, height: detailH)
+        note.frame = NSRect(x: textX, y: detail.frame.maxY, width: firstWidth - textX * 2, height: noteH)
+        let secondX = firstWidth + textX, secondWidth = max(0, bounds.width - firstWidth - textX * 2)
+        title2.frame = NSRect(x: secondX, y: top, width: secondWidth, height: titleH)
+        detail2.frame = NSRect(x: secondX, y: title2.frame.maxY, width: secondWidth, height: detailH)
+        note2.frame = NSRect(x: secondX, y: detail2.frame.maxY, width: secondWidth, height: noteH)
     }
-
-    /// The area the pages' pictures fill: what a caption changing must leave exactly where it is.
-    var pictureArea: NSRect { imageClip.frame }
 }
 
 /// Shows previews after a short hover, then follows the pointer from row to row without delay.
@@ -351,9 +148,6 @@ final class TabPreviewController {
     private var showWork: DispatchWorkItem?
     private var hideWork: DispatchWorkItem?
     private var refreshTimer: Timer?
-    /// When the card has finished sliding out. Until then the pictures it shows are the ones it appeared with, so
-    /// tiles don't change size under the entrance as live snapshots land.
-    private var settlesAt: CFTimeInterval = 0
     private weak var tab: Tab?
     private weak var row: NSView?
     private var snapshotTokens: [SignalToken] = []
@@ -361,8 +155,6 @@ final class TabPreviewController {
     /// Hover can end without a word: the row closes under the pointer, or you switch apps. This checks while a
     /// preview is up and takes it away once the pointer has really left.
     private var watchTimer: Timer?
-    /// A click in the sidebar puts the preview away at once.
-    nonisolated(unsafe) private var clickMonitor: Any?
     #if DEBUG
     /// The debug bridge's hover: this row counts as under the pointer, wherever the real one is.
     weak var debugRow: NSView?
@@ -386,10 +178,7 @@ final class TabPreviewController {
         ]
     }
 
-    deinit {
-        menuTokens.forEach(NotificationCenter.default.removeObserver)
-        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
-    }
+    deinit { menuTokens.forEach(NotificationCenter.default.removeObserver) }
 
     func hover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         // No preview over an open panel or menu, or for a tab under the mini player while hovering or dragging it.
@@ -431,15 +220,6 @@ final class TabPreviewController {
         let panel = self.panel ?? TabPreviewView()
         self.panel = panel
         self.row = row
-        if clickMonitor == nil {
-            clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-                MainActor.assumeIsolated {
-                    guard let self, let controller = self.controller, event.window === controller.window else { return }
-                    if controller.root.sidebarFrame.contains(event.locationInWindow) { self.hide() }
-                }
-                return event
-            }
-        }
         // A split's row is one card: its first page, then the other, laid out as they share the window.
         let manager = controller.tabManager
         let pair = tab.flatMap { manager.split(for: $0) }
@@ -458,8 +238,7 @@ final class TabPreviewController {
         }
         snapshotTokens = pages.map { page in
             page.changed.observe { [weak self, weak first] change in
-                guard change == .snapshot, let self, let first, first === self.tab,
-                      CACurrentMediaTime() >= self.settlesAt else { return }
+                guard change == .snapshot, let self, let first, first === self.tab else { return }
                 self.panel?.setImages(refs.map { $0.tab?.snapshot })
             }
         }
@@ -467,8 +246,7 @@ final class TabPreviewController {
         let card = controller.root.cardFrame
         let width = Tokens.Metric.previewWidth
         let aspect = card.height > 0 ? min(card.height / max(card.width, 1), 0.9) : 0.62
-        // A card declares one size and keeps it, so a note coming or going can't move the pictures under it.
-        let height = isNew ? round(width * aspect) + panel.declareFooter(width: width) : panel.bounds.height
+        let height = round(width * aspect) + panel.footerHeight(width: width)
         let rowFrame = row.convert(row.bounds, to: overlay)
         // Beside the sidebar, over the page: right of it, or left of it on the right.
         let x = controller.root.besideSidebar(width: width)
@@ -479,23 +257,12 @@ final class TabPreviewController {
         if isNew {
             panel.frame = frame
             overlay.addSubview(panel)
-            // The card comes out of the sidebar's side at the size it keeps. Growing it from a point scaled every
-            // tile inside by 96% and back, which read as the pane resizing into place rather than the card arriving.
-            panel.attachedEdge = controller.root.sidebarOnRight ? .maxX : .minX
+            // Slides out from the row's side toward the sidebar, at the row's height.
+            let rowY = overlay.isFlipped ? rowFrame.midY - frame.minY : frame.maxY - rowFrame.midY
+            panel.growsFrom = CGPoint(x: controller.root.sidebarOnRight ? 1 : 0, y: min(max(rowY / max(height, 1), 0), 1))
             panel.present()
-            // Tiles 2-4 used to change scale while the card was still sliding out: their cached snapshots were
-            // full-window, the live pages were recaptured the moment the card was asked for, and each new picture
-            // re-covered its tile at a different scale. The hovered page was already fresh, which is why only the
-            // others moved. Let the entrance finish on the pictures it began with.
-            settlesAt = CACurrentMediaTime() + Tokens.Motion.enter * Tokens.Motion.debugSlowdown
-        } else {
-            settlesAt = 0
-            // Only its place follows the pointer; its size stays the one it declared on the way out.
-            var next = frame
-            next.size = panel.bounds.size
-            if panel.frame != next {
-                Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { panel.animator().frame = next }
-            }
+        } else if panel.frame != frame {
+            Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { panel.animator().frame = frame }
         }
         // Live pages refresh while you look at the preview.
         refreshTimer?.invalidate()
@@ -503,20 +270,8 @@ final class TabPreviewController {
         keepWatched()
         watched = live
         if !live.isEmpty {
-            // In memory while you watch; written to disk once, when the preview goes. A card coming out waits for
-            // its entrance to finish, so a snapshot landing mid-slide can't resize a tile under it; one already
-            // out refreshes at once.
-            if isNew {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.standard * Tokens.Motion.debugSlowdown) { [weak self, weak first] in
-                    MainActor.assumeIsolated {
-                        guard let self, let first, self.tab === first else { return }
-                        refs.forEach { if let page = $0.tab, !page.isSuspended { page.captureSnapshot(keep: false) } }
-                        self.panel?.setImages(refs.map { $0.tab?.snapshot })
-                    }
-                }
-            } else {
-                live.forEach { $0.captureSnapshot(keep: false) }
-            }
+            // In memory while you watch; written to disk once, when the preview goes.
+            live.forEach { $0.captureSnapshot(keep: false) }
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated {
                     refs.forEach { if let page = $0.tab, !page.isSuspended { page.captureSnapshot(keep: false) } }
@@ -567,8 +322,6 @@ final class TabPreviewController {
         watchTimer = nil
         refreshTimer?.invalidate()
         refreshTimer = nil
-        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
-        clickMonitor = nil
         keepWatched()
         snapshotTokens = []
         guard let panel else { return }

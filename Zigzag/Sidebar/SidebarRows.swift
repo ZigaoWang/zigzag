@@ -15,8 +15,6 @@ class SidebarRowView: InteractiveView {
 
     /// Set while the list's sliding card travels to this row: the row draws no card of its own until it lands.
     var holdsCardBack = false { didSet { if oldValue != holdsCardBack { stateDidChange(animated: false) } } }
-    /// The tab the peek popout is showing: a temporary wash, separate from the selected row.
-    var isPeeked = false { didSet { if oldValue != isPeeked { stateDidChange(animated: false) } } }
     /// Picked with ⌘ or ⇧ along with others, to drag or act on together.
     var isMarked = false { didSet { if oldValue != isMarked { stateDidChange(animated: true) } } }
     /// A pinned page that's open: a fine edge, as on a favorite's tile, so you can tell which are loaded.
@@ -78,8 +76,6 @@ class SidebarRowView: InteractiveView {
         let showsCard = (isSelected && !holdsCardBack) || isLifted
         if showsCard {
             base = isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card
-        } else if isPeeked {
-            base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.2 : 0.14)
         } else if isMarked {
             base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
         } else if isSelected {
@@ -120,22 +116,11 @@ class SidebarRowView: InteractiveView {
         }
     }
 
-    /// A page the surface showing this list can't take (the edge panel and Zigzag's own pages): its title and icon
-    /// stay greyed, whatever the pointer does. The row still takes hover, so its wash says where the pointer is.
-    var isUnusable = false {
-        didSet {
-            guard oldValue != isUnusable else { return }
-            applyFreshness()
-        }
-    }
-
     /// The views that fade: icon and title, or every part's on a split row.
     var fadingViews: [NSView] { [icon, title] }
 
     func applyFreshness(animated: Bool = false) {
-        let visible = isAboutToClear ? 0.18
-            : isUnusable ? 0.45
-            : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
+        let visible = isAboutToClear ? 0.18 : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
         for view in fadingViews { (animated ? view.animator() : view).alphaValue = visible }
     }
 }
@@ -576,16 +561,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     func debugPoint(atPart part: Int?) { pointedPart = part }
     #endif
     private var moveTracking: NSTrackingArea?
-    /// The page under the pointer, when it moves from one part of a split or tile group to another: the edge panel
-    /// previews the part being pointed at, not only the row's first page.
-    var onHoverPart: ((Tab?) -> Void)?
-    private var reportedPart: Int?
-    /// The page under the pointer now, in a multi-page row; the row's own page when there is only one.
-    var pageUnderPointer: Tab? {
-        guard let window else { return tab }
-        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        return bounds.contains(point) ? page(at: point) : tab
-    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -633,15 +608,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     private func trackPointer(_ event: NSEvent) {
+        guard closesPart, isSplit else { pointedPart = nil; return }
         let point = convert(event.locationInWindow, from: nil)
-        let inside = bounds.contains(point)
-        let part = isSplit && inside ? half(at: point) : nil
-        pointedPart = closesPart && isSplit ? part : nil
-        // A split's or a tile group's parts are pages of their own: the preview follows the pointer from one to the
-        // next, as a click already does.
-        guard part != reportedPart else { return }
-        reportedPart = part
-        onHoverPart?(part == nil ? nil : page(at: point))
+        pointedPart = bounds.contains(point) ? half(at: point) : nil
     }
 
     /// While another tab is dragged over this row's right half: where it would open.

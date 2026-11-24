@@ -57,7 +57,7 @@ enum DebugBridge {
 
     #if DEBUG
     /// mini [url], miniquick [text], miniquickenter, miniquickesc, minibar [text], miniext <url>, minisetting on|off,
-    /// minitype <text>, minimove, miniborrow, miniclose, minifind [text|close], minispace [name], minicopy, miniresize <w> <h>,
+    /// minitype <text>, minimove, miniclose, minifind [text|close], minispace [name], minicopy, miniresize <w> <h>,
     /// minimenu <char> [cmd|shift|ctrl|opt...], ministate <path> (JSON), minishot <path> (PNG; web content may be
     /// blank), miniclosebrowsers, minijs <script>, miniesc, miniquit, miniask notifications, minianswer
     /// allow|always|alternate|deny|notnow|<action>, minisave save|notnow, minieval <path> <script>, miniswipe <dx> [slow]
@@ -256,11 +256,6 @@ enum DebugBridge {
         case "minisetting": MiniWindowController.opensExternalLinks = arg == "on"
         case "minitype": mini?.debugEnter(arg)
         case "minimove": mini?.openInZigzag()
-        case "miniborrow":
-            guard let browser = WindowManager.shared.keyController,
-                  let tab = browser.tabManager.selectedTab, browser.canOpenInMini(tab)
-            else { break }
-            MiniWindowController.open(borrowing: tab, from: browser)
         case "mininote": mini?.debugLinksNote(arg)
         case "minispace": mini?.debugSpace(arg)
         case "minicopy": mini?.copyPageURL(nil)

@@ -94,8 +94,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settleSpaceNameStyle()
         Tutorial.migrate()
-        // The sidebar's hot screen edge (#363), if it was turned on last time.
-        EdgeSidebar.shared.activate()
+        // The sidebar at the screen's edge (#363), if it's on.
+        EdgeSidebar.shared.startIfOn()
         // Getting started picks up where you left off, if you'd begun and haven't ended it.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             guard !Tutorial.done.isEmpty, WelcomeWindowController.shared == nil,

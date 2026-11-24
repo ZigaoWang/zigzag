@@ -112,16 +112,13 @@ extension CALayer {
     }
 }
 
-/// Base for everything clickable we draw ourselves: tracks hover, press, selection and enabled state.
-/// A view whose subtree keeps its hover tracking working while the app is inactive and the window isn't key: the
-/// sidebar at the screen's edge is its own panel over another app, and every control in it must still answer the
-/// pointer there. A window's sidebar doesn't, so a background window never lights up under the pointer.
+/// A view whose controls answer hover while Zigzag is inactive: the screen edge's sidebar over another app.
 protocol HoverTrackingWhileInactive: AnyObject {
     var hoversWhileInactive: Bool { get }
 }
 
 extension NSView {
-    /// Whether this view belongs to a panel that tracks hover over other apps (`HoverTrackingWhileInactive`).
+    /// Whether this view is inside a `HoverTrackingWhileInactive` view that has it on.
     var tracksHoverWhileInactive: Bool {
         var view: NSView? = self
         while let current = view {
@@ -132,6 +129,7 @@ extension NSView {
     }
 }
 
+/// Base for everything clickable we draw ourselves: tracks hover, press, selection and enabled state.
 class InteractiveView: NSView {
     /// Hover shows and goes at once, both ways: a fade on something you sweep past a hundred times a day only reads
     /// as lag (https://emilkowal.ski/ui/you-dont-need-animations#frequency-of-use).
@@ -237,9 +235,8 @@ class InteractiveView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea { removeTrackingArea(trackingArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited,
-                                                         tracksHoverWhileInactive ? .activeAlways : .activeInActiveApp,
-                                                         .inVisibleRect], owner: self)
+        let active: NSTrackingArea.Options = tracksHoverWhileInactive ? .activeAlways : .activeInActiveApp
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, active, .inVisibleRect], owner: self)
         addTrackingArea(area)
         trackingArea = area
         // Keep hover honest after scrolling or relayout.
@@ -765,13 +762,6 @@ final class IconButton: InteractiveView {
     /// How big a full-color image is drawn; a site's icon by default.
     var imageSide = Tokens.Metric.favicon { didSet { needsLayout = true } }
     var tint: NSColor = Tokens.Color.icon { didSet { stateDidChange(animated: false) } }
-    /// A page load in progress: the same button becomes Stop, as the browser's reload does.
-    var isLoading = false { didSet {
-        guard isLoading != oldValue else { return }
-        symbol = isLoading ? "stop.fill" : "arrow.clockwise"
-        toolTip = isLoading ? String(localized: "Stop", comment: "Tooltip of the address bar's button while a page loads.")
-            : String(localized: "Reload", comment: "Tooltip of the address bar's reload button.")
-    } }
     var radius: CGFloat = Tokens.Radius.control { didSet { layer?.cornerRadius = radius } }
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
     /// The symbol's size; a button that lives on through a change of the sidebar's size takes the new one.
@@ -2287,7 +2277,10 @@ final class MenuPanel: FloatingPanelView {
             return
         }
         let action = rows[index].item.action
+        // From the screen edge's sidebar, the browser window comes forward to do it.
+        let fromEdge = EdgeSidebar.shared.isPanel(window)
         close()
+        if fromEdge { EdgeSidebar.shared.chose() }
         action()
     }
 

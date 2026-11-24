@@ -349,14 +349,6 @@ final class TabManager {
         return tab(with: id)
     }
 
-    /// The page picked in the edge panel stays its space's selection: the window behind keeps the tab it was on
-    /// while the panel is out, and the space comes back to the picked page. Nothing on screen changes now, so no
-    /// notification goes with it.
-    func rememberPicked(_ page: Tab, in spaceID: UUID) {
-        guard !page.isClosed, tab(with: page.id) === page, page.isFavorite || page.spaceID == spaceID else { return }
-        selectedBySpace[spaceID] = page.id
-    }
-
     /// Asked once per sidebar row on every refresh: looks through the lists in place rather than building `allTabs`.
     func tab(with id: UUID) -> Tab? {
         for list in tabsBySpace.values { if let tab = list.first(where: { $0.id == id }) { return tab } }

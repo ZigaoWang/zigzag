@@ -1647,12 +1647,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sizeRow.keywords = String(localized: "text size font bigger larger smaller scale zoom interface ui", comment: "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sizeRow)
-        edgeSidebarToggle.onChange = { on in EdgeSidebar.isOn = on }
+        edgeSidebarToggle.onChange = { on in EdgeSidebar.shared.setOn(on) }
         let edgeRow = FormRow(title: String(localized: "Sidebar from the screen edge", comment: "A setting in Settings › Appearance: moving the pointer to the screen's edge shows the sidebar over other apps, as the Dock does."),
-                              detail: String(localized: "Move the pointer to the edge of the screen to bring the sidebar out over other apps. Click a tab to keep its page open.",
+                              detail: String(localized: "Push the pointer against the edge of the screen on the sidebar’s side to bring the sidebar out over other apps, and click a tab to go to it. Not on a side the Dock or Stage Manager uses.",
                                              comment: "Explanation under “Sidebar from the screen edge” in Settings › Appearance."),
                               control: edgeSidebarToggle)
-        edgeRow.keywords = String(localized: "edge dock hover peek reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.") + " 边缘 拉出 悬停"
+        edgeRow.keywords = String(localized: "edge dock hover reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.") + " 边缘 拉出 悬停"
         appearanceGroup.add(edgeRow)
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),

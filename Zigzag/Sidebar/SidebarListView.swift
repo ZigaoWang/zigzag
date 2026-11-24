@@ -159,36 +159,8 @@ final class SidebarListView: NSView {
     weak var delegate: SidebarListDelegate?
     /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
     var spaceOverride: UUID?
-    /// The tab the peek popout is showing: a temporary highlight, separate from the browser's selection.
-    var peekTabID: UUID?
-    /// The row the surface showing this list has locked, rather than the window's tab: the edge panel's page. Nil:
-    /// the window's selection, as in the window's own sidebar.
-    private(set) var selectionOverride: UUID?
-    /// The edge panel's list takes web pages only: Zigzag's own pages (Settings, History, the archive) have no page to
-    /// lend it, so their rows grey out, take no preview and take no pick. The window's own sidebar leaves this false.
-    var refusesSystemPages = false
-    /// The row a pick came from, on screen: the peek grows from it and shrinks back into it.
-    private(set) var lastPickedRowFrame: NSRect?
-
-    func setPeek(_ id: UUID?) {
-        guard peekTabID != id else { return }
-        peekTabID = id
-        reload(animated: false)
-    }
-
-    /// Outlines `id` as this list's selection, or goes back to the window's with nil. A click in the panel picks its
-    /// page there; the window behind keeps the tab it was on.
-    func setSelectionOverride(_ id: UUID?) {
-        guard selectionOverride != id else { return }
-        selectionOverride = id
-        reload(animated: false)
-    }
-
-    /// The window's selection, or the panel's locked row while it is in the space this list shows.
-    private func selectedTab(in spaceID: UUID, of manager: TabManager) -> Tab? {
-        if let id = selectionOverride, let tab = manager.tab(with: id), tab.spaceID == spaceID { return tab }
-        return manager.selectedTab(in: spaceID)
-    }
+    /// Off in the screen edge's sidebar: a drag would leave its panel.
+    var allowsDragging = true
     /// In a private window, the header says "Private" instead of the space name.
     var privateLabel = false
     private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
@@ -208,18 +180,6 @@ final class SidebarListView: NSView {
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
     private var drag: DragState?
-    /// A tab or page picked with a click: the edge sidebar sets this to bring its window forward. The window's own
-    /// list leaves it nil, and its delegate selects as before.
-    var onPickTab: ((Tab) -> Void)?
-    /// A pinned page picked with a click: the edge sidebar's own hook, or the window's delegate.
-    var onOpenBookmark: ((Bookmark) -> Void)?
-    /// New Tab picked with a click: the edge sidebar sets this to open the browser's bar over the screen, in place.
-    /// The window's own list leaves it nil, and its delegate opens it in the window.
-    var onNewTab: (() -> Void)?
-    /// The pointer entered or left a row, with its frame on screen: the edge sidebar shows a still preview there.
-    var onHoverTab: ((Tab?, NSRect?) -> Void)?
-    /// Whether rows can be dragged out. The edge sidebar's list can't: a drag would leave the panel.
-    var allowsDragging = true
     /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
     private(set) var marked: [SidebarItem] = [] {
         didSet {
@@ -302,8 +262,7 @@ final class SidebarListView: NSView {
         folderPageCounts = [:]
         // The right page of a pinned split rides in its left page's row, as a split among tabs does.
         let riders = Set(Library.shared.pinnedSplits(in: spaceID).flatMap(\.riders))
-        let currentTab = selectedTab(in: spaceID, of: manager)
-        let current = currentTab?.bookmarkID.map(Self.rowID)
+        let current = manager.selectedTab?.bookmarkID.map(Self.rowID)
         // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
         // open without opening every folder on the way to it. The page you're on is always open.
         let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil }
@@ -324,7 +283,7 @@ final class SidebarListView: NSView {
         let levels = TabTree.levels(manager.treeNodes(in: spaceID))
         tabLevels = levels
         let byID = Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let selected = selectedTab(in: spaceID, of: manager)
+        let selected = manager.selectedTab(in: spaceID)
         // Tab groups (#209) show like folders: the row at the first tab, tabs indented below. Collapsed, only the current tab
         // stays visible.
         var shownGroup: UUID?
@@ -953,9 +912,8 @@ final class SidebarListView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited,
-                                                         tracksHoverWhileInactive ? .activeAlways : .activeInKeyWindow,
-                                                         .inVisibleRect], owner: self)
+        let active: NSTrackingArea.Options = tracksHoverWhileInactive ? .activeAlways : .activeInKeyWindow
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, active, .inVisibleRect], owner: self)
         addTrackingArea(area)
         hoverArea = area
     }
@@ -1058,10 +1016,7 @@ final class SidebarListView: NSView {
             return NSView()
         case .newTab:
             let row = NewTabRowView()
-            row.onClick = { [weak self] _ in
-                guard let self else { return }
-                if let onNewTab { onNewTab() } else { delegate?.listNewTab() }
-            }
+            row.onClick = { [weak self] _ in self?.delegate?.listNewTab() }
             return row
         case .tab(let id):
             let row = TabRowView()
@@ -1072,8 +1027,7 @@ final class SidebarListView: NSView {
                 if self.zoomsPart(of: row, with: event) { return }
                 if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
-                self.lastPickedRowFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
-                self.pick(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
+                self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
                 _ = id
             }
             // In a row of several pages, the part double-clicked is the page renamed.
@@ -1134,14 +1088,11 @@ final class SidebarListView: NSView {
                         opening = pinned.ids[part]
                     } else if part == 1, let partner = row.partner, partner.bookmarkID == nil {
                         // The tab split beside it, riding in this row.
-                        self.lastPickedRowFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
-                        self.pick(partner)
+                        self.delegate?.listSelect(partner)
                         return
                     }
                 }
-                if let bookmark = Library.shared.bookmark(opening) {
-                    if let onOpenBookmark { onOpenBookmark(bookmark) } else { self.delegate?.listOpenBookmark(bookmark) }
-                }
+                if let bookmark = Library.shared.bookmark(opening) { self.delegate?.listOpenBookmark(bookmark) }
             }
             // A pinned split's or group's row unloads all its pages, the one you're on last.
             let unload = { [weak self, weak row] in
@@ -1176,7 +1127,7 @@ final class SidebarListView: NSView {
 
     private func configure(_ view: NSView, for item: SidebarItem) {
         guard let manager else { return }
-        let selected = selectedTab(in: shownSpaceID ?? manager.currentSpaceID, of: manager)
+        let selected = manager.selectedTab(in: shownSpaceID ?? manager.currentSpaceID)
         switch item {
         case .header:
             let spaceID = shownSpaceID ?? manager.currentSpaceID
@@ -1204,11 +1155,9 @@ final class SidebarListView: NSView {
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
-            row.isUnusable = refusesSystemPages && !EdgeLensPolicy.takesPage(url: tab.url)
             row.configure(tab: tab)
             // Both halves of a split show as open, and every page of a tile group.
             let partners = manager.partners(of: tab)
-
             configureGroup(row, own: tab, parts: partners.map { TabRowView.Part(page: $0) },
                            partnerLeads: partners.count == 1 && manager.split(for: tab)?.left == partners.first?.id, selected: selected)
             // A split's age for Clear is its newest page's.
@@ -1232,7 +1181,6 @@ final class SidebarListView: NSView {
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
             let tab = manager.bookmarkTab(for: id)
-            row.isUnusable = refusesSystemPages && !EdgeLensPolicy.takesPage(url: tab?.url ?? bookmark.url)
             row.bookmarkIcon = bookmark.displayIcon
             if row.bookmarkIcon == nil { FaviconStore.shared.prefetch(for: bookmark.url) }
             // Moved on from its pinned page: the row shows where it is now, and its button goes back.
@@ -1733,31 +1681,13 @@ final class SidebarListView: NSView {
     private func observeHover(_ row: TabRowView) {
         row.hoverChanged = { [weak self, weak row] hovering in
             guard let self, let row, self.drag == nil else { return }
-            let page = row.pageUnderPointer ?? row.tab
-            // A row the panel can't take still lights under the pointer, and the panel explains it in its own page
-            // area: the note, not a window preview and not a page.
-            if hovering, self.refusesSystemPages, !EdgeLensPolicy.takesPage(url: page?.url) {
-                let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
-                self.onHoverTab?(page, screenFrame)
-                return
-            }
             if hovering {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
-                self.delegate?.listHover(page, row: row, bookmark: bookmark)
-                let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
-                self.onHoverTab?(page, screenFrame)
+                self.delegate?.listHover(row.tab, row: row, bookmark: bookmark)
             } else {
                 self.delegate?.listHover(nil, row: nil, bookmark: nil)
-                self.onHoverTab?(nil, nil)
             }
-        }
-        // A split's or a tile group's parts are pages of their own: moving across the row previews each as it comes
-        // under the pointer.
-        row.onHoverPart = { [weak self, weak row] page in
-            guard let self, let row, self.drag == nil, let page else { return }
-            let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
-            self.onHoverTab?(page, screenFrame)
         }
     }
 
@@ -1999,12 +1929,6 @@ final class SidebarListView: NSView {
 
     /// Where a tab from another window would land, for a screen point over this list.
     func dropIndex(at screenPoint: NSPoint) -> Int { dropTarget(at: screenPoint, allowsPinned: false).index }
-
-    /// A page picked with a click: the edge sidebar's own hook, or the window's delegate.
-    private func pick(_ tab: Tab) {
-        guard !refusesSystemPages || EdgeLensPolicy.takesPage(url: tab.url) else { return }
-        if let onPickTab { onPickTab(tab) } else { delegate?.listSelect(tab) }
-    }
 
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
         guard allowsDragging, let window, let manager, item.isDraggable else { return false }

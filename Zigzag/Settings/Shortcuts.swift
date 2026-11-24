@@ -56,7 +56,7 @@ enum Shortcuts {
                 if let sub = item.submenu { walk(sub) } else if id(item) != nil { result.append(item) }
             }
         }
-        if let menu = NSApp?.mainMenu { walk(menu) }
+        if let menu = NSApp.mainMenu { walk(menu) }
         return result
     }
 

@@ -124,33 +124,6 @@ struct ShipFixesTests {
         card.pageLeftFullScreen(other)
         #expect(other.isDescendant(of: card))
     }
-
-    /// The edge panel borrows a pane's holder. Giving it back must find the card that still shows the page, including
-    /// a split's other pane; `show` would skip it because the card's web view never changed.
-    @Test func aBorrowedPaneComesBackToItsCard() throws {
-        let first = PageCardView(frame: NSRect(x: 0, y: 0, width: 500, height: 500))
-        let second = PageCardView(frame: NSRect(x: 500, y: 0, width: 500, height: 500))
-        let firstTab = Tab(url: nil, spaceID: UUID(), configuration: WKWebViewConfiguration())
-        let secondTab = Tab(url: nil, spaceID: UUID(), configuration: WKWebViewConfiguration())
-        let firstPage = firstTab.ensureWebView(), secondPage = secondTab.ensureWebView()
-        first.show(firstPage)
-        second.show(secondPage)
-        first.layoutSubtreeIfNeeded()
-        second.layoutSubtreeIfNeeded()
-        let holder = try #require(secondTab.pageHolder)
-        #expect(secondPage.isDescendant(of: second))
-        // The panel takes the second pane's holder, as it does for a preview.
-        holder.removeFromSuperview()
-        #expect(!secondPage.isDescendant(of: second))
-        // Closing the panel gives it back to the card that still shows it, not the window's first card.
-        second.reclaim(holder)
-        second.layoutSubtreeIfNeeded()
-        #expect(secondPage.isDescendant(of: second))
-        #expect(!secondPage.isDescendant(of: first))
-        #expect(holder.frame.size == second.bounds.size)
-        firstTab.close()
-        secondTab.close()
-    }
 }
 
 /// Passwords across one site's parts, never across sites, by the Public Suffix List.

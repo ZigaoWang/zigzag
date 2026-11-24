@@ -795,21 +795,6 @@ final class PageCardView: NSView {
         refreshGround()
     }
 
-    /// A borrowed holder comes back after another surface (the edge panel) showed the page. `show` would skip it
-    /// because the card's web view never changed; this puts the holder in the clip again and lets the card place it
-    /// for the size the card has now, including a split's other pane.
-    func reclaim(_ borrowed: PageHolder) {
-        guard let page = borrowed.page, webView === page, borrowed.superview !== clip else { return }
-        borrowed.layer?.cornerRadius = 0
-        borrowed.layer?.masksToBounds = false
-        holder = borrowed
-        clip.addSubview(borrowed, positioned: .below, relativeTo: placeholder)
-        needsLayout = true
-        layoutSubtreeIfNeeded()
-        // A PDF the panel borrowed comes back out of the holder with it.
-        refreshDocument()
-    }
-
     /// A page's full screen ended: WebKit put it back in its holder. Left here behind the page now shown, that holder
     /// goes, rather than staying under it with its page still on screen to itself.
     func pageLeftFullScreen(_ page: WKWebView) {
@@ -822,27 +807,23 @@ final class PageCardView: NSView {
     /// Puts the shown tab's PDF viewer (or Settings) over its page, or takes it away. Typing goes to it, as it did to
     /// the page.
     private func refreshDocument() {
-        // The panel has the page: the viewer stays in the borrowed holder so a PDF travels with it.
-        if let holder, holder.superview !== clip { return }
         let owner = (webView as? BrowserWebView)?.owner
         let viewer: NSView? = owner?.pdfViewer ?? owner?.settingsView
-        if document !== viewer {
-            if let document, document.superview != nil {
-                // Typing was in the viewer going away: it goes back to the page rather than nowhere.
-                if let window, let webView, let responder = window.firstResponder as? NSView,
-                   responder.isDescendant(of: document) {
-                    window.makeFirstResponder(webView)
-                }
-                document.removeFromSuperview()
+        guard viewer !== document else { return }
+        if let document, document.superview === clip || document.superview === surface {
+            // Typing was in the viewer going away: it goes back to the page rather than nowhere.
+            if let window, let responder = window.firstResponder as? NSView, responder.isDescendant(of: document) {
+                window.makeFirstResponder(webView)
             }
-            document = viewer
+            document.removeFromSuperview()
         }
+        document = viewer
         guard let viewer, let webView, let holder else { return }
-        needsLayout = true
-        viewer.autoresizingMask = [.width, .height]
         // The page's whole room, whatever the page's own size is: a page at a size of its own has a holder
         // smaller than that. Laid out again with the card.
         let room = NSRect(x: 0, y: 0, width: clip.bounds.width, height: max(0, clip.bounds.height - contentTop))
+        needsLayout = true
+        viewer.autoresizingMask = [.width, .height]
         if glides(viewer) {
             viewer.frame = room.offsetBy(dx: 0, dy: contentTop)
             surface.addSubview(viewer, positioned: .above, relativeTo: clip)
@@ -850,9 +831,7 @@ final class PageCardView: NSView {
             viewer.frame = room
             clip.addSubview(viewer, positioned: .above, relativeTo: holder)
         }
-        if let window, window.firstResponder === webView {
-            window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer)
-        }
+        if let window, window.firstResponder === webView { window.makeFirstResponder((viewer as? PDFViewerView)?.pdfView ?? viewer) }
     }
 
     func hidePlaceholder() {

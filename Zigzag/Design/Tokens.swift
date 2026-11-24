@@ -809,7 +809,7 @@ enum Tokens {
         // Delays and ambient time, which aren't transitions.
 
         /// Delay before a hover preview appears.
-        static let previewDelay: TimeInterval = 0.35
+        static let previewDelay: TimeInterval = 0.6
         /// How long the pointer can stray off the floating sidebar before it slides away.
         static let edgeHideDelay: TimeInterval = 0.05
         /// The page's loading line inching on between WebKit's steps, linearly, once this often.

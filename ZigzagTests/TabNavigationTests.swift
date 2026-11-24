@@ -123,27 +123,6 @@ import Testing
         }
     }
 
-    /// The edge panel's pick is the space's selection, though the window behind kept the tab it was on while the
-    /// panel was out.
-    @Test func aPagePickedInASpaceIsThereWhenYouComeBack() {
-        let before = Library.shared.snapshot
-        defer { Library.shared.restore(before) }
-        let home = Library.shared.spaces[0].id
-        let other = Library.shared.addSpace(name: "Picked page").id
-        let manager = TabManager(spaceID: home)
-        defer { manager.invalidate() }
-        let cat = Tab(url: URL(string: "https://example.com/cat")!, title: "Cat", spaceID: home)
-        let dog = Tab(url: URL(string: "https://example.com/dog")!, title: "Dog", spaceID: home)
-        manager.adopt([cat, dog], in: home)
-        manager.select(cat)
-        manager.switchToSpace(other)
-        manager.rememberPicked(dog, in: home)
-        #expect(manager.selectedTab(in: home) === dog)
-        #expect(manager.selectedTab == nil)
-        manager.switchToSpace(home)
-        #expect(manager.selectedTab === dog)
-    }
-
     /// ⌃Tab keeps the recent-tabs switcher unless Settings › Tabs says sidebar order.
     @Test func controlTabFollowsTheSetting() throws {
         let defaults = UserDefaults.standard

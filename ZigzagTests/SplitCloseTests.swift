@@ -59,41 +59,6 @@ import Testing
         }
     }
 
-    /// A tile group's non-first pages are shown on cards that were hidden and cleared while the group was away, or
-    /// that have just joined it. They must already be their pane's size when they are shown, not resize a frame later.
-    @Test func everyPaneComesBackAtItsOwnSize() throws {
-        try inWindow(["A", "B", "C", "D", "E"]) { controller, tabs in
-            let manager = controller.tabManager
-            manager.makeSplit(tabs[0], with: tabs[1])
-            manager.select(tabs[0])
-            let third = try #require(TileShape.placing(.bottomRight, beside: manager.split(for: tabs[0])?.shape.regions ?? []))
-            manager.tile(tabs[2], beside: tabs[0], .place(region: .bottomRight, regions: third))
-            // The third page joins a card that was hidden until now; it is not the group's first page.
-            try expectNoPaneResize(controller, tabs: [tabs[0], tabs[1], tabs[2]])
-            let fourth = try #require(TileShape.placing(.bottomLeft, beside: manager.split(for: tabs[0])?.shape.regions ?? []))
-            manager.tile(tabs[3], beside: tabs[0], .place(region: .bottomLeft, regions: fourth))
-            try expectNoPaneResize(controller, tabs: [tabs[0], tabs[1], tabs[2], tabs[3]])
-            // Leave the group, then come back on a pane that is not the group's first page.
-            manager.select(tabs[4])
-            controller.window?.layoutIfNeeded()
-            manager.select(tabs[1])
-            // The first pane too: it is the anchor card, and it must come back at its size like the rest.
-            try expectNoPaneResize(controller, tabs: [tabs[0], tabs[1], tabs[2], tabs[3]])
-        }
-    }
-
-    /// The holders are at the size their cards would give them now; a layout pass changes none of them.
-    private func expectNoPaneResize(_ controller: BrowserWindowController, tabs: [Tab]) throws {
-        let holders = tabs.compactMap { $0.pageHolder }
-        #expect(holders.count == tabs.count)
-        let before = holders.map(\.frame)
-        controller.window?.layoutIfNeeded()
-        let after = holders.map(\.frame)
-        if after != before {
-            Issue.record("a pane resized a layout later: before \(before), after \(after), cards \(controller.root.paneCards.map(\.frame))")
-        }
-    }
-
     /// The row's × is on the part pointed at, else on the page you're in.
     @Test func theRowsCloseButtonClosesOnePart() throws {
         try inWindow(["A", "B"]) { controller, tabs in
