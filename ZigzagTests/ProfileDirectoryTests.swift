@@ -731,6 +731,32 @@ struct NothingOfYoursTests {
     }
 
     /// Only theirs isn't given your data; the role and the policy are known without asking the directory again.
+    /// Apps on This Mac is your switch: their pages never get the door, even on a site you allowed.
+    @Test func noDoorToAppsOnThisMac() async throws {
+        let name = "NothingOfYoursTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        let master = LocalReceivers.isEnabled
+        defer {
+            LocalReceivers.isEnabled = master
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let origin = "https://creator.zerowork.io"
+        LocalReceivers.isEnabled = true
+        SitePermissions.setLocalReceivers(true, origin: origin)
+        try await withTabs { theirs, yours in
+            for (tab, gets) in [(yours, true), (theirs, false)] {
+                let controller = WKUserContentController()
+                let messages = LocalReceiverShim.sync(controller: controller, tab: tab, origin: origin, isPrivate: false)
+                #expect((messages != nil) == gets)
+                messages?.closeAllSockets()
+                controller.removeAllScriptMessageHandlers()
+            }
+        }
+    }
+
     @Test func onlyTheirsIsNotGivenYourData() async throws {
         try await withTabs { theirs, yours in
             #expect(!theirs.profile.getsYourData && yours.profile.getsYourData)
@@ -746,7 +772,7 @@ struct NothingOfYoursTests {
             #expect(SiteRoutes.place(from: yours, in: window) == .browser)
             #expect(SiteRoutes.place(from: theirs, in: window) == .withoutYourData)
             // A page typed in with their space in front: the space's profile decides.
-            let onTheirs = TabManager(spaceID: theirs.spaceID)
+            let onTheirs = TabManager(spaceID: theirs.spaceID, keepsToProfile: theirs.profile.id)
             defer { onTheirs.invalidate() }
             #expect(SiteRoutes.place(from: nil, in: onTheirs) == .withoutYourData)
             #expect(SiteRoutes.place(from: nil, in: window) == .browser)

@@ -973,7 +973,7 @@ final class SitePanel: FloatingPanelView {
         // Translating is a browser window's (`translatePage`).
         context.foreignLanguage = controller != nil && tab.foreignLanguage != nil
         // This site's own scripts may reach a program listening on this Mac, once Settings allows it at all.
-        context.localApps = context.isWeb && !isPrivate && origin != nil && LocalReceivers.isEnabled
+        context.localApps = context.isWeb && !isPrivate && tab.profile.getsYourData && origin != nil && LocalReceivers.isEnabled
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         context.manySpaces = Library.shared.yourSpaces.count > 1 && SiteRoutes.site(of: url) != nil
         context.userAgent = Tab.addonsPage(url) == nil

@@ -275,13 +275,14 @@ While AI apps work in the background:
   own. It's listed in Settings › Profiles, but its name can't be changed, and its space stays out of your windows:
   it's not among your spaces in the sidebar, the command bar, Settings › Spaces or a space's Profile menu. Its sign-ins, history and extensions are its own: an app is signed in to
   nothing of yours there.
-- **Nothing of yours is given to its pages**, in their window or in one of yours: no sign-in or certificate from
-  your Keychain, no password saved or filled and no form filled from your card, no passkeys, none of the answers
-  you gave sites (camera, microphone, location, notifications and screen sharing are asked again, and with no one
-  there, refused), none of your download and link rules, and none of your site routes. Its tabs never go to your
-  Archive. Extensions you install in it yourself are its own.
-- **An item in the menu bar** shows while their window is open or Zigzag runs for them alone, with **Show AI Apps Window** (to watch them), **Stop AI
-  Apps** (the same as Stop on a tab's bar: every app is cut off and the key replaced), and, when Zigzag runs for
+- **Nothing of yours is given to its pages**: no sign-in or certificate from your Keychain, no password saved or
+  filled and no form filled from your card, no passkeys, none of the answers you gave sites (camera, microphone,
+  location, notifications and screen sharing are asked again, and with no one there, refused), none of your
+  download and link rules, none of your site routes, and no reaching apps on this Mac (Settings › Privacy › Apps on
+  This Mac doesn't apply there). Its tabs never go to your Archive. Extensions you install in it yourself are its
+  own.
+- **An item in the menu bar** shows while their window is open or Zigzag runs for them alone, with **Show AI Apps
+  Window** (to watch them), **Stop AI Apps** (the same as Stop on a tab's bar: every app is cut off and the key replaced), and, when Zigzag runs for
   them alone, **Quit Zigzag**.
 - **Show AI Apps Window**, in the Window menu and the command bar too, brings their window on screen. They go on
   where they were, with the same refs, and the bar with Stop shows over the tab in use. Closing it hides it again
