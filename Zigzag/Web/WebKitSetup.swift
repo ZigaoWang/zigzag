@@ -114,6 +114,7 @@ enum WebKitSetup {
             // One passkey request at a time, where passkeys are the system's. Here, not with the tab's other passkey
             // script, so an extension's sign-in window and its pop-ups on a site have it too. It asks PageFrames' frames.
             if Passkeys.available { Passkeys.attachRequests(to: configuration.userContentController) }
+            FramePacing.attach(to: configuration.userContentController)
             configuration.userContentController.addUserScript(PageVideos.script)
             configuration.userContentController.add(PageVideos.shared, contentWorld: .defaultClient, name: PageVideos.messageName)
             configuration.userContentController.addUserScript(SwipeAnswers.script)

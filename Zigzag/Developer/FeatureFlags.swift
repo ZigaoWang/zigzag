@@ -150,7 +150,11 @@ enum FeatureFlags {
     /// Many flags are read only as a page loads, which is why Settings says to reload.
     private static func applyToOpenPages(_ key: String, _ on: Bool) {
         guard DeveloperTools.isOn else { return }
-        for webView in openWebViews { engine.set(on, key: key, in: webView.configuration.preferences) }
+        for webView in openWebViews {
+            // A page held near 60 fps stays so; the switch only ever holds more.
+            if key == sixtyFPSKey, !on, FramePacing.holds(webView) { continue }
+            engine.set(on, key: key, in: webView.configuration.preferences)
+        }
     }
 
     /// Every open web view except sleeping tabs, which pick up settings on wake. Each has its own preferences

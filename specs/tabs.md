@@ -87,6 +87,16 @@
 - Pause the video or audio a tab's sound came from → its speaker goes away after a moment, even if WebKit still says it plays.
   Test: MiniPlayerPageTests.aSoundFromAVideoEndsOnceItStops
 
+## Frame rate
+- A page on a 120 Hz display → it draws at the display's full rate, as in Chrome; Prefer Page Rendering Updates near 60fps in Settings › Developer › Feature Flags holds every page near 60 instead.
+  Test: FeatureFlagsTests.pagesDrawAtTheScreensRateUnlessChanged
+- Every page Zigzag shows (tab, Mini, web app, pop-up, extension page, Reader) → starts at that same rate.
+  Test: FramePacingTests.everyPageStartsAtTheChosenRate
+- A page that misses more than a quarter of the display's frames in two of three one-second spells of scrolling → held near 60 fps, as in Safari, until its tab goes to another site; a page that keeps up stays at the full rate.
+  Test: FramePacingTests.aPageThatCantKeepUpIsHeldNear60
+  Test: FramePacingTests.aPageKeepingUpStaysAtTheFullRate
+  Test: FramePacingTests.anotherSiteStartsOver
+
 ## Mini player when you leave
 - Show a mini player when you leave Zigzag on, and switch to another app with the window covered, minimized, hidden or on a desktop no longer showing → after a moment the watched video moves into the mini player.
   Test: AutoPictureInPictureTests.movesOnlyOnceTheWindowIsOutOfSight

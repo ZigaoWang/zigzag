@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - On a touch display, a two-finger swipe goes back or forward after about 2 cm of finger travel, as it feels on the trackpad, instead of twice that, and a page that fits the window no longer slides sideways under your fingers.
+- Pages draw at the display's full refresh rate, up to 120 times a second on a ProMotion display, as in Chrome, so scrolling and animations are smoother. A page too heavy to keep up while you scroll, like signed-in GitHub, steadies at 60 until you go to another site, instead of stuttering. Settings › Developer › Feature Flags › Prefer Page Rendering Updates near 60fps still holds every page at 60. ([#394](https://github.com/ZigaoWang/zigzag/issues/394))
 
 ## [0.9.5] - 2026-11-24
 
