@@ -736,6 +736,7 @@ final class ReaderView: NSView {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
         configuration.websiteDataStore = store
+        FeatureFlags.applyOwn(to: configuration.preferences)
         return configuration
     }
 

@@ -41,6 +41,8 @@ enum WebKitSetup {
     static func separatePreferences(of configuration: WKWebViewConfiguration) {
         guard let own = configuration.preferences.copy() as? WKPreferences else { return }
         PageStyles.set(true, in: own)
+        // A new page starts at the chosen frame rate, even when its opener was held near 60 fps.
+        FeatureFlags.applyOwn(to: own)
         configuration.preferences = own
     }
 

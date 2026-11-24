@@ -63,8 +63,12 @@ enum FeatureFlags {
 
     private static let key = "WebKitFeatureFlags"
 
-    /// Flags Zigzag sets differently from WebKit on every page; none now (#394).
-    static let ownDefaults: [String: Bool] = [:]
+    /// WebKit's flag that holds pages near 60 fps on a faster display.
+    static let sixtyFPSKey = "PreferPageRenderingUpdatesNear60FPSEnabled"
+
+    /// Flags Zigzag sets differently from WebKit on every page. Pages draw at the display's full rate, as in Chrome;
+    /// one too heavy to keep up is held near 60 by `FramePacing` (#394).
+    static let ownDefaults: [String: Bool] = [sixtyFPSKey: false]
 
     /// The flags you can change, the ones WebKit keeps to itself left out; nil when there's no list to show.
     static var flags: [Flag]? {
@@ -125,6 +129,21 @@ enum FeatureFlags {
         let all = overrides
         guard !all.isEmpty else { return }
         for (key, on) in all { engine.set(on, key: key, in: preferences) }
+    }
+
+    /// Zigzag's own defaults, or a change made to one while Developer Mode is on, for a page made without `apply`:
+    /// pop-ups, extension pages, Reader.
+    static func applyOwn(to preferences: WKPreferences) {
+        let listed = Set((engine.flags ?? []).map(\.key))
+        for (key, on) in ownDefaults.sorted(by: { $0.key < $1.key }) where listed.contains(key) {
+            engine.set(DeveloperTools.isOn ? overrides[key] ?? on : on, key: key, in: preferences)
+        }
+    }
+
+    /// Whether pages start held near 60 fps: WebKit's default, or Zigzag's, or what Settings changed it to.
+    static var pagesStartNear60FPS: Bool {
+        guard let flag = (engine.flags ?? []).first(where: { $0.key == sixtyFPSKey }) else { return true }
+        return DeveloperTools.isOn ? isOn(withOwnDefault(flag)) : withOwnDefault(flag).defaultValue
     }
 
     /// Pages already open take a change too, so reloading one is enough: each one's preferences are its own and live.

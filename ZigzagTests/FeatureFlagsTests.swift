@@ -82,31 +82,50 @@ struct FeatureFlagsTests {
     private static let sixty = FeatureFlags.Flag(key: "PreferPageRenderingUpdatesNear60FPSEnabled", name: "Prefer Page Rendering Updates near 60fps",
                                                  details: "", status: .stable, defaultValue: true)
 
-    @Test func pagesDrawAtWebKitsRateUnlessChanged() throws {
+    @Test func pagesDrawAtTheScreensRateUnlessChanged() throws {
         try with([Self.anchors, Self.sixty]) { engine in
-            // WebKit's default holds on every page, with or without Developer Mode: nothing is set, and it's listed
-            // as on. Starting it off made heavy pages stutter on a 120 Hz display (#394).
+            // Off on every page, Developer Mode or not, and listed as off by default. A page too heavy for the
+            // display's rate is held near 60 on its own (FramePacing, #394).
             DeveloperTools.isOn = false
             FeatureFlags.apply(to: WKPreferences())
-            #expect(engine.applied.isEmpty)
+            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false"])
+            engine.applied = []
+            FeatureFlags.applyOwn(to: WKPreferences())
+            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false"])
+            #expect(!FeatureFlags.pagesStartNear60FPS)
             let listed = try #require(FeatureFlags.flags?.first { $0.key == Self.sixty.key })
-            #expect(listed.defaultValue && FeatureFlags.isOn(listed) && !FeatureFlags.isChanged(listed))
-            // Turned off in Settings: stored as a change, applied while Developer Mode is on.
+            #expect(!listed.defaultValue && !FeatureFlags.isOn(listed) && !FeatureFlags.isChanged(listed))
+            // Turned on in Settings: kept as a change, set after Zigzag's own default, and every page starts near 60.
             DeveloperTools.isOn = true
-            FeatureFlags.set(false, for: listed)
-            #expect(FeatureFlags.overrides == ["PreferPageRenderingUpdatesNear60FPSEnabled": false])
+            FeatureFlags.set(true, for: listed)
+            #expect(FeatureFlags.overrides == ["PreferPageRenderingUpdatesNear60FPSEnabled": true])
             engine.applied = []
             FeatureFlags.apply(to: WKPreferences())
-            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false"])
-            // Back on returns to the default and is forgotten.
-            FeatureFlags.set(true, for: listed)
-            #expect(FeatureFlags.overrides.isEmpty)
+            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false", "PreferPageRenderingUpdatesNear60FPSEnabled true"])
+            engine.applied = []
+            FeatureFlags.applyOwn(to: WKPreferences())
+            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled true"])
+            #expect(FeatureFlags.pagesStartNear60FPS)
+            // Developer Mode off: Zigzag's default again, the change kept.
+            DeveloperTools.isOn = false
+            #expect(!FeatureFlags.pagesStartNear60FPS)
+            DeveloperTools.isOn = true
+            // Back off is back to the default: forgotten.
+            FeatureFlags.set(false, for: listed)
+            #expect(FeatureFlags.overrides.isEmpty && !FeatureFlags.pagesStartNear60FPS)
         }
     }
 
-    @Test func noFlagStartsOtherThanWebKitHasIt() {
-        // Forcing Prefer Page Rendering Updates near 60fps off made heavy pages stutter on a 120 Hz display (#394).
-        #expect(FeatureFlags.ownDefaults.isEmpty)
+    @Test func onlyTheFrameRateStartsOtherThanWebKitHasIt() {
+        #expect(FeatureFlags.ownDefaults == ["PreferPageRenderingUpdatesNear60FPSEnabled": false])
+    }
+
+    @Test func aWebKitWithoutTheFlagLeavesPagesAsTheyAre() {
+        with([Self.anchors]) { engine in
+            FeatureFlags.applyOwn(to: WKPreferences())
+            #expect(engine.applied.isEmpty)
+            #expect(FeatureFlags.pagesStartNear60FPS)
+        }
     }
 
     @Test func everyOwnDefaultNamesAFlagThisMacsWebKitHas() {

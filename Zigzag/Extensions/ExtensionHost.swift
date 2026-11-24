@@ -225,6 +225,8 @@ final class ExtensionHost: NSObject {
         // (shazam.com's) turns away one that claims Chrome but doesn't look it. Their own code still reads Chrome
         // (bridge.js), since several choose their code path from navigator.userAgent.
         configuration.webViewConfiguration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
+        // Extension pages draw at the same frame rate as sites.
+        FeatureFlags.applyOwn(to: configuration.webViewConfiguration.preferences)
         // Profiles' page preludes reach every extension page through the shared configuration; each runs only on
         // its own extension's pages, before their scripts.
         // Set before the compatibility layer, which reads it to add Firefox's runtime members.
