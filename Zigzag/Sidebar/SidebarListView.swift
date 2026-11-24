@@ -159,6 +159,8 @@ final class SidebarListView: NSView {
     weak var delegate: SidebarListDelegate?
     /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
     var spaceOverride: UUID?
+    /// Off in the screen edge's sidebar: a drag would leave its panel.
+    var allowsDragging = true
     /// In a private window, the header says "Private" instead of the space name.
     var privateLabel = false
     private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
@@ -910,7 +912,8 @@ final class SidebarListView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        let active: NSTrackingArea.Options = tracksHoverWhileInactive ? .activeAlways : .activeInKeyWindow
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, active, .inVisibleRect], owner: self)
         addTrackingArea(area)
         hoverArea = area
     }
@@ -1928,7 +1931,7 @@ final class SidebarListView: NSView {
     func dropIndex(at screenPoint: NSPoint) -> Int { dropTarget(at: screenPoint, allowsPinned: false).index }
 
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
-        guard let window, let manager, item.isDraggable else { return false }
+        guard allowsDragging, let window, let manager, item.isDraggable else { return false }
         delegate?.listHover(nil, row: nil, bookmark: nil)
         // Dragging one of several picked rows carries them all, landing together in list order.
         let picked = marked.count > 1 && marked.contains(item) ? marked : [item]

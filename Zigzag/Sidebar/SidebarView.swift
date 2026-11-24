@@ -976,6 +976,17 @@ final class SidebarView: NSView {
     /// Where the favorites start while the address is above the page: the page's top, so the two line up under the
     /// top row (set by the window as it lays out the page).
     var contentTop: CGFloat = TopBarView.height { didSet { if contentTop != oldValue { needsLayout = true } } }
+    /// Off in the screen edge's sidebar, a list to pick from: the address row stays in the window.
+    var showsAddressRow = true {
+        didSet {
+            guard showsAddressRow != oldValue else { return }
+            holdsAddress = showsAddressRow
+            (addressViews + [sidebarButton]).forEach { $0.isHidden = !showsAddressRow }
+            contentTop = showsAddressRow ? TopBarView.height : Tokens.Space.x2
+        }
+    }
+    /// The screen edge's sidebar answers hover while another app is in front.
+    var hoversWhileInactive = false
     /// What moves to the bar above the page: the three buttons in order, then the address.
     var addressButtons: [IconButton] { [backButton, forwardButton, reloadButton] }
     private var addressViews: [NSView] { addressButtons + [address] }
@@ -2712,3 +2723,5 @@ enum SpaceReorder {
         return to == from ? nil : to
     }
 }
+
+extension SidebarView: HoverTrackingWhileInactive {}
