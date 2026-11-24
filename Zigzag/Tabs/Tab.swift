@@ -340,8 +340,10 @@ final class Tab: NSObject {
     /// Why its page last stopped, until it has loaded again and that's been said.
     private var stoppedFor: PageStop?
     /// Where you were on the page and what you'd typed, read as you left it; it stays while the tab is out of sight.
-    /// A sleeping tab's also holds its page's sessionStorage.
-    private(set) var pageState: PageState?
+    /// A sleeping tab's also holds its page's sessionStorage, which is also kept for the next launch (`SavedSessionStorage`).
+    private(set) var pageState: PageState? {
+        didSet { if oldValue?.session != pageState?.session { SavedSessionStorage.changed() } }
+    }
     /// The script putting the woken page's sessionStorage back, until it has run on its origin or a page has loaded.
     private var sessionScript: WKUserScript?
     /// The origin `sessionScript` puts its sessionStorage back on.
@@ -692,21 +694,14 @@ final class Tab: NSObject {
             loadOwn(url, in: webView)
         } else if let state = pendingInteractionState {
             restoredPage = .waiting
-            if let session = pageState?.session, pageState?.belongs(to: url) == true,
-               let script = PageState.sessionRestorer(session) {
-                let controller = webView.configuration.userContentController
-                controller.add(SessionRestored.shared, contentWorld: .defaultClient, name: PageState.sessionMessage)
-                controller.addUserScript(script)
-                sessionScript = script
-                sessionScriptOrigin = session.origin
-            }
-            pageState = pageState?.withoutSession
+            putSessionBack(in: webView)
             restoreState(state, in: webView)
             pendingInteractionState = nil
             restoresPageState = pageState?.belongs(to: webView.url ?? url) == true
             // Interaction state restores history but may not start a load on its own.
             if webView.url == nil, let url { loadOwn(url, in: webView) }
         } else if let url, !fromWebKit {
+            putSessionBack(in: webView)
             loadFirst(url, in: webView)
         }
         startsQuietly = quiet
@@ -846,6 +841,25 @@ final class Tab: NSObject {
         if state.darkened != wasDarkened { NotificationCenter.default.post(name: DarkPages.pageDarkenedNotification, object: self) }
     }
 
+    /// The sessionStorage its page kept, asleep or as Zigzag last quit, goes back as that page loads (`sessionRestorer`).
+    private func putSessionBack(in webView: WKWebView) {
+        if let session = pageState?.session, pageState?.belongs(to: url) == true,
+           let script = PageState.sessionRestorer(session) {
+            let controller = webView.configuration.userContentController
+            controller.add(SessionRestored.shared, contentWorld: .defaultClient, name: PageState.sessionMessage)
+            controller.addUserScript(script)
+            sessionScript = script
+            sessionScriptOrigin = session.origin
+        }
+        pageState = pageState?.withoutSession
+    }
+
+    /// Made from the last session: the sessionStorage its page had as Zigzag quit, for its first load to put back.
+    func takeSavedSession(_ session: PageState.Session, from page: URL) {
+        guard !isPrivate, webView == nil, pageState == nil, PageState(url: page, scroll: .zero).belongs(to: url) else { return }
+        pageState = PageState(url: page, scroll: .zero, session: session)
+    }
+
     /// Takes the woken page's sessionStorage script out: it has run, a page has loaded, or the tab moved on.
     private func dropSessionScript(from webView: WKWebView) {
         guard let script = sessionScript else { return }
@@ -865,6 +879,8 @@ final class Tab: NSObject {
     /// forget the sessionStorage they hold for it, so waking doesn't sign you back in.
     static func forgetSessions(in store: WKWebsiteDataStore, site: String? = nil, keeping kept: Set<String> = []) {
         for tab in WindowManager.shared.openTabs { tab.forgetSession(in: store, site: site, keeping: kept) }
+        // Gone from the file for the next launch at once.
+        SavedSessionStorage.saveNow()
     }
 
     /// `forgetSessions` for this tab.

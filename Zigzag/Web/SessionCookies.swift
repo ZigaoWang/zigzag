@@ -274,6 +274,196 @@ enum SessionCookies {
     }
 }
 
+/// The sessionStorage sleeping tabs keep (#502), and open tabs' as Zigzag quits, kept across a relaunch that brings the
+/// last session back, as Chrome does: a site that keeps you signed in there still has you signed in. One file per
+/// profile, beside its session cookies, owner-only; never a private tab's.
+@MainActor
+enum SavedSessionStorage {
+    /// One tab's, as it's written down. Its items never show in a description or a log.
+    nonisolated struct Saved: Codable, Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+        var tab: UUID
+        /// The page it was read from: only that page gets it back.
+        var url: URL
+        var origin: String
+        var items: [[String]]
+
+        var session: PageState.Session { PageState.Session(origin: origin, items: items) }
+        var size: Int { items.reduce(0) { $0 + $1.reduce(0) { $0 + $1.count } } }
+
+        var description: String { "SavedSessionStorage(\(items.count) items)" }
+        var debugDescription: String { description }
+        var customMirror: Mirror { Mirror(self, children: []) }
+    }
+
+    nonisolated struct File: Codable, Sendable {
+        var version = 1
+        var tabs: [Saved]
+    }
+
+    /// One tab carries what a page script should (`PageState.sleepReader`); a profile this many tabs, and this much.
+    nonisolated static let maxTabSize = 250_000
+    nonisolated static let maxTabs = 200
+    nonisolated static let maxSize = 4_000_000
+
+    nonisolated static func file(in folder: URL) -> URL { folder.appendingPathComponent("SessionStorage.json") }
+
+    // MARK: Choosing and writing
+
+    /// What a tab holds to write down: its sleeping page's sessionStorage, or `read` from its open page. Never a
+    /// private tab's.
+    static func entry(for tab: Tab, read: [UUID: Saved] = [:]) -> Saved? {
+        guard !tab.isPrivate, !tab.isClosed else { return nil }
+        if let saved = read[tab.id] { return saved }
+        guard let state = tab.pageState, let session = state.session else { return nil }
+        return Saved(tab: tab.id, url: state.url, origin: session.origin, items: session.items)
+    }
+
+    /// Within the caps: a tab that would take the rest past them is skipped, not the rest. `kept`: only those sites'
+    /// (a profile that clears cookies when Zigzag quits keeps no others).
+    nonisolated static func toSave(_ saved: [Saved], keeping kept: Set<String>? = nil) -> [Saved] {
+        var total = 0
+        var capped: [Saved] = []
+        for entry in saved where capped.count < maxTabs {
+            guard !entry.items.isEmpty, let host = URL(string: entry.origin)?.host()?.lowercased(), !host.isEmpty else { continue }
+            if let kept, !KeptCookies.covers(kept, record: host) { continue }
+            let size = entry.size
+            guard size <= maxTabSize, total + size <= maxSize else { continue }
+            total += size
+            capped.append(entry)
+        }
+        return capped
+    }
+
+    nonisolated static func encode(_ saved: [Saved]) -> Data? { saved.isEmpty ? nil : JSONStore.encode(File(tabs: saved)) }
+
+    /// Owner-only from the first byte, as session cookies are; no file at all when there's nothing to keep.
+    @discardableResult
+    nonisolated static func write(_ saved: [Saved], to url: URL) -> Bool { SessionCookies.write(encode(saved), to: url) }
+
+    nonisolated static func read(_ url: URL) -> [Saved] {
+        guard let data = try? Data(contentsOf: url), let file = try? JSONDecoder().decode(File.self, from: data), file.version == 1 else { return [] }
+        return toSave(file.tabs)
+    }
+
+    // MARK: Putting it back
+
+    /// Read at launch for the session's tabs, by tab, with the profile each was saved in.
+    private static var waiting: [UUID: (profile: UUID, saved: Saved)] = [:]
+
+    /// A profile's file at launch: read for the tabs the last session brings back, or (On launch is Open a new
+    /// window) left unread; removed either way, and the next save writes it again.
+    static func prepare(_ url: URL, resumes: Bool, profile: UUID) {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        if resumes { for saved in read(url) { waiting[saved.tab] = (profile, saved) } }
+        SessionCookies.remove(url)
+    }
+
+    /// A tab made from the last session: its page's sessionStorage goes back on it, before its first load.
+    static func restore(into tab: Tab) {
+        guard let entry = waiting.removeValue(forKey: tab.id), !tab.isPrivate, tab.profile.id == entry.profile else { return }
+        tab.takeSavedSession(entry.saved.session, from: entry.saved.url)
+    }
+
+    /// Whether a tab's is still waiting to be put back.
+    static func isWaiting(for id: UUID) -> Bool { waiting[id] != nil }
+
+    // MARK: Saving while Zigzag runs
+
+    /// On once the last session's tabs are made: nothing is written before. Never on while tests run.
+    private(set) static var isOn = false
+    /// Zigzag is quitting and the quit's save is written: nothing after it (tabs closing as windows go) writes over it.
+    private static var quitting = false
+    private static var scheduled = false
+    private static var written: [UUID: Data] = [:]
+
+    /// From launch, before the session's tabs are made.
+    static func start(resumes: Bool) {
+        for profile in Profiles.shared.all { prepare(file(in: profile.folder), resumes: resumes, profile: profile.id) }
+    }
+
+    /// The session's tabs are made: what none of them took is dropped, and the files are written for what they hold.
+    static func started() {
+        dropWaiting()
+        isOn = true
+        saveNow()
+    }
+
+    static func dropWaiting() { waiting = [:] }
+
+    /// A tab's kept sessionStorage changed: the files are written again, once, on the next turn of the run loop.
+    static func changed() {
+        guard isOn, !quitting, !scheduled else { return }
+        scheduled = true
+        DispatchQueue.main.async {
+            scheduled = false
+            saveNow()
+        }
+    }
+
+    /// Writes every profile's file now from what its tabs hold, with `read` for the open ones.
+    static func saveNow(read: [UUID: Saved] = [:]) {
+        guard isOn, !quitting else { return }
+        let tabs = WindowManager.shared.openTabs
+        for profile in Profiles.shared.all where !profile.isHeadless {
+            let kept = KeptCookies.clearsOnQuit(in: profile.id) ? KeptCookies.sites(in: profile.id) : nil
+            let saved = toSave(tabs.filter { $0.profile === profile }.compactMap { entry(for: $0, read: read) }, keeping: kept)
+            let data = encode(saved)
+            let url = file(in: profile.folder)
+            if data == written[profile.id], (data != nil) == FileManager.default.fileExists(atPath: url.path) { continue }
+            if SessionCookies.write(data, to: url) { written[profile.id] = data }
+        }
+    }
+
+    /// As Zigzag quits: open tabs' pages are asked for their sessionStorage side by side, and what answers within
+    /// `wait` is written with what sleeping tabs hold. Nothing is written after.
+    static func saveForQuit(within wait: TimeInterval, done: @escaping () -> Void) {
+        guard isOn, !quitting else { done(); return }
+        let open = WindowManager.shared.openTabs.filter { !$0.isPrivate && $0.isLoaded }
+        capture(open, within: wait) { read in
+            saveNow(read: read)
+            quitting = true
+            done()
+        }
+    }
+
+    /// Each tab's page's sessionStorage, read as a tab going to sleep reads it, for those that answer within `wait`.
+    static func capture(_ tabs: [Tab], within wait: TimeInterval, done: @escaping ([UUID: Saved]) -> Void) {
+        let reading = Reading(count: tabs.count, done: done)
+        guard !tabs.isEmpty else { reading.finish(); return }
+        for tab in tabs {
+            tab.readPageState(includingSession: true) { state in
+                if let state, let session = state.session {
+                    reading.read[tab.id] = Saved(tab: tab.id, url: state.url, origin: session.origin, items: session.items)
+                }
+                reading.tick()
+            }
+        }
+        // From the run loop, so the wait ends even while the main queue is held up.
+        reading.perform(#selector(Reading.finish), with: nil, afterDelay: wait, inModes: [.common])
+    }
+
+    /// The answers `capture` waits for, handed on once: all in, or the wait over.
+    private final class Reading: NSObject {
+        var read: [UUID: Saved] = [:]
+        private var left: Int
+        private var done: (([UUID: Saved]) -> Void)?
+        init(count: Int, done: @escaping ([UUID: Saved]) -> Void) {
+            left = count
+            self.done = done
+        }
+        func tick() {
+            left -= 1
+            if left <= 0 { finish() }
+        }
+        @objc func finish() {
+            guard let call = done else { return }
+            done = nil
+            NSObject.cancelPreviousPerformRequests(withTarget: self)
+            call(read)
+        }
+    }
+}
+
 /// Where restored cookies are set: a store's cookies, or a made-up one in tests.
 @MainActor
 protocol SessionCookieJar: AnyObject {

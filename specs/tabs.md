@@ -32,6 +32,19 @@
   Test: SessionCookiesTests.privateWindowsKeepNone
 - Clear a site's cookies or website data, or every site's → its kept session cookies go too.
   Test: SessionCookiesTests.clearingASiteTakesItsSavedCookies
+- Quit and open again with Continue where you left off, or restart for an update → each tab's page gets back the sessionStorage it had (asleep, or open as Zigzag quit) before its own scripts first run, so a site that keeps your sign-in there (Microsoft 365) still has you signed in; no other page gets it.
+  Test: UnloadedTabTests.aRestoredTabGetsItsSessionStorageBackBeforeItsFirstLoad
+  Test: SessionCookiesTests.sessionStorageWaitsForItsTabAndTheFileGoes
+- The same with Open a new window → it's gone unread. A private tab's is never kept.
+  Test: SessionCookiesTests.openANewWindowDropsSessionStorageUnread
+  Test: SessionCookiesTests.aPrivateTabsSessionStorageIsNeverKept
+- Clear a site's cookies or website data, or close the tab → what it kept for the next launch goes too.
+  Test: UnloadedTabTests.clearingASitesDataDropsWhatTheNextLaunchWouldGetBack
+- Clear History → it stays, as in Chrome and Safari: clearing history doesn't sign you out.
+  Test: UnloadedTabTests.clearingHistoryKeepsWhatASleepingTabKept
+- It's kept in an owner-only file in the profile's folder, up to 250,000 characters a tab and 4,000,000 in all; a tab past that is skipped, not the rest.
+  Test: SessionCookiesTests.theSessionStorageFileIsOwnerOnly
+  Test: SessionCookiesTests.savedSessionStorageIsCappedATabAtATime
 
 ## New tabs
 - ⌘T → the command bar opens centered on the window, near the top of the page.

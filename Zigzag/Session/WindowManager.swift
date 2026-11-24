@@ -864,6 +864,7 @@ final class WindowManager {
                       lastActivated: state.lastActivated, createdAt: state.createdAt)
         state.apply(to: tab)
         tab.isRestored = true
+        SavedSessionStorage.restore(into: tab)
         return tab
     }
 
