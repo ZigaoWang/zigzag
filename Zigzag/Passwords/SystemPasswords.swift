@@ -677,8 +677,11 @@ enum AutofillKeyIcon {
         return WKContentWorld(configuration: configuration)
     }()
 
-    static var script: WKUserScript {
-        WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world)
+    static var script: WKUserScript { script(watchingFor: watchFor) }
+
+    /// The script, watching for new fields `ms` at a time.
+    static func script(watchingFor ms: Int) -> WKUserScript {
+        WKUserScript(source: source(watchingFor: ms), injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: world)
     }
 
     static func install(in controller: WKUserContentController) {
@@ -713,8 +716,12 @@ enum AutofillKeyIcon {
         }
     }
 
+    /// How long the page is watched for new fields after it loads, and after each click, key or focus, in ms. Sign-in
+    /// forms come with the page or with something you did; a page scrolled or left alone isn't watched.
+    static let watchFor = 10_000
+
     /// Marks the sign-in fields, now and as the page adds them.
-    static let source = """
+    static func source(watchingFor ms: Int) -> String { """
     (() => {
       if (window.__zigzagKeyIcons) return;
       window.__zigzagKeyIcons = true;
@@ -733,14 +740,41 @@ enum AutofillKeyIcon {
         queued = true;
         setTimeout(() => { queued = false; mark(); }, 250);
       };
+      // Only added elements and fields' own changes matter: text, and things taken away, don't.
+      const matters = (records) => {
+        for (const r of records) {
+          if (r.type === 'attributes') { if (r.target.tagName === 'INPUT') return true; continue; }
+          for (const n of r.addedNodes) if (n.nodeType === 1) return true;
+        }
+        return false;
+      };
+      const observer = new MutationObserver((records) => { if (matters(records)) later(); });
+      let watching = false, until = 0;
+      const watch = () => {
+        until = Date.now() + \(ms);
+        if (watching) return;
+        watching = true;
+        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true,
+          attributeFilter: ['type', 'autocomplete', 'disabled', 'readonly', 'name', 'id'] });
+        const check = () => {
+          if (Date.now() < until) { setTimeout(check, until - Date.now()); return; }
+          observer.disconnect();
+          observer.takeRecords();
+          watching = false;
+        };
+        setTimeout(check, \(ms));
+      };
       window.webkit.messageHandlers.\(messageName).postMessage('on').then((on) => {
         if (on !== true) return;
         mark();
-        new MutationObserver(later).observe(document.documentElement, { childList: true, subtree: true, attributes: true,
-          attributeFilter: ['type', 'autocomplete', 'disabled', 'readonly', 'name', 'id'] });
+        watch();
+        if (document.readyState !== 'complete') addEventListener('load', () => { later(); watch(); }, { once: true });
+        for (const type of ['pointerdown', 'keydown']) addEventListener(type, watch, { capture: true, passive: true });
+        // A field focused is checked at once, so its icon is there as you type.
+        addEventListener('focusin', (e) => { watch(); if (e.target && e.target.tagName === 'INPUT') mark(); }, { capture: true, passive: true });
       }).catch(() => {});
     })();
-    """
+    """ }
 }
 
 /// A text view for `SystemPasswordPicker` that never gives its text away: nothing copies, cuts, drags or hands it to a

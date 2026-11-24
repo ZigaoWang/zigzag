@@ -858,6 +858,38 @@ struct SystemPasswordsTests {
         #expect(try await icons(false) == ["none", "none", "none", "none"])
     }
 
+    @Test func theKeyIconWatchesForFieldsAfterLoadingAndAfterYouDoSomething() async throws {
+        guard #available(macOS 27, *) else { return }
+        let (webView, _, _) = await page("<form id='f'></form>") { configuration in
+            configuration.userContentController.addUserScript(AutofillKeyIcon.script(watchingFor: 400))
+            configuration.userContentController.addScriptMessageHandler(AutofillKeyIcon.Asker { _ in true }, contentWorld: AutofillKeyIcon.world, name: AutofillKeyIcon.messageName)
+        }
+        func add(_ id: String) async throws {
+            _ = try await webView.evaluateJavaScript("""
+            (() => { const el = document.createElement('input'); el.type = 'password'; el.id = '\(id)'; document.getElementById('f').append(el); return true; })()
+            """)
+        }
+        func icon(_ id: String) async throws -> String? {
+            try await webView.callAsyncJavaScript("return document.getElementById(id).autofillButtonType", arguments: ["id": id],
+                                                  in: nil, contentWorld: AutofillKeyIcon.world) as? String
+        }
+        // Added as the page loads: marked.
+        try await add("a")
+        try await wait(0.35)
+        #expect(try await icon("a") == "credentials")
+        // Left alone past the watch, the page isn't watched: a field it adds by itself waits.
+        try await wait(0.6)
+        try await add("b")
+        try await wait(0.35)
+        #expect(try await icon("b") == "none")
+        // A click watches again, for what it brings.
+        _ = try await webView.evaluateJavaScript("document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))")
+        try await add("c")
+        try await wait(0.35)
+        #expect(try await icon("b") == "credentials")
+        #expect(try await icon("c") == "credentials")
+    }
+
     @Test func theKeyIconIsOnlyZigzagsWhenItFills() {
         guard #available(macOS 27, *) else { return }
         #expect(AutofillKeyIcon.shows(fills: true, managerOn: false, panelAvailable: true))
