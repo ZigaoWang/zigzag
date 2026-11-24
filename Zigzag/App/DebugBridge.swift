@@ -903,8 +903,13 @@ enum DebugBridge {
             try? (rows + [controller.tabManager.selectedTab?.displayTitle ?? "-"]).joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         // newtabclick <i>: clicks the i-th of those rows.
         case "newtabclick": controller.newTabNote.debugClick(Int(arg) ?? 0)
-        // topbar on|off: Settings › Appearance › Address bar above the page.
-        case "topbar": BrowserRootView.addressAbovePage = arg == "on"
+        // topbar off|autohide|always|on: Settings › Appearance › Address bar above the page.
+        case "topbar":
+            switch arg {
+            case "on", "always": BrowserRootView.addressBarPlace = .always
+            case "autohide": BrowserRootView.addressBarPlace = .autohide
+            default: BrowserRootView.addressBarPlace = .off
+            }
         // sidebarside right|left: Settings › Appearance › Sidebar position.
         case "sidebarside": BrowserRootView.sidebarOnRight = arg == "right"
         // sideframes: where the sidebar, the page and the traffic lights are, in the debug log.

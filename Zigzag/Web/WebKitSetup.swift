@@ -101,6 +101,7 @@ enum WebKitSetup {
             for script in PageScripts.all + Reader.scripts { configuration.userContentController.addUserScript(script) }
             // Runs in its own world, invisible to the page.
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
+            configuration.userContentController.add(ScrollMessages.shared, contentWorld: .defaultClient, name: ScrollMessages.messageName)
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagLinkClick")
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagIcons")
             configuration.userContentController.addUserScript(PasswordCapture.script)
@@ -192,7 +193,7 @@ enum PageScripts {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
         [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark,
-         modifiedLinkClicks, iconWatch]
+         modifiedLinkClicks, ScrollMessages.script, iconWatch]
     }
 
     /// Tells the browser when the page changes its icon links, as GitHub does for dark mode, so the tab's icon follows (#386).
@@ -315,6 +316,99 @@ enum PageScripts {
         .map(l => ({ href: l.href, sizes: l.getAttribute('sizes') || '', rel: l.rel, type: l.type || '' }));
     })();
     """
+}
+
+/// The page's own scrolls for Autohide: one report a frame, from the main frame only (#359).
+final class ScrollMessages: NSObject, WKScriptMessageHandler {
+    static let shared = ScrollMessages()
+    static let messageName = "zigzagScroll"
+
+    static let script = WKUserScript(source: """
+    (() => {
+      if (window.__zigzagScroll) return;
+      window.__zigzagScroll = true;
+      // When the person last scrolled with their own hand: a wheel or trackpad (momentum keeps sending these) or a
+      // scrolling key; and whether the scroll bar is held. A scroll event is trusted even when the page's own script
+      // scrolled, so only a scroll this close to the person's input counts.
+      let input = 0, keyInput = 0, pressed = false, touchY = null;
+      const mark = () => { input = Date.now(); };
+      const markKey = () => { input = keyInput = Date.now(); };
+      const keys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
+      const options = { capture: true, passive: true };
+      window.addEventListener('wheel', (event) => { if (event.isTrusted) mark(); }, options);
+      window.addEventListener('touchstart', (event) => {
+        if (event.isTrusted) { touchY = event.touches[0]?.clientY ?? null; }
+      }, options);
+      window.addEventListener('touchmove', (event) => {
+        if (!event.isTrusted) return;
+        mark();
+        const touch = event.touches[0];
+        if (touch) {
+          // A pull down at the page's top is the touch way back to the bar (the report lands on the top rule).
+          if (touchY != null && touch.clientY > touchY + 2 && y() <= 0.5) report(true);
+          touchY = touch.clientY;
+        }
+      }, options);
+      window.addEventListener('touchend', () => { touchY = null; }, options);
+      window.addEventListener('touchcancel', () => { touchY = null; }, options);
+      window.addEventListener('keydown', (event) => { if (event.isTrusted && keys.has(event.key)) markKey(); }, options);
+      // On the scroll bar, not a click on the page: a link that jumps somewhere is the page scrolling.
+      window.addEventListener('mousedown', (event) => {
+        const html = document.documentElement;
+        if (event.isTrusted && (event.target === html || event.clientX >= html.clientWidth)) pressed = true;
+      }, options);
+      window.addEventListener('mouseup', () => { pressed = false; }, options);
+      window.addEventListener('blur', () => { pressed = false; }, options);
+      const root = document.scrollingElement || document.documentElement;
+      const y = () => Math.max(0, window.scrollY || root.scrollTop || 0);
+      // A field has the focus: the bar stays where it is while the person types (a page's own field counts too).
+      const editing = () => {
+        const el = document.activeElement;
+        if (!el) return false;
+        if (el.isContentEditable) return true;
+        const tag = el.localName;
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
+      };
+      let pending = null, frame = 0;
+      const report = (trusted) => {
+        const next = { y: y(), trusted, key: Date.now() - keyInput < 400, editing: editing(), dragging: pressed };
+        if (pending) {
+          // The last place is the one that counts; a real gesture anywhere in the frame still marks it.
+          next.trusted = next.trusted || pending.trusted;
+          next.key = next.key || pending.key;
+        }
+        pending = next;
+        if (frame) return;
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          const out = pending;
+          pending = null;
+          if (!out) return;
+          try { window.webkit.messageHandlers.\(messageName).postMessage(out); } catch (e) {}
+        });
+      };
+      window.addEventListener('scroll', (event) => {
+        const target = event.target;
+        // A page's own elements scroll inside it all the time; only the page itself moves the bar.
+        if (target !== document && target !== document.documentElement && target !== root) return;
+        // A key's smooth scroll runs on a little after the key, and a dragged scroll bar for as long as it's held.
+        report(pressed || Date.now() - input < 400);
+      }, options);
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName,
+              let webView = message.webView as? BrowserWebView, let tab = webView.owner,
+              let body = message.body as? [String: Any], let y = (body["y"] as? NSNumber)?.doubleValue,
+              let controller = webView.window?.windowController as? BrowserWindowController,
+              let pane = controller.paneIndex(of: tab) else { return }
+        controller.pageScrolled(to: CGFloat(y), trusted: (body["trusted"] as? Bool) ?? false,
+                                editing: (body["editing"] as? Bool) ?? false,
+                                dragging: (body["dragging"] as? Bool) ?? false,
+                                key: (body["key"] as? Bool) ?? false,
+                                inPane: pane, tab: tab)
+    }
 }
 
 /// Receives messages from our page scripts and routes them to the tab that sent them.

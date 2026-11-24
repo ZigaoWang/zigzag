@@ -87,6 +87,37 @@ struct TrafficLightTests {
         #expect(window.dragMovesWindow && window.isMovableByWindowBackground)
     }
 
+    /// With the sidebar hidden and Autohide having put the bar away, full screen still needs the lights' backing: the
+    /// bar is configured but not on screen, so it cannot back them (#462).
+    @Test func fullScreenBacksTheLightsWhenTheBarIsAway() {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/fullscreen-lights")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+        root.showsTopBar = true
+        root.barHoldsAddress = true
+        root.autohidesBar = true
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        let travel = root.autohideTravel(at: 0)
+        #expect(travel > 0)
+        root.setBarOffset(travel, animated: false)
+        root.layoutSubtreeIfNeeded()
+        #expect(!root.barOnScreen)
+        #expect(controller.trafficLightBacking(fullScreen: true), "the page is under the lights")
+        root.setBarOffset(0, animated: false)
+        root.layoutSubtreeIfNeeded()
+        #expect(!controller.trafficLightBacking(fullScreen: true), "the bar is back under them")
+    }
+
     /// The lights get a backing in full screen only when the page, not the bar or sidebar, is under them (#462).
     @Test func backingOnlyWhenNothingOfOursIsUnderTheLights() {
         #expect(BrowserWindowController.needsTrafficLightBacking(fullScreen: true, barShown: false,

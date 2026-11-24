@@ -256,6 +256,9 @@ final class TopBarView: NSView {
     private var stripPanes: [ClosedRange<CGFloat>] = []
     /// How far in from its pane's edges a strip keeps: the bar's own inset from the page's (`edgeInset`).
     var stripInset: CGFloat = 0 { didSet { if stripInset != oldValue { needsLayout = true } } }
+    /// Autohide in a split: how far up each strip has slid out of the row, in the panes' order. 0 is fully there;
+    /// the strip's own pane takes the room it leaves.
+    var stripOffsets: [CGFloat] = [] { didSet { if stripOffsets != oldValue { needsLayout = true } } }
 
     /// Takes the panes' strips into the row, over these panes (none: the row is the bar's own again). The bar's own
     /// controls are left as they are: the window fades them out or in (`ownControls`).
@@ -324,7 +327,10 @@ final class TopBarView: NSView {
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
         if let rect = frames.pill { places.append((pill, rect)) }
-        for (strip, place) in zip(strips, stripPlaces) where strip.superview === self { places.append((strip, place.frame)) }
+        for (i, strip) in strips.enumerated() where strip.superview === self && stripPlaces.indices.contains(i) {
+            let up = i < stripOffsets.count ? stripOffsets[i] : 0
+            places.append((strip, stripPlaces[i].frame.offsetBy(dx: 0, dy: -up)))
+        }
         places = places.map { ($0.view, $0.frame.offsetBy(dx: 0, dy: rowTop)) }
         // Held for the sidebar's own: where that one lands in the window, whatever the bar's row is doing.
         if frames.sidebarButton == nil, let origin = heldSidebarButtonOrigin {
