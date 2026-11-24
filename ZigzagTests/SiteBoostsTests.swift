@@ -332,4 +332,141 @@ struct SiteBoostsTests {
         #expect(try await webView.evaluateJavaScript("document.querySelectorAll('zigzag-zap').length") as? Int == 0)
         #expect(try await webView.evaluateJavaScript("document.documentElement.style.cursor") as? String == "")
     }
+
+    @Test func zapsAreNamedByWhatTheElementSays() async throws {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        await load("""
+        <html><body>
+          <div id="a" aria-label="  Cookie
+            notice "><p>We use cookies</p></div>
+          <iframe id="b" title="Advertisement"></iframe>
+          <img id="c" alt="Sale banner" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+          <section id="d"><h2>Sign up for our newsletter</h2><p>Every week</p></section>
+          <div id="e">
+            <p>Free shipping today</p>
+            <p>Ends soon</p>
+          </div>
+          <div id="f"></div>
+          <svg id="g" aria-label="Logo"><path id="h" d="M0 0h10v10z"/></svg>
+        </body></html>
+        """, in: webView)
+        func name(_ id: String) async throws -> String? {
+            let result = try await webView.evaluateJavaScript(PageBoosts.selectorSource + "\nString(window.ZigzagBoostName(document.getElementById('\(id)')))")
+            return (result as? String).flatMap { $0 == "null" ? nil : $0 }
+        }
+        #expect(try await name("a") == "Cookie notice")
+        #expect(try await name("b") == "Advertisement")
+        #expect(try await name("c") == "Sale banner")
+        #expect(try await name("d") == "Sign up for our newsletter")
+        #expect(try await name("e") == "Free shipping today")
+        #expect(try await name("f") == nil)
+        // Inside an SVG, the SVG's own name.
+        #expect(try await name("h") == "Logo")
+    }
+
+    @Test func zapNamesAreOneShortLine() {
+        #expect(SiteBoosts.zapName("  Cookie\n\tnotice ") == "Cookie notice")
+        #expect(SiteBoosts.zapName(" \n ") == nil)
+        #expect(SiteBoosts.zapName(nil) == nil)
+        let long = SiteBoosts.zapName(String(repeating: "word ", count: 20))
+        #expect(long?.count == SiteBoosts.maxZapName)
+        #expect(long?.hasSuffix("…") == true)
+        #expect(long?.contains(" …") == false)
+    }
+
+    @Test func aZapKeepsItsNameUntilItComesOff() async throws {
+        try await withDefaults {
+            #expect(SiteBoosts.zap("div.consent", name: "Cookie notice", forSite: "example.com"))
+            #expect(SiteBoosts.zap("#promo", name: "  ", forSite: "example.com"))
+            #expect(SiteBoosts.zap("aside.newsletter", forSite: "example.com"))
+            var boost = SiteBoosts.boost(forSite: "example.com")
+            #expect(boost.names == ["div.consent": "Cookie notice"])
+            #expect(boost.name(forZap: "div.consent") == "Cookie notice")
+            // Without a name, one is made from the selector.
+            #expect(boost.name(forZap: "#promo") == "#promo")
+            #expect(boost.name(forZap: "aside.newsletter") == "aside.newsletter")
+            // Taking one off keeps the others and their names.
+            SiteBoosts.unzap("div.consent", forSite: "example.com")
+            boost = SiteBoosts.boost(forSite: "example.com")
+            #expect(boost.zaps == ["#promo", "aside.newsletter"])
+            #expect(boost.names.isEmpty)
+            SiteBoosts.zap("div.consent", name: "Cookie notice", forSite: "example.com")
+            SiteBoosts.restoreZaps(forSite: "example.com")
+            #expect(SiteBoosts.sites.isEmpty)
+            // The oldest zaps past the limit take their names with them.
+            SiteBoosts.zap("#first", name: "First", forSite: "example.com")
+            for i in 0..<SiteBoosts.maxZaps { SiteBoosts.zap("#z\(i)", name: "Zap \(i)", forSite: "example.com") }
+            boost = SiteBoosts.boost(forSite: "example.com")
+            #expect(boost.zaps.count == SiteBoosts.maxZaps && !boost.zaps.contains("#first"))
+            #expect(boost.names["#first"] == nil && boost.names.count == SiteBoosts.maxZaps)
+        }
+    }
+
+    @Test func zapsKeptBeforeNamesStillRead() throws {
+        let old = try JSONDecoder().decode(SiteBoost.self, from: Data(##"{"zaps":["#list > li:nth-of-type(2)"],"style":""}"##.utf8))
+        #expect(old.names.isEmpty)
+        #expect(old.name(forZap: "#list > li:nth-of-type(2)") == "#list › li")
+        // A names field that isn't a list of names is left out, not the whole boost.
+        let odd = try JSONDecoder().decode(SiteBoost.self, from: Data(##"{"zaps":["#a"],"names":[1]}"##.utf8))
+        #expect(odd.zaps == ["#a"] && odd.names.isEmpty)
+        let round = try JSONDecoder().decode(SiteBoost.self, from: JSONEncoder().encode(SiteBoost(zaps: ["#a"], names: ["#a": "Banner"])))
+        #expect(round.names == ["#a": "Banner"])
+    }
+
+    @Test func removingAZapShowsItOnTheOpenPage() async throws {
+        try await withDefaults {
+            SiteBoosts.zap("#promo", name: "Promo", forSite: "example.com")
+            SiteBoosts.zap("div.banner", forSite: "example.com")
+            let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+            let url = try #require(URL(string: "https://example.com/"))
+            PageBoosts.prepare(webView, for: url, privateStore: nil, errorPage: false)
+            await load(Self.page, in: webView, at: url.absoluteString)
+            let promo = "getComputedStyle(document.getElementById('promo')).display"
+            let banner = "getComputedStyle(document.querySelector('.banner')).display"
+            #expect(try await webView.evaluateJavaScript(promo) as? String == "none")
+            SiteBoosts.unzap("#promo", forSite: "example.com")
+            // What `PageBoosts.refresh` runs: the sheet's rules are replaced, no reload.
+            let css = SiteBoosts.css(for: SiteBoosts.boost(forSite: "example.com"))
+            _ = try await webView.evaluateJavaScript(PageBoosts.source(css: css, site: "example.com") + "\n;true", in: nil, contentWorld: PageBoosts.world)
+            #expect(try await webView.evaluateJavaScript(promo) as? String == "block")
+            #expect(try await webView.evaluateJavaScript(banner) as? String == "none")
+            #expect(try await webView.evaluateJavaScript("document.querySelectorAll('style').length") as? Int == 1)
+        }
+    }
+
+    @Test func aZapRowShowsItsNameAndSelector() throws {
+        let named = PanelRow.zap("div.consent-wrap > div:nth-of-type(2)", name: "Cookie notice") {}
+        #expect(named.accessibilityLabel() == "Cookie notice")
+        #expect(named.accessibilityValue() as? String == "div.consent-wrap > div:nth-of-type(2)")
+        #expect(named.toolTip == "div.consent-wrap > div:nth-of-type(2)")
+        let selector = try #require(named.subviews.compactMap { $0 as? Label }.first { $0.stringValue == "div.consent-wrap > div:nth-of-type(2)" })
+        #expect(!selector.isHidden && selector.lineBreakMode == .byTruncatingMiddle)
+        #expect(selector.font == Tokens.Font.code(Tokens.TypeSize.small))
+        // An old zap with no name is named from its selector.
+        #expect(PanelRow.zap("#list > li:nth-of-type(2)") {}.accessibilityLabel() == "#list › li")
+    }
+
+    @Test func settingsListsEachZapWithItsOwnRemove() async throws {
+        try await withDefaults {
+            SiteBoosts.zap("div.consent", name: "Cookie notice", forSite: "example.com")
+            SiteBoosts.zap("#promo", forSite: "example.com")
+            let settings = SettingsView(pane: .privacy)
+            settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+            settings.debugReadNow()
+            var rows = settings.debugSiteFormRows
+            let notice = try #require(rows.first { $0.debugTitle == "Cookie notice" })
+            #expect(notice.debugDetail.stringValue == "div.consent")
+            #expect(notice.debugDetail.font == Tokens.Font.code(Tokens.TypeSize.label))
+            // Newest first.
+            let titles = rows.map(\.debugTitle)
+            let promo = try #require(titles.firstIndex(of: "#promo"))
+            #expect(promo < (titles.firstIndex(of: "Cookie notice") ?? 0))
+            let remove = try #require(notice.control as? IconButton)
+            #expect(remove.accessibilityPerformPress())
+            #expect(SiteBoosts.boost(forSite: "example.com").zaps == ["#promo"])
+            rows = settings.debugSiteFormRows
+            #expect(!rows.contains { $0.debugTitle == "Cookie notice" })
+            #expect(rows.contains { $0.debugTitle == "#promo" })
+        }
+    }
 }

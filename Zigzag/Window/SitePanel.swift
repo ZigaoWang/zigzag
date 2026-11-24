@@ -95,8 +95,9 @@ final class SitePanel: FloatingPanelView {
     /// The zapped elements, newest first, each with ×, and Restore All under them (#498).
     private let zapsGroup = PanelGroup()
     private var restoreAllRow: PanelLinkRow?
-    /// The zaps `zapsGroup` was built from, in zap order.
+    /// The zaps `zapsGroup` was built from, in zap order, and their names.
     private var listedZaps: [String] = []
+    private var listedNames: [String: String] = [:]
     private let zapsHeader = PanelPageHeader(String(localized: "Zapped Elements", comment: "Title of the site panel's page that lists the elements hidden on the site with Zap Element."))
     /// The site's custom CSS, if any; opens Edit Style.
     private var styleRow: PanelLinkRow?
@@ -1314,9 +1315,13 @@ final class SitePanel: FloatingPanelView {
         zappedRow?.titleText = SiteBoosts.zapped(zaps.count)
         zappedRow?.isHidden = zaps.isEmpty
         styleRow?.isHidden = !boost.hasStyle
-        if zappedRow != nil, listedZaps != zaps {
+        if zappedRow != nil, listedZaps != zaps || listedNames != boost.names {
+            let boost = boost
             listedZaps = zaps
-            zapsGroup.rows = zaps.reversed().map { selector in PanelRow.zap(selector) { [weak self] in self?.unzap(selector) } }
+            listedNames = boost.names
+            zapsGroup.rows = zaps.reversed().map { selector in
+                PanelRow.zap(selector, name: boost.name(forZap: selector)) { [weak self] in self?.unzap(selector) }
+            }
         }
         needsLayout = true
     }
@@ -1864,14 +1869,15 @@ final class PanelRow: NSView {
     /// A name and a control of the panel's own (the zoom stepper).
     static func custom(_ title: String, control: NSView) -> PanelRow { PanelRow(title, control: control) }
 
-    /// A zapped element: its short name, its selector under it cut in the middle (whole on hover and to VoiceOver),
-    /// and × to show it again.
-    static func zap(_ selector: String, remove: @escaping () -> Void) -> PanelRow {
-        let name = SiteBoosts.label(forZap: selector)
+    /// A zapped element: its short name, its selector under it in code type cut in the middle (whole on hover and to
+    /// VoiceOver), and × to show it again.
+    static func zap(_ selector: String, name: String? = nil, remove: @escaping () -> Void) -> PanelRow {
+        let name = name ?? SiteBoosts.label(forZap: selector)
         let button = IconButton(symbol: "xmark", size: .compact, toolTip: SiteBoosts.restoreTitle)
         button.setAccessibilityLabel(SiteBoosts.restoreLabel(name))
         button.onClick = { _ in remove() }
         let row = PanelRow(name, control: button, value: selector)
+        row.value?.font = Tokens.Font.code(Tokens.TypeSize.small)
         row.value?.lineBreakMode = .byTruncatingMiddle
         // A selector that is its own name ("div.banner") says it once.
         row.value?.isHidden = name == selector

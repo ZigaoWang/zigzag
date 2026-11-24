@@ -320,6 +320,14 @@ final class FormRow: NSView, SettingsSearchable {
         }
     }
 
+    /// The line under the title in code type (a CSS selector).
+    var detailIsCode = false {
+        didSet {
+            detail.font = detailIsCode ? Tokens.Font.code(Tokens.TypeSize.label) : Tokens.Font.detail()
+            needsLayout = true
+        }
+    }
+
     /// Where the row's text starts.
     var textInset: CGFloat {
         (icon.isHidden && !isIndented && !isNested ? pad : pad + Self.iconSide + Tokens.Space.x3) + (isNested ? Tokens.Space.x4 : 0)
@@ -3209,6 +3217,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// Site Permissions' rows themselves.
+    var debugSiteFormRows: [FormRow] { sitesGroup.rows.compactMap { $0 as? FormRow } }
+
     /// Picks a choice in a site's permission dropdown, as a click there does.
     func debugChooseSitePermission(_ title: String, _ choice: String) {
         guard let row = sitesGroup.rows.compactMap({ $0 as? FormRow }).first(where: { $0.debugTitle == title }),
@@ -4682,14 +4693,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 })
             }
 
-            if let zaps = SiteBoosts.all[site]?.zaps, !zaps.isEmpty {
+            if let boost = SiteBoosts.all[site], !boost.zaps.isEmpty {
+                let zaps = boost.zaps
                 rows.append(makeRow(String(localized: "Zapped elements", comment: "Row in Settings › Privacy › Sites: elements hidden on this site."),
                                     detail: String(localized: "\(zaps.count) hidden", comment: "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count."),
                                     control: NSView()) {
                     SiteBoosts.restoreZaps(forSite: site)
                     PageBoosts.refreshOpenTabs(site: site)
                 })
-                rows += zapRows(zaps, site: site)
+                rows += zapRows(boost, site: site)
             }
 
             if SiteBoosts.all[site]?.hasStyle == true {
@@ -4776,10 +4788,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     /// Each zapped element of `site`, newest first, with × to show it again: the newest five, then the rest on request.
-    private func zapRows(_ zaps: [String], site: String) -> [FormRow] {
+    private func zapRows(_ boost: SiteBoost, site: String) -> [FormRow] {
+        let zaps = boost.zaps
         let shown = zapsShowAll.contains(site) ? zaps.count : 5
         var rows: [FormRow] = zaps.reversed().prefix(shown).map { selector in
-            let name = SiteBoosts.label(forZap: selector)
+            let name = boost.name(forZap: selector)
             let x = IconButton(symbol: "xmark", size: .compact, toolTip: SiteBoosts.restoreTitle)
             x.setAccessibilityLabel(SiteBoosts.restoreLabel(name))
             x.onClick = { [weak self] _ in
@@ -4791,6 +4804,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let row = FormRow(title: name, detail: name == selector ? nil : selector, control: x)
             row.isNested = true
             row.detailTruncatesMiddle = true
+            row.detailIsCode = true
             row.toolTip = selector
             row.keywords = site
             return row
