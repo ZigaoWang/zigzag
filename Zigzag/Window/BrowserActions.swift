@@ -54,7 +54,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func showDownloads(_ sender: Any?) {
         // From the sidebar's Downloads button; with the sidebar hidden, from its stand-in in the same corner, and the
         // sidebar stays hidden, as you left it.
-        if !(root.sidebarVisible || root.isSidebarFloatingVisible) {
+        if !(root.chromeSidebarShown || root.isSidebarFloatingVisible) {
             showFloatingDownloads()
             floatingDownloads.layoutSubtreeIfNeeded()
             DownloadsPanel.show(from: floatingDownloadsButton, in: self)
@@ -225,6 +225,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     // MARK: View
 
     @objc func toggleBrowserSidebar(_ sender: Any?) {
+        // The Whole Screen keeps the sidebar out of the way: it slides out over the page, and its setting stays.
+        if root.isImmersive { root.reveal(!root.isSidebarFloatingVisible); return }
         root.setSidebarVisible(!root.sidebarVisible, animated: true)
         // With the sidebar back, the update card returns there.
         if root.sidebarVisible { Updater.shared.stopFloating() }
@@ -969,8 +971,9 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(reopenClosedTab(_:)): return WindowManager.shared.canReopenLastClosed(from: tabManager)
         case #selector(toggleBrowserSidebar(_:)):
-            item.title = root.sidebarVisible ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
-                                              : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")
+            let shown = root.chromeSidebarShown || (root.isImmersive && root.isSidebarFloatingVisible)
+            item.title = shown ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
+                               : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")
             return true
         case #selector(toggleDeveloperBar(_:)):
             item.title = Self.developerBarTitle(shown: DeveloperTools.showsInBar)

@@ -86,6 +86,43 @@ import Testing
         #expect(DiaImporter.folders(for: [Self.workID, "other"], browser: Self.dia, in: root.userData)["other"] == "Profile 1")
     }
 
+    @Test func aSidebarWithNoProfileGoesToTheOneLastUsed() throws {
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root.userData.deletingLastPathComponent()) }
+        let state = root.userData.appendingPathComponent("Local State")
+        var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: state)) as? [String: Any])
+        var profile = try #require(json["profile"] as? [String: Any])
+        profile["last_used"] = Self.workID
+        json["profile"] = profile
+        try JSONSerialization.data(withJSONObject: json).write(to: state)
+        #expect(DiaImporter.folders(for: [""], browser: Self.dia, in: root.userData) == ["": Self.workID])
+    }
+
+    @Test func everyProfileIsASpaceEvenWithNothingPinned() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root.userData.deletingLastPathComponent()) }
+        // A third profile with no sidebar tabs of its own.
+        try FileManager.default.createDirectory(at: root.userData.appendingPathComponent("Profile 3", isDirectory: true), withIntermediateDirectories: true)
+        let state = root.userData.appendingPathComponent("Local State")
+        var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: state)) as? [String: Any])
+        var profile = try #require(json["profile"] as? [String: Any])
+        let empty = "Dia Empty \(UUID().uuidString)"
+        var cache = try #require(profile["info_cache"] as? [String: Any])
+        cache["Profile 3"] = ["name": empty]
+        profile["info_cache"] = cache
+        profile["profiles_order"] = ["Profile 1", Self.workID, "Profile 3"]
+        json["profile"] = profile
+        try JSONSerialization.data(withJSONObject: json).write(to: state)
+        let result = DiaImporter.importSidebar(Self.dia, parts: [.spaces], userData: root.userData)
+        #expect(result.spaces == 3)
+        let space = try #require(Library.shared.spaces.first { $0.name == empty })
+        #expect(space.importedFrom == "Dia/User Data/Profile 3" && space.bookmarks.isEmpty)
+        // Again: nothing new.
+        #expect(DiaImporter.importSidebar(Self.dia, parts: [.spaces], userData: root.userData).spaces == 0)
+    }
+
     @Test func pinnedTabsAndFavoritesComeOver() throws {
         let before = Library.shared.snapshot
         defer { Library.shared.restore(before) }

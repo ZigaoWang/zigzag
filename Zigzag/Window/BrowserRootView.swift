@@ -693,18 +693,70 @@ final class BrowserRootView: SpaceFrameView {
     /// The top of the bar as it is drawn now: its usual top less how far it has travelled out.
     var barTop: CGFloat { topBarFrame.minY - barOffset }
     /// The bar is on screen: there, even if Autohide has begun to take it out.
-    var barOnScreen: Bool { showsTopBar && !barPutAway }
+    var barOnScreen: Bool { chromeBarShown && !barPutAway }
     var showsTopBar = false {
         didSet {
             guard oldValue != showsTopBar else { return }
             if !showsTopBar { barOffset = 0 }
-            topBar.isHidden = !showsTopBar
+            topBar.isHidden = !chromeBarShown
             needsLayout = true
             refreshGlassFrame()
             refreshGlassOcclusion()
             refreshGrabber()
         }
     }
+    /// The Whole Screen (#462): a page fills the window and the chrome gets out of its way. The bar is laid out but
+    /// hidden until the pointer reaches the top; the sidebar tucks away but its edge still brings it out.
+    var isImmersive = false {
+        didSet {
+            guard oldValue != isImmersive else { return }
+            if isImmersive { sidebarRevealed = false }
+            // The Whole Screen's reveal owns the bar: none of Autohide's offset comes along.
+            if isImmersive { setBarOffset(0, animated: false) }
+            topBarRevealed = false
+            topBar.isHidden = !chromeBarShown
+            needsLayout = true
+            refreshGlassFrame()
+            refreshGlassOcclusion()
+            refreshGrabber()
+        }
+    }
+    /// True while the bar is down over the page in The Whole Screen: an overlay, so the page doesn't move for it.
+    private(set) var topBarRevealed = false {
+        didSet {
+            guard oldValue != topBarRevealed else { return }
+            topBar.isHidden = !chromeBarShown
+            needsLayout = true
+            refreshGlassFrame()
+            refreshGlassOcclusion()
+            if topBarRevealed { slideTopBarDown() }
+        }
+    }
+    /// Keeps the bar down while something hangs from it or has the keyboard (a panel, the address).
+    var keepsTopBar: (() -> Bool)?
+
+    /// Puts the bar away again, as leaving the window does while it's down in full screen.
+    func hideTopBar() {
+        if keepsTopBar?() != true { topBarRevealed = false }
+    }
+
+    /// The bar comes down from above the window's top; with Reduce Motion it fades in where it is.
+    private func slideTopBarDown() {
+        guard let layer = topBar.layer else { return }
+        let reduce = Tokens.Motion.reduceMotion
+        let animation = Tokens.Motion.easeAnimation(keyPath: reduce ? "opacity" : "transform.translation.y", duration: Tokens.Motion.Role.present.duration())
+        animation.fromValue = reduce ? 0 : -topBarFrame.maxY
+        animation.toValue = reduce ? 1 : 0
+        animation.fillMode = .backwards
+        layer.add(animation, forKey: "reveal")
+    }
+
+    /// The sidebar as the window shows it: hidden in The Whole Screen's full screen.
+    var chromeSidebarShown: Bool { sidebarVisible && !isImmersive }
+    /// The bar as the window shows it: in The Whole Screen only when it comes down from the top edge.
+    var chromeBarShown: Bool { isImmersive ? topBarRevealed : showsTopBar }
+    /// The bar is laid out in full screen even while hidden, ready to come down.
+    private var laysOutBar: Bool { showsTopBar || isImmersive }
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
     /// The band over the sidebar's edge, on the card's inner edge while the sidebar is out over the page (#431).
@@ -802,7 +854,8 @@ final class BrowserRootView: SpaceFrameView {
         attentionEdge.isHidden = true
         attentionEdge.onClick = { [weak self] in
             guard let self else { return }
-            self.setSidebarVisible(true, animated: true)
+            // In full screen the sidebar is out of the layout: its edge brings it out.
+            if self.isImmersive { self.reveal(true) } else { self.setSidebarVisible(true, animated: true) }
             // Select the tab the question is for so its banner shows.
             if let waiting = self.waitingTabs.first,
                let tabs = (self.window?.windowController as? BrowserWindowController)?.tabManager {
@@ -851,7 +904,7 @@ final class BrowserRootView: SpaceFrameView {
             // opens again. Closed this way it keeps the width it had, for when it opens next.
             let closesAt = Tokens.Metric.sidebarMinWidth / 2
             // Out over the page, the edge sets the width and nothing else: it stays out until the pointer leaves.
-            if self.sidebarRevealed, !self.sidebarVisible {
+            if self.sidebarRevealed, !self.chromeSidebarShown {
                 // The card floats a frame's inset in from the window edge, so the width is the pointer's reach less it.
                 let reach = x - Tokens.Metric.cardInset
                 let width = Tokens.Space.snap(min(max(reach, Tokens.Metric.sidebarMinWidth), Tokens.Metric.sidebarMaxWidth))
@@ -861,12 +914,12 @@ final class BrowserRootView: SpaceFrameView {
                 self.layoutSubtreeIfNeeded()
                 return
             }
-            if self.sidebarVisible, x < closesAt {
+            if self.chromeSidebarShown, x < closesAt {
                 self.sidebarWidth = self.widthBeforeDrag
                 self.setSidebarVisible(false, animated: true)
                 return
             }
-            if !self.sidebarVisible {
+            if !self.chromeSidebarShown {
                 guard x >= closesAt else { return }
                 self.sidebarWidth = Tokens.Metric.sidebarMinWidth
                 self.setSidebarVisible(true, animated: true)
@@ -996,7 +1049,7 @@ final class BrowserRootView: SpaceFrameView {
 
     /// What a finger landing at `point` does to the sidebar, if anything.
     private func touchTake(at point: NSPoint) -> TouchSidebarPull.Take? {
-        guard !sidebarVisible, window != nil, bounds.contains(point) else { return nil }
+        guard !chromeSidebarShown, window != nil, bounds.contains(point) else { return nil }
         if grabberTakes(point) { return .pull }
         guard resizeHandle(atTouch: point) == nil else { return nil }
         let page = pageAreaFrame
@@ -1086,7 +1139,7 @@ final class BrowserRootView: SpaceFrameView {
 
     /// A finger took the card (`take`), its far edge `base` in from the window's edge.
     func touchPullBegan(_ take: TouchSidebarPull.Take, base: CGFloat) {
-        guard !sidebarVisible else { return }
+        guard !chromeSidebarShown else { return }
         pullTake = take
         pullBase = base
         // From where it is on screen: a slide under way stops where it is.
@@ -1165,7 +1218,7 @@ final class BrowserRootView: SpaceFrameView {
     private var hadSidebarShown: Bool?
 
     /// Hidden in the window: not docked, not out, not under a finger.
-    private var sidebarShown: Bool { sidebarVisible || sidebarRevealed || touchReach != nil }
+    private var sidebarShown: Bool { chromeSidebarShown || sidebarRevealed || touchReach != nil }
 
     private func touchLanded(_ event: NSEvent) {
         guard let window, event.windowNumber == window.windowNumber else { return }
@@ -1185,7 +1238,7 @@ final class BrowserRootView: SpaceFrameView {
 
     /// Whether the group can show with the lights now: the sidebar hidden, no bar, no strip on top, a finger in use.
     private var grabberCanReveal: Bool {
-        TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
+        TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: chromeBarShown, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
                                   now: ProcessInfo.processInfo.systemUptime) && topStrip == nil && window?.styleMask.contains(.fullScreen) != true
     }
 
@@ -1314,7 +1367,7 @@ final class BrowserRootView: SpaceFrameView {
     /// Shows or hides the grabber as `TouchSidebarGrabber.shows` says: in the top strip, or with the lights while
     /// revealed, fading.
     func refreshGrabber() {
-        let show = TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: showsTopBar, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
+        let show = TouchSidebarGrabber.shows(sidebarShown: sidebarShown, barShown: chromeBarShown, touchedAt: touchedAt, pointerMovedAt: pointerMovedAt,
                                              now: ProcessInfo.processInfo.systemUptime)
         // Just hidden with a finger in use: shown a moment so it can be found.
         let hadShown = hadSidebarShown
@@ -1361,7 +1414,7 @@ final class BrowserRootView: SpaceFrameView {
 
     /// A tap on the grabber: the sidebar comes out and stays, as after a finger's pull.
     func openFromGrabber() {
-        guard !sidebarVisible else { return }
+        guard !chromeSidebarShown else { return }
         // The same button as the docked sidebar's toggle: it shows the sidebar in the window, as a click does.
         if let controller = window?.windowController as? BrowserWindowController {
             controller.toggleBrowserSidebar(nil)
@@ -1420,7 +1473,8 @@ final class BrowserRootView: SpaceFrameView {
     /// With the sidebar hidden, the page is the whole window, no frame around it; the sidebar that slides out from
     /// the edge is what moves and zooms the window. With the sidebar showing, the page floats in its frame.
     var isEdgeToEdge: Bool {
-        !sidebarVisible && (Self.isBorderless || window?.styleMask.contains(.fullScreen) == true)
+        if isImmersive { return true }
+        return !sidebarVisible && (Self.isBorderless || window?.styleMask.contains(.fullScreen) == true)
     }
 
     /// With the sidebar hidden, the page runs to the window's edges. On unless turned off in Settings.
@@ -1486,7 +1540,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     var topBarFrame: NSRect {
-        Self.topBarFrame(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth, inset: topBarInset, onRight: sidebarOnRight)
+        Self.topBarFrame(in: bounds, sidebarVisible: chromeSidebarShown, sidebarWidth: sidebarWidth, inset: topBarInset, onRight: sidebarOnRight)
     }
 
     /// Where the bar is drawn now: its usual frame, moved up by however far Autohide has taken it out.
@@ -1516,8 +1570,8 @@ final class BrowserRootView: SpaceFrameView {
 
     /// The page area as a whole, before a side panel takes its share.
     private var pageAreaFrame: NSRect {
-        Self.pageArea(in: bounds, sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth, edgeToEdge: isEdgeToEdge,
-                      borderless: Self.isBorderless, topBar: showsTopBar, barInset: topBarInset, barOffset: barOffset,
+        Self.pageArea(in: bounds, sidebarVisible: chromeSidebarShown, sidebarWidth: sidebarWidth, edgeToEdge: isEdgeToEdge,
+                      borderless: Self.isBorderless, topBar: isImmersive ? false : showsTopBar, barInset: topBarInset, barOffset: barOffset,
                       onRight: sidebarOnRight)
     }
 
@@ -1614,14 +1668,14 @@ final class BrowserRootView: SpaceFrameView {
         return topBarInset > 0 ? Tokens.Color.cardBackground : nil
     }
 
-    private var paintsTopBar: Bool { showsTopBar && barColor != nil && tiles == nil && !isEmpty }
+    private var paintsTopBar: Bool { chromeBarShown && barColor != nil && tiles == nil && !isEmpty }
 
     /// Framed in split view under the bar, each pane whose strip is up in the bar's row is one card with it, as a page
     /// alone is with the bar: its card reaches up to the bar's top, its own ground (its page's color, or the card's)
     /// behind its strip, so no strip floats on the glass over a card. Between the panes the glass shows down to the
     /// window's frame, and the bar has no fill of its own across them. Borderless and edge to edge, the panes meet the
     /// bar in a straight line as before.
-    private var splitJoinsBar: Bool { showsTopBar && tiles != nil && topBarInset > 0 && !isEmpty }
+    private var splitJoinsBar: Bool { chromeBarShown && tiles != nil && topBarInset > 0 && !isEmpty }
 
     /// Whether the card of the pane at `index` reaches up under the bar: a page alone under a bar in its color, or in
     /// split view framed, a pane whose strip is up in the bar (not one enlarged over the rest).
@@ -1681,7 +1735,7 @@ final class BrowserRootView: SpaceFrameView {
         card.frame = left.frame
         card.band = left.band
         topBar.pageColor = paintsTopBar ? barColor : nil
-        let attached = sidebarVisible && Self.isBorderless
+        let attached = chromeSidebarShown && Self.isBorderless
         squareCorners(of: card)
         card.isAttached = attached
         for (i, extra) in extraCards.enumerated() {
@@ -1713,7 +1767,7 @@ final class BrowserRootView: SpaceFrameView {
             let frame = sidePanelFrame
             sidePanel.frame = frame
             // Shaped like a page pane: all four corners at its radius.
-            let attached = sidebarVisible && Self.isBorderless
+            let attached = chromeSidebarShown && Self.isBorderless
             sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius(in: window) : Tokens.Radius.card, squareRight: (false, false))
         }
     }
@@ -1944,8 +1998,8 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     var sidebarFrame: NSRect {
-        let frame = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: sidebarVisible, revealed: sidebarRevealed, onRight: sidebarOnRight)
-        guard let touchReach, !sidebarVisible else { return frame }
+        let frame = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: chromeSidebarShown, revealed: sidebarRevealed, onRight: sidebarOnRight)
+        guard let touchReach, !chromeSidebarShown else { return frame }
         // Under a finger: the card's far edge where the finger has it.
         let out = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: false)
         let pulled = NSRect(x: bounds.minX + touchReach - sidebarWidth, y: out.minY, width: sidebarWidth, height: out.height)
@@ -2003,11 +2057,11 @@ final class BrowserRootView: SpaceFrameView {
     /// of the whole window every frame the page changes (a video, an animation). Otherwise the whole window.
     override var glassFrame: NSRect {
         // Edge to edge under the bar above the page, only the bar shows the frame, as in Zigzag Mini.
-        if showsTopBar, isEdgeToEdge, !card.isHidden { return topBarFrame }
+        if chromeBarShown, isEdgeToEdge, !card.isHidden { return topBarFrame }
         // Beside the sidebar too, the frame shows along the top and the side: glass under all of it.
-        if showsTopBar { return bounds }
+        if chromeBarShown { return bounds }
         // A split view's seam between its two pages shows the frame: glass under all of it then.
-        guard sidebarVisible, card.isAttached, !card.isHidden,
+        guard chromeSidebarShown, card.isAttached, !card.isHidden,
               extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
         return Self.mirrored(NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + max(Tokens.Radius.attached, PageCardView.attachedRadius(in: window)) * 2), height: bounds.height),
                              in: bounds, if: sidebarOnRight)
@@ -2024,7 +2078,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// Nothing to see through: the page runs edge to edge, or the tab overview covers the window with its own glass.
-    override var glassIsCovered: Bool { (isEdgeToEdge && (!showsTopBar || paintsTopBar) && !card.isHidden) || glassCovered }
+    override var glassIsCovered: Bool { (isEdgeToEdge && (!chromeBarShown || paintsTopBar) && !card.isHidden) || glassCovered }
 
     override func layout() {
         super.layout()
@@ -2032,21 +2086,21 @@ final class BrowserRootView: SpaceFrameView {
         layoutCards()
         layoutTopBar()
         sidebarContainer.frame = sidebarFrame
-        sidebarContainer.isFloating = !sidebarVisible && !leavesDocked
+        sidebarContainer.isFloating = !chromeSidebarShown && !leavesDocked
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         // The popout's inner edge takes the pointer too: its card is inset, so the band follows the card (#431).
-        resizeHandle.frame = sidebarRevealed && !sidebarVisible
+        resizeHandle.frame = sidebarRevealed && !chromeSidebarShown
             ? Self.revealedResizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
             : Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
         resizeHandle.line = Self.resizeHandleLine(onRight: sidebarOnRight)
-        resizeHandle.isHidden = !sidebarVisible && !sidebarRevealed && !isDraggingSidebarEdge
+        resizeHandle.isHidden = !chromeSidebarShown && !sidebarRevealed && !isDraggingSidebarEdge
         // With the sidebar hidden, the glow goes on the window edge, not at the resize handle, which would sit inside
         // the page.
         attentionEdge.frame = Self.attentionEdgeFrame(in: bounds, onRight: sidebarOnRight)
         let waiting = waitingTabs
         attentionEdge.waiting = waiting.count
-        attentionEdge.isHidden = sidebarVisible || waiting.isEmpty
+        attentionEdge.isHidden = chromeSidebarShown || waiting.isEmpty
         if isGrabberShown { placeGrabber() }
         refreshGrabber()
         overlay.frame = bounds
@@ -2069,7 +2123,7 @@ final class BrowserRootView: SpaceFrameView {
     /// where the frame comes and goes with the sidebar: there the row would move as the sidebar is shown, and its
     /// toggle, the one thing you reach for in that corner, stays where it is with the sidebar hidden.
     var sidebarTopRowDrop: CGFloat {
-        showsTopBar && barHoldsAddress && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
+        chromeBarShown && barHoldsAddress && !sidebarContainer.isFloating && !frameComesWithSidebar ? topBarFrame.minY : 0
     }
 
     /// Moves the bar and the page's top by `offset`; only Autohide may put it away (#359).
@@ -2184,12 +2238,12 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func layoutTopBar() {
-        guard showsTopBar else { return }
+        guard laysOutBar else { return }
         let page = pageAreaFrame
         placeTopBar()
         // Beside it, the sidebar's favorites and tabs start under the bar's place, wherever Autohide has it.
-        let content = showsTopBar && barHoldsAddress ? topBarFrame.maxY : page.minY
-        if sidebarVisible { sidebarContainer.sidebar.contentTop = content - sidebarFrame.minY }
+        let content = showsTopBar && barHoldsAddress && !isImmersive ? topBarFrame.maxY : page.minY
+        if chromeSidebarShown { sidebarContainer.sidebar.contentTop = content - sidebarFrame.minY }
     }
 
     /// The address's end is over the page's card, the bar being its top: not beside an extension's side panel, where
@@ -2229,7 +2283,7 @@ final class BrowserRootView: SpaceFrameView {
     /// Stacked, the top pane's goes up; the bottom one keeps its own on its card. In a tile group, the panes along
     /// the top, left to right. A pane enlarged over the rest takes its strip with it, on its card.
     private var cardsForBar: [PageCardView] {
-        guard showsTopBar, tiles != nil else { return [] }
+        guard chromeBarShown, tiles != nil else { return [] }
         let frames = tileFrames, top = cardFrame.minY
         return frames.indices.filter { frames[$0].minY <= top + 0.5 && $0 != zoomedPane }.sorted { frames[$0].minX < frames[$1].minX }.map { paneCards[$0] }
     }
@@ -2244,7 +2298,7 @@ final class BrowserRootView: SpaceFrameView {
     private func placeStrips(animated: Bool) {
         let cards = cardsForBar
         // A split's pages each have their own controls: the bar's stay out the whole time, zoomed or not.
-        let stepsAside = showsTopBar && tiles != nil
+        let stepsAside = chromeBarShown && tiles != nil
         guard cards != liftedCards || stepsAside != stripsInBar else { return }
         let entering = stepsAside && !stripsInBar, leaving = !stepsAside && stripsInBar
         liftedCards = cards
@@ -2383,7 +2437,7 @@ final class BrowserRootView: SpaceFrameView {
         layoutSubtreeIfNeeded()
         refreshGlassFrame()
         refreshGlassOcclusion()
-        guard animated, sidebarVisible, !Tokens.Motion.reduceMotion, window != nil else { onSlide?(0, Tokens.Motion.gentle.timing); return }
+        guard animated, chromeSidebarShown, !Tokens.Motion.reduceMotion, window != nil else { onSlide?(0, Tokens.Motion.gentle.timing); return }
         let curve = Tokens.Motion.gentle
         let duration = Tokens.Motion.slide(sidebarContainer, fromOffsetX: oldSidebar.minX - sidebarContainer.frame.minX, curve: curve, fromKeyboard: true)
         onSlide?(duration, curve.timing)
@@ -2422,7 +2476,7 @@ final class BrowserRootView: SpaceFrameView {
         // The bar's strip at the window's left edge holds the traffic lights while the sidebar is hidden: reaching
         // for them there leaves the sidebar be, so they don't move off into it under the pointer. (A sidebar on the
         // right comes out at the other edge, clear of them.)
-        let lights = showsTopBar && !sidebarVisible && !sidebarOnRight ? topBarFrame.maxY : 0
+        let lights = chromeBarShown && !chromeSidebarShown && !sidebarOnRight ? topBarFrame.maxY : 0
         let out = Self.sidebarFrame(in: bounds, width: sidebarWidth, visible: false, revealed: true, onRight: sidebarOnRight)
         return SidebarEdgeZone(bounds: bounds, sidebar: out, onRight: sidebarOnRight, reservedTop: lights)
     }
@@ -2456,6 +2510,23 @@ final class BrowserRootView: SpaceFrameView {
             notePointerMoved(at: event.timestamp)
         }
         if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: lastMoveSpeed) }
+        revealTopBar(near: convert(event.locationInWindow, from: nil))
+    }
+
+    /// In The Whole Screen, the pointer at the window's top brings the bar down over the page without moving it, and
+    /// leaving the bar puts it away again (#462).
+    private func revealTopBar(near point: NSPoint) {
+        guard isImmersive else { return }
+        let revealed = Self.topBarRevealed(at: point, bar: topBarFrame, revealed: topBarRevealed, kept: { self.keepsTopBar?() == true })
+        if revealed != topBarRevealed { topBarRevealed = revealed }
+    }
+
+    /// Whether the bar is down after the pointer moves to `point`: it comes at the window's top edge and goes once
+    /// the pointer is past it, unless something keeps it.
+    static func topBarRevealed(at point: NSPoint, bar: NSRect, revealed: Bool, kept: () -> Bool) -> Bool {
+        if point.y <= Tokens.Space.x2 { return true }
+        guard revealed, point.y > bar.maxY + Tokens.Space.x2 else { return revealed }
+        return kept()
     }
 
     /// The speed of the last moved event, if it came just now: entering and leaving carry none of their own.
@@ -2472,6 +2543,7 @@ final class BrowserRootView: SpaceFrameView {
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
         if edgeZone.opens(at: convert(event.locationInWindow, from: nil)) { pointerAtEdge(at: event.timestamp, speed: recentSpeed(at: event.timestamp)) }
+        revealTopBar(near: convert(event.locationInWindow, from: nil))
     }
 
     /// Looks at the pointer every frame in the moment after it meets the edge, outside the window too, where no
@@ -2489,7 +2561,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     private func pointerAtEdge(at time: TimeInterval, speed: CGFloat) {
-        guard !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
+        guard !chromeSidebarShown, !sidebarRevealed, blocksEdgeReveal?() != true else { return }
         if case .hidden = edgeReveal.phase, let p = pointer {
             Self.edgeLog.notice("met x=\(Int(p.x), privacy: .public) y=\(Int(p.y), privacy: .public) speed=\(Int(speed), privacy: .public) w=\(Int(self.bounds.width), privacy: .public) screenEdge=\(self.windowMeetsScreenEdge, privacy: .public)")
         }
@@ -2507,7 +2579,7 @@ final class BrowserRootView: SpaceFrameView {
     private func decideEdge() {
         // Something may have opened over the window in the meantime (⌘L with the pointer resting here).
         let open: Bool?
-        if let point = pointer, !sidebarVisible, !sidebarRevealed, blocksEdgeReveal?() != true {
+        if let point = pointer, !chromeSidebarShown, !sidebarRevealed, blocksEdgeReveal?() != true {
             open = edgeReveal.decide(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone)
         } else {
             open = false
@@ -2548,7 +2620,7 @@ final class BrowserRootView: SpaceFrameView {
     private func pacePointer() {
         pointerTimer?.invalidate()
         pointerTimer = nil
-        guard let window, !sidebarVisible, sidebarRevealed, window.occlusionState.contains(.visible) else { return }
+        guard let window, !chromeSidebarShown, sidebarRevealed, window.occlusionState.contains(.visible) else { return }
         // Every frame only once the pointer has left, to time the hide exactly; while it rests on the sidebar a tenth of
         // a second is quick enough to notice it leave, and doesn't wake the Mac sixty times a second meanwhile.
         let attentive = NSApp.isActive && window.isKeyWindow
@@ -2576,7 +2648,7 @@ final class BrowserRootView: SpaceFrameView {
     private func followPointer() {
         // A drag on the edge is not the pointer leaving: the band reaches past the card, and the width follows it.
         guard !isDraggingSidebarEdge else { return }
-        guard let point = pointer, !sidebarVisible, sidebarRevealed else { watchPointer(false); return }
+        guard let point = pointer, !chromeSidebarShown, sidebarRevealed else { watchPointer(false); return }
         let wasLeaving = edgeReveal.isLeaving
         let held = isHeld || isTouchHeld || NSEvent.pressedMouseButtons != 0
         if edgeReveal.follow(at: point, time: ProcessInfo.processInfo.systemUptime, in: edgeZone, held: held) {
@@ -2589,7 +2661,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     func reveal(_ show: Bool) {
-        guard !sidebarVisible, show != sidebarRevealed else { return }
+        guard !chromeSidebarShown, show != sidebarRevealed else { return }
         if !show && isHeld { return }
         Self.edgeLog.notice("reveal \(show ? "out" : "in", privacy: .public)")
         let old = sidebarContainer.frame
@@ -2669,7 +2741,7 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// True while the sidebar is in its floating, slid-in state.
-    var isSidebarFloatingVisible: Bool { !sidebarVisible && sidebarRevealed }
+    var isSidebarFloatingVisible: Bool { !chromeSidebarShown && sidebarRevealed }
 
     #if DEBUG
     /// Testing builds: how evenly the frames come while the sidebar slides out or back (debug.log).

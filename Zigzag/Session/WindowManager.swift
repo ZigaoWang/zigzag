@@ -457,7 +457,7 @@ final class WindowManager {
                                         sidebarWidth: Double(controller.root.sidebarWidth),
                                         currentSpaceID: manager.currentSpaceID,
                                         spaces: spaces, bookmarkTabs: bookmarkTabs,
-                                        isFullScreen: controller.window?.styleMask.contains(.fullScreen),
+                                        isFullScreen: controller.savesFullScreen,
                                         splits: withTabs ? manager.splits : nil,
                                         tabGroups: Self.savedGroups(spaces, in: manager))
     }

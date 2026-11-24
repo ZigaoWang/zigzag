@@ -94,9 +94,11 @@ enum DiaImporter {
         all.profile = nil
         let folders = ChromiumImporter.profiles(of: all, in: userData).map(\.lastPathComponent)
         var cache: [String: Any] = [:]
+        var lastUsed: String?
         if let data = try? Data(contentsOf: userData.appendingPathComponent("Local State")),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             cache = ((json["profile"] as? [String: Any])?["info_cache"] as? [String: Any]) ?? [:]
+            lastUsed = (json["profile"] as? [String: Any])?["last_used"] as? String
         }
         func plain(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
         func holds(_ any: Any?, _ key: String, depth: Int = 0) -> Bool {
@@ -113,7 +115,11 @@ enum DiaImporter {
         }
         for id in ids {
             let key = plain(id)
-            guard !key.isEmpty else { continue }
+            // Dia leaves the ID empty when its sidebar isn't tied to one profile: the profile it last used has it.
+            if key.isEmpty {
+                if let lastUsed, folders.contains(lastUsed) { result[id] = lastUsed }
+                continue
+            }
             if let folder = folders.first(where: { plain($0) == key })
                 ?? (key.count >= 4 ? folders.first(where: { holds(cache[$0], key) }) : nil)
                 ?? (key.count >= 8 ? folders.first(where: { plain($0).contains(key) }) : nil) {
@@ -197,6 +203,19 @@ enum DiaImporter {
                 for bookmark in incoming.bookmarks.prefix(40) { FaviconStore.shared.prefetch(for: bookmark.url) }
             }
             if !tabs.isEmpty { open.append((spaceID, tabs)) }
+        }
+        // Every Dia profile is a space, as its bookmarks would make one, even a profile with none to bring.
+        if parts.contains(.spaces) {
+            let labels = ChromiumImporter.profileLabels(of: browser, in: userData)
+            for label in labels where browser.profile == nil || browser.profile == label.folder {
+                guard let from = ChromiumImporter.importProfile(of: browser, folder: label.folder, labels: labels) else { continue }
+                let place = ImportCoordinator.placement(for: from, source: browser.name, in: library.spaces, on: profile,
+                                                        profileOf: library.profileID(ofSpace:))
+                guard place.space == nil else { continue }
+                let space = library.addSpace(name: place.name, profile: profile)
+                library.setImportedFrom(from.key, forSpace: space.id)
+                result.spaces += 1
+            }
         }
         result.tabs = ArcImporter.openInWindow(open)
         log.notice("Dia import: \(result.spaces) spaces, \(result.bookmarks) bookmarks, \(result.tabs) open tabs, \(result.problems.count) problems")

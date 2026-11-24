@@ -1888,7 +1888,7 @@ final class SidebarListView: NSView {
         for window in NSApp.orderedWindows where window.isVisible && window.frame.contains(screenPoint) {
             guard let controller = window.windowController as? BrowserWindowController else { return nil }
             let container = controller.root.sidebarContainer
-            guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else { return nil }
+            guard controller.root.chromeSidebarShown || controller.root.isSidebarFloatingVisible else { return nil }
             let local = container.convert(window.convertPoint(fromScreen: screenPoint), from: nil)
             return container.bounds.contains(local) ? (controller, controller.sidebar.list) : nil
         }
