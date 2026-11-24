@@ -32,18 +32,15 @@ struct InPageMiniHostTests {
         }
     }
 
-    @Test func theHostOpensOneAndClosesIt() {
+    @Test func dockedChromeStartsHiddenAndComesDownAtTheTop() {
         inWindow { browser, tab in
-            browser.inPageMini.enabledProvider = { true }
-            browser.inPageMini.shouldDock = { _, _, _, _, _ in true }
-            NSApp.activate(ignoringOtherApps: true)
-            browser.window?.makeKeyAndOrderFront(nil)
-            #expect(browser.inPageMini.openURL(url: URL(string: "about:blank"), configuration: nil, opener: tab, by: .page))
-            #expect(browser.inPageMini.record != nil)
-            #expect(browser.inPageMini.record?.controller.isDockedInPage == true)
-            browser.inPageMini.closeShown(animated: false)
-            #expect(browser.inPageMini.record == nil)
-            #expect(browser.root.inPageMini == nil)
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            #expect(mini.root.chromeOverlay)
+            #expect(!mini.root.chromeRevealed)
+            mini.root.pointerMoved(to: NSPoint(x: 4, y: 1))
+            #expect(mini.root.chromeRevealed)
+            mini.closeInPage(animated: false)
         }
     }
 }

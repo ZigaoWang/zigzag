@@ -40,17 +40,17 @@ final class InPageMiniHost {
     }
 
     weak var browser: BrowserWindowController?
-    var enabledProvider: () -> Bool = { InPageMiniSettings.isEnabled }
-    var shouldDock: @MainActor (Bool, Bool, Bool, Bool, Bool) -> Bool = InPageMiniPolicy.shouldDock
     private(set) var record: Record?
 
     /// Opens `url` in the page if the setting is on and this window can hold it. Returns false to fall back to the
     /// standalone Mini.
     func openURL(url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender) -> Bool {
-        guard enabledProvider(), let browser, let window = browser.window,
+        guard InPageMiniSettings.isEnabled, let browser, let window = browser.window,
               let host = opener ?? browser.tabManager.selectedTab else { return false }
-        guard shouldDock(true, window.isKeyWindow, window.isVisible,
-                         window.isMiniaturized, window.isOnActiveSpace) else { return false }
+        guard InPageMiniPolicy.shouldDock(enabled: true, windowIsKey: window.isKeyWindow,
+                                          windowIsVisible: window.isVisible,
+                                          windowIsMiniaturized: window.isMiniaturized,
+                                          windowIsOnActiveSpace: window.isOnActiveSpace) else { return false }
         closeShown(animated: false)
         let controller = MiniWindowController.open(fromPage: url, configuration: configuration, opener: host,
                                                    in: browser, by: sender, dockedIn: browser)
@@ -98,11 +98,6 @@ final class InPageMiniHost {
     }
 
     func windowClosing() { closeShown(animated: false) }
-
-    func fullScreenChanged(_ phase: FullScreenPhase) {
-        guard record != nil, !phase.isMoving else { return }
-        browserLayoutChanged()
-    }
 
     func browserLayoutChanged() {
         guard let record, let browser else { return }

@@ -223,6 +223,8 @@ final class BrowserWindow: NSWindow {
         }
         if let eventInterceptor, eventInterceptor(event) { return }
         if let side = SideButton(event.type, button: event.buttonNumber) {
+            if let controller = windowController as? BrowserWindowController,
+               controller.peekHandlesSideButton(side, at: event.locationInWindow) { return }
             if let action = side.action { windowController?.tryToPerform(action, with: nil) }
             return
         }

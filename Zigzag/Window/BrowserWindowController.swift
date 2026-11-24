@@ -2640,7 +2640,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// is done moving them.
     private func fullScreenChanged(_ event: FullScreenPhase.Event) {
         let phase = browserWindow.fullScreenPhase.after(event)
-        inPageMini.fullScreenChanged(phase)
         browserWindow.fullScreenPhase = phase
         if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
             browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
@@ -2752,6 +2751,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func openInMini(_ url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
         commandBar.dismiss(restoringFocus: false)
         return MiniWindowController.open(fromPage: url, configuration: configuration, opener: opener, in: self, by: sender).tab.webView
+    }
+
+    /// A side button over a docked Mini goes to the Mini's own history, not the page underneath.
+    func peekHandlesSideButton(_ side: BrowserWindow.SideButton, at point: NSPoint) -> Bool {
+        guard side != .press, let record = inPageMini.record, record.controller.isDockedInPage,
+              let peekRoot = record.controller.root.superview else { return false }
+        guard peekRoot.frame.contains(root.convert(point, from: nil)) else { return false }
+        if side == .back { record.controller.goBack(nil) } else { record.controller.goForward(nil) }
+        return true
     }
 
     /// A shift-click that should appear in the page, if the setting is on and this window can hold it.
