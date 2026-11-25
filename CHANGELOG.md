@@ -5,6 +5,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-25
+
+Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
+
 ### New
 - Zigzag is now in Japanese, following Apple's own Japanese terms for macOS and Safari. It follows your Mac's language, or pick it in Settings › General › Language.
 - Zigzag is now in Korean, German, French, Italian, Spanish, Brazilian Portuguese, Russian, Dutch, Polish and Turkish, following Apple's own terms for each. It follows your Mac's language, or pick one in Settings › General › Language.
@@ -1670,6 +1674,7 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 - The first public release: signed and notarized, with updates that install themselves.
 
 [Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.5...HEAD
+[0.10.0]: https://github.com/ZigaoWang/zigzag/compare/v0.9.5...HEAD
 [0.9.5]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/ZigaoWang/zigzag/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...v0.9.3
