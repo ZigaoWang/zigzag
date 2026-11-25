@@ -129,7 +129,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// What the feature is called wherever Zigzag names it.
     static var name: String { String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.") }
 
-    let tab: Tab
+    private(set) var tab: Tab
     let root = MiniRootView()
     private var strip: MiniStripView { root.strip }
     /// The Mini is presented in a page: dimmed page, click-out and Esc, the same root and page.
@@ -189,6 +189,23 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private(set) weak var source: BrowserWindowController?
     private weak var sourceTab: Tab?
     private(set) var fromPage = false
+
+    /// A page on loan from the screen-edge sidebar: the row's own tab, shown here live, with the page still in the
+    /// browser's tab list. Closing this window gives the page back rather than closing the tab.
+    private struct BorrowedPage {
+        weak var host: (any TabHost)?
+        let wasOutsideTabList: Bool
+        weak var origin: NSView?
+        let originFrame: NSRect
+        weak var card: PageCardView?
+        weak var browser: BrowserWindowController?
+    }
+    private var borrowed: BorrowedPage?
+    /// The row tab's own changes, replaced when the preview swaps pages. The other tokens outlive the page.
+    private var tabToken: SignalToken?
+    /// The preview is showing a row's live tab rather than a page of its own.
+    var isBorrowingPage: Bool { borrowed != nil }
+
     /// From a private window: its own store, nothing written down.
     var isPrivate: Bool { tab.isPrivate }
 
@@ -379,20 +396,24 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
-    /// A page previewed from the screen-edge sidebar: the same Mini, docked as a card beside the sidebar. It loads the
-    /// page's address in its space; it does not take the tab or its page.
+    /// A page previewed from the screen-edge sidebar: the row's own tab, live, docked as a card beside the sidebar.
+    /// The page is on loan: closing the Mini gives it back to the browser rather than closing the tab.
     @discardableResult
     static func openPreview(of tab: Tab, from browser: BrowserWindowController,
                             dockedIn edge: any MiniDockHosting) -> MiniWindowController? {
         guard let url = tab.url, !tab.isPrivate,
               ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return nil }
-        let page = Tab(url: url, spaceID: tab.spaceID, configuration: nil)
-        page.opener = tab
-        page.firstLoad.sender = .page
-        let controller = MiniWindowController(tab: page, frame: NSRect(origin: .zero, size: openingSize), overFullScreen: false)
+        let holder = tab.pageHolder
+        let borrow = BorrowedPage(host: tab.host, wasOutsideTabList: tab.isOutsideTabList,
+                                  origin: holder?.superview, originFrame: holder?.frame ?? .zero,
+                                  card: Self.card(holding: holder), browser: browser)
+        let controller = MiniWindowController(tab: tab, frame: NSRect(origin: .zero, size: openingSize), overFullScreen: false)
         controller.fromPage = true
         controller.source = browser
         controller.sourceTab = tab
+        controller.borrowed = borrow
+        // The row keeps its place in the list: the Mini has its page, not its tab.
+        controller.tab.isOutsideTabList = borrow.wasOutsideTabList
         all.append(controller)
         Diagnostics.note("Zigzag Mini opened", site: url.host(), "from the edge sidebar")
         controller.attachDocked(in: edge, quiet: true)
@@ -405,11 +426,86 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
-    /// Swaps the previewed page without making a new Mini or resizing the card.
+    /// Swaps the previewed page without making a new Mini or resizing the card. The page it was showing goes back to
+    /// its tab first; the next comes in live, with its scroll, form and media state as it was.
     func loadPreview(_ tab: Tab) {
-        guard isDockedInPage, tab.spaceID == self.tab.spaceID, let url = tab.url else { return }
+        guard isDockedInPage, tab.spaceID == self.tab.spaceID, let url = tab.url, !tab.isPrivate else { return }
+        if isBorrowingPage {
+            guard tab !== self.tab else { return }
+            giveBackBorrowedPage()
+            adoptBorrowedPage(tab)
+            return
+        }
         sourceTab = tab
         if self.tab.url != url { self.tab.load(url, by: .page) }
+    }
+
+    /// Takes the row's tab into this Mini, remembering where its page came from and how the tab was listed.
+    private func adoptBorrowedPage(_ tab: Tab) {
+        let holder = tab.pageHolder
+        borrowed = BorrowedPage(host: tab.host, wasOutsideTabList: tab.isOutsideTabList,
+                                origin: holder?.superview, originFrame: holder?.frame ?? .zero,
+                                card: Self.card(holding: holder), browser: source)
+        self.tab = tab
+        tab.host = self
+        // It is still in the browser's list: the Mini has its page, not its row.
+        tab.isOutsideTabList = borrowed?.wasOutsideTabList ?? false
+        sourceTab = tab
+        observeTab()
+        root.card.showLoading(of: tab)
+        showPage()
+        refreshStrip()
+        refreshBar(animated: false)
+        window?.title = tab.displayTitle
+    }
+
+    /// Gives the borrowed page back to its tab. It goes back to the card it came from only while that still shows it;
+    /// a card that moved on takes it again when its tab is shown.
+    private func giveBackBorrowedPage() {
+        guard let borrowed else { return }
+        let page = tab
+        self.borrowed = nil
+        tabToken?.cancel()
+        tabToken = nil
+        if !page.isClosed, let holder = page.pageHolder {
+            holder.removeFromSuperview()
+            // A page the browser's card replaced meanwhile stays out, so it never paints over the page there now.
+            if let origin = borrowed.origin, let card = borrowed.card, card.webView === page.webView {
+                holder.frame = borrowed.originFrame
+                // The card lays the page out again when the Web Inspector takes room beside it.
+                holder.onDockedRoomChange = { [weak card] in card?.needsLayout = true }
+                origin.addSubview(holder)
+                origin.needsLayout = true
+                card.needsLayout = true
+            }
+        }
+        page.isOutsideTabList = borrowed.wasOutsideTabList
+        page.host = borrowed.host
+    }
+
+    /// The page card a tab's holder is in, whichever pane of a split it is.
+    private static func card(holding holder: PageHolder?) -> PageCardView? {
+        var view = holder?.superview
+        while let current = view {
+            if let card = current as? PageCardView { return card }
+            view = current.superview
+        }
+        return nil
+    }
+
+    /// Expand with a borrowed page: the row's tab leaves the browser's list and this Mini keeps it for good, so
+    /// closing the standalone window closes the page, as any Zigzag Mini does.
+    private func commitBorrowedPage() -> Bool {
+        guard let borrowed, let browser = borrowed.browser, !tab.isClosed,
+              browser.tabManager.tab(with: tab.id) === tab else { return false }
+        if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
+        guard browser.tabManager.release(tab) != nil else { return false }
+        self.borrowed = nil
+        tab.host = self
+        tab.isOutsideTabList = true
+        sourceTab = nil
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(self) }
+        return true
     }
 
     // MARK: - In the page
@@ -489,6 +585,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// Expands the docked Mini into its own window, with the same root, tab and web view.
     func promoteFromPage() {
         guard isDockedInPage, !isLeaving, let window else { return }
+        // A borrowed page's tab leaves the browser's list here: the standalone Mini owns it from now on.
+        if isBorrowingPage, !commitBorrowedPage() { return }
         let card = window.frame
         endDockPresentation()
         let size = NSSize(width: card.width, height: card.height + Tokens.Metric.miniStripHeight)
@@ -791,7 +889,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         root.card.showLoading(of: tab)
 
         tab.host = self
-        tokens.append(tab.changed.observe { [weak self] change in self?.tabChanged(change) })
+        observeTab()
         // The space's color or name changed, or the space went: the window follows, as a browser window does.
         tokens.append(Library.shared.changed.observe { [weak self] in
             self?.settleProfile()
@@ -953,7 +1051,22 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         root.card.hidePlaceholder()
     }
 
+    /// Its page's changes. Replaced when the edge preview swaps to another row's tab; the window's other signals stay.
+    private func observeTab() {
+        tabToken?.cancel()
+        tabToken = tab.changed.observe { [weak self] change in self?.tabChanged(change) }
+    }
+
     private func tabChanged(_ change: Tab.Change) {
+        // A borrowed page whose tab closed in the browser has nowhere to be shown: the preview goes with it.
+        if tab.isClosed {
+            if isDockedInPage {
+                closeInPage(focusBack: false)
+            } else {
+                window?.close()
+            }
+            return
+        }
         switch change {
         case .url, .loading, .title, .favicon, .webView, .navigation:
             refreshStrip()
@@ -1219,8 +1332,35 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window
-    /// fades away first, then the page is there.
-    @objc func openInZigzag(_ sender: Any? = nil) { moveOut() }
+    /// fades away first, then the page is there. A borrowed preview page is already a browser tab: it goes back to it.
+    @objc func openInZigzag(_ sender: Any? = nil) {
+        if isBorrowingPage {
+            returnBorrowedPageToBrowser()
+            return
+        }
+        moveOut()
+    }
+
+    /// Open in Zigzag from the edge preview: the page is already the browser's tab, so it goes back to its card, its
+    /// row is selected, and the sidebar has finished its errand.
+    private func returnBorrowedPageToBrowser() {
+        guard isBorrowingPage, !movedOut, !isLeaving, let browser = source else { return }
+        returnTo = nil
+        commandBar.dismiss(restoringFocus: false)
+        linkStatus.hide()
+        let page = tab
+        fadeAway { [weak self] in
+            guard let self else { return }
+            self.movedOut = true
+            self.tokens.removeAll()
+            self.giveBackBorrowedPage()
+            self.window?.close()
+            if let still = browser.tabManager.tab(with: page.id), still === page {
+                browser.tabManager.select(page)
+            }
+            Self.bringForward(browser)
+        }
+    }
 
     /// `then`: runs in the browser window the page went to.
     private func moveOut(then: ((BrowserWindowController) -> Void)? = nil) {
@@ -1271,6 +1411,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         madeFindBar?.hide()
         pageGone.send()
         tokens.removeAll()
+        tabToken?.cancel()
+        tabToken = nil
         Autofill.shared.forget(windowOf: window)
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         tab.pageHolder?.removeFromSuperview()
@@ -1423,10 +1565,18 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         pageGone.send()
         linkStatus.hide()
         Autofill.shared.forget(windowOf: window)
-        if !movedOut {
+        if isBorrowingPage {
+            // The row's page goes back to its tab; closing the preview is not closing the page.
+            giveBackBorrowedPage()
             tokens.removeAll()
-            if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
-            tab.close()
+        } else if !movedOut {
+            tokens.removeAll()
+            tabToken?.cancel()
+            tabToken = nil
+            if !tab.isClosed {
+                if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
+                tab.close()
+            }
         }
         if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
         // Getting started's ⇧-click step is done once a Mini from a page closes or moves into a tab.
@@ -1837,8 +1987,9 @@ final class MiniRootView: SpaceFrameView {
     }
 
     private func scheduleChromeHide() {
-        guard chromeOverlay, chromeRevealed else { return }
-        chromeHideWork?.cancel()
+        // One hide for as long as the pointer is away. The edge sidebar follows the pointer every 0.05 s, so starting
+        // the wait again on each sample would push it back forever and leave the strip down.
+        guard chromeOverlay, chromeRevealed, chromeHideWork == nil else { return }
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.chromeOverlay, self.chromeRevealed else { return }

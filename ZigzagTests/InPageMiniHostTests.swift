@@ -32,6 +32,34 @@ struct InPageMiniHostTests {
         try await body(controller, tab)
     }
 
+    private func inWindow(pageAt url: String, _ body: (BrowserWindowController, Tab) throws -> Void) rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = manager.newTab(url: URL(string: url), spaceID: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        try body(controller, tab)
+    }
+
+    private func inWindow(pageAt url: String, and second: String,
+                          _ body: (BrowserWindowController, Tab, Tab) throws -> Void) rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: url), spaceID: space)
+        let other = manager.newTab(url: URL(string: second), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        try body(controller, first, other)
+    }
+
     @Test func aDockedMiniIsABorderlessChildOfTheBrowserWindow() throws {
         try inWindow { browser, tab in
             let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
@@ -115,6 +143,101 @@ struct InPageMiniHostTests {
             mini.root.pointerMoved(to: NSPoint(x: 4, y: 1))
             #expect(mini.root.chromeRevealed)
             mini.closeInPage(animated: false)
+        }
+    }
+
+    @Test func theStripGoesBackUpWhileThePointerRestsAway() async throws {
+        try await inWindowAsync { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            #expect(!mini.root.chromeRevealed)
+            mini.root.pointerMoved(to: NSPoint(x: 4, y: 1))
+            #expect(mini.root.chromeRevealed)
+            // The edge sidebar follows the pointer every 0.05 s. Resting away from the top must not push the hide back
+            // each time, or the strip would stay down for as long as the sidebar is open.
+            for _ in 0..<10 {
+                try await Task.sleep(for: .milliseconds(50))
+                mini.root.pointerMoved(to: NSPoint(x: 4, y: 300))
+            }
+            #expect(!mini.root.chromeRevealed)
+            mini.closeInPage(animated: false)
+        }
+    }
+
+    @Test func theEdgePreviewBorrowsTheRowsLivePage() throws {
+        try inWindow(pageAt: "https://example.test/live") { browser, tab in
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))
+            let holder = try #require(tab.pageHolder)
+            // The row's own tab, not a second load: the Mini shows the page the browser already has.
+            #expect(mini.tab === tab)
+            #expect(tab.host === mini)
+            #expect(mini.root.card.webView === tab.webView)
+            #expect(browser.root.card.webView === tab.webView)
+            #expect(holder.superview != nil)
+            #expect(!tab.isOutsideTabList)
+            mini.closeInPage(focusBack: false, animated: false)
+            // Closing the preview gives the page back; the tab is still in the browser's list, unclosed.
+            #expect(!tab.isClosed)
+            #expect(tab.host === browser)
+            #expect(!tab.isOutsideTabList)
+            #expect(tab.pageHolder === holder)
+            #expect(browser.root.card.webView === tab.webView)
+            #expect(holder.superview != nil)
+            #expect(!MiniWindowController.all.contains { $0 === mini })
+        }
+    }
+
+    @Test func swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack() throws {
+        try inWindow(pageAt: "https://example.test/one", and: "https://example.test/two") { browser, first, second in
+            let mini = try #require(MiniWindowController.openPreview(of: first, from: browser, dockedIn: browser))
+            let firstHolder = try #require(first.pageHolder)
+            mini.loadPreview(second)
+            #expect(mini.tab === second)
+            #expect(second.host === mini)
+            #expect(mini.root.card.webView === second.webView)
+            // The first page is back in the card it came from, still the browser's page.
+            #expect(first.host === browser)
+            #expect(browser.root.card.webView === first.webView)
+            #expect(firstHolder.superview != nil)
+            let secondHolder = try #require(second.pageHolder)
+            mini.closeInPage(focusBack: false, animated: false)
+            #expect(!second.isClosed)
+            #expect(second.host === browser)
+            // It was never the browser's page, so its holder waits for the row to be shown rather than painting over.
+            #expect(secondHolder.superview == nil)
+            browser.tabManager.select(second)
+            browser.window?.layoutIfNeeded()
+            #expect(browser.root.card.webView === second.webView)
+            #expect(secondHolder.superview != nil)
+        }
+    }
+
+    @Test func openInZigzagGivesTheBorrowedPageBackToItsTab() throws {
+        try inWindow(pageAt: "https://example.test/open") { browser, tab in
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))
+            // Nothing on screen to fade: Open in Zigzag runs at once.
+            mini.window?.alphaValue = 0
+            mini.openInZigzag()
+            #expect(!tab.isClosed)
+            #expect(tab.host === browser)
+            #expect(browser.tabManager.selectedTab === tab)
+            #expect(browser.root.card.webView === tab.webView)
+            #expect(!MiniWindowController.all.contains { $0 === mini })
+            #expect(!MiniWindowController.all.contains { $0.tab === tab })
+        }
+    }
+
+    @Test func expandingThePreviewTakesTheRowsTabOutOfTheList() throws {
+        try inWindow(pageAt: "https://example.test/expand") { browser, tab in
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))
+            mini.promoteFromPage()
+            #expect(!mini.isDockedInPage)
+            // Expanded, the page is a Mini of its own: its row leaves the browser and the Mini owns it.
+            #expect(browser.tabManager.tab(with: tab.id) == nil)
+            #expect(tab.isOutsideTabList)
+            #expect(tab.host === mini)
+            mini.window?.close()
+            #expect(tab.isClosed)
         }
     }
 
