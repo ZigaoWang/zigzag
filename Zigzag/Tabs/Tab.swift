@@ -5,6 +5,9 @@ import WebKit
 protocol TabHost: AnyObject {
     var hostWindow: NSWindow? { get }
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender)
+    /// Offers a shift-click to the host's in-page Mini. False falls back to the standalone Mini.
+    @discardableResult
+    func tab(_ tab: Tab, openInPageMini url: URL, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender) -> Bool
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView?
     func tabDidRequestClose(_ tab: Tab)
     /// Back from a tab a link opened, with no page before this one in it.
@@ -28,6 +31,7 @@ protocol TabHost: AnyObject {
 
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
+    func tab(_ tab: Tab, openInPageMini url: URL, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender) -> Bool { false }
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
     /// No space of the window's own for the page here (a web app, Zigzag Mini): The Whole Screen is WebKit's, as before.
     func tab(_ tab: Tab, pageFullScreenChanged on: Bool) {
@@ -2071,6 +2075,7 @@ extension Tab: WKNavigationDelegate {
                 host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
             case .mini:
+                if host?.tab(self, openInPageMini: url, configuration: nil, by: .page) == true { return (.cancel, preferences) }
                 host?.tab(self, openURL: url, disposition: .mini)
                 return (.cancel, preferences)
             case .download:
@@ -2137,6 +2142,13 @@ extension Tab: WKNavigationDelegate {
             return .page
         }
         return followed ?? .page
+    }
+
+    /// A ⇧-click the page handled itself: no web view comes back for WebKit's configuration to belong to, so the Mini
+    /// gets none, matching the off path that opens the standalone Mini.
+    @discardableResult
+    func openPageHandledMini(_ url: URL) -> Bool {
+        host?.tab(self, openInPageMini: url, configuration: nil, by: .page) == true
     }
 
     /// Where a request for a new window opens. A real link click uses `linkActivation`'s precedence (⌘ wins, ⇧ alone is
@@ -2765,6 +2777,7 @@ extension Tab: WKUIDelegate {
                                                  modifiers: navigationAction.modifierFlags,
                                                  buttonNumber: navigationAction.buttonNumber)
             if activation == .mini, let url = navigationAction.request.url {
+                if openPageHandledMini(url) { return nil }
                 host?.tab(self, openURL: url, disposition: .mini)
                 return nil
             }

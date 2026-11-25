@@ -26,6 +26,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private(set) var edgeSidebar: SidebarView?
     private var edgeContainer: SidebarContainer?
     let root: BrowserRootView
+    let inPageMini = InPageMiniHost()
+    private var inPageMiniEscMonitor: Any?
     var browserWindow: BrowserWindow { window as! BrowserWindow }
 
     private var tokens: [SignalToken] = []
@@ -80,6 +82,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
+        inPageMini.browser = self
         // A width saved before the toolbar's buttons grew can be narrower than they now need. With none given, the
         // view keeps the width dragged out last time, which every window shares (#431).
         if let sidebarWidth {
@@ -103,6 +106,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             self.placeFloatingUpdate()
         }
+        root.onInPageMiniLayout = { [weak self] _ in self?.inPageMini.browserLayoutChanged() }
+        root.onInPageMiniSlide = { [weak self] show, duration in
+            self?.inPageMini.sidebarSlid(show: show, duration: duration)
+        }
+        // Only a docked Mini needs the window's Esc monitor: with the setting off, none is installed.
+        inPageMini.onRecordChanged = { [weak self] in self?.inPageMiniRecordChanged() }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onTouchPull = { [weak self] pulling in
             guard let self else { return }
@@ -454,6 +463,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .structure:
             // Many at once (`TabManager.together`): once, when they're all done.
             if tabManager.isBatching { break }
+            inPageMini.tabsChanged()
             bothSidebars { $0.list.reload(animated: window?.isVisible == true) }
             // Pinned or unpinned from a row, a drag or ⌘Z, or its opener closed: the star and Back follow.
             refreshAddress(for: tabManager.selectedTab)
@@ -485,6 +495,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private(set) var handoff: NSUserActivity?
 
     private func spaceChanged() {
+        inPageMini.closeShown()
         let spaces = tabManager.listedSpaces
         let old = lastSpaceID
         let oldIndex = old.flatMap { id in spaces.firstIndex { $0.id == id } } ?? 0
@@ -802,6 +813,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func showSelectedTab() {
         Freezes.mark("tab switch")
+        inPageMini.willSelect(tabManager.selectedTab)
         previews.hide()
         let tab = tabManager.selectedTab
         // The site panel describes one page; another tab coming forward takes it away.
@@ -3039,6 +3051,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // The space never came: the chrome comes back and the page keeps its fill in the window.
         endWholeScreen()
         fullScreenChanged(.didFailToEnter)
+        inPageMini.fullScreenTransitionFailed()
         // The browser's space never came: the page can still go to WebKit's own full screen.
         if let tab = pageFullScreenNativeAfterSpace {
             pageFullScreenNativeAfterSpace = nil
@@ -3069,6 +3082,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Diagnostics.note("Full screen didn't end")
         pageFullScreenNativeAfterSpace = nil
         fullScreenChanged(.didFailToExit)
+        inPageMini.fullScreenTransitionFailed()
     }
 
     /// One place for the title bar through full screen: what each phase wants, and the buttons laid out once AppKit
@@ -3103,12 +3117,36 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Set as the window closes, for what holds on to this controller past that (Zigzag Mini's source).
     private(set) var windowClosed = false
 
+    /// Whether the window is watching for Esc over a docked Mini, for the off path's sake.
+    var hasInPageMiniEscMonitor: Bool { inPageMiniEscMonitor != nil }
+
+    private func inPageMiniRecordChanged() {
+        if inPageMini.record == nil { removeInPageMiniEscMonitor() } else { installInPageMiniEscMonitor() }
+    }
+
+    private func installInPageMiniEscMonitor() {
+        guard inPageMiniEscMonitor == nil else { return }
+        inPageMiniEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.keyCode == 53, !event.isARepeat,
+                  self.window?.isKeyWindow == true, self.inPageMini.record != nil else { return event }
+            return self.inPageMini.escapePressed(event) ? nil : event
+        }
+    }
+
+    private func removeInPageMiniEscMonitor() {
+        if let monitor = inPageMiniEscMonitor { NSEvent.removeMonitor(monitor) }
+        inPageMiniEscMonitor = nil
+    }
+
     /// Closing the AI apps' window while they work hides it again instead (Headless).
     func windowShouldClose(_ sender: NSWindow) -> Bool { !Headless.parksInsteadOfClosing(self) }
 
     func windowWillClose(_ notification: Notification) {
         EdgeSidebar.shared.windowClosed(self)
         windowClosed = true
+        inPageMini.onRecordChanged = nil
+        inPageMini.windowClosing()
+        removeInPageMiniEscMonitor()
         fadeTimer?.invalidate()
         numberHints?.stop()
         Autofill.shared.forget(windowOf: window)
@@ -3183,6 +3221,28 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func openInMini(_ url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
         commandBar.dismiss(restoringFocus: false)
         return MiniWindowController.open(fromPage: url, configuration: configuration, opener: opener, in: self, by: sender).tab.webView
+    }
+
+    /// A side button over a docked Mini goes to the Mini's own history, not the page underneath. Visible, the Mini is
+    /// a child window and takes the button itself; this covers the moment it is ordered out under the window's chrome.
+    func peekHandlesSideButton(_ side: BrowserWindow.SideButton, at point: NSPoint) -> Bool {
+        guard side != .press, let record = inPageMini.record, record.controller.isDockedInPage,
+              let frame = record.controller.dockedScreenFrame, let window else { return false }
+        let onScreen = window.convertToScreen(NSRect(origin: point, size: .zero)).origin
+        guard frame.contains(onScreen) else { return false }
+        if side == .back { record.controller.goBack(nil) } else { record.controller.goForward(nil) }
+        return true
+    }
+
+    /// A shift-click that should appear in the page, if the setting is on and this window can hold it.
+    @discardableResult
+    func openInPageMini(_ url: URL, configuration: WKWebViewConfiguration?, opener: Tab,
+                        by sender: Tab.LoadSender = .page) -> Bool {
+        // The setting is checked first: with it off, the command bar closes in `openInMini` on the path that opens one,
+        // exactly as it did before.
+        guard inPageMini.openURL(url: url, configuration: configuration, opener: opener, by: sender) else { return false }
+        commandBar.dismiss(restoringFocus: false)
+        return true
     }
 
     private func sidebarContains(_ event: NSEvent) -> Bool {
@@ -3267,6 +3327,11 @@ extension BrowserWindowController: TabHost {
 
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool {
         openRouted(url, arrival: arrival, from: tab, inBackground: inBackground, by: .page)
+    }
+
+    @discardableResult
+    func tab(_ tab: Tab, openInPageMini url: URL, configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender) -> Bool {
+        openInPageMini(url, configuration: configuration, opener: tab, by: sender)
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {

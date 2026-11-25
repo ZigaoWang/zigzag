@@ -127,6 +127,9 @@ enum Tokens {
         static let miniWindowMinSize = NSSize(width: 360, height: 260)
         /// Zigzag Mini's strip on top: as slim as a split view pane's, the traffic lights centered in it.
         static let miniStripHeight: CGFloat = Pane.height
+        /// A Mini docked in a page opens at the old Peek's size: 8% of the page card in from each side, a little
+        /// less above and below.
+        static let miniPeekInsetRatio: CGFloat = 0.08
         /// The space's color around Zigzag Mini's page, on its sides and below: a thin, even frame.
         static let miniFrame: CGFloat = Space.x1 + 2
         /// ⌘L's command bar over Zigzag Mini's strip, at its widest before you type.
@@ -1454,6 +1457,8 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.4), highDark: hex(0xFFFFFF, alpha: 0.4))
         static let panelShadow = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.4))
         static let scrim = dynamic(light: hex(0x000000, alpha: 0.10), dark: hex(0x000000, alpha: 0.30))
+        /// A firmer dim than `scrim`, under the docked Mini: the page reads as a layer beneath it.
+        static let peekScrim = dynamic(light: hex(0x000000, alpha: 0.20), dark: hex(0x000000, alpha: 0.42))
 
         /// Zigzag's one accent. The rule: UI in a browser window takes that window's space accent, so progress,
         /// focus, selection and actions agree there; windows that belong to the app rather than a space (Settings,

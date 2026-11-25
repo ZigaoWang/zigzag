@@ -41932,6 +41932,57 @@
           }
         }
       }
+    },
+    "Open in Window" : {
+      "comment" : "Tooltip on the button that turns the Mini docked in a page into a window of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在独立窗口中打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在獨立視窗中開啟"
+          }
+        }
+      }
+    },
+    "Open ⇧-clicked links in the page" : {
+      "comment" : "A setting in Settings › Zigzag Mini.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 Shift 点击的链接在页面中打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住 Shift 點擊的連結在頁面中開啟"
+          }
+        }
+      }
+    },
+    "The Mini stays over the page you clicked from. When off, ⇧-clicked links open in a separate Mini window instead. Expand turns the inline one into a window." : {
+      "comment" : "Explanation under “Open ⇧-clicked links in the page” in Settings › Zigzag Mini.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mini 会留在你点击的页面上面。关闭后，按住 Shift 点击的链接会改为在独立的 Mini 窗口中打开；展开按钮会把页面上的 Mini 变成独立窗口。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mini 會留在你點擊的頁面上面。關閉後，按住 Shift 點擊的連結會改為在獨立的 Mini 視窗中開啟；展開按鈕會把頁面上的 Mini 變成獨立視窗。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

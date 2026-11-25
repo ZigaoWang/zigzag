@@ -414,6 +414,21 @@ final class BrowserRootView: SpaceFrameView {
     static let minimumPaneHeight: CGFloat = 160
     let sidebarContainer: SidebarContainer
     let card = PageCardView()
+    /// The dim under the one in-page Mini this window owns. The Mini itself is a borderless child window over the page
+    /// card (`MiniWindowController`), so only its dim lives in this window's view tree. Owner-checked so a closing Mini
+    /// cannot remove a newer one opened during its fade.
+    weak var inPageMiniDim: NSView?
+    private weak var inPageMiniOwner: AnyObject?
+    /// True while a Mini is docked over this window's page.
+    var hasInPageMini: Bool { inPageMiniOwner != nil }
+    /// Chrome this window draws over the page card has to win over the docked Mini, which is a separate window and is
+    /// composited above everything here: the Mini is ordered out while one of these is over the card.
+    var coversInPageMini: Bool { (sidebarRevealed && !chromeSidebarShown) || topBarRevealed }
+    /// Called when the page area moves or resizes, so the docked Mini keeps its place.
+    var onInPageMiniLayout: ((NSRect) -> Void)?
+    /// Called as the edge sidebar starts to slide over the page or back (`show`, duration): the docked Mini has to be
+    /// out of its way for the whole slide, and come back only after it has tucked away.
+    var onInPageMiniSlide: ((Bool, TimeInterval) -> Void)?
     /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
     /// it (#210): the window still reads as a sidebar and a page, as it does with a page open.
     let emptyHint = EmptySpaceMark()
@@ -1561,6 +1576,30 @@ final class BrowserRootView: SpaceFrameView {
         return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - paneGap, height: whole.height)
     }
 
+    /// Puts the dim for a Mini docked over the page. The Mini is a borderless child window; the dim is the part of the
+    /// presentation that has to live in this window, under the sidebar, so its rows still take the pointer.
+    func showInPageMiniDim(_ dim: NSView, owner: AnyObject) {
+        if inPageMiniOwner === owner, inPageMiniDim === dim {
+            dim.frame = cardFrame
+            return
+        }
+        inPageMiniDim?.removeFromSuperview()
+        inPageMiniOwner = owner
+        inPageMiniDim = dim
+        dim.frame = cardFrame
+        addSubview(dim, positioned: .below, relativeTo: sidebarContainer)
+        needsLayout = true
+    }
+
+    /// Takes the dim away only if `owner` is still the one in the slot.
+    func hideInPageMiniDim(owner: AnyObject) {
+        guard inPageMiniOwner === owner else { return }
+        inPageMiniDim?.removeFromSuperview()
+        inPageMiniDim = nil
+        inPageMiniOwner = nil
+        needsLayout = true
+    }
+
     /// Where the side panel sits: beside the page, a gap away, over the same height, reaching as far right as the page
     /// would have. It reads as a second pane, like a split's.
     var sidePanelFrame: NSRect {
@@ -2104,6 +2143,10 @@ final class BrowserRootView: SpaceFrameView {
         if isGrabberShown { placeGrabber() }
         refreshGrabber()
         overlay.frame = bounds
+        if inPageMiniOwner != nil {
+            inPageMiniDim?.frame = cardFrame
+            onInPageMiniLayout?(cardFrame)
+        }
         onLayoutChange?()
     }
 
@@ -2676,6 +2719,7 @@ final class BrowserRootView: SpaceFrameView {
         let curve = show ? Tokens.Motion.edgeSlide : Tokens.Motion.edgeTuck
         // Out, it slides all the way before the pointer can send it back: one slide, never cut short and begun again.
         let slide = Tokens.Motion.reduceMotion ? Tokens.Motion.crossfade * Tokens.Motion.debugSlowdown : curve.duration
+        onInPageMiniSlide?(show, slide)
         edgeReveal.shown(show, at: ProcessInfo.processInfo.systemUptime, settling: slide)
         watchPointer(show)
         let target = sidebarFrame

@@ -30,6 +30,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         if (window as? BrowserWindow)?.selectAllInSidebar() != true { NSSound.beep() }
     }
     @objc func closeTab(_ sender: Any?) {
+        if inPageMini.closeShown() { return }
         if commandBar.isVisible { commandBar.dismiss(); return }
         // On the desk, the card you're on.
         if desk.isVisible { desk.closeFocused(); return }

@@ -45,9 +45,22 @@ final class BrowserWindow: NSWindow {
 
     /// Parked for AI apps (Headless.park): stays off screen, never key or main.
     var isParked = false
+    /// A Mini docked over a page: a borderless child of the browser window. It takes the keyboard when clicked, but it
+    /// is never the window you are "in" for the Window menu or ⌘`, and never a main window of its own.
+    var isOverlayChild = false
 
     override var canBecomeKey: Bool { !isParked }
-    override var canBecomeMain: Bool { !isParked }
+    override var canBecomeMain: Bool { !isParked && !isOverlayChild }
+
+    /// A Mini docked over a page is borderless and has no close button for AppKit to press, so ⌘W, ⇧⌘W, a page's
+    /// `window.close()` and an extension closing it all take this one way out.
+    override func performClose(_ sender: Any?) {
+        if let mini = windowController as? MiniWindowController, mini.isDockedInPage {
+            mini.closeInPage()
+            return
+        }
+        super.performClose(sender)
+    }
 
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         isParked ? frameRect : super.constrainFrameRect(frameRect, to: screen)
@@ -235,6 +248,9 @@ final class BrowserWindow: NSWindow {
         }
         if let eventInterceptor, eventInterceptor(event) { return }
         if let side = SideButton(event.type, button: event.buttonNumber) {
+            // Over a docked Mini that is ordered out under the chrome, the button is the Mini's own Back and Forward.
+            if sideHeldMenu == nil, let controller = windowController as? BrowserWindowController,
+               controller.peekHandlesSideButton(side, at: event.locationInWindow) { return }
             handleSideButton(side, event)
             return
         }
