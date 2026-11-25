@@ -41983,6 +41983,57 @@
           }
         }
       }
+    },
+    "Return to Zigzag" : {
+      "comment" : "Button in the edge sidebar's note for one of Zigzag's own pages: brings the browser forward on that page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回 Zigzag"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回 Zigzag"
+          }
+        }
+      }
+    },
+    "This page opens in Zigzag" : {
+      "comment" : "The edge sidebar's note for one of Zigzag's own pages when the page's name is not known yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面在 Zigzag 中打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此頁面在 Zigzag 中開啟"
+          }
+        }
+      }
+    },
+    "Zigzag's own pages only work in the browser window." : {
+      "comment" : "Under the page's name in the edge sidebar's note for one of Zigzag's own pages, which the panel can't show.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 自己的页面只能在浏览器窗口中打开。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 自己的頁面只能在瀏覽器視窗中開啟。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

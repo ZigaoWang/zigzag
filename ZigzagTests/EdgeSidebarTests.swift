@@ -162,5 +162,119 @@ struct EdgeSidebarTests {
         #expect(mirror.backButton.tracksHoverWhileInactive)
         #expect(!SidebarView(frame: .zero).backButton.tracksHoverWhileInactive)
     }
+
+    /// The panel lends the tab's own page, so Zigzag's own pages (Settings, History, the archive) have nothing to
+    /// lend: their rows grey out and take no pick. A web page, local or not, is taken.
+    @Test func thePanelTakesWebPagesAndNotZigzagsOwn() {
+        #expect(EdgeLensPolicy.takesPage(url: URL(string: "https://example.com/page")))
+        #expect(EdgeLensPolicy.takesPage(url: URL(string: "http://localhost:8080")))
+        #expect(EdgeLensPolicy.takesPage(url: URL(string: "file:///Users/me/page.html")))
+        #expect(!EdgeLensPolicy.takesPage(url: URL(string: "zigzag://settings")))
+        #expect(!EdgeLensPolicy.takesPage(url: URL(string: "zigzag://history")))
+        #expect(!EdgeLensPolicy.takesPage(url: URL(string: "zigzag://archive")))
+        // No address at all is not one of Zigzag's pages; the callers' scheme guard still keeps a blank tab out.
+        #expect(EdgeLensPolicy.takesPage(url: nil))
+    }
+
+    @Test func aPickOpensReplacesOrLocksThePageOut() {
+        #expect(EdgeLensPolicy.pickAction(isVisible: false, sameTab: false) == .open)
+        #expect(EdgeLensPolicy.pickAction(isVisible: true, sameTab: true) == .lock)
+        #expect(EdgeLensPolicy.pickAction(isVisible: true, sameTab: false) == .replace)
+    }
+
+    @Test func aSpaceSwitchKeepsThePreviewAndKnowsWhichWayItSlides() {
+        #expect(EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: true))
+        #expect(!EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: false))
+        let one = UUID(), two = UUID(), three = UUID()
+        let order = [one, two, three]
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: two, order: order) == 1)
+        #expect(EdgePreviewRouting.spaceSlide(from: two, to: one, order: order) == -1)
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: three, order: order) == 1)
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: one, order: order) == 0)
+        #expect(EdgePreviewRouting.spaceSlide(from: nil, to: two, order: order) == 0)
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: UUID(), order: order) == 0)
+    }
+
+    /// The note for one of Zigzag's own pages stands where the page pill would, says which page it is, and its one
+    /// button brings the browser forward on it.
+    @Test func theNoteStandsInThePagePillAndOffersTheWindow() throws {
+        let host = EdgeSidebarHost(frame: visible)
+        let container = SidebarContainer(sidebar: SidebarView(frame: .zero))
+        host.cardWidth = 240
+        host.set(container)
+        host.pageShowing = true
+        host.noticeShowing = true
+        host.placeCard()
+        #expect(!host.notice.isHidden)
+        #expect(host.notice.frame == host.pageFrame)
+
+        let tab = Tab(url: URL(string: "zigzag://settings")!, title: "Settings", spaceID: UUID())
+        host.notice.show(tab: tab)
+        #expect(host.notice.subviews.contains { ($0 as? Label)?.stringValue == "Settings" })
+        #expect(host.notice.returnButton.title == String(localized: "Return to Zigzag"))
+
+        var returned = false
+        host.notice.onReturn = { returned = true }
+        let press = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [],
+                                                    timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,
+                                                    clickCount: 1, pressure: 0))
+        host.notice.returnButton.onClick?(press)
+        #expect(returned)
+
+        // A page taking the pill's place takes the note's too.
+        host.noticeShowing = false
+        host.placeCard()
+        #expect(host.notice.isHidden)
+    }
+
+    /// A screen too narrow for the sidebar and the page's third: the panel stops at the screen, and the page takes
+    /// what is left rather than being cut off.
+    @Test func thePanelAndPageNeverWidenPastTheScreen() {
+        let inset = Tokens.Metric.cardInset
+        for onRight in [false, true] {
+            let narrow = NSRect(x: 0, y: 0, width: 380, height: visible.height)
+            let width = EdgeSidebarLayout.width(sidebar: 240, page: true, inset: inset, in: narrow)
+            let panel = EdgeSidebarLayout.frame(in: narrow, width: width, onRight: onRight)
+            #expect(panel.width == narrow.width)
+            let bounds = NSRect(origin: .zero, size: panel.size)
+            let card = EdgeSidebarLayout.cardFrame(in: bounds, sidebar: 240, inset: inset, page: true, onRight: onRight)
+            let page = EdgeSidebarLayout.pageFrame(in: bounds, sidebar: 240, inset: inset, page: true, onRight: onRight)
+            #expect(card.minX >= 0)
+            #expect(page.maxX <= bounds.width)
+            #expect(page.width > 0)
+        }
+    }
+
+    /// A split's or a tile group's parts are pages of their own: the row reports the page under the pointer, and
+    /// only when the pointer moves to another part.
+    @Test func aMultiPageRowReportsThePartUnderThePointer() throws {
+        let space = Library.shared.spaces[0].id
+        let left = Tab(url: URL(string: "https://example.com/left")!, title: "Left", spaceID: space)
+        let right = Tab(url: URL(string: "https://example.com/right")!, title: "Right", spaceID: space)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 200), styleMask: [.borderless],
+                              backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: Tokens.Sidebar.rowHeight))
+        window.contentView?.addSubview(row)
+        row.configure(tab: left)
+        row.configure(parts: [TabRowView.Part(page: right)])
+        #expect(row.isSplit)
+
+        var reported: [Tab?] = []
+        row.onHoverPart = { reported.append($0) }
+        func move(to x: CGFloat) throws {
+            let event = try #require(NSEvent.mouseEvent(with: .mouseMoved, location: NSPoint(x: x, y: row.bounds.midY),
+                                                        modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                                                        context: nil, eventNumber: 0, clickCount: 0, pressure: 0))
+            row.mouseMoved(with: event)
+        }
+        try move(to: 60)
+        try move(to: 100)
+        try move(to: 180)
+        #expect(reported.count == 2)
+        #expect(reported[0] === left)
+        #expect(reported[1] === right)
+    }
 }
 

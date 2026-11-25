@@ -445,6 +445,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             guard tab !== self.tab else { return }
             giveBackBorrowedPage()
             adoptBorrowedPage(tab)
+            // Another page takes this one's place: unfold it from the sidebar's side, as the first page came in.
+            root.layoutSubtreeIfNeeded()
+            revealDockedPage(fromRight: dockedHost?.dockPageOnRight ?? false)
             return
         }
         sourceTab = tab

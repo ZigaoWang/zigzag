@@ -4385,6 +4385,7 @@ extension BrowserWindowController {
         // A list to pick from: the address row stays in the window, and rows don't drag out of the panel.
         mirror.showsAddressRow = false
         mirror.list.allowsDragging = false
+        mirror.list.refusesSystemPages = true
         mirror.hoversWhileInactive = true
         mirror.onEditSpace = { [weak self] id in self?.openSpaceEditor(id, anchor: self?.sidebar.dot(for: id)) }
         mirror.onSwipeSpace = { [weak self] offset in
