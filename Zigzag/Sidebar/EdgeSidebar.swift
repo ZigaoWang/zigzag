@@ -409,21 +409,18 @@ final class EdgeSidebar {
     /// `foldFromRight`: a space switch folds from the side its list slid in on; nil is the sidebar's side.
     private func showPreview(_ tab: Tab, in controller: BrowserWindowController, foldFromRight: Bool? = nil) {
         guard isShowing, let panel, let host, !tab.isPrivate, EdgeLensPolicy.takesPage(url: tab.url) else { return }
+        // The page already out stays under the next one until its fold has covered it. Giving it back first made
+        // the next fold start over an empty Mini, and a space switch closed the old page before the new one existed.
+        let previous = preview
+        guard previous?.tab !== tab else { return }
         let fromNotice = noticeTab != nil
         // A page replacing a page or a note already has the room: only the page folds in. The first page out widens
         // the panel, and does it in place, with the page already at its final frame.
-        let wasWide = preview != nil || fromNotice
+        let wasWide = previous != nil || fromNotice
         if noticeTab != nil {
             noticeTab = nil
             host.noticeShowing = false
             host.notice.onReturn = nil
-        }
-        // A page from another space is another Mini: the strip and the space it wears belong to the page.
-        if let old = preview, old.tab.spaceID != tab.spaceID {
-            preview = nil
-            old.onInPageMiniClosed = nil
-            old.onInPageMiniDetached = nil
-            old.closeInPage(focusBack: false, animated: false)
         }
         let sidebar = controller.edgeSidebarWidth
         let wide = EdgeSidebarLayout.width(sidebar: sidebar, page: true, inset: host.inset, in: shownVisible)
@@ -437,23 +434,27 @@ final class EdgeSidebar {
         }
         host.placeCard()
         host.layoutSubtreeIfNeeded()
-        if let preview {
-            preview.loadPreview(tab, fromRight: foldFromRight)
-        } else if let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self, reveal: false) {
-            mini.onInPageMiniClosed = { [weak self, weak mini] in self?.previewClosed(mini) }
-            mini.onInPageMiniDetached = { [weak self, weak mini] in self?.previewDetached(mini) }
-            preview = mini
-            previewTab = tab
-            mini.layoutInDock(force: true)
-            // The page is at its final place already; the fold uncovers it as the panel edge reaches it.
-            mini.revealDockedPage(fromRight: foldFromRight ?? shownOnRight)
-            return
-        } else {
-            narrowPanel()
+        guard let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self, reveal: false) else {
+            if previous == nil { narrowPanel() }
             return
         }
+        mini.onInPageMiniClosed = { [weak self, weak mini] in self?.previewClosed(mini) }
+        mini.onInPageMiniDetached = { [weak self, weak mini] in self?.previewDetached(mini) }
+        preview = mini
         previewTab = tab
-        preview?.layoutInDock(force: true)
+        mini.layoutInDock(force: true)
+        // The page is at its final place already; the fold uncovers it as the panel edge reaches it, or over the page
+        // it replaces.
+        mini.revealDockedPage(fromRight: foldFromRight ?? shownOnRight)
+        if let previous {
+            // Off the bookkeeping first: the old Mini is closing under the new one, not taking the panel with it.
+            previous.onInPageMiniClosed = nil
+            previous.onInPageMiniDetached = nil
+            let duration = Tokens.Motion.reduceMotion ? 0 : Tokens.Motion.Role.drawer.duration(entering: true) + 0.02
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                MainActor.assumeIsolated { previous.closeInPage(focusBack: false, animated: false) }
+            }
+        }
     }
 
     /// One of Zigzag's own pages under the pointer: the panel can't lend its page, so the page area says where it
