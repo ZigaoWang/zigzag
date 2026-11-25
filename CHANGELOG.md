@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- 1Password's toolbar icon now matches Zigzag's toolbar: on a dark space it shows its dark-toolbar icon even when the Mac is in light mode, and the other way around.
-- Pressing and holding Back or Forward in the sidebar, then sliding down, no longer drags the whole window: the list opens and you can slide onto a page and let go, with the mouse as with a finger.
-
 ## [0.9.5] - 2026-11-24
 
 Export Your Data so you can always take everything with you, live folders, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.
@@ -62,6 +58,8 @@ Export Your Data so you can always take everything with you, live folders, Tradi
 - A tab's chevron goes away once the last tab nested under it leaves, instead of staying behind and doing nothing, and dragging a tab right to nest it under the tab just above now shows the line at the depth it will land. Thanks to [bkonia](https://github.com/bkonia). ([#526](https://github.com/ZigaoWang/zigzag/issues/526))
 - Holding Back or Forward with the mouse or trackpad, then sliding onto a page in the list and letting go, goes to that page again, as with a finger. Before, letting go there did nothing in the sidebar's top row and the bar above the page. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
 - An extension pinned to the address, like 1Password, shows its whole icon centered in its button. Before, an icon that arrived after the button was drawn sat a little off and soft. In Site Controls the pin mark sits in the tile's corner instead of over the icon.
+- 1Password's toolbar icon now matches Zigzag's toolbar: on a dark space it shows its dark-toolbar icon even when the Mac is in light mode, and the other way around.
+- Pressing and holding Back or Forward in the sidebar, then sliding down, no longer drags the whole window: the list opens and you can slide onto a page and let go, with the mouse as with a finger.
 
 ## [0.9.4] - 2026-11-24
 
