@@ -13,6 +13,7 @@
 #                                      GitHub pre-release; no DMG, website or Homebrew
 # Before releasing: add the version's section to CHANGELOG.md (New and Fixed); every place notes appear reads it.
 # Add Simplified Chinese for What's New and the update feed. Traditional Chinese is optional for What's New.
+# Every string in every shipped language must be translated: scripts/check-strings.py lists what's left.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -37,6 +38,9 @@ PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
 grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $PLANNED. Add one, then release."; exit 1; }
 # The Simplified Chinese notes should come with them. Traditional Chinese can follow later without a warning.
 grep -q "^## \[$PLANNED\]" CHANGELOG.zh-Hans.md || echo "Warning: CHANGELOG.zh-Hans.md has no section for $PLANNED. Simplified Chinese readers get the English notes."
+
+# Every language Zigzag ships has every string translated and reviewed, or nothing is built. See docs/i18n/README.md.
+python3 scripts/check-strings.py || { echo "Some strings above aren't translated or still need review. Finish them, then release."; exit 1; }
 
 # The ad blocking scriptlets a release accepts are pinned by hash in the app: one older than Ghostery's newest keeps
 # working, but misses its fixes. Pinning is a code change, so it's for before the release, not here.
