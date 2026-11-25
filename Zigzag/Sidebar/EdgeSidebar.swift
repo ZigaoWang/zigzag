@@ -75,6 +75,18 @@ enum EdgeSidebarLayout {
     }
 }
 
+/// The edge preview rests like the page-in-panel preview did: long enough that crossing rows previews nothing, short
+/// enough that stopping on one still feels immediate. A pointer that moves within the row starts the wait again.
+enum EdgePreviewHoverPolicy {
+    static let dwell: TimeInterval = 0.2
+    static let check: TimeInterval = 0.05
+    static let movement: CGFloat = 2
+
+    static func rests(now: TimeInterval, since: TimeInterval, moved: Bool) -> Bool {
+        !moved && now - since >= dwell
+    }
+}
+
 /// The sidebar at the screen's edge (#363): the last browser window's sidebar, over other apps.
 @MainActor
 final class EdgeSidebar {
@@ -107,6 +119,8 @@ final class EdgeSidebar {
     private var preview: MiniWindowController?
     private var previewTab: Tab?
     private var previewWork: DispatchWorkItem?
+    /// Counts hovers, so a rest check left over from the previous row cannot preview it.
+    private var hoverCheck = 0
     private var closeWork: DispatchWorkItem?
     /// The panel's wide frame: the sidebar's own width plus the page's third.
     private var previewPanelFrame: NSRect = .zero
@@ -268,6 +282,7 @@ final class EdgeSidebar {
         previewWork = nil
         closeWork?.cancel()
         closeWork = nil
+        hoverCheck += 1
         guard let tab else {
             schedulePreviewClose()
             return
@@ -277,18 +292,36 @@ final class EdgeSidebar {
             schedulePreviewClose()
             return
         }
-        let work = DispatchWorkItem { [weak self, weak controller] in
+        scheduleHoverCheck(tab: tab, in: controller, pointer: NSEvent.mouseLocation,
+                           stillSince: ProcessInfo.processInfo.systemUptime, token: hoverCheck)
+    }
+
+    /// Follows the pointer while it rests on a row: a crossing pointer never previews, a stopped one does after the
+    /// same short beat the old page-in-panel preview used.
+    private func scheduleHoverCheck(tab: Tab, in controller: BrowserWindowController, pointer: NSPoint,
+                                    stillSince: TimeInterval, token: Int) {
+        let work = DispatchWorkItem { [weak self, weak tab, weak controller] in
             MainActor.assumeIsolated {
-                guard let self, let controller, self.isShowing, self.target === controller else { return }
-                self.showPreview(tab, in: controller)
+                guard let self, let tab, let controller, self.isShowing, self.target === controller,
+                      self.hoverCheck == token else { return }
+                let now = ProcessInfo.processInfo.systemUptime
+                let point = NSEvent.mouseLocation
+                let moved = abs(point.x - pointer.x) > EdgePreviewHoverPolicy.movement
+                    || abs(point.y - pointer.y) > EdgePreviewHoverPolicy.movement
+                if EdgePreviewHoverPolicy.rests(now: now, since: stillSince, moved: moved) {
+                    self.previewWork = nil
+                    self.showPreview(tab, in: controller)
+                } else {
+                    self.scheduleHoverCheck(tab: tab, in: controller, pointer: point,
+                                            stillSince: moved ? now : stillSince, token: token)
+                }
             }
         }
         previewWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.previewDelay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + EdgePreviewHoverPolicy.check, execute: work)
     }
 
-    /// The page is the same docked Mini as the in-page peek: the sidebar's own width stays put, and the coloured
-    /// surface widens to hold the page beside it.
+    /// The page is the same docked Mini as the in-page peek: its own floor-to-ceiling pill beside the sidebar.
     private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
         guard isShowing, let panel, let host, !tab.isPrivate else { return }
         // A page from another space is another Mini: the strip and the space it wears belong to the page.
@@ -529,7 +562,8 @@ final class EdgeSidebarHost: NSView {
     let inset = Tokens.Metric.cardInset
     var onRight = false { didSet { placeCard() } }
     var cardWidth: CGFloat = 0 { didSet { placeCard() } }
-    /// The preview's page sits beside the sidebar in the same coloured surface; the sidebar keeps its width and place.
+    /// The preview's page sits beside the sidebar as its own floor-to-ceiling pill; the sidebar keeps its width and
+    /// place, and the panel's background stays clear between them.
     var pageShowing = false { didSet { placeCard() } }
 
     override var isFlipped: Bool { true }
@@ -539,14 +573,10 @@ final class EdgeSidebarHost: NSView {
         EdgeSidebarLayout.cardFrame(in: bounds, sidebar: cardWidth, inset: inset, page: pageShowing, onRight: onRight)
     }
 
-    /// Beside the card, inside the same surface.
+    /// Beside the card: the page's own pill, the same inset from the card and the panel's inner edge.
     var pageFrame: NSRect {
         EdgeSidebarLayout.pageFrame(in: bounds, sidebar: cardWidth, inset: inset, page: pageShowing, onRight: onRight)
     }
-
-    /// The card and the page pane as one surface: the coloured section grows to hold the page, rather than a second
-    /// card appearing beside the sidebar.
-    var surfaceFrame: NSRect { pageShowing ? cardFrame.union(pageFrame) : cardFrame }
 
     func set(_ container: SidebarContainer) {
         if self.container !== container {
@@ -559,11 +589,8 @@ final class EdgeSidebarHost: NSView {
     }
 
     func placeCard() {
-        guard let container else { return }
-        // The card's contents keep their own width; its surface is the whole widened section.
-        container.contentWidth = cardWidth
-        container.contentOnRight = onRight
-        container.frame = surfaceFrame
+        // The sidebar is its own card, not a surface widened behind the page: the page is a separate pill.
+        container?.frame = cardFrame
     }
 
     override func layout() {
@@ -571,9 +598,12 @@ final class EdgeSidebarHost: NSView {
         placeCard()
     }
 
-    /// A click beside the card puts the panel away.
+    /// A click beside the cards puts the panel away; while the page pill is out, the gutter between it and the
+    /// sidebar is part of the panel, not a dismissal.
     override func mouseDown(with event: NSEvent) {
-        if container?.frame.contains(convert(event.locationInWindow, from: nil)) != true {
+        let point = convert(event.locationInWindow, from: nil)
+        if container?.frame.contains(point) != true, !pageFrame.contains(point) {
+            if pageShowing { return }
             EdgeSidebar.shared.hide()
             return
         }
@@ -585,10 +615,15 @@ extension EdgeSidebar: MiniDockHosting {
     var dockParentWindow: NSWindow? { panel }
     var dockPageView: NSView { host ?? panel?.contentView ?? NSView() }
     var dockPageFrame: NSRect { host?.pageFrame ?? .zero }
+    /// The preview is the page pill itself: floor to ceiling, the old page card's large corners, ground and shadow.
+    func dockCardFrame(in page: NSRect) -> NSRect { page }
+    var dockCardRadius: CGFloat { Tokens.Radius.large }
+    var dockCardColor: NSColor? { Tokens.Color.cardBackground }
+    var dockHasShadow: Bool { true }
     var dockIsCovered: Bool { !isShowing || !(host?.pageShowing ?? false) }
     var dockIsFullScreen: Bool { false }
 
-    /// No page behind it to dim: the page sits in the sidebar's own coloured surface.
+    /// No page behind it to dim: the page is its own card beside the sidebar.
     func dockShowDim(owner: AnyObject, onClick: @escaping () -> Void) -> MiniPeekDimView? { nil }
     func dockHideDim(owner: AnyObject) {}
     func dockFocusPage() {}

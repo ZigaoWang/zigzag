@@ -77,7 +77,7 @@ struct EdgeSidebarTests {
         #expect(!EdgeSidebarLayout.keeps(at: NSPoint(x: 300, y: 400), panel: left))
     }
 
-    @Test func thePreviewWidensTheSurfaceAndLeavesTheSidebarWhereItIs() {
+    @Test func thePreviewWidensThePanelAndLeavesTheSidebarWhereItIs() {
         let inset = Tokens.Metric.cardInset
         let sidebar: CGFloat = 240
         let page = EdgeSidebarLayout.pageWidth(in: visible)
@@ -94,7 +94,7 @@ struct EdgeSidebarTests {
                                                    sidebar: sidebar, inset: inset, page: true, onRight: onRight)
             let pageFrame = EdgeSidebarLayout.pageFrame(in: NSRect(origin: .zero, size: widePanel.size),
                                                         sidebar: sidebar, inset: inset, page: true, onRight: onRight)
-            // The sidebar keeps its width and its place on screen; the page and the surface grow inward.
+            // The sidebar keeps its width and its place on screen; the page grows inward.
             #expect(card.width == sidebar)
             #expect(narrowPanel.minX + narrowCard.minX == widePanel.minX + card.minX)
             #expect(pageFrame.width == page)
@@ -103,17 +103,32 @@ struct EdgeSidebarTests {
         }
     }
 
-    @Test func theWidenedSurfaceKeepsTheSidebarAtItsEdge() {
-        let sidebar = SidebarView(frame: .zero)
-        let container = SidebarContainer(sidebar: sidebar)
-        container.frame = NSRect(x: 0, y: 0, width: 800, height: 600)
-        container.contentWidth = 240
-        container.layoutSubtreeIfNeeded()
-        // The card's colour fills the widened surface; the rows stay in their own width at the screen's edge.
-        #expect(sidebar.frame == NSRect(x: 0, y: 0, width: 240, height: 600))
-        container.contentOnRight = true
-        container.layoutSubtreeIfNeeded()
-        #expect(sidebar.frame == NSRect(x: 560, y: 0, width: 240, height: 600))
+    @Test func thePreviewIsItsOwnFloorToCeilingPill() {
+        let inset = Tokens.Metric.cardInset
+        let host = EdgeSidebarHost(frame: visible)
+        let container = SidebarContainer(sidebar: SidebarView(frame: .zero))
+        host.cardWidth = 240
+        host.set(container)
+        host.pageShowing = true
+        host.placeCard()
+        // The sidebar stays its own card, exactly where it was; the page is a separate pill beside it.
+        #expect(container.frame == host.cardFrame)
+        #expect(host.pageFrame.minY == inset)
+        #expect(host.pageFrame.height == visible.height - inset * 2)
+        #expect(!host.pageFrame.intersects(host.cardFrame))
+        // The docked Mini takes the page pill whole: no page-card inset, the old large corners and shadow.
+        let page = host.pageFrame
+        #expect(EdgeSidebar.shared.dockCardFrame(in: page) == page)
+        #expect(EdgeSidebar.shared.dockCardRadius == Tokens.Radius.large)
+        #expect(EdgeSidebar.shared.dockCardColor == Tokens.Color.cardBackground)
+        #expect(EdgeSidebar.shared.dockHasShadow)
+    }
+
+    @Test func theEdgePreviewRestsLikeTheOneItReplaces() {
+        #expect(EdgePreviewHoverPolicy.dwell == 0.2)
+        #expect(EdgePreviewHoverPolicy.check == 0.05)
+        #expect(EdgePreviewHoverPolicy.rests(now: 0.25, since: 0, moved: false))
+        #expect(!EdgePreviewHoverPolicy.rests(now: 0.25, since: 0, moved: true))
     }
 
     @Test func theSwitchIsOffUntilTurnedOn() {

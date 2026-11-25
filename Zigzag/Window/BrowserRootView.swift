@@ -36,10 +36,6 @@ enum AddressBarAutohide {
 final class SidebarContainer: NSView {
     let sidebar: SidebarView
     var isFloating = false { didSet { refresh() } }
-    /// The edge panel widens its card to hold the page beside the sidebar. Then the sidebar's contents keep this width,
-    /// pinned to the screen's edge, while the card's coloured surface takes the whole container. Nil in a window.
-    var contentWidth: CGFloat? { didSet { if contentWidth != oldValue { refresh() } } }
-    var contentOnRight = false { didSet { if contentOnRight != oldValue { needsLayout = true } } }
     var tint: NSColor = SpaceColor.sky.background { didSet { refresh() } }
     /// Floating, it carries the window's look with it: the gradient (the same slice of it the window shows there)
     /// and the grain, so sliding it out never strips them.
@@ -182,31 +178,14 @@ final class SidebarContainer: NSView {
 
     override func layout() {
         super.layout()
-        let wholeCard = contentWidth == nil
-        if let contentWidth {
-            let width = min(max(contentWidth, 0), bounds.width)
-            sidebar.frame = NSRect(x: contentOnRight ? bounds.width - width : 0, y: 0, width: width, height: bounds.height)
-        } else {
-            sidebar.frame = bounds
-        }
+        sidebar.frame = bounds
         frost.frame = bounds
         liquidGlass?.frame = bounds
-        // The colour, gradient and grain belong to the card, not the rows: in a window they fill the sidebar; widened
-        // for the edge preview they fill the whole coloured section, under the page beside it.
-        if let backdrop {
-            if wholeCard {
-                if backdrop.superlayer !== sidebar.layer { sidebar.layer?.insertSublayer(backdrop, at: 0) }
-            } else if backdrop.superlayer !== layer {
-                layer?.insertSublayer(backdrop, at: 0)
-            }
-        }
         Tokens.Motion.withoutAnimation {
-            backdrop?.frame = bounds
+            backdrop?.frame = sidebar.bounds
             backdrop?.cornerRadius = isFloating ? Tokens.Radius.card : 0
-            backdrop?.borderWidth = !wholeCard && isFloating ? Tokens.Metric.hairline : 0
-            backdrop?.borderColor = cgColor(Tokens.Color.panelEdge)
             placeGradient()
-            grainLayer.frame = bounds
+            grainLayer.frame = sidebar.bounds
             // The same fine noise as the window: drawn at the screen's resolution, not doubled up.
             let scale = self.window?.backingScaleFactor ?? 2
             backdrop?.contentsScale = scale
@@ -264,12 +243,10 @@ final class SidebarContainer: NSView {
     }
 
     private func refresh() {
-        let wholeCard = contentWidth == nil
         Tokens.Motion.withoutAnimation {
-            sidebar.layer?.cornerRadius = wholeCard && isFloating ? Tokens.Radius.card : 0
-            // As glass the color lies once, in the backdrop: twice would thicken it. Widened, the surface is the
-            // container's whole width, so its color lives there instead of on the narrower sidebar.
-            sidebar.layer?.backgroundColor = wholeCard && isFloating && !isGlass ? cgColor(tint) : nil
+            sidebar.layer?.cornerRadius = isFloating ? Tokens.Radius.card : 0
+            // As glass the color lies once, in the backdrop: twice would thicken it.
+            sidebar.layer?.backgroundColor = isFloating && !isGlass ? cgColor(tint) : nil
             // The window's own kind of glass: Liquid Glass, or the frosting where the space chose it.
             let liquid = Self.usesLiquidGlass(isGlass: isGlass, windowGlass: windowGlass)
             showLiquidGlass(liquid)
@@ -290,10 +267,8 @@ final class SidebarContainer: NSView {
                 gradientLayer.isHidden = true
             }
             grainLayer.opacity = Float(min(max(grain, 0), 1) * 0.18)
-            sidebar.layer?.borderWidth = wholeCard && isFloating ? Tokens.Metric.hairline : 0
+            sidebar.layer?.borderWidth = isFloating ? Tokens.Metric.hairline : 0
             sidebar.layer?.borderColor = cgColor(Tokens.Color.panelEdge)
-            backdrop?.borderWidth = !wholeCard && isFloating ? Tokens.Metric.hairline : 0
-            backdrop?.borderColor = cgColor(Tokens.Color.panelEdge)
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
             layer?.shadowOpacity = isFloating ? 1 : 0
             layer?.shadowRadius = Tokens.Shadow.panelRadius / 2

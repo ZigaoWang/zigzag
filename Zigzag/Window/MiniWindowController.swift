@@ -67,6 +67,15 @@ final class MiniPeekDimView: ColorView {
     /// The view `dockPageFrame` is in.
     var dockPageView: NSView { get }
     var dockPageFrame: NSRect { get }
+    /// The Mini's card in the page area. The in-page peek stands in from the page card; the edge preview is the page
+    /// pill itself, floor to ceiling.
+    func dockCardFrame(in page: NSRect) -> NSRect
+    /// The card's corner radius while docked.
+    var dockCardRadius: CGFloat { get }
+    /// The card's ground while docked. Nil keeps the space's own paint, as the in-page peek does.
+    var dockCardColor: NSColor? { get }
+    /// Whether the docked card casts its own shadow, as the edge preview's pill does.
+    var dockHasShadow: Bool { get }
     /// Host chrome over the page: the child is ordered out under it.
     var dockIsCovered: Bool { get }
     var dockIsFullScreen: Bool { get }
@@ -75,6 +84,13 @@ final class MiniPeekDimView: ColorView {
     func dockHideDim(owner: AnyObject)
     /// Where the keyboard goes when the Mini closes.
     func dockFocusPage()
+}
+
+extension MiniDockHosting {
+    func dockCardFrame(in page: NSRect) -> NSRect { MiniDockLayout.frame(in: page) }
+    var dockCardRadius: CGFloat { Tokens.Radius.card }
+    var dockCardColor: NSColor? { nil }
+    var dockHasShadow: Bool { false }
 }
 
 extension BrowserWindowController: MiniDockHosting {
@@ -413,17 +429,20 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if let dim = host.dockShowDim(owner: self, onClick: { [weak self] in self?.closeInPage() }) {
             inPageMiniDim = dim
         }
-        // A borderless child over the page area: no title bar, no shadow, never a main window or one to manage.
+        // A borderless child over the page area: no title bar, never a main window or one to manage. The edge preview
+        // keeps the old page card's shadow; the in-page peek stands on the page without one.
         window.styleMask = [.borderless]
         (window as? BrowserWindow)?.isOverlayChild = true
         window.collectionBehavior = [.fullScreenAuxiliary, .transient, .ignoresCycle]
         window.minSize = .zero
         window.level = parent.level
-        window.hasShadow = false
+        window.hasShadow = host.dockHasShadow
         window.animationBehavior = .none
         window.isMovableByWindowBackground = false
         window.isExcludedFromWindowsMenu = true
         window.tabbingMode = .disallowed
+        root.pageOverlayRadius = host.dockCardRadius
+        root.pageOverlayColor = host.dockCardColor
         root.isPageOverlay = true
         root.autoresizingMask = [.width, .height]
         parent.addChildWindow(window, ordered: .above)
@@ -443,7 +462,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// parent and cannot be covered by a sibling view.
     func layoutInDock(force: Bool = false) {
         guard isDockedInPage, let host = dockedHost, let window, let parent = host.dockParentWindow else { return }
-        let card = MiniDockLayout.frame(in: host.dockPageFrame)
+        let card = host.dockCardFrame(in: host.dockPageFrame)
         let screen = parent.convertToScreen(host.dockPageView.convert(card, to: nil))
         dockedScreenFrame = screen
         guard !isTransitioningWithParent else { return }
@@ -1679,6 +1698,10 @@ final class MiniRootView: SpaceFrameView {
     /// Docked in a page: the Mini's window is a borderless child, so the window itself stays clear and the rounded card
     /// is the root's own shape.
     var isPageOverlay = false { didSet { applyPageOverlay() } }
+    /// The docked card's shape: the in-page peek's card, or the edge preview's page pill.
+    var pageOverlayRadius: CGFloat = Tokens.Radius.card { didSet { applyPageOverlay() } }
+    /// The docked card's ground, where the host lends one: the edge preview's pill stands on the card's own color.
+    var pageOverlayColor: NSColor? { didSet { applyPageOverlay() } }
     private(set) var chromeRevealed = true
 
     private func applyPageOverlay() {
@@ -1690,7 +1713,8 @@ final class MiniRootView: SpaceFrameView {
         wantsLayer = true
         window?.isOpaque = false
         window?.backgroundColor = .clear
-        layer?.cornerRadius = Tokens.Radius.card
+        layer?.backgroundColor = pageOverlayColor.map { cgColor($0) }
+        layer?.cornerRadius = pageOverlayRadius
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
     }
