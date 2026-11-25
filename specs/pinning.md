@@ -127,3 +127,9 @@
   Test: SidebarRowMenuTests.aLiveFoldersMenuReadsRefreshesEditsAndDeletes
 - A GitHub list → open pull requests, issues or review requests in public repositories for that username; when GitHub asks to wait, it waits.
   Test: LiveFoldersTests.gitHubListsComeFromItsSearchAndWaitWhenAsked
+- A live folder's menu → first a line that can't be clicked saying when it last fetched, like Updated 5 Minutes Ago, or Updating… while it fetches; the last good time stays after a failure and is kept on disk.
+  Test: LiveFoldersTests.itSaysWhenItWasLastUpdated
+- Refresh Now in a live folder's menu → it fetches at once, and its menu says Updating… until it's done.
+  Test: SidebarRowMenuTests.aLiveFoldersMenuSaysWhenItWasUpdated
+- The New and Edit Live Folder sheet → the source first (address, or username then list), then name and count, each control as wide as the fields; a note under them says what the folder shows and that it checks every 30 minutes, hourly in Low Power Mode; an empty name shows the name it will get; a username GitHub can't have is marked and keeps the button off.
+  Test: SidebarRowMenuTests.theLiveFolderSheetSaysWhatItShowsAndHowOften
