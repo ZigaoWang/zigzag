@@ -1,6 +1,6 @@
 # Simplified Chinese glossary
 
-For Traditional Chinese, see [the zh-Hant glossary](glossary.zh-Hant.md).
+For Traditional Chinese, see [the zh-Hant glossary](glossary.zh-Hant.md). For Japanese, see [the ja glossary](glossary.ja.md).
 
 The words Zigzag uses most, and what they become in Simplified Chinese (zh-Hans). Translating the catalog
 (`Zigzag/Resources/Localizable.xcstrings`) starts from this table, so one English word is one Chinese word everywhere.

@@ -75,7 +75,7 @@ happens when a tab closes should work the way those users expect, unless an issu
 
 ## Localization
 
-Zigzag speaks English, Simplified Chinese, and Traditional Chinese. Every word people read goes through
+Zigzag speaks English, Simplified Chinese, Traditional Chinese, and Japanese. Every word people read goes through
 `String(localized: "…", comment: "…")`, with a comment that says where it appears. After adding or changing
 strings, build, bring the catalog in step and add Simplified Chinese in `Zigzag/Resources/Localizable.xcstrings`:
 
@@ -84,10 +84,10 @@ xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -derivedDataPath build/dev b
 scripts/sync-strings.sh build/dev
 ```
 
-`LocalizationTests` requires Simplified Chinese and checks the formatting of both translations where present.
-Traditional Chinese is welcome but optional: leave untranslated entries out so they use the English source.
-See the [Simplified Chinese](docs/i18n/glossary.md) and [Traditional Chinese](docs/i18n/glossary.zh-Hant.md)
-glossaries for wording and typography. If you can't write the Simplified Chinese, say so in the pull request.
+`LocalizationTests` requires Simplified Chinese and checks the formatting of every translation where present.
+Traditional Chinese and Japanese are welcome but optional: leave untranslated entries out so they use the English
+source. See the [Simplified Chinese](docs/i18n/glossary.md), [Traditional Chinese](docs/i18n/glossary.zh-Hant.md)
+and [Japanese](docs/i18n/glossary.ja.md) glossaries for wording and typography. If you can't write the Simplified Chinese, say so in the pull request.
 
 A change to README.md updates [README.zh-Hans.md](README.zh-Hans.md) and [README.zh-Hant.md](README.zh-Hant.md) in the
 same pull request, or the pull request says they still need it.
@@ -97,6 +97,7 @@ Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Han
 and credited names. Use `### 新功能` for New, `### 修复` for Fixed in Simplified Chinese, and `### 修正` in Traditional Chinese.
 `WhatsNewTests` compares shipped Simplified Chinese notes with English and skips Unreleased. If the Traditional
 Chinese notes for a version are incomplete or missing, the in-app What's New sheet shows its English notes.
+Japanese has no changelog of its own, so What's New shows the English notes under Japanese headings.
 Sparkle's pre-install notes still use Simplified Chinese for its single Chinese release-notes link.
 
 ## Commits and pull requests
