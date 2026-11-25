@@ -560,6 +560,7 @@
 		E137A0DE21BBDB974852712E /* EmojiSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F945D7E0BF21B2E2FD7A4C7 /* EmojiSearchTests.swift */; };
 		E1A05EC81079773031DC8766 /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60AE774C9F1A97F60F3E627 /* MCPTools.swift */; };
 		E31FC3B636082D37DDFB6A0D /* HistoryClusters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05040A784BBF98D3612C0A6A /* HistoryClusters.swift */; };
+		7A1C5E2B9D3F4A6B8C0D1E2F /* HistorySearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B2D4F1A8C3E5B7D9F0A1C2E /* HistorySearch.swift */; };
 		E341CC4E85411227052D3A17 /* Reader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FC50557675B6C303B2E0AE /* Reader.swift */; };
 		E35DE3455DA23C45B296D4C4 /* SameSiteTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17D0EB87AD6124B7E4334FF /* SameSiteTabsTests.swift */; };
 		E3A8ED15A7F4B1612C745407 /* LocalReceiversTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D02F02DFE20E463010E54EA /* LocalReceiversTests.swift */; };
@@ -706,6 +707,7 @@
 		02E61EC3537FA9842B9EC140 /* EmptyPageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyPageTests.swift; sourceTree = "<group>"; };
 		03627381328E3E3CDA43C0B6 /* ghostery-adblocker.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "ghostery-adblocker.js"; sourceTree = "<group>"; };
 		05040A784BBF98D3612C0A6A /* HistoryClusters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryClusters.swift; sourceTree = "<group>"; };
+		6B2D4F1A8C3E5B7D9F0A1C2E /* HistorySearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySearch.swift; sourceTree = "<group>"; };
 		05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkSiteTests.swift; sourceTree = "<group>"; };
 		05160D4ABF2A17C7C0D3E968 /* tab-capture-page.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "tab-capture-page.js"; sourceTree = "<group>"; };
 		05942C5562AD233537EF434C /* TabSwitcherGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitcherGridTests.swift; sourceTree = "<group>"; };
@@ -1712,6 +1714,7 @@
 				93578FE502EC8C0F2D11346A /* FindMarks.swift */,
 				D2EFB5AC2A624266268504D9 /* HandoffNotice.swift */,
 				05040A784BBF98D3612C0A6A /* HistoryClusters.swift */,
+				6B2D4F1A8C3E5B7D9F0A1C2E /* HistorySearch.swift */,
 				9318C9D9C45049E8105EA1CE /* HistoryPage.swift */,
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
 				53812A3D2F9723418E0A8FB6 /* KeptCookies.swift */,
@@ -2644,6 +2647,7 @@
 				6102EF2A9BC539FECDEE1B96 /* HandoffNotice.swift in Sources */,
 				888C0839A35AB223C7909641 /* Haptics.swift in Sources */,
 				E31FC3B636082D37DDFB6A0D /* HistoryClusters.swift in Sources */,
+				7A1C5E2B9D3F4A6B8C0D1E2F /* HistorySearch.swift in Sources */,
 				63392082D00360175C202F9A /* HistoryLookup.swift in Sources */,
 				7CE7860B87B15575B3C746D3 /* HistoryMenu.swift in Sources */,
 				2D55489310DC30BCEAE9D9C3 /* HistoryPage.swift in Sources */,
