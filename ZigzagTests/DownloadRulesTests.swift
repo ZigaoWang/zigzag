@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 import Testing
 @testable import Zigzag
 
@@ -780,6 +781,33 @@ struct DownloadRuleTests {
         rule.handoffType = .file
         #expect(DownloadHandoff.defersToSavedFile(rule, forDownload: true))
         #expect(!DownloadHandoff.defersToSavedFile(rule, forDownload: false))
+    }
+
+    /// A File handoff's download you cancel or remove goes quietly; only a failure says the download didn't finish.
+    @MainActor @Test func aCancelledFileHandoffSaysNothing() {
+        let rule = DownloadRule(name: "Quiet \(UUID().uuidString)", match: .any, action: DownloadRuleAction(kind: .openApp), handoffType: .file)
+        let pending = PendingFileHandoff(rule: rule, request: DownloadHandoff.Request(url: URL(string: "https://example.com/a.torrent")!))
+        let cancelled = DownloadItem(filename: "a.torrent", sourceURL: nil, isPrivate: false)
+        DownloadManager.shared.debugSetFileHandoff(pending, on: cancelled)
+        DownloadManager.shared.cancel(cancelled)
+        let removed = DownloadItem(filename: "b.torrent", sourceURL: nil, isPrivate: false)
+        DownloadManager.shared.debugSetFileHandoff(pending, on: removed)
+        DownloadManager.shared.remove(removed)
+        #expect(cancelled.fileHandoff == nil && removed.fileHandoff == nil)
+        #expect(!Diagnostics.events.contains { $0.kind == "Handoff failed" && ($0.detail ?? "").contains(rule.name) })
+    }
+
+    /// The site refused the download after Hand Off: its File handoff is dropped at once, others stay.
+    @MainActor @Test func aRefusedDownloadDropsItsFileHandoff() {
+        let rule = DownloadRule(name: "Torrents", match: .any, action: DownloadRuleAction(kind: .openApp), handoffType: .file)
+        let webView = WKWebView()
+        let refused = URL(string: "https://example.com/a.torrent")!, other = URL(string: "https://example.com/b.torrent")!
+        DownloadManager.shared.expectFileHandoff(rule, request: DownloadHandoff.Request(url: refused), from: webView)
+        DownloadManager.shared.expectFileHandoff(rule, request: DownloadHandoff.Request(url: other), from: webView)
+        DownloadManager.shared.dropFileHandoff(for: refused, from: webView)
+        #expect(DownloadManager.shared.debugPendingFileHandoffs(from: webView) == [other])
+        DownloadManager.shared.dropFileHandoff(for: other, from: webView)
+        #expect(DownloadManager.shared.debugPendingFileHandoffs(from: webView).isEmpty)
     }
 
     /// An Open App action gets the saved file once there is one; a link still gets the address.

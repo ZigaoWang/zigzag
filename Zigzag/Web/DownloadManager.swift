@@ -208,6 +208,18 @@ final class DownloadManager: NSObject {
         pendingFileHandoffs[key] = waiting
     }
 
+    /// The site refused the download a File handoff was waiting for: it won't come.
+    func dropFileHandoff(for url: URL, from webView: WKWebView) {
+        let key = ObjectIdentifier(webView)
+        let waiting = (pendingFileHandoffs[key] ?? []).filter { $0.request.url != url }
+        pendingFileHandoffs[key] = waiting.isEmpty ? nil : waiting
+    }
+
+    #if DEBUG
+    func debugPendingFileHandoffs(from webView: WKWebView) -> [URL] { (pendingFileHandoffs[ObjectIdentifier(webView)] ?? []).map(\.request.url) }
+    func debugSetFileHandoff(_ handoff: PendingFileHandoff?, on item: DownloadItem) { item.fileHandoff = handoff }
+    #endif
+
     /// The File handoff waiting for this download, matched by its address, before or after redirects. Never another
     /// download's, so a handoff whose download never started can't take a later file.
     private func takeFileHandoff(for download: WKDownload, response: URLResponse) -> PendingFileHandoff? {
@@ -324,7 +336,8 @@ final class DownloadManager: NSObject {
     }
 
     func cancel(_ item: DownloadItem) {
-        failFileHandoff(item)
+        // You stopped it: the handoff goes quietly.
+        item.fileHandoff = nil
         if item.state == .paused {
             discardPartial(item)
             item.state = .cancelled
@@ -528,7 +541,7 @@ final class DownloadManager: NSObject {
     }
 
     func remove(_ item: DownloadItem) {
-        failFileHandoff(item)
+        item.fileHandoff = nil
         if item.state == .downloading { cancel(item) }
         if [.paused, .cancelled, .failed].contains(item.state) { discardPartial(item) }
         items.removeAll { $0 === item }

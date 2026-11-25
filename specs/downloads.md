@@ -53,8 +53,10 @@
   Test: DownloadRuleTests.fileTokensAreTheSavedFileAndNothingWithoutOne
 - A rule saved before Hand off existed → keeps handing off its URL.
   Test: DownloadRuleTests.aFileHandoffIsOptInAndOlderRulesKeepTheURL
-- A File handoff whose download fails or is cancelled → nothing is handed off.
-  No test yet.
+- A File handoff whose download fails or is cancelled → nothing is handed off. A download you cancel or remove says nothing; only a failure says the download didn't finish.
+  Test: DownloadRuleTests.aCancelledFileHandoffSaysNothing
+- A site that refuses the download after Hand Off → its File handoff is dropped at once.
+  Test: DownloadRuleTests.aRefusedDownloadDropsItsFileHandoff
 - Open for apps, scripts, installers, archives and web pages → never opens them; they're only saved.
   Test: DownloadRuleTests.anOpenNeverTakesAnAppScriptOrArchive
 
