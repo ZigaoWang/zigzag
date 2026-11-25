@@ -103,9 +103,30 @@ struct EdgeSidebarTests {
         }
     }
 
-    @Test func thePreviewIsItsOwnFloorToCeilingPill() {
+    @Test func aHoverPreviewIsASquareThatGrowsToThePageRoomWhenPicked() {
         let inset = Tokens.Metric.cardInset
-        let host = EdgeSidebarHost(frame: visible)
+        let bounds = NSRect(x: 0, y: 0, width: EdgeSidebarLayout.width(sidebar: 240, page: true, inset: inset, in: visible),
+                            height: visible.height)
+        for onRight in [false, true] {
+            let full = EdgeSidebarLayout.pageFrame(in: bounds, sidebar: 240, inset: inset, page: true, onRight: onRight)
+            let square = EdgeSidebarLayout.previewFrame(in: bounds, sidebar: 240, inset: inset, page: true,
+                                                        onRight: onRight, expanded: false)
+            let grown = EdgeSidebarLayout.previewFrame(in: bounds, sidebar: 240, inset: inset, page: true,
+                                                       onRight: onRight, expanded: true)
+            #expect(grown == full)
+            #expect(square.width == square.height)
+            #expect(square.width == min(full.width, full.height))
+            #expect(square.midX == full.midX)
+            #expect(square.midY == full.midY)
+            #expect(square.minY >= full.minY)
+            #expect(square.maxY <= full.maxY)
+        }
+    }
+
+    @Test func aHoverPreviewIsASquareInTheMiddleOfThePageRoom() {
+        let inset = Tokens.Metric.cardInset
+        let wide = EdgeSidebarLayout.width(sidebar: 240, page: true, inset: inset, in: visible)
+        let host = EdgeSidebarHost(frame: NSRect(x: 0, y: 0, width: wide, height: visible.height))
         let container = SidebarContainer(sidebar: SidebarView(frame: .zero))
         host.cardWidth = 240
         host.set(container)
@@ -116,8 +137,15 @@ struct EdgeSidebarTests {
         #expect(host.pageFrame.minY == inset)
         #expect(host.pageFrame.height == visible.height - inset * 2)
         #expect(!host.pageFrame.intersects(host.cardFrame))
-        // The docked Mini takes the page pill whole: no page-card inset, the old large corners and shadow.
-        let page = host.pageFrame
+        // A hover is a square of the page's width in the middle of its room; a pick fills the room.
+        #expect(host.previewFrame.width == host.previewFrame.height)
+        #expect(host.previewFrame.width == min(host.pageFrame.width, host.pageFrame.height))
+        #expect(host.previewFrame.midX == host.pageFrame.midX)
+        #expect(host.previewFrame.midY == host.pageFrame.midY)
+        host.pageExpanded = true
+        #expect(host.previewFrame == host.pageFrame)
+        // The docked Mini takes the preview whole: no page-card inset, the old large corners and shadow.
+        let page = host.previewFrame
         #expect(EdgeSidebar.shared.dockCardFrame(in: page) == page)
         #expect(EdgeSidebar.shared.dockCardRadius == Tokens.Radius.large)
         #expect(EdgeSidebar.shared.dockCardColor == Tokens.Color.cardBackground)

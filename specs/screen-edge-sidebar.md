@@ -29,22 +29,24 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.thePanelRunsDownTheScreensEdgeAndStaysWhileThePointerIsOnIt
 
 ## The preview
-- Rest the pointer on a tab's row → after a short rest, that tab's running page comes in beside the sidebar, in the same docked Mini that peeks over a page. The page is at its final frame; the panel widens to it from the sidebar's side, so it opens in place rather than sliding over the sidebar.
+- Rest the pointer on a tab's row → after a short rest, that tab's running page comes in beside the sidebar, in the same docked Mini that peeks over a page, as a square of the page's width in the middle of the page's room. The panel widens to it from the sidebar's side, so it opens in place rather than sliding over the sidebar.
   Test: EdgeSidebarTests.theEdgePreviewRestsLikeTheOneItReplaces
   Test: EdgeSidebarTests.thePreviewWidensThePanelAndLeavesTheSidebarWhereItIs
-  Test: EdgeSidebarTests.thePreviewIsItsOwnFloorToCeilingPill
+  Test: EdgeSidebarTests.aHoverPreviewIsASquareThatGrowsToThePageRoomWhenPicked
+  Test: EdgeSidebarTests.aHoverPreviewIsASquareInTheMiddleOfThePageRoom
   Test: InPageMiniHostTests.theEdgePreviewBorrowsTheRowsLivePage
-- A row whose page isn't running — asleep, or not loaded since Zigzag reopened → the page pill shows the tab's stored snapshot, blurred, with its name, why it isn't running and “Click the tab to wake it.” Resting on the row never wakes the page; only a click loads it.
+- A row whose page isn't running — asleep, or not loaded since Zigzag reopened → the square shows the tab's stored snapshot, blurred, with its name, why it isn't running and “Click the tab to wake it.” Resting on the row never wakes the page; only a click loads it.
   Test: EdgeSidebarTests.aPagePreviewsItsSnapshotWhileItIsNotRunning
 - Move across a split's or a tile group's parts without leaving the row → each part previews as it comes under the pointer. Only the edge panel follows the parts; the window's own hover card stays on the row's page.
   Test: EdgeSidebarTests.aMultiPageRowReportsThePartUnderThePointer
-- Click any row → today's behavior stays: the panel goes and the browser window comes forward on that tab. The preview is a hover only; a click neither locks it nor keeps it in the panel.
-  No test yet.
-- Rest on another row → that page takes the first one's place with the same fold from the sidebar's side.
+- Click a row → the browser's tab becomes active there, but Zigzag doesn't come forward and the panel stays out. The square grows to the page's full room, and that page is the one a later hover comes back to.
+  Test: InPageMiniHostTests.aPickedPreviewGrowsFromItsSquareToThePageRoom
+  No test yet for the selection without bringing the window forward.
+- Rest on another row → that page takes the picked page's place as a square; leaving the rows returns to the picked page at full size.
   Test: InPageMiniHostTests.swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack
-- Leave the rows, press Esc, or click away → the page folds back behind the sidebar as the panel narrows; the sidebar stays out.
+- Leave the rows with nothing picked, press Esc, or click away → the page folds back behind the sidebar as the panel narrows; the sidebar stays out.
   No test yet.
-- Switch spaces in the panel while a page or a snapshot is out → the preview goes; it does not follow the space that comes next.
+- Switch spaces in the panel while a page or a snapshot is out → the preview and the pick go; the preview does not follow the space that comes next.
   No test yet.
 - A page Zigzag serves itself, like Settings or History → it doesn't preview; the row behaves as before and a click opens it in the browser window.
   Test: EdgeSidebarTests.thePanelTakesWebPagesAndNotZigzagsOwn

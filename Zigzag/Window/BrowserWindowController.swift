@@ -3471,7 +3471,14 @@ extension BrowserWindowController: TabHost {
 extension BrowserWindowController: SidebarDelegate {
     // Picking one sends a sidebar held out by touch back, as the pointer leaving sends back a hovered one.
     func listSelect(_ tab: Tab) {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        // In the edge panel a click marks the tab active in this window without bringing Zigzag forward: the panel
+        // stays out, and the picked page is the one a later hover comes back to.
+        if EdgeSidebar.shared.isShowing {
+            tabManager.select(tab)
+            EdgeSidebar.shared.markActive(tab, in: self)
+            root.endTouchHold()
+            return
+        }
         tabManager.select(tab)
         root.endTouchHold()
     }
