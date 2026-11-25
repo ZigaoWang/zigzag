@@ -9,18 +9,6 @@
 
 ## [Unreleased]
 
-### 新功能
-- 「網站設定」新增「相容模式」，給無法正常使用的網站用：一個開關就能在這個網站上關閉延伸功能、廣告阻擋、Cookie 彈出式視窗和已隱藏的元素，關閉相容模式後，你之前對它們的選擇都會恢復。開啟時「網站設定」按鈕會變成強調色，「設定 › 隱私 › 網站」也會列出它。感謝 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
-- 「設定 › 外觀 › 指向連結時顯示連結網址」：關閉後，指向連結時網頁角落不會再顯示連結網址，瀏覽器視窗、Zigzag Mini、Web App 和分頁概覽都一樣。預設仍然開啟。感謝 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
-- 「設定 › 外觀 › 較短的浮動側邊欄」：側邊欄隱藏時，浮現在網頁上的側邊欄高度是視窗的三分之二，上下各留出六分之一。固定的側邊欄不變。預設關閉。感謝 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
-- 「設定 › 外觀 › 已固定分頁顯示為方塊」：不在資料夾裡的已固定分頁會以方塊顯示在收藏下方，和收藏在同一個格狀排列裡，中間隔一條細線；打開、卸載、右鍵選單和拖移都和原本的列一樣。資料夾和裡面的網頁仍然是列。預設關閉。感謝 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
-- 「設定」裡的長列表現在像「網站權限」一樣收合成方框：「鍵盤快速鍵」的每個選單、每條下載規則（儲存的回答在裡面）、每類功能旗標，以及超過三項時的「開發者模式中的網站」「受信任的憑證」和「網頁尺寸」。「搜尋設定」仍會展開符合項目所在的方框。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
-- 「網站權限」本身的搜尋和「搜尋設定」現在也能依權限和選擇找網站：輸入「相機」「通知」或「阻擋」，就能看到做了這個選擇的每個網站，各自在網站名稱下面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
-
-### 修正
-- 「設定」開啟得更快了。每個部分在第一次開啟時才產生，收合的方框在展開或被搜尋時才產生，所以在「一般」開啟「設定」時不會再產生「下載項目」「鍵盤快速鍵」或「開發者」。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
-- Bitwarden 的「使用生物辨識解鎖」現在能連上 Bitwarden App 了。之前 Zigzag 告訴 Bitwarden 它已經能和 App 溝通，所以 Bitwarden 從不申請，Zigzag 卻又不讓它連上 App。現在 Bitwarden 會申請，Zigzag 會詢問你是否允許。如果之前開啟過生物辨識，請在 Bitwarden 的設定裡把「使用生物辨識解鎖」關閉再開啟。感謝 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag 新增十三種語言，包括日文、韓文、德文、法文、西班牙文和俄文；下載規則可以轉交下載好的檔案；即時資料夾會顯示上次更新的時間；用中文拼音輸入中途切換到英文，不會再多出空格。
@@ -31,6 +19,12 @@ Zigzag 新增十三種語言，包括日文、韓文、德文、法文、西班�
 - 下載規則可以轉交檔案，而不只是網址：把「轉交」設為「檔案」，Zigzag 會先用網頁的登入狀態下載，再把儲存好的檔案交給 App、指令碼或服務。連結仍然轉交網址；轉交檔案時，範本可以用 {file} 或 {file_url} 取得儲存的檔案。感謝 [Lakeland97](https://github.com/Lakeland97)。([#529](https://github.com/ZigaoWang/zigzag/issues/529))
 - 即時資料夾的選單頂端現在會顯示上次更新的時間，例如「5分鐘前更新」；正在取得時顯示「正在更新…」。
 - 「新增即時資料夾」和「編輯即時資料夾」會先詢問來源，下拉式選單與輸入欄位對齊，下方會說明資料夾會顯示什麼，以及每 30 分鐘檢查一次（低耗電模式下每小時一次）。名稱留空時會顯示將使用的名稱，不可能是 GitHub 使用者名稱的輸入會被標出。
+- 「網站設定」新增「相容模式」，給無法正常使用的網站用：一個開關就能在這個網站上關閉延伸功能、廣告阻擋、Cookie 彈出式視窗和已隱藏的元素，關閉相容模式後，你之前對它們的選擇都會恢復。開啟時「網站設定」按鈕會變成強調色，「設定 › 隱私 › 網站」也會列出它。感謝 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- 「設定 › 外觀 › 指向連結時顯示連結網址」：關閉後，指向連結時網頁角落不會再顯示連結網址，瀏覽器視窗、Zigzag Mini、Web App 和分頁概覽都一樣。預設仍然開啟。感謝 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
+- 「設定 › 外觀 › 較短的浮動側邊欄」：側邊欄隱藏時，浮現在網頁上的側邊欄高度是視窗的三分之二，上下各留出六分之一。固定的側邊欄不變。預設關閉。感謝 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
+- 「設定 › 外觀 › 已固定分頁顯示為方塊」：不在資料夾裡的已固定分頁會以方塊顯示在收藏下方，和收藏在同一個格狀排列裡，中間隔一條細線；打開、卸載、右鍵選單和拖移都和原本的列一樣。資料夾和裡面的網頁仍然是列。預設關閉。感謝 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
+- 「設定」裡的長列表現在像「網站權限」一樣收合成方框：「鍵盤快速鍵」的每個選單、每條下載規則（儲存的回答在裡面）、每類功能旗標，以及超過三項時的「開發者模式中的網站」「受信任的憑證」和「網頁尺寸」。「搜尋設定」仍會展開符合項目所在的方框。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- 「網站權限」本身的搜尋和「搜尋設定」現在也能依權限和選擇找網站：輸入「相機」「通知」或「阻擋」，就能看到做了這個選擇的每個網站，各自在網站名稱下面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
 
 ### 修正
 - 網頁上開啟 Zigzag Mini 時，在變暗的網頁上捲動不會再把後面的網頁捲走。感謝 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -38,6 +32,8 @@ Zigzag 新增十三種語言，包括日文、韓文、德文、法文、西班�
 - 在「設定」中，標題旁有按鈕或搜尋欄位的清單，例如「網站儲存的資料」或「轉交下載和連結」，不會再緊貼在這些控制項下方，與其他標題下方保留相同的間距。感謝 [Lakeland97](https://github.com/Lakeland97)。([#527](https://github.com/ZigaoWang/zigzag/issues/527))
 - 拼音輸入到一半切換到英文時，字母之間不再留下空格，網頁和網址列裡都是，與 Chrome 一致。
 - 玻璃選為「透明」的空間，在 Zigzag 什麼都沒做時（即使是空白頁或「設定」）不會再讓 Mac 的圖形處理器一直忙碌。之前 macOS 每一格畫面都要重畫整個視窗和它的陰影，現在只在有變化時才重畫。更新卡片的進度列在隱藏時也不會再繼續滑動。
+- 「設定」開啟得更快了。每個部分在第一次開啟時才產生，收合的方框在展開或被搜尋時才產生，所以在「一般」開啟「設定」時不會再產生「下載項目」「鍵盤快速鍵」或「開發者」。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- Bitwarden 的「使用生物辨識解鎖」現在能連上 Bitwarden App 了。之前 Zigzag 告訴 Bitwarden 它已經能和 App 溝通，所以 Bitwarden 從不申請，Zigzag 卻又不讓它連上 App。現在 Bitwarden 會申請，Zigzag 會詢問你是否允許。如果之前開啟過生物辨識，請在 Bitwarden 的設定裡把「使用生物辨識解鎖」關閉再開啟。感謝 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 
 ## [0.9.5] - 2026-11-25
 

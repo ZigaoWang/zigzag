@@ -12,18 +12,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-### 新功能
-- “网站设置”新增“兼容模式”，给不能正常使用的网站用：一个开关就能在这个网站上关掉扩展、广告拦截、Cookie 弹窗和已隐藏的元素，关掉兼容模式后，你之前对它们的选择都会恢复。打开时“网站设置”按钮会变成强调色，“设置 › 隐私 › 网站”也会列出它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
-- “设置 › 外观 › 指向链接时显示链接地址”：关掉后，指向链接时页面角落不会再显示链接地址，浏览器窗口、Zigzag Mini、网页应用和标签页概览都一样。默认仍然打开。感谢 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
-- “设置 › 外观 › 较短的浮动边栏”：边栏隐藏时，浮现在页面上的边栏高度是窗口的三分之二，上下各留出六分之一。停靠的边栏不变。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
-- “设置 › 外观 › 已固定标签页显示为方块”：不在文件夹里的已固定标签页会以方块显示在收藏下方，和收藏在同一个网格里，中间隔一条细线；打开、卸载、右键菜单和拖移都和原来的行一样。文件夹和里面的页面仍然是行。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
-- “设置”里的长列表现在像“网站权限”一样折叠成方框：“快捷键”的每个菜单、每条下载规则（保存的回答在里面）、每类功能标志，以及超过三项时的“开发者模式中的网站”“受信任的证书”和“网页尺寸”。“查找设置”仍会展开匹配项所在的方框。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
-- “网站权限”自带的搜索和“查找设置”现在也能按权限和选择找网站：输入“摄像头”“通知”或“阻止”，就能看到做了这个选择的每个网站，各自在网站名称下面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
-
-### 修复
-- “设置”打开得更快了。每个部分在第一次打开时才生成，折叠的方框在展开或被搜索时才生成，所以在“通用”打开“设置”时不会再生成“下载”“快捷键”或“开发者”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
-- Bitwarden 的“使用生物识别解锁”现在能连上 Bitwarden App 了。之前 Zigzag 告诉 Bitwarden 它已经能和 App 通信，所以 Bitwarden 从不申请，Zigzag 却又不让它连 App。现在 Bitwarden 会申请，Zigzag 会问你是否允许。如果之前打开过生物识别，请在 Bitwarden 的设置里把“使用生物识别解锁”关掉再打开。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag 新增十三种语言，包括日语、韩语、德语、法语、西班牙语和俄语；下载规则可以转交下载好的文件；实时文件夹会显示上次更新的时间；用中文拼音输入中途切换到英文，不会再多出空格。
@@ -34,6 +22,12 @@ Zigzag 新增十三种语言，包括日语、韩语、德语、法语、西班�
 - 下载规则可以转交文件而不是地址：把“转交”设为“文件”，Zigzag 会先用网页的登录状态下载，再把保存好的文件交给 App、脚本或服务。链接仍然转交地址；转交文件时，模板可以用 {file} 或 {file_url} 取得保存的文件。感谢 [Lakeland97](https://github.com/Lakeland97)。([#529](https://github.com/ZigaoWang/zigzag/issues/529))
 - 实时文件夹的菜单顶部现在会显示上次更新的时间，比如“5分钟前更新”；正在获取时显示“正在更新…”。
 - “新建实时文件夹”和“编辑实时文件夹”先问来源，下拉菜单和输入框对齐，下方会说明文件夹会显示什么，以及每 30 分钟检查一次（低电量模式下每小时一次）。名称留空时会显示将使用的名称，不可能是 GitHub 用户名的输入会被标出。
+- “网站设置”新增“兼容模式”，给不能正常使用的网站用：一个开关就能在这个网站上关掉扩展、广告拦截、Cookie 弹窗和已隐藏的元素，关掉兼容模式后，你之前对它们的选择都会恢复。打开时“网站设置”按钮会变成强调色，“设置 › 隐私 › 网站”也会列出它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- “设置 › 外观 › 指向链接时显示链接地址”：关掉后，指向链接时页面角落不会再显示链接地址，浏览器窗口、Zigzag Mini、网页应用和标签页概览都一样。默认仍然打开。感谢 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
+- “设置 › 外观 › 较短的浮动边栏”：边栏隐藏时，浮现在页面上的边栏高度是窗口的三分之二，上下各留出六分之一。停靠的边栏不变。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
+- “设置 › 外观 › 已固定标签页显示为方块”：不在文件夹里的已固定标签页会以方块显示在收藏下方，和收藏在同一个网格里，中间隔一条细线；打开、卸载、右键菜单和拖移都和原来的行一样。文件夹和里面的页面仍然是行。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
+- “设置”里的长列表现在像“网站权限”一样折叠成方框：“快捷键”的每个菜单、每条下载规则（保存的回答在里面）、每类功能标志，以及超过三项时的“开发者模式中的网站”“受信任的证书”和“网页尺寸”。“查找设置”仍会展开匹配项所在的方框。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- “网站权限”自带的搜索和“查找设置”现在也能按权限和选择找网站：输入“摄像头”“通知”或“阻止”，就能看到做了这个选择的每个网站，各自在网站名称下面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
 
 ### 修复
 - 网页上打开 Zigzag Mini 时，在变暗的网页上滚动不会再把后面的网页滚走。感谢 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -41,6 +35,8 @@ Zigzag 新增十三种语言，包括日语、韩语、德语、法语、西班�
 - 在“设置”中，标题旁边有按钮或搜索框的列表，比如“网站存储的数据”或“转交下载和链接”，不会再紧贴在这些控件下面，和其他标题下面留出一样的间距。感谢 [Lakeland97](https://github.com/Lakeland97)。([#527](https://github.com/ZigaoWang/zigzag/issues/527))
 - 拼音输入到一半切换到英文时，字母之间不再留下空格，网页和地址栏里都是，与 Chrome 一致。
 - 玻璃选为“透明”的空间，在 Zigzag 什么都没做时（即使是空白页或“设置”）不会再让 Mac 的图形处理器一直忙碌。之前 macOS 每一帧都要重画整个窗口和它的阴影，现在只在有变化时才重画。更新卡片的进度条在隐藏时也不会再继续滑动。
+- “设置”打开得更快了。每个部分在第一次打开时才生成，折叠的方框在展开或被搜索时才生成，所以在“通用”打开“设置”时不会再生成“下载”“快捷键”或“开发者”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- Bitwarden 的“使用生物识别解锁”现在能连上 Bitwarden App 了。之前 Zigzag 告诉 Bitwarden 它已经能和 App 通信，所以 Bitwarden 从不申请，Zigzag 却又不让它连 App。现在 Bitwarden 会申请，Zigzag 会问你是否允许。如果之前打开过生物识别，请在 Bitwarden 的设置里把“使用生物识别解锁”关掉再打开。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 
 ## [0.9.5] - 2026-11-25
 
