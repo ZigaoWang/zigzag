@@ -911,6 +911,16 @@ extension SyncLibrary {
         #expect(!SyncRetry.isPermanent(gone))
     }
 
+    @Test func onlyZigzagsOwnPushesFromICloudFetch() {
+        let push: [String: Any] = ["aps": ["content-available": 1],
+                                   "ck": ["ce": 2, "cid": ICloudSync.containerID, "nid": "1", "met": ["dbs": 1, "sid": "s"]]]
+        #expect(ICloudSync.isOurPush(push))
+        var other = push
+        other["ck"] = ["ce": 2, "cid": "iCloud.example.other", "nid": "1", "met": ["dbs": 1, "sid": "s"]]
+        #expect(!ICloudSync.isOurPush(other))
+        #expect(!ICloudSync.isOurPush(["aps": ["alert": "Hi"]]))
+    }
+
     // MARK: Trying again
 
     /// A retry whose waits are noted and run by hand.

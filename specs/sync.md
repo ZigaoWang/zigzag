@@ -104,3 +104,5 @@
 - The first sync on an iCloud that has no Zigzag library yet → this Mac's library goes up and makes it. iCloud's library gone after a sync (removed on another Mac, or iCloud's data deleted in System Settings) → sync turns off here and says so, without trying again; this Mac keeps everything.
   Test: SyncTests.aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing
   Test: SyncTests.aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain
+- Something changed on another Mac while Zigzag is open here → iCloud's push fetches it within seconds; pushes for other apps are ignored.
+  Test: SyncTests.onlyZigzagsOwnPushesFromICloudFetch

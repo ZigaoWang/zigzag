@@ -242,6 +242,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillBecomeActive(_ notification: Notification) { MiniLinkWake.appWillActivate() }
+
+    // Sync with iCloud: a push says another Mac changed something.
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        ICloudSync.shared.remoteNotification(userInfo)
+    }
     func applicationWillResignActive(_ notification: Notification) {
         // A Picture in Picture window that hasn't floated yet does before you're in the other app (#210).
         PictureInPicture.floatPanels()

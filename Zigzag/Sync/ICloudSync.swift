@@ -55,6 +55,7 @@ final class ICloudSync {
     private var observers: [NSObjectProtocol] = []
     private let localDebouncer = Debouncer(delay: 1, maxWait: 10)
     private let saveDebouncer = Debouncer(delay: 1, maxWait: 10)
+    private let pushDebouncer = Debouncer(delay: 1, maxWait: 5)
     private var timer: Timer?
     private var lastFetch = Date.distantPast
     private var connecting = false
@@ -107,6 +108,7 @@ final class ICloudSync {
     func turnOff() {
         UserDefaults.standard.set(false, forKey: Self.enabledKey)
         stop()
+        NSApplication.shared.unregisterForRemoteNotifications()
         try? FileManager.default.removeItem(at: Self.stateFile)
         status = .off
     }
@@ -136,6 +138,8 @@ final class ICloudSync {
         session.onChange = { [weak self] in self?.saveSoon() }
         self.session = session
         watchLibrary()
+        // CKSyncEngine listens for pushes too, but its own fetch on one goes through a scheduler that can refuse it.
+        NSApplication.shared.registerForRemoteNotifications()
         status = .syncing
         Task { await connect() }
     }
@@ -293,6 +297,16 @@ final class ICloudSync {
         }
         monitor.start(queue: .main)
         network = monitor
+    }
+
+    /// A push from iCloud: another Mac changed something, so the zone is fetched.
+    func remoteNotification(_ userInfo: [AnyHashable: Any]) {
+        guard isOn, session != nil, Self.isOurPush(userInfo) else { return }
+        pushDebouncer.call { [weak self] in self?.fetchSoon(after: 0) }
+    }
+
+    static func isOurPush(_ userInfo: [AnyHashable: Any]) -> Bool {
+        CKNotification(fromRemoteNotificationDictionary: userInfo)?.containerIdentifier == containerID
     }
 
     // MARK: Saving the state
