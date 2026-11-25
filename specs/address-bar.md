@@ -56,3 +56,8 @@
   Test: TopBarTests.theLightsGoWithAnAutohideBar
 - Full screen with the sidebar hidden and the bar away → they come down with the menu bar on their own backing.
   Test: TrafficLightTests.fullScreenBacksTheLightsWhenTheBarIsAway
+- Full screen with the menu bar up → nothing keeps room for them: the bar's controls start at its edge, and glide over
+  as they come down with the menu bar. The same in Zigzag Mini and web apps.
+  Test: TrafficLightTests.noRoomForTheLightsInTheBarWhileTheyreOffScreen
+- Sidebar hidden with the shorter floating sidebar out → they stay in the bar, beside its controls.
+  Test: AppearanceSwitchesTests.theLightsStayInTheBarBesideTheShorterCard
