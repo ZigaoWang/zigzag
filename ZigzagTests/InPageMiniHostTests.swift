@@ -32,6 +32,44 @@ struct InPageMiniHostTests {
         try await body(controller, tab)
     }
 
+    private func inWindowAsync(pageAt url: URL, _ body: (BrowserWindowController, Tab) async throws -> Void) async rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = manager.newTab(url: url, spaceID: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        try await body(controller, tab)
+    }
+
+    private func until(_ seconds: Double = 10, _ condition: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return condition()
+    }
+
+    /// A wheel turn at a point in `window`, handed to it as one would arrive.
+    private func scroll(at pointInWindow: NSPoint, in window: NSWindow, dy: Int32) throws -> NSEvent {
+        let onScreen = window.convertPoint(toScreen: pointInWindow)
+        let flippedY = (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
+                                     wheel1: dy, wheel2: 0, wheel3: 0))
+        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 2)
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+        cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
+        cg.location = CGPoint(x: onScreen.x, y: flippedY)
+        cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+        cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+        return try #require(NSEvent(cgEvent: cg))
+    }
+
     @Test func aDockedMiniIsABorderlessChildOfTheBrowserWindow() throws {
         try inWindow { browser, tab in
             let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
@@ -421,6 +459,35 @@ struct InPageMiniHostTests {
             #expect(!mini.isDockedInPage)
             #expect(browser.inPageMini.record == nil)
             #expect(!browser.root.hasInPageMini)
+        }
+    }
+
+    @Test func aScrollOverTheDimLeavesThePageBehindStill() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("peek-scroll-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("tall.html")
+        try "<style>body{height:4000px}p{font:20px sans-serif}</style><p>top</p>".write(to: url, atomically: true, encoding: .utf8)
+        try await inWindowAsync(pageAt: url) { browser, tab in
+            let page = try #require(tab.webView)
+            let loaded = await until { !page.isLoading }
+            #expect(loaded)
+            try await page.evaluateJavaScript("window.scrollTo(0, 600)")
+            try await Task.sleep(for: .milliseconds(150))
+            #expect(try await page.evaluateJavaScript("window.scrollY") as? Double == 600)
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            let window = try #require(browser.window)
+            let pane = browser.root.cardFrame
+            // On the dim, outside the Mini's own card.
+            let point = NSPoint(x: pane.minX + 8, y: pane.midY)
+            #expect(browser.root.hitTest(point) === browser.root.inPageMiniDim)
+            window.sendEvent(try scroll(at: browser.root.convert(point, to: nil), in: window, dy: 200))
+            try await Task.sleep(for: .milliseconds(400))
+            let moved = try await page.evaluateJavaScript("window.scrollY") as? Double
+            #expect(moved == 600, "the page behind the dim scrolled to \(moved ?? -1)")
+            mini.closeInPage(animated: false)
         }
     }
 

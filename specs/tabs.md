@@ -79,6 +79,8 @@
   Test: InPageMiniHostTests.closeWindowStaysOnForADockedMini
   Test: InPageMiniHostTests.aPagesWindowCloseClosesTheDockedMini
   Test: InPageMiniHostTests.aTabSwitchClosesTheDockedMini
+- A scroll over the dimmed page around the Mini stays out of the page behind it.
+  Test: InPageMiniHostTests.aScrollOverTheDimLeavesThePageBehindStill
 - Expand on the Mini over the page → the same live page goes into a Mini window of its own, without reloading.
   Test: InPageMiniHostTests.promotingTakesTheMiniOutIntoAWindowOfItsOwn
   Test: InPageMiniHostTests.expandKeepsTheSameLivePage
