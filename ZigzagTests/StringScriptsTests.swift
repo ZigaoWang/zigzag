@@ -267,4 +267,30 @@ struct StringScriptsTests {
         #expect(try fixture.run("merge-translations.py", ["--check", partialFile]).status == 1)
         #expect(try fixture.run("merge-translations.py", ["--check", "--allow-missing", partialFile]).status == 0)
     }
+
+    /// The gate also wants the version's notes in every shipped language, with the English points and issues.
+    @Test func theGateWantsEachLanguagesNotes() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let link = { (n: Int) in "([#\(n)](https://github.com/o/r/issues/\(n)))" }
+        try "## [Unreleased]\n\n## [1.0.0] - 2026-11-01\n\n### New\n- One. \(link(1))\n- Two\n\n### Fixed\n- Three. \(link(3))\n"
+            .write(to: fixture.root.appendingPathComponent("CHANGELOG.md"), atomically: true, encoding: .utf8)
+        let folder = fixture.root.appendingPathComponent("docs/i18n/changelog")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        func chinese(_ body: String) throws -> (status: Int32, output: String) {
+            try body.write(to: folder.appendingPathComponent("CHANGELOG.zh-Hans.md"), atomically: true, encoding: .utf8)
+            return try fixture.run("check-strings.py", ["--notes", "1.0.0"])
+        }
+        let missing = try fixture.run("check-strings.py", ["--notes", "1.0.0"])
+        #expect(missing.status == 1)
+        #expect(missing.output.contains("zh-Hans: release notes: docs/i18n/changelog/CHANGELOG.zh-Hans.md has no section for 1.0.0"))
+        let short = try chinese("## [1.0.0] - 2026-11-01\n\n### 新功能\n- 一。\(link(1))\n\n### 修复\n- 三。\(link(3))\n")
+        #expect(short.status == 1 && short.output.contains("has [1, 1] points per section, the English [2, 1]"), "\(short.output)")
+        let otherIssue = try chinese("## [1.0.0] - 2026-11-01\n\n### 新功能\n- 一。\(link(2))\n- 二\n\n### 修复\n- 三。\(link(3))\n")
+        #expect(otherIssue.status == 1 && otherIssue.output.contains("links other issues than the English"), "\(otherIssue.output)")
+        let done = try chinese("## [Unreleased]\n\n## [1.0.0] - 2026-11-01\n\n### 新功能\n- 一。\(link(1))\n- 二\n\n### 修复\n- 三。\(link(3))\n")
+        #expect(done.status == 0, "\(done.output)")
+        // A version not in CHANGELOG.md yet has nothing to compare.
+        #expect(try fixture.run("check-strings.py", ["--notes", "2.0.0"]).status == 0)
+    }
 }
