@@ -2391,6 +2391,12 @@ extension Tab: WKNavigationDelegate {
         }
         switch decision.gate {
         case .handOff:
+            // A File rule needs the download first: let WebKit make it, and the download manager runs the rule on the
+            // saved file when it finishes.
+            if DownloadHandoff.defersToSavedFile(rule, forDownload: !appliesToLinks) {
+                DownloadManager.shared.expectFileHandoff(rule, request: handoff, from: webView)
+                return false
+            }
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
             // A matched rule that didn't take it (declined Open URL) acts as no match; the download manager must not

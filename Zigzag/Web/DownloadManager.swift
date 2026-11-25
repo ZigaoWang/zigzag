@@ -2,6 +2,14 @@ import AppKit
 import WebKit
 import os
 
+/// A File handoff waiting for Zigzag to save the file before it runs the rule.
+struct PendingFileHandoff {
+    var rule: DownloadRule
+    var request: DownloadHandoff.Request
+    /// A download follows a Hand Off at once; an older answer is left for the next one.
+    var at = Date()
+}
+
 final class DownloadItem {
     enum State: Equatable { case downloading, paused, finished, failed, cancelled }
 
@@ -21,6 +29,8 @@ final class DownloadItem {
     fileprivate var replaces: URL?
     /// Set by a rule's Open: hand the finished file to its default app. Not saved with the item.
     fileprivate var opensWhenFinished = false
+    /// A File handoff waiting for this download; nil for a URL handoff. Not saved with the item.
+    fileprivate(set) var fileHandoff: PendingFileHandoff?
     let sourceURL: URL?
     /// Bytes a second, smoothed over the last few seconds, for "time left".
     fileprivate(set) var speed: Double = 0
@@ -185,6 +195,35 @@ final class DownloadManager: NSObject {
     private var ruleOpenedDownloads: Set<ObjectIdentifier> = []
     /// Downloads whose handoff question was put off; don't ask the same rule again.
     private var ruleDeclinedDownloads: Set<ObjectIdentifier> = []
+    /// File handoffs a tab or pop-up answered before WebKit made its download, by the page's web view.
+    private var pendingFileHandoffs: [ObjectIdentifier: [PendingFileHandoff]] = [:]
+
+    /// A tab or pop-up answered Hand Off for a File rule: let the download run, and this rule takes the saved file.
+    func expectFileHandoff(_ rule: DownloadRule, request: DownloadHandoff.Request, from webView: WKWebView?) {
+        guard let webView else { return }
+        let key = ObjectIdentifier(webView)
+        let cutoff = Date().addingTimeInterval(-60)
+        var waiting = (pendingFileHandoffs[key] ?? []).filter { $0.at > cutoff }
+        waiting.append(PendingFileHandoff(rule: rule, request: request))
+        pendingFileHandoffs[key] = waiting
+    }
+
+    /// The first File handoff waiting for this download, matched by its address when there are several.
+    private func takeFileHandoff(for download: WKDownload) -> PendingFileHandoff? {
+        guard let webView = download.webView else { return nil }
+        let key = ObjectIdentifier(webView)
+        let cutoff = Date().addingTimeInterval(-60)
+        var waiting = (pendingFileHandoffs[key] ?? []).filter { $0.at > cutoff }
+        guard !waiting.isEmpty else {
+            pendingFileHandoffs[key] = nil
+            return nil
+        }
+        let url = download.originalRequest?.url
+        let index = waiting.firstIndex { $0.request.url == url } ?? 0
+        let pending = waiting.remove(at: index)
+        pendingFileHandoffs[key] = waiting.isEmpty ? nil : waiting
+        return pending
+    }
 
     /// A Firefox package coming in from a page (the store's Add to Firefox): it is installed, not kept. The file is
     /// temporary, and the window and profile are the ones the page was in, for the install sheet.
@@ -270,6 +309,14 @@ final class DownloadManager: NSObject {
         items.first { $0.download === download }
     }
 
+    /// A File handoff that won't run: it is forgotten, and the failure is said once.
+    private func failFileHandoff(_ item: DownloadItem) {
+        guard let handoff = item.fileHandoff else { return }
+        item.fileHandoff = nil
+        DownloadHandoff.report(.failed(String(localized: "The download didn’t finish.", comment: "Why a File handoff didn't run: the download failed or was cancelled.")),
+                               rule: handoff.rule, request: handoff.request)
+    }
+
     /// A paused download given up on: the part already downloaded goes too.
     private func discardPartial(_ item: DownloadItem) {
         item.resumeData = nil
@@ -277,6 +324,7 @@ final class DownloadManager: NSObject {
     }
 
     func cancel(_ item: DownloadItem) {
+        failFileHandoff(item)
         if item.state == .paused {
             discardPartial(item)
             item.state = .cancelled
@@ -480,6 +528,7 @@ final class DownloadManager: NSObject {
     }
 
     func remove(_ item: DownloadItem) {
+        failFileHandoff(item)
         if item.state == .downloading { cancel(item) }
         if [.paused, .cancelled, .failed].contains(item.state) { discardPartial(item) }
         items.removeAll { $0 === item }
@@ -604,18 +653,20 @@ extension DownloadManager: WKDownloadDelegate {
             changed.send(nil)
             return file
         }
+        // A tab or pop-up already answered Hand Off for a File rule. Its download runs, then the saved file is handed
+        // off; don't ask again.
+        var fileHandoff = takeFileHandoff(for: download)
         // Download rules for downloads the navigation never saw: context-menu Download Linked File, or a page's
-        // startDownload. Save Page As already chose its file. Handing off cancels WebKit's copy and removes its row.
-        // Only page downloads can be handed off; pop-ups and extensions have no page to answer, so theirs stay in
-        // Zigzag. A rule-opened page's download and a just-put-off one aren't offered again, or a rule that matches
-        // its own file would loop.
+        // startDownload. Save Page As already chose its file. A URL handoff cancels WebKit's copy and removes its row;
+        // a File handoff lets it finish. A rule-opened page's download and a just-put-off one aren't offered again, or
+        // a rule that matches its own file would loop.
         defer {
             ruleOpenedDownloads.remove(identifier)
             ruleDeclinedDownloads.remove(identifier)
         }
         let ruleMayAsk = !ruleOpenedDownloads.contains(identifier) && !ruleDeclinedDownloads.contains(identifier)
         let owner = (download.webView as? BrowserWebView)?.owner
-        if ruleMayAsk, let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
+        if fileHandoff == nil, ruleMayAsk, let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false, filename: name,
                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false), in: owner.profile) {
@@ -630,15 +681,19 @@ extension DownloadManager: WKDownloadDelegate {
             handoff.place = decision.place
             switch decision.gate {
             case .handOff:
-                let outcome = await DownloadHandoff.perform(rule, request: handoff)
-                if outcome == .handedOff {
-                    items.removeAll { $0.download === download }
-                    changed.send(nil)
-                    Task { _ = await download.cancel() }
-                    return nil
+                if DownloadHandoff.defersToSavedFile(rule, forDownload: true) {
+                    fileHandoff = PendingFileHandoff(rule: rule, request: handoff)
+                } else {
+                    let outcome = await DownloadHandoff.perform(rule, request: handoff)
+                    if outcome == .handedOff {
+                        items.removeAll { $0.download === download }
+                        changed.send(nil)
+                        Task { _ = await download.cancel() }
+                        return nil
+                    }
+                    if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+                    // Matched but not taken: saved as usual.
                 }
-                if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-                // Matched but not taken: saved as usual.
             case .browser:
                 break
             case .cancel:
@@ -664,13 +719,13 @@ extension DownloadManager: WKDownloadDelegate {
                     destination = Self.uniqueDestination(for: chosen.lastPathComponent, avoiding: inProgress)
                 }
             }
-        } else if let url = download.originalRequest?.url,
+        } else if fileHandoff == nil, let url = download.originalRequest?.url,
                   let place = Self.rulePlace(url: url, filename: name, response: response, download: download, avoiding: inProgress) {
             // A file-type rule decides the location: its folder, or the normal one for an Open rule. Destinations
             // never stop the download.
             destination = place.destination
             opensWhenFinished = place.openWhenFinished
-        } else if Self.asksWhereToSave {
+        } else if fileHandoff == nil, Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
                 items.removeAll { $0.download === download }
@@ -690,6 +745,7 @@ extension DownloadManager: WKDownloadDelegate {
             item.replaces = replacing
             item.destination = destination
             item.opensWhenFinished = opensWhenFinished
+            item.fileHandoff = fileHandoff
             changed.send(item)
             started.send((item, window))
         }
@@ -781,6 +837,18 @@ extension DownloadManager: WKDownloadDelegate {
         }
         changed.send(item)
         if item.opensWhenFinished { openWhenFinished(item) }
+        if let handoff = item.fileHandoff {
+            item.fileHandoff = nil
+            guard let file = item.destination else {
+                DownloadHandoff.report(.failed(String(localized: "The download didn’t finish.", comment: "Why a File handoff didn't run: the download failed or was cancelled.")),
+                                       rule: handoff.rule, request: handoff.request)
+                return
+            }
+            Task { @MainActor in
+                let outcome = await DownloadHandoff.perform(handoff.rule, request: handoff.request, file: file)
+                if case .failed = outcome { DownloadHandoff.report(outcome, rule: handoff.rule, request: handoff.request) }
+            }
+        }
 }
 
     /// A package arrived: verify and unpack it, offer it with the store's own sheet in the profile it came from,
@@ -863,6 +931,8 @@ extension DownloadManager: WKDownloadDelegate {
         guard let item = item(for: download) else { return }
         // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
         if item.state == .paused { return }
+        // A File handoff never runs for a failed or cancelled download.
+        failFileHandoff(item)
         helpers[item.id] = nil
         item.resumeData = resumeData
         item.progressObservation = nil

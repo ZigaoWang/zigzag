@@ -73,6 +73,14 @@ Add Rule lists the ready-made rules first. **Custom…** holds the four actions 
 The executable path, the script path, the endpoint and the method are **literal**. A page can fill the values a rule
 passes along, but it cannot choose what runs or where the values are sent.
 
+A handoff rule also chooses **Hand off: URL or File**. **URL** gives the action the address, as before. **File**
+downloads in Zigzag first, using the page's own session, then gives the action the saved file. A link never waits for
+a file: a rule that catches links and downloads still hands off a link's address. The file goes to the downloads
+folder, and the rule runs only after the download finishes. This is how a `.torrent` from a site that needs a passkey
+outside the address reaches rTorrent or aria2: Zigzag makes the request with the page's sign-in, then hands over the
+file it saved, so the service doesn't have to sign in itself. The same choice opens a finished download in an app, or
+sends it to a service, once it is saved.
+
 ### Values and tokens
 
 An Open URL template, a script's arguments and a service's parameters may use:
@@ -90,10 +98,13 @@ An Open URL template, a script's arguments and a service's parameters may use:
 | `{filename}` | The download's name, or a safe name made from the address. |
 | `{mime}` | The file's media type, where there is one. |
 | `{space}` | The name of the space the tab is in. |
+| `{file}` | The saved file's path, for a File handoff. Empty for a URL handoff. |
+| `{file_url}` | The saved file as a `file://` URL, for a File handoff. Empty for a URL handoff. |
 
 A script also gets `ZIGZAG_LINK`, `ZIGZAG_REFERRER`, `ZIGZAG_FILENAME`, `ZIGZAG_MIME`, `ZIGZAG_SPACE`,
-`ZIGZAG_COOKIES` and `ZIGZAG_COOKIE_HEADER` where they apply. A JSON-RPC or XML-RPC rule may use `{secret}` in its
-parameters for the token kept in the Keychain; a script is not given the token.
+`ZIGZAG_COOKIES` and `ZIGZAG_COOKIE_HEADER` where they apply. A File handoff also sets `ZIGZAG_FILE` and
+`ZIGZAG_FILE_URL` to the saved file. A JSON-RPC or XML-RPC rule may use `{secret}` in its parameters for the token
+kept in the Keychain; a script is not given the token.
 
 ### Cookies
 
@@ -113,6 +124,9 @@ A rule asks before it hands anything off, on the same card over the page that a 
 **Hand Off**, **Open in Browser** (or **Save in Zigzag** for a download), or **Don't Allow**, with a close button for
 "not now". The answer holds for the page that asked, so a link and the download it starts ask once. Open in Browser, or Save in Zigzag, leaves the link or download exactly as it would have
 been without the rule. Don't Allow refuses it: a link goes nowhere, and a download is not saved.
+
+For a File handoff, **Hand Off** starts the download in Zigzag and the rule runs when it finishes. If the download
+fails or is cancelled, the rule doesn't run, and Zigzag says so once in its notice and diagnostics.
 
 A question is only asked where it can be seen: in the page in front, in a window that is visible and front. A page's
 earlier answer still holds in a background tab or a window behind another; where it has no earlier answer, a new

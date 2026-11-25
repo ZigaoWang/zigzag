@@ -47,6 +47,14 @@
   Test: DownloadRuleTests.aDestinationIsTheFirstThatMatches
 - A handoff rule by file type → sends every download whose own name ends in one of its extensions, whatever its address says; links have no name, so they never match.
   Test: DownloadRuleTests.aFileTypeHandoffMatchesTheDownloadsNameAndNeverALink
+- A rule's Hand off set to File → Zigzag saves the download in Downloads first, then hands the saved file to the action; a link still hands off its address.
+  Test: DownloadRuleTests.onlyDownloadsHandOffASavedFile
+- A File handoff's templates → `{file}` is the saved file's path and `{file_url}` its file URL, while `{link}` stays the address.
+  Test: DownloadRuleTests.fileTokensAreTheSavedFileAndNothingWithoutOne
+- A rule saved before Hand off existed → keeps handing off its URL.
+  Test: DownloadRuleTests.aFileHandoffIsOptInAndOlderRulesKeepTheURL
+- A File handoff whose download fails or is cancelled → nothing is handed off.
+  No test yet.
 - Open for apps, scripts, installers, archives and web pages → never opens them; they're only saved.
   Test: DownloadRuleTests.anOpenNeverTakesAnAppScriptOrArchive
 

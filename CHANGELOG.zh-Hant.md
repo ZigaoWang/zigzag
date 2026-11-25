@@ -9,6 +9,9 @@
 
 ## [Unreleased]
 
+### 新功能
+- 下載規則可以轉交檔案而不是網址：把「轉交」設為「檔案」，Zigzag 會先用網頁的登入狀態下載，再把儲存好的檔案交給 App、腳本或服務。連結仍然轉交網址；轉交檔案時，範本可以使用 {file} 或 {file_url} 取得儲存的檔案。([#530](https://github.com/ZigaoWang/zigzag/pull/530))
+
 ### 修正
 - 網頁上開啟 Zigzag Mini 時，在變暗的網頁上捲動不會再把後面的網頁捲走。感謝 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 - 允許網站存取這台 Mac 上的 App 之前的說明，現在按順序寫清楚了：先開啟這個設定，再在網站設定裡開啟每個網站，關閉這個設定會停止所有網站。感謝 [Lakeland97](https://github.com/Lakeland97)。([#533](https://github.com/ZigaoWang/zigzag/issues/533))

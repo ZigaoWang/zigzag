@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- A download rule can hand off the file instead of the address: set Hand off to File, and Zigzag downloads it first with the page's session, then gives the saved file to the app, script or service. Links still hand off their address, and a File handoff's templates can use {file} or {file_url} for the saved file. ([#530](https://github.com/ZigaoWang/zigzag/pull/530))
+
 ### Fixed
 - With Zigzag Mini open over a page, scrolling over the dimmed page no longer moves the page behind it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 - The briefing before websites may reach apps on this Mac now says the steps in order: turn the setting on, then turn on each site in its Site Controls, and turning the setting off stops every site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#533](https://github.com/ZigaoWang/zigzag/issues/533))

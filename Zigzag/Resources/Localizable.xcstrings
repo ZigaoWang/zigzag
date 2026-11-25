@@ -1,6 +1,160 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ are saved first, then are handed to %@" : {
+      "comment": "A File handoff in a sentence: what it catches is downloaded first, then given to the script. The placeholders are the two parts.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先把 %@ 保存下来，然后交给 %@"
+          }
+        }
+      }
+    },
+    "%@ are saved first, then go to %@" : {
+      "comment": "A File handoff in a sentence: what it catches is downloaded first, then sent to the service. The placeholders are the two parts, as in “Downloads ending in .torrent” and “rTorrent”.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先把 %@ 保存下来，然后送往 %@"
+          }
+        }
+      }
+    },
+    "%@ are saved first, then open in %@" : {
+      "comment": "A File handoff in a sentence: what it catches is downloaded first, then opened in the app. The placeholders are the two parts.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先把 %@ 保存下来，然后在 %@ 中打开"
+          }
+        }
+      }
+    },
+    "Downloads ending in %@" : {
+      "comment": "Part of a download rule's sentence for a File handoff: the files whose address ends this way. The placeholder is the end of the address, such as .torrent.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以 %@ 结尾的下载"
+          }
+        }
+      }
+    },
+    "Downloads matching %@" : {
+      "comment": "Part of a download rule's sentence for a File handoff: the files whose address matches this expression. The placeholder is the expression.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匹配 %@ 的下载"
+          }
+        }
+      }
+    },
+    "Downloads starting with %@" : {
+      "comment": "Part of a download rule's sentence for a File handoff: the files whose address begins this way. The placeholder is the beginning of the address.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以 %@ 开头的下载"
+          }
+        }
+      }
+    },
+    "Downloads whose address contains %@" : {
+      "comment": "Part of a download rule's sentence for a File handoff: the files whose address contains this text. The placeholder is the text looked for in the address.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地址包含 %@ 的下载"
+          }
+        }
+      }
+    },
+    "File saves the download in Zigzag first, using the page’s session, then hands off the saved file; links still hand off their address." : {
+      "comment": "Under the Hand off choice in a download rule's sheet: what File does, and that links are unaffected.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“文件”会先用网页的登录状态把下载保存到 Zigzag，再转交保存好的文件；链接仍然转交地址。"
+          }
+        }
+      }
+    },
+    "Hand off" : {
+      "comment": "Label of the choice between handing off a download rule's URL or its saved file, in its sheet.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转交"
+          }
+        }
+      }
+    },
+    "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE." : {
+      "comment": "Under the arguments of a Run Script download rule: one argument a line, and the names the link, the cookies and a File handoff's saved file arrive under.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一行一个参数。链接和 Cookie 分别放在 ZIGZAG_LINK 和 ZIGZAG_COOKIES 中；转交文件时还会设置 ZIGZAG_FILE。"
+          }
+        }
+      }
+    },
+    "The download didn’t finish." : {
+      "comment": "Why a File handoff didn't run: the download failed or was cancelled.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载没有完成。"
+          }
+        }
+      }
+    },
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff." : {
+      "comment": "The tokens a download rule's fields may use, listed in its sheet. File and file_url are only filled in when the rule hands off a saved file.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用标记：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}。{file} 和 {file_url} 需要选择“文件”转交。"
+          }
+        }
+      }
+    },
+    "handed this file to %@" : {
+      "comment": "An automation's notice over the page: what a rule did with the file it downloaded first. The placeholder is the app's own name, like mpv.",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把这个文件交给了 %@"
+          }
+        }
+      }
+    },
+    "sent this file to %@" : {
+      "comment": "An automation's notice over the page: what a rule did with the file it downloaded first. The placeholder names the service and the method, like 127.0.0.1 (aria2.addUri).",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把这个文件发送到了 %@"
+          }
+        }
+      }
+    },
     "AI Apps" : {
       "comment" : "The name of the profile AI apps use in the background. It can't be changed.",
       "localizations" : {
