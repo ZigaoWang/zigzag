@@ -140,6 +140,8 @@ final class SyncSession {
     var onChange: (() -> Void)?
     /// Called when removals are held, or no longer are.
     var onHeld: (() -> Void)?
+    /// Called when a save finds the zone gone after the first sync: removed from iCloud on another Mac.
+    var onRemovedElsewhere: (() -> Void)?
     /// True while it writes into the library, so the change that causes isn't read as one made here.
     private(set) var isApplying = false
 
@@ -531,6 +533,8 @@ final class SyncSession {
             state.serverPayloads[name] = nil
             if state.base[name] != nil { state.unsent.insert(name); queue(([name], [])) }
         case .zoneMissing:
+            // After the first sync it was removed, never made again from here.
+            if state.merged { onRemovedElsewhere?(); return }
             state.systemFields = [:]
             state.unsent.formUnion(state.base.keys)
             queue((Array(state.base.keys), []))

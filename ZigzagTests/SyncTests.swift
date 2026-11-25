@@ -21,8 +21,16 @@ import Testing
 
     enum Saved { case saved(SyncRemote), failed(SyncSaveFailure) }
 
+    /// The zone was removed (Remove from iCloud on another Mac).
+    func removeZone() {
+        records = [:]
+        zoneRemoved = true
+    }
+    private(set) var zoneRemoved = false
+
     @discardableResult
     func save(_ upload: SyncUpload) -> Saved {
+        if zoneRemoved { return .failed(.zoneMissing) }
         let tag = upload.systemFields.flatMap { Int(String(decoding: $0, as: UTF8.self)) }
         if let current = records[upload.name] {
             if tag != current.tag, let server = remote(upload.name) { return .failed(.conflict(server)) }
@@ -1140,6 +1148,17 @@ extension SyncLibrary {
         let sent = a.sent
         a.sync()
         #expect(a.sent == sent)
+    }
+
+    @Test func aSaveFindingTheZoneGoneNeverMakesItAgain() {
+        let (cloud, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        var removed = false
+        a.session.onRemovedElsewhere = { removed = true }
+        cloud.removeZone()
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("b")) } }
+        a.sync()
+        #expect(removed)
+        #expect(a.saves.isEmpty && cloud.records.isEmpty)
     }
 
     @Test func aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing() async throws {

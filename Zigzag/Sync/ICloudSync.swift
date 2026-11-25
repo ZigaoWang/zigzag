@@ -175,6 +175,7 @@ final class ICloudSync {
         let session = SyncSession(host: host, state: state)
         session.onChange = { [weak self] in self?.saveSoon() }
         session.onHeld = { [weak self] in self?.changed.send() }
+        session.onRemovedElsewhere = { [weak self] in self?.zoneDeleted(reset: false) }
         self.session = session
         watchLibrary()
         // CKSyncEngine listens for pushes too, but its own fetch on one goes through a scheduler that can refuse it.
@@ -585,7 +586,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         configuration.automaticallySync = true
         let engine = CKSyncEngine(configuration)
         self.engine = engine
-        engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: ICloudSync.zoneID))])
+        // Made only by the first sync: a zone gone after it was removed elsewhere, and isn't made again.
+        if session?.state.merged != true { engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: ICloudSync.zoneID))]) }
     }
 
     func stop() {
@@ -704,9 +706,10 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                 switch failure.error.code {
                 case .serverRecordChanged:
                     if let server = failure.error.serverRecord { session.saveFailed(name, .conflict(Self.remote(server))) }
-                case .zoneNotFound:
-                    syncEngine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: ICloudSync.zoneID))])
+                case .zoneNotFound, .userDeletedZone:
+                    if !session.state.merged { syncEngine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: ICloudSync.zoneID))]) }
                     session.saveFailed(name, .zoneMissing)
+                    if session.state.merged { return }
                 case .unknownItem:
                     session.saveFailed(name, .gone)
                 case .quotaExceeded:
