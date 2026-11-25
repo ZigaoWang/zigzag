@@ -119,3 +119,23 @@
   Test: SiteUserAgentsTests.privateWindowsFollowKeptChoicesWithoutTheRow
 - addons.mozilla.org → still asked for as Firefox, whatever is chosen.
   Test: SiteUserAgentsTests.theAddonsStoreIsStillAskedForAsFirefox
+
+## Compatibility mode
+- Compatibility mode on for a site in Site Controls → extensions, ad blocking, cookie banners, zapped elements and custom style are all off there and on its subdomains; other sites keep theirs.
+  Test: SiteCompatibilityTests.onSetsEverythingAsideForThatSiteOnly
+- Turned off again → the site's own choices for each come back exactly as they were; none of them changed while it was on.
+  Test: SiteCompatibilityTests.offRestoresTheChoicesExactly
+- Turned off on a subdomain of a site it's on for → off for that site too, as allowing ads is.
+  Test: SiteCompatibilityTests.offOnASubdomainTakesTheCoveringSiteOff
+- While it's on → Ad blocking, Cookie banners and Extensions show off and dimmed, saying it's compatibility mode; the zapped and Custom style rows say Off.
+  Test: SiteCompatibilityTests.overriddenRowsShowOffAndDimmed
+- While it's on → Site Controls by the address is in the accent, and says so in its tooltip and to VoiceOver.
+  Test: SiteCompatibilityTests.siteControlsShowsItInTheAccent
+- Turning it on or off → the page reloads once.
+  No test yet.
+- Turned on → kept across launches and listed in Settings › Privacy › Sites, where × and Forget turn it off.
+  Test: SiteCompatibilityTests.itIsKeptAndListedInSettings
+- A private window → follows it with no row of its own, and keeps nothing new for the site.
+  Test: SiteCompatibilityTests.privateWindowsFollowItAndKeepNothing
+- Boosts saved before it existed → still load, with it off.
+  Test: SiteCompatibilityTests.boostsSavedBeforeCompatibilityStillRead

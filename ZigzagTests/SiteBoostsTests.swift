@@ -470,3 +470,198 @@ struct SiteBoostsTests {
         }
     }
 }
+
+/// Compatibility mode (#497): one switch sets a site's extensions, blockers, zaps and style aside, keeping each choice.
+@MainActor
+@Suite(.serialized)
+struct SiteCompatibilityTests {
+    private let site = URL(string: "https://example.com/page")!
+    private let other = URL(string: "https://other.com/")!
+
+    /// Each store on defaults of its own, or put back as it was.
+    private func withStores(_ body: () async throws -> Void) async throws {
+        let suite = "zigzag-compat-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let boosts = SiteBoosts.defaults, banners = CookieBanners.defaults
+        let blocking = ContentBlocker.isEnabled, allowed = ContentBlocker.allowedSites
+        let profile = Profiles.shared.profile(Profile.defaultID)
+        let off = ExtensionStore.extensionsOffSites(in: profile)
+        SiteBoosts.defaults = defaults
+        CookieBanners.defaults = defaults
+        ContentBlocker.isEnabled = true
+        ContentBlocker.allowedSites = []
+        defer {
+            SiteBoosts.defaults = boosts
+            CookieBanners.defaults = banners
+            ContentBlocker.isEnabled = blocking
+            ContentBlocker.allowedSites = allowed
+            ExtensionStore.setExtensionsOffSites(off, in: profile)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try await body()
+    }
+
+    /// An extension asking for every site, with a content script on all of them.
+    private func probeContext() async throws -> WKWebExtensionContext {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0","host_permissions":["*://*/*"],"content_scripts":[{"matches":["<all_urls>"],"js":["c.js"]}]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("".utf8).write(to: folder.appendingPathComponent("c.js"))
+        return WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+    }
+
+    @Test func onSetsEverythingAsideForThatSiteOnly() async throws {
+        try await withStores {
+            SiteBoosts.zap("#promo", forSite: "example.com")
+            SiteBoosts.zap("#promo", forSite: "other.com")
+            SiteCompatibility.set(true, for: site)
+            #expect(SiteCompatibility.isOn(for: site))
+            #expect(SiteCompatibility.isOn(for: URL(string: "https://news.example.com/")))
+            #expect(!SiteCompatibility.isOn(for: other))
+            // Ad blocking and cookie banners.
+            #expect(!ContentBlocker.blocks(on: site))
+            #expect(ContentBlocker.blocks(on: other))
+            #expect(!CookieBanners.runs(on: site))
+            #expect(CookieBanners.runs(on: other))
+            // Zaps and style.
+            #expect(PageBoosts.applied(site: "example.com", privateStore: nil).isEmpty)
+            #expect(!PageBoosts.applied(site: "other.com", privateStore: nil).isEmpty)
+            let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+            PageBoosts.prepare(webView, for: site, privateStore: nil, errorPage: false)
+            #expect(!webView.configuration.userContentController.userScripts.contains(where: PageBoosts.isOurs))
+            // Extensions: denied the site, so their content scripts stay out, as with Extensions off for it.
+            let profile = Profiles.shared.profile(Profile.defaultID)
+            let offSites = ExtensionStore.extensionsOffSitesInEffect(in: profile)
+            #expect(offSites.contains("example.com") && !offSites.contains("other.com"))
+            let context = try await probeContext()
+            let all = try WKWebExtension.MatchPattern(string: "*://*/*")
+            ExtensionHost.applySiteAccess(nil, approved: [all], sites: [], offSites: offSites, approvesActiveTab: false, to: context)
+            #expect(context.permissionStatus(for: site) == .deniedExplicitly)
+            #expect([.grantedExplicitly, .grantedImplicitly].contains(context.permissionStatus(for: other)))
+        }
+    }
+
+    @Test func offRestoresTheChoicesExactly() async throws {
+        try await withStores {
+            let profile = Profiles.shared.profile(Profile.defaultID)
+            let ads = URL(string: "https://ads.example.com/")
+            ContentBlocker.setAllowed(true, on: ads)
+            CookieBanners.setChoice(false, for: site)
+            ExtensionStore.setExtensionsOffSites(["example.com"], in: profile)
+            SiteBoosts.zap("#promo", name: "Promo", forSite: "example.com")
+            SiteBoosts.setStyle("body { color: red }", forSite: "example.com")
+            let boost = SiteBoosts.boost(forSite: "example.com")
+            let allowed = ContentBlocker.allowedSites, handled = CookieBanners.sitesHandled, left = CookieBanners.sitesLeft
+            SiteCompatibility.set(true, for: site)
+            // Nothing underneath changes while it's on.
+            #expect(ContentBlocker.allowedSites == allowed)
+            #expect(CookieBanners.sitesHandled == handled && CookieBanners.sitesLeft == left)
+            #expect(ExtensionStore.extensionsOffSites(in: profile) == ["example.com"])
+            #expect(SiteBoosts.boost(forSite: "example.com").zaps == boost.zaps)
+            SiteCompatibility.set(false, for: site)
+            #expect(!SiteCompatibility.isOn(for: site))
+            #expect(SiteBoosts.boost(forSite: "example.com") == boost)
+            #expect(ContentBlocker.allowedSites == allowed)
+            #expect(ContentBlocker.blocks(on: site))
+            #expect(!ContentBlocker.blocks(on: ads))
+            #expect(CookieBanners.choice(for: site) == false && CookieBanners.runs(on: site))
+            #expect(ExtensionStore.extensionsOffSitesInEffect(in: profile) == ["example.com"])
+            #expect(PageBoosts.applied(site: "example.com", privateStore: nil) == SiteBoosts.css(for: boost))
+        }
+    }
+
+    /// Off on a subdomain a parent's switch covers takes the parent's off too, as allowing ads does.
+    @Test func offOnASubdomainTakesTheCoveringSiteOff() async throws {
+        try await withStores {
+            SiteCompatibility.set(true, for: site)
+            SiteCompatibility.set(false, for: URL(string: "https://news.example.com/"))
+            #expect(!SiteCompatibility.isOn(for: site))
+        }
+    }
+
+    @Test func itIsKeptAndListedInSettings() async throws {
+        try await withStores {
+            SiteCompatibility.set(true, for: site)
+            let data = try #require(SiteBoosts.defaults.data(forKey: SiteBoosts.key))
+            let kept = try JSONDecoder().decode([String: SiteBoost].self, from: data)
+            #expect(kept["example.com"]?.compatible == true)
+            let settings = SettingsView(pane: .privacy)
+            settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+            settings.debugReadNow()
+            let row = try #require(settings.debugSiteFormRows.first { $0.debugTitle == SitePanel.compatibilityTitle })
+            #expect(row.isIndented)
+            // × there, and Forget, take it off.
+            SiteCompatibility.set(false, forSite: "example.com")
+            #expect(SiteBoosts.sites.isEmpty)
+            SiteCompatibility.set(true, forSite: "example.com")
+            SiteBoosts.forget(site: "example.com")
+            #expect(!SiteCompatibility.isOn(for: site))
+        }
+    }
+
+    @Test func privateWindowsFollowItAndKeepNothing() async throws {
+        try await withStores {
+            var context = SitePanelRows.Context()
+            #expect(SitePanelRows.rows(context).contains(.compatibility))
+            context.isPrivate = true
+            #expect(!SitePanelRows.rows(context).contains(.compatibility))
+            SiteCompatibility.set(true, for: site)
+            let kept = SiteBoosts.defaults.data(forKey: SiteBoosts.key)
+            let window = WKWebsiteDataStore.nonPersistent()
+            // Zapping there keeps its own copy; the kept switch still holds for its pages.
+            SiteBoosts.zap("#mine", forSite: "example.com", privateStore: window)
+            #expect(PageBoosts.applied(site: "example.com", privateStore: window).isEmpty)
+            #expect(SiteBoosts.defaults.data(forKey: SiteBoosts.key) == kept)
+            #expect(!ContentBlocker.blocks(on: site) && !CookieBanners.runs(on: site))
+        }
+    }
+
+    @Test func overriddenRowsShowOffAndDimmed() async throws {
+        try await withStores {
+            CookieBanners.setChoice(false, for: site)
+            let tab = Tab(url: site, title: "Example", spaceID: UUID())
+            let first = try #require(SitePanel.forTesting(tab: tab))
+            let before = first.debugState["rows"] as? [String] ?? []
+            first.close()
+            #expect(before.contains("Ad blocking: on"))
+            #expect(before.contains("\(SitePanel.compatibilityTitle): off"))
+            SiteCompatibility.set(true, for: site)
+            let panel = try #require(SitePanel.forTesting(tab: tab))
+            let rows = panel.debugState["rows"] as? [String] ?? []
+            panel.close()
+            #expect(rows.contains("Ad blocking: off, dimmed"))
+            #expect(rows.contains("Cookie banners: off, dimmed"))
+            #expect(rows.contains("\(SitePanel.compatibilityTitle): on"))
+        }
+    }
+
+    @Test func siteControlsShowsItInTheAccent() async throws {
+        try await withStores {
+            let button = IconButton(symbol: "slider.horizontal.3", toolTip: "Site Controls")
+            SitePanel.markCompatibility(button, url: site)
+            #expect(button.tint == Tokens.Color.icon)
+            SiteCompatibility.set(true, for: site)
+            SitePanel.markCompatibility(button, url: site)
+            #expect(button.tint != Tokens.Color.icon)
+            #expect(button.toolTip != PaneHeaderView.siteControlsTitle)
+            #expect(button.accessibilityValue() as? String == SitePanel.compatibilityTitle)
+            SitePanel.markCompatibility(button, url: other)
+            #expect(button.tint == Tokens.Color.icon)
+        }
+    }
+
+    @Test func boostsSavedBeforeCompatibilityStillRead() throws {
+        let old = try JSONDecoder().decode([String: SiteBoost].self, from: Data(##"{"example.com":{"zaps":["#a"],"style":""}}"##.utf8))
+        #expect(old["example.com"]?.compatible == false && old["example.com"]?.zaps == ["#a"])
+        // A switch that isn't one is off, and the rest still reads.
+        let odd = try JSONDecoder().decode(SiteBoost.self, from: Data(##"{"zaps":["#a"],"compatible":"yes"}"##.utf8))
+        #expect(!odd.compatible && odd.zaps == ["#a"])
+        // Off, it isn't written, so files for sites without it stay as they were.
+        let plain = String(decoding: try JSONEncoder().encode(SiteBoost(zaps: ["#a"])), as: UTF8.self)
+        #expect(!plain.contains("compatible"))
+        let round = try JSONDecoder().decode(SiteBoost.self, from: JSONEncoder().encode(SiteBoost(compatible: true)))
+        #expect(round.compatible && !round.isEmpty)
+    }
+}

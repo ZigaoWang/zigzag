@@ -162,6 +162,32 @@ import Testing
         }
     }
 
+    /// With compatibility mode on (#497), the rows it sets aside say so under their names.
+    @Test func siteControlsFitInCompatibilityMode() throws {
+        let suite = "zigzag-layout-compat-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let boosts = SiteBoosts.defaults, banners = CookieBanners.defaults
+        SiteBoosts.defaults = defaults
+        CookieBanners.defaults = defaults
+        defer {
+            SiteBoosts.defaults = boosts
+            CookieBanners.defaults = banners
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let url = try #require(URL(string: "https://example.com/page"))
+        CookieBanners.setChoice(false, for: url)
+        SiteBoosts.zap("#promo", forSite: "example.com")
+        SiteCompatibility.set(true, for: url)
+        try pseudo {
+            let tab = Tab(url: url, title: "Example", spaceID: UUID())
+            let panel = try #require(SitePanel.forTesting(tab: tab))
+            panel.frame = NSRect(x: 0, y: 0, width: SitePanel.width, height: 700)
+            panel.layoutSubtreeIfNeeded()
+            let found = Self.cutOff(under: panel, "site panel compatibility mode")
+            #expect(found.isEmpty, "\(found.joined(separator: "\n"))")
+        }
+    }
+
     /// Each pane at a roomy page and at a narrow one.
     @Test(arguments: SettingsPane.allCases, [1040, 720]) func settingsFits(_ pane: SettingsPane, width: CGFloat) {
         pseudo {
