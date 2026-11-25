@@ -540,3 +540,7 @@ main, .nav { max-width: 1240px; }
   .dl-folder .back { fill: #5E8FC4; } .dl-folder .front { fill: #7FAEDF; }
   .pitch.sky-card p:not(.fine) { color: rgba(31, 45, 64, .72); }
 }
+
+/* The home page in each of the app's languages, as a line of their own names in the footer. */
+.end .langs { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; font-size: 13px; }
+.end .langs a { color: var(--soft); } .end .langs a:hover, .end .langs a[aria-current] { color: var(--ink); }

@@ -1,6 +1,243 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://zigzagbrowser.com/</loc><lastmod>2026-11-25</lastmod></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url><loc>https://zigzagbrowser.com/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/zh-hans/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/zh-hant/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/ja/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/ko/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/de/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/fr/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/it/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/es/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/pt-br/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/ru/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/nl/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/pl/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
+  <url><loc>https://zigzagbrowser.com/tr/</loc><lastmod>2026-11-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zigzagbrowser.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zigzagbrowser.com/zh-hans/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://zigzagbrowser.com/zh-hant/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zigzagbrowser.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zigzagbrowser.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://zigzagbrowser.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://zigzagbrowser.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://zigzagbrowser.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zigzagbrowser.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://zigzagbrowser.com/pt-br/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zigzagbrowser.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://zigzagbrowser.com/nl/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://zigzagbrowser.com/pl/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zigzagbrowser.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zigzagbrowser.com/"/>
+  </url>
   <url><loc>https://zigzagbrowser.com/download/</loc><lastmod>2026-11-25</lastmod></url>
   <url><loc>https://zigzagbrowser.com/release-notes/</loc><lastmod>2026-11-25</lastmod></url>
 </urlset>

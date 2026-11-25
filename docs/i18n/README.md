@@ -140,6 +140,7 @@ before using a new one.
 4. Run the pseudo-locale and the layout tests, then run the app in the language and take screenshots of the main
    surfaces. Fix anything cut off in the layout, not by shortening one translation.
 5. Add `docs/i18n/readme/README.<lang>.md`, translated from `README.md`, and add it to the language line at the top of every README.
+   For the website, add `scripts/site-strings/<lang>.json` and the language to `LANGS` in `scripts/site-languages.py`.
 6. Add the language's own name to `AppLanguage.ownName` (Settings › General › Language), and its code to
    `knownRegions` in `Zigzag.xcodeproj/project.pbxproj`, `CFBundleLocalizations` in `project.yml` and
    `Zigzag/Info.plist`, and `LocalizationTests.translated`. The code is the one Xcode and Bundle use (`pt-BR`, not
@@ -149,6 +150,21 @@ before using a new one.
    group and the Zigzag target's resources in `Zigzag.xcodeproj/project.pbxproj` by hand. Add the code to
    `WhatsNew.notesLanguages`, its New and Fixed headings to `WhatsNew.newHeadings` and `fixedHeadings`, and the code
    to `WhatsNewTests.languages`.
+
+## The website
+
+zigzagbrowser.com has the home page in every app language, at `/<lang>/` (`/ja/`, `/pt-br/`). `site/index.html` is
+the English source; `scripts/site-strings/en.json` lists its pieces to translate, and `scripts/site-strings/<lang>.json`
+gives each one's translation, in the glossary's words. After changing either, rebuild the pages, the language links
+and the sitemap:
+
+```sh
+scripts/site-languages.py           # writes site/<lang>/index.html and site/sitemap.xml
+scripts/site-languages.py --check   # fails if a page is out of date or the English changed under a translation
+```
+
+Never edit `site/<lang>/index.html` by hand. When an English line changes, change it in `en.json` and every
+language file too.
 
 ## The release gate
 
