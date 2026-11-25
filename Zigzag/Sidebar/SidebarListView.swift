@@ -1198,7 +1198,8 @@ final class SidebarListView: NSView {
             let folded = shownSpaceID.map(Self.isCollapsed) ?? false
             let siteIcon = folder.icon == nil ? folder.live.flatMap { LiveFolderSheet.siteIcon(for: $0.source) } : nil
             row.configure(name: folder.name, open: folder.isOpen && !folded, count: count, icon: folder.icon,
-                          live: folder.live != nil, siteIcon: siteIcon, unread: folder.live == nil ? 0 : LiveFolders.shared.unreadCount(id))
+                          live: folder.live != nil, siteIcon: siteIcon, unread: folder.live == nil ? 0 : LiveFolders.shared.unreadCount(id),
+                          updating: folder.live != nil && LiveFolders.shared.isRefreshing(id))
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
         case .tabGroup(let id):
             guard let row = view as? FolderRowView, let group = manager.group(id) else { return }

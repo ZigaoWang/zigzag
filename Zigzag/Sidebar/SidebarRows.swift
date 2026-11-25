@@ -1477,12 +1477,16 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// The live mark on a live folder's plain folder icon, as the chip on a site's icon.
     private var liveChip: CALayer?
-    private var renderedChip: (side: CGFloat, scale: CGFloat, color: CGColor)?
+    private var renderedChip: (side: CGFloat, scale: CGFloat, color: CGColor, mark: FaviconView.BadgeMark)?
+    /// A fetch of the live folder is under way: its chip shows the turning ring.
+    private(set) var isUpdating = false
+    /// The chip's ring is turning, on the site's icon or the folder's.
+    var isChipSpinning: Bool { liveChip.map(FaviconView.isSpinning) == true || icon.isBadgeSpinning }
 
     /// `live`: a live folder, wearing `siteIcon` (its site's) unless it has an icon of its own, else its folder, with
-    /// the live chip on the corner either way; `unread` new pages.
+    /// the live chip on the corner either way; `unread` new pages; `updating` while it fetches.
     func configure(name: String, open: Bool, count: Int, icon: String? = nil, tabGroup: Bool = false, live: Bool = false,
-                   siteIcon: NSImage? = nil, unread: Int = 0) {
+                   siteIcon: NSImage? = nil, unread: Int = 0, updating: Bool = false) {
         title.stringValue = name
         let site = live && icon == nil ? siteIcon : nil
         let side = Tokens.Sidebar.favicon
@@ -1491,7 +1495,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         folderIcon.isHidden = site != nil
         self.icon.isHidden = site == nil
         self.icon.image = site
-        self.icon.badgeMark = .feed
+        isUpdating = live && updating
+        self.icon.badgeMark = isUpdating && site != nil ? .updating : .feed
         self.icon.developerBadge = site == nil ? nil : Brand.Theme.for(self).badge
         showChip(live && site == nil)
         isOpen = open
@@ -1565,7 +1570,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
             liveChip = chip
         }
         Tokens.Motion.withoutAnimation { liveChip?.isHidden = !on }
-        renderedChip = nil
+        if let liveChip { FaviconView.spin(liveChip, on && isUpdating) }
+        needsLayout = true
     }
 
     /// The chip where a site icon's sits on the icon's corner, drawn again only when its size, screen or color changes.
@@ -1576,12 +1582,13 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         let y = isFlipped ? square.maxY - spot.maxY : square.minY + spot.minY
         let scale = window?.backingScaleFactor ?? 2
         let color = cgColor(Brand.Theme.for(self).badge)
+        let mark: FaviconView.BadgeMark = isUpdating ? .updating : .feed
         Tokens.Motion.withoutAnimation {
             chip.frame = CGRect(x: square.minX + spot.minX, y: y, width: spot.width, height: spot.height)
             chip.contentsScale = scale
-            if let last = renderedChip, last.side == spot.width, last.scale == scale, last.color == color { return }
-            renderedChip = (spot.width, scale, color)
-            chip.contents = FaviconView.renderBadge(side: spot.width, scale: scale, color: color, mark: .feed)
+            if let last = renderedChip, last.side == spot.width, last.scale == scale, last.color == color, last.mark == mark { return }
+            renderedChip = (spot.width, scale, color, mark)
+            chip.contents = FaviconView.renderBadge(side: spot.width, scale: scale, color: color, mark: mark)
         }
     }
 

@@ -46,11 +46,34 @@ final class FaviconView: NSView {
             needsLayout = true
         }
     }
-    /// What the chip has knocked out of it: Developer Mode's hammer, or a live folder's feed mark.
-    enum BadgeMark { case developer, feed }
+    /// What the chip has knocked out of it: Developer Mode's hammer, a live folder's feed mark, or the open ring a
+    /// live folder shows while it fetches.
+    enum BadgeMark { case developer, feed, updating }
     var badgeMark = BadgeMark.developer {
-        didSet { if oldValue != badgeMark { renderedBadge = nil; needsLayout = true } }
+        didSet {
+            guard oldValue != badgeMark else { return }
+            renderedBadge = nil
+            needsLayout = true
+            Self.spin(badge, badgeMark == .updating)
+        }
     }
+    /// The chip's ring is turning.
+    var isBadgeSpinning: Bool { Self.isSpinning(badge) }
+
+    /// A chip with the updating ring turns while it shows, one turn per mark cycle; with Reduce Motion it stays still.
+    static func spin(_ chip: CALayer, _ on: Bool) {
+        guard on, !Tokens.Motion.reduceMotion else { chip.removeAnimation(forKey: "updating"); return }
+        guard chip.animation(forKey: "updating") == nil else { return }
+        let turn = CABasicAnimation(keyPath: "transform.rotation.z")
+        turn.fromValue = 0
+        turn.toValue = -2 * CGFloat.pi
+        turn.duration = Tokens.Motion.Ambient.markCycle
+        turn.repeatCount = .infinity
+        turn.timingFunction = CAMediaTimingFunction(name: .linear)
+        chip.add(turn, forKey: "updating")
+    }
+
+    static func isSpinning(_ chip: CALayer) -> Bool { chip.animation(forKey: "updating") != nil }
     private let badge = CALayer()
     private let badgeCut = CAShapeLayer()
     private var renderedBadge: (side: CGFloat, scale: CGFloat, color: CGColor)?
@@ -285,6 +308,10 @@ final class FaviconView: NSView {
             cutFeedMark(in: context, side: rect.width)
             return context.makeImage()
         }
+        if mark == .updating {
+            cutUpdatingRing(in: context, side: rect.width)
+            return context.makeImage()
+        }
         let config = NSImage.SymbolConfiguration(pointSize: side * scale, weight: .bold)
         if let glyph = NSImage(systemSymbolName: DeveloperTool.modeSymbol + ".fill", accessibilityDescription: nil)?.withSymbolConfiguration(config)
             ?? NSImage(systemSymbolName: DeveloperTool.modeSymbol, accessibilityDescription: nil)?.withSymbolConfiguration(config) {
@@ -318,6 +345,19 @@ final class FaviconView: NSView {
             context.addArc(center: CGPoint(x: corner, y: corner), radius: radius, startAngle: 0, endAngle: .pi / 2, clockwise: false)
             context.strokePath()
         }
+        context.restoreGState()
+    }
+
+    /// Three quarters of a ring in the feed mark's line weight, in the middle of the disc.
+    private static func cutUpdatingRing(in context: CGContext, side: CGFloat) {
+        let line = side * Tokens.Sidebar.feedLineShare
+        let radius = side * Tokens.Sidebar.feedMarkShare / 2 - line / 2
+        context.saveGState()
+        context.setBlendMode(.clear)
+        context.setLineWidth(line)
+        context.setLineCap(.round)
+        context.addArc(center: CGPoint(x: side / 2, y: side / 2), radius: radius, startAngle: .pi / 2, endAngle: 2 * .pi, clockwise: false)
+        context.strokePath()
         context.restoreGState()
     }
 
