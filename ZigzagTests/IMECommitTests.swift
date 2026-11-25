@@ -20,6 +20,14 @@ import WebKit
         Case(marked: "ni hao", source: pinyin, expected: "nihao"),
         Case(marked: "a b c", source: pinyin, expected: "abc"),
         Case(marked: "ni hao", source: IMECommit.Source(id: "com.sogou.inputmethod.sogou.pinyin", languages: ["zh-Hans"]), expected: "nihao"),
+        Case(marked: "ni hao", source: IMECommit.Source(id: "com.tencent.inputmethod.wetype.pinyin", languages: ["zh-Hans"]), expected: "nihao"),
+        Case(marked: "ni hao", source: IMECommit.Source(id: "com.apple.inputmethod.SCIM.Shuangpin", languages: ["zh-Hans"]), expected: "nihao"),
+        Case(marked: "ni hao", source: IMECommit.Source(id: "com.apple.inputmethod.TCIM.Pinyin", languages: ["zh-Hant"]), expected: "nihao"),
+        // Not pinyin: English typed inline keeps its spaces.
+        Case(marked: "ni hao", source: IMECommit.Source(id: "com.apple.inputmethod.TCIM.Zhuyin", languages: ["zh-Hant"]), expected: "ni hao"),
+        Case(marked: "ni hao", source: IMECommit.Source(id: "com.apple.inputmethod.TCIM.Cangjie", languages: ["zh-Hant"]), expected: "ni hao"),
+        Case(marked: "ni hao", source: IMECommit.Source(id: "com.apple.inputmethod.SCIM.WBX", languages: ["zh-Hans"]), expected: "ni hao"),
+        Case(marked: "ni hao", source: IMECommit.Source(id: "com.example.inputmethod.wubi", languages: ["zh-Hans"]), expected: "ni hao"),
         Case(marked: "ni hao", source: english, expected: "ni hao"),
         Case(marked: "ni hao", source: nil, expected: "ni hao"),
         Case(marked: "ni hao", source: japanese, expected: "ni hao"),
@@ -103,6 +111,51 @@ import WebKit
         #expect(try await page.value() == "nihao")
     }
 
+    /// The page drops its composition itself: a text replacement or dictation inserted after keeps its spaces.
+    @Test func aCancelledCompositionLeavesLaterTextAlone() async throws {
+        let page = try await page()
+        defer { page.window.close() }
+        try await using(Self.pinyin) {
+            try await compose("ni hao", in: page.client)
+            _ = try await page.webView.evaluateJavaScript("const f = document.getElementById('f'); f.blur(); f.value = ''; f.focus()")
+            try await Task.sleep(for: .milliseconds(200))
+            page.client.insertText("be right back", replacementRange: Self.none)
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        #expect(try await page.value() == "be right back")
+    }
+
+    /// A click in the page or a new page ends what was being composed.
+    @Test func aClickOrANewPageForgetsTheComposition() async throws {
+        let page = try await page()
+        defer { page.window.close() }
+        try await using(Self.pinyin) { try await compose("ni hao", in: page.client) }
+        #expect(page.webView.debugMarkedLetters == "ni hao")
+        let click = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: NSPoint(x: 300, y: 300), modifierFlags: [], timestamp: 0,
+                                                    windowNumber: page.window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        page.webView.mouseDown(with: click)
+        #expect(page.webView.debugMarkedLetters == nil)
+
+        try await using(Self.pinyin) { try await compose("ni hao", in: page.client) }
+        let loading = Loading()
+        page.webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            page.webView.loadHTMLString("<input id=f>", baseURL: URL(string: "https://example.org/"))
+        }
+        #expect(page.webView.debugMarkedLetters == nil)
+    }
+
+    /// Only selectors WKWebView has are taken over; a missing one is left as it is, not forwarded blind.
+    @Test func onlyWebKitsOwnSelectorsAreTakenOver() throws {
+        #expect(Set(BrowserWebView.imeSelectors.map(\.webKit)).isSubset(of: Set(BrowserWebView.interposed)))
+        let bare: AnyClass = try #require(objc_allocateClassPair(NSView.self, "ZigzagIMEProbe\(UUID().uuidString.prefix(8))", 0))
+        objc_registerClassPair(bare)
+        defer { objc_disposeClassPair(bare) }
+        #expect(BrowserWebView.interpose(into: bare, over: NSView.self).isEmpty)
+        for (webKit, _) in BrowserWebView.imeSelectors { #expect(class_getInstanceMethod(bare, webKit) == nil) }
+    }
+
     @Test func typingWithoutMarkedTextIsLeftAlone() async throws {
         let page = try await page()
         defer { page.window.close() }
@@ -156,6 +209,20 @@ import WebKit
         try await using(Self.pinyin) { try await compose("ni hao", in: editor) }
         await using(Self.english) { editor.unmarkText() }
         #expect(editor.string == "nihao")
+    }
+
+    /// A text replacement over marked letters isn't the letters themselves, so it keeps its spaces.
+    @Test func aFieldLeavesOtherTextOverMarkedLettersAlone() async throws {
+        let host = Host()
+        let bar = CommandBarController(host: host)
+        bar.show(mode: .newTab)
+        defer { bar.dismiss(restoringFocus: false) }
+        let editor = try #require(host.window?.firstResponder as? NSTextView)
+        try await using(Self.pinyin) {
+            try await compose("brb", in: editor)
+            editor.insertText("be right back", replacementRange: Self.none)
+        }
+        #expect(editor.string == "be right back")
     }
 
     @Test func aFieldWithoutMarkedTextIsLeftAlone() async throws {
