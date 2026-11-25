@@ -5,13 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Turn on Settings › Zigzag Mini › Open ⇧-clicked links in the page and a ⇧-clicked link opens in Zigzag Mini right over the page you clicked from, the page dimmed behind it, instead of in a window of its own. Esc, a click on the dimmed page, ⌘W or switching tabs puts it away, and Open in Window gives the same page a Mini window of its own without reloading it. Off until you turn it on, so ⇧-click works as before. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#481](https://github.com/ZigaoWang/zigzag/issues/481), [#501](https://github.com/ZigaoWang/zigzag/issues/501))
-
-### Fixed
-- Holding Back or Forward with the mouse or trackpad, then sliding onto a page in the list and letting go, goes to that page again, as with a finger. Before, letting go there did nothing in the sidebar's top row and the bar above the page. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
-- An extension pinned to the address, like 1Password, shows its whole icon centered in its button. Before, an icon that arrived after the button was drawn sat a little off and soft. In Site Controls the pin mark sits in the tile's corner instead of over the icon.
-
 ## [0.9.5] - 2026-11-24
 
 Export Your Data so you can always take everything with you, live folders, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.
@@ -32,6 +25,7 @@ Export Your Data so you can always take everything with you, live folders, Tradi
 - Live folders can follow the open issues or pull requests in the repositories a GitHub user owns, whoever opened them, so a maintainer's folder fills with what comes in. The other GitHub lists now say what they hold: Pull Requests Opened, Issues Assigned and Review Requests.
 - A live folder shows its site's icon in the sidebar, GitHub's for a GitHub list, with a small live mark on the corner so it still reads as live.
 - Hold your mouse's Back or Forward button to see the pages that way at the pointer, as with the on-screen arrows. Slide onto a page and let go to go there, or let go and click one. A quick press still goes one step. Thanks to [Lakeland97](https://github.com/Lakeland97) for the idea. ([#515](https://github.com/ZigaoWang/zigzag/issues/515))
+- Turn on Settings › Zigzag Mini › Open ⇧-clicked links in the page and a ⇧-clicked link opens in Zigzag Mini right over the page you clicked from, the page dimmed behind it, instead of in a window of its own. Esc, a click on the dimmed page, ⌘W or switching tabs puts it away, and Open in Window gives the same page a Mini window of its own without reloading it. Off until you turn it on, so ⇧-click works as before. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#481](https://github.com/ZigaoWang/zigzag/issues/481), [#501](https://github.com/ZigaoWang/zigzag/issues/501))
 
 ### Fixed
 - An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate. ([#510](https://github.com/ZigaoWang/zigzag/issues/510))
@@ -62,6 +56,8 @@ Export Your Data so you can always take everything with you, live folders, Tradi
 - A rule that hands downloads to an app, a script or a service can now match the file's own type, like torrent or pdf, not only its address. A tracker's download address often names no file, so its .torrent downloads can now reach the downloader whatever the address looks like. ([#524](https://github.com/ZigaoWang/zigzag/issues/524))
 - Opened for a Zigzag Mini link, an installed site or AI apps alone, Zigzag no longer drops the last session's sign-ins: when you open a browser window and the session comes back, its session cookies and sessionStorage come back with it, so Microsoft 365 and similar sites keep you signed in. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - A tab's chevron goes away once the last tab nested under it leaves, instead of staying behind and doing nothing, and dragging a tab right to nest it under the tab just above now shows the line at the depth it will land. Thanks to [bkonia](https://github.com/bkonia). ([#526](https://github.com/ZigaoWang/zigzag/issues/526))
+- Holding Back or Forward with the mouse or trackpad, then sliding onto a page in the list and letting go, goes to that page again, as with a finger. Before, letting go there did nothing in the sidebar's top row and the bar above the page. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
+- An extension pinned to the address, like 1Password, shows its whole icon centered in its button. Before, an icon that arrived after the button was drawn sat a little off and soft. In Site Controls the pin mark sits in the tile's corner instead of over the icon.
 
 ## [0.9.4] - 2026-11-24
 
