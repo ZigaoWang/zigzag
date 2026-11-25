@@ -44,7 +44,8 @@
   Test: SyncTests.twoMacsTurningSyncOnAtOnceMakeNoCopies
 - Something iCloud doesn't have → added to iCloud, never removed from this Mac.
   Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
-- Sync turned on again, or iCloud's copy reset → merged again, and nothing is added twice.
+- Sync turned on again, or iCloud's copy reset → merged again, and nothing is added twice. A Mac that was offline during a reset matches its items as before the reset, even renamed ones, and nothing is copied; but as in any first sync, iCloud's version of what matched wins, so what that Mac changed offline is lost, and what it removed offline comes back from the Mac that sent first.
+  Test: SyncTests.aResetWhileAnotherMacWasOfflineAddsNoCopies
   Test: SyncTests.turningSyncOnAgainAddsNothingTwice
 - Sync turned off, something renamed, and turned on again → the renamed space, folder or page is matched as it was before, taking iCloud's version, never added again.
   Test: SyncTests.turningSyncOffRenamingAndOnAgainAddsNoCopy

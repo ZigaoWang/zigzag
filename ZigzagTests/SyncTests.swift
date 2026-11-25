@@ -21,6 +21,9 @@ import Testing
 
     enum Saved { case saved(SyncRemote), failed(SyncSaveFailure) }
 
+    /// iCloud's copy reset (its encryption keys): the zone is there, empty.
+    func reset() { records = [:] }
+
     /// The zone was removed (Remove from iCloud on another Mac).
     func removeZone() {
         records = [:]
@@ -447,6 +450,24 @@ extension SyncLibrary {
         #expect(again.library.spaceNames == ["Personal"] && again.library.urls(in: "Personal") == ["a"])
         #expect(a.library.spaceNames == ["Personal"])
         #expect(cloud.records.keys.filter { $0.hasPrefix("space.") }.count == 1)
+    }
+
+    @Test func aResetWhileAnotherMacWasOfflineAddsNoCopies() {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        // B goes offline and renames its space; iCloud's copy is reset meanwhile and A sends its library again.
+        b.online = false
+        b.edit { $0.editSpace("Personal") { $0.name = "Home" } }
+        cloud.reset()
+        a.session.startOver()
+        a.sync()
+        b.online = true
+        b.session.startOver()
+        b.sync(); a.sync()
+        for mac in [a, b] {
+            #expect(mac.library.contents.spaces.count == 1)
+            #expect(mac.library.contents.spaces[0].bookmarks.map(\.url.lastPathComponent) == ["a", "b"])
+        }
+        #expect(cloud.records.keys.filter { $0.hasPrefix("space.") || $0.hasPrefix("page.") }.count == 3)
     }
 
     @Test func aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto() {
