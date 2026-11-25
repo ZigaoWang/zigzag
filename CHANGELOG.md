@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Zigzag is now in Japanese, following Apple's own Japanese terms for macOS and Safari. It follows your Mac's language, or pick it in Settings › General › Language.
+- Zigzag is now in Korean, German, French, Italian, Spanish, Brazilian Portuguese, Russian, Dutch, Polish and Turkish, following Apple's own terms for each. It follows your Mac's language, or pick one in Settings › General › Language.
 - A download rule can hand off the file instead of the address: set Hand off to File, and Zigzag downloads it first with the page's session, then gives the saved file to the app, script or service. Links still hand off their address, and a File handoff's templates can use {file} or {file_url} for the saved file. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#529](https://github.com/ZigaoWang/zigzag/issues/529))
 - A live folder's menu now starts with when it last updated, like Updated 5 Minutes Ago, or Updating… while it fetches.
 - The New and Edit Live Folder sheet asks for the source first, lines its menus up with the fields, and says under them what the folder will show and that it checks every 30 minutes (hourly in Low Power Mode). A name left empty shows the name it will get, and a username GitHub can't have is marked.
