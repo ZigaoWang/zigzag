@@ -89,8 +89,8 @@ Traditional Chinese and Japanese are welcome but optional: leave untranslated en
 source. See the [Simplified Chinese](docs/i18n/glossary.md), [Traditional Chinese](docs/i18n/glossary.zh-Hant.md)
 and [Japanese](docs/i18n/glossary.ja.md) glossaries for wording and typography. If you can't write the Simplified Chinese, say so in the pull request.
 
-A change to README.md updates [README.zh-Hans.md](README.zh-Hans.md) and [README.zh-Hant.md](README.zh-Hant.md) in the
-same pull request, or the pull request says they still need it.
+A change to README.md updates [README.zh-Hans.md](README.zh-Hans.md), [README.zh-Hant.md](README.zh-Hant.md) and
+[README.ja.md](README.ja.md) in the same pull request, or the pull request says they still need it.
 
 Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
 [CHANGELOG.zh-Hant.md](CHANGELOG.zh-Hant.md) can follow later. Keep the same version, date, order, issue links

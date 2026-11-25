@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | 繁體中文
+[English](README.md) | [简体中文](README.zh-Hans.md) | 繁體中文 | [日本語](README.ja.md)
 
 本文是 README.md 的翻譯；如有出入，以英文版為準。
 
