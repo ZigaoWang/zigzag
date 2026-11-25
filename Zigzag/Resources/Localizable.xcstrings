@@ -132395,6 +132395,9 @@
         }
       }
     },
+    "Remove All Pages from %@" : {
+      "comment" : "Item in the right-click menu of a row on the History page: removes every page on that site from History. The placeholder is the site, like “github.com”."
+    },
     "Remove All Shown…" : {
       "comment" : "Button over the list in Settings › Privacy › Stored by Websites while it's searched: removes the data of the sites shown.",
       "localizations" : {

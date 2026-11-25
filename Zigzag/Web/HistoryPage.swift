@@ -144,11 +144,31 @@ enum HistoryPage {
                 // once however big History is. A search the same tab typed over answers nothing; the page drops it.
                 let asker = message.webView.map { ObjectIdentifier($0).hashValue } ?? 0
                 Task {
-                    let json = await HistoryPage.profile(of: message.webView).history.search(query, limit: 300, asker: asker) { found in
-                        (try? JSONSerialization.data(withJSONObject: HistoryPage.sessions(found))).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+                    let json = await HistoryPage.profile(of: message.webView).history.pageSearch(query, asker: asker) { found in
+                        (try? JSONSerialization.data(withJSONObject: HistoryPage.sessions(found, stacks: false))).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
                     }
                     replyHandler(json, nil)
                 }
+            case "open":
+                // ⌘Return: the chosen pages in tabs behind this one.
+                let urls = ((body["urls"] as? [String]) ?? []).compactMap(URL.init(string:)).filter { $0.scheme == "http" || $0.scheme == "https" }
+                if let controller = HistoryPage.controller(for: message.webView) {
+                    for url in urls { controller.open(url, disposition: .backgroundTab) }
+                }
+                replyHandler(true, nil)
+            case "menu":
+                // Said as a row's right-click menu opens: what its Remove items name.
+                HistoryPage.menuContext = MenuContext(page: message.webView, count: body["count"] as? Int ?? 1,
+                                                      host: body["host"] as? String ?? "", at: Date())
+                replyHandler(true, nil)
+            case "deleteSite":
+                let host = (body["host"] as? String) ?? ""
+                guard !host.isEmpty else { replyHandler(false, nil); return }
+                HistoryPage.change(String(localized: "Remove Pages from History", comment: "Name of the undoable change in the Edit menu, as in “Undo Remove Pages from History”."),
+                                   from: message.webView, refresh: true) { [history = HistoryPage.profile(of: message.webView).history] in
+                    history.remove(host: host)
+                }
+                replyHandler(true, nil)
             case "delete":
                 // One page, or every page in a cluster.
                 let strings = (body["urls"] as? [String]) ?? [body["url"] as? String].compactMap { $0 }
@@ -186,9 +206,9 @@ enum HistoryPage {
         return entries
     }
 
-    /// Sessions of clusters, as the page draws them.
-    nonisolated private static func sessions(_ entries: [HistoryEntry]) -> [[String: Any]] {
-        HistoryClusters.group(entries).map { session in
+    /// Sessions of clusters, as the page draws them; a search's without stacks.
+    nonisolated static func sessions(_ entries: [HistoryEntry], stacks: Bool = true) -> [[String: Any]] {
+        HistoryClusters.group(entries, stacks: stacks).map { session in
             [
                 "title": HistoryClusters.title(startingAt: session.start),
                 "clusters": session.clusters.map { cluster in
@@ -276,8 +296,59 @@ enum HistoryPage {
     }
 
     /// A change to History from this page, undoable with ⌘Z in its window. The page shows it itself.
-    private static func change(_ name: String, from webView: WKWebView?, _ take: @escaping () -> HistoryRemoval) {
-        if let controller = controller(for: webView) { controller.historyChange(name, refresh: false, take) } else { BrowserWindowController.historyChange(name, take) }
+    private static func change(_ name: String, from webView: WKWebView?, refresh: Bool = false, _ take: @escaping () -> HistoryRemoval) {
+        if let controller = controller(for: webView) { controller.historyChange(name, refresh: refresh, take) } else { BrowserWindowController.historyChange(name, take) }
+    }
+
+    // MARK: The right-click menu
+
+    struct MenuContext {
+        weak var page: WKWebView?
+        let count: Int
+        let host: String
+        let at: Date
+    }
+
+    /// The rows a right-click on the page is about, as the page said just before its menu opened.
+    static var menuContext: MenuContext?
+
+    /// Remove items at the end of a row's right-click menu: the row, or the rows chosen with it, and its whole site.
+    static func addMenuItems(to menu: NSMenu, in webView: WKWebView) {
+        guard let context = menuContext, context.page === webView, Date().timeIntervalSince(context.at) < 2 else { return }
+        menuContext = nil
+        let remove = context.count > 1
+            ? String(localized: "Remove \(context.count) Pages from History", comment: "Tooltip of the × on a site's group of pages on the History page. Always two or more.")
+            : String(localized: "Remove from History", comment: "Tooltip of the × on a page on the History page.")
+        var items = [MenuTarget.item(remove, script: "remove", in: webView)]
+        if !context.host.isEmpty {
+            items.append(MenuTarget.item(String(localized: "Remove All Pages from \(context.host)", comment: "Item in the right-click menu of a row on the History page: removes every page on that site from History. The placeholder is the site, like “github.com”."),
+                                         script: "site", in: webView))
+        }
+        if let last = menu.items.last, !last.isSeparatorItem { menu.addItem(.separator()) }
+        items.forEach(menu.addItem)
+    }
+
+    /// Hands a chosen Remove item back to the page, which knows its rows.
+    final class MenuTarget: NSObject {
+        static let shared = MenuTarget()
+
+        static func item(_ title: String, script: String, in webView: WKWebView) -> NSMenuItem {
+            let item = NSMenuItem(title: title, action: #selector(chosen(_:)), keyEquivalent: "")
+            item.target = shared
+            item.representedObject = (webView, script)
+            return item
+        }
+
+        @objc func chosen(_ sender: NSMenuItem) {
+            guard let (webView, what) = sender.representedObject as? (WKWebView, String) else { return }
+            webView.evaluateJavaScript("window.zigzagMenu && window.zigzagMenu('\(what)')")
+        }
+    }
+
+    /// ⌘F on History: its own search field, as in Safari, not the find bar.
+    static func focusSearch(in webView: WKWebView) {
+        webView.window?.makeFirstResponder(webView)
+        webView.evaluateJavaScript("window.zigzagFocusSearch && window.zigzagFocusSearch()")
     }
 
     /// Every open History page shows History as it is now, after a change made elsewhere or undone.
@@ -365,8 +436,8 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .clear { position: relative; margin-right: 30px; }
 
 #list { padding: 4px calc(var(--gutter) - var(--row-inset)) 48px; }
-/* A session: one sitting, from the first page to a break. Sessions are set apart by room and a quiet label, never a
-   line. Its label stays in view while its pages scroll. */
+/* A part of a day: its label stays in view while its pages scroll. Parts are set apart by room and a quiet label,
+   never a line. */
 .session { margin-bottom: var(--group-gap); }
 .session-head { position: sticky; top: var(--header, 56px); z-index: 2; background: var(--bg); display: flex; align-items: baseline;
                 gap: var(--space-2); padding: var(--space-3) var(--row-inset) var(--space-1); color: var(--faint); font-size: var(--label); font-weight: 500; }
@@ -386,15 +457,17 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
    disclosure, icon, title, address, time, remove. */
 .row { display: grid; grid-template-columns: 12px var(--favicon) minmax(0, 1fr) minmax(0, 34%) 120px 20px; align-items: center; column-gap: 10px;
        min-height: var(--row); padding: 0 var(--row-inset); border-radius: var(--radius-row); color: inherit; text-decoration: none;
-       width: 100%; text-align: left; }
+       width: 100%; text-align: left; scroll-margin: calc(var(--header, 56px) + 36px) 0 var(--space-2); }
 .row:hover { background: var(--hover); }
 .row:active { background: var(--pressed); }
-/* Reached with the keyboard: chosen, as a section is in Settings. */
-.row:focus-visible { background: color-mix(in srgb, var(--accent) var(--selection), transparent); outline: none; }
-/* Everything selected (⌘A): each session's pages as one lit block, as Finder shows a selection, not a stack of pills. */
+/* Chosen with a click, the arrows or ⇧: a soft fill of the accent, as the sidebar's selection. */
+.row.selected { background: color-mix(in srgb, var(--accent) var(--selection), transparent); }
+.row:focus-visible { outline: none; }
+.row:focus-visible:not(.selected) { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) var(--focus), transparent); }
+/* Everything selected (⌘A): each part's pages as one lit block, as Finder shows a selection, not a stack of pills. */
 .rows { border-radius: var(--radius-row); }
 .all-selected .rows { background: color-mix(in srgb, var(--accent) var(--selection), transparent); }
-.all-selected .row:hover, .all-selected .row:focus-visible { background: none; }
+.all-selected .row:hover, .all-selected .row.selected { background: none; }
 .row img, .row .dot { grid-column: 2; width: var(--favicon); height: var(--favicon); border-radius: var(--radius-small); }
 .row .dot { background: var(--muted); -webkit-mask: url(data:image/png;base64,%GLOBE%) center / 17px no-repeat; }
 /* One-color icons (GitHub, ChatGPT) come drawn in the page's own ink, so no icon needs a tile. */
@@ -402,6 +475,9 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
 .row .where { grid-column: 4; color: var(--faint); font-size: var(--label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row time { grid-column: 5; color: var(--faint); font-size: var(--small); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .row .remove { grid-column: 6; }
+/* What a search found, in the words typed: set in the row's heavier weight, as the address bar marks it. */
+mark { background: none; color: inherit; font-weight: 600; }
+.row .where mark { color: var(--muted); }
 /* Out of sight until the pointer or keyboard focus reaches the row, but still in the Tab order. */
 .row:not(:hover):not(:focus-within) .remove { opacity: 0; }
 @media (max-width: 640px) {
@@ -409,9 +485,12 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
   .row .where { display: none; }
   .row time { grid-column: 4; }
   .row .remove { grid-column: 5; }
+  /* A stack keeps its count, in the time's place. */
+  .row.head .where { display: block; grid-column: 4; text-align: right; }
+  .row.head time { display: none; }
 }
 
-/* A cluster: one site, several pages in a row. Its pages sit under it, indented past the icon. */
+/* A stack: one site, several pages in a row. Its pages sit under it, indented past the icon. */
 .cluster > .head .title { font-weight: 500; }
 .cluster > .head .chevron { grid-column: 1; width: 12px; height: 12px; color: var(--muted); transition: transform .15s cubic-bezier(.23, 1, .32, 1); }
 .cluster.open > .head .chevron { transform: rotate(90deg); }
@@ -444,7 +523,7 @@ main { max-width: calc(var(--max) + 2 * var(--gutter)); margin: 0 auto; }
   </div>
 </div></header>
 <main>
-  <div id="list"></div>
+  <div id="list" role="listbox" aria-multiselectable="true" aria-label="%PAGETITLE%"></div>
   <div class="empty" id="empty" hidden>%MARK%<div id="emptyText"></div></div>
   <div id="more"></div>
 </main>
@@ -458,7 +537,7 @@ const list = document.getElementById('list');
 const empty = document.getElementById('empty');
 const query = document.getElementById('query');
 const bar = document.getElementById('bar');
-// Sessions, newest first, each holding clusters of pages on one site: { title, clusters: [{ host, items, open }] }.
+// Parts of days, newest first, each holding stacks of pages on one site: { title, clusters: [{ host, items }] }.
 let sessions = [], done = false, loading = false, searching = '';
 const batch = 100;
 
@@ -471,16 +550,20 @@ const span = (items) => {
   const from = oldest.match(suffix)?.[0] === newest.match(suffix)?.[0] ? oldest.replace(suffix, '') : oldest;
   return fill(words.span, { from, to: newest });
 };
-// The address without its scheme, as the address bar shows it.
-const where = (url) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+// The address without its scheme, decoded, as the address bar shows it.
+const where = (url) => {
+  const short = url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+  try { return decodeURI(short); } catch { return short; }
+};
+const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const icon = (url) => {
   const img = new Image(); img.alt = ''; img.src = 'zigzag://icon/?u=' + encodeURIComponent(url);
   img.onerror = () => img.replaceWith(el('span', 'dot'));
   return img;
 };
-// The × is for the pointer. It sits inside its row (a link, or a heading that opens), and a control inside another
-// can't be reached with VoiceOver or Tab, so it's left out for them: the row itself takes Delete instead.
+// The × is for the pointer. It sits inside its row, and a control inside another can't be reached with VoiceOver or
+// Tab, so it's left out for them: the row itself takes Delete instead.
 const removeButton = (label, action) => {
   const b = el('button', 'remove'); b.title = label; b.tabIndex = -1; b.setAttribute('aria-hidden', 'true');
   b.innerHTML = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>';
@@ -488,52 +571,101 @@ const removeButton = (label, action) => {
   return b;
 };
 
-// Delete or Backspace on a focused row removes it, as its × does; VoiceOver says so.
-const removableByKey = (row, action) => {
-  row.setAttribute('aria-keyshortcuts', 'Delete');
-  row.addEventListener('keydown', (e) => {
-    if ((e.key !== 'Delete' && e.key !== 'Backspace') || allSelected || e.metaKey || e.altKey || e.ctrlKey) return;
-    e.preventDefault(); e.stopPropagation(); action();
-  });
-};
+// Matches are marked as the store finds them: case, accents and full-width letters aside.
+const foldChar = (c) => c.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+const foldWords = (text) => text.split(/\s+/).map((w) => [...w].map(foldChar).join('')).filter(Boolean);
+let marks = [];
+function marked(text) {
+  const out = document.createDocumentFragment();
+  if (!marks.length) { out.append(text); return out; }
+  // Where in the text each folded letter came from.
+  let folded = '', offset = 0;
+  const from = [];
+  for (const c of text) { const f = foldChar(c); for (let k = 0; k < f.length; k++) from.push(offset); folded += f; offset += c.length; }
+  from.push(text.length);
+  const hit = new Uint8Array(text.length);
+  for (const w of marks) {
+    for (let i = folded.indexOf(w); i >= 0; i = folded.indexOf(w, i + w.length)) hit.fill(1, from[i], from[i + w.length] ?? text.length);
+  }
+  let start = 0;
+  for (let i = 1; i <= text.length; i++) {
+    if (i < text.length && hit[i] === hit[start]) continue;
+    const part = text.slice(start, i);
+    out.append(hit[start] ? el('mark', null, part) : part);
+    start = i;
+  }
+  return out;
+}
 
-function page(item, session) {
+// The chosen rows, by key, so a row drawn again (a stack opened, more loaded) comes back chosen.
+const selected = new Set();
+let anchor = null, focusing = false;
+const rowsNow = () => [...list.querySelectorAll('.row')];
+const currentRow = () => document.activeElement?.closest?.('#list .row') || null;
+function paint() {
+  for (const r of rowsNow()) { const on = selected.has(r.key); r.classList.toggle('selected', on); r.setAttribute('aria-selected', on); }
+}
+// Chooses a row (`extend`: and every row from the anchor to it, as ⇧ does) and gives it the focus.
+function choose(row, extend) {
+  if (!row) return;
+  selectAll(false);
+  const rows = rowsNow(), a = rows.findIndex((r) => r.key === anchor);
+  if (extend && a >= 0) {
+    const b = rows.indexOf(row);
+    selected.clear();
+    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) selected.add(rows[i].key);
+  } else {
+    selected.clear(); selected.add(row.key); anchor = row.key;
+  }
+  paint();
+  focusing = true; row.focus({ preventScroll: true }); focusing = false;
+  row.scrollIntoView({ block: 'nearest' });
+}
+function clearSelection() { selected.clear(); anchor = null; paint(); }
+// Every page the chosen rows stand for: a stack's are all of its own.
+const chosenRows = () => rowsNow().filter((r) => selected.has(r.key));
+const urlsOf = (rows) => [...new Set(rows.flatMap((r) => r.urls))];
+const keep = (row, key, urls, host) => { row.key = key; row.urls = urls; row.host = host; if (selected.has(key)) row.classList.add('selected'); row.setAttribute('aria-selected', selected.has(key)); };
+
+function page(item) {
   const a = el('a', 'row'); a.href = item.url; a.title = item.url;
-  a.append(icon(item.url), el('span', 'title', item.title), el('span', 'where', where(item.url)), el('time', null, timeOf(item.time)),
-           removeButton(words.removePage, () => forget([item.url], session)));
-  removableByKey(a, () => forget([item.url], session));
+  a.setAttribute('role', 'option'); a.setAttribute('aria-keyshortcuts', 'Delete');
+  const title = el('span', 'title'); title.append(marked(item.title));
+  const address = el('span', 'where'); address.append(marked(where(item.url)));
+  a.append(icon(item.url), title, address, el('time', null, timeOf(item.time)), removeButton(words.removePage, () => forget([item.url])));
+  keep(a, 'p ' + item.url, [item.url], hostOf(item.url));
   return a;
 }
 
-function clusterElement(cluster, session) {
+// Stacks opened by hand stay open when History is shown again (a removal undone, a change elsewhere).
+const opened = new Set();
+const stackKey = (cluster) => cluster.host + ' ' + cluster.items[cluster.items.length - 1].url;
+
+function clusterElement(cluster) {
   const box = el('div', 'cluster' + (cluster.open ? ' open' : ''));
+  box.setAttribute('role', 'none');
   const head = el('button', 'row head');
-  head.setAttribute('aria-expanded', cluster.open);
+  head.setAttribute('role', 'option'); head.setAttribute('aria-expanded', !!cluster.open); head.setAttribute('aria-keyshortcuts', 'Delete');
   const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   chevron.setAttribute('class', 'chevron'); chevron.setAttribute('viewBox', '0 0 12 12');
   chevron.innerHTML = '<path d="M4.5 2.5L8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>';
   const count = cluster.items.length;
   head.append(chevron, icon(cluster.items[0].url), el('span', 'title', cluster.host), el('span', 'where', pages(count)),
               el('time', null, span(cluster.items)),
-              removeButton(fill(words.removePages, { n: count }), () => forget(cluster.items.map((i) => i.url), session)));
-  removableByKey(head, () => forget(cluster.items.map((i) => i.url), session));
-  head.onclick = () => {
-    // Opened or closed from the keyboard, the new heading keeps the focus, so the arrows carry on from it.
-    const focused = document.activeElement === head;
-    cluster.open = !cluster.open;
-    const fresh = clusterElement(cluster, session);
-    box.replaceWith(fresh);
-    if (focused) fresh.firstChild.focus();
-  };
+              removeButton(fill(words.removePages, { n: count }), () => forget(cluster.items.map((i) => i.url))));
+  keep(head, 'h ' + stackKey(cluster), cluster.items.map((i) => i.url), cluster.host);
+  head.onclick = () => toggle(cluster, box);
+  box.cluster = cluster;
   box.append(head);
   if (cluster.open) {
     // A long afternoon on one site can be hundreds of pages: draw them a hundred at a time.
     const pages = el('div', 'pages');
+    pages.setAttribute('role', 'none');
     const shown = cluster.shown || batch;
-    cluster.items.slice(0, shown).forEach((i) => pages.append(page(i, session)));
+    cluster.items.slice(0, shown).forEach((i) => pages.append(page(i)));
     if (count > shown) {
       const more = el('button', 'more', fill(words.showMore, { n: Math.min(batch, count - shown) }));
-      more.onclick = () => { cluster.shown = shown + batch; box.replaceWith(clusterElement(cluster, session)); };
+      more.onclick = () => { cluster.shown = shown + batch; box.replaceWith(clusterElement(cluster)); };
       pages.append(more);
     }
     box.append(pages);
@@ -541,22 +673,39 @@ function clusterElement(cluster, session) {
   return box;
 }
 
+// Opens or closes a stack in place; its heading keeps the focus, so the arrows carry on from it.
+function toggle(cluster, box, open = !cluster.open) {
+  const focused = box.contains(document.activeElement);
+  cluster.open = open;
+  if (open) opened.add(stackKey(cluster)); else opened.delete(stackKey(cluster));
+  const fresh = clusterElement(cluster);
+  box.replaceWith(fresh);
+  if (focused) { focusing = true; fresh.firstChild.focus({ preventScroll: true }); focusing = false; }
+  return fresh;
+}
+
 function sessionElement(session) {
   const section = el('section', 'session');
+  section.setAttribute('role', 'group'); section.setAttribute('aria-label', session.title);
   const items = session.clusters.flatMap((c) => c.items);
   const head = el('div', 'session-head');
+  head.setAttribute('aria-hidden', 'true');
   // The heading names the day and time of day; times are on the rows. Count only for multiple rows, since a single
   // site row already shows its page count.
   head.append(el('h2', null, session.title),
               el('span', 'count', session.clusters.length > 1 ? pages(items.length) : ''),
-              removeButton(words.removeSession, () => forget(items.map((i) => i.url), session)));
+              removeButton(words.removeSession, () => forget(items.map((i) => i.url))));
   const rows = el('div', 'rows');
-  for (const c of session.clusters) rows.append(c.items.length > 1 ? clusterElement(c, session) : page(c.items[0], session));
+  rows.setAttribute('role', 'none');
+  for (const c of session.clusters) {
+    if (c.items.length > 1) c.open = c.open || opened.has(stackKey(c));
+    rows.append(c.items.length > 1 ? clusterElement(c) : page(c.items[0]));
+  }
   section.append(head, rows);
   return section;
 }
 
-// Draws one session again in place: only the one that changed, so a long history never redraws as a whole.
+// Draws one part again in place: only the one that changed, so a long history never redraws as a whole.
 function redraw(session) {
   const fresh = session.clusters.length ? sessionElement(session) : null;
   if (session.el && fresh) session.el.replaceWith(fresh); else if (session.el) session.el.remove(); else if (fresh) list.append(fresh);
@@ -572,11 +721,13 @@ function render() {
   showEmpty();
 }
 
+// Whether what's drawn reaches a screenful past the bottom of the window.
+const filled = () => (list.lastElementChild?.getBoundingClientRect().bottom ?? 0) > innerHeight + 600;
+
 function drawMore() {
-  const more = document.getElementById('more');
   for (const s of sessions) {
     if (s.el) continue;
-    if (more.getBoundingClientRect().top > innerHeight + 600) break;
+    if (filled()) break;
     redraw(s);
   }
 }
@@ -587,20 +738,42 @@ function showEmpty() {
   empty.classList.toggle('searching', !!searching);
 }
 
-// Removes pages from History, then from the session they were drawn in.
-async function forget(urls, session) {
+// Removes pages from History (⌘Z puts them back), then from the parts they were drawn in. A stack left with too few
+// pages to stack becomes its rows.
+async function forget(urls) {
+  if (!urls.length) return;
   await ask({ action: 'delete', urls });
   const gone = new Set(urls);
-  for (const c of session.clusters) c.items = c.items.filter((i) => !gone.has(i.url));
-  session.clusters = session.clusters.filter((c) => c.items.length);
-  redraw(session);
-  if (!session.clusters.length) sessions = sessions.filter((s) => s !== session);
+  for (const session of [...sessions]) {
+    const before = session.clusters.reduce((n, c) => n + c.items.length, 0);
+    for (const c of session.clusters) c.items = c.items.filter((i) => !gone.has(i.url));
+    session.clusters = session.clusters.filter((c) => c.items.length)
+      .flatMap((c) => c.items.length > 1 && c.items.length < 3 ? c.items.map((i) => ({ host: c.host, items: [i] })) : [c]);
+    if (session.clusters.reduce((n, c) => n + c.items.length, 0) === before) continue;
+    if (session.el) redraw(session);
+    if (!session.clusters.length) sessions = sessions.filter((s) => s !== session);
+  }
   showEmpty();
+}
+
+// Delete: the chosen rows go, and the row after them is chosen next, as in Finder and Mail.
+async function removeChosen() {
+  const rows = rowsNow(), chosen = rows.filter((r) => selected.has(r.key));
+  if (!chosen.length) return;
+  const urls = urlsOf(chosen), gone = new Set(urls);
+  const stays = (r) => !r.urls.every((u) => gone.has(u));
+  const next = rows.slice(rows.indexOf(chosen[chosen.length - 1]) + 1).find(stays) || rows.slice(0, rows.indexOf(chosen[0])).reverse().find(stays);
+  const nextKey = next?.key;
+  await forget(urls);
+  const again = rowsNow().find((r) => r.key === nextKey);
+  if (again) choose(again); else { clearSelection(); query.focus(); }
 }
 
 // Each reload or search starts a new generation; an answer that comes back for an older one is dropped, so a slow
 // search or page never lands on top of what you asked for since.
 let generation = 0;
+// Drawn again in place (a change undone), the page holds its height until it's filled back to where you were.
+let holding = false;
 
 async function loadMore() {
   if (done || loading || searching) return;
@@ -612,18 +785,27 @@ async function loadMore() {
   loading = false;
   if (mine !== generation) { if (!searching) loadMore(); return; }
   if (searching) return;
-  if (!more.length) { done = true; showEmpty(); return; }
-  // Batches end where a session ends, so each one only adds.
+  if (!more.length) { done = true; release(); showEmpty(); return; }
+  // Batches end where a part of a day ends, so each one only adds.
   for (const s of more) { sessions.push(s); redraw(s); }
   showEmpty();
-  // Collapsed clusters take little room, so one batch may not fill a tall window: keep going until it does.
-  requestAnimationFrame(() => { if (document.getElementById('more').getBoundingClientRect().top < innerHeight + 600) loadMore(); });
+  // Stacks take little room, so one batch may not fill a tall window: keep going until it does.
+  requestAnimationFrame(() => { if (!filled()) loadMore(); else release(); });
 }
+function release() { if (holding) { holding = false; list.style.minHeight = ''; } }
 
-async function reload() { generation++; sessions = []; done = false; list.textContent = ''; await loadMore(); }
-// The browser asks after History changed (a clear, or ⌘Z bringing pages back): shown again as it is now, the search
-// kept.
-window.zigzagRefresh = () => { selectAll(false); return query.value.trim() ? search() : reload(); };
+async function reload(inPlace) {
+  generation++;
+  holding = !!inPlace;
+  list.style.minHeight = inPlace ? list.offsetHeight + 'px' : '';
+  sessions = []; done = false; list.textContent = '';
+  await loadMore();
+}
+// The browser asks after History changed (a clear, a site removed, or ⌘Z bringing pages back): shown again as it is
+// now, where it was, the search kept.
+window.zigzagRefresh = () => { selectAll(false); return query.value.trim() ? search() : reload(true); };
+// ⌘F: the search field, its text chosen to type over.
+window.zigzagFocusSearch = () => { query.focus(); query.select(); };
 
 let timer;
 // Shows what matches the search field now. Typing waits a moment before calling it; Return calls it at once.
@@ -634,11 +816,14 @@ async function search() {
     const mine = ++generation;
     const answer = await ask({ action: 'search', query: searching });
     if (mine !== generation || answer == null) return;
-    const found = JSON.parse(answer);
-    // Clusters that hold a match open by themselves.
-    found.forEach((s) => s.clusters.forEach((c) => c.open = true));
-    sessions = found; done = true; render();
-  } else { await reload(); }
+    marks = foldWords(searching);
+    sessions = JSON.parse(answer); done = true;
+    selected.clear(); anchor = null;
+    render();
+    // The first match is chosen, so Return opens what's lit.
+    const first = list.querySelector('.row');
+    if (first) { selected.add(first.key); anchor = first.key; paint(); }
+  } else { marks = []; clearSelection(); await reload(); }
 }
 query.addEventListener('input', () => {
   clearTimeout(timer);
@@ -651,24 +836,100 @@ query.addEventListener('keydown', async (e) => {
     e.preventDefault();
     // Typed and returned at once: the search hasn't run yet, so run it first, or the top of everything opens.
     if (timer || query.value.trim() !== searching) await search();
-    const first = list.querySelector('a.row');
-    if (first) location.href = first.href;
+    const chosen = chosenRows().filter((r) => r.matches('a.row'));
+    if (e.metaKey) { const urls = urlsOf(chosenRows()); if (urls.length) ask({ action: 'open', urls }); return; }
+    const target = chosen[0] || list.querySelector('a.row');
+    if (target) location.href = target.href;
   }
   if (e.key === 'Escape' && query.value) { query.value = ''; query.dispatchEvent(new Event('input')); e.preventDefault(); }
 });
 
-// The arrow keys walk the rows, from the search field down and back up to it.
+// The keyboard, as in a Mac list: the arrows choose (⇧ adds), → and ← open and close stacks, Return opens (⌘Return
+// in tabs behind this one), Delete removes, Esc lets go, and typing goes to the search field.
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-  if (menu.classList.contains('open')) return;
-  const rows = [...list.querySelectorAll('.row')];
-  const at = rows.indexOf(document.activeElement);
-  if (document.activeElement === query && e.key === 'ArrowDown' && rows.length) { rows[0].focus(); e.preventDefault(); return; }
-  if (at < 0) return;
-  e.preventDefault();
-  if (e.key === 'ArrowDown') rows[Math.min(at + 1, rows.length - 1)].focus();
-  else if (at === 0) query.focus(); else rows[at - 1].focus();
+  if (e.isComposing || e.keyCode === 229 || menu.classList.contains('open') || allSelected) return;
+  const inQuery = document.activeElement === query;
+  const rows = rowsNow(), row = currentRow();
+  const modified = e.metaKey || e.ctrlKey || e.altKey;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (modified) return;
+    if (inQuery) {
+      if (e.key === 'ArrowDown' && rows.length) { e.preventDefault(); choose(chosenRows()[0] || rows[0]); }
+      return;
+    }
+    if (!row) { if (rows.length && document.activeElement === document.body) { e.preventDefault(); choose(rows[0]); } return; }
+    e.preventDefault();
+    const at = rows.indexOf(row);
+    if (e.key === 'ArrowUp' && at === 0 && !e.shiftKey) { clearSelection(); query.focus(); return; }
+    choose(rows[Math.max(0, Math.min(rows.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))], e.shiftKey);
+    return;
+  }
+  if (inQuery || !row) {
+    if (!inQuery && !modified && e.key.length === 1 && e.key.trim() && document.activeElement === document.body) { e.preventDefault(); query.focus(); query.value += e.key; query.dispatchEvent(new Event('input')); }
+    return;
+  }
+  const box = row.closest('.cluster');
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !modified && !e.shiftKey) {
+    e.preventDefault();
+    if (row.classList.contains('head')) {
+      const open = box.cluster.open;
+      if (e.key === 'ArrowRight' && open) choose(box.querySelector('.pages .row'));
+      else if (e.key === 'ArrowRight' || open) { const fresh = toggle(box.cluster, box, e.key === 'ArrowRight'); choose(fresh.firstChild); }
+    } else if (e.key === 'ArrowLeft' && box) {
+      choose(box.querySelector('.head'));
+    }
+    return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (e.metaKey) { const urls = urlsOf(chosenRows().length ? chosenRows() : [row]); if (urls.length) ask({ action: 'open', urls }); return; }
+    if (modified) return;
+    if (row.classList.contains('head')) choose(toggle(box.cluster, box).firstChild); else location.href = row.href;
+    return;
+  }
+  if ((e.key === 'Backspace' || e.key === 'Delete') && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    if (!selected.has(row.key)) choose(row);
+    removeChosen();
+    return;
+  }
+  if (e.key === 'Escape' && selected.size) { e.preventDefault(); clearSelection(); return; }
+  if (!modified && e.key.length === 1 && e.key.trim()) { e.preventDefault(); query.focus(); query.value += e.key; query.dispatchEvent(new Event('input')); }
 });
+
+// The pointer: a click opens a page (⌘-click in a tab behind this one, as on any page), or a stack; ⇧-click chooses
+// every row from the last one chosen. A row reached with Tab is chosen too.
+list.addEventListener('click', (e) => {
+  const row = e.target.closest('.row');
+  if (!row || e.target.closest('.remove') || !e.shiftKey) return;
+  e.preventDefault(); e.stopPropagation();
+  choose(row, true);
+}, true);
+list.addEventListener('focusin', (e) => {
+  const row = e.target.closest('.row');
+  if (row && !focusing && !selected.has(row.key)) choose(row);
+});
+document.addEventListener('mousedown', (e) => {
+  if (allSelected) selectAll(false);
+  const row = e.target.closest?.('.row');
+  if (row && e.button === 0 && !e.shiftKey && !e.metaKey) { selected.clear(); selected.add(row.key); anchor = row.key; paint(); }
+  else if (!row && !e.target.closest?.('.menu, #clearButton, .search')) clearSelection();
+});
+// A right-click chooses the row under it, unless it's one of those chosen, and tells the browser what its menu's
+// Remove items are about.
+list.addEventListener('contextmenu', (e) => {
+  const row = e.target.closest('.row');
+  if (!row) return;
+  if (!selected.has(row.key)) choose(row);
+  const chosen = chosenRows();
+  menuHost = row.host;
+  ask({ action: 'menu', count: urlsOf(chosen).length, host: chosen.every((r) => r.host === row.host) ? row.host : '' });
+});
+let menuHost = '';
+window.zigzagMenu = (what) => {
+  if (what === 'remove') removeChosen();
+  else if (what === 'site' && menuHost) ask({ action: 'deleteSite', host: menuHost });
+};
 
 // ⌘A selects every row, as in Safari, and Delete then clears them, after asking: all of History, or while searching,
 // just what it found. Esc, a click or typing lets go. In the search field with something typed, ⌘A selects that text.
@@ -678,6 +939,7 @@ const selectAll = (on) => { allSelected = on; list.classList.toggle('all-selecte
 window.zigzagSelectAll = () => {
   if ((document.activeElement === query && query.value) || !list.querySelector('.row')) return false;
   if (document.activeElement === query) query.blur();
+  clearSelection();
   selectAll(true);
   return true;
 };
@@ -696,9 +958,8 @@ document.addEventListener('keydown', async (e) => {
   const urls = sessions.flatMap((s) => s.clusters.flatMap((c) => c.items.map((i) => i.url)));
   const cleared = searching ? await ask({ action: 'forget', urls }) : await ask({ action: 'clear', range: 'all' });
   selectAll(false);
-  if (cleared) { searching = ''; query.value = ''; await reload(); }
+  if (cleared) { searching = ''; marks = []; query.value = ''; await reload(); }
 });
-document.addEventListener('mousedown', () => { if (allSelected) selectAll(false); });
 query.addEventListener('input', () => selectAll(false));
 query.addEventListener('focus', () => selectAll(false));
 
@@ -733,10 +994,10 @@ document.addEventListener('keydown', (e) => {
 });
 items.forEach((b) => b.onclick = async (e) => {
   e.stopPropagation(); setMenu(false);
-  if (await ask({ action: 'clear', range: b.dataset.range })) { searching = ''; query.value = ''; await reload(); }
+  if (await ask({ action: 'clear', range: b.dataset.range })) { searching = ''; marks = []; query.value = ''; await reload(); }
 });
 
-// Session headings stick just under the toolbar, which grows when a narrow window wraps the search field.
+// Headings stick just under the toolbar, which grows when a narrow window wraps the search field.
 new ResizeObserver(() => document.documentElement.style.setProperty('--header', bar.offsetHeight + 'px')).observe(bar);
 addEventListener('scroll', () => bar.classList.toggle('scrolled', scrollY > 0), { passive: true });
 new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) searching ? drawMore() : loadMore(); }, { rootMargin: '600px' })

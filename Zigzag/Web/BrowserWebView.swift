@@ -300,6 +300,7 @@ final class BrowserWebView: WKWebView {
         // In a browser window's page or Zigzag Mini's, which a browser window translates; not a web app's.
         if let owner, WindowManager.shared.controller(for: window) != nil || MiniWindowController.showing(window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
+        if HistoryPage.isHistory(url) { HistoryPage.addMenuItems(to: menu, in: self) }
         Self.placeInspectElementLast(in: menu)
         #if DEBUG
         // What the page's menu holds, with submenus and actions (AutoFill › Passwords… in a field), for scripts.
