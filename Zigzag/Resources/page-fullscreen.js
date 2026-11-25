@@ -23,6 +23,8 @@
   const activeNow = own(window.UserActivation && UserActivation.prototype, 'isActive');
   const frameAllows = own(window.HTMLIFrameElement && HTMLIFrameElement.prototype, 'allowFullscreen');
   const frameAllow = own(window.HTMLIFrameElement && HTMLIFrameElement.prototype, 'allow');
+  const H = window.HTMLElement && HTMLElement.prototype;
+  const showPopover = H && H.showPopover, hidePopover = H && H.hidePopover;
 
   // A recent user gesture, which WebKit full screen requires.
   const activated = () => {
@@ -60,7 +62,7 @@
 
   // The element filling the page (in the page around a frame, the frame), whether it came from a video's own
   // full screen, and what was in its style and its ancestors' before.
-  let current = null, viaVideo = false, saved = [], sheet = null;
+  let current = null, viaVideo = false, saved = [], sheet = null, lifted = false;
 
   const fill = {
     position: 'fixed', top: '0', right: '0', bottom: '0', left: '0', width: '100vw', height: '100vh',
@@ -91,6 +93,28 @@
       if (el.getAttribute('style') === '') el.removeAttribute('style');
     }
     saved = [];
+  };
+  // A manual popover puts the element in the top layer, as WebKit's full screen does, keeping the look it had.
+  const popoverLook = ['color', 'overflow-x', 'overflow-y'].concat(...['top', 'right', 'bottom', 'left'].map((side) =>
+    [`padding-${side}`, `border-${side}-width`, `border-${side}-style`, `border-${side}-color`]));
+  const lift = (el) => {
+    if (!showPopover || !(el instanceof HTMLElement) || el.hasAttribute('popover')) return;
+    try { if (el.matches(':modal')) return; } catch (e) {}
+    const look = getComputedStyle(el);
+    const before = popoverLook.map((p) => look.getPropertyValue(p));
+    try {
+      el.setAttribute('popover', 'manual');
+      call(showPopover, el);
+      lifted = true;
+    } catch (e) { el.removeAttribute('popover'); return; }
+    const kept = popoverLook.map((p, i) => (look.getPropertyValue(p) === before[i] ? '' : `${p}: ${before[i]}`)).filter(Boolean);
+    if (kept.length && sheet) { try { sheet.sheet.insertRule(`:where([${MARK}][popover]) { ${kept.join('; ')} }`, sheet.sheet.cssRules.length); } catch (e) {} }
+  };
+  const drop = (el) => {
+    if (!lifted) return;
+    lifted = false;
+    try { call(hidePopover, el); } catch (e) {}
+    el.removeAttribute('popover');
   };
   const parentOf = (el) => el.parentElement || (el.getRootNode && el.getRootNode() instanceof ShadowRoot ? el.getRootNode().host : null);
 
@@ -168,6 +192,7 @@
       setStyle(a, freed);
     }
     addSheet();
+    lift(el);
     if (!isTop) post(window.parent, 'enter');
     changed(el, viaVideo, true);
     report();
@@ -179,6 +204,7 @@
     const video = viaVideo;
     current = null;
     viaVideo = false;
+    drop(el);
     restoreStyles();
     el.removeAttribute(MARK);
     for (const a of document.querySelectorAll(`[${ANCESTOR}]`)) a.removeAttribute(ANCESTOR);
