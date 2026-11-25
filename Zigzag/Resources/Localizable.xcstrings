@@ -2618,6 +2618,23 @@
         }
       }
     },
+    "Web App" : {
+      "comment" : "Name of a site installed as an app, in the Applications folder, when the site has neither a name nor an address to name it by.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页 App"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "網頁 App"
+          }
+        }
+      }
+    },
     "Where ⌘T and links put a new tab in the sidebar." : {
       "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
       "localizations" : {
