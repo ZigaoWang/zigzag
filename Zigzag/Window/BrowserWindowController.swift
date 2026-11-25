@@ -4370,6 +4370,7 @@ extension BrowserWindowController {
         mirror.currentSpaceID = tabManager.currentSpaceID
         mirror.reloadSpaces(current: tabManager.currentSpaceID)
         mirror.list.reload(animated: false)
+        mirror.update(tab: tabManager.selectedTab)
         mirror.setUpdateCard(Updater.shared.cardState)
         reloadFavorites()
         downloadsChanged()
