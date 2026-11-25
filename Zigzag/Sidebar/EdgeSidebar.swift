@@ -118,6 +118,8 @@ final class EdgeSidebar {
     /// The page shown beside the sidebar while a row is rested on: the same docked Mini as the in-page peek.
     private var preview: MiniWindowController?
     private var previewTab: Tab?
+    /// The row picked while the preview is out: leaving the rows comes back to it. Nil until a pick.
+    private var lockedTab: Tab?
     private var previewWork: DispatchWorkItem?
     /// Counts hovers, so a rest check left over from the previous row cannot preview it.
     private var hoverCheck = 0
@@ -284,7 +286,12 @@ final class EdgeSidebar {
         closeWork = nil
         hoverCheck += 1
         guard let tab else {
-            schedulePreviewClose()
+            // Leaving the rows after a pick goes back to the picked page; before one, the preview stays for a glance.
+            if let lockedTab, previewTab !== lockedTab {
+                showPreview(lockedTab, in: controller)
+            } else {
+                schedulePreviewClose()
+            }
             return
         }
         guard tab !== previewTab, let url = tab.url, !tab.isPrivate,
@@ -294,6 +301,32 @@ final class EdgeSidebar {
         }
         scheduleHoverCheck(tab: tab, in: controller, pointer: NSEvent.mouseLocation,
                            stillSince: ProcessInfo.processInfo.systemUptime, token: hoverCheck)
+    }
+
+    /// The row under the pointer is clicked: its page stays in the panel from then on, and the keyboard goes into it.
+    /// A pick that the panel cannot show returns false, so the click keeps today's way into the window.
+    @discardableResult
+    func pick(_ tab: Tab, in controller: BrowserWindowController) -> Bool {
+        guard isShowing, target === controller, !tab.isPrivate,
+              let url = tab.url, ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return false }
+        previewWork?.cancel()
+        previewWork = nil
+        closeWork?.cancel()
+        closeWork = nil
+        hoverCheck += 1
+        if previewTab !== tab { showPreview(tab, in: controller) }
+        guard previewTab === tab, let preview else { return false }
+        lockedTab = tab
+        preview.focusPage()
+        return true
+    }
+
+    /// Esc in the panel closes the page first, as #365 did, leaving the sidebar where it is.
+    @discardableResult
+    func dismissPreview() -> Bool {
+        guard preview != nil else { return false }
+        closePreview()
+        return true
     }
 
     /// Follows the pointer while it rests on a row: a crossing pointer never previews, a stopped one does after the
@@ -377,6 +410,7 @@ final class EdgeSidebar {
         guard let mini = preview else { return }
         preview = nil
         previewTab = nil
+        lockedTab = nil
         mini.onInPageMiniClosed = nil
         mini.onInPageMiniDetached = nil
         mini.closeInPage(focusBack: false, animated: false)
@@ -393,8 +427,13 @@ final class EdgeSidebar {
         closeWork = nil
         preview = nil
         previewTab = nil
+        lockedTab = nil
         narrowPanel()
-        if moved { hide(animated: false) }
+        if moved {
+            hide(animated: false)
+        } else {
+            panel?.makeKey()
+        }
     }
 
     /// Expand took the page out into a window of its own: the panel has done its job and goes.
@@ -405,6 +444,7 @@ final class EdgeSidebar {
         closeWork = nil
         preview = nil
         previewTab = nil
+        lockedTab = nil
         narrowPanel()
         hide(animated: false)
     }
@@ -538,8 +578,9 @@ final class EdgeSidebarPanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         if !isKeyWindow, event.type == .leftMouseDown || event.type == .rightMouseDown { makeKey() }
         if eventInterceptor?(event) == true { return }
-        // Esc puts it away, unless a field is being edited.
+        // Esc puts the page away first, then the panel, unless a field is being edited.
         if event.type == .keyDown, event.keyCode == 53, !(firstResponder is NSTextView), MenuPanel.current == nil {
+            if EdgeSidebar.shared.dismissPreview() { return }
             EdgeSidebar.shared.hide()
             return
         }

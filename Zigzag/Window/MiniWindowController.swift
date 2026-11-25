@@ -479,6 +479,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         inPageMiniDim = nil
     }
 
+    /// A row picked while the Mini is docked: the page takes the keyboard, the panel stays.
+    func focusPage() {
+        guard isDockedInPage, let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        if let page = tab.webView { window.makeFirstResponder(page) }
+    }
+
     /// Expands the docked Mini into its own window, with the same root, tab and web view.
     func promoteFromPage() {
         guard isDockedInPage, !isLeaving, let window else { return }

@@ -3435,6 +3435,10 @@ extension BrowserWindowController: TabHost {
 extension BrowserWindowController: SidebarDelegate {
     // Picking one sends a sidebar held out by touch back, as the pointer leaving sends back a hovered one.
     func listSelect(_ tab: Tab) {
+        if EdgeSidebar.shared.isShowing, EdgeSidebar.shared.pick(tab, in: self) {
+            root.endTouchHold()
+            return
+        }
         if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         tabManager.select(tab)
         root.endTouchHold()
