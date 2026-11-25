@@ -9932,8 +9932,8 @@
         }
       }
     },
-    "As a download" : {
-      "comment" : "Under the test address in Settings › Downloads, before the rule that would take the address if it were a file.",
+    "As a download: %@" : {
+      "comment" : "Under the test address in Settings › Downloads: the rule that would take the address if it were a file. The placeholder is the rule in a sentence, and may go on to a second line with what it would send.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9944,13 +9944,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "作为下载"
+            "value" : "作为下载：%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "作為下載"
+            "value" : "作為下載：%@"
           }
         }
       }

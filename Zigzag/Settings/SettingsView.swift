@@ -3286,8 +3286,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // does the blocking.
         var detail = String(localized: "Uses EasyList and EasyPrivacy, by the EasyList authors, and uBlock Origin’s filter lists.", comment: "Explanation under “Block ads and trackers” in Settings › Privacy. EasyList, EasyPrivacy and uBlock Origin are names of open-source filter lists: keep them as they are.")
         if ContentBlocker.isEnabled, let blocker = AdBlockers.active(in: profile) {
-            detail += " " + String(localized: "\(blocker) is blocking ads on YouTube.",
-                                   comment: "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag.")
+            detail = Words.sentences(detail, String(localized: "\(blocker) is blocking ads on YouTube.",
+                                                    comment: "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag."))
         }
         blockingGroup.add(FormRow(title: String(localized: "Block ads and trackers", comment: "A setting in Settings › Privacy."),
                                   detail: detail, control: blockingToggle))
@@ -4469,7 +4469,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let detail = preview.isEmpty ? rule.summarySentence : "\(rule.summarySentence)\n\(preview)"
         // A downloads-only rule catches it as a file, not as a link.
         row.detailText = linkMatch == nil
-            ? "\(String(localized: "As a download", comment: "Under the test address in Settings › Downloads, before the rule that would take the address if it were a file.")): \(detail)"
+            ? String(localized: "As a download: \(detail)", comment: "Under the test address in Settings › Downloads: the rule that would take the address if it were a file. The placeholder is the rule in a sentence, and may go on to a second line with what it would send.")
             : detail
     }
 
