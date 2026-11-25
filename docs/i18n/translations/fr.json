@@ -1104,10 +1104,10 @@
         "value": "Un tableau JSON. Les jetons sont remplacés par leur valeur."
       }
     },
-    "A beta can break.": {
+    "Get new features first and help catch bugs before everyone else. A beta can break.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Une version bêta peut présenter des problèmes."
+        "value": "Découvrez les nouveautés en premier et aidez à repérer les problèmes avant tout le monde. Une version bêta peut présenter des problèmes."
       }
     },
     "A blocker stopped this page": {

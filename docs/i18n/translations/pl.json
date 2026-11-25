@@ -1261,10 +1261,10 @@
         "value": "Dane logowania z %@ pozostały zablokowane. Kliknij „Spróbuj ponownie”, wpisz hasło do Maca, gdy macOS o to poprosi, i kliknij „Zezwól”."
       }
     },
-    "A beta can break.": {
+    "Get new features first and help catch bugs before everyone else. A beta can break.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Wersja beta może nie działać poprawnie."
+        "value": "Wypróbuj nowości jako pierwszy i pomóż znaleźć błędy. Wersja beta może nie działać poprawnie."
       }
     },
     "A site you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to talk to a program on this Mac, over loopback only. Never the local network, and a page can’t switch itself on.": {

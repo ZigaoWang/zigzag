@@ -1506,10 +1506,10 @@
         "value": "Массив JSON. Токены подставляются."
       }
     },
-    "A beta can break.": {
+    "Get new features first and help catch bugs before everyone else. A beta can break.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Бета-версия может работать нестабильно."
+        "value": "Пробуйте новые функции первыми и помогайте находить ошибки. Бета-версия может работать нестабильно."
       }
     },
     "A blocker stopped this page": {

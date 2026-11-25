@@ -875,7 +875,7 @@ enum SettingsVersionRow {
         let toggle = Toggle(isOn: Updater.getsBetas)
         toggle.onChange = { on in Updater.getsBetas = on }
         let row = FormRow(title: String(localized: "Beta updates", comment: "A setting in Settings › General."),
-                          detail: String(localized: "A beta can break.", comment: "Explanation under “Beta updates” in Settings › General."),
+                          detail: String(localized: "Get new features first and help catch bugs before everyone else. A beta can break.", comment: "Under “Beta updates” in Settings › General: why someone would turn beta updates on, then an honest note that a beta can be rough."),
                           control: toggle)
         row.keywords = String(localized: "beta channel prerelease", comment: "Words that find the Beta updates setting with Find a setting in Settings. Not shown.")
         return row

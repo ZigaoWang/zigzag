@@ -1104,10 +1104,10 @@
         "value": "Ein JSON-Array. Tokens werden ausgefüllt."
       }
     },
-    "A beta can break.": {
+    "Get new features first and help catch bugs before everyone else. A beta can break.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Eine Beta kann Fehler enthalten."
+        "value": "Hol dir neue Funktionen zuerst und hilf, Fehler vor allen anderen zu finden. Eine Beta kann Fehler enthalten."
       }
     },
     "A blocker stopped this page": {

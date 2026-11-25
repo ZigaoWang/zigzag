@@ -1261,10 +1261,10 @@
         "value": "De aanmeldingen van %@ bleven vergrendeld. Klik op Probeer opnieuw, typ het wachtwoord van je Mac wanneer macOS erom vraagt en klik op Sta toe."
       }
     },
-    "A beta can break.": {
+    "Get new features first and help catch bugs before everyone else. A beta can break.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Een bèta kan fouten bevatten."
+        "value": "Probeer nieuwe functies als eerste en help fouten te vinden. Een bèta kan fouten bevatten."
       }
     },
     "A site you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to talk to a program on this Mac, over loopback only. Never the local network, and a page can’t switch itself on.": {

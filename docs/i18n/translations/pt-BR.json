@@ -1230,10 +1230,10 @@
         "value": "Um array JSON. Os tokens são preenchidos."
       }
     },
-    "A beta can break.": {
+    "Get new features first and help catch bugs before everyone else. A beta can break.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Um beta pode apresentar falhas."
+        "value": "Experimente as novidades primeiro e ajude a encontrar problemas. Um beta pode apresentar falhas."
       }
     },
     "A blocker stopped this page": {

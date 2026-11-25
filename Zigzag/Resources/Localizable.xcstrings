@@ -17767,91 +17767,91 @@
         }
       }
     },
-    "A beta can break." : {
-      "comment" : "Explanation under “Beta updates” in Settings › General.",
+    "Get new features first and help catch bugs before everyone else. A beta can break." : {
+      "comment" : "Under “Beta updates” in Settings › General: why someone would turn beta updates on, then an honest note that a beta can be rough.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eine Beta kann Fehler enthalten."
+            "value" : "Hol dir neue Funktionen zuerst und hilf, Fehler vor allen anderen zu finden. Eine Beta kann Fehler enthalten."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "A beta can break."
+            "value" : "Get new features first and help catch bugs before everyone else. A beta can break."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Una beta puede fallar."
+            "value" : "Prueba las novedades antes que nadie y ayuda a encontrar errores. Una beta puede fallar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une version bêta peut présenter des problèmes."
+            "value" : "Découvrez les nouveautés en premier et aidez à repérer les problèmes avant tout le monde. Une version bêta peut présenter des problèmes."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Una beta può non funzionare correttamente."
+            "value" : "Prova per primo le novità e aiuta a trovare i problemi prima di tutti. Una beta può non funzionare correttamente."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ベータ版は不安定な場合があります。"
+            "value" : "新機能をいち早く試して、問題を見つける手助けができます。ベータ版は不安定な場合があります。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "베타 버전은 불안정할 수 있습니다."
+            "value" : "새로운 기능을 먼저 사용해 보고 문제를 찾는 데 도움을 주세요. 베타 버전은 불안정할 수 있습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Een bèta kan fouten bevatten."
+            "value" : "Probeer nieuwe functies als eerste en help fouten te vinden. Een bèta kan fouten bevatten."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wersja beta może nie działać poprawnie."
+            "value" : "Wypróbuj nowości jako pierwszy i pomóż znaleźć błędy. Wersja beta może nie działać poprawnie."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Um beta pode apresentar falhas."
+            "value" : "Experimente as novidades primeiro e ajude a encontrar problemas. Um beta pode apresentar falhas."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Бета-версия может работать нестабильно."
+            "value" : "Пробуйте новые функции первыми и помогайте находить ошибки. Бета-версия может работать нестабильно."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beta sürümü bozulabilir."
+            "value" : "Yeni özellikleri herkesten önce deneyin ve hataları bulmaya yardımcı olun. Beta sürümü bozulabilir."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beta 版可能不稳定。"
+            "value" : "抢先体验新功能，帮忙在大家用到之前发现问题。Beta 版可能不稳定。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beta 版可能不穩定。"
+            "value" : "搶先體驗新功能，協助在大家用到之前找出問題。Beta 版可能不穩定。"
           }
         }
       }

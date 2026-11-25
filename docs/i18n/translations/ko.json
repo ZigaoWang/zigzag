@@ -1261,10 +1261,10 @@
         "value": "%@의 로그인 상태가 잠겨 있습니다. ‘다시 시도’를 클릭하고 macOS에서 요청하면 Mac 암호를 입력한 다음 ‘허용’을 클릭하세요."
       }
     },
-    "A beta can break.": {
+    "Get new features first and help catch bugs before everyone else. A beta can break.": {
       "stringUnit": {
         "state": "translated",
-        "value": "베타 버전은 불안정할 수 있습니다."
+        "value": "새로운 기능을 먼저 사용해 보고 문제를 찾는 데 도움을 주세요. 베타 버전은 불안정할 수 있습니다."
       }
     },
     "A site you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to talk to a program on this Mac, over loopback only. Never the local network, and a page can’t switch itself on.": {
