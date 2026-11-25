@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Live folders can follow the open issues or pull requests in the repositories a GitHub user owns, whoever opened them, so a maintainer's folder fills with what comes in. The other GitHub lists now say what they hold: Pull Requests Opened, Issues Assigned and Review Requests.
+
 ## [0.9.5] - 2026-11-24
 
 Export Your Data so you can always take everything with you, live folders, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.

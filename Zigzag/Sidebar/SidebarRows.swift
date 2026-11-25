@@ -1469,10 +1469,25 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     /// A live folder's new pages while it's shut: a dot beside its chevron.
     private var unreadDot: ColorView?
 
-    /// `live`: a live folder, with its live mark in the folder unless it has an icon of its own, and `unread` new pages.
-    func configure(name: String, open: Bool, count: Int, icon: String? = nil, tabGroup: Bool = false, live: Bool = false, unread: Int = 0) {
+    /// The live mark on a live folder's plain folder icon, as the chip on a site's icon.
+    private var liveChip: CALayer?
+    private var renderedChip: (side: CGFloat, scale: CGFloat, color: CGColor)?
+
+    /// `live`: a live folder, wearing `siteIcon` (its site's) unless it has an icon of its own, else its folder, with
+    /// the live chip on the corner either way; `unread` new pages.
+    func configure(name: String, open: Bool, count: Int, icon: String? = nil, tabGroup: Bool = false, live: Bool = false,
+                   siteIcon: NSImage? = nil, unread: Int = 0) {
         title.stringValue = name
-        folderIcon.image = IconChoice.folder(icon ?? (live ? LiveFolderSheet.symbol : nil), open: open, size: Tokens.Sidebar.favicon)
+        let site = live && icon == nil ? siteIcon : nil
+        let side = Tokens.Sidebar.favicon
+        let folder = IconChoice.folder(icon, open: open, size: side)
+        folderIcon.image = live && site == nil ? Self.cutForChip(folder, side: side) : folder
+        folderIcon.isHidden = site != nil
+        self.icon.isHidden = site == nil
+        self.icon.image = site
+        self.icon.badgeMark = .feed
+        self.icon.developerBadge = site == nil ? nil : Brand.Theme.for(self).badge
+        showChip(live && site == nil)
         isOpen = open
         isTabGroup = tabGroup
         if live {
@@ -1518,6 +1533,57 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         layer.add(turn, forKey: "turn")
     }
 
+    /// `image` with the chip's spot and its gap cut away, as a site's icon is cut round it (`FaviconView.badgeFrame`).
+    private static func cutForChip(_ image: NSImage, side: CGFloat) -> NSImage {
+        let size = image.size
+        // Where the icon square sits on the image, which an image view draws centered on it.
+        let square = CGPoint(x: (size.width - side) / 2, y: (size.height - side) / 2)
+        let gap = Tokens.Sidebar.developerBadgeGap
+        let spot = FaviconView.badgeFrame(side: side).offsetBy(dx: square.x, dy: square.y).insetBy(dx: -gap, dy: -gap)
+        let cut = NSImage(size: size, flipped: false) { rect in
+            image.draw(in: rect)
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: spot).fill()
+            return true
+        }
+        cut.isTemplate = image.isTemplate
+        return cut
+    }
+
+    private func showChip(_ on: Bool) {
+        if on, liveChip == nil {
+            let chip = CALayer()
+            chip.contentsGravity = .resizeAspect
+            layer?.addSublayer(chip)
+            liveChip = chip
+        }
+        Tokens.Motion.withoutAnimation { liveChip?.isHidden = !on }
+        renderedChip = nil
+    }
+
+    /// The chip where a site icon's sits on the icon's corner, drawn again only when its size, screen or color changes.
+    private func layoutChip() {
+        guard let chip = liveChip, !chip.isHidden else { return }
+        let square = folderIcon.frame
+        let spot = FaviconView.badgeFrame(side: square.width)
+        let y = isFlipped ? square.maxY - spot.maxY : square.minY + spot.minY
+        let scale = window?.backingScaleFactor ?? 2
+        let color = cgColor(Brand.Theme.for(self).badge)
+        Tokens.Motion.withoutAnimation {
+            chip.frame = CGRect(x: square.minX + spot.minX, y: y, width: spot.width, height: spot.height)
+            chip.contentsScale = scale
+            if let last = renderedChip, last.side == spot.width, last.scale == scale, last.color == color { return }
+            renderedChip = (spot.width, scale, color)
+            chip.contents = FaviconView.renderBadge(side: spot.width, scale: scale, color: color, mark: .feed)
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsLayout = true
+    }
+
     override func layout() {
         super.layout()
         let side = Tokens.Space.x3
@@ -1525,6 +1591,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         let column = bounds.width - Self.buttonEdge - Tokens.Sidebar.rowButton / 2
         chevron.frame = NSRect(x: round(column - side / 2), y: (bounds.height - side) / 2, width: side, height: side)
         folderIcon.frame = icon.frame
+        layoutChip()
         var end = chevron.frame.minX
         if let dot = unreadDot, !dot.isHidden {
             let side = TabRowView.unreadSide
@@ -1543,6 +1610,8 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
         super.stateDidChange(animated: animated)
         // The space's ink, as the pinned pages under it.
         title.textColor = Brand.Theme.for(self).rowInk
+        if !icon.isHidden { icon.developerBadge = Brand.Theme.for(self).badge }
+        if liveChip?.isHidden == false { needsLayout = true }
         if isDropTarget {
             // The one drop target look, as on the favorites and a split's half.
             setLifted(false)

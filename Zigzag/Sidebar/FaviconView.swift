@@ -46,6 +46,11 @@ final class FaviconView: NSView {
             needsLayout = true
         }
     }
+    /// What the chip has knocked out of it: Developer Mode's hammer, or a live folder's feed mark.
+    enum BadgeMark { case developer, feed }
+    var badgeMark = BadgeMark.developer {
+        didSet { if oldValue != badgeMark { renderedBadge = nil; needsLayout = true } }
+    }
     private let badge = CALayer()
     private let badgeCut = CAShapeLayer()
     private var renderedBadge: (side: CGFloat, scale: CGFloat, color: CGColor)?
@@ -211,7 +216,7 @@ final class FaviconView: NSView {
         effectiveAppearance.performAsCurrentDrawingAppearance { resolved = color.cgColor }
         if let last = renderedBadge, last.side == frame.width, last.scale == scale, last.color == resolved { return }
         renderedBadge = (frame.width, scale, resolved)
-        badge.contents = Self.renderBadge(side: frame.width, scale: scale, color: resolved)
+        badge.contents = Self.renderBadge(side: frame.width, scale: scale, color: resolved, mark: badgeMark)
         badge.contentsScale = scale
     }
 
@@ -267,8 +272,8 @@ final class FaviconView: NSView {
         return context.makeImage()
     }
 
-    /// The chip: a disc of `color` with the hammer cut out of it, at exactly the pixels it fills.
-    private static func renderBadge(side: CGFloat, scale: CGFloat, color: CGColor) -> CGImage? {
+    /// The chip: a disc of `color` with its mark cut out of it, at exactly the pixels it fills.
+    static func renderBadge(side: CGFloat, scale: CGFloat, color: CGColor, mark: BadgeMark = .developer) -> CGImage? {
         let pixels = Int((side * scale).rounded())
         guard pixels > 0, let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
                                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -276,6 +281,10 @@ final class FaviconView: NSView {
         let rect = CGRect(x: 0, y: 0, width: pixels, height: pixels)
         context.setFillColor(color)
         context.fillEllipse(in: rect)
+        if mark == .feed {
+            cutFeedMark(in: context, side: rect.width)
+            return context.makeImage()
+        }
         let config = NSImage.SymbolConfiguration(pointSize: side * scale, weight: .bold)
         if let glyph = NSImage(systemSymbolName: DeveloperTool.modeSymbol + ".fill", accessibilityDescription: nil)?.withSymbolConfiguration(config)
             ?? NSImage(systemSymbolName: DeveloperTool.modeSymbol, accessibilityDescription: nil)?.withSymbolConfiguration(config) {
@@ -290,6 +299,26 @@ final class FaviconView: NSView {
             NSGraphicsContext.restoreGraphicsState()
         }
         return context.makeImage()
+    }
+
+    /// The feed mark, a dot and two arcs evenly apart, drawn rather than a symbol so it stays sharp at a chip's size;
+    /// its box in the middle of the disc.
+    private static func cutFeedMark(in context: CGContext, side: CGFloat) {
+        let line = side * Tokens.Sidebar.feedLineShare, dot = line * 0.85
+        let ink = side * Tokens.Sidebar.feedMarkShare
+        let gap = (ink - 2 * dot - 2 * line) / 2
+        let inner = dot + gap + line / 2, outer = inner + line + gap
+        let corner = side / 2 - ink / 2 + dot
+        context.saveGState()
+        context.setBlendMode(.clear)
+        context.fillEllipse(in: CGRect(x: corner - dot, y: corner - dot, width: dot * 2, height: dot * 2))
+        context.setLineWidth(line)
+        context.setLineCap(.round)
+        for radius in [inner, outer] {
+            context.addArc(center: CGPoint(x: corner, y: corner), radius: radius, startAngle: 0, endAngle: .pi / 2, clockwise: false)
+            context.strokePath()
+        }
+        context.restoreGState()
     }
 
     override func viewDidChangeEffectiveAppearance() {

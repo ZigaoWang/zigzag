@@ -25,6 +25,29 @@ nonisolated struct LiveSource: Codable, Equatable, Sendable {
         guard let host = (feed ?? address)?.host() else { return nil }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
+
+    /// The site whose icon the folder wears: GitHub's, or the typed address's (else the feed's) front page.
+    var iconSite: URL? {
+        if gitHub != nil { return URL(string: "https://github.com/") }
+        guard let page = address ?? feed, let scheme = page.scheme, let host = page.host() else { return nil }
+        var parts = URLComponents()
+        parts.scheme = scheme
+        parts.host = host
+        parts.port = page.port
+        parts.path = "/"
+        return parts.url
+    }
+}
+
+nonisolated extension LiveSource {
+    /// A GitHub list this build doesn't know reads as none, so the rest of the library still loads.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        address = try c.decodeIfPresent(URL.self, forKey: .address)
+        feed = try c.decodeIfPresent(URL.self, forKey: .feed)
+        gitHub = try? c.decodeIfPresent(GitHubList.self, forKey: .gitHub)
+        user = try c.decodeIfPresent(String.self, forKey: .user)
+    }
 }
 
 /// One page a live folder shows: the feed entry it is, and the pinned page that shows it.

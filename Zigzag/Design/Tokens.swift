@@ -280,6 +280,9 @@ enum Tokens {
         static let developerBadgeOverhang: CGFloat = 0.3
         static let developerGlyphShare: CGFloat = 0.72
         static let developerBadgeGap: CGFloat = 1
+        /// A live folder's chip has the feed mark in it: its box `feedMarkShare` of the chip, its lines `feedLineShare`.
+        static let feedMarkShare: CGFloat = 0.64
+        static let feedLineShare: CGFloat = 0.12
         /// A section label's slot, the label low in it.
         static var labelHeight: CGFloat { scaledEven(24) }
         /// The space's name over its pinned tabs: larger and light, the one heading in the sidebar, with room above it.

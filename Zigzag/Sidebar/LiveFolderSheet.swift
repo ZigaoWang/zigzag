@@ -8,7 +8,7 @@ enum LiveFolderSheet {
     #endif
 
     static var newTitle: String { String(localized: "New Live Folder…", comment: "Item in the menu of the sidebar's +, its empty space, a space's menu and a folder's menu: a folder that fills itself from a feed or GitHub.") }
-    /// The live folder's mark, inside its folder icon and on its menu items.
+    /// The live folder's mark on its menu items and sheet.
     static let symbol = "dot.radiowaves.up.forward"
 
     /// What's typed, as a web address: "example.com" is https, a feed: address is its https one.
@@ -27,9 +27,11 @@ enum LiveFolderSheet {
 
     static func listTitle(_ list: GitHubList) -> String {
         switch list {
-        case .pullRequests: String(localized: "Pull Requests", comment: "A GitHub list a live folder can follow: the open pull requests someone made.")
-        case .issues: String(localized: "Issues", comment: "A GitHub list a live folder can follow: the open issues assigned to someone.")
+        case .pullRequests: String(localized: "Pull Requests Opened", comment: "A GitHub list a live folder can follow: the open pull requests someone made.")
+        case .issues: String(localized: "Issues Assigned", comment: "A GitHub list a live folder can follow: the open issues assigned to someone.")
         case .reviewRequests: String(localized: "Review Requests", comment: "A GitHub list a live folder can follow: the open pull requests someone is asked to review.")
+        case .repositoryIssues: String(localized: "Issues in Owned Repositories", comment: "A GitHub list a live folder can follow: the open issues in the repositories someone owns, whoever opened them.")
+        case .repositoryPullRequests: String(localized: "Pull Requests in Owned Repositories", comment: "A GitHub list a live folder can follow: the open pull requests in the repositories someone owns, whoever opened them.")
         }
     }
 

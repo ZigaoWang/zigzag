@@ -404,13 +404,15 @@ nonisolated enum FeedDiscovery {
 /// The GitHub lists a live folder can follow, for a GitHub username, through GitHub's public search: open items in
 /// public repositories, newest activity first. No sign-in, so nothing private shows.
 nonisolated enum GitHubList: String, Codable, CaseIterable, Sendable {
-    case pullRequests, issues, reviewRequests
+    case pullRequests, issues, reviewRequests, repositoryIssues, repositoryPullRequests
 
     func query(for user: String) -> String {
         switch self {
         case .pullRequests: "is:pr is:open archived:false author:\(user)"
         case .issues: "is:issue is:open archived:false assignee:\(user)"
         case .reviewRequests: "is:pr is:open archived:false review-requested:\(user)"
+        case .repositoryIssues: "is:issue is:open archived:false user:\(user)"
+        case .repositoryPullRequests: "is:pr is:open archived:false user:\(user)"
         }
     }
 
