@@ -8708,6 +8708,18 @@
         "value": "Fixada"
       }
     },
+    "Pinned tabs as tiles": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Abas fixadas como blocos"
+      }
+    },
+    "Pinned tabs outside folders show as tiles under your favorites.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Abas fixadas fora de pastas aparecem como blocos abaixo dos favoritos."
+      }
+    },
     "Pinned tabs stay, even after you quit": {
       "stringUnit": {
         "state": "translated",

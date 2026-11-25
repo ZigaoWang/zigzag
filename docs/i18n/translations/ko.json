@@ -145,6 +145,18 @@
         "value": "%@이(가) 소유한 공개 저장소의 열린 풀 리퀘스트를 최근 활동순으로 표시합니다."
       }
     },
+    "Pinned tabs as tiles": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "고정된 탭을 타일로 표시"
+      }
+    },
+    "Pinned tabs outside folders show as tiles under your favorites.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "폴더에 없는 고정된 탭을 즐겨찾기 아래에 타일로 표시합니다."
+      }
+    },
     "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
       "stringUnit": {
         "state": "translated",

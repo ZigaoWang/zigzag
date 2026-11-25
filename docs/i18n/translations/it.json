@@ -145,6 +145,18 @@
         "value": "Pull request aperte nei repository pubblici di %@, prima le più recenti."
       }
     },
+    "Pinned tabs as tiles": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Pannelli fissati come riquadri"
+      }
+    },
+    "Pinned tabs outside folders show as tiles under your favorites.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "I pannelli fissati fuori dalle cartelle appaiono come riquadri sotto i preferiti."
+      }
+    },
     "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
       "stringUnit": {
         "state": "translated",

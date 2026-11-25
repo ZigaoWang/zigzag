@@ -1612,6 +1612,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let doubleClickTabToggle = Toggle()
     private let linkStatusToggle = Toggle()
     private let shortFloatingToggle = Toggle()
+    private let pinnedTilesToggle = Toggle()
     private var sideToken: NSObjectProtocol?
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
@@ -2067,6 +2068,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › Appearance: how many favorites' tiles sit side by side in the sidebar."),
                                     detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › Appearance."),
                                     control: favoritesPerRow))
+        pinnedTilesToggle.onChange = { on in SidebarView.pinnedTabsAsTiles = on }
+        appearanceGroup.add(FormRow(title: String(localized: "Pinned tabs as tiles", comment: "A setting in Settings › Appearance: pinned tabs show as small tiles like the favorites' instead of rows."),
+                                    detail: String(localized: "Pinned tabs outside folders show as tiles under your favorites.", comment: "Explanation under “Pinned tabs as tiles” in Settings › Appearance."),
+                                    control: pinnedTilesToggle))
         // Default zoom for sites without their own, as in Chrome and Safari.
         pageZoom.options = ZoomLevels.steps.map { DropdownButton.Option(title: ZoomLevels.percent($0)) }
         pageZoom.onSelect = { index in ZoomLevels.defaultZoom = ZoomLevels.steps[index] }
@@ -4820,6 +4825,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         linkStatusToggle.isOn = LinkStatusController.showsOnHover
         shortFloatingToggle.isOn = BrowserRootView.shortFloatingSidebar
+        pinnedTilesToggle.isOn = SidebarView.pinnedTabsAsTiles
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript

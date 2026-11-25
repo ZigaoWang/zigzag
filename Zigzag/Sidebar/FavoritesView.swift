@@ -7,6 +7,19 @@ final class FavoritesView: NSView {
     /// The × on an open favorite: unloads its page, the favorite stays.
     var onClose: ((Bookmark) -> Void)?
     private var tiles: [FavoriteTile] = []
+    /// What its tiles are: favorites, or the space's pinned pages shown as tiles (#539).
+    var kind: TabManager.SplitSide.Kind = .favorite
+    /// Columns shared with another grid, so both lay out as one (#539); nil: its own.
+    var columnsOverride: Int? { didSet { if columnsOverride != oldValue { relayout(gliding: false) } } }
+    /// A grid laid out inside this one, below its tiles (#539): drops and drags here keep to the tiles' own area.
+    weak var below: NSView?
+    /// The tiles' own area: the whole view unless another grid sits below them.
+    var ownArea: NSRect {
+        guard let below, !below.isHidden else { return bounds }
+        return NSRect(x: 0, y: 0, width: bounds.width, height: preferredHeight)
+    }
+    /// The leading page of each tile, in order.
+    var tileIDs: [UUID] { tiles.compactMap { $0.bookmark?.id } }
     #if DEBUG
     func debugTiles() -> [(String, NSRect)] {
         guard let window else { return [] }
@@ -68,11 +81,13 @@ final class FavoritesView: NSView {
             return NSRect(x: clip.minX, y: clip.minY + top, width: clip.width, height: clip.height - top)
         } ?? visibleRect
         var direction: CGFloat = 0
-        if let windowPoint, let clip = enclosingScrollView?.contentView, bounds.height > visible.height + 1 {
-            let y = convert(windowPoint, from: nil).y
+        // In the scrolled grid's terms: a grid inside another scrolls that one.
+        let whole = enclosingScrollView?.documentView ?? self
+        if let windowPoint, let clip = enclosingScrollView?.contentView, whole.bounds.height > visible.height + 1 {
+            let y = whole.convert(windowPoint, from: nil).y
             let zone = Self.edgeScrollZone
             if y < visible.minY + zone, y > visible.minY - zone, visible.minY > 0 { direction = -1 }
-            if y > visible.maxY - zone, y < visible.maxY + zone, visible.maxY < bounds.height { direction = 1 }
+            if y > visible.maxY - zone, y < visible.maxY + zone, visible.maxY < whole.bounds.height { direction = 1 }
             if direction != 0 {
                 guard edgeScrollTimer == nil else { edgeScrollDirection = direction; edgeScrollMoved = moved; return }
                 edgeScrollDirection = direction
@@ -80,7 +95,7 @@ final class FavoritesView: NSView {
                 let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self, weak clip] _ in
                     MainActor.assumeIsolated {
                         guard let self, let clip, let scroll = self.enclosingScrollView else { return }
-                        let limit = max(-top, self.bounds.height - clip.bounds.height)
+                        let limit = max(-top, (scroll.documentView ?? self).bounds.height - clip.bounds.height)
                         let y = min(max(clip.bounds.minY + self.edgeScrollDirection * 4, -top), limit)
                         guard y != clip.bounds.minY else { self.scrollNearEdge(at: nil); return }
                         clip.scroll(to: NSPoint(x: 0, y: y))
@@ -106,7 +121,7 @@ final class FavoritesView: NSView {
         // Most of a tile, away from its edges, is for a split.
         let middle = tiles.first { tile in
             guard tile !== moving, let carried, tile.frame.insetBy(dx: tile.frame.width * 0.2, dy: tile.frame.height * 0.2).contains(point) else { return false }
-            return TabManager.canSplit(carried, onto: TabManager.SplitSide(kind: .favorite, inSplit: !tile.partners.isEmpty))
+            return TabManager.canSplit(carried, onto: TabManager.SplitSide(kind: kind, inSplit: !tile.partners.isEmpty))
         }
         if let middle, let id = middle.bookmark?.id {
             showSplit((id, point.x > middle.frame.midX))
@@ -248,7 +263,7 @@ final class FavoritesView: NSView {
     /// How tall the grid is at a width: its rows of tiles and the gaps between them.
     func preferredHeight(for width: CGFloat) -> CGFloat {
         guard tileCount > 0 else { return 0 }
-        let columns = Self.columns(for: width, count: tileCount)
+        let columns = columnsOverride ?? Self.columns(for: width, count: tileCount)
         let rows = (tileCount + columns - 1) / columns
         return CGFloat(rows) * Self.tileHeight + CGFloat(rows - 1) * Tokens.Sidebar.favoriteGap
     }
@@ -333,14 +348,14 @@ final class FavoritesView: NSView {
                                radius: Tokens.Sidebar.favoriteRadius, alternate: (row, rowSize, rowGrab, Tokens.Sidebar.rowRadius))
         tile.alphaValue = CarriedCopy.faint
         copy.lift()
-        let carried = TabManager.SplitSide(kind: .favorite, inSplit: !tile.partners.isEmpty)
+        let carried = TabManager.SplitSide(kind: kind, inSplit: !tile.partners.isEmpty)
         var last = start
         var inside = true
         CarriedCopy.carry(in: window, moved: { event in
             last = window.convertPoint(toScreen: event.locationInWindow)
             copy.follow(last)
             let local = self.convert(window.convertPoint(fromScreen: last), from: nil)
-            inside = self.visibleRect.insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
+            inside = self.visibleRect.intersection(self.ownArea).insetBy(dx: 0, dy: -Tokens.Space.x2).contains(local)
             if inside { self.aim(at: local, carried: carried, moving: tile) } else { self.clearAim() }
             let point = window.convertPoint(fromScreen: last)
             self.scrollNearEdge(at: inside ? point : nil) { [weak self] in
@@ -396,7 +411,7 @@ final class FavoritesView: NSView {
         let gap = Tokens.Sidebar.favoriteGap
         // As many columns as fit or were chosen, every tile one size, a shorter last row from the left. A lone
         // favorite is never wider than two would be: half the row, not a long bar around a small icon.
-        let columns = max(2, min(Self.columns(for: bounds.width, count: all.count), all.count))
+        let columns = columnsOverride ?? max(2, min(Self.columns(for: bounds.width, count: all.count), all.count))
         let width = (bounds.width - gap * CGFloat(columns - 1)) / CGFloat(columns)
         for (i, tile) in all.enumerated() {
             let row = i / columns, column = i % columns

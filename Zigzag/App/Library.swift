@@ -1842,6 +1842,26 @@ final class Library {
 
     func pinnedSplits(in spaceID: UUID) -> [PinnedSplit] { space(spaceID)?.pinnedSplits ?? [] }
 
+    /// A space's pinned pages outside folders as tiles (#539): one each, a pinned split's pages in one, its first leading.
+    func pinnedTiles(in spaceID: UUID) -> [(Bookmark, partners: [Bookmark])] {
+        let filed = Set(folders(in: spaceID).flatMap(\.bookmarkIDs))
+        let splits = pinnedSplits(in: spaceID)
+        let riders = Set(splits.flatMap(\.riders))
+        let pages = bookmarks(in: spaceID)
+        let byID = Dictionary(pages.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return pages.filter { !filed.contains($0.id) && !riders.contains($0.id) }.map { page in
+            (page, splits.first { $0.left == page.id }.map { $0.riders.compactMap { byID[$0] } } ?? [])
+        }
+    }
+
+    /// Where a tile slot falls in `order`: before that tile's first page, or after the last tile (#539).
+    static func pinnedIndex(forTile slot: Int, tiles: [[UUID]], order: [UUID]) -> Int {
+        let at = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        let placed = tiles.filter { $0.contains { at[$0] != nil } }
+        if placed.indices.contains(slot), let first = placed[slot].compactMap({ at[$0] }).min() { return first }
+        return placed.last.flatMap { $0.compactMap { at[$0] }.max() }.map { $0 + 1 } ?? 0
+    }
+
     /// The pinned split a pinned page is half of, if any.
     func pinnedSplit(containing bookmarkID: UUID) -> PinnedSplit? {
         if let split = favoriteSplits.first(where: { $0.contains(bookmarkID) }) { return split }

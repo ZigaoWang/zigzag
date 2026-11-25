@@ -365,7 +365,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return nil }
             return SidebarMenus.favoriteMenu(for: favorite, controller: self)
         }
-        sidebar.favorites.onDragMove = { [weak self] _, point in
+        sidebar.favorites.onDragMove = { [weak self] favorite, point in
             guard let self, let window = self.window else { return false }
             if self.favoriteDragOrigin == nil { self.favoriteDragOrigin = self.tabManager.currentSpaceID }
             // Over another window's list, the line shows there instead.
@@ -373,7 +373,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if self.favoriteDropWindow !== other { self.favoriteDropWindow?.sidebar.list.externalHover(at: nil) }
             self.favoriteDropWindow = other
             other?.sidebar.list.externalHover(at: point, allowsPinned: true)
-            let over = other == nil && !self.tabManager.isPrivate && self.isOverList(point)
+            // Over the pinned tiles, it would be pinned there (#539).
+            let carrying = TabManager.SplitSide(kind: .favorite, inSplit: Library.shared.pinnedSplit(containing: favorite.id) != nil)
+            let overTiles = self.dragOverPinnedTiles(at: other == nil ? window.convertPoint(fromScreen: point) : nil, carrying: carrying)
+            let over = other == nil && !overTiles && !self.tabManager.isPrivate && self.isOverList(point)
             self.sidebar.list.externalHover(at: over ? point : nil, allowsPinned: true)
             self.favoriteSpring(at: other == nil ? window.convertPoint(fromScreen: point) : nil)
             self.sidebar.list.carryToEdge(at: other == nil ? point : nil)
@@ -389,6 +392,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 self.unfavoriteWithUndo(favorite.id, to: 0, in: dot)
                 return (true, nil)
             }
+            if self.sidebar.pinnedTiles.isDropTarget { return (true, self.dropFavoriteOnPinnedTiles(favorite)) }
             guard self.isOverList(point) else { return (false, nil) }
             return (true, self.dropFavorite(favorite, at: point))
         }
@@ -400,6 +404,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.favoriteSpring(at: nil)
             self.sidebar.list.carryToEdge(at: nil)
             self.sidebar.clearDropTargets()
+            self.sidebar.pinnedTiles.isDropTarget = false
             // Called off: back to the space it started in, as if it had never moved.
             if cancelled, let origin = self.favoriteDragOrigin { self.tabManager.showSpaceKeepingPage(origin) }
             self.favoriteDragOrigin = nil
@@ -416,6 +421,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self, !self.tabManager.isPrivate else { return }
             self.pageChange(String(localized: "Move Favorite", comment: "Undo action name, shown in the Edit menu as Undo Move Favorite.")) { Library.shared.moveFavorite(favorite.id, to: index) }
         }
+        wirePinnedTiles()
         reloadFavorites()
         sidebar.currentSpaceID = tabManager.currentSpaceID
         sidebar.list.reload(animated: false)
@@ -512,6 +518,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.currentSpaceID = tabManager.currentSpaceID
         sidebar.reloadSpaces(current: tabManager.currentSpaceID)
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: old, snapshot: snapshot)
+        reloadPinnedTiles()
         if let edgeSidebar {
             edgeSidebar.currentSpaceID = tabManager.currentSpaceID
             edgeSidebar.reloadSpaces(current: tabManager.currentSpaceID)
@@ -559,6 +566,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// The window showing where a favorite carried from here would land, when that's another window's list.
     private weak var favoriteDropWindow: BrowserWindowController?
+    /// Settings › Appearance › Pinned tabs as tiles turned on or off (#539).
+    private var pinnedTilesToken: NSObjectProtocol?
 
     /// Another window whose list is in front at a screen point, to take a favorite carried from here. Never to or
     /// from a private window: its pages stay in it.
@@ -643,6 +652,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             $0.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
             $0.needsLayout = true
         }
+        reloadPinnedTiles()
     }
 
     private func libraryChanged() {
@@ -3672,9 +3682,10 @@ extension BrowserWindowController: SidebarDelegate {
     func listDragEnded() {
         sidebar.clearDropTargets()
         sidebar.favorites.isDropTarget = false
+        sidebar.pinnedTiles.isDropTarget = false
         root.splitDropHint.show(nil)
     }
-    func listFavoriteTile(for bookmarkID: UUID) -> NSView? { sidebar.favorites.tile(for: bookmarkID) }
+    func listFavoriteTile(for bookmarkID: UUID) -> NSView? { sidebar.tile(for: bookmarkID) }
     /// A drag that opened another space kept the page on screen. Dropped in that space, you stay there, with its
     /// own page, as if you'd switched to it; dropped back home, the page you were on stays in front. Either way the
     /// selection matches what's showing, so ⌘W closes the page you see.
@@ -3971,6 +3982,13 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool {
+        let overTiles = dragOverPinnedTiles(at: windowPoint, carrying: carrying)
+        let over = dragOverFavoritesGrid(at: overTiles ? nil : windowPoint, carrying: carrying)
+        return overTiles || over
+    }
+
+    /// Carried over the favorites' tiles, or the band where the first would go.
+    func dragOverFavoritesGrid(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool {
         let favorites = sidebar.favorites
         // Favorites are shared by every window: a private one doesn't change them.
         guard let windowPoint, !tabManager.isPrivate else {
@@ -3979,8 +3997,10 @@ extension BrowserWindowController: SidebarDelegate {
         }
         // An empty grid still takes drops in the band under the address, or under the top row with the address above
         // the page.
-        var zone = favorites.convert(favorites.visibleRect, to: nil)
-        if favorites.isHidden {
+        var zone = favorites.convert(favorites.visibleRect.intersection(favorites.ownArea), to: nil)
+        // No favorites yet above the pinned tiles (#539): the same band.
+        let none = favorites.tileIDs.isEmpty && !favorites.isDropTarget && !sidebar.pinnedTiles.isHidden
+        if favorites.isHidden || none {
             let above: NSView = sidebar.holdsAddress ? sidebar.address : favorites
             let edge = above.convert(above.bounds, to: nil)
             zone = NSRect(x: edge.minX, y: edge.minY - Tokens.Space.x10, width: edge.width, height: Tokens.Space.x10)
@@ -3992,6 +4012,7 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listDropOnFavorites(_ items: [SidebarItem], dragged: SidebarItem) -> Bool {
+        if sidebar.pinnedTiles.isDropTarget { return dropOnPinnedTiles(items, dragged: dragged) }
         guard sidebar.favorites.isDropTarget, !tabManager.isPrivate else { return false }
         let index = sidebar.favorites.dropIndex, split = sidebar.favorites.splitTarget
         sidebar.favorites.isDropTarget = false
@@ -4414,6 +4435,9 @@ extension BrowserWindowController {
             guard let self else { return nil }
             return SidebarMenus.favoriteMenu(for: favorite, controller: self)
         }
+        mirror.pinnedTiles.onOpen = { [weak self] page in self?.listOpenBookmark(page) }
+        mirror.pinnedTiles.onMenu = { [weak self] page in self?.listMenu(for: .bookmark(page.id)) }
+        mirror.list.onFold = { [weak self] in self?.reloadPinnedTiles() }
         mirror.onNowPlayingShow = { [weak self] tab in
             self?.bringForwardForEdge()
             self?.tabManager.select(tab)
@@ -4525,5 +4549,191 @@ enum HandoffPage: Equatable {
         if current.title != title { current.title = title }
         current.becomeCurrent()
         return current
+    }
+}
+
+// MARK: - Pinned tabs as tiles (#539)
+
+extension BrowserWindowController {
+    /// The space's pinned tiles as shown: folded, only open ones and the page you're on, as rows would be.
+    var shownPinnedTiles: [(Bookmark, partners: [Bookmark])] {
+        guard SidebarView.pinnedTabsAsTiles else { return [] }
+        let space = tabManager.currentSpaceID
+        let tiles = Library.shared.pinnedTiles(in: space)
+        guard SidebarListView.isCollapsed(space) else { return tiles }
+        let current = tabManager.selectedTab?.bookmarkID
+        return tiles.filter { tile in ([tile.0] + tile.partners).contains { $0.id == current || tabManager.bookmarkTab(for: $0.id) != nil } }
+    }
+
+    func reloadPinnedTiles() {
+        let tiles = shownPinnedTiles
+        let ids = tiles.flatMap { [$0.0.id] + $0.partners.map(\.id) }
+        let tabs = Dictionary(ids.compactMap { id in tabManager.bookmarkTab(for: id).map { (id, $0) } }, uniquingKeysWith: { a, _ in a })
+        let selected = tabManager.selectedTab?.bookmarkID.flatMap { ids.contains($0) ? $0 : nil }
+        bothSidebars {
+            $0.pinnedTiles.reload(favorites: tiles, selectedID: selected, tabs: tabs)
+            $0.needsLayout = true
+        }
+    }
+
+    /// A tile does what its row does: click, ×, right-click and drag.
+    fileprivate func wirePinnedTiles() {
+        let grid = sidebar.pinnedTiles
+        grid.onOpen = { [weak self] page in self?.listOpenBookmark(page) }
+        grid.onClose = { [weak self] page in self?.unloadPinnedTile(page.id) }
+        grid.onMenu = { [weak self] page in self?.listMenu(for: .bookmark(page.id)) }
+        grid.onReorder = { [weak self] page, slot in self?.movePinnedTile(page.id, toSlot: slot) }
+        grid.onJoin = { [weak self] page, target, onRight in self?.listJoinPinned(page.id, onto: target, onRight: onRight) }
+        grid.onDragMove = { [weak self] page, point in self?.pinnedTileMoved(page, to: point) ?? false }
+        grid.onDrop = { [weak self] page, point in self?.pinnedTileDropped(page, at: point) ?? (false, nil) }
+        grid.onDragEnd = { [weak self] cancelled in self?.pinnedTileDragEnded(cancelled: cancelled) }
+        sidebar.list.onFold = { [weak self] in self?.reloadPinnedTiles() }
+        pinnedTilesToken = NotificationCenter.default.addObserver(forName: SidebarView.pinnedTilesChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.bothSidebars { $0.list.reload(animated: self.window?.isVisible == true) }
+                self.reloadPinnedTiles()
+                self.numberHints?.placesChanged()
+            }
+        }
+    }
+
+    /// Its pages unload, the one you're on last; it stays pinned.
+    private func unloadPinnedTile(_ id: UUID) {
+        let ids = Library.shared.pinnedSplit(containing: id)?.ids ?? [id]
+        let selected = tabManager.selectedTab
+        let pages = ids.compactMap(tabManager.bookmarkTab(for:)).sorted { $1 === selected && $0 !== selected }
+        for page in pages { listClose(page) }
+    }
+
+    /// Where a tile's slot among the tiles is in the space's pinned pages, without what's carried.
+    private func pinnedIndex(forTile slot: Int?, moving: Set<UUID>) -> Int {
+        let order = Library.shared.bookmarks(in: tabManager.currentSpaceID).map(\.id).filter { !moving.contains($0) }
+        let tiles = shownPinnedTiles.map { [$0.0.id] + $0.partners.map(\.id) }
+        return Library.pinnedIndex(forTile: slot ?? tiles.count, tiles: tiles, order: order)
+    }
+
+    private func movePinnedTile(_ id: UUID, toSlot slot: Int) {
+        let moving = Set(Library.shared.pinnedSplit(containing: id)?.ids ?? [id])
+        listMoveBookmark(id, to: pinnedIndex(forTile: slot, moving: moving), in: tabManager.currentSpaceID, folder: nil)
+    }
+
+    /// Carried over the pinned tiles: a bar shows where it lands, a tile's middle offers a split.
+    func dragOverPinnedTiles(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool {
+        let grid = sidebar.pinnedTiles
+        guard let windowPoint, !tabManager.isPrivate, !grid.isHidden, grid.window != nil else {
+            grid.isDropTarget = false
+            return false
+        }
+        // A little past its last row, as the favorites' grid; its top is the line's.
+        let shown = grid.convert(grid.visibleRect, to: nil)
+        let zone = NSRect(x: shown.minX, y: shown.minY - Tokens.Space.x2, width: shown.width, height: shown.height + Tokens.Space.x2)
+        let over = !shown.isEmpty && zone.contains(windowPoint)
+        grid.isDropTarget = over
+        if over { grid.hoverDrop(at: windowPoint, carrying: carrying) }
+        return over
+    }
+
+    /// Rows let go over the pinned tiles: pinned at the bar, out of folders, or split with a tile.
+    private func dropOnPinnedTiles(_ items: [SidebarItem], dragged: SidebarItem) -> Bool {
+        let grid = sidebar.pinnedTiles
+        let slot = grid.dropIndex, split = grid.splitTarget
+        grid.isDropTarget = false
+        guard !tabManager.isPrivate else { return false }
+        let space = tabManager.currentSpaceID
+        if let split {
+            switch dragged {
+            case .tab(let id): if let tab = tabManager.tab(with: id) { listPinSplit(tab, onto: split.id, tabOnRight: split.onRight) }
+            case .bookmark(let id): listJoinPinned(id, onto: split.id, onRight: split.onRight)
+            default: break
+            }
+            return true
+        }
+        let moving = Set(items.flatMap { item -> [UUID] in
+            if case .bookmark(let id) = item { return Library.shared.pinnedSplit(containing: id)?.ids ?? [id] }
+            return []
+        })
+        var index = pinnedIndex(forTile: slot, moving: moving)
+        listAsOne(SavePath.saveName) { [weak self, tabManager] in
+            for item in items {
+                switch item {
+                case .tab(let id):
+                    guard let tab = tabManager.tab(with: id) else { continue }
+                    if tab.spaceID != space { self?.listMove(tab, to: 0, in: space) }
+                    self?.listBookmark(tab, at: index, in: space)
+                    index += 1
+                case .bookmark(let id):
+                    self?.listMoveBookmark(id, to: index, in: space, folder: nil)
+                    index += Library.shared.pinnedSplit(containing: id)?.ids.count ?? 1
+                default: break
+                }
+            }
+        }
+        return true
+    }
+
+    /// A favorite let go over the pinned tiles: pinned where the bar is; it leaves Favorites.
+    private func dropFavoriteOnPinnedTiles(_ favorite: Bookmark) -> NSView? {
+        let slot = sidebar.pinnedTiles.dropIndex
+        sidebar.pinnedTiles.isDropTarget = false
+        let space = tabManager.currentSpaceID
+        let index = pinnedIndex(forTile: slot, moving: [])
+        pageChange(SavePath.saveName) { Library.shared.pinFavorite(favorite.id, in: space, at: index) }
+        return sidebar.pinnedTiles.tile(for: favorite.id)
+    }
+
+    /// A tile carried out of its grid; true while over a list, where the copy turns into a row.
+    private func pinnedTileMoved(_ page: Bookmark, to point: NSPoint) -> Bool {
+        guard let window, !tabManager.isPrivate else { return false }
+        if favoriteDragOrigin == nil { favoriteDragOrigin = tabManager.currentSpaceID }
+        let other = otherWindowForFavorite(at: point)
+        if favoriteDropWindow !== other { favoriteDropWindow?.sidebar.list.externalHover(at: nil) }
+        favoriteDropWindow = other
+        other?.sidebar.list.externalHover(at: point, allowsPinned: true)
+        let local = window.convertPoint(fromScreen: point)
+        let carrying = TabManager.SplitSide(kind: .pinned, inSplit: Library.shared.pinnedSplit(containing: page.id) != nil)
+        let overFavorites = dragOverFavoritesGrid(at: other == nil ? local : nil, carrying: carrying)
+        let over = other == nil && !overFavorites && isOverList(point)
+        sidebar.list.externalHover(at: over ? point : nil, allowsPinned: true)
+        favoriteSpring(at: other == nil ? local : nil)
+        sidebar.list.carryToEdge(at: other == nil ? point : nil)
+        return over || other != nil
+    }
+
+    /// Let go outside its grid: into another window, Favorites, another space, a folder or among the tabs.
+    private func pinnedTileDropped(_ page: Bookmark, at point: NSPoint) -> (handled: Bool, landing: NSView?) {
+        guard let window, !tabManager.isPrivate else { return (false, nil) }
+        if let other = otherWindowForFavorite(at: point) { return (true, other.takePinned(page.id, from: self, at: point)) }
+        if sidebar.favorites.isDropTarget {
+            _ = listDropOnFavorites([.bookmark(page.id)], dragged: .bookmark(page.id))
+            return (true, sidebar.favorites.tile(for: page.id))
+        }
+        if let dot = sidebar.spaceDot(at: window.convertPoint(fromScreen: point)) {
+            if Library.shared.spaceID(ofBookmark: page.id) != dot { listMoveBookmark(page.id, to: Int.max, in: dot) }
+            return (true, nil)
+        }
+        guard isOverList(point) else { return (false, nil) }
+        let landing = sidebar.list.dropTarget(at: point, allowsPinned: true, carrying: [.bookmark(page.id)])
+        let space = tabManager.currentSpaceID
+        if landing.section == .bookmarks {
+            listMoveBookmark(page.id, to: landing.index, in: space, folder: landing.folder)
+            return (true, sidebar.list.row(forBookmark: page.id))
+        }
+        listUnbookmark(page.id, to: landing.index)
+        let tabs = tabManager.tabs(in: space)
+        return (true, tabs.indices.contains(landing.index) ? sidebar.list.row(for: tabs[landing.index]) : nil)
+    }
+
+    private func pinnedTileDragEnded(cancelled: Bool) {
+        favoriteDropWindow?.sidebar.list.externalHover(at: nil)
+        favoriteDropWindow = nil
+        sidebar.list.externalHover(at: nil)
+        favoriteSpring(at: nil)
+        sidebar.list.carryToEdge(at: nil)
+        sidebar.clearDropTargets()
+        sidebar.favorites.isDropTarget = false
+        if cancelled, let origin = favoriteDragOrigin { tabManager.showSpaceKeepingPage(origin) }
+        favoriteDragOrigin = nil
+        listDropFinished()
     }
 }

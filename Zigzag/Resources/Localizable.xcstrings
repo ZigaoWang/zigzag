@@ -1993,6 +1993,172 @@
         }
       }
     },
+    "Pinned tabs as tiles" : {
+      "comment" : "A setting in Settings › Appearance: pinned tabs show as small tiles like the favorites' instead of rows.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fixierte Tabs als Kacheln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pestañas fijadas como mosaicos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onglets épinglés en vignettes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pannelli fissati come riquadri"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定タブをタイルで表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고정된 탭을 타일로 표시"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vastgezette tabbladen als tegels"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przypięte karty jako kafelki"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abas fixadas como blocos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закреплённые вкладки плитками"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sabitlenmiş sekmeler kutucuk olarak"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已固定标签页显示为方块"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已固定分頁顯示為方塊"
+          }
+        }
+      }
+    },
+    "Pinned tabs outside folders show as tiles under your favorites." : {
+      "comment" : "Explanation under “Pinned tabs as tiles” in Settings › Appearance.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fixierte Tabs außerhalb von Ordnern erscheinen als Kacheln unter deinen Favoriten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las pestañas fijadas que no están en carpetas aparecen como mosaicos bajo tus favoritos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les onglets épinglés hors des dossiers s’affichent en vignettes sous vos favoris."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pannelli fissati fuori dalle cartelle appaiono come riquadri sotto i preferiti."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォルダに入っていない固定タブを、お気に入りの下にタイルで表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더에 없는 고정된 탭을 즐겨찾기 아래에 타일로 표시합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vastgezette tabbladen buiten mappen staan als tegels onder je favorieten."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przypięte karty spoza folderów są widoczne jako kafelki pod ulubionymi."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abas fixadas fora de pastas aparecem como blocos abaixo dos favoritos."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закреплённые вкладки вне папок показываются плитками под избранным."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klasörlerin dışındaki sabitlenmiş sekmeler favorilerin altında kutucuk olarak görünür."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不在文件夹里的已固定标签页，会以方块显示在收藏下方。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不在資料夾裡的已固定分頁，會以方塊顯示在收藏下方。"
+          }
+        }
+      }
+    },
     "Pointing at a link shows where it goes in the page’s bottom-left corner." : {
       "comment" : "Explanation under “Show link address on hover” in Settings › Appearance.",
       "localizations" : {
