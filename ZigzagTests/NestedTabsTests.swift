@@ -367,3 +367,61 @@ struct NestedTabsTests {
         #expect(SessionState.savedParents(tree, keeping: [a, b, c, d, e]) == [b: a, c: b, d: a])
     }
 }
+
+/// The sidebar's rows for nested tabs (#526).
+@MainActor
+struct NestedTabRowsTests {
+    private func inWindow(_ count: Int, _ body: (BrowserWindowController, [Tab]) throws -> Void) throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tabs = (0..<count).map { Tab(url: URL(string: "https://example.com/nest-row/\($0)"), title: "T\($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        manager.select(tabs[0])
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 900, height: 600))
+        defer { controller.window?.close() }
+        // Behind the other windows: a drag finds the list under the pointer among the windows on screen.
+        controller.window?.orderBack(nil)
+        controller.window?.layoutIfNeeded()
+        try body(controller, tabs)
+    }
+
+    private func shownRow(_ tab: Tab, in list: SidebarListView) throws -> TabRowView {
+        list.reload(animated: false)
+        list.layoutSubtreeIfNeeded()
+        return try #require(list.row(for: tab) as? TabRowView)
+    }
+
+    private func click(_ button: IconButton) throws {
+        button.onClick?(try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0,
+                                                        windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)))
+    }
+
+    @Test func theChevronGoesWithTheLastTabUnderIt() throws {
+        try inWindow(3) { controller, tabs in
+            let manager = controller.tabManager, list = controller.sidebar.list
+            manager.nest(tabs[1], deeper: true)
+            manager.select(tabs[2])
+            let row = try shownRow(tabs[0], in: list)
+            // The chevron shows, takes the click, and folds the tab under it away.
+            let chevron = try #require(row.debugNestedButton)
+            #expect(row.hitTest(row.convert(NSPoint(x: chevron.frame.midX, y: chevron.frame.midY), to: row.superview)) === chevron)
+            try click(chevron)
+            #expect(tabs[0].isCollapsed)
+            #expect(!list.debugItems.contains(.tab(tabs[1].id)))
+            // Folded or not, once the last tab under it goes a level out, the chevron goes too.
+            manager.select(tabs[1])
+            manager.nest(tabs[1], deeper: false)
+            #expect(try shownRow(tabs[0], in: list).debugNestedButton == nil)
+            // Under it again: back, and it folds.
+            manager.nest(tabs[1], deeper: true)
+            manager.select(tabs[2])
+            let again = try #require(try shownRow(tabs[0], in: list).debugNestedButton)
+            if tabs[0].isCollapsed { try click(again) }
+            try click(again)
+            #expect(tabs[0].isCollapsed)
+            #expect(!list.debugItems.contains(.tab(tabs[1].id)))
+        }
+    }
+}

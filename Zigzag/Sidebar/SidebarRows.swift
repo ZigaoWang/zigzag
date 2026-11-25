@@ -285,8 +285,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
     }
     var onToggleNested: (() -> Void)?
-    /// The chevron of a tab with tabs nested under it, in the column a folder's sits in.
-    private lazy var nestedButton: IconButton = {
+    /// The chevron of a tab with tabs nested under it, in the column a folder's sits in. Made the first time it shows.
+    private var madeNestedButton: IconButton?
+    private var nestedButton: IconButton {
+        if let madeNestedButton { return madeNestedButton }
         let button = TabRowView.rowButton("chevron.down", toolTip: "")
         button.tint = Tokens.Color.textTertiary
         button.wantsLayer = true
@@ -294,8 +296,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         button.onClick = { [weak self] _ in self?.onToggleNested?() }
         button.isHidden = true
         addSubview(button)
+        madeNestedButton = button
         return button
-    }()
+    }
     private var showsNested: Bool { nestedTabs != nil && renameField == nil }
 
     /// Bookmarks keep their own title; only the icon and state follow the page.
@@ -559,6 +562,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     #if DEBUG
     /// The debug bridge's pointer over one part of the row (`half(at:)`'s numbering).
     func debugPoint(atPart part: Int?) { pointedPart = part }
+    /// The chevron of a tab with tabs under it, while it shows.
+    var debugNestedButton: IconButton? { madeNestedButton?.isHidden == false ? madeNestedButton : nil }
     #endif
     private var moveTracking: NSTrackingArea?
 
@@ -1044,7 +1049,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let page = extraPages.indices.contains(i) ? extraPages[i] : nil
             views.audio.isHidden = page.map { !($0.isPlayingAudio || $0.isMuted) } ?? true || renameField != nil
         }
-        if nestedTabs != nil || renameField != nil { nestedButton.isHidden = !showsNested }
+        // Hidden again once the last tab under it leaves (#526).
+        madeNestedButton?.isHidden = !showsNested
         // Quiet at rest as a folder's is, clear under the pointer or while the tabs are folded away.
         if nestedTabs != nil { nestedButton.alphaValue = isHovered || nestedTabs == .collapsed ? 1 : 0.6 }
         needsLayout = true
