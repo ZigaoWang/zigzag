@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag：心地よく、軽い。Mac用の軽量ブラウザで、無料のオープンソースです。Split Viewで開いたZigzagのウインドウ。Fonts In UseとGrilli Typeが並び、サイドバーにはスペースと固定タブが表示されています。"></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag：心地よく、軽い。Mac用の軽量ブラウザで、無料のオープンソースです。Split Viewで開いたZigzagのウインドウ。Fonts In UseとGrilli Typeが並び、サイドバーにはスペースと固定タブが表示されています。"></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | 日本語 | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
+<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | 日本語 | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 このページはREADME.mdの翻訳です。内容が異なる場合は英語版が優先されます。
 
@@ -40,17 +40,17 @@
 ## 見てみる
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Zigzagで3つのスペースを切り替えている様子。スペースごとに色とタブが違います">
+  <img src="../../docs/spaces.gif" width="960" alt="Zigzagで3つのスペースを切り替えている様子。スペースごとに色とタブが違います">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split View：Fonts In UseとGrilli Typeが並んでいます"><br><b>Split View。</b>タブをページにドラッグすると、横に並べて開きます。最大4つまで同時に表示できます。</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="3つのスペースのすべてのタブがカードで表示されています"><br><b>すべてのタブを一度に。</b>⇧⌘\ ですべてのスペースを表示します。入力して絞り込めます。</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Split View：Fonts In UseとGrilli Typeが並んでいます"><br><b>Split View。</b>タブをページにドラッグすると、横に並べて開きます。最大4つまで同時に表示できます。</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="3つのスペースのすべてのタブがカードで表示されています"><br><b>すべてのタブを一度に。</b>⇧⌘\ ですべてのスペースを表示します。入力して絞り込めます。</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="開いたページの上に重なった、タイポグラフィについてのWikipediaの記事"><br><b>Zigzag Mini。</b>リンクをShiftキーを押しながらクリックすると、今のページを離れずにちらっと見られます。</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="リーダーで表示したThe Public Domain Reviewのエッセイ"><br><b>リーダー。</b>長い文章を、余計なものなしで読めます。</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="開いたページの上に重なった、タイポグラフィについてのWikipediaの記事"><br><b>Zigzag Mini。</b>リンクをShiftキーを押しながらクリックすると、今のページを離れずにちらっと見られます。</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="リーダーで表示したThe Public Domain Reviewのエッセイ"><br><b>リーダー。</b>長い文章を、余計なものなしで読めます。</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@
 | **デベロッパモード** | 自分で作るサイトのためのモードで、最初は `localhost` が対象です。エラー数つきのコンソール、「要素の詳細を表示」、デバイスのサイズ、ライトとダーク、プリント用のスタイル、JavaScript、画像やスタイルのオフ、ほかのユーザエージェント、スマートフォンでページを開くQRコードが使えます。 |
 | **機能拡張** | Chromeウェブストアから入れます。ストア自身のボタンには「Zigzagに追加」と表示されます。1Password、Bitwarden、Dark Reader、Tampermonkeyなど、人気の機能拡張のほとんどが動きます。動かないものは下に書いています。 |
 | **読み込む** | Arc、Chrome、Safari、Dia、Edge、Brave、Vivaldi、Opera、Comet、Helium、Yandex、Whale、Chromium、Thorium、Firefox、Zen、Orionから、ブックマーク、履歴、パスワード、ログイン状態、機能拡張を読み込めます。 |
-| **ダウンロード** | ファイルの種類ごとに専用のフォルダへ保存したり、PDFなど安全なものは保存後にそのまま開いたりできます。ルールを使うと、リンクやダウンロードをApp、スクリプト、aria2のようなダウンロードマネージャへ渡せます。渡す前に必ず確認します。[docs/download-rules.md](docs/download-rules.md)を参照してください。 |
-| **オートメーション** | AppleScript、ショートカット、`osascript` から、タブの一覧表示や開く操作、ページの読み取りができます。書き方はSafariやChromeと同じです。[docs/automation.md](docs/automation.md)を参照してください。 |
-| **AI App** | 初期状態ではオフです。オンにすると、MacのAI AppがMCPを通してタブを使えます。プライベートウインドウやパスワードは使えません。[docs/automation.md](docs/automation.md#ai-apps-mcp)を参照してください。 |
+| **ダウンロード** | ファイルの種類ごとに専用のフォルダへ保存したり、PDFなど安全なものは保存後にそのまま開いたりできます。ルールを使うと、リンクやダウンロードをApp、スクリプト、aria2のようなダウンロードマネージャへ渡せます。渡す前に必ず確認します。[docs/download-rules.md](../../docs/download-rules.md)を参照してください。 |
+| **オートメーション** | AppleScript、ショートカット、`osascript` から、タブの一覧表示や開く操作、ページの読み取りができます。書き方はSafariやChromeと同じです。[docs/automation.md](../../docs/automation.md)を参照してください。 |
+| **AI App** | 初期状態ではオフです。オンにすると、MacのAI AppがMCPを通してタブを使えます。プライベートウインドウやパスワードは使えません。[docs/automation.md](../../docs/automation.md#ai-apps-mcp)を参照してください。 |
 | **自分のデータ** | 「ファイル › データを書き出す…」で、ブックマークをどのブラウザでも読み込める標準のHTMLファイルとして保存できます。別のMacで復元できる、Zigzag全体のバックアップも保存できます。 |
 | **言語** | 英語、簡体字中国語、繁体字中国語、日本語、韓国語、ドイツ語、フランス語、イタリア語、スペイン語、ポルトガル語（ブラジル）、ロシア語、オランダ語、ポーランド語、トルコ語。 |
 | **ほかにも** | リーダー、PDFビューア、iPhone、iPad、ほかのMacへのHandoff、範囲、ページの一部、ページ全体のスクリーンショット（⇧⌘2）、オンデバイスの翻訳、すべての一致箇所に印を付けるページ内検索、「最近閉じたもの」と過去7日間を含む履歴メニュー、既定のページズーム、好みで置けるページの上のアドレスバー、ピクチャ・イン・ピクチャ、プライベートウインドウ、Webインスペクタ。 |
@@ -145,13 +145,13 @@ Zigzagは、`WKWebView` を中心にした約12万行のSwift 6とAppKitでで�
 
     brew install --cask zigaowang/tap/zigzag
 
-アップデートは自動でインストールされます。各バージョンの変更点は、[リリースノート](https://zigzagbrowser.com/release-notes)と[CHANGELOG.md](CHANGELOG.md)にあります。
+アップデートは自動でインストールされます。各バージョンの変更点は、[リリースノート](https://zigzagbrowser.com/release-notes)と[CHANGELOG.md](../../CHANGELOG.md)にあります。
 
 ## フィードバック
 
 - **不具合やアイデア：** [Issueを作成](https://github.com/ZigaoWang/zigzag/issues/new/choose)するか、アプリの「ヘルプ › フィードバックを送信…」を使ってください。不具合の場合は、「ヘルプ › 問題を報告…」で、送る前に読めるレポートを書き出せます。
 - **メール：** a@zigao.wang
-- **セキュリティ上の問題：** [SECURITY.md](SECURITY.md)を参照してください。公開のIssueには投稿しないでください。
+- **セキュリティ上の問題：** [SECURITY.md](../../SECURITY.md)を参照してください。公開のIssueには投稿しないでください。
 
 ## ソースからビルドする
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## コントリビュート
 
-コントリビュートを歓迎します。プロジェクトのビルド、テスト、スタイルについては[CONTRIBUTING.md](CONTRIBUTING.md)を読んでください。
+コントリビュートを歓迎します。プロジェクトのビルド、テスト、スタイルについては[CONTRIBUTING.md](../../CONTRIBUTING.md)を読んでください。
 
 ## ライセンス
 
-Zigzagのコードは[Apache License, Version 2.0](LICENSE)でライセンスされています。商用かどうかを問わず、使用、変更、フォーク、配布ができます。
+Zigzagのコードは[Apache License, Version 2.0](../../LICENSE)でライセンスされています。商用かどうかを問わず、使用、変更、フォーク、配布ができます。
 
-「Zigzag」という名前、Appのアイコン、ロゴはライセンスの対象外です。これらは商標で、すべての権利を留保します。フォークには独自の名前とアイコンが必要です。[TRADEMARKS.md](TRADEMARKS.md)と[NOTICE](NOTICE)を参照してください。Zigzagが使っているサードパーティの成果物は、[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)に載せています。
+「Zigzag」という名前、Appのアイコン、ロゴはライセンスの対象外です。これらは商標で、すべての権利を留保します。フォークには独自の名前とアイコンが必要です。[TRADEMARKS.md](../../TRADEMARKS.md)と[NOTICE](../../NOTICE)を参照してください。Zigzagが使っているサードパーティの成果物は、[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)に載せています。
 
 ## 謝辞
 

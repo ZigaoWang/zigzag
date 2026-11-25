@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: 기분 좋고, 가볍습니다. 무료 오픈 소스 Mac용 경량 브라우저입니다. Split View로 열린 Zigzag 윈도우에 Fonts In Use와 Grilli Type이 나란히 있고, 사이드바에는 스페이스와 고정된 탭이 보입니다."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: 기분 좋고, 가볍습니다. 무료 오픈 소스 Mac용 경량 브라우저입니다. Split View로 열린 Zigzag 윈도우에 Fonts In Use와 Grilli Type이 나란히 있고, 사이드바에는 스페이스와 고정된 탭이 보입니다."></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | 한국어 | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
+<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 이 페이지는 README.md의 번역입니다. 내용이 다를 경우 영어 버전을 기준으로 합니다.
 
@@ -40,17 +40,17 @@
 ## 둘러보기
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Zigzag에서 스페이스 세 개를 전환하는 모습. 스페이스마다 색상과 탭이 다릅니다">
+  <img src="../../docs/spaces.gif" width="960" alt="Zigzag에서 스페이스 세 개를 전환하는 모습. 스페이스마다 색상과 탭이 다릅니다">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split View: Fonts In Use와 Grilli Type이 나란히 열려 있습니다"><br><b>Split View.</b> 탭을 페이지로 끌어다 놓으면 옆에 나란히 열립니다. 한 번에 최대 4개까지 열 수 있습니다.</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="스페이스 세 개의 모든 탭이 카드로 표시되어 있습니다"><br><b>모든 탭을 한눈에.</b> ⇧⌘\ 로 모든 스페이스를 봅니다. 입력하면 걸러 줍니다.</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Split View: Fonts In Use와 Grilli Type이 나란히 열려 있습니다"><br><b>Split View.</b> 탭을 페이지로 끌어다 놓으면 옆에 나란히 열립니다. 한 번에 최대 4개까지 열 수 있습니다.</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="스페이스 세 개의 모든 탭이 카드로 표시되어 있습니다"><br><b>모든 탭을 한눈에.</b> ⇧⌘\ 로 모든 스페이스를 봅니다. 입력하면 걸러 줍니다.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="열어 둔 페이지 위에 겹쳐 표시된 타이포그래피 관련 Wikipedia 문서"><br><b>Zigzag Mini.</b> 링크를 Shift 키를 누른 채 클릭하면 보고 있던 자리를 잃지 않고 훑어볼 수 있습니다.</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="읽기 도우미로 표시한 The Public Domain Review의 에세이"><br><b>읽기 도우미.</b> 긴 글을 군더더기 없이 읽습니다.</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="열어 둔 페이지 위에 겹쳐 표시된 타이포그래피 관련 Wikipedia 문서"><br><b>Zigzag Mini.</b> 링크를 Shift 키를 누른 채 클릭하면 보고 있던 자리를 잃지 않고 훑어볼 수 있습니다.</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="읽기 도우미로 표시한 The Public Domain Review의 에세이"><br><b>읽기 도우미.</b> 긴 글을 군더더기 없이 읽습니다.</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@
 | **개발자 모드** | 직접 만드는 사이트를 위한 모드로, 처음에는 `localhost`가 대상입니다. 오류 개수가 표시되는 콘솔, ‘요소 검사’, 기기 크기, 라이트와 다크, 프린트 스타일, JavaScript, 이미지, 스타일 끄기, 다른 사용자 에이전트, 휴대폰에서 페이지를 여는 QR 코드를 제공합니다. |
 | **확장 프로그램** | Chrome 웹 스토어에서 설치하며, 스토어의 버튼에는 ‘Zigzag에 추가’라고 표시됩니다. 1Password, Bitwarden, Dark Reader, Tampermonkey와 인기 있는 대부분의 확장 프로그램이 동작합니다. 동작하지 않는 것은 아래를 참고하세요. |
 | **가져오기** | Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen, Orion에서 책갈피, 방문 기록, 암호, 로그인 상태, 확장 프로그램을 가져옵니다. |
-| **다운로드** | 파일 형식별로 전용 폴더에 보내거나, PDF처럼 안전한 파일은 저장된 뒤 바로 엽니다. 규칙을 만들면 링크나 다운로드를 앱, 스크립트, aria2 같은 다운로드 관리자에 전달하며, 먼저 확인을 받습니다. [docs/download-rules.md](docs/download-rules.md)를 참고하세요. |
-| **자동화** | AppleScript, 단축어, `osascript`로 탭 목록을 보고, 탭을 열고, 페이지를 읽을 수 있습니다. Safari와 Chrome이 받는 방식 그대로 작성합니다. [docs/automation.md](docs/automation.md)를 참고하세요. |
-| **AI 앱** | 켜기 전에는 꺼져 있습니다. 켜면 Mac의 AI 앱이 MCP로 탭을 사용할 수 있으며, 개인 정보 보호 윈도우와 암호에는 접근할 수 없습니다. [docs/automation.md](docs/automation.md#ai-apps-mcp)를 참고하세요. |
+| **다운로드** | 파일 형식별로 전용 폴더에 보내거나, PDF처럼 안전한 파일은 저장된 뒤 바로 엽니다. 규칙을 만들면 링크나 다운로드를 앱, 스크립트, aria2 같은 다운로드 관리자에 전달하며, 먼저 확인을 받습니다. [docs/download-rules.md](../../docs/download-rules.md)를 참고하세요. |
+| **자동화** | AppleScript, 단축어, `osascript`로 탭 목록을 보고, 탭을 열고, 페이지를 읽을 수 있습니다. Safari와 Chrome이 받는 방식 그대로 작성합니다. [docs/automation.md](../../docs/automation.md)를 참고하세요. |
+| **AI 앱** | 켜기 전에는 꺼져 있습니다. 켜면 Mac의 AI 앱이 MCP로 탭을 사용할 수 있으며, 개인 정보 보호 윈도우와 암호에는 접근할 수 없습니다. [docs/automation.md](../../docs/automation.md#ai-apps-mcp)를 참고하세요. |
 | **데이터** | ‘파일 › 데이터 내보내기…’는 어떤 브라우저에서든 가져올 수 있는 표준 HTML 파일로 책갈피를 저장하고, 다른 Mac에서 복원할 수 있는 Zigzag 전체 백업도 저장합니다. |
 | **언어** | 영어, 중국어(간체), 중국어(번체), 일본어, 한국어, 독일어, 프랑스어, 이탈리아어, 스페인어, 포르투갈어(브라질), 러시아어, 네덜란드어, 폴란드어, 튀르키예어. |
 | **그 밖에** | 읽기 도우미, PDF 뷰어, iPhone, iPad, 다른 Mac으로의 Handoff, 영역, 페이지 일부, 전체 페이지 캡처(⇧⌘2), 온디바이스 번역, 일치하는 항목을 모두 표시하는 페이지에서 찾기, ‘최근에 닫은 항목’과 최근 7일이 있는 방문 기록 메뉴, 기본 페이지 확대/축소, 원하면 페이지 위에 두는 주소 막대, PIP, 개인 정보 보호 윈도우, 웹 속성 보기. |
@@ -145,13 +145,13 @@ Zigzag는 `WKWebView`를 중심으로 한 Swift 6와 AppKit 코드 약 120,000�
 
     brew install --cask zigaowang/tap/zigzag
 
-업데이트는 저절로 설치됩니다. 버전마다 무엇이 바뀌었는지는 [릴리스 노트](https://zigzagbrowser.com/release-notes)와 [CHANGELOG.md](CHANGELOG.md)에 있습니다.
+업데이트는 저절로 설치됩니다. 버전마다 무엇이 바뀌었는지는 [릴리스 노트](https://zigzagbrowser.com/release-notes)와 [CHANGELOG.md](../../CHANGELOG.md)에 있습니다.
 
 ## 피드백
 
 - **버그와 아이디어:** [이슈 열기](https://github.com/ZigaoWang/zigzag/issues/new/choose), 또는 앱에서 ‘도움말 › 피드백 보내기…’. 버그는 ‘도움말 › 문제 보고…’로 보내기 전에 읽어 볼 수 있는 보고서를 작성하세요.
 - **이메일:** a@zigao.wang
-- **보안 문제:** [SECURITY.md](SECURITY.md)를 참고하세요. 공개 이슈에는 올리지 마세요.
+- **보안 문제:** [SECURITY.md](../../SECURITY.md)를 참고하세요. 공개 이슈에는 올리지 마세요.
 
 ## 소스에서 빌드하기
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## 기여하기
 
-기여를 환영합니다. 프로젝트를 어떻게 빌드하고, 테스트하고, 스타일을 맞추는지는 [CONTRIBUTING.md](CONTRIBUTING.md)를 읽어 보세요.
+기여를 환영합니다. 프로젝트를 어떻게 빌드하고, 테스트하고, 스타일을 맞추는지는 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 읽어 보세요.
 
 ## 라이선스
 
-Zigzag의 코드는 [Apache License, Version 2.0](LICENSE)에 따라 라이선스됩니다. 상업적이든 아니든 사용하고, 수정하고, 포크하고, 배포할 수 있습니다.
+Zigzag의 코드는 [Apache License, Version 2.0](../../LICENSE)에 따라 라이선스됩니다. 상업적이든 아니든 사용하고, 수정하고, 포크하고, 배포할 수 있습니다.
 
-‘Zigzag’라는 이름, 앱 아이콘, 로고는 라이선스 대상이 아닙니다. 상표이며 모든 권리가 유보됩니다. 포크는 별도의 이름과 아이콘이 필요합니다. [TRADEMARKS.md](TRADEMARKS.md)와 [NOTICE](NOTICE)를 참고하세요. Zigzag가 사용하는 서드파티 저작물은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 정리되어 있습니다.
+‘Zigzag’라는 이름, 앱 아이콘, 로고는 라이선스 대상이 아닙니다. 상표이며 모든 권리가 유보됩니다. 포크는 별도의 이름과 아이콘이 필요합니다. [TRADEMARKS.md](../../TRADEMARKS.md)와 [NOTICE](../../NOTICE)를 참고하세요. Zigzag가 사용하는 서드파티 저작물은 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)에 정리되어 있습니다.
 
 ## 감사의 말
 

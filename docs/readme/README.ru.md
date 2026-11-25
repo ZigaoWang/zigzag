@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: приятный в работе и ничего не весит. Лёгкий браузер для Mac, бесплатный и с открытым исходным кодом. Окно Zigzag в режиме Split View: Fonts In Use рядом с Grilli Type, а в боковом меню пространства и закреплённые вкладки."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: приятный в работе и ничего не весит. Лёгкий браузер для Mac, бесплатный и с открытым исходным кодом. Окно Zigzag в режиме Split View: Fonts In Use рядом с Grilli Type, а в боковом меню пространства и закреплённые вкладки."></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | Русский | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
+<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | Русский | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 Эта страница является переводом README.md. Если они различаются, главной считается английская версия.
 
@@ -53,17 +53,17 @@ Arc 22 декабря, мне очень не хотелось возвраща�
 ## Как это выглядит
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Переключение между тремя пространствами в Zigzag: у каждого свой цвет и свои вкладки">
+  <img src="../../docs/spaces.gif" width="960" alt="Переключение между тремя пространствами в Zigzag: у каждого свой цвет и свои вкладки">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split View: Fonts In Use рядом с Grilli Type"><br><b>Split View.</b> Перетащите вкладку на страницу, чтобы открыть её рядом, до четырёх сразу.</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="Все вкладки из трёх пространств в виде карточек"><br><b>Все вкладки сразу.</b> ⇧⌘\ показывает все пространства. Начните вводить текст, чтобы отфильтровать.</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Split View: Fonts In Use рядом с Grilli Type"><br><b>Split View.</b> Перетащите вкладку на страницу, чтобы открыть её рядом, до четырёх сразу.</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="Все вкладки из трёх пространств в виде карточек"><br><b>Все вкладки сразу.</b> ⇧⌘\ показывает все пространства. Начните вводить текст, чтобы отфильтровать.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="Статья из Википедии о типографике поверх страницы, из которой её открыли"><br><b>Zigzag Mini.</b> Щёлкните по ссылке с нажатым Shift, чтобы взглянуть на страницу, не теряя своего места.</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="Эссе из The Public Domain Review в режиме чтения"><br><b>Режим чтения.</b> Длинные тексты без лишнего.</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="Статья из Википедии о типографике поверх страницы, из которой её открыли"><br><b>Zigzag Mini.</b> Щёлкните по ссылке с нажатым Shift, чтобы взглянуть на страницу, не теряя своего места.</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="Эссе из The Public Domain Review в режиме чтения"><br><b>Режим чтения.</b> Длинные тексты без лишнего.</td>
   </tr>
 </table>
 
@@ -99,9 +99,9 @@ Arc 22 декабря, мне очень не хотелось возвраща�
 | **Режим разработчика** | Для сайтов, которые вы делаете, сначала для `localhost`: консоль со счётчиком ошибок, «Исследовать элемент», размеры устройств, светлая и тёмная тема, стили печати, JavaScript, отключение изображений или стилей, другой User-Agent и QR-код, чтобы открыть страницу на телефоне. |
 | **Расширения** | Из Chrome Web Store, где собственная кнопка магазина называется «Добавить в Zigzag». 1Password, Bitwarden, Dark Reader, Tampermonkey и большинство популярных работают; что не работает, смотрите ниже. |
 | **Импорт** | Закладки, история, пароли, входы и расширения из Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen и Orion. |
-| **Загрузки** | Отправляйте файлы определённого типа в отдельную папку или открывайте безопасные, например PDF, сразу после сохранения. Правила передают ссылку или загрузку приложению, скрипту или менеджеру загрузок вроде aria2, предварительно спросив вас. См. [docs/download-rules.md](docs/download-rules.md). |
-| **Автоматизация** | AppleScript, «Быстрые команды» и `osascript` могут перечислять и открывать вкладки и читать страницы, в том виде, в каком их принимают Safari и Chrome. См. [docs/automation.md](docs/automation.md). |
-| **ИИ-приложения** | Выключены, пока вы их не включите: ИИ-приложения на вашем Mac могут использовать ваши вкладки через MCP, но никогда не частные окна и не пароли. См. [docs/automation.md](docs/automation.md#ai-apps-mcp). |
+| **Загрузки** | Отправляйте файлы определённого типа в отдельную папку или открывайте безопасные, например PDF, сразу после сохранения. Правила передают ссылку или загрузку приложению, скрипту или менеджеру загрузок вроде aria2, предварительно спросив вас. См. [docs/download-rules.md](../../docs/download-rules.md). |
+| **Автоматизация** | AppleScript, «Быстрые команды» и `osascript` могут перечислять и открывать вкладки и читать страницы, в том виде, в каком их принимают Safari и Chrome. См. [docs/automation.md](../../docs/automation.md). |
+| **ИИ-приложения** | Выключены, пока вы их не включите: ИИ-приложения на вашем Mac могут использовать ваши вкладки через MCP, но никогда не частные окна и не пароли. См. [docs/automation.md](../../docs/automation.md#ai-apps-mcp). |
 | **Ваши данные** | «Файл» › «Экспортировать данные…» сохраняет ваши закладки в стандартный файл HTML, который импортирует любой браузер, а также полную резервную копию Zigzag, которую можно восстановить на другом Mac. |
 | **Языки** | Английский, китайский (упрощённый), китайский (традиционный), японский, корейский, немецкий, французский, итальянский, испанский, португальский (Бразилия), русский, нидерландский, польский и турецкий. |
 | **И ещё** | Режим чтения, просмотр PDF, «Передача» на iPhone, iPad или другой Mac, «Снимок» области, части страницы или всей страницы (⇧⌘2), перевод на устройстве, поиск по странице с подсветкой каждого совпадения, меню «История» с пунктом «Недавно закрытые» и последними семью днями, масштаб страниц по умолчанию, адресная строка над страницей, если вам так удобнее, «Картинка в картинке», частные окна, «Веб-инспектор». |
@@ -179,13 +179,13 @@ Zigzag состоит примерно из 120 000 строк на Swift 6 и A
     brew install --cask zigaowang/tap/zigzag
 
 Обновления устанавливаются сами. Что изменилось в каждой версии, написано в
-[примечаниях к выпуску](https://zigzagbrowser.com/release-notes) и в [CHANGELOG.md](CHANGELOG.md).
+[примечаниях к выпуску](https://zigzagbrowser.com/release-notes) и в [CHANGELOG.md](../../CHANGELOG.md).
 
 ## Обратная связь
 
 - **Ошибки и идеи:** [создайте issue](https://github.com/ZigaoWang/zigzag/issues/new/choose) или выберите «Справка» › «Отправить отзыв…» в приложении. Если это ошибка, «Справка» › «Сообщить о проблеме…» создаёт отчёт, который можно прочитать перед отправкой.
 - **Почта:** a@zigao.wang
-- **Проблемы безопасности:** см. [SECURITY.md](SECURITY.md). Пожалуйста, не публикуйте их в открытых issues.
+- **Проблемы безопасности:** см. [SECURITY.md](../../SECURITY.md). Пожалуйста, не публикуйте их в открытых issues.
 
 ## Сборка из исходников
 
@@ -217,17 +217,17 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## Участие в разработке
 
-Вклад приветствуется. Прочитайте [CONTRIBUTING.md](CONTRIBUTING.md), чтобы узнать, как проект собирается, тестируется и
+Вклад приветствуется. Прочитайте [CONTRIBUTING.md](../../CONTRIBUTING.md), чтобы узнать, как проект собирается, тестируется и
 оформляется.
 
 ## Лицензия
 
-Код Zigzag распространяется по лицензии [Apache License, Version 2.0](LICENSE). Используйте его, изменяйте, форкайте и
+Код Zigzag распространяется по лицензии [Apache License, Version 2.0](../../LICENSE). Используйте его, изменяйте, форкайте и
 распространяйте, в коммерческих целях или нет.
 
 Название «Zigzag», значок приложения и логотип лицензией не охватываются: это товарные знаки, все права защищены.
-Форку нужны собственные название и значок. См. [TRADEMARKS.md](TRADEMARKS.md) и [NOTICE](NOTICE).
-Сторонние работы, которые использует Zigzag, перечислены в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Форку нужны собственные название и значок. См. [TRADEMARKS.md](../../TRADEMARKS.md) и [NOTICE](../../NOTICE).
+Сторонние работы, которые использует Zigzag, перечислены в [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
 
 ## Благодарности
 

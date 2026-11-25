@@ -111,7 +111,7 @@ before using a new one.
 3. Have someone who didn't translate it review it against the glossary, in the app.
 4. Run the pseudo-locale and the layout tests, then run the app in the language and take screenshots of the main
    surfaces. Fix anything cut off in the layout, not by shortening one translation.
-5. Add `README.<lang>.md`, translated from `README.md`, and link it from the other READMEs.
+5. Add `docs/readme/README.<lang>.md`, translated from `README.md`, and add it to the language line at the top of every README.
 6. Add the language's own name to `AppLanguage.ownName` (Settings › General › Language), and its code to
    `knownRegions` in `Zigzag.xcodeproj/project.pbxproj`, `CFBundleLocalizations` in `project.yml` and
    `Zigzag/Info.plist`, and `LocalizationTests.translated`. The code is the one Xcode and Bundle use (`pt-BR`, not

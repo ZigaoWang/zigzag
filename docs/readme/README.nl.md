@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Voelt geweldig. Weegt niets. De lichte browser voor Mac, gratis en open source. Een Zigzag-venster in Split View, Fonts In Use naast Grilli Type, met de navigatiekolom met spaces en vastgezette tabbladen."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Voelt geweldig. Weegt niets. De lichte browser voor Mac, gratis en open source. Een Zigzag-venster in Split View, Fonts In Use naast Grilli Type, met de navigatiekolom met spaces en vastgezette tabbladen."></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | Nederlands | [Polski](README.pl.md) | [Türkçe](README.tr.md)
+<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | Nederlands | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 Deze pagina is een vertaling van README.md. Als ze van elkaar verschillen, is de Engelse versie leidend.
 
@@ -40,17 +40,17 @@ Hoi, ik ben Zigao, een middelbare scholier in Shanghai. Ik gebruikte Arc elke da
 ## Bekijk het
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Wisselen tussen drie spaces in Zigzag, elk met een eigen kleur en eigen tabbladen">
+  <img src="../../docs/spaces.gif" width="960" alt="Wisselen tussen drie spaces in Zigzag, elk met een eigen kleur en eigen tabbladen">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split View: Fonts In Use naast Grilli Type"><br><b>Split View.</b> Sleep een tabblad naar de pagina om het ernaast te openen, tot vier tegelijk.</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="Alle tabbladen van drie spaces als kaarten"><br><b>Alle tabbladen tegelijk.</b> ⇧⌘\ toont elke space. Typ om te filteren.</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Split View: Fonts In Use naast Grilli Type"><br><b>Split View.</b> Sleep een tabblad naar de pagina om het ernaast te openen, tot vier tegelijk.</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="Alle tabbladen van drie spaces als kaarten"><br><b>Alle tabbladen tegelijk.</b> ⇧⌘\ toont elke space. Typ om te filteren.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="Een Wikipedia-artikel over typografie boven de pagina waarvanuit het is geopend"><br><b>Zigzag Mini.</b> Klik met ⇧ op een link om er een blik op te werpen zonder je plek kwijt te raken.</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="Een essay van The Public Domain Review in Reader"><br><b>Reader.</b> Lange teksten, zonder de rommel eromheen.</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="Een Wikipedia-artikel over typografie boven de pagina waarvanuit het is geopend"><br><b>Zigzag Mini.</b> Klik met ⇧ op een link om er een blik op te werpen zonder je plek kwijt te raken.</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="Een essay van The Public Domain Review in Reader"><br><b>Reader.</b> Lange teksten, zonder de rommel eromheen.</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@ Hoi, ik ben Zigao, een middelbare scholier in Shanghai. Ik gebruikte Arc elke da
 | **Ontwikkelaarsmodus** | Voor de websites die je bouwt, om te beginnen `localhost`: de console met een foutenteller, Inspecteer element, apparaatformaten, licht en donker, printstijlen, JavaScript, afbeeldingen of stijlen uit, een andere user-agent, en een QR-code om de pagina op je telefoon te openen. |
 | **Extensies** | Uit de Chrome Web Store, waar de eigen knop van de store Voeg toe aan Zigzag zegt. 1Password, Bitwarden, Dark Reader, Tampermonkey en de meeste populaire werken; zie hieronder wat niet werkt. |
 | **Importeer** | Bladwijzers, geschiedenis, wachtwoorden, aanmeldingen en extensies uit Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen en Orion. |
-| **Downloads** | Stuur bestanden van een bepaald type naar een eigen map, of open veilige, zoals pdf's, zodra ze zijn bewaard. Regels geven een link of een download door aan een app, een script of een downloadmanager zoals aria2, en vragen eerst om jouw toestemming. Zie [docs/download-rules.md](docs/download-rules.md). |
-| **Automatisering** | AppleScript, Opdrachten en `osascript` kunnen tabbladen weergeven en openen en pagina's lezen, geschreven zoals Safari en Chrome ze accepteren. Zie [docs/automation.md](docs/automation.md). |
-| **AI-apps** | Uit tot je het aanzet: AI-apps op je Mac kunnen je tabbladen gebruiken via MCP, nooit privévensters of wachtwoorden. Zie [docs/automation.md](docs/automation.md#ai-apps-mcp). |
+| **Downloads** | Stuur bestanden van een bepaald type naar een eigen map, of open veilige, zoals pdf's, zodra ze zijn bewaard. Regels geven een link of een download door aan een app, een script of een downloadmanager zoals aria2, en vragen eerst om jouw toestemming. Zie [docs/download-rules.md](../../docs/download-rules.md). |
+| **Automatisering** | AppleScript, Opdrachten en `osascript` kunnen tabbladen weergeven en openen en pagina's lezen, geschreven zoals Safari en Chrome ze accepteren. Zie [docs/automation.md](../../docs/automation.md). |
+| **AI-apps** | Uit tot je het aanzet: AI-apps op je Mac kunnen je tabbladen gebruiken via MCP, nooit privévensters of wachtwoorden. Zie [docs/automation.md](../../docs/automation.md#ai-apps-mcp). |
 | **Jouw gegevens** | Archief › Exporteer je gegevens… bewaart je bladwijzers als standaard HTML-bestand dat elke browser importeert, en een volledige Zigzag-reservekopie die je op een andere Mac kunt terugzetten. |
 | **Talen** | Engels, vereenvoudigd Chinees, traditioneel Chinees, Japans, Koreaans, Duits, Frans, Italiaans, Spaans, Braziliaans Portugees, Russisch, Nederlands, Pools en Turks. |
 | **En** | Reader, pdf-viewer, Handoff naar je iPhone, iPad of andere Mac, Opname van een gebied, een deel van de pagina of de hele pagina (⇧⌘2), vertalen op het apparaat, zoeken op pagina dat elke treffer markeert, een menu Geschiedenis met Recent gesloten en de laatste zeven dagen, een standaardzoom voor pagina's, een adresbalk boven de pagina als je die liever hebt, Beeld-in-beeld, privévensters, Webinspector. |
@@ -145,13 +145,13 @@ Download de dmg van [zigzagbrowser.com](https://zigzagbrowser.com/download), ope
 
     brew install --cask zigaowang/tap/zigzag
 
-Updates worden vanzelf geïnstalleerd. Wat er in elke versie is veranderd, staat in de [release-opmerkingen](https://zigzagbrowser.com/release-notes) en [CHANGELOG.md](CHANGELOG.md).
+Updates worden vanzelf geïnstalleerd. Wat er in elke versie is veranderd, staat in de [release-opmerkingen](https://zigzagbrowser.com/release-notes) en [CHANGELOG.md](../../CHANGELOG.md).
 
 ## Feedback
 
 - **Bugs en ideeën:** [open een issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), of kies Help › Stuur feedback… in de app. Voor een bug schrijft Help › Meld een probleem… een rapport dat je kunt lezen voordat je het verstuurt.
 - **E-mail:** a@zigao.wang
-- **Beveiligingsproblemen:** zie [SECURITY.md](SECURITY.md). Plaats ze alsjeblieft niet in openbare issues.
+- **Beveiligingsproblemen:** zie [SECURITY.md](../../SECURITY.md). Plaats ze alsjeblieft niet in openbare issues.
 
 ## Zelf bouwen vanuit de broncode
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## Bijdragen
 
-Bijdragen zijn welkom. Lees [CONTRIBUTING.md](CONTRIBUTING.md) voor hoe het project wordt gebouwd, getest en opgemaakt.
+Bijdragen zijn welkom. Lees [CONTRIBUTING.md](../../CONTRIBUTING.md) voor hoe het project wordt gebouwd, getest en opgemaakt.
 
 ## Licentie
 
-De code van Zigzag valt onder de [Apache License, Version 2.0](LICENSE). Gebruik het, wijzig het, fork het en lever het uit, commercieel of niet.
+De code van Zigzag valt onder de [Apache License, Version 2.0](../../LICENSE). Gebruik het, wijzig het, fork het en lever het uit, commercieel of niet.
 
-De naam “Zigzag”, het app-pictogram en het logo vallen niet onder de licentie: het zijn handelsmerken, alle rechten voorbehouden. Een fork heeft een eigen naam en pictogram nodig. Zie [TRADEMARKS.md](TRADEMARKS.md) en [NOTICE](NOTICE). Werk van derden dat Zigzag gebruikt staat in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+De naam “Zigzag”, het app-pictogram en het logo vallen niet onder de licentie: het zijn handelsmerken, alle rechten voorbehouden. Een fork heeft een eigen naam en pictogram nodig. Zie [TRADEMARKS.md](../../TRADEMARKS.md) en [NOTICE](../../NOTICE). Werk van derden dat Zigzag gebruikt staat in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
 
 ## Dankwoord
 

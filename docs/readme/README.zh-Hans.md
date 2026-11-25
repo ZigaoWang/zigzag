@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag：用着舒服，轻得像没有。轻量的 Mac 浏览器，免费开源。一个分屏浏览的 Zigzag 窗口，Fonts In Use 和 Grilli Type 并排，边栏里是空间和已固定标签页。"></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag：用着舒服，轻得像没有。轻量的 Mac 浏览器，免费开源。一个分屏浏览的 Zigzag 窗口，Fonts In Use 和 Grilli Type 并排，边栏里是空间和已固定标签页。"></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | 简体中文 | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
+<p align="center"><sub><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 本文是 README.md 的翻译；如有出入，以英文版为准。
 
@@ -40,17 +40,17 @@
 ## 看看它
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="在 Zigzag 的三个空间之间切换，每个空间都有自己的颜色和标签页">
+  <img src="../../docs/spaces.gif" width="960" alt="在 Zigzag 的三个空间之间切换，每个空间都有自己的颜色和标签页">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="分屏浏览：Fonts In Use 和 Grilli Type 并排"><br><b>分屏浏览。</b>把标签页拖到网页上，就能在旁边打开，最多同时四个。</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="三个空间里的所有标签页以卡片显示"><br><b>所有标签页一览。</b>⇧⌘\ 显示所有空间。打字就能筛选。</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="分屏浏览：Fonts In Use 和 Grilli Type 并排"><br><b>分屏浏览。</b>把标签页拖到网页上，就能在旁边打开，最多同时四个。</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="三个空间里的所有标签页以卡片显示"><br><b>所有标签页一览。</b>⇧⌘\ 显示所有空间。打字就能筛选。</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="一篇关于字体排印的维基百科文章，浮在打开它的网页上"><br><b>Zigzag Mini。</b>按住 Shift 点按链接，看一眼，不会丢掉当前的位置。</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="阅读器里的一篇 The Public Domain Review 文章"><br><b>阅读器。</b>长文章，没有杂乱的东西。</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="一篇关于字体排印的维基百科文章，浮在打开它的网页上"><br><b>Zigzag Mini。</b>按住 Shift 点按链接，看一眼，不会丢掉当前的位置。</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="阅读器里的一篇 The Public Domain Review 文章"><br><b>阅读器。</b>长文章，没有杂乱的东西。</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@
 | **开发者模式** | 给你在做的网站用，一开始就包括 `localhost`：带错误计数的控制台、检查元素、设备尺寸、浅色和深色、打印样式、关闭 JavaScript、图像或样式、换用户代理，还有一个二维码，用手机打开这个网页。 |
 | **扩展** | 来自 Chrome 网上应用店，商店自己的按钮会显示“添加到 Zigzag”。1Password、Bitwarden、Dark Reader、Tampermonkey 和大多数热门扩展都能用；不能用的见下文。 |
 | **导入** | 从 Arc、Chrome、Safari、Dia、Edge、Brave、Vivaldi、Opera、Comet、Helium、Yandex、Whale、Chromium、Thorium、Firefox、Zen 和 Orion 导入书签、历史记录、密码、登录状态和扩展。 |
-| **下载** | 把某种类型的文件存到单独的文件夹，或者在 PDF 这类安全文件存好后直接打开。规则可以把链接或下载转交给 App、脚本或 aria2 这样的下载管理器，转交前会先问你。见 [docs/download-rules.md](docs/download-rules.md)。 |
-| **自动化** | AppleScript、快捷指令和 `osascript` 可以列出和打开标签页、读取网页，写法和 Safari、Chrome 接受的一样。见 [docs/automation.md](docs/automation.md)。 |
-| **AI 应用** | 默认关闭，打开后，你 Mac 上的 AI 应用可以通过 MCP 使用你的标签页，但永远碰不到无痕浏览窗口和密码。见 [docs/automation.md](docs/automation.md#ai-apps-mcp)。 |
+| **下载** | 把某种类型的文件存到单独的文件夹，或者在 PDF 这类安全文件存好后直接打开。规则可以把链接或下载转交给 App、脚本或 aria2 这样的下载管理器，转交前会先问你。见 [docs/download-rules.md](../../docs/download-rules.md)。 |
+| **自动化** | AppleScript、快捷指令和 `osascript` 可以列出和打开标签页、读取网页，写法和 Safari、Chrome 接受的一样。见 [docs/automation.md](../../docs/automation.md)。 |
+| **AI 应用** | 默认关闭，打开后，你 Mac 上的 AI 应用可以通过 MCP 使用你的标签页，但永远碰不到无痕浏览窗口和密码。见 [docs/automation.md](../../docs/automation.md#ai-apps-mcp)。 |
 | **你的数据** | “文件 › 导出你的数据…”会把书签存成任何浏览器都能导入的标准 HTML 文件，还有一份完整的 Zigzag 备份，可以在另一台 Mac 上恢复。 |
 | **语言** | 英文、简体中文、繁体中文、日语、韩语、德语、法语、意大利语、西班牙语、巴西葡萄牙语、俄语、荷兰语、波兰语和土耳其语。 |
 | **还有** | 阅读器、PDF 查看器、接力到你的 iPhone、iPad 或另一台 Mac、截图（区域、网页的一部分或整个网页，⇧⌘2）、设备端翻译、标出每个匹配项的网页内查找、带“最近关闭”和最近七天的“历史记录”菜单、默认网页缩放、喜欢的话可以把地址栏放在页面上方、画中画、无痕浏览窗口、网页检查器。 |
@@ -145,13 +145,13 @@ Zigzag 大约是 120,000 行 Swift 6 和 AppKit，围绕 `WKWebView` 写成。�
 
     brew install --cask zigaowang/tap/zigzag
 
-更新会自动安装。每个版本改了什么，见[发行说明](https://zigzagbrowser.com/release-notes)和[CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md)。
+更新会自动安装。每个版本改了什么，见[发行说明](https://zigzagbrowser.com/release-notes)和[CHANGELOG.zh-Hans.md](../../CHANGELOG.zh-Hans.md)。
 
 ## 反馈
 
 - **Bug 和想法：** [提交议题](https://github.com/ZigaoWang/zigzag/issues/new/choose)，或者在 App 里选择“帮助 › 发送反馈…”。如果是 bug，“帮助 › 报告问题…”会写一份报告，你可以在发送前先读一遍。
 - **邮件：** a@zigao.wang
-- **安全问题：** 见 [SECURITY.md](SECURITY.md)。请不要发在公开的议题里。
+- **安全问题：** 见 [SECURITY.md](../../SECURITY.md)。请不要发在公开的议题里。
 
 ## 从源代码构建
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## 参与贡献
 
-欢迎贡献。项目怎么构建、测试，代码风格是什么样的，请看 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎贡献。项目怎么构建、测试，代码风格是什么样的，请看 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
 
 ## 许可证
 
-Zigzag 的代码采用 [Apache License, Version 2.0](LICENSE) 许可。随便用、随便改、随便 fork、随便发布，商用也可以。
+Zigzag 的代码采用 [Apache License, Version 2.0](../../LICENSE) 许可。随便用、随便改、随便 fork、随便发布，商用也可以。
 
-“Zigzag”这个名字、App 图标和标志不在许可范围内：它们是商标，保留所有权利。fork 需要用自己的名字和图标。见 [TRADEMARKS.md](TRADEMARKS.md) 和 [NOTICE](NOTICE)。Zigzag 用到的第三方作品列在[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 里。
+“Zigzag”这个名字、App 图标和标志不在许可范围内：它们是商标，保留所有权利。fork 需要用自己的名字和图标。见 [TRADEMARKS.md](../../TRADEMARKS.md) 和 [NOTICE](../../NOTICE)。Zigzag 用到的第三方作品列在[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) 里。
 
 ## 致谢
 

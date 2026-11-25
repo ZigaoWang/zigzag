@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: ótimo de usar, leve como o ar. O navegador leve para Mac, gratuito e de código aberto. Uma janela do Zigzag em Split View, com Fonts In Use ao lado de Grilli Type e a barra lateral de espaços e abas fixadas."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: ótimo de usar, leve como o ar. O navegador leve para Mac, gratuito e de código aberto. Uma janela do Zigzag em Split View, com Fonts In Use ao lado de Grilli Type e a barra lateral de espaços e abas fixadas."></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | Português (Brasil) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
+<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | Português (Brasil) | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 Esta página é uma tradução do README.md; se houver diferenças, a versão em inglês é a referência.
 
@@ -40,17 +40,17 @@ Oi, eu sou o Zigao, estudante do ensino médio em Xangai. Eu usava o Arc todos o
 ## Veja
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Alternando entre três espaços no Zigzag, cada um com sua própria cor e suas próprias abas">
+  <img src="../../docs/spaces.gif" width="960" alt="Alternando entre três espaços no Zigzag, cada um com sua própria cor e suas próprias abas">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split View: Fonts In Use ao lado de Grilli Type"><br><b>Split View.</b> Arraste uma aba para a página para abri-la ao lado, até quatro ao mesmo tempo.</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="Todas as abas de três espaços exibidas como cartões"><br><b>Todas as abas de uma vez.</b> ⇧⌘\ mostra todos os espaços. Digite para filtrar.</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Split View: Fonts In Use ao lado de Grilli Type"><br><b>Split View.</b> Arraste uma aba para a página para abri-la ao lado, até quatro ao mesmo tempo.</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="Todas as abas de três espaços exibidas como cartões"><br><b>Todas as abas de uma vez.</b> ⇧⌘\ mostra todos os espaços. Digite para filtrar.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="Um artigo da Wikipédia sobre tipografia sobre a página de onde foi aberto"><br><b>Zigzag Mini.</b> Clique em um link com Shift pressionado para dar uma olhada sem perder seu lugar.</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="Um ensaio da The Public Domain Review no Leitor"><br><b>Leitor.</b> Leituras longas, sem a bagunça.</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="Um artigo da Wikipédia sobre tipografia sobre a página de onde foi aberto"><br><b>Zigzag Mini.</b> Clique em um link com Shift pressionado para dar uma olhada sem perder seu lugar.</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="Um ensaio da The Public Domain Review no Leitor"><br><b>Leitor.</b> Leituras longas, sem a bagunça.</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@ Oi, eu sou o Zigao, estudante do ensino médio em Xangai. Eu usava o Arc todos o
 | **Modo de desenvolvedor** | Para os sites que você cria, `localhost` para começar: o console com contagem de erros, Inspecionar elemento, tamanhos de dispositivo, claro e escuro, estilos de impressão, JavaScript, imagens ou estilos desativados, outro user agent e um QR code para abrir a página no celular. |
 | **Extensões** | Da Chrome Web Store, onde o botão da própria loja diz Adicionar ao Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey e a maioria das populares funcionam; veja abaixo o que não funciona. |
 | **Importar** | Marcadores, histórico, senhas, logins e extensões do Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen e Orion. |
-| **Downloads** | Envie arquivos de um tipo para uma pasta própria, ou abra os seguros, como PDFs, assim que forem salvos. Regras entregam um link ou um download a um app, um script ou um gerenciador de downloads como o aria2, perguntando antes. Veja [docs/download-rules.md](docs/download-rules.md). |
-| **Automação** | AppleScript, Atalhos e `osascript` podem listar e abrir abas e ler páginas, escritos como o Safari e o Chrome os aceitam. Veja [docs/automation.md](docs/automation.md). |
-| **Apps de IA** | Desativados até você ativar: apps de IA no seu Mac podem usar suas abas por MCP, nunca janelas privadas nem senhas. Veja [docs/automation.md](docs/automation.md#ai-apps-mcp). |
+| **Downloads** | Envie arquivos de um tipo para uma pasta própria, ou abra os seguros, como PDFs, assim que forem salvos. Regras entregam um link ou um download a um app, um script ou um gerenciador de downloads como o aria2, perguntando antes. Veja [docs/download-rules.md](../../docs/download-rules.md). |
+| **Automação** | AppleScript, Atalhos e `osascript` podem listar e abrir abas e ler páginas, escritos como o Safari e o Chrome os aceitam. Veja [docs/automation.md](../../docs/automation.md). |
+| **Apps de IA** | Desativados até você ativar: apps de IA no seu Mac podem usar suas abas por MCP, nunca janelas privadas nem senhas. Veja [docs/automation.md](../../docs/automation.md#ai-apps-mcp). |
 | **Seus dados** | Arquivo › Exportar seus dados… salva seus marcadores como um arquivo HTML padrão que qualquer navegador importa, e um backup completo do Zigzag que você pode restaurar em outro Mac. |
 | **Idiomas** | Inglês, chinês simplificado, chinês tradicional, japonês, coreano, alemão, francês, italiano, espanhol, português do Brasil, russo, holandês, polonês e turco. |
 | **E mais** | Leitor, visualizador de PDF, Handoff para seu iPhone, iPad ou outro Mac, Captura de uma área, de uma parte da página ou da página inteira (⇧⌘2), tradução no dispositivo, busca na página que marca todas as ocorrências, um menu Histórico com Fechados recentemente e os últimos sete dias, um zoom de página padrão, uma barra de endereço acima da página se você preferir, Picture in Picture, janelas privadas, Inspetor Web. |
@@ -145,13 +145,13 @@ Baixe o DMG em [zigzagbrowser.com](https://zigzagbrowser.com/download), abra-o e
 
     brew install --cask zigaowang/tap/zigzag
 
-As atualizações se instalam sozinhas. O que mudou em cada versão está nas [notas de versão](https://zigzagbrowser.com/release-notes) e no [CHANGELOG.md](CHANGELOG.md).
+As atualizações se instalam sozinhas. O que mudou em cada versão está nas [notas de versão](https://zigzagbrowser.com/release-notes) e no [CHANGELOG.md](../../CHANGELOG.md).
 
 ## Feedback
 
 - **Bugs e ideias:** [abra uma issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), ou Ajuda › Enviar feedback… no app. Para um bug, Ajuda › Relatar um problema… escreve um relatório que você pode ler antes de enviar.
 - **E-mail:** a@zigao.wang
-- **Problemas de segurança:** veja [SECURITY.md](SECURITY.md). Por favor, não os publique em issues públicas.
+- **Problemas de segurança:** veja [SECURITY.md](../../SECURITY.md). Por favor, não os publique em issues públicas.
 
 ## Compilar a partir do código-fonte
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## Contribuir
 
-Contribuições são bem-vindas. Leia o [CONTRIBUTING.md](CONTRIBUTING.md) para saber como o projeto é construído, testado e estilizado.
+Contribuições são bem-vindas. Leia o [CONTRIBUTING.md](../../CONTRIBUTING.md) para saber como o projeto é construído, testado e estilizado.
 
 ## Licença
 
-O código do Zigzag é licenciado sob a [Apache License, Version 2.0](LICENSE). Use, altere, faça fork e distribua, comercialmente ou não.
+O código do Zigzag é licenciado sob a [Apache License, Version 2.0](../../LICENSE). Use, altere, faça fork e distribua, comercialmente ou não.
 
-O nome “Zigzag”, o ícone do app e o logotipo não são cobertos pela licença: são marcas registradas, todos os direitos reservados. Um fork precisa de nome e ícone próprios. Veja [TRADEMARKS.md](TRADEMARKS.md) e [NOTICE](NOTICE). Os trabalhos de terceiros que o Zigzag usa estão listados em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+O nome “Zigzag”, o ícone do app e o logotipo não são cobertos pela licença: são marcas registradas, todos os direitos reservados. Um fork precisa de nome e ícone próprios. Veja [TRADEMARKS.md](../../TRADEMARKS.md) e [NOTICE](../../NOTICE). Os trabalhos de terceiros que o Zigzag usa estão listados em [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
 
 ## Agradecimentos
 

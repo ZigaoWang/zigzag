@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Kullanması çok keyifli. Neredeyse hiç yer kaplamaz. Mac için hafif tarayıcı, ücretsiz ve açık kaynak. Bölünmüş Görünüm'deki bir Zigzag penceresi: Fonts In Use, Grilli Type'ın yanında; kenar çubuğunda Space'ler ve sabitlenmiş sekmeler görünüyor."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Kullanması çok keyifli. Neredeyse hiç yer kaplamaz. Mac için hafif tarayıcı, ücretsiz ve açık kaynak. Bölünmüş Görünüm'deki bir Zigzag penceresi: Fonts In Use, Grilli Type'ın yanında; kenar çubuğunda Space'ler ve sabitlenmiş sekmeler görünüyor."></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | Türkçe
+<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | Türkçe</sub></p>
 
 Bu sayfa README.md dosyasının çevirisidir; aralarında fark olursa başvuru kaynağı İngilizce sürümdür.
 
@@ -40,17 +40,17 @@ Merhaba, ben Zigao, Şanghay’da lise öğrencisiyim. Her gün Arc kullanıyord
 ## Görün
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Zigzag’de, her biri kendi rengine ve sekmelerine sahip üç Space arasında geçiş">
+  <img src="../../docs/spaces.gif" width="960" alt="Zigzag’de, her biri kendi rengine ve sekmelerine sahip üç Space arasında geçiş">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Bölünmüş Görünüm: Fonts In Use, Grilli Type’ın yanında"><br><b>Bölünmüş Görünüm.</b> Bir sekmeyi sayfanın üzerine sürükleyin, yanında açılsın; aynı anda dörde kadar.</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="Üç Space’teki tüm sekmeler kart olarak gösteriliyor"><br><b>Tüm sekmeler bir arada.</b> ⇧⌘\ her Space’i gösterir. Süzmek için yazın.</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Bölünmüş Görünüm: Fonts In Use, Grilli Type’ın yanında"><br><b>Bölünmüş Görünüm.</b> Bir sekmeyi sayfanın üzerine sürükleyin, yanında açılsın; aynı anda dörde kadar.</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="Üç Space’teki tüm sekmeler kart olarak gösteriliyor"><br><b>Tüm sekmeler bir arada.</b> ⇧⌘\ her Space’i gösterir. Süzmek için yazın.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="Tipografi üzerine bir Wikipedia maddesi, açıldığı sayfanın üzerinde"><br><b>Zigzag Mini.</b> Yerinizi kaybetmeden bir bağlantıya göz atmak için tıklarken Shift’e basın.</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="The Public Domain Review’dan bir deneme yazısı Okuyucu’da"><br><b>Okuyucu.</b> Uzun okumalar, kalabalık olmadan.</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="Tipografi üzerine bir Wikipedia maddesi, açıldığı sayfanın üzerinde"><br><b>Zigzag Mini.</b> Yerinizi kaybetmeden bir bağlantıya göz atmak için tıklarken Shift’e basın.</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="The Public Domain Review’dan bir deneme yazısı Okuyucu’da"><br><b>Okuyucu.</b> Uzun okumalar, kalabalık olmadan.</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@ Merhaba, ben Zigao, Şanghay’da lise öğrencisiyim. Her gün Arc kullanıyord
 | **Geliştirici Modu** | Yaptığınız siteler için, başta `localhost`: hata sayısıyla konsol, Öğeyi İncele, cihaz boyutları, açık ve koyu görünüm, yazdırma stilleri, JavaScript, görüntüler veya stiller kapalı, başka bir kullanıcı aracısı ve sayfayı telefonunuzda açmak için bir QR kodu. |
 | **Genişletmeler** | Chrome Web Store’dan; mağazanın kendi düğmesinde “Zigzag’e Ekle” yazar. 1Password, Bitwarden, Dark Reader, Tampermonkey ve popüler olanların çoğu çalışır; çalışmayanlar için aşağıya bakın. |
 | **İçe aktarma** | Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen ve Orion’dan yer işaretleri, geçmiş, parolalar, girişler ve genişletmeler. |
-| **İndirilenler** | Bir türdeki dosyaları kendi klasörlerine gönderin veya PDF gibi güvenli olanları kaydedildikten sonra açın. Kurallar bir bağlantıyı veya indirmeyi bir uygulamaya, bir betiğe ya da aria2 gibi bir indirme yöneticisine devreder; önce size sorarak. Bkz. [docs/download-rules.md](docs/download-rules.md). |
-| **Otomasyon** | AppleScript, Kısayollar ve `osascript` sekmeleri listeleyebilir, açabilir ve sayfaları okuyabilir; Safari ve Chrome’un kabul ettiği biçimde yazılır. Bkz. [docs/automation.md](docs/automation.md). |
-| **Yapay zekâ uygulamaları** | Siz açana kadar kapalı: Mac’inizdeki yapay zekâ uygulamaları sekmelerinizi MCP üzerinden kullanabilir; özel pencereleri veya parolaları asla. Bkz. [docs/automation.md](docs/automation.md#ai-apps-mcp). |
+| **İndirilenler** | Bir türdeki dosyaları kendi klasörlerine gönderin veya PDF gibi güvenli olanları kaydedildikten sonra açın. Kurallar bir bağlantıyı veya indirmeyi bir uygulamaya, bir betiğe ya da aria2 gibi bir indirme yöneticisine devreder; önce size sorarak. Bkz. [docs/download-rules.md](../../docs/download-rules.md). |
+| **Otomasyon** | AppleScript, Kısayollar ve `osascript` sekmeleri listeleyebilir, açabilir ve sayfaları okuyabilir; Safari ve Chrome’un kabul ettiği biçimde yazılır. Bkz. [docs/automation.md](../../docs/automation.md). |
+| **Yapay zekâ uygulamaları** | Siz açana kadar kapalı: Mac’inizdeki yapay zekâ uygulamaları sekmelerinizi MCP üzerinden kullanabilir; özel pencereleri veya parolaları asla. Bkz. [docs/automation.md](../../docs/automation.md#ai-apps-mcp). |
 | **Verileriniz** | Dosya › Verilerinizi Dışa Aktar…, yer işaretlerinizi her tarayıcının içe aktarabildiği standart bir HTML dosyası olarak ve başka bir Mac’te geri yükleyebileceğiniz tam bir Zigzag yedeği olarak kaydeder. |
 | **Diller** | İngilizce, Basitleştirilmiş Çince, Geleneksel Çince, Japonca, Korece, Almanca, Fransızca, İtalyanca, İspanyolca, Brezilya Portekizcesi, Rusça, Felemenkçe, Lehçe ve Türkçe. |
 | **Ve** | Okuyucu, PDF görüntüleyici, iPhone’unuza, iPad’inize veya başka bir Mac’e Handoff, bir alanın, sayfanın bir bölümünün veya tüm sayfanın yakalanması (⇧⌘2), cihaz üzerinde çeviri, her eşleşmeyi işaretleyen sayfada bul, Son Kapatılanlar ve son yedi günü içeren bir Geçmiş menüsü, varsayılan sayfa yakınlaştırması, isterseniz sayfanın üstünde bir adres çubuğu, Pencere İçinde Pencere, özel pencereler, Web Denetçisi. |
@@ -145,13 +145,13 @@ DMG’yi [zigzagbrowser.com](https://zigzagbrowser.com/download) adresinden indi
 
     brew install --cask zigaowang/tap/zigzag
 
-Güncellemeler kendiliğinden kurulur. Her sürümde nelerin değiştiği [sürüm notlarında](https://zigzagbrowser.com/release-notes) ve [CHANGELOG.md](CHANGELOG.md) dosyasında.
+Güncellemeler kendiliğinden kurulur. Her sürümde nelerin değiştiği [sürüm notlarında](https://zigzagbrowser.com/release-notes) ve [CHANGELOG.md](../../CHANGELOG.md) dosyasında.
 
 ## Geri bildirim
 
 - **Hatalar ve fikirler:** [bir sorun açın](https://github.com/ZigaoWang/zigzag/issues/new/choose) veya uygulamada Yardım › Geri Bildirim Gönder… Bir hata için Yardım › Sorun Bildir…, göndermeden önce okuyabileceğiniz bir rapor yazar.
 - **E-posta:** a@zigao.wang
-- **Güvenlik sorunları:** bkz. [SECURITY.md](SECURITY.md). Lütfen bunları herkese açık sorunlarda paylaşmayın.
+- **Güvenlik sorunları:** bkz. [SECURITY.md](../../SECURITY.md). Lütfen bunları herkese açık sorunlarda paylaşmayın.
 
 ## Kaynaktan derleme
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## Katkıda bulunma
 
-Katkılara açığız. Projenin nasıl derlendiği, test edildiği ve biçimlendirildiği için [CONTRIBUTING.md](CONTRIBUTING.md) dosyasını okuyun.
+Katkılara açığız. Projenin nasıl derlendiği, test edildiği ve biçimlendirildiği için [CONTRIBUTING.md](../../CONTRIBUTING.md) dosyasını okuyun.
 
 ## Lisans
 
-Zigzag’in kodu [Apache Lisansı, Sürüm 2.0](LICENSE) altında lisanslıdır. Kullanın, değiştirin, çatallayın ve dağıtın; ticari olarak veya değil.
+Zigzag’in kodu [Apache Lisansı, Sürüm 2.0](../../LICENSE) altında lisanslıdır. Kullanın, değiştirin, çatallayın ve dağıtın; ticari olarak veya değil.
 
-“Zigzag” adı, uygulama simgesi ve logo lisansın kapsamında değildir: bunlar ticari markadır, tüm hakları saklıdır. Bir çatalın kendi adına ve simgesine ihtiyacı vardır. Bkz. [TRADEMARKS.md](TRADEMARKS.md) ve [NOTICE](NOTICE). Zigzag’in kullandığı üçüncü taraf çalışmaların listesi [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyasındadır.
+“Zigzag” adı, uygulama simgesi ve logo lisansın kapsamında değildir: bunlar ticari markadır, tüm hakları saklıdır. Bir çatalın kendi adına ve simgesine ihtiyacı vardır. Bkz. [TRADEMARKS.md](../../TRADEMARKS.md) ve [NOTICE](../../NOTICE). Zigzag’in kullandığı üçüncü taraf çalışmaların listesi [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) dosyasındadır.
 
 ## Teşekkürler
 

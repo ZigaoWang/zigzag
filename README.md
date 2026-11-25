@@ -2,11 +2,7 @@
   <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Feels great. Weighs nothing. The lightweight browser for Mac, free and open source. A Zigzag window in split view, Fonts In Use beside Grilli Type, with the sidebar of spaces and pinned tabs."></a>
 </p>
 
-<div align="center">
-
-English | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
-
-</div>
+<p align="center"><sub>English | <a href="docs/readme/README.zh-Hans.md">简体中文</a> | <a href="docs/readme/README.zh-Hant.md">繁體中文</a> | <a href="docs/readme/README.ja.md">日本語</a> | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.it.md">Italiano</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt-BR.md">Português (Brasil)</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.nl.md">Nederlands</a> | <a href="docs/readme/README.pl.md">Polski</a> | <a href="docs/readme/README.tr.md">Türkçe</a></sub></p>
 
 <p align="center">
   <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a><br>

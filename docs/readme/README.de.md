@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Fühlt sich großartig an. Wiegt nichts. Der leichte Browser für den Mac, kostenlos und Open Source. Ein Zigzag-Fenster in der Split View, Fonts In Use neben Grilli Type, mit der Seitenleiste aus Spaces und fixierten Tabs."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Fühlt sich großartig an. Wiegt nichts. Der leichte Browser für den Mac, kostenlos und Open Source. Ein Zigzag-Fenster in der Split View, Fonts In Use neben Grilli Type, mit der Seitenleiste aus Spaces und fixierten Tabs."></a>
 </p>
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | Deutsch | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
+<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Deutsch | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 Diese Seite ist eine Übersetzung der README.md. Weichen sie voneinander ab, gilt die englische Version.
 
@@ -55,17 +55,17 @@ Unter [Datenschutz](#datenschutz) steht alles, womit Zigzag sich von selbst verb
 ## Ansehen
 
 <p align="center">
-  <img src="docs/spaces.gif" width="960" alt="Wechsel zwischen drei Spaces in Zigzag, jeder mit eigener Farbe und eigenen Tabs">
+  <img src="../../docs/spaces.gif" width="960" alt="Wechsel zwischen drei Spaces in Zigzag, jeder mit eigener Farbe und eigenen Tabs">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="site/assets/clips/split.jpg" alt="Split View: Fonts In Use neben Grilli Type"><br><b>Split View.</b> Zieh einen Tab auf die Seite, um ihn daneben zu öffnen, bis zu vier gleichzeitig.</td>
-    <td width="50%"><img src="docs/all-tabs.jpg" alt="Alle Tabs aus drei Spaces als Karten dargestellt"><br><b>Alle Tabs auf einmal.</b> ⇧⌘\ zeigt jeden Space. Tippe, um zu filtern.</td>
+    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Split View: Fonts In Use neben Grilli Type"><br><b>Split View.</b> Zieh einen Tab auf die Seite, um ihn daneben zu öffnen, bis zu vier gleichzeitig.</td>
+    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="Alle Tabs aus drei Spaces als Karten dargestellt"><br><b>Alle Tabs auf einmal.</b> ⇧⌘\ zeigt jeden Space. Tippe, um zu filtern.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="site/assets/win-peek.webp" alt="Ein Wikipedia-Artikel über Typografie über der Seite, von der aus er geöffnet wurde"><br><b>Zigzag Mini.</b> Klicke bei gedrückter Umschalttaste auf einen Link, um einen Blick darauf zu werfen, ohne den Faden zu verlieren.</td>
-    <td width="50%"><img src="site/assets/clips/reader.jpg" alt="Ein Essay der Public Domain Review im Reader"><br><b>Reader.</b> Lange Texte, ohne Ablenkung.</td>
+    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="Ein Wikipedia-Artikel über Typografie über der Seite, von der aus er geöffnet wurde"><br><b>Zigzag Mini.</b> Klicke bei gedrückter Umschalttaste auf einen Link, um einen Blick darauf zu werfen, ohne den Faden zu verlieren.</td>
+    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="Ein Essay der Public Domain Review im Reader"><br><b>Reader.</b> Lange Texte, ohne Ablenkung.</td>
   </tr>
 </table>
 
@@ -101,9 +101,9 @@ Unter [Datenschutz](#datenschutz) steht alles, womit Zigzag sich von selbst verb
 | **Entwicklermodus** | Für die Websites, die du baust, zunächst `localhost`: die Konsole mit Fehlerzähler, „Element untersuchen“, Gerätegrößen, hell und dunkel, Druckstile, JavaScript, Bilder oder Stile aus, ein anderer User-Agent und ein QR-Code, um die Seite auf dem iPhone zu öffnen. |
 | **Erweiterungen** | Aus dem Chrome Web Store, wo der Button des Stores „Zu Zigzag hinzufügen“ heißt. 1Password, Bitwarden, Dark Reader, Tampermonkey und die meisten beliebten funktionieren; was nicht geht, steht weiter unten. |
 | **Import** | Lesezeichen, Verlauf, Passwörter, Anmeldungen und Erweiterungen aus Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen und Orion. |
-| **Downloads** | Schicke Dateien eines Typs in einen eigenen Ordner oder öffne sichere wie PDFs, sobald sie gesichert sind. Regeln übergeben einen Link oder einen Download an eine App, ein Skript oder einen Download-Manager wie aria2, nachdem sie dich gefragt haben. Siehe [docs/download-rules.md](docs/download-rules.md). |
-| **Automation** | AppleScript, Kurzbefehle und `osascript` können Tabs auflisten und öffnen und Seiten lesen, in der Form, wie Safari und Chrome sie annehmen. Siehe [docs/automation.md](docs/automation.md). |
-| **KI-Apps** | Aus, bis du es einschaltest: KI-Apps auf deinem Mac können deine Tabs über MCP nutzen, nie private Fenster oder Passwörter. Siehe [docs/automation.md](docs/automation.md#ai-apps-mcp). |
+| **Downloads** | Schicke Dateien eines Typs in einen eigenen Ordner oder öffne sichere wie PDFs, sobald sie gesichert sind. Regeln übergeben einen Link oder einen Download an eine App, ein Skript oder einen Download-Manager wie aria2, nachdem sie dich gefragt haben. Siehe [docs/download-rules.md](../../docs/download-rules.md). |
+| **Automation** | AppleScript, Kurzbefehle und `osascript` können Tabs auflisten und öffnen und Seiten lesen, in der Form, wie Safari und Chrome sie annehmen. Siehe [docs/automation.md](../../docs/automation.md). |
+| **KI-Apps** | Aus, bis du es einschaltest: KI-Apps auf deinem Mac können deine Tabs über MCP nutzen, nie private Fenster oder Passwörter. Siehe [docs/automation.md](../../docs/automation.md#ai-apps-mcp). |
 | **Deine Daten** | „Ablage“ › „Deine Daten exportieren …“ sichert deine Lesezeichen als Standard-HTML-Datei, die jeder Browser importiert, und ein vollständiges Zigzag-Backup, das du auf einem anderen Mac wiederherstellen kannst. |
 | **Sprachen** | Englisch, Vereinfachtes Chinesisch, Traditionelles Chinesisch, Japanisch, Koreanisch, Deutsch, Französisch, Italienisch, Spanisch, Brasilianisches Portugiesisch, Russisch, Niederländisch, Polnisch und Türkisch. |
 | **Und** | Reader, PDF-Viewer, Handoff auf dein iPhone, iPad oder einen anderen Mac, Bildschirmfoto eines Bereichs, eines Teils der Seite oder der ganzen Seite (⇧⌘2), Übersetzung auf dem Gerät, „Auf Seite suchen“ mit Markierung jedes Treffers, ein Menü „Verlauf“ mit „Zuletzt geschlossen“ und den letzten sieben Tagen, ein Standard-Seitenzoom, eine Adressleiste über der Seite, wenn du eine haben möchtest, Bild-in-Bild, private Fenster, Web-Inspektor. |
@@ -182,13 +182,13 @@ Lade das DMG von [zigzagbrowser.com](https://zigzagbrowser.com/download), öffne
     brew install --cask zigaowang/tap/zigzag
 
 Updates installieren sich von selbst. Was sich in jeder Version geändert hat, steht in den
-[Release Notes](https://zigzagbrowser.com/release-notes) und in der [CHANGELOG.md](CHANGELOG.md).
+[Release Notes](https://zigzagbrowser.com/release-notes) und in der [CHANGELOG.md](../../CHANGELOG.md).
 
 ## Feedback
 
 - **Fehler und Ideen:** [Eröffne ein Issue](https://github.com/ZigaoWang/zigzag/issues/new/choose) oder wähle in der App „Hilfe“ › „Feedback senden …“. Bei einem Fehler schreibt „Hilfe“ › „Problem melden …“ einen Bericht, den du vor dem Senden lesen kannst.
 - **E-Mail:** a@zigao.wang
-- **Sicherheitsprobleme:** siehe [SECURITY.md](SECURITY.md). Poste sie bitte nicht in öffentlichen Issues.
+- **Sicherheitsprobleme:** siehe [SECURITY.md](../../SECURITY.md). Poste sie bitte nicht in öffentlichen Issues.
 
 ## Aus dem Quellcode bauen
 
@@ -220,17 +220,17 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## Mitwirken
 
-Beiträge sind willkommen. Lies [CONTRIBUTING.md](CONTRIBUTING.md), wie das Projekt gebaut, getestet und
+Beiträge sind willkommen. Lies [CONTRIBUTING.md](../../CONTRIBUTING.md), wie das Projekt gebaut, getestet und
 gestaltet wird.
 
 ## Lizenz
 
-Der Code von Zigzag steht unter der [Apache License, Version 2.0](LICENSE). Nutze ihn, ändere ihn, forke ihn und liefere
+Der Code von Zigzag steht unter der [Apache License, Version 2.0](../../LICENSE). Nutze ihn, ändere ihn, forke ihn und liefere
 ihn aus, kommerziell oder nicht.
 
 Der Name „Zigzag“, das App-Symbol und das Logo fallen nicht unter die Lizenz: Sie sind Marken, alle Rechte
-vorbehalten. Ein Fork braucht einen eigenen Namen und ein eigenes Symbol. Siehe [TRADEMARKS.md](TRADEMARKS.md) und [NOTICE](NOTICE).
-Drittanbieter-Software, die Zigzag nutzt, ist in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) aufgeführt.
+vorbehalten. Ein Fork braucht einen eigenen Namen und ein eigenes Symbol. Siehe [TRADEMARKS.md](../../TRADEMARKS.md) und [NOTICE](../../NOTICE).
+Drittanbieter-Software, die Zigzag nutzt, ist in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) aufgeführt.
 
 ## Danksagung
 
