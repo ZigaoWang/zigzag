@@ -66,6 +66,22 @@
   Test: MiniFromPageTests.aPrivateWindowsMiniIsPrivate
 - ⌘O in a Mini opened from a page → the same live page becomes a tab right after the one it came from.
   Test: MiniFromPageTests.openInZigzagPutsItRightAfterTheTabItCameFrom
+- Settings › Zigzag Mini › Open ⇧-clicked links in the page off, as it starts → ⇧-click opens the standalone Zigzag Mini as above.
+  Test: InPageMiniPolicyTests.theSettingIsOffUntilTurnedOn
+  Test: InPageMiniHostTests.withTheSettingOffAShiftClickIsTheStandaloneMini
+- The same setting on → ⇧-click opens the Mini over the page you clicked from, the page dimmed behind it, following the page as the window moves or resizes.
+  Test: InPageMiniHostTests.aDockedMiniIsABorderlessChildOfTheBrowserWindow
+  Test: InPageMiniHostTests.theDockedMiniFollowsThePageCard
+- Esc, a click on the dimmed page, ⌘W, the page's `window.close()` or switching tabs → the Mini over the page closes.
+  Test: InPageMiniHostTests.escClosesTheDockedMini
+  Test: InPageMiniHostTests.aClickOnTheDimClosesTheDockedMini
+  Test: InPageMiniHostTests.commandWClosesTheDockedMini
+  Test: InPageMiniHostTests.closeWindowStaysOnForADockedMini
+  Test: InPageMiniHostTests.aPagesWindowCloseClosesTheDockedMini
+  Test: InPageMiniHostTests.aTabSwitchClosesTheDockedMini
+- Expand on the Mini over the page → the same live page goes into a Mini window of its own, without reloading.
+  Test: InPageMiniHostTests.promotingTakesTheMiniOutIntoAWindowOfItsOwn
+  Test: InPageMiniHostTests.expandKeepsTheSameLivePage
 
 ## Order and sidebar keys
 - ⌥⌘↓ / ⌥⌘↑ or ⇧⌘] / ⇧⌘[ → next or previous row as the sidebar shows it, wrapping, never another space.
