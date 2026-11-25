@@ -575,16 +575,16 @@ struct BookmarkFolderTests {
     }
 
     @Test func swipeNeedsAThirdOfThePage() {
-        // A third of a narrow page, at most 220 points however wide the window (#377).
-        #expect(SwipeDecision.distance(forWidth: 600) == 200)
-        #expect(SwipeDecision.distance(forWidth: 900) == 220)
-        #expect(SwipeDecision.distance(forWidth: 300) == 160)
-        #expect(SwipeDecision.distance(forWidth: 2000) == 220)
-        // All the way, or a quick flick well started.
+        // A third of a narrow page, at most 180 points however wide the window (#377).
+        #expect(SwipeDecision.distance(forWidth: 450) == 150)
+        #expect(SwipeDecision.distance(forWidth: 900) == 180)
+        #expect(SwipeDecision.distance(forWidth: 300) == 120)
+        #expect(SwipeDecision.distance(forWidth: 2000) == 180)
+        // All the way, or a flick that got started.
         #expect(SwipeDecision.commits(progress: 1, speed: 0))
         #expect(SwipeDecision.commits(progress: 0.5, speed: 1000))
         // Short, slow, or pulled back before letting go: no.
-        #expect(!SwipeDecision.commits(progress: 0.3, speed: 2000))
+        #expect(!SwipeDecision.commits(progress: 0.2, speed: 2000))
         #expect(!SwipeDecision.commits(progress: 0.9, speed: 0))
         #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }

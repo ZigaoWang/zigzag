@@ -67,7 +67,8 @@ final class SwipeNavigator {
 
     /// How far to swipe before letting go navigates: a third of the page, as in Safari (#377).
     private var threshold: CGFloat {
-        byTouch ? SwipeDecision.touchDistance : SwipeDecision.distance(forWidth: webView?.bounds.width ?? 0)
+        let width = webView?.bounds.width ?? 0
+        return byTouch ? SwipeDecision.touchDistance(forWidth: width) : SwipeDecision.distance(forWidth: width)
     }
 
     init(webView: BrowserWebView) {
@@ -673,22 +674,25 @@ enum SwipeDecision: Equatable {
     enum Page { case unknown, left, took }
 
     /// How far a swipe on a page `width` wide goes before letting go navigates: a third of a narrow page, and no
-    /// more than 220 points on a wide one, since the fingers travel the same trackpad whatever the window's size.
-    static func distance(forWidth width: CGFloat) -> CGFloat { min(max(width / 3, 160), 220) }
+    /// more than 180 scrolled points on a wide one, since the fingers travel the same trackpad whatever the window's size.
+    static func distance(forWidth width: CGFloat) -> CGFloat { min(max(width / 3, 120), 180) }
 
     /// Whether letting go navigates, `progress` along `distance` and the fingers going at `speed` points a second
-    /// the swipe's way: all the way, or a quick flick that got well started. Pulled back, it doesn't.
+    /// the swipe's way: all the way, or a flick that got started. Pulled back, it doesn't.
     static func commits(progress: CGFloat, speed: CGFloat) -> Bool {
-        progress >= 1 || (progress >= 0.4 && speed > 700)
+        progress >= 1 || (progress >= 0.3 && speed > 450)
     }
 
     /// How far fingers on the screen travel before letting go navigates: about the 2 cm the trackpad's distance
     /// takes the fingers there, since a trackpad scrolls further than the fingers move.
     static let touchDistance: CGFloat = 100
 
+    /// `touchDistance`, and no more than a third of a narrow page (a split pane, Zigzag Mini), as on the trackpad.
+    static func touchDistance(forWidth width: CGFloat) -> CGFloat { min(touchDistance, max(width / 3, 60)) }
+
     /// `commits` for fingers on the screen: a flick is measured in the points the fingers actually travel.
     static func commits(progress: CGFloat, touchSpeed speed: CGFloat) -> Bool {
-        progress >= 1 || (progress >= 0.4 && speed > 350)
+        progress >= 1 || (progress >= 0.3 && speed > 300)
     }
 
     /// Whether a swipe already armed stays armed: a little short of the distance still counts, so fingers hovering at
