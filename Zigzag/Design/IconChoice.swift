@@ -215,7 +215,8 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    fileprivate func pick(_ icon: String?) {
+    /// Picks it, as a click on its cell does.
+    func pick(_ icon: String?) {
         selected = icon
         if let icon, !IconChoice.isSymbol(icon) {
             emojiField.stringValue = icon
@@ -463,6 +464,11 @@ final class IconPickerPanel: FloatingPanelView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// A folder's grid: its plain choice is the folder itself.
+    static func forFolder(selected: String?, onPick: @escaping (String?) -> Void) -> IconPickerPanel {
+        IconPickerPanel(noneSymbol: "folder", selected: selected, onPick: onPick)
+    }
 
     /// Beside the sidebar, level with the row it's for.
     func show(beside row: NSView, in overlay: NSView, x: CGFloat) {

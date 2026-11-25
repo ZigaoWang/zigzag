@@ -1196,9 +1196,7 @@ final class SidebarListView: NSView {
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
             let count = folderPageCounts[id] ?? Library.shared.allBookmarkIDs(inFolder: id).count
             let folded = shownSpaceID.map(Self.isCollapsed) ?? false
-            let site = folder.icon == nil ? folder.live?.source.iconSite : nil
-            let siteIcon = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
-            if let site, siteIcon == nil { FaviconStore.shared.prefetch(for: site) }
+            let siteIcon = folder.icon == nil ? folder.live.flatMap { LiveFolderSheet.siteIcon(for: $0.source) } : nil
             row.configure(name: folder.name, open: folder.isOpen && !folded, count: count, icon: folder.icon,
                           live: folder.live != nil, siteIcon: siteIcon, unread: folder.live == nil ? 0 : LiveFolders.shared.unreadCount(id))
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)

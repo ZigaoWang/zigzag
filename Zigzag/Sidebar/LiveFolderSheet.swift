@@ -11,6 +11,14 @@ enum LiveFolderSheet {
     /// The live folder's mark on its menu items and sheet.
     static let symbol = "dot.radiowaves.up.forward"
 
+    /// The site's icon a live folder wears (GitHub's for a GitHub list), fetched when it isn't kept yet.
+    static func siteIcon(for source: LiveSource) -> NSImage? {
+        guard let site = source.iconSite else { return nil }
+        let icon = FaviconStore.shared.cachedIcon(for: site)
+        if icon == nil { FaviconStore.shared.prefetch(for: site) }
+        return icon
+    }
+
     /// What's typed, as a web address: "example.com" is https, a feed: address is its https one.
     nonisolated static func address(from text: String) -> URL? {
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -75,6 +83,8 @@ enum LiveFolderSheet {
             form.commit(in: controller, parent: parent)
         }
         form.sheet = sheet
+        sheet.header.makePictureClickable(toolTip: SidebarMenus.changeIconTitle) { [weak form] in form?.chooseIcon() }
+        form.showIcon()
         sheet.heldUpNote = { [weak form] in form?.usernameProblem }
         #if DEBUG
         current = sheet
@@ -96,6 +106,10 @@ enum LiveFolderSheet {
         let count = DropdownButton()
         let note = NSTextField.dialogText("", font: Tokens.Font.detail())
         weak var sheet: FormSheet?
+        /// The icon chosen in the sheet, kept on Save or Add.
+        private(set) var icon: String?
+        private var iconToken: SignalToken?
+        private var shownIcon: String?
         private let lists = GitHubList.allCases
         /// What looking up an address found, for the address it was for (nil while it looks).
         private var lookup: (url: URL, result: LiveFolders.Lookup?)?
@@ -103,6 +117,7 @@ enum LiveFolderSheet {
 
         init(editing folder: BookmarkFolder?) {
             existing = folder
+            icon = folder?.icon
             let live = folder?.live
             kind.selectedIndex = live?.source.gitHub == nil ? 0 : 1
             kind.setAccessibilityLabel(String(localized: "Source", comment: "Accessibility label of the Feed or GitHub switch in the New Live Folder sheet."))
@@ -172,9 +187,57 @@ enum LiveFolderSheet {
             return String(localized: "GitHub usernames have only letters, numbers and single hyphens.", comment: "Tooltip on the username field of the New Live Folder sheet when what's typed can't be a GitHub username, so its button can't be pressed.")
         }
 
+        /// The source the header's icon is for: a feed once it's found, a GitHub list once the username can be one.
+        private var iconSource: LiveSource? {
+            if isGitHub { return source }
+            guard let lookup, lookup.url == typedAddress, case .found? = lookup.result else { return existing?.live?.source }
+            return source
+        }
+
+        /// The heading's icon, as the folder's sidebar row shows it: its own icon in a folder, else its site's icon,
+        /// else the folder; the feed mark while a new folder has no source yet.
+        func showIcon() {
+            guard let header = sheet?.header else { return }
+            let source = icon == nil ? iconSource : nil
+            let site = source.flatMap(LiveFolderSheet.siteIcon(for:))
+            let key = [icon ?? "", source?.iconSite?.absoluteString ?? "", site.map { "\(ObjectIdentifier($0).hashValue)" } ?? ""].joined(separator: "|")
+            guard key != shownIcon else { return }
+            shownIcon = key
+            let side = Tokens.TypeSize.heading
+            if let icon {
+                let image = IconChoice.folder(icon, open: false, size: side)
+                if IconChoice.isEmoji(icon) || PageImageIcon.isImage(icon) { header.setImage(image) } else { header.setTemplate(image, tint: Tokens.Color.icon) }
+                return
+            }
+            guard let source else {
+                header.setSymbol(existing == nil ? LiveFolderSheet.symbol : "folder", tint: Tokens.Color.icon)
+                return
+            }
+            if let site {
+                header.setImage(site)
+            } else {
+                header.setSymbol("folder", tint: Tokens.Color.icon)
+                let key = FaviconStore.shared.iconKey(for: source.iconSite)
+                iconToken = FaviconStore.shared.updated.observe { [weak self] site in if site == key { self?.showIcon() } }
+            }
+        }
+
+        /// The same grid as the folder's Change Icon…, under the heading's icon.
+        func chooseIcon() {
+            guard let sheet, let button = sheet.header.pictureButton else { return }
+            if let open = IconPickerPanel.current, open.isDescendant(of: sheet) { open.close(); return }
+            let panel = IconPickerPanel.forFolder(selected: icon) { [weak self] picked in
+                self?.icon = picked
+                self?.showIcon()
+            }
+            let corner = button.convert(NSPoint(x: button.bounds.minX, y: button.bounds.maxY + Tokens.Space.x1), to: sheet)
+            panel.show(at: corner, in: sheet, growsFrom: CGPoint(x: 0, y: 1))
+        }
+
         func canConfirm() -> Bool {
             lookUp()
             showNote()
+            showIcon()
             if name.placeholder != emptyName { name.placeholder = emptyName }
             user.isInvalid = usernameProblem != nil
             user.toolTip = usernameProblem
@@ -230,6 +293,7 @@ enum LiveFolderSheet {
                 let title = typed.isEmpty ? (changed || !followsFeed ? defaultName : existing.name) : typed
                 controller.libraryChange(String(localized: "Edit Live Folder", comment: "Undo action name, shown in Edit › Undo.")) {
                     Library.shared.updateLiveFolder(existing.id, name: title, namedByFeed: followsFeed, source: chosen, limit: limit)
+                    if icon != existing.icon { Library.shared.setIcon(icon, forFolder: existing.id) }
                 }
                 if changed { LiveFolders.shared.reset(existing.id) }
                 LiveFolders.shared.refreshNow(existing.id)
@@ -240,6 +304,7 @@ enum LiveFolderSheet {
             controller.libraryChange(String(localized: "New Live Folder", comment: "Undo action name, shown in Edit › Undo.")) {
                 made = Library.shared.addLiveFolder(named: typed.isEmpty ? defaultName : typed, source: chosen, limit: limit,
                                                     namedByFeed: followsFeed, in: spaceID, parent: parent)
+                if let made, let icon { Library.shared.setIcon(icon, forFolder: made.id) }
             }
             guard let made else { return }
             if SidebarListView.isCollapsed(spaceID) { SidebarListView.setCollapsed(spaceID, false) }

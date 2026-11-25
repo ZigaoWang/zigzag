@@ -31,7 +31,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     private let scroll = NSScrollView()
     /// Scrolls rows between a fixed heading and buttons when the form is taller than the screen.
     private let content = FlippedView()
-    private let header: DialogHeader
+    let header: DialogHeader
     private let body: NSTextField?
     private var rows: [Row]
     private var labels: [Label?] = []
@@ -203,6 +203,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     private func handle(_ event: NSEvent, in window: NSWindow) -> NSEvent? {
         // A dropdown's menu, open over the form, has the keys while it's up.
         if MenuPanel.current != nil { return event }
+        // So does an icon grid opened from its heading.
+        if let picker = IconPickerPanel.current, picker.isDescendant(of: self) { return event }
         let composing = (window.firstResponder as? NSTextView)?.hasMarkedText() == true
         // Return in a MultilineField inserts a newline.
         if [36, 76].contains(event.keyCode), let text = window.firstResponder as? NSTextView, !text.isFieldEditor, text.isEditable,

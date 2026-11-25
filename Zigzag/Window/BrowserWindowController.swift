@@ -4048,7 +4048,7 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate else { return }
         guard let folder = Library.shared.folder(id), let row = sidebar.list.folderRow(id) else { return }
         closeFloatingPanels()
-        let panel = IconPickerPanel(noneSymbol: "folder", selected: folder.icon) { [weak self] icon in
+        let panel = IconPickerPanel.forFolder(selected: folder.icon) { [weak self] icon in
             self?.libraryChange(String(localized: "Change Icon", comment: "Undo action name, shown in the Edit menu as Undo Change Icon.")) { Library.shared.setIcon(icon, forFolder: id) }
         }
         panel.show(beside: row, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
