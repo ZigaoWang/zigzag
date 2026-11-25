@@ -108,3 +108,6 @@
   Test: SyncTests.onlyZigzagsOwnPushesFromICloudFetch
 - Zigzag quits in the middle of a fetch → what the fetch brought is saved with how far it read, and arrives at the next launch; nothing is skipped.
   Test: SyncTests.whatAFetchBroughtBeforeAQuitArrivesAfterIt
+- No push arrives (CloudKit's scheduler refused it, or the Mac was off) → Zigzag reads the zone's changes itself, from where it last read, at launch, on waking, when brought forward after a minute away and every 15 minutes. A record read twice, or an older copy read late, changes nothing.
+  Test: SyncTests.aMacStartedAfterItsFirstSyncFetchesWhatChangedWhileItWasAway
+  Test: SyncTests.aRecordFetchedTwiceOrLateChangesNothing

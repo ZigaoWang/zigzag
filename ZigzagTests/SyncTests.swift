@@ -15,7 +15,8 @@ import Testing
     private var tags = 0
 
     func remote(_ name: String) -> SyncRemote? {
-        records[name].map { SyncRemote(name: name, type: $0.type, payload: $0.payload, modified: $0.modified, systemFields: Data(String($0.tag).utf8)) }
+        records[name].map { SyncRemote(name: name, type: $0.type, payload: $0.payload, modified: $0.modified, systemFields: Data(String($0.tag).utf8),
+                                       serverModified: Date(timeIntervalSince1970: Double($0.tag))) }
     }
 
     enum Saved { case saved(SyncRemote), failed(SyncSaveFailure) }
@@ -906,6 +907,24 @@ extension SyncLibrary {
         #expect(first == true)
         #expect(a.session.state.merged)
         #expect(!cloud.records.isEmpty && a.saves.isEmpty)
+    }
+
+    @Test func aRecordFetchedTwiceOrLateChangesNothing() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let old = try #require(cloud.remote(cloud.records.keys.first { $0.hasPrefix("page.") }!))
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "Renamed" } }
+        b.sync()
+        let new = try #require(cloud.remote(old.name))
+        // The same record twice, then the older copy from a fetch that crossed this one.
+        for record in [new, new, old] {
+            a.session.fetched([record], deleted: [])
+            a.session.fetchFinished()
+        }
+        #expect(a.library.titles(in: "Personal") == ["Renamed"])
+        #expect(a.session.state.unsent.isEmpty && a.saves.isEmpty)
+        let sent = a.sent
+        a.sync()
+        #expect(a.sent == sent)
     }
 
     @Test func aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing() async throws {

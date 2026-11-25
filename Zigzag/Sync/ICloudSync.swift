@@ -260,7 +260,7 @@ final class ICloudSync {
                 MainActor.assumeIsolated { self?.accountChanged() }
             },
             NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.retry.soon() }
+                MainActor.assumeIsolated { self?.woke() }
             },
         ]
         watchNetwork()
@@ -281,6 +281,11 @@ final class ICloudSync {
         // Not connected yet (signed out, offline at launch), or the first sync didn't finish: tried again.
         guard engine != nil else { Task { await connect() }; return }
         Task { await catchUp() }
+    }
+
+    /// What failed is tried again, and otherwise what changed while the Mac slept is fetched.
+    private func woke() {
+        if retry.failures > 0 || retry.isStopped { retry.soon() } else { fetchSoon(after: 60) }
     }
 
     /// The network coming back tries again at once.
@@ -550,8 +555,39 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         switch scope {
         case .pending: try await engine?.fetchChanges()
         // Without a push the engine knows of no changed zone and asks nothing, so the zone is named.
-        case .zone: try await engine?.fetchChanges(CKSyncEngine.FetchChangesOptions(scope: .zoneIDs([ICloudSync.zoneID])))
+        case .zone:
+            try await engine?.fetchChanges(CKSyncEngine.FetchChangesOptions(scope: .zoneIDs([ICloudSync.zoneID])))
+            try await fetchZone()
         }
+    }
+
+    /// The zone's changes since Zigzag's own token, read without CKSyncEngine, which only fetches a zone a push marked.
+    /// Each batch is saved with the token it brought; once merged, what came settles into the library.
+    private func fetchZone() async throws {
+        guard let session else { return }
+        let database = container.privateCloudDatabase
+        var token = session.state.zoneToken.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0) }
+        var more = true
+        while more {
+            let changes: (modificationResultsByID: [CKRecord.ID: Result<CKDatabase.RecordZoneChange.Modification, Error>],
+                          deletions: [CKDatabase.RecordZoneChange.Deletion], changeToken: CKServerChangeToken, moreComing: Bool)
+            do {
+                changes = try await database.recordZoneChanges(inZoneWith: ICloudSync.zoneID, since: token)
+            } catch let error as CKError where error.code == .changeTokenExpired && token != nil {
+                // Read from the start again: what's already here takes no change.
+                token = nil
+                continue
+            }
+            guard self.session === session else { return }
+            let records = changes.modificationResultsByID.values.compactMap { try? $0.get().record }
+                .filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(Self.remote)
+            session.fetched(records, deleted: changes.deletions.map(\.recordID.recordName))
+            token = changes.changeToken
+            let archived = try? NSKeyedArchiver.archivedData(withRootObject: changes.changeToken, requiringSecureCoding: true)
+            session.updateState { $0.zoneToken = archived }
+            more = changes.moreComing
+        }
+        if session.state.merged { session.fetchFinished() }
     }
     func sendChanges() async throws { try await engine?.sendChanges() }
 
@@ -588,7 +624,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         return SyncRemote(name: record.recordID.recordName, type: record.recordType,
                           payload: (record[payloadField] as? Data) ?? Data("{}".utf8),
                           modified: (record[modifiedField] as? Date) ?? record.modificationDate ?? .distantPast,
-                          systemFields: coder.encodedData)
+                          systemFields: coder.encodedData, serverModified: record.modificationDate)
     }
 
     // MARK: CKSyncEngineDelegate

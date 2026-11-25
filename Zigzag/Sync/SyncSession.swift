@@ -35,6 +35,8 @@ struct SyncRemote: Codable {
     var modified: Date
     /// The server's own fields (its change tag), handed back with the next save so a stale one is caught.
     var systemFields: Data?
+    /// When the server last saved it, so an older copy arriving late is told apart.
+    var serverModified: Date? = nil
 }
 
 /// A record ready to send.
@@ -79,10 +81,14 @@ struct SyncState: Codable {
     /// What a fetch brought that isn't in the library yet, saved with the server's token so a quit can't lose it.
     var incoming: [String: SyncRemote] = [:]
     var incomingRemoved: Set<String> = []
+    /// When the server last saved each record, as this Mac last had it.
+    var serverDates: [String: Date] = [:]
+    /// How far Zigzag's own fetch of the zone has read, beside CKSyncEngine's.
+    var zoneToken: Data?
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved
+        case incoming, incomingRemoved, serverDates, zoneToken
     }
 
     init() {}
@@ -102,6 +108,8 @@ struct SyncState: Codable {
         keptProfiles = try c.decodeIfPresent(Set<UUID>.self, forKey: .keptProfiles) ?? []
         incoming = try c.decodeIfPresent([String: SyncRemote].self, forKey: .incoming) ?? [:]
         incomingRemoved = try c.decodeIfPresent(Set<String>.self, forKey: .incomingRemoved) ?? []
+        serverDates = try c.decodeIfPresent([String: Date].self, forKey: .serverDates) ?? [:]
+        zoneToken = try c.decodeIfPresent(Data.self, forKey: .zoneToken)
     }
 }
 
@@ -230,6 +238,7 @@ final class SyncSession {
             } else {
                 state.systemFields[name] = nil
                 state.serverPayloads[name] = nil
+                state.serverDates[name] = nil
                 // Changed here since: it comes back rather than vanish.
                 if state.unsent.contains(name) { resend.append(name); continue }
                 if state.base.removeValue(forKey: name) != nil {
@@ -248,6 +257,9 @@ final class SyncSession {
     /// The server's version of a record meets this Mac's. Returns whether the library changes, and whether this
     /// Mac's version still has to go up.
     private func take(_ record: SyncRemote) -> (changed: Bool, resend: Bool) {
+        // An older copy than the one here (two fetches crossing): nothing to do.
+        if let date = record.serverModified, let known = state.serverDates[record.name], date < known { return (false, false) }
+        if let date = record.serverModified { state.serverDates[record.name] = date }
         state.systemFields[record.name] = record.systemFields
         state.serverPayloads[record.name] = record.payload
         let theirs = SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified)
@@ -282,6 +294,7 @@ final class SyncSession {
     private func mergeFirst() {
         var server: [String: SyncItem] = [:]
         for case let (name, record?) in incoming {
+            if let date = record.serverModified { state.serverDates[name] = date }
             state.systemFields[name] = record.systemFields
             state.serverPayloads[name] = record.payload
             server[name] = SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified)
@@ -319,6 +332,7 @@ final class SyncSession {
         for record in records {
             state.systemFields[record.name] = record.systemFields
             state.serverPayloads[record.name] = record.payload
+            if let date = record.serverModified { state.serverDates[record.name] = date }
             if let item = state.base[record.name], item.modified == record.modified { state.unsent.remove(record.name) }
         }
         state.lastSynced = now()
@@ -329,6 +343,7 @@ final class SyncSession {
         for name in names where state.base[name] == nil {
             state.systemFields[name] = nil
             state.serverPayloads[name] = nil
+            state.serverDates[name] = nil
         }
         onChange?()
     }
