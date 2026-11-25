@@ -12,8 +12,17 @@ nonisolated enum PseudoLocale {
 
     static var isOn: Bool { forTheRun || on }
 
+    /// A real language every string is looked up in for the run, from ZIGZAG_TEST_LANGUAGE, so the layout tests can lay
+    /// out German or Russian without touching the Mac's languages or any settings.
+    nonisolated(unsafe) private(set) static var language: String?
+
     /// At launch: on for the run when asked, before any string is looked up. ZIGZAG_PSEUDO_LOCALIZE=1 asks for a test run.
     static func startIfAsked() {
+        if let code = ProcessInfo.processInfo.environment["ZIGZAG_TEST_LANGUAGE"], !code.isEmpty {
+            language = code
+            install()
+            return
+        }
         guard UserDefaults.standard.bool(forKey: "ZigzagPseudoLocalize")
                 || ProcessInfo.processInfo.environment["ZIGZAG_PSEUDO_LOCALIZE"] == "1" else { return }
         forTheRun = true
@@ -31,6 +40,7 @@ nonisolated enum PseudoLocale {
         guard let method = class_getInstanceMethod(Bundle.self, selector) else { return }
         let original = unsafeBitCast(method_getImplementation(method), to: Lookup.self)
         let wrapped: @convention(block) (AnyObject, NSString, NSString?, NSString?, AnyObject?) -> NSString = { bundle, key, value, table, languages in
+            if let language, isApp(bundle) { return original(bundle, selector, key, value, table, [language] as NSArray) }
             let found = original(bundle, selector, key, value, table, languages)
             guard isOn, isApp(bundle) else { return found }
             return pseudo(found, key: key, table: table)

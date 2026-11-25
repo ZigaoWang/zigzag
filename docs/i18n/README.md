@@ -65,6 +65,13 @@ sidebar, the top bar, the command bar, the site panel, every Settings pane, the 
 fails on text cut off where it isn't meant to be. `scripts/test.sh` runs it in a test process of its own with
 `ZIGZAG_PSEUDO_LOCALIZE=1`. The argument and the variable do nothing in a release build.
 
+The same test lays the surfaces out in a real language, checking every word, and can save each one as a picture.
+German and Russian are the longest:
+
+```sh
+TEST_RUNNER_ZIGZAG_TEST_LANGUAGE=de TEST_RUNNER_ZIGZAG_LAYOUT_SHOTS=/tmp/shots scripts/test.sh --only PseudoLocalizedLayoutTests
+```
+
 When something is cut off, fix the layout so it works for any language: let the row grow, wrap the text, or use the
 control's own width. Text that is meant to fade or end in "…" (tab titles, addresses, a menu's choice that shows whole
 in its tooltip) is left as it is.

@@ -4,7 +4,9 @@ import Testing
 
 /// The main surfaces laid out with pseudo-localized strings, about 40% longer than English: no word of Zigzag's is cut
 /// off where it isn't meant to be. scripts/test.sh runs this suite in a process of its own with every string pseudo
-/// from launch (ZIGZAG_PSEUDO_LOCALIZE); run elsewhere, it turns pseudo strings on for what it builds.
+/// from launch (ZIGZAG_PSEUDO_LOCALIZE); run elsewhere, it turns pseudo strings on for what it builds. With
+/// ZIGZAG_TEST_LANGUAGE (de, ru) it lays the same surfaces out in that language instead, and with ZIGZAG_LAYOUT_SHOTS
+/// it saves each surface as a PNG in that folder.
 @MainActor @Suite(.serialized) struct PseudoLocalizedLayoutTests {
     /// Text that's meant to end in a fade or "…": names and addresses people choose, which can be any length.
     private static let deliberatelyShortened: [AnyClass] = [TabRowView.self]
@@ -14,8 +16,9 @@ import Testing
     private static let notOurs: Set<String> = ["Zigzag", "Google", "GitHub", "Downloads", "Emoji & Symbols", "Example", "example.com",
                                                "split", "copy", "settings", "e"]
 
-    /// Runs `body` with pseudo strings on, unless the whole process already has them.
+    /// Runs `body` with pseudo strings on, unless the whole process already has them or speaks a real language.
     private func pseudo<T>(_ body: () throws -> T) rethrows -> T {
+        if PseudoLocale.language != nil { return try body() }
         PseudoLocale.install()
         return try PseudoLocale.$on.withValue(true, operation: body)
     }
@@ -25,6 +28,9 @@ import Testing
     /// With every string pseudo from launch, words that aren't are words that skipped the catalog.
     static func cutOff(under root: NSView, _ surface: String, expectsWords: Bool = true, othersWords: Bool = false) -> [String] {
         var found: [String] = [], checked = 0
+        // In a real language every word is checked, not only pseudo ones.
+        let real = PseudoLocale.language != nil
+        if let folder = ProcessInfo.processInfo.environment["ZIGZAG_LAYOUT_SHOTS"], !folder.isEmpty { save(root, surface, in: folder) }
         func shown(_ view: NSView) -> Bool {
             var view: NSView? = view
             while let current = view, current !== root.superview {
@@ -47,7 +53,7 @@ import Testing
                text.filter(\.isLetter).count > 1, !text.contains(where: { "⌘⌃⌥⇧".contains($0) }) {
                 found.append("\(surface): “\(text)” in \(type(of: field.superview ?? field)) isn't localized")
             }
-            guard !text.isEmpty, PseudoLocale.isPseudo(text), let cell = field.cell else { continue }
+            guard !text.isEmpty, real || PseudoLocale.isPseudo(text), let cell = field.cell else { continue }
             checked += 1
             if let label = field as? Label, label.fadesTail { continue }
             // Cut short on purpose, and whole in the tooltip of what holds it (a menu's long choice, #189).
@@ -72,8 +78,16 @@ import Testing
                 }
             }
         }
-        if checked == 0, expectsWords { found.append("\(surface): no pseudo-localized words to check") }
+        if checked == 0, expectsWords { found.append("\(surface): no localized words to check") }
         return found
+    }
+
+    /// The surface as drawn, for looking at a language's layout by eye.
+    private static func save(_ view: NSView, _ surface: String, in folder: String) {
+        guard view.bounds.width > 0, view.bounds.height > 0, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let name = (PseudoLocale.language ?? "pseudo") + "-" + surface.replacingOccurrences(of: "[^A-Za-z0-9]+", with: "-", options: .regularExpression)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: folder).appendingPathComponent(name + ".png"))
     }
 
     /// A browser window at its narrowest, with a tab of its own.
@@ -93,7 +107,7 @@ import Testing
         try body(controller)
     }
 
-    @Test func pseudoStringsAreLongerAccentedAndBracketed() {
+    @Test(.enabled(if: PseudoLocale.language == nil)) func pseudoStringsAreLongerAccentedAndBracketed() {
         #expect(PseudoLocale.transform("Settings") == "[Šéţţîñĝš ~~~~]")
         #expect(PseudoLocale.transform("Close %lld Tabs") == "[Çļöšé %lld Ţáƀš ~~~~]")
         #expect(PseudoLocale.transform("%1$@ in %2$@") == "[%1$@ îñ %2$@ ~]")
