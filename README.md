@@ -70,7 +70,8 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Profiles** | Keep work and personal apart. Each profile has its own extensions, sign-ins, history and favorites, and every space is on one. |
 | **Sites in spaces** | Choose a space for a site in Site Controls or Settings › Spaces, and its links open there wherever they come from: another app, ⌘T or another space, as with Arc's Air Traffic Control. Paths can go to their own spaces too, like `github.com/org1` to one and `github.com/org2` to another. A space on its own profile works like a Firefox container. |
 | **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. Type `you`, press Tab, and you're searching YouTube. Drag the bar anywhere in the window and it opens there from then on. |
-| **Tab groups** | Pick some tabs and choose Group Tabs, and they become a folder in the sidebar that opens and closes, renames, and moves as one. |
+| **Tab groups** | Pick some tabs and choose Group Tabs, and they become a folder in the sidebar that opens and closes, renames, and moves as one. Drag a tab to the right to nest it under the tab above, and to the left to take it back out. |
+| **Live folders** | A pinned folder that fills itself from a feed or a site, or from GitHub: pull requests, review requests, or the open issues and pull requests in your repositories. New pages come with a dot. |
 | **Split view** | Up to four tabs: drag a tab onto the page's edges for a half, or its corners for a quarter. Drag a page by its strip to move it, and pin a split to keep it. |
 | **Windows** | Drag a tab to another window and it moves as it is, without loading again. Turn on Settings › Tabs › Windows share a space's tabs and every window on a space lists the same tabs, as in Arc. The sidebar sits on the left or the right. |
 | **Web apps** | Install as App makes a site an app of its own, in your Applications folder, the Dock and ⌘Tab, with a toolbar in the site's color. |
@@ -93,6 +94,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Downloads** | Send files of a type to a folder of their own, or open safe ones like PDFs once they're saved. Rules hand a link or a download to an app, a script or a download manager like aria2, asking you first. See [docs/download-rules.md](docs/download-rules.md). |
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
+| **Your data** | File › Export Your Data… saves your bookmarks as a standard HTML file any browser imports, and a full Zigzag backup you can restore on another Mac. |
 | **Languages** | English, Simplified Chinese, and Traditional Chinese. |
 | **And** | Reader, PDF viewer, Handoff to your iPhone, iPad or other Mac, Capture of an area, a part of the page or the whole page (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
 
