@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag : agréable à utiliser, léger comme une plume. Le navigateur léger pour Mac, gratuit et open source. Une fenêtre Zigzag en Split View, Fonts In Use à côté de Grilli Type, avec la barre latérale des espaces et des onglets épinglés."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag : agréable à utiliser, léger comme une plume. Le navigateur léger pour Mac, gratuit et open source. Une fenêtre Zigzag en Split View, Fonts In Use à côté de Grilli Type, avec la barre latérale des espaces et des onglets épinglés."></a>
 </p>
 
 <div align="center">
 
-<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | Français | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
+<p align="center"><sub><a href="../../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | Français | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 Cette page est une traduction de README.md ; si elles diffèrent, la version anglaise fait foi.
 
@@ -40,17 +40,17 @@ Salut, je m’appelle Zigao, je suis lycéen à Shanghai. J’utilisais Arc tous
 ## Aperçu
 
 <p align="center">
-  <img src="../../docs/spaces.gif" width="960" alt="Passage entre trois espaces dans Zigzag, chacun avec sa couleur et ses onglets">
+  <img src="../../../docs/spaces.gif" width="960" alt="Passage entre trois espaces dans Zigzag, chacun avec sa couleur et ses onglets">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Split View : Fonts In Use à côté de Grilli Type"><br><b>Split View.</b> Faites glisser un onglet sur la page pour l’ouvrir à côté, jusqu’à quatre à la fois.</td>
-    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="Tous les onglets de trois espaces affichés sous forme de cartes"><br><b>Tous les onglets d’un coup.</b> ⇧⌘\ affiche tous les espaces. Tapez pour filtrer.</td>
+    <td width="50%"><img src="../../../site/assets/clips/split.jpg" alt="Split View : Fonts In Use à côté de Grilli Type"><br><b>Split View.</b> Faites glisser un onglet sur la page pour l’ouvrir à côté, jusqu’à quatre à la fois.</td>
+    <td width="50%"><img src="../../../docs/all-tabs.jpg" alt="Tous les onglets de trois espaces affichés sous forme de cartes"><br><b>Tous les onglets d’un coup.</b> ⇧⌘\ affiche tous les espaces. Tapez pour filtrer.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="Un article de Wikipédia sur la typographie au-dessus de la page depuis laquelle il a été ouvert"><br><b>Zigzag Mini.</b> Cliquez sur un lien en maintenant Maj pour y jeter un œil sans perdre votre place.</td>
-    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="Un essai de The Public Domain Review dans Lecteur"><br><b>Lecteur.</b> Les longues lectures, sans le fouillis.</td>
+    <td width="50%"><img src="../../../site/assets/win-peek.webp" alt="Un article de Wikipédia sur la typographie au-dessus de la page depuis laquelle il a été ouvert"><br><b>Zigzag Mini.</b> Cliquez sur un lien en maintenant Maj pour y jeter un œil sans perdre votre place.</td>
+    <td width="50%"><img src="../../../site/assets/clips/reader.jpg" alt="Un essai de The Public Domain Review dans Lecteur"><br><b>Lecteur.</b> Les longues lectures, sans le fouillis.</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@ Salut, je m’appelle Zigao, je suis lycéen à Shanghai. J’utilisais Arc tous
 | **Mode développeur** | Pour les sites que vous construisez, `localhost` pour commencer : la console avec un compteur d’erreurs, Inspecter l’élément, les tailles d’appareil, clair et sombre, les styles d’impression, JavaScript, images ou styles désactivés, un autre agent utilisateur, et un code QR pour ouvrir la page sur votre téléphone. |
 | **Extensions** | Depuis le Chrome Web Store, où le bouton du store lui-même indique Ajouter à Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey et la plupart des extensions populaires fonctionnent ; voyez plus bas ce qui ne fonctionne pas. |
 | **Importer** | Signets, historique, mots de passe, connexions et extensions depuis Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen et Orion. |
-| **Téléchargements** | Envoyez les fichiers d’un type vers un dossier à part, ou ouvrez ceux qui sont sûrs, comme les PDF, une fois enregistrés. Des règles transfèrent un lien ou un téléchargement à une app, à un script ou à un gestionnaire de téléchargement comme aria2, en vous demandant d’abord. Voir [docs/download-rules.md](../../docs/download-rules.md). |
-| **Automatisation** | AppleScript, Raccourcis et `osascript` peuvent lister et ouvrir des onglets et lire des pages, écrits comme le prennent Safari et Chrome. Voir [docs/automation.md](../../docs/automation.md). |
-| **Apps d’IA** | Désactivé tant que vous ne l’activez pas : les apps d’IA de votre Mac peuvent utiliser vos onglets via MCP, jamais les fenêtres privées ni les mots de passe. Voir [docs/automation.md](../../docs/automation.md#ai-apps-mcp). |
+| **Téléchargements** | Envoyez les fichiers d’un type vers un dossier à part, ou ouvrez ceux qui sont sûrs, comme les PDF, une fois enregistrés. Des règles transfèrent un lien ou un téléchargement à une app, à un script ou à un gestionnaire de téléchargement comme aria2, en vous demandant d’abord. Voir [docs/download-rules.md](../../../docs/download-rules.md). |
+| **Automatisation** | AppleScript, Raccourcis et `osascript` peuvent lister et ouvrir des onglets et lire des pages, écrits comme le prennent Safari et Chrome. Voir [docs/automation.md](../../../docs/automation.md). |
+| **Apps d’IA** | Désactivé tant que vous ne l’activez pas : les apps d’IA de votre Mac peuvent utiliser vos onglets via MCP, jamais les fenêtres privées ni les mots de passe. Voir [docs/automation.md](../../../docs/automation.md#ai-apps-mcp). |
 | **Vos données** | Fichier › Exporter vos données… enregistre vos signets dans un fichier HTML standard que tout navigateur sait importer, ainsi qu’une sauvegarde complète de Zigzag que vous pouvez restaurer sur un autre Mac. |
 | **Langues** | Anglais, chinois simplifié, chinois traditionnel, japonais, coréen, allemand, français, italien, espagnol, portugais brésilien, russe, néerlandais, polonais et turc. |
 | **Et aussi** | Lecteur, lecteur de PDF, Handoff vers votre iPhone, iPad ou un autre Mac, Capture d’une zone, d’une partie de la page ou de la page entière (⇧⌘2), traduction sur l’appareil, recherche dans la page qui marque chaque occurrence, un menu Historique avec Récemment fermés et les sept derniers jours, un zoom de page par défaut, une barre d’adresse au-dessus de la page si vous préférez, Image dans l’image, fenêtres privées, Inspecteur web. |
@@ -145,13 +145,13 @@ Téléchargez le DMG depuis [zigzagbrowser.com](https://zigzagbrowser.com/downlo
 
     brew install --cask zigaowang/tap/zigzag
 
-Les mises à jour s’installent toutes seules. Ce qui a changé dans chaque version figure dans les [notes de version](https://zigzagbrowser.com/release-notes) et dans [CHANGELOG.md](../../CHANGELOG.md).
+Les mises à jour s’installent toutes seules. Ce qui a changé dans chaque version figure dans les [notes de version](https://zigzagbrowser.com/release-notes) et dans [CHANGELOG.md](../../../CHANGELOG.md).
 
 ## Retours
 
 - **Bugs et idées :** [ouvrez une issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), ou Aide › Envoyer des commentaires… dans l’app. Pour un bug, Aide › Signaler un problème… écrit un rapport que vous pouvez lire avant de l’envoyer.
 - **E-mail :** a@zigao.wang
-- **Problèmes de sécurité :** voir [SECURITY.md](../../SECURITY.md). Ne les publiez pas dans des issues publiques.
+- **Problèmes de sécurité :** voir [SECURITY.md](../../../SECURITY.md). Ne les publiez pas dans des issues publiques.
 
 ## Compiler depuis les sources
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## Contribuer
 
-Les contributions sont les bienvenues. Lisez [CONTRIBUTING.md](../../CONTRIBUTING.md) pour savoir comment le projet est construit, testé et mis en forme.
+Les contributions sont les bienvenues. Lisez [CONTRIBUTING.md](../../../CONTRIBUTING.md) pour savoir comment le projet est construit, testé et mis en forme.
 
 ## Licence
 
-Le code de Zigzag est sous [licence Apache, version 2.0](../../LICENSE). Utilisez-le, modifiez-le, forkez-le et distribuez-le, à titre commercial ou non.
+Le code de Zigzag est sous [licence Apache, version 2.0](../../../LICENSE). Utilisez-le, modifiez-le, forkez-le et distribuez-le, à titre commercial ou non.
 
-Le nom « Zigzag », l’icône de l’app et le logo ne sont pas couverts par la licence : ce sont des marques déposées, tous droits réservés. Un fork a besoin de son propre nom et de sa propre icône. Voir [TRADEMARKS.md](../../TRADEMARKS.md) et [NOTICE](../../NOTICE). Les travaux tiers utilisés par Zigzag sont listés dans [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
+Le nom « Zigzag », l’icône de l’app et le logo ne sont pas couverts par la licence : ce sont des marques déposées, tous droits réservés. Un fork a besoin de son propre nom et de sa propre icône. Voir [TRADEMARKS.md](../../../TRADEMARKS.md) et [NOTICE](../../../NOTICE). Les travaux tiers utilisés par Zigzag sont listés dans [THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md).
 
 ## Remerciements
 

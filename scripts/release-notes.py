@@ -53,7 +53,7 @@ def write(version, planned, out, root=ROOT):
     if not sections: sys.exit(f"CHANGELOG.md has no notes for {planned}")
     # A fragment, without <body>: generate_appcast embeds it as the update's description.
     (out / "updates" / f"Zigzag-{version}.html").write_text(STYLE + body(summary, sections), encoding="utf-8")
-    zh = root / "CHANGELOG.zh-Hans.md"
+    zh = root / "docs/i18n/changelog/CHANGELOG.zh-Hans.md"
     zh_summary, zh_sections = section(zh.read_text(encoding="utf-8"), planned) if zh.exists() else ([], [])
     if zh_sections:
         # generate_appcast takes the language from the name's ISO 639 code: "zh", which macOS matches to zh-Hans.

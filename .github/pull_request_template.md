@@ -26,7 +26,7 @@ None.
 
 - [ ] The app builds and `TEST_RUNNER_ZIGZAG_TEST_VAULT=memory xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag` passes.
 - [ ] Logic I changed has tests in `ZigzagTests`.
-- [ ] A changelog line under `[Unreleased]` in both `CHANGELOG.md` and `CHANGELOG.zh-Hans.md`.
+- [ ] A changelog line under `[Unreleased]` in both `CHANGELOG.md` and `docs/i18n/changelog/CHANGELOG.zh-Hans.md`.
 - [ ] `specs/` updated if behavior changed.
 - [ ] New or changed strings use `String(localized:comment:)` with a comment that says where they show (English only is fine; translations are filled in before release).
 - [ ] UI changes use Zigzag's own controls from `Zigzag/Design`, with screenshots in light and dark.

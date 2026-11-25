@@ -1,9 +1,9 @@
 <!--
-The Chinese release notes, kept beside CHANGELOG.md with the same shape: each release adds its section here too,
-with the same version heading and date, a summary line, and ### 新功能 and ### 修复 for New and Fixed. Keep the
-issue links and the names of the people thanked as they are, and the words the app uses (docs/i18n/glossary.md
-and Zigzag/Resources/Localizable.xcstrings). A release with no section here shows its English notes in Chinese,
-and scripts/release.sh warns about it.
+The Simplified Chinese release notes, translated from CHANGELOG.md with the same shape: each release adds its section
+here too, with the same version heading and date, a summary line, and ### 新功能 and ### 修复 for New and Fixed. Keep
+the issue links and the names of the people thanked as they are, and the words the app uses
+(docs/i18n/glossaries/zh-Hans.md and Zigzag/Resources/Localizable.xcstrings). A release with no section here shows its
+English notes in Chinese, and scripts/release.sh warns about it.
 -->
 # 更新日志
 

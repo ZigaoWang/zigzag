@@ -79,18 +79,18 @@ in its tooltip) is left as it is.
 
 ## The glossary
 
-Each language has a glossary in this folder: [Simplified Chinese](glossary.md),
-[Traditional Chinese](glossary.zh-Hant.md), [Japanese](glossary.ja.md), [Korean](glossary.ko.md),
-[German](glossary.de.md), [French](glossary.fr.md), [Italian](glossary.it.md), [Spanish](glossary.es.md),
-[Brazilian Portuguese](glossary.pt-BR.md), [Russian](glossary.ru.md), [Dutch](glossary.nl.md),
-[Polish](glossary.pl.md), [Turkish](glossary.tr.md). It lists Zigzag's words with the one translation each gets, the words
+Each language has a glossary in [glossaries](glossaries): [Simplified Chinese](glossaries/zh-Hans.md),
+[Traditional Chinese](glossaries/zh-Hant.md), [Japanese](glossaries/ja.md), [Korean](glossaries/ko.md),
+[German](glossaries/de.md), [French](glossaries/fr.md), [Italian](glossaries/it.md), [Spanish](glossaries/es.md),
+[Brazilian Portuguese](glossaries/pt-BR.md), [Russian](glossaries/ru.md), [Dutch](glossaries/nl.md),
+[Polish](glossaries/pl.md), [Turkish](glossaries/tr.md). It lists Zigzag's words with the one translation each gets, the words
 that were considered and not used, and the language's typography rules. Translate from it, and add a word to it
 before using a new one.
 
 ## Adding a language
 
-1. Write `docs/i18n/glossary.<lang>.md` first, from Apple's own words for that language in macOS and Safari.
-2. Translate. Each translator writes `translations/<lang>.json`, never the catalogs:
+1. Write `docs/i18n/glossaries/<lang>.md` first, from Apple's own words for that language in macOS and Safari.
+2. Translate. Each translator writes `docs/i18n/translations/<lang>.json`, never the catalogs:
 
    ```json
    {"language": "ko",
@@ -102,8 +102,8 @@ before using a new one.
    `substitutions`. Then fold the file in:
 
    ```sh
-   scripts/merge-translations.py --check translations/ko.json   # report only
-   scripts/merge-translations.py translations/ko.json
+   scripts/merge-translations.py --check docs/i18n/translations/ko.json   # report only
+   scripts/merge-translations.py docs/i18n/translations/ko.json
    ```
 
    It refuses a file with unknown or missing keys, a form that isn't `translated`, or format arguments that differ
@@ -112,7 +112,7 @@ before using a new one.
 3. Have someone who didn't translate it review it against the glossary, in the app.
 4. Run the pseudo-locale and the layout tests, then run the app in the language and take screenshots of the main
    surfaces. Fix anything cut off in the layout, not by shortening one translation.
-5. Add `docs/readme/README.<lang>.md`, translated from `README.md`, and add it to the language line at the top of every README.
+5. Add `docs/i18n/readme/README.<lang>.md`, translated from `README.md`, and add it to the language line at the top of every README.
 6. Add the language's own name to `AppLanguage.ownName` (Settings › General › Language), and its code to
    `knownRegions` in `Zigzag.xcodeproj/project.pbxproj`, `CFBundleLocalizations` in `project.yml` and
    `Zigzag/Info.plist`, and `LocalizationTests.translated`. The code is the one Xcode and Bundle use (`pt-BR`, not

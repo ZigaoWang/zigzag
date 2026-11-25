@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag：用起來舒服，輕得像沒有。輕量的 Mac 瀏覽器，免費開源。一個分割顯示的 Zigzag 視窗，Fonts In Use 和 Grilli Type 並排，側邊欄裡是空間和已固定分頁。"></a>
+  <a href="https://zigzagbrowser.com"><img src="../../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag：用起來舒服，輕得像沒有。輕量的 Mac 瀏覽器，免費開源。一個分割顯示的 Zigzag 視窗，Fonts In Use 和 Grilli Type 並排，側邊欄裡是空間和已固定分頁。"></a>
 </p>
 
 <div align="center">
 
-<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
+<p align="center"><sub><a href="../../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 本文是 README.md 的翻譯；如有出入，以英文版為準。
 
@@ -40,17 +40,17 @@
 ## 看看它
 
 <p align="center">
-  <img src="../../docs/spaces.gif" width="960" alt="在 Zigzag 的三個空間之間切換，每個空間都有自己的顏色和分頁">
+  <img src="../../../docs/spaces.gif" width="960" alt="在 Zigzag 的三個空間之間切換，每個空間都有自己的顏色和分頁">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="分割顯示：Fonts In Use 和 Grilli Type 並排"><br><b>分割顯示。</b>把分頁拖到網頁上，就能在旁邊開啟，最多同時四個。</td>
-    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="三個空間裡的所有分頁以卡片顯示"><br><b>所有分頁一覽。</b>⇧⌘\ 顯示所有空間。打字就能篩選。</td>
+    <td width="50%"><img src="../../../site/assets/clips/split.jpg" alt="分割顯示：Fonts In Use 和 Grilli Type 並排"><br><b>分割顯示。</b>把分頁拖到網頁上，就能在旁邊開啟，最多同時四個。</td>
+    <td width="50%"><img src="../../../docs/all-tabs.jpg" alt="三個空間裡的所有分頁以卡片顯示"><br><b>所有分頁一覽。</b>⇧⌘\ 顯示所有空間。打字就能篩選。</td>
   </tr>
   <tr>
-    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="一篇關於字體排印的維基百科文章，浮在開啟它的網頁上"><br><b>Zigzag Mini。</b>按住 Shift 點一下連結，先看一眼，不會失去目前的位置。</td>
-    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="閱讀器裡的一篇 The Public Domain Review 文章"><br><b>閱讀器。</b>長篇文章，沒有雜亂的東西。</td>
+    <td width="50%"><img src="../../../site/assets/win-peek.webp" alt="一篇關於字體排印的維基百科文章，浮在開啟它的網頁上"><br><b>Zigzag Mini。</b>按住 Shift 點一下連結，先看一眼，不會失去目前的位置。</td>
+    <td width="50%"><img src="../../../site/assets/clips/reader.jpg" alt="閱讀器裡的一篇 The Public Domain Review 文章"><br><b>閱讀器。</b>長篇文章，沒有雜亂的東西。</td>
   </tr>
 </table>
 
@@ -86,9 +86,9 @@
 | **開發者模式** | 給你正在做的網站用，一開始就包含 `localhost`：帶錯誤計數的主控台、檢查元素、裝置尺寸、淺色和深色、列印樣式、關閉 JavaScript、影像或樣式、換用其他使用者代理，還有一個 QR 碼，用手機開啟這個網頁。 |
 | **延伸功能** | 來自 Chrome 線上應用程式商店，商店本身的按鈕會顯示「新增到 Zigzag」。1Password、Bitwarden、Dark Reader、Tampermonkey 和大多數熱門延伸功能都可以用；不能用的請見下文。 |
 | **匯入** | 從 Arc、Chrome、Safari、Dia、Edge、Brave、Vivaldi、Opera、Comet、Helium、Yandex、Whale、Chromium、Thorium、Firefox、Zen 和 Orion 匯入書籤、瀏覽記錄、密碼、登入狀態和延伸功能。 |
-| **下載項目** | 把某種類型的檔案存到專屬的資料夾，或在 PDF 這類安全檔案儲存後直接開啟。規則可以把連結或下載項目轉交給 App、指令碼或 aria2 這類下載管理器，轉交前會先問你。請見 [docs/download-rules.md](../../docs/download-rules.md)。 |
-| **自動化** | AppleScript、捷徑和 `osascript` 可以列出和開啟分頁、讀取網頁，寫法和 Safari、Chrome 接受的一樣。請見 [docs/automation.md](../../docs/automation.md)。 |
-| **AI App** | 預設關閉，開啟後，你 Mac 上的 AI App 可以透過 MCP 使用你的分頁，但絕不會碰到私密瀏覽視窗和密碼。請見 [docs/automation.md](../../docs/automation.md#ai-apps-mcp)。 |
+| **下載項目** | 把某種類型的檔案存到專屬的資料夾，或在 PDF 這類安全檔案儲存後直接開啟。規則可以把連結或下載項目轉交給 App、指令碼或 aria2 這類下載管理器，轉交前會先問你。請見 [docs/download-rules.md](../../../docs/download-rules.md)。 |
+| **自動化** | AppleScript、捷徑和 `osascript` 可以列出和開啟分頁、讀取網頁，寫法和 Safari、Chrome 接受的一樣。請見 [docs/automation.md](../../../docs/automation.md)。 |
+| **AI App** | 預設關閉，開啟後，你 Mac 上的 AI App 可以透過 MCP 使用你的分頁，但絕不會碰到私密瀏覽視窗和密碼。請見 [docs/automation.md](../../../docs/automation.md#ai-apps-mcp)。 |
 | **你的資料** | 「檔案 › 匯出你的資料…」會把書籤存成任何瀏覽器都能匯入的標準 HTML 檔案，還有一份完整的 Zigzag 備份，可以在另一台 Mac 上還原。 |
 | **語言** | 英文、簡體中文、繁體中文、日文、韓文、德文、法文、義大利文、西班牙文、巴西葡萄牙文、俄文、荷蘭文、波蘭文和土耳其文。 |
 | **還有** | 閱讀器、PDF 檢視器、接力到你的 iPhone、iPad 或另一台 Mac、截圖（區域、網頁的一部分或整個網頁，⇧⌘2）、裝置端翻譯、標出每個相符項目的網頁內尋找、帶「最近關閉」和最近七天的「瀏覽記錄」選單、預設網頁縮放、喜歡的話可以在網頁上方顯示網址列、子母畫面、私密瀏覽視窗、網頁檢查器。 |
@@ -145,13 +145,13 @@ Zigzag 大約是 120,000 行 Swift 6 和 AppKit，圍繞 `WKWebView` 寫成。�
 
     brew install --cask zigaowang/tap/zigzag
 
-更新會自動安裝。每個版本改了什麼，請見[版本說明](https://zigzagbrowser.com/release-notes)和[CHANGELOG.zh-Hant.md](../../CHANGELOG.zh-Hant.md)。
+更新會自動安裝。每個版本改了什麼，請見[版本說明](https://zigzagbrowser.com/release-notes)和[CHANGELOG.zh-Hant.md](../changelog/CHANGELOG.zh-Hant.md)。
 
 ## 意見回饋
 
 - **Bug 和想法：** [提交議題](https://github.com/ZigaoWang/zigzag/issues/new/choose)，或在 App 裡選擇「輔助說明 › 提供意見回饋…」。如果是 bug，「輔助說明 › 報告問題…」會寫一份報告，你可以在傳送前先讀過。
 - **電子郵件：** a@zigao.wang
-- **安全性問題：** 請見 [SECURITY.md](../../SECURITY.md)。請不要貼在公開的議題裡。
+- **安全性問題：** 請見 [SECURITY.md](../../../SECURITY.md)。請不要貼在公開的議題裡。
 
 ## 從原始碼建置
 
@@ -180,13 +180,13 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## 參與貢獻
 
-歡迎貢獻。專案怎麼建置、測試，程式碼風格是什麼樣子，請看 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
+歡迎貢獻。專案怎麼建置、測試，程式碼風格是什麼樣子，請看 [CONTRIBUTING.md](../../../CONTRIBUTING.md)。
 
 ## 授權
 
-Zigzag 的程式碼採用 [Apache License, Version 2.0](../../LICENSE) 授權。盡量用、盡量改、盡量 fork、盡量發布，商業用途也可以。
+Zigzag 的程式碼採用 [Apache License, Version 2.0](../../../LICENSE) 授權。盡量用、盡量改、盡量 fork、盡量發布，商業用途也可以。
 
-「Zigzag」這個名稱、App 圖示和標誌不在授權範圍內：它們是商標，保留一切權利。fork 需要用自己的名稱和圖示。請見 [TRADEMARKS.md](../../TRADEMARKS.md) 和 [NOTICE](../../NOTICE)。Zigzag 用到的第三方作品列在[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) 裡。
+「Zigzag」這個名稱、App 圖示和標誌不在授權範圍內：它們是商標，保留一切權利。fork 需要用自己的名稱和圖示。請見 [TRADEMARKS.md](../../../TRADEMARKS.md) 和 [NOTICE](../../../NOTICE)。Zigzag 用到的第三方作品列在[THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md) 裡。
 
 ## 致謝
 

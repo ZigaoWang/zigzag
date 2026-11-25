@@ -37,7 +37,7 @@ TEAM=$(/usr/libexec/PlistBuddy -c "Print :teamID" scripts/ExportOptions.plist)
 PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
 grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $PLANNED. Add one, then release."; exit 1; }
 # The Simplified Chinese notes should come with them. Traditional Chinese can follow later without a warning.
-grep -q "^## \[$PLANNED\]" CHANGELOG.zh-Hans.md || echo "Warning: CHANGELOG.zh-Hans.md has no section for $PLANNED. Simplified Chinese readers get the English notes."
+grep -q "^## \[$PLANNED\]" docs/i18n/changelog/CHANGELOG.zh-Hans.md || echo "Warning: docs/i18n/changelog/CHANGELOG.zh-Hans.md has no section for $PLANNED. Simplified Chinese readers get the English notes."
 
 # Every language Zigzag ships has every string translated and reviewed, or nothing is built. See docs/i18n/README.md.
 python3 scripts/check-strings.py || { echo "Some strings above aren't translated or still need review. Finish them, then release."; exit 1; }
@@ -155,8 +155,8 @@ rm "$ZIP" && ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 spctl --assess --type execute --verbose "$APP"
 
 # The release notes for the update window: this version's section of CHANGELOG.md as HTML, with
-# CHANGELOG.zh-Hans.md's beside it for a Mac in Chinese, and for a GitHub release as Markdown (build/release/notes.md,
-# for --notes-file). A beta uses the section of the version it leads up to. See scripts/release-notes.py.
+# docs/i18n/changelog/CHANGELOG.zh-Hans.md's beside it for a Mac in Chinese, and for a GitHub release as Markdown
+# (build/release/notes.md, for --notes-file). A beta uses the section of the version it leads up to. See scripts/release-notes.py.
 write_notes() { python3 scripts/release-notes.py "$VERSION" "$PLANNED" "$OUT"; }
 # The notes in each language are files of their own that the feed links to, so they go up before it.
 upload_notes() {

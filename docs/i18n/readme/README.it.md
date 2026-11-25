@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://zigzagbrowser.com"><img src="../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: ti trovi bene, non pesa nulla. Il browser leggero per Mac, gratuito e open source. Una finestra di Zigzag in vista divisa, Fonts In Use accanto a Grilli Type, con la barra laterale degli spazi e dei pannelli fissati."></a>
+  <a href="https://zigzagbrowser.com"><img src="../../../docs/brand/readme-hero.jpg" width="960" alt="Zigzag: ti trovi bene, non pesa nulla. Il browser leggero per Mac, gratuito e open source. Una finestra di Zigzag in vista divisa, Fonts In Use accanto a Grilli Type, con la barra laterale degli spazi e dei pannelli fissati."></a>
 </p>
 
 <div align="center">
 
-<p align="center"><sub><a href="../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | Italiano | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
+<p align="center"><sub><a href="../../../README.md">English</a> | <a href="README.zh-Hans.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.fr.md">Français</a> | Italiano | <a href="README.es.md">Español</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.ru.md">Русский</a> | <a href="README.nl.md">Nederlands</a> | <a href="README.pl.md">Polski</a> | <a href="README.tr.md">Türkçe</a></sub></p>
 
 Questa pagina è la traduzione di README.md; in caso di differenze, fa fede la versione in inglese.
 
@@ -53,17 +53,17 @@ ospito sono il feed degli aggiornamenti e una breve lista di correzioni per il b
 ## Guardalo
 
 <p align="center">
-  <img src="../../docs/spaces.gif" width="960" alt="Passaggio tra tre spazi in Zigzag, ciascuno con il proprio colore e i propri pannelli">
+  <img src="../../../docs/spaces.gif" width="960" alt="Passaggio tra tre spazi in Zigzag, ciascuno con il proprio colore e i propri pannelli">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="../../site/assets/clips/split.jpg" alt="Vista divisa: Fonts In Use accanto a Grilli Type"><br><b>Vista divisa.</b> Trascina un pannello sulla pagina per aprirlo di fianco, fino a quattro alla volta.</td>
-    <td width="50%"><img src="../../docs/all-tabs.jpg" alt="Tutti i pannelli di tre spazi mostrati come schede"><br><b>Tutti i pannelli insieme.</b> ⇧⌘\ mostra tutti gli spazi. Scrivi per filtrare.</td>
+    <td width="50%"><img src="../../../site/assets/clips/split.jpg" alt="Vista divisa: Fonts In Use accanto a Grilli Type"><br><b>Vista divisa.</b> Trascina un pannello sulla pagina per aprirlo di fianco, fino a quattro alla volta.</td>
+    <td width="50%"><img src="../../../docs/all-tabs.jpg" alt="Tutti i pannelli di tre spazi mostrati come schede"><br><b>Tutti i pannelli insieme.</b> ⇧⌘\ mostra tutti gli spazi. Scrivi per filtrare.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="../../site/assets/win-peek.webp" alt="Un articolo di Wikipedia sulla tipografia sopra la pagina da cui è stato aperto"><br><b>Zigzag Mini.</b> Fai clic su un link tenendo premuto Maiuscole per dargli un’occhiata senza perdere il punto in cui sei.</td>
-    <td width="50%"><img src="../../site/assets/clips/reader.jpg" alt="Un saggio di The Public Domain Review nel Lettore"><br><b>Lettore.</b> Letture lunghe, senza distrazioni.</td>
+    <td width="50%"><img src="../../../site/assets/win-peek.webp" alt="Un articolo di Wikipedia sulla tipografia sopra la pagina da cui è stato aperto"><br><b>Zigzag Mini.</b> Fai clic su un link tenendo premuto Maiuscole per dargli un’occhiata senza perdere il punto in cui sei.</td>
+    <td width="50%"><img src="../../../site/assets/clips/reader.jpg" alt="Un saggio di The Public Domain Review nel Lettore"><br><b>Lettore.</b> Letture lunghe, senza distrazioni.</td>
   </tr>
 </table>
 
@@ -99,9 +99,9 @@ ospito sono il feed degli aggiornamenti e una breve lista di correzioni per il b
 | **Modalità sviluppatore** | Per i siti che crei, a cominciare da `localhost`: la console con il conteggio degli errori, Ispeziona elemento, dimensioni dei dispositivi, chiaro e scuro, stili di stampa, JavaScript, immagini o stili disattivati, un altro user agent e un codice QR per aprire la pagina sul telefono. |
 | **Estensioni** | Dal Chrome Web Store, dove il pulsante dello store stesso dice Aggiungi a Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey e la maggior parte di quelle più diffuse funzionano; più sotto trovi quelle che non funzionano. |
 | **Importa** | Segnalibri, cronologia, password, accessi ed estensioni da Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen e Orion. |
-| **Download** | Invia i file di un certo tipo in una cartella dedicata, oppure apri quelli sicuri come i PDF una volta salvati. Le regole trasferiscono un link o un download a un’app, a uno script o a un gestore di download come aria2, chiedendo prima a te. Vedi [docs/download-rules.md](../../docs/download-rules.md). |
-| **Automazione** | AppleScript, Comandi rapidi e `osascript` possono elencare e aprire pannelli e leggere pagine, scritti nel modo in cui li accettano Safari e Chrome. Vedi [docs/automation.md](../../docs/automation.md). |
-| **App IA** | Disattivato finché non lo attivi: le app IA sul tuo Mac possono usare i tuoi pannelli tramite MCP, mai le finestre private né le password. Vedi [docs/automation.md](../../docs/automation.md#ai-apps-mcp). |
+| **Download** | Invia i file di un certo tipo in una cartella dedicata, oppure apri quelli sicuri come i PDF una volta salvati. Le regole trasferiscono un link o un download a un’app, a uno script o a un gestore di download come aria2, chiedendo prima a te. Vedi [docs/download-rules.md](../../../docs/download-rules.md). |
+| **Automazione** | AppleScript, Comandi rapidi e `osascript` possono elencare e aprire pannelli e leggere pagine, scritti nel modo in cui li accettano Safari e Chrome. Vedi [docs/automation.md](../../../docs/automation.md). |
+| **App IA** | Disattivato finché non lo attivi: le app IA sul tuo Mac possono usare i tuoi pannelli tramite MCP, mai le finestre private né le password. Vedi [docs/automation.md](../../../docs/automation.md#ai-apps-mcp). |
 | **I tuoi dati** | File › Esporta i tuoi dati… salva i tuoi segnalibri come file HTML standard che qualsiasi browser importa, e un backup completo di Zigzag che puoi ripristinare su un altro Mac. |
 | **Lingue** | Inglese, cinese semplificato, cinese tradizionale, giapponese, coreano, tedesco, francese, italiano, spagnolo, portoghese brasiliano, russo, olandese, polacco e turco. |
 | **E inoltre** | Lettore, visualizzatore PDF, Handoff verso iPhone, iPad o un altro Mac, Cattura di un’area, di una parte della pagina o dell’intera pagina (⇧⌘2), traduzione sul dispositivo, ricerca nella pagina che segna ogni corrispondenza, un menu Cronologia con Chiusi di recente e gli ultimi sette giorni, uno zoom predefinito delle pagine, una barra degli indirizzi sopra la pagina se la preferisci, Picture in Picture, finestre private, Web Inspector. |
@@ -180,13 +180,13 @@ Applicazioni. Oppure, con Homebrew:
     brew install --cask zigaowang/tap/zigzag
 
 Gli aggiornamenti si installano da soli. Cosa è cambiato in ogni versione si trova nelle
-[note di rilascio](https://zigzagbrowser.com/release-notes) e in [CHANGELOG.md](../../CHANGELOG.md).
+[note di rilascio](https://zigzagbrowser.com/release-notes) e in [CHANGELOG.md](../../../CHANGELOG.md).
 
 ## Feedback
 
 - **Bug e idee:** [apri una issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), oppure Aiuto › Invia feedback… nell’app. Per un bug, Aiuto › Segnala un problema… scrive un rapporto che puoi leggere prima di inviarlo.
 - **Email:** a@zigao.wang
-- **Problemi di sicurezza:** vedi [SECURITY.md](../../SECURITY.md). Per favore, non pubblicarli nelle issue pubbliche.
+- **Problemi di sicurezza:** vedi [SECURITY.md](../../../SECURITY.md). Per favore, non pubblicarli nelle issue pubbliche.
 
 ## Compilare dal sorgente
 
@@ -218,17 +218,17 @@ xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 
 ## Contribuire
 
-I contributi sono benvenuti. Leggi [CONTRIBUTING.md](../../CONTRIBUTING.md) per sapere come il progetto viene compilato, testato e
+I contributi sono benvenuti. Leggi [CONTRIBUTING.md](../../../CONTRIBUTING.md) per sapere come il progetto viene compilato, testato e
 formattato.
 
 ## Licenza
 
-Il codice di Zigzag è distribuito con la [licenza Apache, versione 2.0](../../LICENSE). Usalo, modificalo, fanne un fork e distribuiscilo,
+Il codice di Zigzag è distribuito con la [licenza Apache, versione 2.0](../../../LICENSE). Usalo, modificalo, fanne un fork e distribuiscilo,
 a scopo commerciale o no.
 
 Il nome “Zigzag”, l’icona dell’app e il logo non sono coperti dalla licenza: sono marchi, con tutti i diritti
-riservati. Un fork ha bisogno di un nome e di un’icona propri. Vedi [TRADEMARKS.md](../../TRADEMARKS.md) e [NOTICE](../../NOTICE).
-Le opere di terze parti usate da Zigzag sono elencate in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
+riservati. Un fork ha bisogno di un nome e di un’icona propri. Vedi [TRADEMARKS.md](../../../TRADEMARKS.md) e [NOTICE](../../../NOTICE).
+Le opere di terze parti usate da Zigzag sono elencate in [THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md).
 
 ## Ringraziamenti
 

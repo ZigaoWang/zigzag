@@ -1302,6 +1302,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		6D1A0C3E9B2F47A8C5E01D72 /* changelog */ = {
+			isa = PBXGroup;
+			children = (
+				B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */,
+				B657FD604243B45A30819412 /* CHANGELOG.zh-Hant.md */,
+			);
+			path = docs/i18n/changelog;
+			sourceTree = "<group>";
+		};
 		02EE121D21A28124FDE29A1C /* Passwords */ = {
 			isa = PBXGroup;
 			children = (
@@ -2118,8 +2127,7 @@
 			isa = PBXGroup;
 			children = (
 				C88A57E41A091A03DA97E06C /* CHANGELOG.md */,
-				B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */,
-				B657FD604243B45A30819412 /* CHANGELOG.zh-Hant.md */,
+				6D1A0C3E9B2F47A8C5E01D72 /* changelog */,
 				E35F3B1C28D9313BCCFA9CA4 /* LICENSE */,
 				FA29F3657E11FE3895D8BAC3 /* THIRD_PARTY_NOTICES.md */,
 				CD39D1D910FD12A53CD6ABF8 /* site */,

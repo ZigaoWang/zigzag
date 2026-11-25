@@ -1,6 +1,6 @@
 <!--
 繁體中文版版本說明。版本、日期、條目順序、問題連結和致謝名單請與 CHANGELOG.md 保持一致。
-用語請參考 docs/i18n/glossary.zh-Hant.md。翻譯不完整或尚未翻譯的版本，App 會顯示英文版說明。
+用語請參考 docs/i18n/glossaries/zh-Hant.md。翻譯不完整或尚未翻譯的版本，App 會顯示英文版說明。
 -->
 # 版本記錄
 

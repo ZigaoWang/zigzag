@@ -2020,7 +2020,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sidebarSide.onSelect = { index in BrowserRootView.sidebarOnRight = Self.sidebarSides[index] }
         let sideRow = FormRow(title: String(localized: "Sidebar position", comment: "A setting in Settings › Appearance: which edge of the window the sidebar runs along, Left or Right."),
                               control: sidebarSide)
-        // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
+        // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossaries/zh-Hans.md): found by it, never shown.
         sideRow.keywords = String(localized: "sidebar right left side position move", comment: "Words that find the Sidebar position setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sideRow)
         doubleClickTabToggle.onChange = { on in SidebarView.doubleClickOpensNewTab = on }
@@ -2068,7 +2068,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             self?.laidOutWidth = -1
             self?.needsLayout = true
         }
-        // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
+        // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossaries/zh-Hans.md): found by it, never shown.
         sizeRow.keywords = String(localized: "text size font bigger larger smaller scale zoom interface ui", comment: "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sizeRow)
         edgeSidebarToggle.onChange = { on in EdgeSidebar.shared.setOn(on) }

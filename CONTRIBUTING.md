@@ -95,11 +95,11 @@ and plurals.
 [docs/i18n/README.md](docs/i18n/README.md) has the whole workflow: one sentence per string, plurals, dates and
 numbers, the pseudo-locale for finding cut-off text, adding a language, and the release gate.
 
-A change to README.md updates its translations in [docs/readme](docs/readme) (one per language) in the same pull
+A change to README.md updates its translations in [docs/i18n/readme](docs/i18n/readme) (one per language) in the same pull
 request, or the pull request says they still need it. Every README starts with the same small language line.
 
-Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
-[CHANGELOG.zh-Hant.md](CHANGELOG.zh-Hant.md) can follow later. Keep the same version, date, order, issue links
+Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Hans.md](docs/i18n/changelog/CHANGELOG.zh-Hans.md).
+[CHANGELOG.zh-Hant.md](docs/i18n/changelog/CHANGELOG.zh-Hant.md) can follow later. Keep the same version, date, order, issue links
 and credited names. Use `### 新功能` for New, `### 修复` for Fixed in Simplified Chinese, and `### 修正` in Traditional Chinese.
 `WhatsNewTests` compares shipped Simplified Chinese notes with English and skips Unreleased. If the Traditional
 Chinese notes for a version are incomplete or missing, the in-app What's New sheet shows its English notes.
@@ -119,7 +119,7 @@ Sparkle's pre-install notes still use Simplified Chinese for its single Chinese 
 - Don't add CI workflows or other files under `.github/workflows`.
 - Write `Fixes #N` in the pull request so the issue closes with it.
 - Every change people will notice gets a line under `## [Unreleased]`, in `### New` or `### Fixed`, in
-  [CHANGELOG.md](CHANGELOG.md) and under the matching heading in [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
+  [CHANGELOG.md](CHANGELOG.md) and under the matching heading in [CHANGELOG.zh-Hans.md](docs/i18n/changelog/CHANGELOG.zh-Hans.md).
   Add a Traditional Chinese line if you can. Write the Chinese as a person would say it, not word for word.
   End the line with the issue link, and separate several with ", ": `([#311](…), [#312](…))`.
 - Make sure the app builds and the tests pass, and say in the pull request how you checked your change. For UI,

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Folds translations/<lang>.json files into Localizable.xcstrings and InfoPlist.xcstrings.
+"""Folds docs/i18n/translations/<lang>.json files into Localizable.xcstrings and InfoPlist.xcstrings.
 
-    scripts/merge-translations.py translations/ko.json [translations/de.json …]
-    scripts/merge-translations.py --check translations/ko.json     validate only, write nothing
-    scripts/merge-translations.py --allow-missing translations/ko.json   merge a partial file
+    scripts/merge-translations.py docs/i18n/translations/ko.json [docs/i18n/translations/de.json …]
+    scripts/merge-translations.py --check docs/i18n/translations/ko.json     validate only, write nothing
+    scripts/merge-translations.py --allow-missing docs/i18n/translations/ko.json   merge a partial file
 
 Each file is
     {"language": "ko",
