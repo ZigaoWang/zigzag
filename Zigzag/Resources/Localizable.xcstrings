@@ -132396,7 +132396,87 @@
       }
     },
     "Remove All Pages from %@" : {
-      "comment" : "Item in the right-click menu of a row on the History page: removes every page on that site from History. The placeholder is the site, like “github.com”."
+      "comment" : "Item in the right-click menu of a row on the History page: removes every page on that site from History. The placeholder is the site, like “github.com”.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Seiten von %@ aus dem Verlauf entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar del historial todas las páginas de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer de l’historique toutes les pages de %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi dalla cronologia tutte le pagine di %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のすべてのページを履歴から削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "방문 기록에서 %@의 모든 페이지 제거"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwijder alle pagina’s van %@ uit geschiedenis"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuń z historii wszystkie strony z %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover do histórico todas as páginas de %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить из истории все страницы %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Sitesindeki Tüm Sayfaları Geçmişten Kaldır"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中移除 %@ 的所有页面"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從瀏覽記錄中移除 %@ 的所有網頁"
+          }
+        }
+      }
     },
     "Remove All Shown…" : {
       "comment" : "Button over the list in Settings › Privacy › Stored by Websites while it's searched: removes the data of the sites shown.",
