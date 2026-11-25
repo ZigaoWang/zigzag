@@ -49,6 +49,14 @@ final class BrowserWindow: NSWindow {
     /// is never the window you are "in" for the Window menu or ⌘`, and never a main window of its own.
     var isOverlayChild = false
 
+    #if DEBUG
+    /// A test copy started with `ZIGZAG_ORDER_BACK=1` puts its windows behind every other app's, never in front.
+    static let ordersBack = ProcessInfo.processInfo.environment["ZIGZAG_ORDER_BACK"] == "1"
+    override func makeKeyAndOrderFront(_ sender: Any?) { Self.ordersBack ? orderBack(sender) : super.makeKeyAndOrderFront(sender) }
+    override func orderFront(_ sender: Any?) { Self.ordersBack ? orderBack(sender) : super.orderFront(sender) }
+    override func orderFrontRegardless() { Self.ordersBack ? orderBack(nil) : super.orderFrontRegardless() }
+    #endif
+
     override var canBecomeKey: Bool { !isParked }
     override var canBecomeMain: Bool { !isParked && !isOverlayChild }
 
