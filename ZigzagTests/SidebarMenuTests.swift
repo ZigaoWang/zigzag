@@ -722,33 +722,41 @@ struct SidebarRowMenuTests {
 
     /// A live folder's menu opens with when it was last updated, or Updating… while it fetches, and Refresh Now
     /// fetches it.
-    @Test func aLiveFoldersMenuSaysWhenItWasUpdated() throws {
+    @Test func aLiveFoldersMenuSaysWhenItWasUpdated() async throws {
         let live = LiveFolders.shared
         let (clock, fetcher) = (live.now, live.fetcher)
         defer { live.now = clock; live.fetcher = fetcher; LiveFoldersTests.Server.reset() }
         let config = LiveFetcher.configuration(userAgent: "Zigzag tests")
         config.protocolClasses = [LiveFoldersTests.Server.self]
         live.fetcher = LiveFetcher(configuration: config)
-        try inWindow(["A"]) { controller, _, space in
-            let folder = try #require(Library.shared.addLiveFolder(named: "News", source: .feed(URL(string: "https://example.com/menu/updated")!), limit: 25,
-                                                                   namedByFeed: false, in: space))
-            // Never fetched: no line.
-            #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first == "Close Folder")
-            let fetched = Date()
-            live.now = { fetched }
-            live.apply(.unchanged, to: folder.id)
-            live.now = { fetched.addingTimeInterval(5 * 60) }
-            let menu = SidebarMenus.folderMenu(for: folder, controller: controller)
-            #expect(Array(titles(menu).prefix(2)) == ["Updated 5 Minutes Ago", "-"])
-            #expect(menu.items.first?.isEnabled == false)
-            // Refresh Now fetches, and the menu says so while it does.
-            try run(menu.items.first { $0.title == "Refresh Now" })
-            let until = Date().addingTimeInterval(2)
-            while !live.isRefreshing(folder.id), Date() < until { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
-            #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first == "Updating…")
-            while live.isRefreshing(folder.id), Date() < until { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
-            #expect(LiveFoldersTests.Server.requests.last?.url?.absoluteString == "https://example.com/menu/updated")
-        }
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/menu/0")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let folder = try #require(Library.shared.addLiveFolder(named: "News", source: .feed(URL(string: "https://example.com/menu/updated")!), limit: 25,
+                                                               namedByFeed: false, in: space))
+        // Never fetched: no line.
+        #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first != "Updating…")
+        #expect(!titles(SidebarMenus.folderMenu(for: folder, controller: controller)).contains { $0.hasPrefix("Updated") })
+        let fetched = Date()
+        live.now = { fetched }
+        live.apply(.unchanged, to: folder.id)
+        live.now = { fetched.addingTimeInterval(5 * 60) }
+        let menu = SidebarMenus.folderMenu(for: folder, controller: controller)
+        #expect(Array(titles(menu).prefix(2)) == ["Updated 5 Minutes Ago", "-"])
+        #expect(menu.items.first?.isEnabled == false)
+        // Refresh Now fetches, and the menu says so while it does.
+        try run(menu.items.first { $0.title == "Refresh Now" })
+        for _ in 0..<1000 where !live.isRefreshing(folder.id) { await Task.yield() }
+        #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first == "Updating…")
+        for _ in 0..<500 where live.isRefreshing(folder.id) { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(LiveFoldersTests.Server.requests.last?.url?.absoluteString == "https://example.com/menu/updated")
     }
 
     /// The live folder sheet: the source first, then what to show; dropdowns as wide as the fields; a note that says
