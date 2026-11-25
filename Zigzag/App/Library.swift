@@ -753,7 +753,7 @@ final class Library {
     /// Fires whenever spaces or bookmarks change.
     let changed = Signal<Void>()
     /// Whether the library was read from its file, not started afresh (a first run, or a file that couldn't be read).
-    private let wasRead: Bool
+    let wasRead: Bool
 
     private init() {
         let hadProfiles = FileManager.default.fileExists(atPath: Paths.profiles.path)

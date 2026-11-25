@@ -75,10 +75,10 @@ import Testing
     private(set) var sent = 0
     var clock = Date(timeIntervalSince1970: 1_800_000_000)
 
-    init(_ cloud: FakeCloud, _ library: SyncLibrary, clock: Date = Date(timeIntervalSince1970: 1_800_000_000)) {
+    init(_ cloud: FakeCloud, _ library: SyncLibrary, clock: Date = Date(timeIntervalSince1970: 1_800_000_000), state: SyncState = SyncState()) {
         self.cloud = cloud
         host = MemoryHost(library)
-        session = SyncSession(host: host)
+        session = SyncSession(host: host, state: state)
         self.clock = clock
         session.server = self
         session.now = { [unowned self] in self.clock }
@@ -335,6 +335,24 @@ extension SyncLibrary {
         a.sync()
         #expect(a.library.urls(in: "Personal").sorted() == ["a", "b1", "b2"])
         #expect(a.library.contents.favorites.map(\.url.lastPathComponent) == ["fav"])
+    }
+
+    @Test func aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto() {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a")]), Sample.space("Work", [Sample.page("b")])], favorites: [Sample.page("fav")]))
+        a.sync()
+        let records = cloud.records.count
+        // Zigzag starts again with a new library (the file couldn't be read): what sync kept is put aside, and it merges again.
+        let state = ICloudSync.stateAtLaunch(saved: a.session.state, libraryWasRead: false)
+        #expect(!state.merged && state.base.isEmpty && state.account == a.session.state.account)
+        let again = FakeMac(cloud, Sample.library([Sample.space("Personal")]), clock: a.clock, state: state)
+        again.sync()
+        #expect(cloud.records.count == records)
+        #expect(again.library.spaceNames == ["Personal", "Work"])
+        #expect(again.library.urls(in: "Work") == ["b"])
+        #expect(again.library.contents.favorites.map(\.url.lastPathComponent) == ["fav"])
+        // Read as usual, it carries on.
+        #expect(ICloudSync.stateAtLaunch(saved: a.session.state, libraryWasRead: true).merged)
     }
 
     @Test func turningSyncOnAgainAddsNothingTwice() {

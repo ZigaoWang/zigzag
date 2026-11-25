@@ -38,6 +38,8 @@
   Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
 - Sync turned on again, or iCloud's copy reset → merged again, and nothing is added twice.
   Test: SyncTests.turningSyncOnAgainAddsNothingTwice
+- This Mac's library couldn't be read and Zigzag started afresh → merged again as on a first sync, so iCloud fills it in; nothing is removed from iCloud.
+  Test: SyncTests.aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto
 
 ## Two Macs at once
 - Edits to different things on two Macs → both arrive on both.

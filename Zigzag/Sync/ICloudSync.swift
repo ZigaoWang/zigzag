@@ -65,7 +65,20 @@ final class ICloudSync {
     /// At launch: picks up where it was, when it's on.
     func startIfOn() {
         guard isOn, session == nil else { return }
-        start(state: JSONStore.load(SyncState.self, from: Self.stateFile) ?? SyncState())
+        let library = Library.shared
+        start(state: Self.stateAtLaunch(saved: JSONStore.load(SyncState.self, from: Self.stateFile) ?? SyncState(),
+                                        libraryWasRead: library.wasRead && !library.profilesWereSetAside))
+    }
+
+    /// What sync starts from at launch. A library that couldn't be read (and started afresh) is merged with iCloud as
+    /// on a first sync, so iCloud fills it in rather than its missing spaces being removed from every Mac.
+    static func stateAtLaunch(saved: SyncState, libraryWasRead: Bool) -> SyncState {
+        var state = saved
+        if !libraryWasRead {
+            state = SyncState()
+            state.account = saved.account
+        }
+        return state
     }
 
     /// Turned on in Settings: a backup first, then the first sync merges this Mac's library with iCloud's.
