@@ -98,8 +98,9 @@
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
 - Not signed in to iCloud → says so, with Open System Settings; nothing on this Mac changes.
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
-- Signed in to a different iCloud account → sync stops and says so; this Mac's library is never sent to that account until sync is turned off and on again.
+- Signed in to a different iCloud account → sync stops and says so; this Mac's library is never sent to that account until sync is turned off and on again, even when its sync state couldn't be read.
   Test: SyncTests.anotherAccountIsNeverSyncedWithoutAsking
+  Test: SyncTests.aStateFileThatCouldntBeReadStillKnowsTheAccount
 - iCloud full, unreachable or unavailable → says so in plain words; changes wait on this Mac.
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
 - iCloud unreachable or refusing a request (an outage, a flaky network, an account not ready yet) → Zigzag tries again on its own after 30 seconds, then twice as long each time up to 30 minutes, never sooner than iCloud asks; at once when the network comes back, the account changes or the Mac wakes. It stops when sync is turned off.

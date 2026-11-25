@@ -82,7 +82,8 @@ final class ICloudSync {
         let library = Library.shared
         let saved = JSONStore.load(SyncState.self, from: Self.stateFile) ?? SyncState()
         start(state: Self.stateAtLaunch(saved: saved, libraryWasRead: Self.libraryWasRead(library.wasRead && !library.profilesWereSetAside,
-                                                                                        profilesFile: library.profilesFileExisted, saved: saved)))
+                                                                                        profilesFile: library.profilesFileExisted, saved: saved),
+                                        account: UserDefaults.standard.string(forKey: Self.accountKey)))
     }
 
     /// A Profiles.json that's gone while iCloud has this Mac's other profiles counts as unreadable, not as every
@@ -110,16 +111,22 @@ final class ICloudSync {
 
     /// What sync starts from at launch. A library that couldn't be read (and started afresh) is merged with iCloud as
     /// on a first sync, so iCloud fills it in rather than its missing spaces being removed from every Mac. A first
-    /// sync that didn't finish reads all of iCloud again, not only what changed since it was cut short.
-    static func stateAtLaunch(saved: SyncState, libraryWasRead: Bool) -> SyncState {
+    /// sync that didn't finish reads all of iCloud again, not only what changed since it was cut short. `account`: the
+    /// one sync was turned on with, kept apart too, so a State.json that couldn't be read doesn't let another in.
+    static func stateAtLaunch(saved: SyncState, libraryWasRead: Bool, account: String? = nil) -> SyncState {
         var state = saved
         if !libraryWasRead {
             state = SyncState()
             state.account = saved.account
+            state.aliases = saved.aliases
         }
         if !state.merged { state.engine = nil }
+        if state.account == nil { state.account = account }
         return state
     }
+
+    /// The account sync was turned on with, beside State.json.
+    static let accountKey = "SyncWithICloudAccount"
 
     /// Turned on in Settings: a backup first, then the first sync merges this Mac's library with iCloud's. Without the
     /// backup (a full disk), it stays off.
@@ -148,6 +155,7 @@ final class ICloudSync {
         stop()
         NSApplication.shared.unregisterForRemoteNotifications()
         JSONStore.save(Self.stateTurningOff(state), to: Self.stateFile)
+        UserDefaults.standard.removeObject(forKey: Self.accountKey)
         shown = .off
     }
 
@@ -220,6 +228,7 @@ final class ICloudSync {
             guard let session, isOn else { return }
             guard Self.mayUse(account: user, saved: session.state.account) else { shown = .otherAccount; return }
             session.updateState { $0.account = user }
+            UserDefaults.standard.set(user, forKey: Self.accountKey)
             let engine = CloudEngine(container: container, session: session, owner: self)
             self.engine = engine
             session.server = engine

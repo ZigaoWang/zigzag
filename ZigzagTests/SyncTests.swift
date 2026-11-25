@@ -878,6 +878,14 @@ extension SyncLibrary {
         #expect(!ICloudSync.mayUse(account: "_xyz", saved: "_abc"))
     }
 
+    @Test func aStateFileThatCouldntBeReadStillKnowsTheAccount() {
+        // State.json unreadable: read as a fresh state, with the account kept beside it.
+        let state = ICloudSync.stateAtLaunch(saved: SyncState(), libraryWasRead: true, account: "_abc")
+        #expect(state.account == "_abc")
+        #expect(!ICloudSync.mayUse(account: "_xyz", saved: state.account))
+        #expect(ICloudSync.stateAtLaunch(saved: SyncState(), libraryWasRead: false, account: "_abc").account == "_abc")
+    }
+
     @Test func onceSettledNothingMoreIsSent() {
         let inner = Sample.page("inner")
         let folder = BookmarkFolder(name: "F", bookmarkIDs: [inner.id])
