@@ -157,6 +157,27 @@ struct WhatsNewTests {
         #expect(WhatsNew.notesFile(for: "ja") == nil)
     }
 
+    /// Japanese has no changelog of its own, so it reads the English notes, under headings in Japanese.
+    @Test func japaneseReadsTheEnglishNotes() throws {
+        #expect(WhatsNew.notesFile(for: "ja") == nil)
+        #expect(WhatsNew.notesFile(for: "ja-JP") == nil)
+        let english = """
+        ## [1.1.0] - 2026-11-01
+
+        ### New
+        - One
+
+        ### Fixed
+        - Two
+        """
+        let notes = WhatsNew.pick(english: english, localized: WhatsNew.notesFile(for: "ja"), version: "1.1.0")
+        #expect(notes == WhatsNew.parse(english, version: "1.1.0"))
+        #expect(notes.sections.map { $0.items.map(\.text) } == [["One"], ["Two"]])
+        let bundle = try #require(Bundle(path: Bundle.main.path(forResource: "ja", ofType: "lproj") ?? ""))
+        #expect(bundle.localizedString(forKey: "New", value: nil, table: nil) == "新機能")
+        #expect(bundle.localizedString(forKey: "Fixed", value: nil, table: nil) == "修正")
+    }
+
     /// The translated notes when they have the version, the English ones when they don't.
     @Test func translatedNotesFallBackToEnglish() {
         let english = """

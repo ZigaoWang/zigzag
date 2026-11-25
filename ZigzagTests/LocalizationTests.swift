@@ -174,7 +174,7 @@ struct LocalizationTests {
 
     /// Each Chinese string takes the same arguments as its English, of the same types, so a translation that
     /// reorders them can't read the wrong one or crash.
-    @Test(arguments: ["zh-Hans", "zh-Hant"]) func chineseKeepsTheFormatSpecifiers(_ language: String) throws {
+    @Test(arguments: ["zh-Hans", "zh-Hant", "ja"]) func chineseKeepsTheFormatSpecifiers(_ language: String) throws {
         var wrong: [String] = []
         for (key, entry) in try Self.catalog() {
             let en = Self.forms(entry, "en").first ?? key
@@ -259,10 +259,9 @@ struct LocalizationTests {
         #expect(Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: ["zh-CN"]).first == "zh-Hans")
     }
 
-    /// A string with no Traditional Chinese yet reads in English, never as a raw key: a key that isn't English
-    /// text carries its English in the code, and a Traditional Chinese entry that is there is complete.
-    @Test func traditionalChineseFallsBackToEnglish() throws {
-        let language = "zh-Hant"
+    /// A string with no Traditional Chinese or Japanese yet reads in English, never as a raw key: a key that isn't
+    /// English text carries its English in the code, and an entry that is there is complete.
+    @Test(arguments: ["zh-Hant", "ja"]) func optionalLanguagesFallBackToEnglish(_ language: String) throws {
         let identifier = try NSRegularExpression(pattern: #"^[a-z0-9]+([.-][A-Za-z0-9]+)+$"#)
         var off: [String] = []
         for name in ["Localizable", "InfoPlist"] {
@@ -294,6 +293,64 @@ struct LocalizationTests {
                 for zh in Self.forms(entry, "zh-Hant") {
                     for word in avoided where zh.contains(word) { off.append("\(zh) says \(word)") }
                     if zh.range(of: #"\p{Han}[,.;:?!]\s|\p{Han}[,;?!]|[“”]"#, options: .regularExpression) != nil { off.append("\(zh): half-width punctuation or “” quotes") }
+                }
+            }
+        }
+        #expect(off.isEmpty, "\(off.joined(separator: "\n"))")
+    }
+
+    // MARK: Japanese
+
+    @MainActor @Test func japaneseReachesTheApp() throws {
+        let language = "ja"
+        let bundle = try #require(Bundle(path: Bundle.main.path(forResource: language, ofType: "lproj") ?? ""))
+        #expect(AppLanguage.choices.contains { $0.code == language && $0.title == "日本語" })
+        for mac in ["ja", "ja-JP"] {
+            #expect(Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: [mac]).first == language, "\(mac)")
+        }
+        #expect(Self.chinese("New Tab", language: language) == "新規タブ")
+        #expect(Self.chinese("New Private Window", language: language) == "新規プライベートウインドウ")
+        #expect(Self.chinese("key.space-bar", language: language) == "スペースバー")
+        #expect(String.localizedStringWithFormat(Self.chinese("%lld tabs", language: language), 1) == "1個のタブ")
+        #expect(String.localizedStringWithFormat(Self.chinese("%lld tabs", language: language), 3) == "3個のタブ")
+        #expect(String(format: Self.chinese("%@ (%@)", language: language), "再読み込み", "⌘R") == "再読み込み（⌘R）")
+        #expect(bundle.localizedString(forKey: "NSCameraUsageDescription", value: nil, table: "InfoPlist")
+                == "アクセスしたWebサイトが、カメラの使用を求めることがあります。")
+    }
+
+    /// Japanese reads as Apple's Japanese does: no space between Japanese and Latin letters, digits or a placeholder,
+    /// full-width punctuation and 「」, Apple's spellings, and one word for each of Zigzag's own things.
+    @Test func japaneseFollowsTheGlossary() throws {
+        let japanese = #"[\p{Hiragana}\p{Katakana}\p{Han}ー、。「」（）：！？]"#
+        let space = try NSRegularExpression(pattern: "\(japanese) [!-~]|[!-~] \(japanese)")
+        let terms: [(english: String, japanese: String)] = [
+            (#"\bSpaces?\b"#, "スペース"), ("[Ss]idebar", "サイドバー"), ("[Cc]ommand bar", "コマンドバー"), (#"\bFavorite"#, "お気に入り"),
+            ("Site Controls", "サイトコントロール"), (#"\b[Pp]rofiles?\b"#, "プロファイル"), (#"\bReload"#, "再読み込み"),
+            ("Private [Ww]indow", "プライベートウインドウ"), (#"\bArchive"#, "アーカイブ"), ("Live Folder", "ライブフォルダ"),
+        ]
+        let avoided = ["あなた", "ウィンドウ", "フォルダー", "ブラウザー", "ユーザー", "サーバー", "デベロッパー", "拡張機能", "新しいタブ",
+                       "インポート", "エクスポート", "ウェブサイト", "印刷"]
+        var off: [String] = []
+        for name in ["Localizable", "InfoPlist"] {
+            for (key, entry) in try Self.catalog(name) {
+                let forms = Self.forms(entry, "ja")
+                // Search words are a list split by spaces, and never shown.
+                let searchWords = ((entry as? [String: Any])?["comment"] as? String)?.contains("Not shown") == true
+                for ja in forms {
+                    // A numbered step keeps the space after its number, and a file name the one before its date.
+                    let plain = ja.replacingOccurrences(of: "%arg", with: "X")
+                        .replacingOccurrences(of: #"(?m)^\d+\. "#, with: "", options: .regularExpression)
+                        .replacingOccurrences(of: #" (%(\d\$)?@\.)"#, with: "$1", options: .regularExpression)
+                    if !searchWords, space.firstMatch(in: plain, range: NSRange(plain.startIndex..., in: plain)) != nil { off.append("\(ja): space beside Latin") }
+                    if ja.range(of: #"[\p{Hiragana}\p{Katakana}\p{Han}][,.;:?!()]|[()][\p{Hiragana}\p{Katakana}\p{Han}]|[“”]"#, options: .regularExpression) != nil {
+                        off.append("\(ja): half-width punctuation or “” quotes")
+                    }
+                    for word in avoided where ja.contains(word) { off.append("\(ja) says \(word)") }
+                }
+                guard name == "Localizable", key != "key.space-bar", let ja = forms.first else { continue }
+                let en = Self.forms(entry, "en").first ?? key
+                for term in terms where en.range(of: term.english, options: .regularExpression) != nil && !forms.contains(where: { $0.contains(term.japanese) }) {
+                    off.append("\(en) → \(ja), wants \(term.japanese)")
                 }
             }
         }
