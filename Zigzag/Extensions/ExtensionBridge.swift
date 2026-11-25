@@ -57,7 +57,7 @@ final class ExtensionBridge {
         BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self,
         BridgeOffscreen.self, BridgeSidePanel.self, BridgeTabCapture.self, BridgeProxy.self,
         BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self, BridgePasswordSaving.self, BridgePageCapture.self,
-        BridgeToolbarAppearance.self,
+        BridgeToolbarAppearance.self, BridgeNativeHosts.self,
     ]
 
     init(host: ExtensionHost) {
