@@ -4,6 +4,18 @@ CHANGELOG.md를 한국어로 옮긴 Zigzag의 릴리스 노트입니다. 앱에�
 
 ## [Unreleased]
 
+### 새로운 기능
+- ‘사이트 제어’에 호환성 모드가 생겼습니다. 제대로 작동하지 않는 사이트를 위한 기능으로, 스위치 하나로 그 사이트의 확장 프로그램, 광고 차단, 쿠키 배너, 숨긴 요소를 끄고, 끄면 그것들에 대해 해 둔 선택이 모두 돌아옵니다. 켜져 있는 동안 ‘사이트 제어’가 강조 색으로 표시되고, ‘설정 › 개인정보 보호 › 사이트’에도 나타납니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- ‘설정 › 모양 › 링크 위에 포인터를 올리면 주소 표시’가 생겼습니다. 끄면 링크 위에 포인터를 올려도 페이지 모서리에 막대가 나타나지 않으며, 브라우저 윈도우, Zigzag Mini, 웹 앱, 탭 개요에서 모두 같습니다. 끄기 전까지는 켜져 있습니다. [sarekhamri](https://github.com/sarekhamri) 님께 감사드립니다. ([#537](https://github.com/ZigaoWang/zigzag/issues/537))
+- ‘설정 › 모양 › 플로팅 사이드바 짧게 표시’가 생겼습니다. 사이드바를 숨긴 상태에서 페이지 위로 나오는 사이드바가 윈도우 높이의 3분의 2가 되고, 위아래로 6분의 1씩 비워 둡니다. 고정된 사이드바는 그대로입니다. 켜기 전까지는 꺼져 있습니다. [sarekhamri](https://github.com/sarekhamri) 님께 감사드립니다. ([#538](https://github.com/ZigaoWang/zigzag/issues/538))
+- ‘설정 › 모양 › 고정된 탭을 타일로 표시’가 생겼습니다. 폴더 밖에 있는 고정된 탭이 즐겨찾기 아래에 타일로 표시되며, 즐겨찾기와 같은 격자 안에서 가는 선을 사이에 두고 놓입니다. 열기, 로드 해제, 메뉴 표시, 드래그는 기존의 행과 똑같이 됩니다. 폴더와 그 안의 페이지는 그대로 행으로 남습니다. 켜기 전까지는 꺼져 있습니다. [sarekhamri](https://github.com/sarekhamri) 님께 감사드립니다. ([#539](https://github.com/ZigaoWang/zigzag/issues/539))
+- 설정의 긴 목록이 ‘사이트 권한’처럼 상자로 접힙니다. ‘단축키’의 각 메뉴, 저장된 답변을 안에 담은 각 다운로드 규칙, 각 종류의 기능 플래그, 그리고 항목이 세 개를 넘을 때의 ‘개발자 모드인 사이트’, ‘신뢰하는 인증서’, ‘페이지 크기’가 해당합니다. ‘설정 찾기’는 일치하는 항목이 있는 상자를 전과 같이 엽니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- ‘사이트 권한’의 자체 검색과 ‘설정 찾기’가 이제 권한과 선택으로도 사이트를 찾습니다. 카메라, 알림 또는 차단을 입력하면 그 선택을 한 모든 사이트가 사이트 이름 아래에 하나씩 표시됩니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#532](https://github.com/ZigaoWang/zigzag/issues/532))
+
+### 수정 사항
+- 설정이 더 빨리 열립니다. 각 섹션의 행은 처음 열 때 만들어지고, 접힌 상자의 행은 상자를 열거나 검색이 그 안을 살펴볼 때 만들어지므로, 일반에서 설정을 열어도 더 이상 다운로드, 단축키, 개발자를 만들지 않습니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- Bitwarden의 ‘생체 인식으로 잠금 해제’가 이제 Bitwarden 앱에 연결됩니다. Zigzag가 Bitwarden에 앱과 이미 통신할 수 있다고 알려서 Bitwarden이 허용을 요청하지 않았고, 그다음에는 Zigzag가 앱 연결을 막고 있었습니다. 이제 Bitwarden이 요청하고 Zigzag가 허용할지 묻습니다. 전에 생체 인식을 켜 두었다면 Bitwarden 설정에서 ‘생체 인식으로 잠금 해제’를 껐다가 다시 켜세요. [retorquere](https://github.com/retorquere) 님께 감사드립니다. ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag가 일본어와 한국어부터 독일어, 프랑스어, 스페인어, 러시아어까지 13개 언어를 더 지원합니다. 다운로드 규칙으로 저장된 파일을 전달할 수 있고, 라이브 폴더는 마지막으로 업데이트된 시간을 표시하며, 중국어 병음으로 입력하다가 영어로 바꿔도 불필요한 공백이 생기지 않습니다.
