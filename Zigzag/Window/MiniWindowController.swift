@@ -414,7 +414,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The page is on loan: closing the Mini gives it back to the browser rather than closing the tab.
     @discardableResult
     static func openPreview(of tab: Tab, from browser: BrowserWindowController,
-                            dockedIn edge: any MiniDockHosting) -> MiniWindowController? {
+                            dockedIn edge: any MiniDockHosting, reveal: Bool = true) -> MiniWindowController? {
         guard let url = tab.url, !tab.isPrivate,
               ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return nil }
         let holder = tab.pageHolder
@@ -430,7 +430,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         controller.tab.isOutsideTabList = borrow.wasOutsideTabList
         all.append(controller)
         Diagnostics.note("Zigzag Mini opened", site: url.host(), "from the edge sidebar")
-        controller.attachDocked(in: edge, quiet: true)
+        controller.attachDocked(in: edge, quiet: true, reveal: reveal)
         guard controller.isDockedInPage else {
             all.removeAll { $0 === controller }
             controller.window?.close()
@@ -442,15 +442,16 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// Swaps the previewed page without making a new Mini or resizing the card. The page it was showing goes back to
     /// its tab first; the next comes in live, with its scroll, form and media state as it was.
-    func loadPreview(_ tab: Tab) {
+    func loadPreview(_ tab: Tab, fromRight: Bool? = nil) {
         guard isDockedInPage, tab.spaceID == self.tab.spaceID, let url = tab.url, !tab.isPrivate else { return }
         if isBorrowingPage {
             guard tab !== self.tab else { return }
             giveBackBorrowedPage()
             adoptBorrowedPage(tab)
-            // Another page takes this one's place: unfold it from the sidebar's side, as the first page came in.
+            // Another page takes this one's place: unfold it from the sidebar's side, or from the side a space
+            // switch's list came from.
             root.layoutSubtreeIfNeeded()
-            revealDockedPage(fromRight: dockedHost?.dockPageOnRight ?? false)
+            revealDockedPage(fromRight: fromRight ?? dockedHost?.dockPageOnRight ?? false)
             return
         }
         sourceTab = tab
@@ -487,13 +488,20 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if !page.isClosed, let holder = page.pageHolder {
             holder.removeFromSuperview()
             // A page the browser's card replaced meanwhile stays out, so it never paints over the page there now.
-            if let origin = borrowed.origin, let card = borrowed.card, card.webView === page.webView {
-                holder.frame = borrowed.originFrame
-                // The card lays the page out again when the Web Inspector takes room beside it.
-                holder.onDockedRoomChange = { [weak card] in card?.needsLayout = true }
-                origin.addSubview(holder)
-                origin.needsLayout = true
-                card.needsLayout = true
+            // A card that cleared its page while the Mini had it — its “shown in another window” state, or no page —
+            // takes it back through show(), which clears that state; re-adding the holder alone would leave the page
+            // dead there until another tab and back.
+            if let card = borrowed.card, card.webView == nil || card.webView === page.webView {
+                if card.webView === page.webView, let origin = borrowed.origin {
+                    holder.frame = borrowed.originFrame
+                    // The card lays the page out again when the Web Inspector takes room beside it.
+                    holder.onDockedRoomChange = { [weak card] in card?.needsLayout = true }
+                    origin.addSubview(holder)
+                    origin.needsLayout = true
+                    card.needsLayout = true
+                } else if card.shownElsewhere == nil || card.shownElsewhere === page {
+                    card.show(page.webView)
+                }
             }
         }
         page.isOutsideTabList = borrowed.wasOutsideTabList
@@ -527,9 +535,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: The docked page's slide
 
+    /// The side the last docked fold was asked to come from: `true` the right. Read by tests and the debug bridge.
+    private(set) var lastRevealFromRight: Bool?
+
     /// Uncovers the docked page from the sidebar's side. Its layout is already the final one, so a live page doesn't
     /// reflow through the slide; the window's shadow comes back once the page is whole.
     func revealDockedPage(fromRight: Bool) {
+        lastRevealFromRight = fromRight
         guard dockedHost?.dockSlidesPage == true, !Tokens.Motion.reduceMotion,
               let rootLayer = root.layer, root.bounds.width > 1 else { return }
         pageSlideGeneration += 1
@@ -604,7 +616,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// presentation changes. Its window becomes a borderless child of the host's window, bound to that page area, so
     /// menus, `window.close()`, questions, find and the command bar all see the right window while it looks like part
     /// of the page. `quiet`: shown without taking the keyboard, as the edge sidebar's preview is.
-    func attachDocked(in host: any MiniDockHosting, quiet: Bool = false) {
+    func attachDocked(in host: any MiniDockHosting, quiet: Bool = false, reveal: Bool = true) {
         guard let window, let parent = host.dockParentWindow else { return }
         isDockedInPage = true
         dockedHost = host
@@ -641,7 +653,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             window.makeFirstResponder(tab.webView)
         }
-        if host.dockSlidesPage {
+        if host.dockSlidesPage, reveal {
             root.layoutSubtreeIfNeeded()
             revealDockedPage(fromRight: host.dockPageOnRight)
         }

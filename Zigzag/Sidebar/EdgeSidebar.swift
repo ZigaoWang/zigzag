@@ -368,7 +368,7 @@ final class EdgeSidebar {
     @discardableResult
     func dismissPreview() -> Bool {
         if noticeTab != nil {
-            closeNotice()
+            closeNotice(animated: true)
             return true
         }
         guard preview != nil else { return false }
@@ -406,8 +406,13 @@ final class EdgeSidebar {
     }
 
     /// The page is the same docked Mini as the in-page peek: its own floor-to-ceiling pill beside the sidebar.
-    private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
+    /// `foldFromRight`: a space switch folds from the side its list slid in on; nil is the sidebar's side.
+    private func showPreview(_ tab: Tab, in controller: BrowserWindowController, foldFromRight: Bool? = nil) {
         guard isShowing, let panel, let host, !tab.isPrivate, EdgeLensPolicy.takesPage(url: tab.url) else { return }
+        let fromNotice = noticeTab != nil
+        // A page replacing a page or a note already has the room: only the page folds in. The first page out widens
+        // the panel, and does it in place, with the page already at its final frame.
+        let wasWide = preview != nil || fromNotice
         if noticeTab != nil {
             noticeTab = nil
             host.noticeShowing = false
@@ -425,15 +430,24 @@ final class EdgeSidebar {
         previewPanelFrame = EdgeSidebarLayout.frame(in: shownVisible, width: wide, onRight: shownOnRight)
         host.cardWidth = sidebar
         host.pageShowing = true
-        panel.setFrame(previewPanelFrame, display: true)
+        if wasWide {
+            panel.setFrame(previewPanelFrame, display: true)
+        } else {
+            widenPanel()
+        }
         host.placeCard()
         host.layoutSubtreeIfNeeded()
         if let preview {
-            preview.loadPreview(tab)
-        } else if let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self) {
+            preview.loadPreview(tab, fromRight: foldFromRight)
+        } else if let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self, reveal: false) {
             mini.onInPageMiniClosed = { [weak self, weak mini] in self?.previewClosed(mini) }
             mini.onInPageMiniDetached = { [weak self, weak mini] in self?.previewDetached(mini) }
             preview = mini
+            previewTab = tab
+            mini.layoutInDock(force: true)
+            // The page is at its final place already; the fold uncovers it as the panel edge reaches it.
+            mini.revealDockedPage(fromRight: foldFromRight ?? shownOnRight)
+            return
         } else {
             narrowPanel()
             return
@@ -444,12 +458,16 @@ final class EdgeSidebar {
 
     /// One of Zigzag's own pages under the pointer: the panel can't lend its page, so the page area says where it
     /// works and offers the window. The panel widens exactly as for a page, so the row keeps the same shape.
-    private func showNotice(_ tab: Tab, in controller: BrowserWindowController) {
+    /// `foldFromRight`: a space switch folds from the side its list slid in on; nil is the sidebar's side.
+    private func showNotice(_ tab: Tab, in controller: BrowserWindowController, foldFromRight: Bool? = nil) {
         guard isShowing, let panel, let host, !tab.isPrivate, !EdgeLensPolicy.takesPage(url: tab.url) else { return }
         previewWork?.cancel()
         previewWork = nil
         closeWork?.cancel()
         closeWork = nil
+        // A page or a note already out has the room: the note folds into it. The first one out widens the panel,
+        // in place, the note already at its final frame.
+        let wasWide = preview != nil || noticeTab != nil
         // A page already out slides back to its tab while the note unfolds in its place, but the picked page stays
         // picked: the notice is only a glance.
         if let mini = preview {
@@ -471,26 +489,34 @@ final class EdgeSidebar {
             guard let self, let controller, let tab else { return }
             self.returnToBrowser(tab, in: controller)
         }
-        panel.setFrame(previewPanelFrame, display: true)
+        if wasWide {
+            panel.setFrame(previewPanelFrame, display: true)
+        } else {
+            widenPanel()
+        }
         host.placeCard()
         host.layoutSubtreeIfNeeded()
         // The note comes in from behind the card, as the page does, rather than appearing in one frame.
-        host.foldInSide()
+        host.foldInSide(fromRight: foldFromRight)
     }
 
     /// The note's button: the page is the window's, so the window comes forward on it and the panel puts itself away.
     private func returnToBrowser(_ tab: Tab, in controller: BrowserWindowController) {
+        // Put the panel away before selecting. A tab in another space would otherwise re-show its note through the
+        // space observer, folding it in just as the panel goes; hiding first also gives the panel the same edge
+        // tuck every other dismissal has.
+        hide(animated: true)
         controller.tabManager.select(tab)
         controller.bringForwardForEdge()
     }
 
     /// The note has gone: the panel narrows to the card unless a page is taking the area.
-    private func closeNotice() {
+    private func closeNotice(animated: Bool = false) {
         guard noticeTab != nil else { return }
         noticeTab = nil
         host?.noticeShowing = false
         host?.notice.onReturn = nil
-        if preview == nil { narrowPanel() }
+        if preview == nil { narrowPanel(animated: animated) }
     }
 
     private func schedulePreviewClose() {
@@ -524,6 +550,9 @@ final class EdgeSidebar {
         previewTab = nil
         lockedTab = nil
         if animated {
+            // The panel edge and the page's fold go together: the page keeps its final layout and is covered from
+            // the card's side as the panel narrows, rather than vanishing first and leaving the panel to jump.
+            narrowPanel(animated: true)
             mini.closeInPage(focusBack: false, animated: true)
         } else {
             mini.onInPageMiniClosed = nil
@@ -546,7 +575,8 @@ final class EdgeSidebar {
         preview = nil
         previewTab = nil
         lockedTab = nil
-        narrowPanel()
+        // A close that began with closePreview narrowed the panel with the page's fold; don't snap it again.
+        if panel?.frame != cardPanelFrame { narrowPanel(animated: true) }
         if moved {
             hide(animated: false)
         } else {
@@ -569,14 +599,37 @@ final class EdgeSidebar {
         hide(animated: false)
     }
 
-    private func narrowPanel() {
+    private func narrowPanel(animated: Bool = false) {
         previewPanelFrame = .zero
         guard isShowing, let host, let panel else { return }
         host.pageShowing = false
         host.noticeShowing = false
         if let target { host.cardWidth = target.edgeSidebarWidth }
         host.placeCard()
-        panel.setFrame(cardPanelFrame, display: true)
+        guard animated, !Tokens.Motion.reduceMotion else {
+            panel.setFrame(cardPanelFrame, display: true)
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Tokens.Motion.Role.drawer.duration(entering: false)
+            context.timingFunction = Tokens.Motion.Role.drawer.timing
+            panel.animator().setFrame(cardPanelFrame, display: true)
+        }
+    }
+
+    /// Widens the panel to the page's room in place: the page already sits at its final frame, so the panel's edge
+    /// moving out uncovers it rather than the page sliding over the sidebar.
+    private func widenPanel() {
+        guard let panel else { return }
+        guard !Tokens.Motion.reduceMotion else {
+            panel.setFrame(previewPanelFrame, display: true)
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Tokens.Motion.Role.drawer.duration(entering: true)
+            context.timingFunction = Tokens.Motion.Role.drawer.timing
+            panel.animator().setFrame(previewPanelFrame, display: true)
+        }
     }
 
     /// The panel shows the window's list, so a change to that list is a change to the panel. A space switch moves the
@@ -601,7 +654,13 @@ final class EdgeSidebar {
         }
         switch change {
         case .space:
-            lastSpaceID = controller.tabManager.currentSpaceID
+            let before = lastSpaceID
+            let after = controller.tabManager.currentSpaceID
+            // The list slides the new space in from the side it came from; the page folds the same way.
+            let slide = EdgePreviewRouting.spaceSlide(from: before, to: after,
+                                                      order: controller.tabManager.listedSpaces.map(\.id))
+            let fold: Bool? = slide == 0 ? nil : slide > 0
+            lastSpaceID = after
             guard EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: preview != nil || noticeTab != nil) else {
                 closeNotice()
                 closePreview()
@@ -614,10 +673,10 @@ final class EdgeSidebar {
                 return
             }
             if EdgeLensPolicy.takesPage(url: shown.url) {
-                showPreview(shown, in: controller)
+                showPreview(shown, in: controller, foldFromRight: fold)
                 if keepsPick, previewTab === shown { lockedTab = shown }
             } else {
-                showNotice(shown, in: controller)
+                showNotice(shown, in: controller, foldFromRight: fold)
                 lockedTab = nil
             }
         case .structure:
@@ -688,7 +747,7 @@ final class EdgeSidebar {
         managerToken = nil
         lastSpaceID = nil
         guard isShowing, let panel else { return }
-        if noticeTab != nil { closeNotice() }
+        if noticeTab != nil { closeNotice(animated: animated) }
         if preview != nil { closePreview(animated: false) }
         isShowing = false
         generation += 1
@@ -851,10 +910,11 @@ final class EdgeSidebarHost: NSView {
         let fold = CABasicAnimation(keyPath: "bounds.size.width")
         fold.fromValue = 0
         fold.toValue = size.width
-        fold.duration = 0.16
-        fold.timingFunction = Tokens.Motion.easeOut
+        let duration = Tokens.Motion.Role.drawer.duration(entering: true)
+        fold.duration = duration
+        fold.timingFunction = Tokens.Motion.Role.drawer.timing
         mask.add(fold, forKey: "fold")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.02) { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.noticeShowing else { return }
                 self.notice.layer?.mask = nil

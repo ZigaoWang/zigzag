@@ -590,7 +590,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let moveTracking { removeTrackingArea(moveTracking) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInActiveApp, .inVisibleRect], owner: self)
+        // The edge panel floats over another app while Zigzag is inactive: like the list's and the row's own hover
+        // areas, the part tracker must stay live there, or moving from one tile to another only refreshes on re-entry.
+        let active: NSTrackingArea.Options = tracksHoverWhileInactive ? .activeAlways : .activeInActiveApp
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, active, .inVisibleRect], owner: self)
         addTrackingArea(area)
         moveTracking = area
     }

@@ -255,12 +255,31 @@ struct InPageMiniHostTests {
         }
     }
 
+    @Test func aBorrowedPageComesBackToACardThatHadClearedIt() throws {
+        try inWindow(pageAt: "https://example.test/cleared") { browser, tab in
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))
+            let holder = try #require(tab.pageHolder)
+            // While the Mini has the page, the card can clear it — the “shown in another window” state, or a card
+            // left with no page. Returning has to go through the card so that state goes too; re-adding the holder
+            // behind its back left the active page dead until another tab and back.
+            browser.root.card.showElsewhere(tab)
+            #expect(browser.root.card.webView == nil)
+            mini.closeInPage(focusBack: false, animated: false)
+            #expect(tab.pageHolder === holder)
+            #expect(holder.superview != nil)
+            #expect(browser.root.card.webView === tab.webView)
+            #expect(browser.root.card.shownElsewhere == nil)
+            #expect(tab.host === browser)
+        }
+    }
+
     @Test func swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack() throws {
         try inWindow(pageAt: "https://example.test/one", and: "https://example.test/two") { browser, first, second in
             let mini = try #require(MiniWindowController.openPreview(of: first, from: browser, dockedIn: browser))
             let firstHolder = try #require(first.pageHolder)
-            mini.loadPreview(second)
+            mini.loadPreview(second, fromRight: true)
             #expect(mini.tab === second)
+            #expect(mini.lastRevealFromRight == true)
             #expect(second.host === mini)
             #expect(mini.root.card.webView === second.webView)
             // The first page is back in the card it came from, still the browser's page.

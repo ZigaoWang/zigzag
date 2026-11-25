@@ -4440,7 +4440,8 @@ extension BrowserWindowController {
 
     /// Something picked in the edge's panel: the panel goes and this window comes forward, as from the Dock.
     func bringForwardForEdge() {
-        EdgeSidebar.shared.hide(animated: false)
+        // The panel tucks toward its edge as every other dismissal does; the window then comes forward on the page.
+        EdgeSidebar.shared.hide(animated: true)
         guard let window else { return }
         if NSApp.isHidden { NSApp.unhide(nil) }
         if window.isMiniaturized { window.deminiaturize(nil) }
