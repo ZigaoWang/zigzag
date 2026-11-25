@@ -204,6 +204,10 @@ class InteractiveView: NSView {
     private var holdTimer: Timer?
     /// The menu a held press opened, while that press is still down.
     private weak var heldMenu: MenuPanel?
+    /// Follows the pointer and the button while that menu is open.
+    private var heldFollow: Timer?
+    /// The pointer on screen and whether the left button is down, as the system has them now.
+    var heldPointer: () -> (location: NSPoint, leftDown: Bool) = { (NSEvent.mouseLocation, NSEvent.pressedMouseButtons & 1 != 0) }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -284,6 +288,8 @@ class InteractiveView: NSView {
         mouseDownEvent = event
         dragging = false
         heldMenu = nil
+        heldFollow?.invalidate()
+        heldFollow = nil
         // A finger's hold has its own menu (`TouchHold`).
         if holdOpensMenu, onRightClick != nil, !TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) {
             startHoldTimer()
@@ -310,6 +316,40 @@ class InteractiveView: NSView {
         guard !entries.isEmpty else { return }
         isPressed = false
         heldMenu = MenuPanel.show(entries, from: self, placement: .below)
+        if heldMenu != nil { startHeldFollow() }
+    }
+
+    /// The window server can keep a title bar strip press's drag and release, so the menu reads the pointer too.
+    private func startHeldFollow() {
+        heldFollow?.invalidate()
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.followHeld() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        heldFollow = timer
+    }
+
+    private func followHeld() {
+        guard let heldMenu, MenuPanel.current === heldMenu, let window else { endHeldPress(); return }
+        let pointer = heldPointer()
+        let point = window.convertPoint(fromScreen: pointer.location)
+        if pointer.leftDown { heldMenu.track(windowPoint: point) } else { releaseHeld(at: point) }
+    }
+
+    /// Let go over an item, it's chosen; anywhere else the menu stays open to click.
+    private func releaseHeld(at windowPoint: NSPoint) {
+        let menu = heldMenu
+        endHeldPress()
+        isPressed = false
+        if let menu, MenuPanel.current === menu { menu.chooseTracked(windowPoint: windowPoint) }
+    }
+
+    private func endHeldPress() {
+        heldFollow?.invalidate()
+        heldFollow = nil
+        heldMenu = nil
+        mouseDownEvent = nil
+        dragging = false
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -334,10 +374,8 @@ class InteractiveView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         defer { mouseDownEvent = nil; dragging = false; holdTimer?.invalidate(); holdTimer = nil; heldMenu = nil }
-        if let heldMenu {
-            isPressed = false
-            // Let go over an item, it's chosen; anywhere else the menu stays open to click.
-            if MenuPanel.current === heldMenu { heldMenu.chooseTracked(windowPoint: event.locationInWindow) }
+        if heldMenu != nil {
+            releaseHeld(at: event.locationInWindow)
             return
         }
         guard isEnabled, mouseDownEvent != nil else { isPressed = false; return }

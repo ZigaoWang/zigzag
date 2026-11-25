@@ -847,6 +847,9 @@ struct SidebarRowMenuTests {
         button.frame = NSRect(x: 40, y: 500, width: 28, height: 28)
         window.contentView?.addSubview(button)
         BrowserWindowController.showsHistory(button, back: true) { nil }
+        // Held still on the button, whatever this Mac's own mouse is doing.
+        let held = window.convertPoint(toScreen: NSPoint(x: button.frame.midX, y: button.frame.midY))
+        button.heldPointer = { (held, true) }
         button.onRightClick = { _ in
             let menu = NSMenu()
             for title in ["One", "Two", "Three"] { menu.addItem(SidebarMenus.Item(title) { chosen(title) }) }
@@ -944,6 +947,166 @@ struct SidebarRowMenuTests {
             }
             for card in controller.root.paneCards {
                 #expect(card.header.back.holdOpensMenu && card.header.forward.holdOpensMenu)
+            }
+        }
+    }
+}
+
+/// Back held with the mouse through the window's own event path, onto a real page's history (#509).
+@MainActor
+struct BackHoldEventTests {
+    private func pages(_ names: [String], _ body: ([URL]) async throws -> Void) async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("hold-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let urls = try names.map { name in
+            let url = folder.appendingPathComponent("\(name).html")
+            try "<title>\(name)</title><p>\(name)".write(to: url, atomically: true, encoding: .utf8)
+            return url
+        }
+        try await body(urls)
+    }
+
+    private func until(_ seconds: Double = 10, _ condition: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return condition()
+    }
+
+    /// A window whose tab went through `urls`, on the last.
+    private func inWindow(_ urls: [URL], _ body: (BrowserWindowController, Tab) async throws -> Void) async throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: urls[0], title: "0", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.orderBack(nil)
+        for url in urls {
+            if url != urls[0] { tab.load(url) }
+            #expect(await until { tab.webView?.url == url && tab.webView?.isLoading == false })
+        }
+        controller.window?.layoutIfNeeded()
+        try await body(controller, tab)
+    }
+
+    /// The pointer and left button the control reads, moved by the events sent.
+    private final class Pointer {
+        var location = NSPoint.zero
+        var leftDown = false
+    }
+
+    /// Through the app's event queue; `delivered` false drops the drags and release, as the window server can.
+    private func send(_ type: NSEvent.EventType, at point: NSPoint, to window: NSWindow, pointer: Pointer, delivered: Bool = true) {
+        pointer.location = window.convertPoint(toScreen: point)
+        pointer.leftDown = type != .leftMouseUp
+        guard delivered || type == .leftMouseDown,
+              let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                             windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+        else { return }
+        NSApp.postEvent(event, atStart: false)
+    }
+
+    private func middle(of view: NSView) -> NSPoint { view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil) }
+
+    /// Down on Back, held past the delay, dragged onto the second page in the list and let go there.
+    private func pressDragRelease(_ button: InteractiveView, in window: NSWindow, delivered: Bool = true) async throws {
+        let pointer = Pointer()
+        button.heldPointer = { (pointer.location, pointer.leftDown) }
+        let start = middle(of: button)
+        send(.leftMouseDown, at: start, to: window, pointer: pointer)
+        try await Task.sleep(for: .seconds(InteractiveView.holdMenuDelay + 0.2))
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.anchor === button)
+        #expect(menu.itemTitles == ["two", "one"])
+        send(.leftMouseDragged, at: NSPoint(x: start.x + 2, y: start.y - 6), to: window, pointer: pointer, delivered: delivered)
+        send(.leftMouseDragged, at: menu.debugItemPoint(1), to: window, pointer: pointer, delivered: delivered)
+        try await Task.sleep(for: .milliseconds(200))
+        // The row under the pointer lights as it does under a finger.
+        #expect(menu.highlightedIndex == 1)
+        send(.leftMouseUp, at: menu.debugItemPoint(1), to: window, pointer: pointer, delivered: delivered)
+    }
+
+    @Test func pressDragAndReleaseOnTheSidebarsBackGoesThere() async throws {
+        try await pages(["one", "two", "three"]) { urls in
+            try await inWindow(urls) { controller, tab in
+                let window = try #require(controller.window)
+                let button = controller.sidebar.backButton
+                #expect(button.isEnabled)
+                try await pressDragRelease(button, in: window)
+                #expect(await until { tab.webView?.url == urls[0] && tab.webView?.isLoading == false })
+                #expect(MenuPanel.current == nil)
+            }
+        }
+    }
+
+    /// The window server counts the sidebar's top row as window drag area, so the drag may never arrive.
+    @Test func pressDragAndReleaseGoesThereWhenTheDragNeverArrives() async throws {
+        try await pages(["one", "two", "three"]) { urls in
+            try await inWindow(urls) { controller, tab in
+                let window = try #require(controller.window)
+                try await pressDragRelease(controller.sidebar.backButton, in: window, delivered: false)
+                #expect(await until { tab.webView?.url == urls[0] && tab.webView?.isLoading == false })
+                #expect(MenuPanel.current == nil)
+            }
+        }
+    }
+
+    @Test func holdAndReleaseOnBackLeavesTheListOpen() async throws {
+        try await pages(["one", "two", "three"]) { urls in
+            try await inWindow(urls) { controller, tab in
+                let window = try #require(controller.window)
+                let button = controller.sidebar.backButton
+                let pointer = Pointer()
+                button.heldPointer = { (pointer.location, pointer.leftDown) }
+                let point = middle(of: button)
+                send(.leftMouseDown, at: point, to: window, pointer: pointer)
+                try await Task.sleep(for: .seconds(InteractiveView.holdMenuDelay + 0.2))
+                let menu = try #require(MenuPanel.current)
+                defer { menu.close(animated: false) }
+                send(.leftMouseUp, at: point, to: window, pointer: pointer)
+                try await Task.sleep(for: .milliseconds(200))
+                #expect(MenuPanel.current === menu)
+                #expect(tab.webView?.url == urls[2])
+            }
+        }
+    }
+
+    @Test func pressDragAndReleaseOnTheTopBarsBackGoesThere() async throws {
+        let place = BrowserRootView.addressBarPlace
+        defer { BrowserRootView.addressBarPlace = place }
+        BrowserRootView.addressBarPlace = .always
+        try await pages(["one", "two", "three"]) { urls in
+            try await inWindow(urls) { controller, tab in
+                controller.placeAddress()
+                controller.window?.layoutIfNeeded()
+                let window = try #require(controller.window)
+                let button = controller.sidebar.backButton
+                #expect(button.isDescendant(of: controller.root.topBar))
+                try await pressDragRelease(button, in: window, delivered: false)
+                #expect(await until { tab.webView?.url == urls[0] && tab.webView?.isLoading == false })
+                #expect(MenuPanel.current == nil)
+            }
+        }
+    }
+
+    @Test func aPlainClickOnTheSidebarsBackGoesOneStep() async throws {
+        try await pages(["one", "two", "three"]) { urls in
+            try await inWindow(urls) { controller, tab in
+                let window = try #require(controller.window)
+                let pointer = Pointer()
+                let point = middle(of: controller.sidebar.backButton)
+                send(.leftMouseDown, at: point, to: window, pointer: pointer)
+                send(.leftMouseUp, at: point, to: window, pointer: pointer)
+                #expect(await until { tab.webView?.url == urls[1] && tab.webView?.isLoading == false })
+                #expect(MenuPanel.current == nil)
             }
         }
     }

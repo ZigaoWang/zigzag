@@ -255,6 +255,9 @@
   Test: SidebarRowMenuTests.aQuickClickOnBackGoesOneStepWithNoList
 - Hold, slide onto a page in the list and let go → that page.
   Test: SidebarRowMenuTests.pressDragAndReleaseOnAPageGoesThere
+  Test: BackHoldEventTests.pressDragAndReleaseOnTheSidebarsBackGoesThere
+  Test: BackHoldEventTests.pressDragAndReleaseGoesThereWhenTheDragNeverArrives
+  Test: BackHoldEventTests.pressDragAndReleaseOnTheTopBarsBackGoesThere
 - Back or Forward dimmed, with no pages that way → holding it opens nothing.
   Test: SidebarRowMenuTests.aDisabledBackOpensNothing
 - A finger held on Back or Forward → the same list; slide onto a page and lift to go there.
