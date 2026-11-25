@@ -290,6 +290,17 @@ struct ExternalLinkAskingTests {
         #expect(ask7)
         #expect(!asked.declined.contains(key))
     }
+    /// A ⇧-click a page handles itself comes back as its own `window.open`: the Mini is offered no WebKit configuration,
+    /// since no web view is returned for it to belong to.
+    @Test func aPageHandledShiftClickOffersTheMiniNoConfiguration() {
+        let host = InPageMiniRecordingHost()
+        let tab = Tab(url: URL(string: "https://example.com/")!, spaceID: UUID())
+        tab.host = host
+        #expect(tab.openPageHandledMini(URL(string: "https://example.com/watch?v=1")!))
+        #expect(host.configurations.count == 1)
+        #expect(host.configurations[0] == nil)
+    }
+
     /// An extension sending the tab to an app link (Downie): the link shows as the address while deciding, but the question belongs to the page, so its Always Open applies (#239).
     @Test func anAppLinkZigzagSendsIsFromThePageItsOn() {
         let link = URL(string: "downie://XUOpenLink?url=https://www.instagram.com/reel/1")
@@ -303,4 +314,23 @@ struct ExternalLinkAskingTests {
         // No asker: no page to store an answer under.
         #expect(ExternalLinks.page(showing: link, asker: nil) == nil)
     }
+}
+
+/// A tab host that records the configuration its in-page Mini was offered.
+@MainActor
+private final class InPageMiniRecordingHost: TabHost {
+    var configurations: [WKWebViewConfiguration?] = []
+    var hostWindow: NSWindow? { nil }
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender) {}
+    func tab(_ tab: Tab, openInPageMini url: URL, configuration: WKWebViewConfiguration?,
+             by sender: Tab.LoadSender) -> Bool {
+        configurations.append(configuration)
+        return true
+    }
+    func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction,
+             features: WKWindowFeatures) -> WKWebView? { nil }
+    func tabDidRequestClose(_ tab: Tab) {}
+    func tabWantsToReturnToOpener(_ tab: Tab) {}
+    func tab(_ tab: Tab, hoveringLink url: URL?) {}
+    func tabWantsToBeShown(_ tab: Tab) {}
 }

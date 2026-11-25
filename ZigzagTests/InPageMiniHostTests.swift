@@ -177,4 +177,164 @@ struct InPageMiniHostTests {
             mini.window?.close()
         }
     }
+
+    // MARK: Closing while docked
+
+    @Test func performCloseClosesTheDockedMiniAndItsPage() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let window = try #require(mini.window)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            #expect(browser.hasInPageMiniEscMonitor)
+            // No fade to wait for: the borderless child's close is synchronous, as ⌘W's is.
+            window.alphaValue = 0
+            window.performClose(nil)
+            #expect(!mini.isDockedInPage)
+            #expect(mini.tab.isClosed)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.hasInPageMiniEscMonitor)
+            #expect(!browser.root.hasInPageMini)
+            #expect(browser.root.inPageMiniDim == nil)
+            #expect(!MiniWindowController.all.contains { $0 === mini })
+        }
+    }
+
+    @Test func aTabsCloseRequestClosesTheDockedMini() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            try #require(mini.window).alphaValue = 0
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            mini.tabDidRequestClose(mini.tab)
+            #expect(!mini.isDockedInPage)
+            #expect(mini.tab.isClosed)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.root.hasInPageMini)
+        }
+    }
+
+    @Test func closingTheWindowItselfLetsGoOfTheHostAndDim() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            mini.window?.close()
+            #expect(!mini.isDockedInPage)
+            #expect(mini.tab.isClosed)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.hasInPageMiniEscMonitor)
+            #expect(!browser.root.hasInPageMini)
+        }
+    }
+
+    @Test func closingReleasesTheHostRecordAndTheController() async throws {
+        try await inWindowAsync { browser, tab in
+            weak var weakMini: MiniWindowController?
+            var mini: MiniWindowController? = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                                       in: browser, by: .page, dockedIn: browser)
+            weakMini = mini
+            browser.inPageMini.debugAdopt(try #require(mini), from: tab)
+            #expect(browser.inPageMini.record?.controller === mini)
+            mini?.window?.alphaValue = 0
+            mini?.closeInPage()
+            #expect(browser.inPageMini.record == nil)
+            #expect(!MiniWindowController.all.contains { $0 === mini })
+            mini = nil
+            // The record no longer owns it, and its callbacks hold it weakly; AppKit finishes letting the window go.
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(weakMini == nil)
+        }
+    }
+
+    // MARK: Undocking and full screen
+
+    @Test func expandingFromAKeptOnTopBrowserGivesANormalWindow() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let window = try #require(mini.window)
+            // A child inherits a Keep on Top parent's level, and keeps it after it is removed.
+            window.level = .floating
+            mini.promoteFromPage()
+            #expect(window.level == .normal)
+            #expect(!mini.isDockedInPage)
+            window.close()
+        }
+    }
+
+    @Test func aFailedFullScreenTransitionBringsTheDockedMiniBack() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            let window = try #require(browser.window)
+            NotificationCenter.default.post(name: NSWindow.willEnterFullScreenNotification, object: window)
+            #expect(mini.isWaitingForParentFullScreen)
+            browser.windowDidFailToEnterFullScreen(window)
+            #expect(!mini.isWaitingForParentFullScreen)
+            NotificationCenter.default.post(name: NSWindow.willExitFullScreenNotification, object: window)
+            #expect(mini.isWaitingForParentFullScreen)
+            browser.windowDidFailToExitFullScreen(window)
+            #expect(!mini.isWaitingForParentFullScreen)
+            mini.window?.alphaValue = 0
+            mini.closeInPage()
+        }
+    }
+
+    @Test func aDockedMiniIsNotSavedForAnUpdatesRestart() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: URL(string: "https://example.com/"), configuration: nil,
+                                                opener: tab, in: browser, by: .page, dockedIn: browser)
+            #expect(mini.savedForRelaunch == nil)
+            mini.promoteFromPage()
+            #expect(mini.savedForRelaunch != nil)
+            mini.window?.close()
+        }
+    }
+
+    // MARK: The off path
+
+    @Test func theStandaloneViewOrderIsTheSameAsMain() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab, in: browser)
+            let root = mini.root
+            func index(_ view: NSView) -> Int? { root.subviews.firstIndex { $0 === view } }
+            // Front to back: bar, strip, page, overlay, then the glow and the command bar over all of it.
+            let order = [root.bar, root.strip, root.card, root.overlay, root.attentionEdge, root.barLayer].compactMap(index)
+            #expect(order.count == 6)
+            #expect(order == order.sorted())
+            mini.window?.close()
+        }
+    }
+
+    @Test func theStandaloneViewOrderComesBackAfterDocking() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let root = mini.root
+            func index(_ view: NSView) -> Int { root.subviews.firstIndex { $0 === view } ?? -1 }
+            // Docked, the page fills the card under the strip.
+            #expect(index(root.card) < index(root.bar))
+            #expect(index(root.bar) < index(root.strip))
+            mini.promoteFromPage()
+            // Standalone again, the strip is above the page as in main.
+            #expect(index(root.bar) < index(root.strip))
+            #expect(index(root.strip) < index(root.card))
+            mini.window?.close()
+        }
+    }
+
+    @Test func theEscMonitorIsOnlyInstalledWhileAMiniIsDocked() throws {
+        try inWindow { browser, tab in
+            #expect(!browser.hasInPageMiniEscMonitor)
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            #expect(browser.hasInPageMiniEscMonitor)
+            mini.window?.alphaValue = 0
+            mini.closeInPage()
+            #expect(!browser.hasInPageMiniEscMonitor)
+        }
+    }
 }

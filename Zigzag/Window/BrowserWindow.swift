@@ -52,6 +52,16 @@ final class BrowserWindow: NSWindow {
     override var canBecomeKey: Bool { !isParked }
     override var canBecomeMain: Bool { !isParked && !isOverlayChild }
 
+    /// A Mini docked over a page is borderless and has no close button for AppKit to press, so ⌘W, ⇧⌘W, a page's
+    /// `window.close()` and an extension closing it all take this one way out.
+    override func performClose(_ sender: Any?) {
+        if let mini = windowController as? MiniWindowController, mini.isDockedInPage {
+            mini.closeInPage()
+            return
+        }
+        super.performClose(sender)
+    }
+
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         isParked ? frameRect : super.constrainFrameRect(frameRect, to: screen)
     }
