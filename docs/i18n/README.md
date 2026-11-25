@@ -14,7 +14,8 @@ so a translator who never sees the screen can still get it right:
 String(localized: "Close \(count) Tabs", comment: "Item in a tab's menu in the sidebar. The number is how many tabs are selected.")
 ```
 
-Then build, bring the catalog in step, and add the Chinese:
+Then build and bring the catalog in step. English is all a pull request needs: until a string is translated it reads
+in English, and the maintainers fill in every language before a release (see "The release gate" below).
 
 ```sh
 xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -derivedDataPath build/dev build

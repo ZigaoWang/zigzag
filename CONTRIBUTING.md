@@ -85,12 +85,12 @@ xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -derivedDataPath build/dev b
 scripts/sync-strings.sh build/dev
 ```
 
-`LocalizationTests` requires Simplified Chinese and checks the formatting of every translation where present.
-Other languages can follow in a later pull request: until then those strings use the English source. A release
-needs every shipped language complete, and `scripts/release.sh` stops until it is. Each language has a glossary in
-[docs/i18n](docs/i18n) for wording and typography, such as [Simplified Chinese](docs/i18n/glossary.md),
-[Traditional Chinese](docs/i18n/glossary.zh-Hant.md) and [Japanese](docs/i18n/glossary.ja.md). If you can't write the
-Simplified Chinese, say so in the pull request.
+Write new strings in English only, each with a comment that says where it shows. You don't need to translate:
+Zigzag ships in 14 languages, and the maintainers fill in every language before a release (`scripts/check-strings.py`
+lists what's missing, and `scripts/release.sh` won't build until it's complete). Until then a new string reads in
+English. If you speak one of the languages and want to translate your own strings too, follow that language's
+glossary in [docs/i18n](docs/i18n). `LocalizationTests` checks whatever translations are there for formatting, names
+and plurals.
 
 [docs/i18n/README.md](docs/i18n/README.md) has the whole workflow: one sentence per string, plurals, dates and
 numbers, the pseudo-locale for finding cut-off text, adding a language, and the release gate.

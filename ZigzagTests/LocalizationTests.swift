@@ -196,28 +196,10 @@ struct LocalizationTests {
         return bundle.localizedString(forKey: key, value: "⟨missing⟩", table: nil)
     }
 
-    /// Simplified Chinese is required; missing Traditional Chinese strings use the English source.
-    @Test func everyStringHasChinese() throws {
-        let language = "zh-Hans"
-        func translated(_ node: [String: Any]) -> Bool {
-            if let unit = node["stringUnit"] as? [String: Any] {
-                guard unit["state"] as? String == "translated", let value = unit["value"] as? String,
-                      !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-            }
-            return node.values.compactMap { $0 as? [String: Any] }.allSatisfy(translated)
-        }
-        for name in ["Localizable", "InfoPlist"] {
-            let strings = try Self.catalog(name)
-            #expect(!strings.isEmpty)
-            let missing = strings.compactMap { key, entry -> String? in
-                guard let units = (entry as? [String: Any])?["localizations"] as? [String: Any],
-                      let unit = units[language] as? [String: Any],
-                      !Self.forms(entry, language).isEmpty, translated(unit) else { return key }
-                return nil
-            }
-            #expect(missing.isEmpty, "\(name) has no \(language) for: \(missing.sorted().prefix(20))")
-        }
-        #expect(Bundle.main.localizations.contains(language))
+    /// Every shipped language is in the app; a string not translated yet reads in English until the release fills it
+    /// (scripts/check-strings.py), so a pull request needs English only.
+    @Test func everyShippedLanguageIsInTheApp() {
+        for language in Self.translated { #expect(Bundle.main.localizations.contains(language), "\(language)") }
     }
 
     /// Each translated string takes the same arguments as its English, of the same types, so a translation that
@@ -313,7 +295,7 @@ struct LocalizationTests {
 
     /// A string with no translation yet reads in English, never as a raw key: a key that isn't
     /// English text carries its English in the code, and an entry that is there is complete.
-    @Test(arguments: Self.translated.filter { $0 != "zh-Hans" }) func optionalLanguagesFallBackToEnglish(_ language: String) throws {
+    @Test(arguments: Self.translated) func everyLanguageFallsBackToEnglish(_ language: String) throws {
         let identifier = try NSRegularExpression(pattern: #"^[a-z0-9]+([.-][A-Za-z0-9]+)+$"#)
         var off: [String] = []
         for name in ["Localizable", "InfoPlist"] {
