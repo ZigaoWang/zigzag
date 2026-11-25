@@ -24,6 +24,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SidebarView()
     /// The sidebar the screen's edge brings out over other apps (#363), made the first time it comes out.
     private(set) var edgeSidebar: SidebarView?
+    /// The command bar is open over the screen in the edge panel, not in this window.
+    private(set) var edgeCommandBarInPlace = false
     private var edgeContainer: SidebarContainer?
     let root: BrowserRootView
     let inPageMini = InPageMiniHost()
@@ -4299,7 +4301,10 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func sidebarOpenCommandBar() {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.editAddressInPlace()
+            return
+        }
         commandBar.show(mode: .editCurrent)
     }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
@@ -4307,13 +4312,18 @@ extension BrowserWindowController: SidebarDelegate {
     func sidebarBlankMenu() -> [MenuPanel.Entry] { SidebarMenus.blankPanel(controller: self) }
     /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
     func sidebarDoubleClickedBlank() {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.newTabInPlace()
+            return
+        }
         if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) }
     }
     func sidebarShowDownloads(from view: NSView) {
-        guard EdgeSidebar.shared.isShowing else { return DownloadsPanel.show(from: view, in: self) }
-        bringForwardForEdge()
-        showDownloads(nil)
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.showDownloads(from: view, in: self)
+            return
+        }
+        DownloadsPanel.show(from: view, in: self)
     }
     /// A space dot's menu: Edit Space… opens at the dot.
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }
@@ -4371,6 +4381,14 @@ extension BrowserWindowController {
     var edgeSidebarOnRight: Bool { root.sidebarOnRight }
 
     /// The edge's sidebar, up to date with this window's, ready to show.
+    /// Opens the browser's own bar in the panel, over the screen: the same bar and results, its overlay and keyboard
+    /// in the edge popup while it is open (`CommandBarHost` in this file).
+    func showEdgeCommandBar(mode: CommandBarController.Mode) {
+        guard !commandBar.isVisible else { return }
+        edgeCommandBarInPlace = true
+        commandBar.show(mode: mode)
+    }
+
     func prepareEdgeSidebar() -> SidebarContainer {
         let (mirror, container) = edgeSidebarViews()
         mirror.isPrivate = tabManager.isPrivate
@@ -4414,6 +4432,7 @@ extension BrowserWindowController {
         // The panel is over another app, with no top bar to hold the address: its own row keeps the URL, the site
         // controls and the sidebar button, as the window's sidebar does when the address is not above the page.
         mirror.showsAddressRow = true
+        mirror.showsSidebarButton = false
         mirror.list.allowsDragging = false
         // The row's controls act on this window, as the list's do; the ones that open something in the page bring
         // the window forward, since there is nowhere over the panel for their UI to open.
@@ -4433,19 +4452,16 @@ extension BrowserWindowController {
             self.bringForwardForEdge()
             self.showTranslateMenu()
         }
-        mirror.address.siteControlsButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            self.bringForwardForEdge()
-            SitePanel.toggle(in: self, from: self.sidebar.address)
+        mirror.address.siteControlsButton.onClick = { [weak self, weak mirror] _ in
+            guard let self, let mirror, let tab = self.tabManager.selectedTab else { return }
+            EdgeSidebar.shared.showSiteControls(for: tab, from: mirror.address.siteControlsButton, in: self)
         }
-        mirror.address.siteControlsButton.onRightClick = { [weak self] _ in
-            guard let self else { return nil }
-            self.bringForwardForEdge()
-            SitePanel.toggle(in: self, from: self.sidebar.address)
+        mirror.address.siteControlsButton.onRightClick = { [weak self, weak mirror] _ in
+            guard let self, let mirror, let tab = self.tabManager.selectedTab else { return nil }
+            EdgeSidebar.shared.showSiteControls(for: tab, from: mirror.address.siteControlsButton, in: self)
             return nil
         }
         mirror.address.saveButton.onClick = { [weak self] _ in self?.saveFromStar() }
-        mirror.sidebarButton.onClick = { [weak self] event in self?.sidebar.sidebarButton.onClick?(event) }
         mirror.list.refusesSystemPages = true
         mirror.hoversWhileInactive = true
         mirror.onEditSpace = { [weak self] id in self?.openSpaceEditor(id, anchor: self?.sidebar.dot(for: id)) }
@@ -4512,11 +4528,17 @@ extension BrowserWindowController {
 // MARK: - The command bar in a browser window
 
 extension BrowserWindowController: CommandBarHost {
-    var commandBarOverlay: NSView { root.overlay }
-    var commandBarPageFrame: NSRect { root.cardFrame }
+    var commandBarOverlay: NSView {
+        edgeCommandBarInPlace ? (EdgeSidebar.shared.commandBarOverlay ?? root.overlay) : root.overlay
+    }
+    var commandBarPageFrame: NSRect {
+        edgeCommandBarInPlace ? (EdgeSidebar.shared.commandBarPageFrame ?? root.cardFrame) : root.cardFrame
+    }
     /// A split pane's address when asked for; else the address above the page, or the sidebar's while the sidebar
     /// shows docked.
     func commandBarAnchor(asked: NSView?) -> NSView? {
+        // The panel's bar opens over the screen's middle, not over a field in the window behind it.
+        if edgeCommandBarInPlace { return nil }
         if let asked { return asked }
         // In split view under the bar, the bar's address steps aside: the address of the pane you're in, as ⌘L edits
         // that pane's page.
@@ -4527,7 +4549,7 @@ extension BrowserWindowController: CommandBarHost {
         return root.chromeSidebarShown && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }
     var commandBarTabs: TabManager? { tabManager }
-    var commandBarIsMovable: Bool { true }
+    var commandBarIsMovable: Bool { !edgeCommandBarInPlace }
     var commandBarProfile: Profile { tabManager.profile }
     var commandBarTab: Tab? { tabManager.selectedTab }
     var commandBarSpace: SpaceInfo? { tabManager.currentSpace }
@@ -4551,7 +4573,26 @@ extension BrowserWindowController: CommandBarHost {
     }
 
     func commandBarRestoreFocus() {
+        // In the panel the popup hands the keyboard back when it goes (`commandBarDidHide`).
+        guard !edgeCommandBarInPlace else { return }
         if let selectedWebView { window?.makeFirstResponder(selectedWebView) }
+    }
+
+    /// A result chosen in the panel is the moment the browser comes forward on it.
+    func commandBarChoseResult() {
+        if edgeCommandBarInPlace { bringForwardForEdge() }
+    }
+
+    /// The same bar, keyboard and all, in the panel's popup.
+    func commandBarFocus(_ field: NSTextField) {
+        if edgeCommandBarInPlace { EdgeSidebar.shared.focusCommandBar(field) }
+        else { window?.makeFirstResponder(field) }
+    }
+
+    func commandBarDidHide() {
+        guard edgeCommandBarInPlace else { return }
+        edgeCommandBarInPlace = false
+        EdgeSidebar.shared.commandBarDidHide()
     }
 }
 

@@ -994,13 +994,22 @@ final class SidebarView: NSView {
     /// Where the favorites start while the address is above the page: the page's top, so the two line up under the
     /// top row (set by the window as it lays out the page).
     var contentTop: CGFloat = TopBarView.height { didSet { if contentTop != oldValue { needsLayout = true } } }
-    /// Off in the screen edge's sidebar, a list to pick from: the address row stays in the window.
+    /// Whether the address row shows, with the address and its buttons; off leaves a plain list.
     var showsAddressRow = true {
         didSet {
             guard showsAddressRow != oldValue else { return }
             holdsAddress = showsAddressRow
-            (addressViews + [sidebarButton]).forEach { $0.isHidden = !showsAddressRow }
+            addressViews.forEach { $0.isHidden = !showsAddressRow }
+            sidebarButton.isHidden = !showsAddressRow || !showsSidebarButton
             contentTop = showsAddressRow ? TopBarView.height : Tokens.Space.x2
+        }
+    }
+    /// Off in the edge panel, which has no window sidebar of its own to show or hide: the address row still shows.
+    var showsSidebarButton = true {
+        didSet {
+            guard showsSidebarButton != oldValue else { return }
+            sidebarButton.isHidden = !showsSidebarButton || !showsAddressRow
+            needsLayout = true
         }
     }
     /// The screen edge's sidebar answers hover while another app is in front.

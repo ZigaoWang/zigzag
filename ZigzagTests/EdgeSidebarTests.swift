@@ -166,6 +166,11 @@ struct EdgeSidebarTests {
         // A window's sidebar keeps its row.
         let window = SidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 800))
         #expect(window.holdsAddress && !window.address.isHidden)
+        // The edge panel keeps the row but has no window sidebar to show or hide.
+        let edge = SidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 800))
+        edge.showsSidebarButton = false
+        #expect(edge.holdsAddress && !edge.address.isHidden)
+        #expect(edge.sidebarButton.isHidden)
     }
 
     @Test func itsControlsAnswerHoverWithAnotherAppInFront() {

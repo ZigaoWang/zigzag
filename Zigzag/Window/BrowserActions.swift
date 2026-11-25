@@ -20,6 +20,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         commandBar.show(mode: .newTab)
     }
     @objc func openLocation(_ sender: Any?) {
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.editAddressInPlace()
+            return
+        }
         if commandBar.isVisible && commandBar.mode == .editCurrent { commandBar.dismiss(); return }
         // Autohide's bar comes back first, so the address is edited where it is (#359).
         revealAutohide()

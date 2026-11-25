@@ -41,8 +41,6 @@ enum EdgeSidebarLayout {
     static let dwell: TimeInterval = 0.25
     /// How long the pointer can be off the panel before it goes back.
     static let leaveDelay: TimeInterval = 0.15
-    /// Room beside the card for a menu from it and its submenu.
-    static let menuRoom: CGFloat = 480
 
     /// The panel: the visible frame's height, `width` wide against the screen's edge, never wider than the screen.
     static func frame(in visible: NSRect, width: CGFloat, onRight: Bool) -> NSRect {
@@ -132,6 +130,9 @@ final class EdgeSidebar {
     private weak var target: BrowserWindowController?
     private var panel: EdgeSidebarPanel?
     private var host: EdgeSidebarHost?
+    /// The browser's command bar over the screen while the panel is in use: the user types in it over another app.
+    private var commandBarPopup: EdgeCommandBarPopup?
+    private(set) var isCommandBarOpen = false
     private(set) var isShowing = false
     private var shownOnRight = false
     /// The visible frame the panel is on, and the panel's frame without a menu's room.
@@ -300,7 +301,7 @@ final class EdgeSidebar {
         guard isShowing, let panel else { return }
         let now = ProcessInfo.processInfo.systemUptime
         // A pressed button, a menu from the panel or a sheet keeps it out.
-        let held = NSEvent.pressedMouseButtons != 0 || MenuPanel.current != nil
+        let held = NSEvent.pressedMouseButtons != 0 || MenuPanel.current != nil || isCommandBarOpen
             || RunLoop.current.currentMode == .eventTracking || NSApp.modalWindow != nil
         // The menu's room goes with the menu; the wide frame while a page or its card is beside the sidebar stays.
         let intended = preview == nil && sleepingTab == nil ? cardPanelFrame : previewPanelFrame
@@ -830,6 +831,7 @@ final class EdgeSidebar {
         shownOnRight = onRight
         leftAt = nil
         // The keyboard stays with the app in front until the panel is clicked.
+        panel.nextResponder = target
         panel.orderFrontRegardless()
         let card = host.cardFrame
         Tokens.Motion.withoutAnimation { container.frame = card }
@@ -846,6 +848,12 @@ final class EdgeSidebar {
     func hide(animated: Bool = true) {
         followTimer?.invalidate()
         followTimer = nil
+        // The bar open over the screen goes with the panel.
+        if isCommandBarOpen, let target { target.commandBar.dismiss(restoringFocus: false) }
+        commandBarPopup?.orderOut(nil)
+        isCommandBarOpen = false
+        if let host, DownloadsPanel.isOpen(in: host.window) { DownloadsPanel.closeCurrent() }
+        if let panel, SitePanel.isOpen(in: panel) { SitePanel.closeCurrent() }
         managerToken?.cancel()
         managerToken = nil
         lastSpaceID = nil
@@ -874,17 +882,82 @@ final class EdgeSidebar {
         }
     }
 
-    /// A menu is opening in the panel: it widens on the inner side, the card staying put, so the menu isn't cut off.
-    func makeRoomForMenu() {
-        guard isShowing, let panel else { return }
-        if sleepingTab != nil { closeSleeping(animated: false) }
-        if preview != nil { closePreview(animated: false) }
-        let width = cardPanelFrame.width + EdgeSidebarLayout.menuRoom
-        panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
+    /// Downloads from the panel: the list in the panel's window, over the mirror's lane, not in the window behind.
+    func showDownloads(from anchor: NSView, in controller: BrowserWindowController) {
+        guard isShowing, let host, let target else { return }
+        DownloadsPanel.show(from: anchor, in: controller, host: host, lane: host.cardFrame,
+                            receding: target.edgeSidebar.map { [$0.list] } ?? [])
     }
 
-    /// ⌘T with the panel clicked into: a new tab in the window, which comes forward.
-    func newTab() { target?.newTabFromEdge() }
+    /// Site Controls for the page the address names: in the preview's own Mini when it shows that page, otherwise
+    /// over the panel's card, never in the browser window behind.
+    func showSiteControls(for tab: Tab, from button: IconButton, in controller: BrowserWindowController) {
+        if let preview, preview.tab === tab {
+            preview.showSiteControls()
+            return
+        }
+        guard isShowing, let host, let panel else { return }
+        SitePanel.toggle(in: EdgeSitePanelHost(tab: tab, overlay: host.overlay, window: panel), from: button)
+    }
+
+    /// ⌘T with the panel clicked into: the browser's own bar, over the screen, not in the window behind it.
+    func newTab() { newTabInPlace() }
+
+    // MARK: The command bar
+
+    /// The surface the browser's command bar draws in while the panel is in use: the screen the panel is on.
+    var commandBarOverlay: NSView? { isCommandBarOpen ? commandBarPopup?.overlay : nil }
+    var commandBarPageFrame: NSRect? {
+        guard isCommandBarOpen, let popup = commandBarPopup else { return nil }
+        return NSRect(origin: .zero, size: popup.frame.size)
+    }
+
+    func newTabInPlace() { openCommandBarInPlace(.newTab) }
+
+    /// The address clicked in the panel: the same bar, editing the page the panel shows.
+    func editAddressInPlace() { openCommandBarInPlace(.editCurrent) }
+
+    private func openCommandBarInPlace(_ mode: CommandBarController.Mode) {
+        guard isShowing, !isCommandBarOpen, let target, shownVisible.width > 0 else { return }
+        if target.commandBar.isVisible { target.commandBar.dismiss(restoringFocus: false) }
+        let popup = commandBarPopup ?? makeCommandBarPopup()
+        popup.setFrame(shownVisible, display: true)
+        popup.overlay.frame = NSRect(origin: .zero, size: shownVisible.size)
+        isCommandBarOpen = true
+        popup.orderFrontRegardless()
+        target.showEdgeCommandBar(mode: mode)
+    }
+
+    /// The bar's field is in the popup, and the popup takes the keyboard for it.
+    func focusCommandBar(_ field: NSTextField) {
+        guard isCommandBarOpen, let popup = commandBarPopup else { return }
+        popup.makeKeyAndOrderFront(nil)
+        popup.makeFirstResponder(field)
+    }
+
+    /// The bar has finished leaving: the popup goes, and the panel takes the keyboard back.
+    func commandBarDidHide() {
+        guard isCommandBarOpen else { return }
+        isCommandBarOpen = false
+        commandBarPopup?.orderOut(nil)
+        if isShowing { panel?.makeKey() }
+    }
+
+    private func makeCommandBarPopup() -> EdgeCommandBarPopup {
+        let popup = EdgeCommandBarPopup(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        popup.level = .statusBar
+        popup.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        popup.isOpaque = false
+        popup.backgroundColor = .clear
+        popup.hasShadow = false
+        popup.hidesOnDeactivate = false
+        popup.isMovable = false
+        popup.isReleasedWhenClosed = false
+        popup.animationBehavior = .none
+        popup.contentView = popup.overlay
+        commandBarPopup = popup
+        return popup
+    }
 
     /// A menu item picked in the panel: the window comes forward with its sidebar out, where the item acts.
     func chose() {
@@ -945,11 +1018,54 @@ final class EdgeSidebarPanel: NSPanel {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
         if mods == .command, event.charactersIgnoringModifiers?.lowercased() == "t" {
-            EdgeSidebar.shared.newTab()
+            EdgeSidebar.shared.newTabInPlace()
             return true
         }
+        // The panel's next responder is its browser window's controller, so the menu's tab and sidebar commands
+        // reach the same actions as they do in the window.
+        if NSApp.mainMenu?.performKeyEquivalent(with: event) == true { return true }
         return super.performKeyEquivalent(with: event)
     }
+}
+
+/// The edge panel as a place for Site Controls: the page the address names, and the panel opens over the card instead
+/// of bringing the browser window forward.
+@MainActor final class EdgeSitePanelHost: SitePanelPageHost {
+    let tab: Tab
+    let overlay: PassthroughView
+    private let hostWindow: NSWindow?
+
+    init(tab: Tab, overlay: PassthroughView, window: NSWindow?) {
+        self.tab = tab
+        self.overlay = overlay
+        self.hostWindow = window
+    }
+
+    var window: NSWindow? { hostWindow }
+    var listsExtensions: Bool { false }
+
+    func copyPageURL(_ sender: Any?) {
+        guard let url = tab.url else { return }
+        CleanLink.write(url, title: tab.displayTitle)
+        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."),
+                   symbol: "link", over: overlay, area: overlay.bounds)
+    }
+
+    func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab) {
+        BrowserWindowController.confirmClear(kind, of: tab, over: overlay) { [weak self] text in
+            guard let self else { return }
+            Toast.show(text, symbol: "checkmark.circle", over: self.overlay, area: self.overlay.bounds)
+        }
+    }
+}
+
+/// The browser's command bar over the screen while the edge sidebar is in use: it takes the keyboard without bringing
+/// Zigzag forward, so the bar can be typed in over another app.
+final class EdgeCommandBarPopup: NSPanel {
+    /// Flipped, as the window's command-bar overlay is: the bar's frames count down from the screen's top.
+    let overlay = PassthroughView()
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
 }
 
 /// The panel's content: the floating sidebar card, set off the screen's edge as it is from a window's.
@@ -964,11 +1080,14 @@ final class EdgeSidebarHost: NSView {
     /// A row whose page isn't running, in the page pill's place: the plain card and why it is asleep.
     let sleeping = EdgeAsleepPageView()
     var sleepingShowing = false { didSet { placeCard() } }
+    /// The panel as a place for Site Controls: their panel opens here, over the card, not in the browser behind.
+    let overlay = PassthroughView()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         sleeping.isHidden = true
         addSubview(sleeping)
+        addSubview(overlay)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1000,6 +1119,7 @@ final class EdgeSidebarHost: NSView {
         container?.frame = cardFrame
         sleeping.frame = pageFrame
         sleeping.isHidden = !sleepingShowing
+        overlay.frame = bounds
     }
 
     override func layout() {

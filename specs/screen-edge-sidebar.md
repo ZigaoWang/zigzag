@@ -19,11 +19,19 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.theDockAndStageManagerKeepTheirSide
 
 ## Using it
-- It shows the address, spaces, favorites, tabs and what's playing; rows don't drag out of it.
+- It shows the address, spaces, favorites, tabs and what's playing; its rows don't drag out, and it has no show/hide sidebar button of its own.
   Test: EdgeSidebarTests.theAddressRowCanBeHiddenForAList
 - Its rows and buttons light up under the pointer with the other app still in front.
   Test: EdgeSidebarTests.itsControlsAnswerHoverWithAnotherAppInFront
-- Click a tab, a favorite, New Tab or a menu item → the panel goes and the browser window comes forward and does it there.
+- Click a tab or a pinned link → its tab becomes active in the browser window, but Zigzag doesn't come forward and the panel stays out.
+  No test yet.
+- The address opens the browser's command bar over the screen, in the panel, and ⌘T does too; typing, Return and Esc all work there without bringing Zigzag forward.
+  No test yet.
+- Downloads and Site Controls open in the panel, over its card, not in the window behind it.
+  No test yet.
+- The menu bar's tab and sidebar keys (⌘T, ⌘W, ⌘L, ⌘1–9 and the rest) act on the browser window while the panel or its preview has the keyboard.
+  No test yet.
+- Menus from the panel (New Tab, New Space, a row's menu) open beside it without stretching the sidebar.
   No test yet.
 - The pointer moves off it, Esc, another app or another Space → it goes back, and the app in front keeps the keyboard unless the panel was clicked.
   Test: EdgeSidebarTests.thePanelRunsDownTheScreensEdgeAndStaysWhileThePointerIsOnIt
