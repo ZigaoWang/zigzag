@@ -4,22 +4,6 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
-### Nieuw
-- Zoeken in de geschiedenis negeert accenten en hoofdletters, vindt elk woord in willekeurige volgorde en markeert het, en verbergt nooit een resultaat in een stapel; elk deel van de dag heeft één kop, twee pagina’s van één website blijven twee rijen, en de lijst reageert op de pijltoetsen, Delete, ⌘Return, ⌘F en een klik met de rechtermuisknop die een hele website verwijdert.
-- Terwijl een livemap op nieuwe pagina’s controleert, toont het badge op het pictogram een draaiende ring, zoals Mail een mailbox toont die wordt gecontroleerd, en die stopt zodra de controle klaar is.
-- Het venster Nieuwe livemap en Wijzig livemap toont het pictogram van de map, zoals de navigatiekolom: dat van GitHub voor een GitHub-lijst, dat van de website voor een feed, of het pictogram dat je koos. Klik erop om het pictogram te wijzigen, zoals met Wijzig pictogram…, en een nieuwe map houdt het gekozen pictogram.
-
-### Gewijzigd
-- Swipes met twee vingers terug en vooruit gaan soepeler, werken al bij een kortere afstand of een lichtere veeg, houden de pagina van op en neer schuiven af en laten nooit de pijl in beeld of de pagina verschoven achter, in tabbladen, Split View en Zigzag Mini.
-
-### Opgelost
-- Met de adresbalk boven de pagina en een doorzichtige space houdt een video die wordt afgespeeld de grafische onderdelen van de Mac niet langer veel drukker bezig dan met de balk uit. Het glas van het venster blijft nu achter de navigatiekolom in plaats van achter het hele venster.
-- Een tabblad dat uren in de slaapstand stond terwijl je Mac weinig geheugen had, is daarna niet langer afgemeld bij websites als Azure DevOps en Microsoft 365: als het deel van WebKit dat aanmeldcookies bewaart stopt, zoals macOS kan doen bij geheugentekort, zet Zigzag ze terug voordat de pagina laadt. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- Een video in schermvullende weergave wordt niet langer bedekt door de eigen bovenbalk of zijkolom van de website, zoals bij Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
-- Terug, vooruit en opnieuw laden laten niet langer een lege plek over voor de vensterknoppen waar die niet worden getoond, zoals in schermvullende weergave voordat de menubalk omlaag komt, en de vensterknoppen blijven in de balk terwijl de kortere zwevende navigatiekolom openstaat. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
-- Het menu van een livemap dat openblijft tijdens het bijwerken, gaat nu van Bezig met bijwerken… naar Zojuist bijgewerkt, of naar de reden waarom vernieuwen mislukte, zonder te sluiten.
-- Met Favorieten per rij op Automatisch worden favorieten gelijk over hun rijen verdeeld: zes waar er vier passen zijn twee rijen van drie, niet vier en twee.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans en Russisch; downloadregels die het bewaarde bestand doorgeven; livemappen die laten zien wanneer ze voor het laatst zijn bijgewerkt; en na Chinees Pinyin overschakelen naar Engels zonder losse spaties.
@@ -36,6 +20,12 @@ Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans e
 - Instellingen › Uiterlijk › Vastgezette tabbladen als tegels: vastgezette tabbladen buiten mappen verschijnen als tegels onder je favorieten, in hetzelfde raster met een fijne lijn ertussen, en ze openen, worden uit het geheugen gehaald, tonen hun menu en worden gesleept zoals hun rijen. Mappen en hun pagina’s blijven rijen. Het staat uit tot je het aanzet. Met dank aan [sarekhamri](https://github.com/sarekhamri). ([#539](https://github.com/ZigaoWang/zigzag/issues/539))
 - In Instellingen klappen lange lijsten nu in vakken in, net als bij Websitetoestemmingen: elk menu in Toetscombinaties, elke downloadregel met haar bewaarde antwoorden erin, elk soort feature flags, en Websites in ontwikkelaarsmodus, Vertrouwde certificaten en Paginagroottes zodra ze meer dan drie vermelden. Zoek een instelling opent nog steeds het vak waarin een treffer staat. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - De eigen zoekfunctie van Websitetoestemmingen en Zoek een instelling vinden websites nu op toestemming en op keuze: typ camera, meldingen of blokkeer om elke website met die keuze te zien, elk onder de naam van zijn website. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#532](https://github.com/ZigaoWang/zigzag/issues/532))
+- Zoeken in de geschiedenis negeert accenten en hoofdletters, vindt elk woord in willekeurige volgorde en markeert het, en verbergt nooit een resultaat in een stapel; elk deel van de dag heeft één kop, twee pagina’s van één website blijven twee rijen, en de lijst reageert op de pijltoetsen, Delete, ⌘Return, ⌘F en een klik met de rechtermuisknop die een hele website verwijdert.
+- Terwijl een livemap op nieuwe pagina’s controleert, toont het badge op het pictogram een draaiende ring, zoals Mail een mailbox toont die wordt gecontroleerd, en die stopt zodra de controle klaar is.
+- Het venster Nieuwe livemap en Wijzig livemap toont het pictogram van de map, zoals de navigatiekolom: dat van GitHub voor een GitHub-lijst, dat van de website voor een feed, of het pictogram dat je koos. Klik erop om het pictogram te wijzigen, zoals met Wijzig pictogram…, en een nieuwe map houdt het gekozen pictogram.
+
+### Gewijzigd
+- Swipes met twee vingers terug en vooruit gaan soepeler, werken al bij een kortere afstand of een lichtere veeg, houden de pagina van op en neer schuiven af en laten nooit de pijl in beeld of de pagina verschoven achter, in tabbladen, Split View en Zigzag Mini.
 
 ### Opgelost
 - Als Zigzag Mini boven een pagina open is, verschuift scrollen over de gedimde pagina de pagina erachter niet meer. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -45,3 +35,10 @@ Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans e
 - Een doorzichtige space met Helder glas houdt de grafische chip van de Mac niet meer bezig terwijl Zigzag niets doet, zelfs op een lege pagina of in Instellingen. macOS tekende elk frame het hele venster en de schaduw ervan opnieuw; nu gebeurt dat alleen als er iets verandert. De voortgangsbalk van de updatekaart stopt ook met schuiven als die verborgen is.
 - Instellingen opent sneller. De rijen van een onderdeel worden gemaakt als je het voor het eerst opent, en die van een ingeklapt vak als je het opent of een zoekopdracht erin kijkt, dus Instellingen openen bij Algemeen bouwt Downloads, Toetscombinaties en Ontwikkelaar niet meer op. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - Ontgrendelen met biometrie van Bitwarden bereikt nu de Bitwarden-app. Zigzag had Bitwarden gezegd dat het al met de app kon praten, waardoor Bitwarden nooit vroeg, en daarna hield Zigzag het bij de app weg. Nu vraagt Bitwarden het en vraagt Zigzag jou het toe te staan. Heb je biometrie eerder aangezet, zet dan Ontgrendelen met biometrie in de instellingen van Bitwarden uit en weer aan. Met dank aan [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Met de adresbalk boven de pagina en een doorzichtige space houdt een video die wordt afgespeeld de grafische onderdelen van de Mac niet langer veel drukker bezig dan met de balk uit. Het glas van het venster blijft nu achter de navigatiekolom in plaats van achter het hele venster.
+- Een tabblad dat uren in de slaapstand stond terwijl je Mac weinig geheugen had, is daarna niet langer afgemeld bij websites als Azure DevOps en Microsoft 365: als het deel van WebKit dat aanmeldcookies bewaart stopt, zoals macOS kan doen bij geheugentekort, zet Zigzag ze terug voordat de pagina laadt. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Een video in schermvullende weergave wordt niet langer bedekt door de eigen bovenbalk of zijkolom van de website, zoals bij Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Terug, vooruit en opnieuw laden laten niet langer een lege plek over voor de vensterknoppen waar die niet worden getoond, zoals in schermvullende weergave voordat de menubalk omlaag komt, en de vensterknoppen blijven in de balk terwijl de kortere zwevende navigatiekolom openstaat. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Het menu van een livemap dat openblijft tijdens het bijwerken, gaat nu van Bezig met bijwerken… naar Zojuist bijgewerkt, of naar de reden waarom vernieuwen mislukte, zonder te sluiten.
+- Met Favorieten per rij op Automatisch worden favorieten gelijk over hun rijen verdeeld: zes waar er vier passen zijn twee rijen van drie, niet vier en twee.
+

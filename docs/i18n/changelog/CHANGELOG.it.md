@@ -4,22 +4,6 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
-### Novità
-- La ricerca nella Cronologia ignora accenti e maiuscole, trova ogni parola in qualsiasi ordine e la evidenzia, e non nasconde mai un risultato in una pila; ogni parte della giornata ha un solo titolo, due pagine dello stesso sito restano due righe, e l’elenco risponde ai tasti freccia, il tasto Elimina, ⌘Return, ⌘F e a un clic destro che rimuove un intero sito.
-- Mentre una cartella live cerca nuove pagine, il badge sulla sua icona mostra un anello che gira, come Mail mostra una casella mentre la controlla, e si ferma appena il controllo finisce.
-- Le finestre Nuova cartella live e Modifica cartella live mostrano l’icona della cartella, come la barra laterale: quella di GitHub per un elenco GitHub, quella del sito per un feed o quella che hai scelto. Fai clic per cambiare l’icona, come con Cambia icona…, e una nuova cartella mantiene l’icona scelta.
-
-### Modifiche
-- Gli scorrimenti a due dita indietro e avanti sono più fluidi, partono con una distanza più breve o un gesto più leggero, non fanno slittare la pagina in su e in giù e non lasciano mai la freccia visibile o la pagina spostata, nei pannelli, nella vista divisa e in Zigzag Mini.
-
-### Correzioni
-- Con la barra degli indirizzi sopra la pagina e uno spazio trasparente, un video in riproduzione non tiene più la grafica del Mac molto più impegnata che con la barra disattivata. Il vetro della finestra ora resta dietro la barra laterale invece che dietro tutta la finestra.
-- Un pannello rimasto in sospensione per ore mentre il Mac aveva poca memoria non si riattiva più senza accesso a siti come Azure DevOps e Microsoft 365: se la parte di WebKit che conserva i cookie di accesso si ferma, come macOS può imporre quando la memoria scarseggia, Zigzag li rimette a posto prima che la pagina si carichi. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- Un video a schermo intero non viene più coperto dalla barra superiore o dalla colonna laterale del sito, come su Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
-- Indietro, Avanti e Ricarica non lasciano più uno spazio vuoto per i pulsanti della finestra dove non sono mostrati, come a schermo intero prima che scenda la barra dei menu, e i pulsanti della finestra restano nella barra mentre è aperta la barra laterale mobile, più corta. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
-- Il menu di una cartella live lasciato aperto durante l’aggiornamento ora passa da Aggiornamento in corso… ad Aggiornata proprio ora, o al motivo per cui non è stato possibile aggiornare, senza chiudersi.
-- Con Preferiti per riga su Automatico, i preferiti si distribuiscono in modo uniforme sulle righe: sei dove ne starebbero quattro diventano due righe da tre, non quattro e due.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, francese, spagnolo e russo; regole di download che trasferiscono il file salvato; cartelle live che dicono quando si sono aggiornate l’ultima volta; e niente più spazi di troppo quando scrivi in pinyin cinese e passi all’inglese.
@@ -36,6 +20,12 @@ Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, frances
 - Impostazioni › Aspetto › Pannelli fissati come riquadri: i pannelli fissati fuori dalle cartelle appaiono come riquadri sotto i preferiti, nella stessa griglia con una linea sottile in mezzo, e si aprono, si scaricano dalla memoria, mostrano il loro menu e si trascinano come le loro righe. Le cartelle e le loro pagine restano righe. È disattivata finché non la attivi. Grazie a [sarekhamri](https://github.com/sarekhamri). ([#539](https://github.com/ZigaoWang/zigzag/issues/539))
 - In Impostazioni, gli elenchi lunghi si richiudono in riquadri come in Autorizzazioni dei siti: ogni menu in Scorciatoie, ogni regola di download con le risposte salvate all’interno, ogni tipo di flag delle funzionalità, e Siti in modalità sviluppatore, Certificati attendibili e Dimensioni pagina quando elencano più di tre voci. Trova un’impostazione apre ancora il riquadro in cui c’è un risultato. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - La ricerca di Autorizzazioni dei siti e Trova un’impostazione ora trovano i siti per autorizzazione e per scelta: scrivi fotocamera, notifiche o blocca per vedere ogni sito con quella scelta, ciascuno sotto il nome del suo sito. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#532](https://github.com/ZigaoWang/zigzag/issues/532))
+- La ricerca nella Cronologia ignora accenti e maiuscole, trova ogni parola in qualsiasi ordine e la evidenzia, e non nasconde mai un risultato in una pila; ogni parte della giornata ha un solo titolo, due pagine dello stesso sito restano due righe, e l’elenco risponde ai tasti freccia, il tasto Elimina, ⌘Return, ⌘F e a un clic destro che rimuove un intero sito.
+- Mentre una cartella live cerca nuove pagine, il badge sulla sua icona mostra un anello che gira, come Mail mostra una casella mentre la controlla, e si ferma appena il controllo finisce.
+- Le finestre Nuova cartella live e Modifica cartella live mostrano l’icona della cartella, come la barra laterale: quella di GitHub per un elenco GitHub, quella del sito per un feed o quella che hai scelto. Fai clic per cambiare l’icona, come con Cambia icona…, e una nuova cartella mantiene l’icona scelta.
+
+### Modifiche
+- Gli scorrimenti a due dita indietro e avanti sono più fluidi, partono con una distanza più breve o un gesto più leggero, non fanno slittare la pagina in su e in giù e non lasciano mai la freccia visibile o la pagina spostata, nei pannelli, nella vista divisa e in Zigzag Mini.
 
 ### Correzioni
 - Con Zigzag Mini aperto sopra una pagina, scorrere sulla pagina oscurata non muove più la pagina dietro. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -45,3 +35,10 @@ Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, frances
 - Uno spazio con trasparenza e vetro Trasparente non tiene più occupata la grafica del Mac mentre Zigzag è fermo, anche su una pagina vuota o in Impostazioni. macOS ridisegnava l’intera finestra e la sua ombra a ogni fotogramma; ora la disegna solo quando cambia qualcosa. Anche la barra di avanzamento del riquadro di aggiornamento smette di scorrere quando è nascosto.
 - Impostazioni si apre più in fretta. Le righe di una sezione vengono create alla prima apertura, e quelle di un riquadro richiuso quando lo apri o una ricerca lo guarda, quindi aprire Impostazioni su Generali non crea più Download, Scorciatoie o Sviluppatore. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - Sblocca con dati biometrici di Bitwarden ora raggiunge l’app Bitwarden. Zigzag aveva detto a Bitwarden di poter già comunicare con l’app, quindi Bitwarden non chiedeva mai, e poi Zigzag la teneva lontana dall’app. Ora Bitwarden chiede e Zigzag ti chiede di consentirlo. Se avevi attivato i dati biometrici in precedenza, disattiva e riattiva Sblocca con dati biometrici nelle impostazioni di Bitwarden. Grazie a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Con la barra degli indirizzi sopra la pagina e uno spazio trasparente, un video in riproduzione non tiene più la grafica del Mac molto più impegnata che con la barra disattivata. Il vetro della finestra ora resta dietro la barra laterale invece che dietro tutta la finestra.
+- Un pannello rimasto in sospensione per ore mentre il Mac aveva poca memoria non si riattiva più senza accesso a siti come Azure DevOps e Microsoft 365: se la parte di WebKit che conserva i cookie di accesso si ferma, come macOS può imporre quando la memoria scarseggia, Zigzag li rimette a posto prima che la pagina si carichi. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Un video a schermo intero non viene più coperto dalla barra superiore o dalla colonna laterale del sito, come su Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Indietro, Avanti e Ricarica non lasciano più uno spazio vuoto per i pulsanti della finestra dove non sono mostrati, come a schermo intero prima che scenda la barra dei menu, e i pulsanti della finestra restano nella barra mentre è aperta la barra laterale mobile, più corta. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Il menu di una cartella live lasciato aperto durante l’aggiornamento ora passa da Aggiornamento in corso… ad Aggiornata proprio ora, o al motivo per cui non è stato possibile aggiornare, senza chiudersi.
+- Con Preferiti per riga su Automatico, i preferiti si distribuiscono in modo uniforme sulle righe: sei dove ne starebbero quattro diventano due righe da tre, non quattro e due.
+

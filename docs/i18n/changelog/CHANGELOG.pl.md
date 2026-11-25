@@ -4,22 +4,6 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
-### Nowe
-- Wyszukiwanie w historii pomija akcenty i wielkość liter, znajduje każde słowo w dowolnej kolejności i je wyróżnia, a dopasowania nigdy nie chowa w stosie; każda pora dnia ma jeden nagłówek, dwie strony z jednej witryny pozostają dwoma wierszami, a lista reaguje na klawisze strzałek, Delete, ⌘Return, ⌘F i na kliknięcie prawym przyciskiem, które usuwa całą witrynę.
-- Gdy folder na żywo sprawdza nowe strony, plakietka na jego ikonie pokazuje obracający się pierścień, tak jak Mail pokazuje sprawdzaną skrzynkę, i zatrzymuje się, gdy tylko sprawdzanie się skończy.
-- Arkusz „Nowy folder na żywo” i „Edytuj folder na żywo” pokazuje ikonę folderu tak jak pasek boczny: ikonę GitHuba dla listy z GitHuba, ikonę witryny dla kanału albo wybraną przez Ciebie. Kliknij ją, aby zmienić ikonę jak przez „Zmień ikonę…”, a nowy folder zachowa wybraną ikonę.
-
-### Zmieniono
-- Przesunięcia dwoma palcami wstecz i do przodu są płynniejsze, działają przy krótszym dystansie lub lżejszym machnięciu, nie pozwalają stronie przesuwać się w górę i w dół i nigdy nie zostawiają strzałki na ekranie ani przesuniętej strony, w kartach, w Split View i w Zigzag Mini.
-
-### Naprawiono
-- Gdy pasek adresu jest nad stroną, a przestrzeń jest przezroczysta, odtwarzane wideo nie obciąża już grafiki Maca dużo bardziej niż przy wyłączonym pasku. Szkło okna zostaje teraz za paskiem bocznym, a nie za całym oknem.
-- Karta, która spała przez wiele godzin, gdy Mac miał mało pamięci, nie budzi się już wylogowana z witryn takich jak Azure DevOps i Microsoft 365: jeśli część WebKit przechowująca pliki cookie logowania się zatrzyma, co macOS może zrobić przy braku pamięci, Zigzag przywraca je przed wczytaniem strony. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- Wideo w trybie pełnoekranowym nie jest już zasłaniane przez górny pasek ani boczną kolumnę samej witryny, jak na Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
-- Przyciski wstecz, dalej i ponownego wczytania nie zostawiają już pustego miejsca na przyciski okna tam, gdzie ich nie ma, jak w trybie pełnoekranowym, zanim opadnie pasek menu, a przyciski okna zostają na pasku, gdy wysunięty jest krótszy pływający pasek boczny. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
-- Menu folderu na żywo otwarte w trakcie aktualizacji zmienia się teraz z „Aktualizowanie…” na „Zaktualizowano przed chwilą” albo na powód, dla którego nie udało się odświeżyć, bez zamykania.
-- Gdy „Ulubione w wierszu” ma wartość „Automatycznie”, ulubione rozkładają się równo na wiersze: sześć tam, gdzie zmieściłoby się cztery, to dwa wiersze po trzy, a nie cztery i dwa.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.
@@ -36,6 +20,12 @@ Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemi
 - „Ustawienia” › „Wygląd” › „Przypięte karty jako kafelki”: przypięte karty poza folderami pojawiają się jako kafelki pod ulubionymi, w tej samej siatce, z cienką linią między nimi, i otwierają się, wyładowują, pokazują swoje menu i przeciągają tak jak ich wiersze. Foldery i ich strony pozostają wierszami. Jest wyłączone, dopóki go nie włączysz. Podziękowania dla [sarekhamri](https://github.com/sarekhamri). ([#539](https://github.com/ZigaoWang/zigzag/issues/539))
 - W Ustawieniach długie listy zwijają się do pól, tak jak „Uprawnienia witryn”: każde menu w „Skrótach”, każda reguła pobierania z zapisanymi odpowiedziami w środku, każdy rodzaj flag funkcji oraz „Witryny w trybie programisty”, „Zaufane certyfikaty” i „Rozmiary stron”, gdy mają więcej niż trzy pozycje. „Znajdź ustawienie” nadal otwiera pole, w którym jest wynik. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - Własne wyszukiwanie „Uprawnień witryn” i „Znajdź ustawienie” znajdują teraz witryny według uprawnienia i wyboru: wpisz „Kamera”, „Powiadomienia” lub „Zablokuj”, aby zobaczyć każdą witrynę z takim wyborem, każdą pod nazwą jej witryny. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#532](https://github.com/ZigaoWang/zigzag/issues/532))
+- Wyszukiwanie w historii pomija akcenty i wielkość liter, znajduje każde słowo w dowolnej kolejności i je wyróżnia, a dopasowania nigdy nie chowa w stosie; każda pora dnia ma jeden nagłówek, dwie strony z jednej witryny pozostają dwoma wierszami, a lista reaguje na klawisze strzałek, Delete, ⌘Return, ⌘F i na kliknięcie prawym przyciskiem, które usuwa całą witrynę.
+- Gdy folder na żywo sprawdza nowe strony, plakietka na jego ikonie pokazuje obracający się pierścień, tak jak Mail pokazuje sprawdzaną skrzynkę, i zatrzymuje się, gdy tylko sprawdzanie się skończy.
+- Arkusz „Nowy folder na żywo” i „Edytuj folder na żywo” pokazuje ikonę folderu tak jak pasek boczny: ikonę GitHuba dla listy z GitHuba, ikonę witryny dla kanału albo wybraną przez Ciebie. Kliknij ją, aby zmienić ikonę jak przez „Zmień ikonę…”, a nowy folder zachowa wybraną ikonę.
+
+### Zmieniono
+- Przesunięcia dwoma palcami wstecz i do przodu są płynniejsze, działają przy krótszym dystansie lub lżejszym machnięciu, nie pozwalają stronie przesuwać się w górę i w dół i nigdy nie zostawiają strzałki na ekranie ani przesuniętej strony, w kartach, w Split View i w Zigzag Mini.
 
 ### Naprawiono
 - Gdy Zigzag Mini jest otwarty nad stroną, przewijanie nad przyciemnioną stroną nie przesuwa już strony pod spodem. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -45,3 +35,10 @@ Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemi
 - Prześwitująca przestrzeń ze szkłem „Przezroczyste” nie obciąża już grafiki Maca, gdy Zigzag nic nie robi, nawet na pustej stronie lub w oknie „Ustawienia”. macOS przerysowywał całe okno i jego cień w każdej klatce; teraz rysuje je tylko wtedy, gdy coś się zmienia. Pasek postępu na karcie aktualizacji też przestaje się przesuwać, gdy jest ukryty.
 - Ustawienia otwierają się szybciej. Wiersze sekcji powstają przy pierwszym jej otwarciu, a wiersze zwiniętego pola, gdy je otworzysz albo wyszukiwanie w nie zajrzy, więc otwarcie Ustawień na „Ogólne” nie buduje już „Pobranych”, „Skrótów” ani „Programisty”. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - „Odblokuj za pomocą biometrii” w Bitwarden dociera teraz do aplikacji Bitwarden. Zigzag powiedział Bitwarden, że już może rozmawiać z aplikacją, więc Bitwarden nigdy nie pytał, a potem Zigzag nie dopuszczał go do aplikacji. Teraz Bitwarden pyta, a Zigzag pyta ciebie, czy na to zezwolić. Jeśli wcześniej włączono biometrię, wyłącz i ponownie włącz „Odblokuj za pomocą biometrii” w ustawieniach Bitwarden. Podziękowania dla [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Gdy pasek adresu jest nad stroną, a przestrzeń jest przezroczysta, odtwarzane wideo nie obciąża już grafiki Maca dużo bardziej niż przy wyłączonym pasku. Szkło okna zostaje teraz za paskiem bocznym, a nie za całym oknem.
+- Karta, która spała przez wiele godzin, gdy Mac miał mało pamięci, nie budzi się już wylogowana z witryn takich jak Azure DevOps i Microsoft 365: jeśli część WebKit przechowująca pliki cookie logowania się zatrzyma, co macOS może zrobić przy braku pamięci, Zigzag przywraca je przed wczytaniem strony. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Wideo w trybie pełnoekranowym nie jest już zasłaniane przez górny pasek ani boczną kolumnę samej witryny, jak na Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Przyciski wstecz, dalej i ponownego wczytania nie zostawiają już pustego miejsca na przyciski okna tam, gdzie ich nie ma, jak w trybie pełnoekranowym, zanim opadnie pasek menu, a przyciski okna zostają na pasku, gdy wysunięty jest krótszy pływający pasek boczny. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Menu folderu na żywo otwarte w trakcie aktualizacji zmienia się teraz z „Aktualizowanie…” na „Zaktualizowano przed chwilą” albo na powód, dla którego nie udało się odświeżyć, bez zamykania.
+- Gdy „Ulubione w wierszu” ma wartość „Automatycznie”, ulubione rozkładają się równo na wiersze: sześć tam, gdzie zmieściłoby się cztery, to dwa wiersze po trzy, a nie cztery i dwa.
+

@@ -5,22 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- History's search ignores accents and case, finds every word in any order and marks it, and never hides a match in a stack; each part of the day has one heading, two pages from one site stay two rows, and the list answers the arrow keys, Delete, ⌘Return, ⌘F and a right-click that removes a whole site.
-- While a live folder checks for new pages, the chip on its icon shows a turning ring, the way Mail shows a mailbox being checked, and it stops the moment the check ends.
-- The New and Edit Live Folder sheet shows the folder's own icon, as the sidebar does: GitHub's for a GitHub list, the site's for a feed, or the one you chose. Click it to change the icon, as Change Icon… does, and a new folder keeps the icon you pick.
-
-### Changed
-- Two-finger swipes back and forward are smoother, go at a shorter distance or a lighter flick, keep the page from drifting up and down, and never leave the arrow up or the page shifted, in tabs, split view and Zigzag Mini.
-
-### Fixed
-- With the address bar above the page and a see-through space, a playing video no longer keeps the Mac's graphics much busier than with the bar off. The window's glass now stays behind the sidebar instead of the whole window.
-- A tab that slept for hours while your Mac was low on memory no longer wakes signed out of sites like Azure DevOps and Microsoft 365: if the part of WebKit that holds sign-in cookies stops, as macOS may make it when memory is short, Zigzag puts them back before the page loads. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
-- A video in full screen is no longer covered by the site's own top bar or side column, as on Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
-- Back, forward and reload no longer leave an empty space for the window buttons where none are shown, as in full screen before the menu bar comes down, and the window buttons stay in the bar while the shorter floating sidebar is out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
-- A live folder's menu left open while it updates now changes from Updating… to Updated Just Now, or to why it couldn't refresh, without closing it.
-- With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
@@ -37,6 +21,12 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - Settings › Appearance › Pinned tabs as tiles: pinned tabs outside folders show as tiles under your favorites, in the same grid with a fine line between them, and open, unload, show their menu and drag as their rows do. Folders and their pages stay rows. It's off until you turn it on. Thanks to [sarekhamri](https://github.com/sarekhamri). ([#539](https://github.com/ZigaoWang/zigzag/issues/539))
 - In Settings, long lists fold into boxes the way Site Permissions does: each menu in Shortcuts, each download rule with its saved answers inside, each kind of feature flag, and Sites in Developer Mode, Trusted Certificates and Page Sizes once they list more than three. Find a setting still opens the box a match is in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - Site Permissions' own search and Find a setting now find sites by permission and by choice: type camera, notifications or block to see every site with that choice, each under its site's name. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#532](https://github.com/ZigaoWang/zigzag/issues/532))
+- History's search ignores accents and case, finds every word in any order and marks it, and never hides a match in a stack; each part of the day has one heading, two pages from one site stay two rows, and the list answers the arrow keys, Delete, ⌘Return, ⌘F and a right-click that removes a whole site.
+- While a live folder checks for new pages, the chip on its icon shows a turning ring, the way Mail shows a mailbox being checked, and it stops the moment the check ends.
+- The New and Edit Live Folder sheet shows the folder's own icon, as the sidebar does: GitHub's for a GitHub list, the site's for a feed, or the one you chose. Click it to change the icon, as Change Icon… does, and a new folder keeps the icon you pick.
+
+### Changed
+- Two-finger swipes back and forward are smoother, go at a shorter distance or a lighter flick, keep the page from drifting up and down, and never leave the arrow up or the page shifted, in tabs, split view and Zigzag Mini.
 
 ### Fixed
 - With Zigzag Mini open over a page, scrolling over the dimmed page no longer moves the page behind it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -46,6 +36,12 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - A see-through space with Clear glass no longer keeps the Mac's graphics busy while Zigzag sits still, even on a blank page or in Settings. macOS was redrawing the whole window and its shadow every frame; it now draws it only when something changes. The update card's progress bar also stops sliding while it's hidden.
 - Settings opens faster. A section's rows are made the first time you open it, and a folded box's when you open it or a search looks in it, so opening Settings on General no longer builds Downloads, Shortcuts or Developer. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - Bitwarden's Unlock with biometrics now reaches the Bitwarden app. Zigzag told Bitwarden it could already talk to the app, so Bitwarden never asked, and Zigzag then kept it from the app. Now Bitwarden asks and Zigzag asks you to allow it. If you turned biometrics on before, turn Unlock with biometrics off and on again in Bitwarden's settings. Thanks to [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- With the address bar above the page and a see-through space, a playing video no longer keeps the Mac's graphics much busier than with the bar off. The window's glass now stays behind the sidebar instead of the whole window.
+- A tab that slept for hours while your Mac was low on memory no longer wakes signed out of sites like Azure DevOps and Microsoft 365: if the part of WebKit that holds sign-in cookies stops, as macOS may make it when memory is short, Zigzag puts them back before the page loads. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- A video in full screen is no longer covered by the site's own top bar or side column, as on Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Back, forward and reload no longer leave an empty space for the window buttons where none are shown, as in full screen before the menu bar comes down, and the window buttons stay in the bar while the shorter floating sidebar is out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- A live folder's menu left open while it updates now changes from Updating… to Updated Just Now, or to why it couldn't refresh, without closing it.
+- With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
 
 ## [0.9.5] - 2026-11-25
 
