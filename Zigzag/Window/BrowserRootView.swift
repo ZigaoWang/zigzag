@@ -2467,6 +2467,8 @@ final class BrowserRootView: SpaceFrameView {
             pageCard.isAttached = visible && Self.isBorderless
             pageCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         }
+        // Coming back, the glass leaves the bar's row it had edge to edge before the sidebar slides in.
+        if visible { refreshGlassFrame() }
         refreshGlassOcclusion()
         // The bar's controls and the page move as one: nothing in the bar jumps to its new place.
         if topBarSlideFrame != nil { topBar.slideControls(from: oldControls, curve: curve) }
