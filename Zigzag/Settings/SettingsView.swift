@@ -6078,8 +6078,18 @@ enum AppLanguage {
     /// A language as its speakers write it.
     static func ownName(_ code: String) -> String {
         switch code {
+        case "de": "Deutsch"
         case "en": "English"
+        case "es": "Español"
+        case "fr": "Français"
+        case "it": "Italiano"
         case "ja": "日本語"
+        case "ko": "한국어"
+        case "nl": "Nederlands"
+        case "pl": "Polski"
+        case "pt-BR": "Português (Brasil)"
+        case "ru": "Русский"
+        case "tr": "Türkçe"
         case "zh-Hans": "简体中文"
         case "zh-Hant": "繁體中文"
         default: Locale(identifier: code).localizedString(forIdentifier: code) ?? code

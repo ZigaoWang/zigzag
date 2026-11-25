@@ -5,16 +5,76 @@
       "comment" : "Shown by macOS when an extension first listens to a tab's sound. Shazam is a product name.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweiterungen wie Shazam können hören, was ein Tab abspielt, aber nur, solange sie zuhören."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Extensions you use, like Shazam, can hear what a tab plays, only while they listen."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las extensiones que usas, como Shazam, pueden oír lo que reproduce una pestaña, solo mientras escuchan."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les extensions que vous utilisez, comme Shazam, peuvent entendre ce que lit un onglet, uniquement pendant leur écoute."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le estensioni che usi, come Shazam, possono ascoltare l’audio di un pannello, solo mentre sono in ascolto."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Shazamなど、使用している機能拡張は、聞き取っているあいだだけ、タブで再生中の音を聞くことができます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shazam 같은 확장 프로그램은 듣고 있는 동안에만 탭에서 재생되는 소리를 들을 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extensies die je gebruikt, zoals Shazam, kunnen horen wat een tabblad afspeelt, alleen terwijl ze luisteren."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rozszerzenia, których używasz, na przykład Shazam, mogą słyszeć, co odtwarza karta, tylko podczas słuchania."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As extensões que você usa (como o Shazam) podem ouvir o som reproduzido nas abas, mas somente enquanto estiverem ouvindo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расширения, которыми вы пользуетесь, например Shazam, могут слышать, что воспроизводит вкладка, только пока они слушают."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kullandığınız Shazam gibi genişletmeler, bir sekmenin çaldığı sesi yalnızca dinlerken duyabilir."
           }
         },
         "zh-Hans" : {
@@ -35,16 +95,76 @@
       "comment" : "Shown by macOS when a website first asks to use the camera.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites, die du besuchst, können um Zugriff auf deine Kamera bitten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask to use your camera."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los sitios web que visitas pueden pedir permiso para usar tu cámara."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sites web que vous consultez peuvent demander à utiliser votre caméra."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I siti web che visiti possono chiedere di usare la fotocamera."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アクセスしたWebサイトが、カメラの使用を求めることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "방문하는 웹 사이트에서 카메라 사용을 요청할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites die je bezoekt, kunnen vragen om je camera te gebruiken."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odwiedzane witryny mogą prosić o użycie kamery."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os sites que você visita podem pedir para usar a sua câmera."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайты, которые вы посещаете, могут запросить доступ к камере."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziyaret ettiğiniz web siteleri kameranızı kullanmak için izin isteyebilir."
           }
         },
         "zh-Hans" : {
@@ -65,16 +185,76 @@
       "comment" : "Shown by macOS when Zigzag first asks to read the person's own card in Contacts, to fill forms.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag füllt deinen Namen, deine E-Mail-Adresse, Telefonnummer und Adresse aus deiner eigenen Karte in den Kontakten in Formulare ein."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Zigzag fills your name, email, phone and address into forms from your own card in Contacts."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag rellena tu nombre, correo electrónico, teléfono y dirección en los formularios con tu propia tarjeta de Contactos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag remplit les formulaires avec vos nom, e-mail, téléphone et adresse à partir de votre propre fiche dans Contacts."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag compila nei moduli il tuo nome, l’email, il telefono e l’indirizzo dalla tua scheda in Contatti."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzagは「連絡先」の自分のカードから、名前、メール、電話番号、住所をフォームに入力します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag는 연락처의 나의 카드에 있는 이름, 이메일, 전화번호 및 주소를 양식에 채웁니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag vult je naam, e-mail, telefoon en adres in formulieren in vanuit je eigen kaart in Contacten."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag wypełnia formularze imieniem i nazwiskiem, adresem e-mail, numerem telefonu i adresem z twojej karty w Kontaktach."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Zigzag usa o seu próprio cartão em Contatos para preencher nome, e-mail, telefone e endereço em formulários."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag подставляет ваше имя, почту, телефон и адрес в формы из вашей карточки в «Контактах»."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag, adınızı, e-postanızı, telefonunuzu ve adresinizi Kişiler’deki kendi kartınızdan formlara doldurur."
           }
         },
         "zh-Hans" : {
@@ -95,16 +275,76 @@
       "comment" : "Shown by macOS when Zigzag first saves into the Downloads folder.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag sichert hier die Dateien, die du lädst."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Zigzag saves the files you download here."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag guarda aquí los archivos que descargas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag enregistre ici les fichiers que vous téléchargez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag salva qui i file che scarichi."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzagは、ダウンロードしたファイルをここに保存します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag는 다운로드한 파일을 여기에 저장합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag bewaart hier de bestanden die je downloadt."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag zachowuje tutaj pobrane pliki."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Zigzag salva aqui os arquivos que você baixa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag сохраняет здесь файлы, которые вы загружаете."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag indirdiğiniz dosyaları buraya kaydeder."
           }
         },
         "zh-Hans" : {
@@ -125,16 +365,76 @@
       "comment" : "Shown by macOS when a website first reaches a device on the local network.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites, die du besuchst, können um Verbindung mit Geräten in deinem lokalen Netzwerk bitten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask to connect to devices on your local network."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los sitios web que visitas pueden pedir conectarse a dispositivos de tu red local."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sites web que vous consultez peuvent demander à se connecter aux appareils de votre réseau local."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I siti web che visiti possono chiedere di connettersi ai dispositivi della tua rete locale."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アクセスしたWebサイトが、ローカルネットワーク上のデバイスへの接続を求めることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "방문하는 웹 사이트에서 로컬 네트워크의 기기에 연결하도록 요청할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites die je bezoekt, kunnen vragen om verbinding te maken met apparaten op je lokale netwerk."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odwiedzane witryny mogą prosić o połączenie z urządzeniami w sieci lokalnej."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os sites que você visita podem pedir para se conectar a dispositivos na sua rede local."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайты, которые вы посещаете, могут запросить подключение к устройствам в вашей локальной сети."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziyaret ettiğiniz web siteleri yerel ağınızdaki aygıtlara bağlanmak için izin isteyebilir."
           }
         },
         "zh-Hans" : {
@@ -155,16 +455,76 @@
       "comment" : "Shown by macOS when a website first asks for the location.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites, die du besuchst, können nach deinem Standort fragen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask for your location."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los sitios web que visitas pueden pedir tu ubicación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sites web que vous consultez peuvent demander votre position."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I siti web che visiti possono chiedere la tua posizione."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アクセスしたWebサイトが、位置情報を求めることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "방문하는 웹 사이트에서 위치 정보를 요청할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites die je bezoekt, kunnen om je locatie vragen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odwiedzane witryny mogą prosić o twoją lokalizację."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os sites que você visita podem pedir a sua localização."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайты, которые вы посещаете, могут запросить доступ к вашей геопозиции."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziyaret ettiğiniz web siteleri konumunuzu isteyebilir."
           }
         },
         "zh-Hans" : {
@@ -185,16 +545,76 @@
       "comment" : "Shown by macOS when a website first asks for the location.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites, die du besuchst, können nach deinem Standort fragen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask for your location."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los sitios web que visitas pueden pedir tu ubicación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sites web que vous consultez peuvent demander votre position."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I siti web che visiti possono chiedere la tua posizione."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アクセスしたWebサイトが、位置情報を求めることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "방문하는 웹 사이트에서 위치 정보를 요청할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites die je bezoekt, kunnen om je locatie vragen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odwiedzane witryny mogą prosić o twoją lokalizację."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os sites que você visita podem pedir a sua localização."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайты, которые вы посещаете, могут запросить доступ к вашей геопозиции."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziyaret ettiğiniz web siteleri konumunuzu isteyebilir."
           }
         },
         "zh-Hans" : {
@@ -215,16 +635,76 @@
       "comment" : "Shown by macOS when a website first asks to use the microphone.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites, die du besuchst, können um Zugriff auf dein Mikrofon bitten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask to use your microphone."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los sitios web que visitas pueden pedir permiso para usar tu micrófono."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sites web que vous consultez peuvent demander à utiliser votre micro."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I siti web che visiti possono chiedere di usare il microfono."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アクセスしたWebサイトが、マイクの使用を求めることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "방문하는 웹 사이트에서 마이크 사용을 요청할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Websites die je bezoekt, kunnen vragen om je microfoon te gebruiken."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odwiedzane witryny mogą prosić o użycie mikrofonu."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os sites que você visita podem pedir para usar o seu microfone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сайты, которые вы посещаете, могут запросить доступ к микрофону."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziyaret ettiğiniz web siteleri mikrofonunuzu kullanmak için izin isteyebilir."
           }
         },
         "zh-Hans" : {
