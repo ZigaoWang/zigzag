@@ -53,6 +53,9 @@ final class MiniPeekDimView: ColorView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
+    /// A wheel over the dimmed page stays there: the page behind the Mini doesn't move under it.
+    override func scrollWheel(with event: NSEvent) {}
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         passesClicks ? nil : super.hitTest(point)
     }
