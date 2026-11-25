@@ -685,6 +685,45 @@ struct SettingsFoldingTests {
         #expect(box.isHidden && !other.isHidden)
     }
 
+    /// The sites shown by the list's own search, each with the titles of the rows open in it.
+    private func found(_ settings: SettingsView, _ text: String) -> [String: [String]] {
+        settings.debugSearchSites(text)
+        return Dictionary(uniqueKeysWithValues: settings.debugSiteBoxes.filter { !$0.isHidden }.map { ($0.headerRow.debugTitle, $0.shownRows.map(\.debugTitle)) })
+    }
+
+    @Test func aPermissionsNameFindsItsSites() throws {
+        try withSites(FoldStyle.searchFrom) { sites in
+            let settings = privacy()
+            // Every site with a camera choice, each under its own name, opened to that row alone.
+            let camera = found(settings, "camera")
+            #expect(camera.count == sites.count && camera.values.allSatisfy { $0 == ["Camera"] })
+            // A choice finds the permissions that have it.
+            #expect(found(settings, "notifications") == [sites[0]: ["Notifications"]])
+            #expect(found(settings, "block") == [sites[0]: ["Notifications"]])
+            #expect(found(settings, "blocked") == [sites[0]: ["Notifications"]])
+            #expect(found(settings, "camera allow").count == sites.count)
+            #expect(found(settings, "camera block").isEmpty)
+            // A site's name still finds its whole box, folded as it was.
+            #expect(found(settings, sites[3]) == [sites[3]: []])
+        }
+    }
+
+    @Test func aPermissionsNameFindsItsSitesInItsLanguage() throws {
+        PseudoLocale.install()
+        try PseudoLocale.$speaking.withValue("de") {
+            try withSites(FoldStyle.searchFrom) { sites in
+                let settings = privacy()
+                let camera = SitePermission.camera.title, notifications = SitePermission.notifications.title
+                #expect(camera == "Kamera")
+                let byName = found(settings, camera)
+                #expect(byName.count == sites.count && byName.values.allSatisfy { $0 == [camera] })
+                #expect(found(settings, PermissionChoice.block.title) == [sites[0]: [notifications]])
+                // The English name isn't what the rows say.
+                #expect(found(settings, "camera").isEmpty)
+            }
+        }
+    }
+
     @Test func findASettingReachesAFoldedRowAndOpensItsBox() throws {
         let name = "SettingsFoldingTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))

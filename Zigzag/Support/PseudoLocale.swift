@@ -15,6 +15,8 @@ nonisolated enum PseudoLocale {
     /// A real language every string is looked up in for the run, from ZIGZAG_TEST_LANGUAGE, so the layout tests can lay
     /// out German or Russian without touching the Mac's languages or any settings.
     nonisolated(unsafe) private(set) static var language: String?
+    /// A real language strings are looked up in for one task and what it calls synchronously, as tests use it.
+    @TaskLocal static var speaking: String?
 
     /// At launch: on for the run when asked, before any string is looked up. ZIGZAG_PSEUDO_LOCALIZE=1 asks for a test run.
     static func startIfAsked() {
@@ -40,7 +42,7 @@ nonisolated enum PseudoLocale {
         guard let method = class_getInstanceMethod(Bundle.self, selector) else { return }
         let original = unsafeBitCast(method_getImplementation(method), to: Lookup.self)
         let wrapped: @convention(block) (AnyObject, NSString, NSString?, NSString?, AnyObject?) -> NSString = { bundle, key, value, table, languages in
-            if let language, isApp(bundle) { return original(bundle, selector, key, value, table, [language] as NSArray) }
+            if let language = language ?? speaking, isApp(bundle) { return original(bundle, selector, key, value, table, [language] as NSArray) }
             let found = original(bundle, selector, key, value, table, languages)
             guard isOn, isApp(bundle) else { return found }
             return pseudo(found, key: key, table: table)
