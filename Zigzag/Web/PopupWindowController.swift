@@ -767,6 +767,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             // on it can't download.
             if SitePermissions.pageWithoutSiteMayDownload(isFile: (webView.url ?? url).isFileURL) { return true }
             refusedDownload(text: DownloadPolicy.blockedText, note: "A page with no site of its own tried to save a file")
+            DownloadManager.shared.dropFileHandoff(for: url, from: webView)
             return false
         }
         // The parent may be another pop-up, which can't ask; the opener tab's window asks and comes forward.
@@ -782,6 +783,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if !allowed {
             refusedDownload(text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
                             action: askAgain(origin: origin, request: request))
+            DownloadManager.shared.dropFileHandoff(for: url, from: webView)
         }
         return allowed
     }

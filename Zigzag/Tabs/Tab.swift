@@ -2315,6 +2315,7 @@ extension Tab: WKNavigationDelegate {
             if SitePermissions.pageWithoutSiteMayDownload(isFile: (webView.url ?? url).isFileURL) { return true }
             refusedDownload(in: webView, text: DownloadPolicy.blockedText,
                             note: "A page with no site of its own tried to save a file")
+            DownloadManager.shared.dropFileHandoff(for: url, from: webView)
             return false
         }
         let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self,
@@ -2322,6 +2323,7 @@ extension Tab: WKNavigationDelegate {
         if !allowed {
             refusedDownload(in: webView, text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
                             action: askAgain(origin: origin, request: retry, in: webView))
+            DownloadManager.shared.dropFileHandoff(for: url, from: webView)
         }
         return allowed
     }
