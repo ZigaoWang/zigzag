@@ -683,30 +683,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if covered { window.orderOut(nil) } else { window.orderFront(nil) }
     }
 
-    /// A picked page grows from the hover's square to the page's full room, with a small spring as it lands.
-    func expandDock(animated: Bool) {
-        guard isDockedInPage, let host = dockedHost, let window, let parent = host.dockParentWindow else { return }
-        let card = host.dockCardFrame(in: host.dockPageFrame)
-        let screen = parent.convertToScreen(host.dockPageView.convert(card, to: nil))
-        dockedScreenFrame = screen
-        guard animated, !Tokens.Motion.reduceMotion, window.frame != screen else {
-            window.setFrame(screen, display: true)
-            return
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Tokens.Motion.Role.drawer.duration(entering: true)
-            context.timingFunction = Tokens.Motion.Role.drawer.timing
-            window.animator().setFrame(screen, display: true)
-        }
-        if let layer = root.layer {
-            let spring = CASpringAnimation(perceptualDuration: Tokens.Motion.Role.drawer.duration(entering: true), bounce: 0.14)
-            spring.keyPath = "transform.scale"
-            spring.fromValue = 0.98
-            spring.toValue = 1
-            layer.add(spring, forKey: "dockGrow")
-        }
-    }
-
     /// Takes the Mini out of the page only if `owner` still owns the slot.
     func unembed(owner: AnyObject) {
         dockedHost?.dockHideDim(owner: owner)

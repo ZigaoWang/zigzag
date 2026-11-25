@@ -21,29 +21,6 @@ private final class SlidingDockHost: MiniDockHosting {
     func dockFocusPage() {}
 }
 
-/// A host whose page area changes from the hover's square to the picked page's room.
-@MainActor
-private final class GrowingDockHost: MiniDockHosting {
-    let browser: BrowserWindowController
-    var pageFrame: NSRect
-    init(browser: BrowserWindowController, pageFrame: NSRect) {
-        self.browser = browser
-        self.pageFrame = pageFrame
-    }
-    var dockParentWindow: NSWindow? { browser.window }
-    var dockPageView: NSView { browser.root }
-    var dockPageFrame: NSRect { pageFrame }
-    func dockCardFrame(in page: NSRect) -> NSRect { page }
-    var dockHasShadow: Bool { true }
-    var dockSlidesPage: Bool { true }
-    var dockPageOnRight: Bool { false }
-    var dockIsCovered: Bool { false }
-    var dockIsFullScreen: Bool { false }
-    func dockShowDim(owner: AnyObject, onClick: @escaping () -> Void) -> MiniPeekDimView? { nil }
-    func dockHideDim(owner: AnyObject) {}
-    func dockFocusPage() {}
-}
-
 @MainActor
 struct InPageMiniHostTests {
     private func inWindow(_ body: (BrowserWindowController, Tab) throws -> Void) rethrows {
@@ -315,27 +292,6 @@ struct InPageMiniHostTests {
             mini.closeInPage(focusBack: false, animated: false)
             #expect(holder.window === browser.window)
             #expect(holder.superview != nil)
-        }
-    }
-
-    @Test func aPickedPreviewGrowsFromItsSquareToThePageRoom() throws {
-        try inWindow(pageAt: "https://example.test/grow") { browser, tab in
-            let full = browser.root.cardFrame
-            let side = min(full.width, full.height)
-            let square = NSRect(x: full.midX - side / 2, y: full.midY - side / 2, width: side, height: side)
-            let host = GrowingDockHost(browser: browser, pageFrame: square)
-            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: host))
-            func screen(_ rect: NSRect) -> NSRect {
-                browser.window?.convertToScreen(browser.root.convert(rect, to: nil)) ?? .zero
-            }
-            #expect(mini.window?.frame == screen(square))
-            // A pick gives the page the whole room, growing the same Mini rather than opening another.
-            host.pageFrame = full
-            mini.expandDock(animated: false)
-            #expect(mini.window?.frame == screen(full))
-            #expect(mini.dockedScreenFrame == screen(full))
-            #expect(mini.tab === tab)
-            mini.closeInPage(focusBack: false, animated: false)
         }
     }
 
