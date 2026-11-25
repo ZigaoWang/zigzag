@@ -1,10 +1,16 @@
 {
   "language": "it",
   "Localizable": {
-    "%@ are saved first, then are handed to %@": {
+    "%@ are saved first, then passed to %@": {
       "stringUnit": {
         "state": "translated",
         "value": "%@ vengono salvati prima, poi trasferiti a %@"
+      }
+    },
+    "%@ are saved first, then passed to %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ vengono salvati prima, poi trasferiti a %@; i link trasferiscono solo il proprio indirizzo"
       }
     },
     "%@ are saved first, then go to %@": {
@@ -13,10 +19,22 @@
         "value": "%@ vengono salvati prima, poi inviati a %@"
       }
     },
+    "%@ are saved first, then go to %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ vengono salvati prima, poi inviati a %@; i link trasferiscono solo il proprio indirizzo"
+      }
+    },
     "%@ are saved first, then open in %@": {
       "stringUnit": {
         "state": "translated",
         "value": "%@ vengono salvati prima, poi aperti in %@"
+      }
+    },
+    "%@ are saved first, then open in %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ vengono salvati prima, poi aperti in %@; i link trasferiscono solo il proprio indirizzo"
       }
     },
     "Checks every %lld minutes, or hourly in Low Power Mode.": {

@@ -1,7 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%@ are saved first, then are handed to %@" : {
+    "%@ are saved first, then passed to %@" : {
       "comment" : "A File handoff in a sentence: what it catches is downloaded first, then given to the script. The placeholders are the two parts.",
       "localizations" : {
         "de" : {
@@ -80,6 +80,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先儲存 %@，然後交給 %@"
+          }
+        }
+      }
+    },
+    "%@ are saved first, then passed to %@; links hand off just their address" : {
+      "comment" : "A File handoff that also catches links, in a sentence: downloads are saved first, then given to the script, while a link is given as its address without being saved. The placeholders are what it catches and the script.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ werden zuerst geladen und dann an %@ übergeben; Links übergeben nur ihre Adresse"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ se guardan primero y después se envían a %@; los enlaces solo envían su dirección"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sont d’abord enregistrés, puis transférés à %@ ; les liens transfèrent seulement leur adresse"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vengono salvati prima, poi trasferiti a %@; i link trasferiscono solo il proprio indirizzo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@を先に保存してから、%2$@に渡す。リンクはアドレスだけを渡す"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@은(는) 먼저 저장된 후 %@에 전달되며, 링크는 주소만 전달합니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ worden eerst bewaard en daarna doorgegeven aan %@; bij links wordt alleen het adres doorgegeven"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ są najpierw zachowywane, a następnie przekazywane do: %2$@; linki przekazują tylko swój adres"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ são salvos primeiro e depois entregues a %@; os links entregam só o endereço"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ сначала сохраняются, затем передаются в %@; ссылки передают только адрес"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ önce kaydedilir, sonra şuraya devredilir: %2$@; bağlantılar yalnızca adresleriyle devredilir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先把 %@ 保存下来，然后交给 %@；链接只转交地址"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先儲存 %@，然後交給 %@；連結只轉交網址"
           }
         }
       }
@@ -167,6 +250,89 @@
         }
       }
     },
+    "%@ are saved first, then go to %@; links hand off just their address" : {
+      "comment" : "A File handoff that also catches links, in a sentence: downloads are saved first, then sent to the service, while a link is sent as its address without being saved. The placeholders are what it catches, as in “Downloads ending in .torrent”, and the service, as in “rTorrent”.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ werden zuerst geladen und dann an %@ gesendet; Links übergeben nur ihre Adresse"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ se guardan primero y después van a %@; los enlaces solo envían su dirección"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sont d’abord enregistrés, puis envoyés à %@ ; les liens transfèrent seulement leur adresse"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vengono salvati prima, poi inviati a %@; i link trasferiscono solo il proprio indirizzo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@を先に保存してから、%2$@に送る。リンクはアドレスだけを渡す"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@은(는) 먼저 저장된 후 %@(으)로 전송되며, 링크는 주소만 전달합니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ worden eerst bewaard en daarna verstuurd naar %@; bij links wordt alleen het adres doorgegeven"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ są najpierw zachowywane, a następnie wysyłane do: %2$@; linki przekazują tylko swój adres"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ são salvos primeiro e depois enviados a %@; os links entregam só o endereço"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ сначала сохраняются, затем отправляются в %@; ссылки передают только адрес"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ önce kaydedilir, sonra şuraya gönderilir: %2$@; bağlantılar yalnızca adresleriyle devredilir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先把 %@ 保存下来，然后送往 %@；链接只转交地址"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先儲存 %@，然後傳送到 %@；連結只轉交網址"
+          }
+        }
+      }
+    },
     "%@ are saved first, then open in %@" : {
       "comment" : "A File handoff in a sentence: what it catches is downloaded first, then opened in the app. The placeholders are the two parts.",
       "localizations" : {
@@ -246,6 +412,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先儲存 %@，然後在 %@ 中開啟"
+          }
+        }
+      }
+    },
+    "%@ are saved first, then open in %@; links hand off just their address" : {
+      "comment" : "A File handoff that also catches links, in a sentence: downloads are saved first, then opened in the app, while a link is sent as its address without being saved. The placeholders are what it catches and the app.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ werden zuerst geladen und dann in %@ geöffnet; Links übergeben nur ihre Adresse"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ se guardan primero y después se abren en %@; los enlaces solo envían su dirección"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sont d’abord enregistrés, puis ouverts dans %@ ; les liens transfèrent seulement leur adresse"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vengono salvati prima, poi aperti in %@; i link trasferiscono solo il proprio indirizzo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@を先に保存してから、%2$@で開く。リンクはアドレスだけを渡す"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@은(는) 먼저 저장된 후 %@에서 열리며, 링크는 주소만 전달합니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ worden eerst bewaard en daarna geopend in %@; bij links wordt alleen het adres doorgegeven"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ są najpierw zachowywane, a następnie otwierane w: %2$@; linki przekazują tylko swój adres"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ são salvos primeiro e depois abertos em %@; os links entregam só o endereço"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ сначала сохраняются, затем открываются в %@; ссылки передают только адрес"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ önce kaydedilir, sonra şu uygulamada açılır: %2$@; bağlantılar yalnızca adresleriyle devredilir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先把 %@ 保存下来，然后在 %@ 中打开；链接只转交地址"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先儲存 %@，然後在 %@ 中開啟；連結只轉交網址"
           }
         }
       }

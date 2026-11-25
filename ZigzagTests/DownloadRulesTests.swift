@@ -758,7 +758,19 @@ struct DownloadRuleTests {
         script.scriptPath = "yt-dlp.sh"
         var links = DownloadRule(name: "Videos", applies: .linksAndDownloads, match: .any, action: script)
         links.handoffType = .file
-        #expect(links.summarySentence == "Downloads are saved first, then are handed to yt-dlp.sh")
+        #expect(links.summarySentence == "Downloads are saved first, then passed to yt-dlp.sh; links hand off just their address")
+        links.applies = .downloads
+        #expect(links.summarySentence == "Downloads are saved first, then passed to yt-dlp.sh")
+        links.applies = .linksAndDownloads
+        links.action = open
+        #expect(links.summarySentence == "Downloads are saved first, then open in rTorrent; links hand off just their address")
+        links.action = send
+        links.match = .endsWith
+        links.pattern = ".torrent"
+        #expect(links.summarySentence == "Downloads ending in .torrent are saved first, then go to 127.0.0.1 (load.start); links hand off just their address")
+        // A type rule never catches links, so it says nothing of them.
+        show.applies = .linksAndDownloads
+        #expect(show.summarySentence == "Files of type torrent are saved first, then open in rTorrent")
     }
 
     /// A link never waits for a file; the same rule hands its address off as before.

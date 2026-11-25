@@ -277,13 +277,26 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             let types = Match.extensions(in: pattern).joined(separator: ", ")
             catches = String(localized: "Files of type \(types)", comment: "Part of a download rule's sentence: it catches files by their own extension, whatever their address. The placeholder lists the extensions, like torrent or pdf.")
         }
+        // A type rule never catches links; any other rule for links hands them off by address.
+        if applies == .linksAndDownloads, match != .fileType {
+            switch action.kind {
+            case .jsonRPC:
+                return String(localized: "\(catches) are saved first, then go to \(goes); links hand off just their address", comment: "A File handoff that also catches links, in a sentence: downloads are saved first, then sent to the service, while a link is sent as its address without being saved. The placeholders are what it catches, as in “Downloads ending in .torrent”, and the service, as in “rTorrent”.")
+            case .openApp, .openURL:
+                return String(localized: "\(catches) are saved first, then open in \(goes); links hand off just their address", comment: "A File handoff that also catches links, in a sentence: downloads are saved first, then opened in the app, while a link is sent as its address without being saved. The placeholders are what it catches and the app.")
+            case .runScript:
+                return String(localized: "\(catches) are saved first, then passed to \(goes); links hand off just their address", comment: "A File handoff that also catches links, in a sentence: downloads are saved first, then given to the script, while a link is given as its address without being saved. The placeholders are what it catches and the script.")
+            case .saveToFolder, .openFile:
+                return goes
+            }
+        }
         switch action.kind {
         case .jsonRPC:
             return String(localized: "\(catches) are saved first, then go to \(goes)", comment: "A File handoff in a sentence: what it catches is downloaded first, then sent to the service. The placeholders are the two parts, as in “Downloads ending in .torrent” and “rTorrent”.")
         case .openApp, .openURL:
             return String(localized: "\(catches) are saved first, then open in \(goes)", comment: "A File handoff in a sentence: what it catches is downloaded first, then opened in the app. The placeholders are the two parts.")
         case .runScript:
-            return String(localized: "\(catches) are saved first, then are handed to \(goes)", comment: "A File handoff in a sentence: what it catches is downloaded first, then given to the script. The placeholders are the two parts.")
+            return String(localized: "\(catches) are saved first, then passed to \(goes)", comment: "A File handoff in a sentence: what it catches is downloaded first, then given to the script. The placeholders are the two parts.")
         case .saveToFolder, .openFile:
             return goes
         }

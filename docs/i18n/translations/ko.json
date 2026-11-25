@@ -1,10 +1,16 @@
 {
   "language": "ko",
   "Localizable": {
-    "%@ are saved first, then are handed to %@": {
+    "%@ are saved first, then passed to %@": {
       "stringUnit": {
         "state": "translated",
         "value": "%@은(는) 먼저 저장된 후 %@에 전달됩니다"
+      }
+    },
+    "%@ are saved first, then passed to %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@은(는) 먼저 저장된 후 %@에 전달되며, 링크는 주소만 전달합니다"
       }
     },
     "%@ are saved first, then go to %@": {
@@ -13,10 +19,22 @@
         "value": "%@은(는) 먼저 저장된 후 %@(으)로 전송됩니다"
       }
     },
+    "%@ are saved first, then go to %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@은(는) 먼저 저장된 후 %@(으)로 전송되며, 링크는 주소만 전달합니다"
+      }
+    },
     "%@ are saved first, then open in %@": {
       "stringUnit": {
         "state": "translated",
         "value": "%@은(는) 먼저 저장된 후 %@에서 열립니다"
+      }
+    },
+    "%@ are saved first, then open in %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@은(는) 먼저 저장된 후 %@에서 열리며, 링크는 주소만 전달합니다"
       }
     },
     "Checks every %lld minutes, or hourly in Low Power Mode.": {

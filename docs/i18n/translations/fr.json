@@ -122,10 +122,16 @@
         "value": "%@ sont transférés à %@"
       }
     },
-    "%@ are saved first, then are handed to %@": {
+    "%@ are saved first, then passed to %@": {
       "stringUnit": {
         "state": "translated",
         "value": "%@ sont d’abord enregistrés, puis transférés à %@"
+      }
+    },
+    "%@ are saved first, then passed to %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ sont d’abord enregistrés, puis transférés à %@ ; les liens transfèrent seulement leur adresse"
       }
     },
     "%@ are saved first, then go to %@": {
@@ -134,10 +140,22 @@
         "value": "%@ sont d’abord enregistrés, puis envoyés à %@"
       }
     },
+    "%@ are saved first, then go to %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ sont d’abord enregistrés, puis envoyés à %@ ; les liens transfèrent seulement leur adresse"
+      }
+    },
     "%@ are saved first, then open in %@": {
       "stringUnit": {
         "state": "translated",
         "value": "%@ sont d’abord enregistrés, puis ouverts dans %@"
+      }
+    },
+    "%@ are saved first, then open in %@; links hand off just their address": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ sont d’abord enregistrés, puis ouverts dans %@ ; les liens transfèrent seulement leur adresse"
       }
     },
     "%@ are saved to %@": {
