@@ -18,6 +18,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 - History's search ignores accents and case, finds every word in any order and marks it, and never hides a match in a stack; each part of the day has one heading, two pages from one site stay two rows, and the list answers the arrow keys, Delete, ⌘Return, ⌘F and a right-click that removes a whole site.
 - Two-finger swipes back and forward are smoother, go at a shorter distance or a lighter flick, keep the page from drifting up and down, and never leave the arrow up or the page shifted, in tabs, split view and Zigzag Mini.
+- With the address bar above the page and a see-through space, a playing video no longer keeps the Mac's graphics much busier than with the bar off. The window's glass now stays behind the sidebar instead of the whole window.
 
 ## [0.10.0] - 2026-11-25
 
