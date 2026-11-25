@@ -3623,7 +3623,13 @@ extension BrowserWindowController: SidebarDelegate {
         }), duration: Toast.undoDuration, in: self)
     }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
-        // The edge panel's rows have no preview: the window's would show behind another app.
+        // The edge panel's rows bring the page in beside the sidebar as the same docked Mini; the window's floating
+        // preview would sit behind another app.
+        if let row, EdgeSidebar.shared.isPanel(row.window) {
+            EdgeSidebar.shared.hover(tab, in: self)
+            return
+        }
+        if tab == nil { EdgeSidebar.shared.hover(nil, in: self) }
         guard row?.window === window || tab == nil else { return }
         previews.hover(tab, row: row, bookmark: bookmark)
     }

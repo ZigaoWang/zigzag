@@ -77,6 +77,45 @@ struct EdgeSidebarTests {
         #expect(!EdgeSidebarLayout.keeps(at: NSPoint(x: 300, y: 400), panel: left))
     }
 
+    @Test func thePreviewWidensTheSurfaceAndLeavesTheSidebarWhereItIs() {
+        let inset = Tokens.Metric.cardInset
+        let sidebar: CGFloat = 240
+        let page = EdgeSidebarLayout.pageWidth(in: visible)
+        let narrow = EdgeSidebarLayout.width(sidebar: sidebar, page: false, inset: inset, in: visible)
+        let wide = EdgeSidebarLayout.width(sidebar: sidebar, page: true, inset: inset, in: visible)
+        #expect(narrow == sidebar + inset)
+        #expect(wide == sidebar + inset + page + inset * 2)
+        for onRight in [false, true] {
+            let narrowPanel = EdgeSidebarLayout.frame(in: visible, width: narrow, onRight: onRight)
+            let widePanel = EdgeSidebarLayout.frame(in: visible, width: wide, onRight: onRight)
+            let narrowCard = EdgeSidebarLayout.cardFrame(in: NSRect(origin: .zero, size: narrowPanel.size),
+                                                         sidebar: sidebar, inset: inset, page: false, onRight: onRight)
+            let card = EdgeSidebarLayout.cardFrame(in: NSRect(origin: .zero, size: widePanel.size),
+                                                   sidebar: sidebar, inset: inset, page: true, onRight: onRight)
+            let pageFrame = EdgeSidebarLayout.pageFrame(in: NSRect(origin: .zero, size: widePanel.size),
+                                                        sidebar: sidebar, inset: inset, page: true, onRight: onRight)
+            // The sidebar keeps its width and its place on screen; the page and the surface grow inward.
+            #expect(card.width == sidebar)
+            #expect(narrowPanel.minX + narrowCard.minX == widePanel.minX + card.minX)
+            #expect(pageFrame.width == page)
+            #expect(card.union(pageFrame).width == widePanel.width - inset * 2)
+            #expect(card.union(pageFrame).height == widePanel.height - inset * 2)
+        }
+    }
+
+    @Test func theWidenedSurfaceKeepsTheSidebarAtItsEdge() {
+        let sidebar = SidebarView(frame: .zero)
+        let container = SidebarContainer(sidebar: sidebar)
+        container.frame = NSRect(x: 0, y: 0, width: 800, height: 600)
+        container.contentWidth = 240
+        container.layoutSubtreeIfNeeded()
+        // The card's colour fills the widened surface; the rows stay in their own width at the screen's edge.
+        #expect(sidebar.frame == NSRect(x: 0, y: 0, width: 240, height: 600))
+        container.contentOnRight = true
+        container.layoutSubtreeIfNeeded()
+        #expect(sidebar.frame == NSRect(x: 560, y: 0, width: 240, height: 600))
+    }
+
     @Test func theSwitchIsOffUntilTurnedOn() {
         let saved = UserDefaults.standard.object(forKey: EdgeSidebar.defaultsKey)
         defer { UserDefaults.standard.set(saved, forKey: EdgeSidebar.defaultsKey) }

@@ -63,9 +63,8 @@ struct InPageMiniHostTests {
             let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
                                                 in: browser, by: .page, dockedIn: browser)
             let window = try #require(mini.window)
-            let pane = NSRect(x: 40, y: 30, width: 620, height: 420)
-            mini.layoutInDock(pane: pane)
-            let card = MiniDockLayout.frame(in: pane)
+            mini.layoutInDock()
+            let card = MiniDockLayout.frame(in: browser.root.cardFrame)
             let expected = try #require(browser.window).convertToScreen(browser.root.convert(card, to: nil))
             #expect(window.frame == expected)
             #expect(browser.root.inPageMiniDim?.frame == browser.root.cardFrame)
@@ -81,11 +80,11 @@ struct InPageMiniHostTests {
             browser.root.sidebarVisible = false
             browser.root.reveal(true)
             #expect(browser.root.coversInPageMini)
-            mini.layoutInDock(pane: browser.root.cardFrame)
+            mini.layoutInDock()
             #expect(mini.isCoveredInDock)
             browser.root.reveal(false)
             #expect(!browser.root.coversInPageMini)
-            mini.layoutInDock(pane: browser.root.cardFrame)
+            mini.layoutInDock()
             #expect(!mini.isCoveredInDock)
             mini.closeInPage(animated: false)
         }
@@ -99,7 +98,7 @@ struct InPageMiniHostTests {
             mini.sidebarSlid(show: true, duration: 0.02)
             #expect(mini.isCoveredInDock)
             mini.sidebarSlid(show: false, duration: 0.02)
-            mini.layoutInDock(pane: browser.root.cardFrame)
+            mini.layoutInDock()
             #expect(mini.isCoveredInDock)
             try await Task.sleep(for: .milliseconds(150))
             #expect(!mini.isCoveredInDock)
@@ -178,3 +177,4 @@ struct InPageMiniHostTests {
         }
     }
 }
+
