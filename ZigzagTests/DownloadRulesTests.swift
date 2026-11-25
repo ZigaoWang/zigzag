@@ -702,6 +702,82 @@ struct DownloadRuleTests {
         #expect(decoded.first?.action.destination == .folder("/Users/me/Downloads/PDFs"))
     }
 
+    // MARK: Handing off the file
+
+    /// Off unless asked for; rules saved before the choice keep handing off their address.
+    @Test func aFileHandoffIsOptInAndOlderRulesKeepTheURL() throws {
+        var rule = DownloadRule(name: "Torrents", applies: .downloads, match: .fileType, pattern: "torrent",
+                                action: DownloadRuleAction(kind: .jsonRPC))
+        #expect(rule.handoffType == .url)
+        rule.handoffType = .file
+        let data = try JSONEncoder().encode([rule])
+        #expect(try JSONDecoder().decode([DownloadRule].self, from: data).first?.handoffType == .file)
+
+        let older = #"[{"name":"Old","action":{"kind":"openURL","urlTemplate":"mpv://{link}"}}]"#
+        let decoded = try JSONDecoder().decode([DownloadRule].self, from: Data(older.utf8))
+        #expect(decoded.first?.handoffType == .url)
+    }
+
+    /// `{file}` is the saved path and `{file_url}` its file URL; both are empty when no file was handed off. `{link}`
+    /// stays the source address.
+    @Test func fileTokensAreTheSavedFileAndNothingWithoutOne() {
+        let link = URL(string: "https://tracker.example/download.php?id=42")!
+        let noFile = HandoffValues(link: link)
+        #expect(DownloadTokens.expand("{file}|{file_url}|{link}", with: noFile) == "||\(link.absoluteString)")
+        #expect(DownloadTokens.names.contains("{file}"))
+        #expect(DownloadTokens.names.contains("{file_url}"))
+
+        let saved = URL(fileURLWithPath: "/Users/me/Downloads/Some Movie.torrent")
+        let file = HandoffValues(link: link, file: saved)
+        #expect(file.filename == "Some Movie.torrent")
+        #expect(DownloadTokens.expand("{file}", with: file) == saved.path)
+        #expect(DownloadTokens.expand("{file_url}", with: file) == saved.absoluteString)
+        #expect(DownloadTokens.expand("{link}", with: file) == link.absoluteString)
+        // In an Open URL template each value is one query value, as `{link}` is.
+        #expect(DownloadTokens.expand("{file}", with: file, query: true)
+                == "/Users/me/Downloads/Some%20Movie.torrent")
+    }
+
+    /// The Settings row says the download is saved first, and that only downloads wait for it.
+    @Test func aFileHandoffReadsAsSavedFirst() {
+        var send = DownloadRuleAction(kind: .jsonRPC)
+        send.rpcEndpoint = "http://127.0.0.1:5000/RPC2"
+        send.rpcMethod = "load.start"
+        var rule = DownloadRule(name: "Torrents", applies: .downloads, match: .endsWith, pattern: ".torrent", action: send)
+        #expect(rule.summarySentence == "Files ending in .torrent go to 127.0.0.1 (load.start)")
+        rule.handoffType = .file
+        #expect(rule.summarySentence == "Downloads ending in .torrent are saved first, then go to 127.0.0.1 (load.start)")
+
+        var open = DownloadRuleAction(kind: .openApp)
+        open.appPath = "/Applications/rTorrent.app"
+        var show = DownloadRule(name: "Torrents", applies: .downloads, match: .fileType, pattern: "torrent", action: open)
+        show.handoffType = .file
+        #expect(show.summarySentence == "Files of type torrent are saved first, then open in rTorrent")
+
+        var script = DownloadRuleAction(kind: .runScript)
+        script.scriptPath = "yt-dlp.sh"
+        var links = DownloadRule(name: "Videos", applies: .linksAndDownloads, match: .any, action: script)
+        links.handoffType = .file
+        #expect(links.summarySentence == "Downloads are saved first, then are handed to yt-dlp.sh")
+    }
+
+    /// A link never waits for a file; the same rule hands its address off as before.
+    @Test func onlyDownloadsHandOffASavedFile() {
+        var rule = DownloadRule(name: "Torrents", match: .any, action: DownloadRuleAction(kind: .openApp))
+        #expect(!DownloadHandoff.defersToSavedFile(rule, forDownload: true))
+        rule.handoffType = .file
+        #expect(DownloadHandoff.defersToSavedFile(rule, forDownload: true))
+        #expect(!DownloadHandoff.defersToSavedFile(rule, forDownload: false))
+    }
+
+    /// An Open App action gets the saved file once there is one; a link still gets the address.
+    @Test func anAppIsGivenTheSavedFileAfterAFileHandoff() {
+        let link = URL(string: "https://tracker.example/download.php?id=42")!
+        let saved = URL(fileURLWithPath: "/Users/me/Downloads/a.torrent")
+        #expect(DownloadHandoff.appTarget(HandoffValues(link: link, file: saved)) == saved)
+        #expect(DownloadHandoff.appTarget(HandoffValues(link: link)) == link)
+    }
+
     // MARK: Where an Open URL rule opens
 
     /// Only web URLs open in Zigzag; others go to their app (mpv, IINA).
@@ -1321,6 +1397,29 @@ extension DownloadRuleTests {
 
             var edited = rule
             edited.action.urlTemplate = "iina://{encoded_link}"
+            store.update(edited)
+
+            #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == nil)
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
+        }
+    }
+
+    /// Changing what the rule hands off, like changing its script or URL, makes answers given for the old behavior stale.
+    @MainActor @Test func changingAHandoffsTypeForgetsThatRulesAnswers() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Torrents", applies: .downloads, match: .fileType, pattern: "torrent",
+                                    action: DownloadRuleAction(kind: .jsonRPC))
+            rule.action.rpcEndpoint = "http://127.0.0.1:5000/RPC2"
+            rule.action.rpcMethod = "load.start"
+            rule.handoffAnswer = "handOff"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule.id), origin: "https://tracker.example")
+
+            var edited = rule
+            edited.handoffType = .file
             store.update(edited)
 
             #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == nil)

@@ -41,6 +41,11 @@ enum DownloadHandoff {
         case failed(String)
     }
 
+    /// Whether this handoff waits for Zigzag to save the file first. Never for a link, which has no file.
+    static func defersToSavedFile(_ rule: DownloadRule, forDownload: Bool) -> Bool {
+        forDownload && rule.handoffType == .file
+    }
+
     /// The matching rule, if any. `appliesToLinks` is true for links, false for downloads.
     static func firstMatch(_ url: URL, appliesToLinks: Bool, filename: String = "", isPrivate: Bool = false, in profile: Profile?) -> DownloadRule? {
         guard isHandoffable(url) else { return nil }
@@ -249,11 +254,14 @@ enum DownloadHandoff {
         }
     }
 
-    /// Cookies are read only when the action uses them; temporary files are removed afterwards.
+    /// Cookies are read only when the action uses them; temporary files are removed afterwards. `file` is the saved
+    /// download for a File handoff, nil for a link or a URL handoff.
     @discardableResult
-    static func perform(_ rule: DownloadRule, request: Request) async -> Outcome {
-        var values = HandoffValues(link: request.url, referrer: request.referrer, filename: request.filename,
+    static func perform(_ rule: DownloadRule, request: Request, file: URL? = nil) async -> Outcome {
+        var values = HandoffValues(link: request.url, file: file, referrer: request.referrer, filename: request.filename,
                                    mime: request.mime, space: request.space)
+        // The file's real name may have gained a number to avoid another download.
+        if let file { values.filename = file.lastPathComponent }
         let secret = rule.action.kind == .jsonRPC ? (HandoffSecrets.secret(for: rule.id) ?? "") : ""
         var cookieFile: URL?
         let cookiesMayLeave = maySendCookies(request) && targetIsOnThisMac(rule.action, values: values)
@@ -295,7 +303,8 @@ enum DownloadHandoff {
     private static func announce(_ rule: DownloadRule, request: Request, values: HandoffValues, secret: String) {
         let choice = opening(rule, at: request.place)
         guard let host = handoffHost(for: request),
-              let line = HandoffNotice.takeLine(for: rule, elsewhere: elsewhere(of: rule.action, at: choice, values: values, secret: secret))
+              let line = HandoffNotice.takeLine(for: rule, elsewhere: elsewhere(of: rule.action, at: choice, values: values, secret: secret),
+                                                file: values.file != nil)
         else { return }
         host.promptToast(line, symbol: rule.action.kind.symbol, duration: 4)
     }
@@ -360,6 +369,9 @@ enum DownloadHandoff {
 
     // MARK: Actions
 
+    /// An app gets the saved file for a File handoff, and the address otherwise.
+    static func appTarget(_ values: HandoffValues) -> URL { values.file ?? values.link }
+
     private static func openApp(_ action: DownloadRuleAction, values: HandoffValues, secret: String) async -> Outcome {
         // Literal: a link can fill an argument but never pick the program.
         let path = (action.appPath as NSString).expandingTildeInPath
@@ -369,7 +381,7 @@ enum DownloadHandoff {
         }
         let configuration = NSWorkspace.OpenConfiguration()
         let error: Error? = await withCheckedContinuation { continuation in
-            NSWorkspace.shared.open([values.link], withApplicationAt: app, configuration: configuration) { _, error in
+            NSWorkspace.shared.open([appTarget(values)], withApplicationAt: app, configuration: configuration) { _, error in
                 continuation.resume(returning: error)
             }
         }
@@ -470,6 +482,10 @@ enum DownloadHandoff {
         let inherited = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + inherited
         environment["ZIGZAG_LINK"] = values.link.absoluteString
+        if let file = values.file {
+            environment["ZIGZAG_FILE"] = file.path
+            environment["ZIGZAG_FILE_URL"] = file.absoluteString
+        }
         environment["ZIGZAG_REFERRER"] = values.referrer?.absoluteString ?? ""
         environment["ZIGZAG_FILENAME"] = values.filename
         environment["ZIGZAG_MIME"] = values.mime

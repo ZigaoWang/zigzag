@@ -4428,7 +4428,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             return
         }
-        let values = HandoffValues(link: url, filename: DownloadTokens.filename(for: url, suggested: ""), space: "")
+        let filename = DownloadTokens.filename(for: url, suggested: "")
+        // A File rule tested as a download fills {file} with where it would save it, not an empty value.
+        let previewFile = linkMatch == nil && rule.handoffType == .file
+            ? DownloadManager.folder.appendingPathComponent(filename)
+            : nil
+        let values = HandoffValues(link: url, file: previewFile, filename: filename, space: "")
         let preview = rule.action.textFields.first.map { DownloadTokens.expand($0, with: values) } ?? ""
         let detail = preview.isEmpty ? rule.summarySentence : "\(rule.summarySentence)\n\(preview)"
         // A downloads-only rule catches it as a file, not as a link.

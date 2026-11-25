@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- A download rule can hand off the file instead of the address: set Hand off to File, and Zigzag downloads it first with the page's session, then gives the saved file to the app, script or service. Links still hand off their address, and a File handoff's templates can use {file} or {file_url} for the saved file.
+
 ## [0.9.5] - 2026-11-25
 
 Export Your Data so you can always take everything with you, live folders, nesting tabs by dragging, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.

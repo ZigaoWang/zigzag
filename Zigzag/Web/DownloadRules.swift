@@ -86,6 +86,20 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
+    /// What a handoff is given. `url` is the address, as before; `file` downloads it in Zigzag first and hands off the
+    /// saved file. Links always use `url`, since they have no file.
+    enum HandoffType: String, Codable, CaseIterable, Sendable {
+        case url
+        case file
+
+        var title: String {
+            switch self {
+            case .url: String(localized: "URL", comment: "Choice of what a download rule hands off: the link or download's address, as before.")
+            case .file: String(localized: "File", comment: "Choice of what a download rule hands off: Zigzag downloads it first, then hands off the saved file.")
+            }
+        }
+    }
+
     /// `fileType` matches the file name's extension; every other kind matches the address. `any` is the catch-all.
     enum Match: String, Codable, CaseIterable, Sendable {
         case startsWith, contains, endsWith, regex, fileType, any
@@ -115,6 +129,8 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     var name: String
     var isEnabled = true
     var applies: Applies = .downloads
+    /// What the action is given. `.file` downloads first and hands off the saved file; links still use `.url`.
+    var handoffType: HandoffType = .url
     var match: Match = .contains
     var pattern = ""
     /// Applies to regex and text. Hosts are always case-insensitive.
@@ -200,6 +216,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         // A destination names the folder it saves into. A file-type handoff is sent somewhere, so it reads like every
         // other handoff, by the files it catches.
         if match == .fileType, action.kind.isDestination { return destinationSentence }
+        if handoffType == .file { return savedFileSentence(goes: goes) }
         if match == .any {
             return applies == .downloads
                 ? String(localized: "Everything you download goes to \(goes)",
@@ -241,18 +258,50 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
+    /// A File handoff reads as the download being saved first, then the action. Only downloads wait: a link still
+    /// hands off its address.
+    private func savedFileSentence(goes: String) -> String {
+        let catches: String
+        switch match {
+        case .any:
+            catches = String(localized: "Downloads", comment: "Part of a download rule's sentence for a File handoff: everything it catches.")
+        case .startsWith:
+            catches = String(localized: "Downloads starting with \(pattern)", comment: "Part of a download rule's sentence for a File handoff: the files whose address begins this way. The placeholder is the beginning of the address.")
+        case .contains:
+            catches = String(localized: "Downloads whose address contains \(pattern)", comment: "Part of a download rule's sentence for a File handoff: the files whose address contains this text. The placeholder is the text looked for in the address.")
+        case .endsWith:
+            catches = String(localized: "Downloads ending in \(pattern)", comment: "Part of a download rule's sentence for a File handoff: the files whose address ends this way. The placeholder is the end of the address, such as .torrent.")
+        case .regex:
+            catches = String(localized: "Downloads matching \(pattern)", comment: "Part of a download rule's sentence for a File handoff: the files whose address matches this expression. The placeholder is the expression.")
+        case .fileType:
+            let types = Match.extensions(in: pattern).joined(separator: ", ")
+            catches = String(localized: "Files of type \(types)", comment: "Part of a download rule's sentence: it catches files by their own extension, whatever their address. The placeholder lists the extensions, like torrent or pdf.")
+        }
+        switch action.kind {
+        case .jsonRPC:
+            return String(localized: "\(catches) are saved first, then go to \(goes)", comment: "A File handoff in a sentence: what it catches is downloaded first, then sent to the service. The placeholders are the two parts, as in “Downloads ending in .torrent” and “rTorrent”.")
+        case .openApp, .openURL:
+            return String(localized: "\(catches) are saved first, then open in \(goes)", comment: "A File handoff in a sentence: what it catches is downloaded first, then opened in the app. The placeholders are the two parts.")
+        case .runScript:
+            return String(localized: "\(catches) are saved first, then are handed to \(goes)", comment: "A File handoff in a sentence: what it catches is downloaded first, then given to the script. The placeholders are the two parts.")
+        case .saveToFolder, .openFile:
+            return goes
+        }
+    }
+
     init(name: String, applies: Applies = .downloads, match: Match = .contains, pattern: String = "",
-         isCaseSensitive: Bool = false, action: DownloadRuleAction) {
+         isCaseSensitive: Bool = false, action: DownloadRuleAction, handoffType: HandoffType = .url) {
         self.name = name
         self.applies = applies
         self.match = match
         self.pattern = pattern
         self.isCaseSensitive = isCaseSensitive
         self.action = action
+        self.handoffType = handoffType
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, handoffAnswer, action
+        case id, name, isEnabled, applies, handoffType, match, pattern, isCaseSensitive, runsInPrivateWindows, handoffAnswer, action
     }
 
     /// Missing keys use defaults, and an unknown kind (e.g. from another branch) decodes as the nearest known one, so
@@ -268,6 +317,8 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         name = value(String.self, .name) ?? ""
         isEnabled = value(Bool.self, .isEnabled) ?? true
         applies = value(String.self, .applies).flatMap(Applies.init(rawValue:)) ?? .downloads
+        // Missing in rules saved before the choice existed; an unknown value is left at the address.
+        handoffType = value(String.self, .handoffType).flatMap(HandoffType.init(rawValue:)) ?? .url
         if let rawMatch = value(String.self, .match) {
             if let known = Match(rawValue: rawMatch) { match = known } else { match = .contains; isEnabled = false }
         } else {
@@ -565,6 +616,8 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
 /// Token values for one handoff. Cookies are filled only when a rule needs them, since reading the store is slow.
 nonisolated struct HandoffValues: Equatable, Sendable {
     var link: URL
+    /// The saved file, only when a File handoff has finished downloading one.
+    var file: URL?
     var referrer: URL?
     var filename: String
     var mime: String
@@ -572,11 +625,14 @@ nonisolated struct HandoffValues: Equatable, Sendable {
     var cookieHeader = ""
     var cookieFile = ""
 
-    init(link: URL, referrer: URL? = nil, filename: String = "", mime: String = "", space: String = "",
+    init(link: URL, file: URL? = nil, referrer: URL? = nil, filename: String = "", mime: String = "", space: String = "",
          cookieHeader: String = "", cookieFile: String = "") {
         self.link = link
+        self.file = file
         self.referrer = referrer
-        self.filename = filename.isEmpty ? DownloadTokens.filename(for: link, suggested: "") : filename
+        self.filename = filename.isEmpty
+            ? DownloadTokens.filename(for: file ?? link, suggested: "")
+            : filename
         self.mime = mime
         self.space = space
         self.cookieHeader = cookieHeader
@@ -588,7 +644,8 @@ nonisolated struct HandoffValues: Equatable, Sendable {
 
 nonisolated enum DownloadTokens {
     /// All tokens, for the editor's note.
-    static let names = ["{link}", "{encoded_link}", "{referrer}", "{cookies}", "{cookie_header}", "{filename}", "{mime}", "{space}"]
+    static let names = ["{link}", "{encoded_link}", "{referrer}", "{cookies}", "{cookie_header}", "{filename}", "{mime}",
+                        "{space}", "{file}", "{file_url}"]
 
     /// Encodes `&`, `+`, `=` and `#` so they stay inside the value.
     static func queryValue(_ text: String) -> String {
@@ -658,6 +715,9 @@ nonisolated enum DownloadTokens {
             "{filename}": value(values.filename),
             "{mime}": value(mime),
             "{space}": value(values.space),
+            // Only a File handoff has one; a URL handoff leaves both empty.
+            "{file}": value(values.file?.path ?? ""),
+            "{file_url}": value(values.file?.absoluteString ?? ""),
             "{secret}": value(secret),
             // Address parts, e.g. `https://bing.com{path}` sends a google.com match to the same page on bing.com.
             // Already percent-encoded.
@@ -868,10 +928,11 @@ final class DownloadRulesStore {
     func update(_ rule: DownloadRule) {
         guard let index = rules.firstIndex(where: { $0.id == rule.id }) else { return }
         let old = rules[index]
-        // Answers were given for the old behavior; a new script or URL clears them. Changing the name or other fields
-        // doesn't.
+        // Answers were given for the old behavior; a new script, URL or handoff type clears them. Changing the name or
+        // other fields doesn't.
         var saved = rule
-        if old.action.scriptPath != rule.action.scriptPath || old.action.urlTemplate != rule.action.urlTemplate {
+        if old.action.scriptPath != rule.action.scriptPath || old.action.urlTemplate != rule.action.urlTemplate
+            || old.handoffType != rule.handoffType {
             saved.handoffAnswer = nil
             Self.forgetHandoffAnswers(for: rule.id)
         }

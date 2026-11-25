@@ -808,6 +808,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let decision = await DownloadHandoff.decide(rule, request: handoff, tab: nil, forDownload: !appliesToLinks)
         switch decision.gate {
         case .handOff:
+            // A File rule waits for WebKit's download; the download manager performs it on the saved file.
+            if DownloadHandoff.defersToSavedFile(rule, forDownload: !appliesToLinks) {
+                DownloadManager.shared.expectFileHandoff(rule, request: handoff, from: webView)
+                return false
+            }
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
             if case .noMatch = outcome { return false }
