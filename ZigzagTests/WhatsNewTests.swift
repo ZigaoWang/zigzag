@@ -157,10 +157,15 @@ struct WhatsNewTests {
         #expect(WhatsNew.notesFile(for: "ja") == nil)
     }
 
-    /// Japanese has no changelog of its own, so it reads the English notes, under headings in Japanese.
-    @Test func japaneseReadsTheEnglishNotes() throws {
-        #expect(WhatsNew.notesFile(for: "ja") == nil)
-        #expect(WhatsNew.notesFile(for: "ja-JP") == nil)
+    /// Languages other than Chinese have no changelog of their own, so they read the English notes, under headings
+    /// in their language.
+    @Test(arguments: [
+        ("ja", "新機能", "修正"), ("de", "Neu", "Behoben"), ("es", "Nuevo", "Correcciones"), ("fr", "Nouveautés", "Corrections"),
+        ("it", "Novità", "Correzioni"), ("ko", "새로운 기능", "수정 사항"), ("nl", "Nieuw", "Opgelost"), ("pl", "Nowe", "Naprawiono"),
+        ("pt-BR", "Novo", "Corrigido"), ("ru", "Новое", "Исправлено"), ("tr", "Yeni Özellikler", "Düzeltmeler"),
+    ]) func otherLanguagesReadTheEnglishNotes(_ language: String, _ new: String, _ fixed: String) throws {
+        #expect(WhatsNew.notesFile(for: language) == nil)
+        #expect(WhatsNew.notesFile(for: "\(language)-XX") == nil)
         let english = """
         ## [1.1.0] - 2026-11-01
 
@@ -170,12 +175,12 @@ struct WhatsNewTests {
         ### Fixed
         - Two
         """
-        let notes = WhatsNew.pick(english: english, localized: WhatsNew.notesFile(for: "ja"), version: "1.1.0")
+        let notes = WhatsNew.pick(english: english, localized: WhatsNew.notesFile(for: language), version: "1.1.0")
         #expect(notes == WhatsNew.parse(english, version: "1.1.0"))
         #expect(notes.sections.map { $0.items.map(\.text) } == [["One"], ["Two"]])
-        let bundle = try #require(Bundle(path: Bundle.main.path(forResource: "ja", ofType: "lproj") ?? ""))
-        #expect(bundle.localizedString(forKey: "New", value: nil, table: nil) == "新機能")
-        #expect(bundle.localizedString(forKey: "Fixed", value: nil, table: nil) == "修正")
+        let bundle = try #require(Bundle(path: Bundle.main.path(forResource: language, ofType: "lproj") ?? ""))
+        #expect(bundle.localizedString(forKey: "New", value: nil, table: nil) == new)
+        #expect(bundle.localizedString(forKey: "Fixed", value: nil, table: nil) == fixed)
     }
 
     /// The translated notes when they have the version, the English ones when they don't.

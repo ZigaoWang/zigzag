@@ -220,9 +220,9 @@ struct LocalizationTests {
         #expect(Bundle.main.localizations.contains(language))
     }
 
-    /// Each Chinese string takes the same arguments as its English, of the same types, so a translation that
+    /// Each translated string takes the same arguments as its English, of the same types, so a translation that
     /// reorders them can't read the wrong one or crash.
-    @Test(arguments: ["zh-Hans", "zh-Hant", "ja"]) func chineseKeepsTheFormatSpecifiers(_ language: String) throws {
+    @Test(arguments: Self.translated) func everyLanguageKeepsTheFormatSpecifiers(_ language: String) throws {
         var wrong: [String] = []
         for (key, entry) in try Self.catalog() {
             let en = Self.forms(entry, "en").first ?? key
@@ -231,7 +231,11 @@ struct LocalizationTests {
             // An untranslated entry is left to the English source, including any substitutions.
             let locales = (entry as? [String: Any])?["localizations"] as? [String: [String: Any]]
             guard let localization = locales?[language] else { continue }
+            let plural = (localization["variations"] as? [String: Any])?["plural"] as? [String: Any]
+            let one = ((plural?["one"] as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String
             for zh in forms where Self.arguments(zh, entry, language) != expected {
+                // A singular may leave out its count, as English "Close Tab" does, but reads every other argument where it was.
+                if zh == one, Self.arguments(zh, entry, language).allSatisfy({ expected[$0.key] == $0.value }) { continue }
                 wrong.append("\(key) → \(zh)")
             }
             // Each substitution has its own argument specifier and plural forms, independent of the outer format.
@@ -307,9 +311,9 @@ struct LocalizationTests {
         #expect(Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: ["zh-CN"]).first == "zh-Hans")
     }
 
-    /// A string with no Traditional Chinese or Japanese yet reads in English, never as a raw key: a key that isn't
+    /// A string with no translation yet reads in English, never as a raw key: a key that isn't
     /// English text carries its English in the code, and an entry that is there is complete.
-    @Test(arguments: ["zh-Hant", "ja"]) func optionalLanguagesFallBackToEnglish(_ language: String) throws {
+    @Test(arguments: Self.translated.filter { $0 != "zh-Hans" }) func optionalLanguagesFallBackToEnglish(_ language: String) throws {
         let identifier = try NSRegularExpression(pattern: #"^[a-z0-9]+([.-][A-Za-z0-9]+)+$"#)
         var off: [String] = []
         for name in ["Localizable", "InfoPlist"] {
@@ -403,6 +407,145 @@ struct LocalizationTests {
             }
         }
         #expect(off.isEmpty, "\(off.joined(separator: "\n"))")
+    }
+
+    // MARK: Every language
+
+    /// Every language Zigzag ships besides English.
+    nonisolated private static let translated = ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt-BR", "ru", "tr", "zh-Hans", "zh-Hant"]
+
+    @Test func translatedListsEveryShippedLanguage() {
+        #expect(Set(Bundle.main.localizations).subtracting(["en", "Base"]) == Set(Self.translated))
+    }
+
+    /// Each language is in the app under the code Bundle picks it by, named in itself in Settings, with its words.
+    @MainActor @Test(arguments: [
+        ("de", "Deutsch", ["de-DE", "de-AT", "de-CH"]), ("es", "Español", ["es-ES", "es-MX", "es-419"]),
+        ("fr", "Français", ["fr-FR", "fr-CA"]), ("it", "Italiano", ["it-IT"]), ("ko", "한국어", ["ko-KR"]),
+        ("nl", "Nederlands", ["nl-NL", "nl-BE"]), ("pl", "Polski", ["pl-PL"]), ("pt-BR", "Português (Brasil)", []),
+        ("ru", "Русский", ["ru-RU"]), ("tr", "Türkçe", ["tr-TR"]),
+    ]) func everyLanguageReachesTheApp(_ language: String, _ name: String, _ macs: [String]) throws {
+        let bundle = try #require(Bundle(path: Bundle.main.path(forResource: language, ofType: "lproj") ?? ""))
+        #expect(AppLanguage.choices.contains { $0.code == language && $0.title == name })
+        #expect(AppLanguage.ownName(language) == name)
+        for mac in [language] + macs {
+            #expect(Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: [mac]).first == language, "\(mac)")
+        }
+        let catalog = try Self.catalog()
+        for key in ["New Tab", "Settings…", "Reopen Closed Tab"] {
+            let entry = try #require(catalog[key])
+            let expected = try #require(Self.forms(entry, language).first)
+            #expect(bundle.localizedString(forKey: key, value: "⟨missing⟩", table: nil) == expected)
+            #expect(expected != key)
+        }
+        let camera = bundle.localizedString(forKey: "NSCameraUsageDescription", value: nil, table: "InfoPlist")
+        #expect(camera != Self.english("NSCameraUsageDescription") && !camera.isEmpty)
+    }
+
+    /// CLDR's plural categories for whole numbers, and the ones a language may leave to "other": French, Italian,
+    /// Spanish and Portuguese have "many" only for millions written as digits, which read the same as "other".
+    private static let pluralCategories: [String: (required: Set<String>, optional: Set<String>)] = [
+        "de": (["one", "other"], []), "nl": (["one", "other"], []), "tr": (["one", "other"], []),
+        "es": (["one", "other"], ["many"]), "fr": (["one", "other"], ["many"]), "it": (["one", "other"], ["many"]),
+        "pt-BR": (["one", "other"], ["many"]), "pl": (["one", "few", "many", "other"], []), "ru": (["one", "few", "many", "other"], []),
+        "ja": (["other"], []), "ko": (["other"], []), "zh-Hans": (["other"], []), "zh-Hant": (["other"], []),
+    ]
+
+    /// English that reads the same in a language because it is a name, a format, an example or a word both share.
+    private static let sameAsEnglish: Set<String> = [
+        "Zigzag Mini", "Split View", "Chrome Web Store", "Firefox Add-ons", "GitHub Issues", "JSON-RPC", "XML-RPC", "Full HD",
+        "Picture in Picture", "Web Inspector", "User agent", "Pop-ups", "pdf, epub", "© %1$@ Zigao Wang. %2$@.",
+        "example.com/files/", "https://example.com/file.zip", "Zigzag Passwords.csv",
+        "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
+    ]
+    private static let sameAsEnglishIn: [String: Set<String>] = [
+        // Dutch "Open" is the same word.
+        "nl": ["Open in", "Open in %@", "Open URL", "Open 1Password", "Open Safari", "Open in Zigzag", "Open in Zigzag Mini", "Open in Split View"],
+    ]
+
+    /// Every translation keeps product names, keyboard symbols and addresses as the English has them, ends a
+    /// "…" item in "…", translates every sentence, and has the plural forms its language needs.
+    @Test(arguments: Self.translated) func everyLanguageKeepsNamesSymbolsAndPlurals(_ language: String) throws {
+        let names = ["Zigzag Mini", "Zigzag", "Chrome", "Safari", "Firefox", "Arc", "GitHub", "1Password", "WebRTC", "JavaScript"]
+        // Japanese leaves out a sentence's subject, Zigzag included, as Apple's Japanese leaves out the app.
+        let droppable: Set<String> = language == "ja" ? ["Zigzag"] : []
+        let placeholder = try NSRegularExpression(pattern: #"%(\d+\$)?(lld|ld|d|@|f|\.\d+f|#@\w+@|arg)"#)
+        let address = try NSRegularExpression(pattern: #"https?://[^\s)»”"]*[^\s)»”".,]"#)
+        let allowed = Self.sameAsEnglish.union(Self.sameAsEnglishIn[language] ?? [])
+        let plurals = try #require(Self.pluralCategories[language])
+        func has(_ text: String, _ regex: NSRegularExpression) -> Bool { regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil }
+        // A name, not part of a longer word or of Zigzag Mini; letters of other scripts may touch it.
+        let exact = try names.map { name in
+            try NSRegularExpression(pattern: #"(?<![A-Za-z0-9-])"# + NSRegularExpression.escapedPattern(for: name)
+                                    + (name == "Zigzag" ? "(?! Mini)" : "") + "(?![A-Za-z0-9])")
+        }
+        let anyCase = try names.map { try NSRegularExpression(pattern: #"(?<![A-Za-z0-9])"# + NSRegularExpression.escapedPattern(for: $0) + "(?![A-Za-z0-9])", options: .caseInsensitive) }
+        var off: [String] = []
+        for catalogName in ["Localizable", "InfoPlist"] {
+            for (key, entry) in try Self.catalog(catalogName) {
+                let forms = Self.forms(entry, language)
+                guard let first = forms.first else { continue }
+                let english = Self.forms(entry, "en")
+                let en = english.first ?? key
+                let allEnglish = english.isEmpty ? [key] : english
+                for (i, brand) in names.enumerated() where has(en, exact[i]) && !droppable.contains(brand) && !forms.contains(where: { has($0, exact[i]) }) {
+                    off.append("\(key) → \(first): keeps \(brand)")
+                }
+                // Search words are lowercase and never shown, and addresses and variables keep their own case.
+                let searchWords = ((entry as? [String: Any])?["comment"] as? String)?.contains("Not shown") == true
+                for (i, brand) in names.enumerated() where !searchWords {
+                    for form in forms {
+                        for match in anyCase[i].matches(in: form, range: NSRange(form.startIndex..., in: form)) {
+                            let spelled = String(form[Range(match.range, in: form)!])
+                            if spelled != brand, spelled != spelled.lowercased(), spelled != spelled.uppercased() { off.append("\(form): spells \(brand) \(spelled)") }
+                        }
+                    }
+                }
+                for form in forms {
+                    if form.contains("...") && !en.contains("...") { off.append("\(form): three dots for …") }
+                    for symbol in ["⌘", "⌥", "⇧", "⌃"] where form.components(separatedBy: symbol).count != en.components(separatedBy: symbol).count {
+                        off.append("\(key) → \(form): keeps \(symbol)")
+                    }
+                }
+                if en.hasSuffix("…"), !first.hasSuffix("…") { off.append("\(key) → \(first): ends in …") }
+                for english in allEnglish {
+                    for match in address.matches(in: english, range: NSRange(english.startIndex..., in: english)) {
+                        let url = String(english[Range(match.range, in: english)!])
+                        if !forms.contains(where: { $0.contains(url) }) { off.append("\(key) → \(first): keeps \(url)") }
+                    }
+                }
+                let words = placeholder.stringByReplacingMatches(in: en, range: NSRange(en.startIndex..., in: en), withTemplate: "")
+                    .components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
+                if words.count > 1, first == en, !allowed.contains(en) { off.append("\(en): left in English") }
+                // Each plural set has the language's categories, and every form but a singular one shows the number.
+                let units = (entry as? [String: Any])?["localizations"] as? [String: [String: Any]] ?? [:]
+                func sets(_ unit: [String: Any]?) -> [String: [String: Any]] {
+                    var out: [String: [String: Any]] = [:]
+                    if let plural = (unit?["variations"] as? [String: Any])?["plural"] as? [String: Any] { out[""] = plural as [String: Any] }
+                    for (sub, value) in unit?["substitutions"] as? [String: [String: Any]] ?? [:] {
+                        if let plural = (value["variations"] as? [String: Any])?["plural"] as? [String: Any] { out[sub] = plural }
+                    }
+                    return out
+                }
+                let source = sets(units["en"])
+                let target = sets(units[language])
+                if !source.isEmpty, target.isEmpty, plurals.required != ["other"] { off.append("\(key): no plural forms") }
+                for (sub, forms) in target {
+                    let categories = Set(forms.keys)
+                    if !plurals.required.isSubset(of: categories) || !categories.isSubset(of: plurals.required.union(plurals.optional)) {
+                        off.append("\(key) \(sub): plural forms \(categories.sorted())")
+                    }
+                    let other = ((source[sub]?["other"] as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String ?? ""
+                    guard placeholder.firstMatch(in: other, range: NSRange(other.startIndex..., in: other)) != nil else { continue }
+                    // Russian "one" is also 21, 31 and on; elsewhere it's 1, or 0 and 1.
+                    for (category, form) in forms where category != "one" || language == "ru" {
+                        let value = ((form as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String ?? ""
+                        if placeholder.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) == nil { off.append("\(key) \(category) → \(value): no number") }
+                    }
+                }
+            }
+        }
+        #expect(off.isEmpty, "\(off.sorted().joined(separator: "\n"))")
     }
 
     /// A catalog entry's strings in one language: its single string, or each plural form and substitution.
