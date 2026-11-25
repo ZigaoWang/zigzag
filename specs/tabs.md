@@ -288,3 +288,7 @@
   Test: SwipeExitTests.callingItOffStillSpringsBack
 - Reduce Motion → the page stays put through a swipe; the arrow alone shows it.
   Test: SwipeExitTests.reduceMotionLeavesThePageWhereItIs
+
+## Typing
+- Switch a Chinese input method like Pinyin to English mid-word → the letters land without the spaces it showed between syllables ("ni hao" → "nihao"), on a page and in Zigzag's fields, as in Chrome; other input methods, Chinese characters and typing without one are left as they are.
+  Test: IMECommitTests.aPageGetsTheLettersCommitted
