@@ -333,6 +333,7 @@ final class LiveFolders {
         var unread: Set<String> = []
         var seen: [String] = []
         var validators = LiveRefresh.Validators()
+        /// The last fetch that worked, for the menu's Updated line.
         var checked: Date?
         var next: Date?
         var failures = 0
@@ -431,6 +432,9 @@ final class LiveFolders {
     }
 
     func refreshNow(_ folderID: UUID) { Task { await refresh(folderID) } }
+
+    /// A fetch of the folder is under way.
+    func isRefreshing(_ folderID: UUID) -> Bool { running.contains(folderID) }
 
     /// A new source (the folder was edited): start over.
     func reset(_ folderID: UUID) {

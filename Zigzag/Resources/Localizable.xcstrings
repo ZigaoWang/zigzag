@@ -205,6 +205,57 @@
         }
       }
     },
+    "Updated %@" : {
+      "comment" : "Line at the top of a live folder's menu in the sidebar: when it was last fetched. The placeholder is a relative time, like “5 Minutes Ago”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@更新"
+          }
+        }
+      }
+    },
+    "Updated Just Now" : {
+      "comment" : "Line at the top of a live folder's menu in the sidebar: it was fetched less than a minute ago.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刚刚更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剛剛更新"
+          }
+        }
+      }
+    },
+    "Updating…" : {
+      "comment" : "Line at the top of a live folder's menu in the sidebar, while it's being fetched.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在更新…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在更新…"
+          }
+        }
+      }
+    },
     "handed this file to %@" : {
       "comment" : "An automation's notice over the page: what a rule did with the file it downloaded first. The placeholder is the app's own name, like mpv.",
       "localizations" : {

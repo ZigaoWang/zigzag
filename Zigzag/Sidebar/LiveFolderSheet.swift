@@ -220,9 +220,31 @@ extension BrowserWindowController {
 }
 
 extension SidebarMenus {
-    /// A live folder's menu: its state when it couldn't refresh, then reading, folding, its source and deleting it.
+    /// "Updated 5 Minutes Ago", "Updated Just Now" under a minute, in the app's language; title case in English.
+    static func updatedTitle(_ date: Date, now: Date = Date(), locale: Locale = Words.locale) -> String {
+        guard now.timeIntervalSince(date) >= 60 else {
+            return String(localized: "Updated Just Now", comment: "Line at the top of a live folder's menu in the sidebar: it was fetched less than a minute ago.")
+        }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = locale
+        formatter.unitsStyle = .full
+        formatter.dateTimeStyle = .numeric
+        formatter.formattingContext = .middleOfSentence
+        var ago = formatter.localizedString(for: min(date, now), relativeTo: now)
+        if locale.language.languageCode == .english { ago = ago.capitalized(with: locale) }
+        return String(localized: "Updated \(ago)", comment: "Line at the top of a live folder's menu in the sidebar: when it was last fetched. The placeholder is a relative time, like “5 Minutes Ago”.")
+    }
+
+    /// A live folder's menu: when it was updated, its state when it couldn't refresh, then reading, folding, its source
+    /// and deleting it.
     static func liveFolderMenu(for folder: BookmarkFolder, controller: BrowserWindowController) -> NSMenu {
         let live = LiveFolders.shared
+        var updated: [NSMenuItem] = []
+        if live.isRefreshing(folder.id) {
+            updated.append(Item(String(localized: "Updating…", comment: "Line at the top of a live folder's menu in the sidebar, while it's being fetched."), symbol: "clock", enabled: false) {})
+        } else if let checked = live.state(folder.id).checked {
+            updated.append(Item(updatedTitle(checked, now: live.now()), symbol: "clock", enabled: false) {})
+        }
         var problem: [NSMenuItem] = []
         if let reason = live.state(folder.id).problem {
             problem.append(.sectionHeader(title: String(localized: "Couldn’t Refresh", comment: "Heading in a live folder's menu in the sidebar, over why its feed couldn't be fetched.")))
@@ -241,7 +263,7 @@ extension SidebarMenus {
             Item(changeIconTitle, symbol: Symbol.changeIcon) { controller.chooseFolderIcon(folder.id) },
         ]
         let close = [Item(String(localized: "Delete Live Folder", comment: "Item in a live folder's menu in the sidebar: the folder and its pages go."), symbol: Symbol.remove, destructive: true) { controller.deleteLiveFolderWithUndo(folder.id) }]
-        return menu([problem, open, view, reading, edit, close])
+        return menu([updated, problem, open, view, reading, edit, close])
     }
 
     /// A live folder's page belongs to its feed: no renaming, filing or removing, but read or unread, and copies

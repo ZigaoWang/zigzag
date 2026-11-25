@@ -701,15 +701,15 @@ struct SidebarRowMenuTests {
                                               validators: .init()), to: folder.id)
             let shown = try #require(Library.shared.folder(folder.id))
             #expect(titles(SidebarMenus.folderMenu(for: shown, controller: controller))
-                    == ["Open All in Tabs", "-", "Close Folder", "-", "Mark All as Read", "Refresh Now", "-", "Edit…", SidebarMenus.changeIconTitle, "-", "Delete Live Folder"])
+                    == ["Updated Just Now", "-", "Open All in Tabs", "-", "Close Folder", "-", "Mark All as Read", "Refresh Now", "-", "Edit…", SidebarMenus.changeIconTitle, "-", "Delete Live Folder"])
             let page = try #require(shown.bookmarkIDs.first.flatMap(Library.shared.bookmark))
             let pageMenu = titles(SidebarMenus.bookmarkMenu(for: page, controller: controller))
             #expect(pageMenu.contains("Mark as Read"))
             for title in ["Rename", "Unpin Tab", "Add to Folder", "Add to New Folder", "Move to Space", SidebarMenus.removePinsTitle(1)] { #expect(!pageMenu.contains(title), "\(title)") }
-            // Couldn't refresh: why, and Try Again in Refresh Now's place.
+            // Couldn't refresh: when it last could, why not, and Try Again in Refresh Now's place.
             LiveFolders.shared.apply(.failed(.status(500), retryAfter: nil), to: folder.id)
             let failed = titles(SidebarMenus.folderMenu(for: shown, controller: controller))
-            #expect(Array(failed.prefix(3)) == ["Couldn’t Refresh", LiveProblem.status(500).message, "Try Again"])
+            #expect(Array(failed.prefix(5)) == ["Updated Just Now", "-", "Couldn’t Refresh", LiveProblem.status(500).message, "Try Again"])
             #expect(!failed.contains("Refresh Now"))
             // Deleted with its pages, and back with ⌘Z.
             controller.deleteLiveFolderWithUndo(folder.id)

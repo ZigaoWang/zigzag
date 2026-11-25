@@ -419,4 +419,37 @@ struct LiveFoldersTests {
         hidden.openBookmark(page)
         #expect(live.isUnread(bookmark: page.id))
     }
+
+    /// Its menu says when it last fetched, in words, or that it's fetching; a failure keeps the last good time, and
+    /// the time is kept on disk, older files without it still reading.
+    @Test func itSaysWhenItWasLastUpdated() async throws {
+        let feed = URL(string: "https://example.com/updated.xml")!
+        try await withFolder(.feed(feed, found: feed)) { live, folder, _ in
+            Server.answer(feed.absoluteString, .init(body: Self.rss([("1", "One")])))
+            let clock = Date(timeIntervalSince1970: 3_000_000)
+            live.now = { clock }
+            #expect(live.state(folder.id).checked == nil)
+            let fetch = Task { await live.refresh(folder.id) }
+            for _ in 0..<100 where !live.isRefreshing(folder.id) { await Task.yield() }
+            #expect(live.isRefreshing(folder.id))
+            await fetch.value
+            #expect(!live.isRefreshing(folder.id))
+            #expect(live.state(folder.id).checked == clock)
+            Server.answer(feed.absoluteString, .init(status: 500))
+            live.now = { clock.addingTimeInterval(600) }
+            await live.refresh(folder.id)
+            #expect(live.state(folder.id).checked == clock)
+
+            let saved = try JSONEncoder().encode([folder.id: live.state(folder.id)])
+            #expect(try JSONDecoder().decode([UUID: LiveFolders.State].self, from: saved)[folder.id]?.checked == clock)
+            let older = Data("{\"unread\": [], \"seen\": [], \"validators\": {}, \"failures\": 0}".utf8)
+            #expect(try JSONDecoder().decode(LiveFolders.State.self, from: older).checked == nil)
+        }
+        let now = Date(timeIntervalSince1970: 3_000_000)
+        let english = Locale(identifier: "en_US")
+        #expect(SidebarMenus.updatedTitle(now.addingTimeInterval(-20), now: now, locale: english) == "Updated Just Now")
+        #expect(SidebarMenus.updatedTitle(now.addingTimeInterval(-5 * 60), now: now, locale: english) == "Updated 5 Minutes Ago")
+        #expect(SidebarMenus.updatedTitle(now.addingTimeInterval(-3 * 3600), now: now, locale: english) == "Updated 3 Hours Ago")
+        #expect(SidebarMenus.updatedTitle(now.addingTimeInterval(-5 * 60), now: now, locale: Locale(identifier: "zh-Hans")).contains("5分钟前"))
+    }
 }
