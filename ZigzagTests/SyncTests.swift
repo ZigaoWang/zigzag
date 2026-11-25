@@ -903,6 +903,28 @@ extension SyncLibrary {
         #expect(a.sent + b.sent == sent)
     }
 
+    @Test func preferencesThisVersionDoesntKnowAreKeptAsTheyAre() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal")], settings: ["ReaderSize": .int(16)]))
+        let future = SyncSettings.Entry(value: .string("on"), modified: Date(timeIntervalSince1970: 1_700_000_000))
+        let elsewhere = "\(ProfileKey.extensionsOffSites.rawValue).\(UUID().uuidString)"
+        guard case .settings(var settings) = SyncBody.decode(type: SyncBody.settingsType, payload: try #require(cloud.records[SyncName.settings]).payload) else {
+            Issue.record("no settings"); return
+        }
+        settings.values["FutureSetting"] = future
+        settings.values[elsewhere] = future
+        let tag = try #require(cloud.remote(SyncName.settings)).systemFields
+        cloud.save(SyncUpload(name: SyncName.settings, type: SyncBody.settingsType, payload: SyncBody.settings(settings).encoded(), modified: Date(), systemFields: tag))
+        a.sync()
+        a.edit { $0.settings["ReaderSize"] = .int(20) }
+        a.sync()
+        guard case .settings(let after) = SyncBody.decode(type: SyncBody.settingsType, payload: try #require(cloud.records[SyncName.settings]).payload) else {
+            Issue.record("no settings"); return
+        }
+        #expect(after.values["ReaderSize"]?.value == .int(20))
+        #expect(after.values["FutureSetting"] == future)
+        #expect(after.values[elsewhere] == future)
+    }
+
     // MARK: Connecting
 
     /// The state as State.json keeps it.

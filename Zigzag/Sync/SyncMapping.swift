@@ -333,8 +333,10 @@ enum SyncMapping {
         // A preference set back to its default is sent as unset; the search engine chosen from an extension stays as it was.
         for (key, entry) in earlier where values[key] == nil {
             if key == SyncPreferences.searchEngineKey, library.searchEngine == .fromExtension { values[key] = entry; continue }
-            // A kept profile's settings stay as iCloud has them.
-            if let profile = SyncPreferences.owner(SyncPreferences.renamed(key, aliases.local)).profile, kept.contains(profile) { values[key] = entry; continue }
+            // One this version doesn't know, or a profile's not here (yet), or a kept profile's: as iCloud has it.
+            let owner = SyncPreferences.owner(SyncPreferences.renamed(key, aliases.local))
+            if key != SyncPreferences.searchEngineKey, !owner.carried { values[key] = entry; continue }
+            if let profile = owner.profile, kept.contains(profile) || directory.profile(profile) == nil { values[key] = entry; continue }
             values[key] = entry.value == nil ? entry : .init(value: nil, modified: now)
         }
         let settingsModified = values.values.map(\.modified).max() ?? previous[SyncName.settings]?.modified ?? now

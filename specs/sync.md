@@ -117,3 +117,5 @@
   Test: SyncTests.aPageArrivingBeforeItsSpaceWaitsForIt
 - Something inside a space, folder or profile only a newer Zigzag can read → left as it is, never moved or rewritten here.
   Test: SyncTests.whatsInsideARecordANewerZigzagWroteIsLeftAlone
+- A preference only a newer Zigzag knows, or one of a profile this Mac doesn't have → kept in iCloud as it is, never sent back as unset.
+  Test: SyncTests.preferencesThisVersionDoesntKnowAreKeptAsTheyAre
