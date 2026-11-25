@@ -368,7 +368,7 @@ struct NestedTabsTests {
     }
 }
 
-/// The sidebar's rows for nested tabs (#526).
+/// The sidebar's rows for nested tabs (#526): the chevron, and the line a drag sets in.
 @MainActor
 struct NestedTabRowsTests {
     private func inWindow(_ count: Int, _ body: (BrowserWindowController, [Tab]) throws -> Void) throws {
@@ -422,6 +422,47 @@ struct NestedTabRowsTests {
             try click(again)
             #expect(tabs[0].isCollapsed)
             #expect(!list.debugItems.contains(.tab(tabs[1].id)))
+        }
+    }
+
+    /// Carries `tab`'s row `dx` across by a finger and lets go: the line before the drop, and the row's frame.
+    private func lineCarrying(_ tab: Tab, by dx: CGFloat, in controller: BrowserWindowController) throws -> (line: NSRect?, row: NSRect) {
+        let list = controller.sidebar.list
+        let row = try shownRow(tab, in: list)
+        let window = try #require(controller.window)
+        let start = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let down = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: start, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        let finger = TouchCarry()
+        TouchCarry.starting = finger
+        #expect(row.onDragStart?(down) == true)
+        finger.move(to: NSPoint(x: start.x + dx / 2, y: start.y))
+        finger.move(to: NSPoint(x: start.x + dx, y: start.y))
+        let line = list.debugInsertionLine
+        finger.release(at: NSPoint(x: start.x + dx, y: start.y))
+        return (line, row.frame)
+    }
+
+    @Test func draggedRightTheLineSetsInRightUnderTheRowAbove() throws {
+        try inWindow(4) { controller, tabs in
+            let list = controller.sidebar.list
+            let step = SidebarListView.folderIndent
+            // Dragged right in its own place: the line sets in right under the tab above, not under the carried row.
+            let above = try shownRow(tabs[1], in: list).frame
+            let first = try lineCarrying(tabs[2], by: step, in: controller)
+            let line = try #require(first.line)
+            #expect(line.minX == SidebarListView.indent(depth: 1))
+            #expect(line.midY > above.maxY && line.midY <= first.row.minY)
+            #expect(tabs[2].parentID == tabs[1].id)
+            // The tab below it, under the same tab, dragged right: under the tab just above, two levels in.
+            controller.tabManager.nest(tabs[3], deeper: true)
+            #expect(tabs[3].parentID == tabs[1].id)
+            let nested = try shownRow(tabs[2], in: list).frame
+            let second = try lineCarrying(tabs[3], by: step, in: controller)
+            let deeper = try #require(second.line)
+            #expect(deeper.minX == SidebarListView.indent(depth: 2))
+            #expect(deeper.midY > nested.maxY && deeper.midY <= second.row.minY)
+            #expect(tabs[3].parentID == tabs[2].id)
         }
     }
 }
