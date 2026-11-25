@@ -1228,6 +1228,10 @@ enum DebugBridge {
             let energy = arg.hasPrefix("energy ")
             let prefix = energy ? String(arg.dropFirst(7)) : arg
             controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(prefix) == true }?.suspend(because: energy ? EnergyWatch.sleepReason : "debug")
+        // networkprocess: the process id of WebKit's network process for the shown tab's store, in the debug log.
+        case "networkprocess":
+            let store = controller.tabManager.selectedTab?.webView?.configuration.websiteDataStore
+            debugLog("networkprocess \(store.map(NetworkProcessCookies.process) ?? 0)")
         // iconpicker <index>: the Change Icon… grid beside the tab at that sidebar position, as its menu item opens it.
         case "iconpicker":
             let list = controller.tabManager.navigableTabs
