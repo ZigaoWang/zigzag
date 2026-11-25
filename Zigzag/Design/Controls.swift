@@ -194,7 +194,19 @@ class InteractiveView: NSView {
     var currentPress: NSEvent? { mouseDownEvent }
 
     /// Held down, it opens its right-click menu under itself, as Safari's Back and Forward do (#509).
-    var holdOpensMenu = false
+    var holdOpensMenu = false {
+        didSet { holdOpensMenu ? guardTitleBand() : bandGuard?.removeFromSuperview() }
+    }
+    /// Under a control that's held and slid from: in the title bar's band, a drag there moves the window otherwise.
+    private var bandGuard: TitleBandGuard?
+
+    private func guardTitleBand() {
+        let guardView = bandGuard ?? TitleBandGuard(frame: bounds)
+        guardView.frame = bounds
+        guardView.autoresizingMask = [.width, .height]
+        if guardView.superview !== self { addSubview(guardView, positioned: .below, relativeTo: nil) }
+        bandGuard = guardView
+    }
     /// How long a press is held before that menu opens.
     nonisolated static let holdMenuDelay: TimeInterval = 0.5
 

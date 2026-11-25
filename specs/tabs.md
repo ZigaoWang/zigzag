@@ -257,6 +257,7 @@
   Test: SidebarRowMenuTests.pressDragAndReleaseOnAPageGoesThere
   Test: BackHoldEventTests.pressDragAndReleaseOnTheSidebarsBackGoesThere
   Test: BackHoldEventTests.pressDragAndReleaseGoesThereWhenTheDragNeverArrives
+  Test: BackHoldEventTests.backAndForwardAreNotWindowDragArea
   Test: BackHoldEventTests.pressDragAndReleaseOnTheTopBarsBackGoesThere
 - Back or Forward dimmed, with no pages that way → holding it opens nothing.
   Test: SidebarRowMenuTests.aDisabledBackOpensNothing

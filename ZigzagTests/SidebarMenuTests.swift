@@ -1047,6 +1047,27 @@ struct BackHoldEventTests {
         }
     }
 
+    /// Back and Forward sit in the title bar's band: a press held and slid from them never moves the window.
+    @Test func backAndForwardAreNotWindowDragArea() async throws {
+        try await pages(["one", "two"]) { urls in
+            try await inWindow(urls) { controller, _ in
+                let window = try #require(controller.window)
+                window.orderFrontRegardless()
+                window.setFrameOrigin(NSPoint(x: -6000, y: 200))
+                window.displayIfNeeded()
+                @MainActor func moves(_ point: NSPoint) -> Bool? {
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+                    return DebugBridge.windowServerMoves(window, at: point)
+                }
+                let back = middle(of: controller.sidebar.backButton)
+                // AppKit's own region, unpublished: where it can't be read, nothing to check.
+                guard let backMoves = moves(back) else { return }
+                #expect(backMoves == false)
+                #expect(moves(middle(of: controller.sidebar.forwardButton)) == false)
+            }
+        }
+    }
+
     /// The window server counts the sidebar's top row as window drag area, so the drag may never arrive.
     @Test func pressDragAndReleaseGoesThereWhenTheDragNeverArrives() async throws {
         try await pages(["one", "two", "three"]) { urls in
