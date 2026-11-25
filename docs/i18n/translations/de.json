@@ -10152,6 +10152,12 @@
         "value": "Kurzbefehle"
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Kürzere schwebende Seitenleiste"
+      }
+    },
     "Show": {
       "stringUnit": {
         "state": "translated",
@@ -13010,6 +13016,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Fenster teilen die Tabs eines Space"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ist die Seitenleiste ausgeblendet, erscheint sie über der Seite mit zwei Dritteln der Fensterhöhe."
       }
     },
     "With this on, the first file a site sends asks whether it may. A site you allow keeps its answer; with this off, downloads save as they always did.": {

@@ -151,6 +151,12 @@
         "value": "링크를 가리키면 페이지 왼쪽 아래에 연결되는 주소가 표시됩니다."
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "플로팅 사이드바 짧게 표시"
+      }
+    },
     "Show link address on hover": {
       "stringUnit": {
         "state": "translated",
@@ -197,6 +203,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "업데이트 중…"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "사이드바를 가렸을 때 윈도우 높이의 3분의 2 크기로 페이지 위에 나타납니다."
       }
     },
     "compatibility.off": {

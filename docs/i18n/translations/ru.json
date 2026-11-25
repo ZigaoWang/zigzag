@@ -10770,6 +10770,12 @@
         "value": "Сочетания клавиш"
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Укороченное плавающее боковое меню"
+      }
+    },
     "Show": {
       "stringUnit": {
         "state": "translated",
@@ -13706,6 +13712,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Окна используют общие вкладки пространства"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Когда боковое меню скрыто, оно появляется поверх страницы на две трети высоты окна."
       }
     },
     "With this on, the first file a site sends asks whether it may. A site you allow keeps its answer; with this off, downloads save as they always did.": {

@@ -151,6 +151,12 @@
         "value": "Als je een link aanwijst, zie je linksonder op de pagina waar die naartoe gaat."
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Kortere zwevende navigatiekolom"
+      }
+    },
     "Show link address on hover": {
       "stringUnit": {
         "state": "translated",
@@ -197,6 +203,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Bezig met bijwerken…"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Als de navigatiekolom verborgen is, verschijnt die boven de pagina op twee derde van de vensterhoogte."
       }
     },
     "compatibility.off": {

@@ -10386,6 +10386,12 @@
         "value": "Atalhos"
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Barra lateral flutuante mais curta"
+      }
+    },
     "Show": {
       "stringUnit": {
         "state": "translated",
@@ -13280,6 +13286,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "As janelas compartilham as abas de um espaço"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Com a barra lateral oculta, ela aparece sobre a página com dois terços da altura da janela."
       }
     },
     "With this on, the first file a site sends asks whether it may. A site you allow keeps its answer; with this off, downloads save as they always did.": {

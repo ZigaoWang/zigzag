@@ -151,6 +151,12 @@
         "value": "Bir bağlantının üzerine gelindiğinde nereye gittiği sayfanın sol alt köşesinde görünür."
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Daha kısa yüzen kenar çubuğu"
+      }
+    },
     "Show link address on hover": {
       "stringUnit": {
         "state": "translated",
@@ -197,6 +203,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Güncelleniyor…"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Kenar çubuğu gizliyken sayfanın üzerinde pencere yüksekliğinin üçte ikisi boyunda açılır."
       }
     },
     "compatibility.off": {

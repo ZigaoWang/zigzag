@@ -2076,6 +2076,89 @@
         }
       }
     },
+    "Shorter floating sidebar" : {
+      "comment" : "A setting in Settings › Appearance: the sidebar that comes out over the page while hidden is shorter than the window.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kürzere schwebende Seitenleiste"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Barra lateral flotante más corta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Barre latérale flottante plus courte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Barra laterale fluttuante più corta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フローティングサイドバーを短くする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "플로팅 사이드바 짧게 표시"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kortere zwevende navigatiekolom"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Krótszy pływający pasek boczny"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Barra lateral flutuante mais curta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Укороченное плавающее боковое меню"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daha kısa yüzen kenar çubuğu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "较短的浮动边栏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "較短的浮動側邊欄"
+          }
+        }
+      }
+    },
     "Show link address on hover" : {
       "comment" : "A setting in Settings › Appearance: pointing at a link shows where it goes in a small bar in the page's corner.",
       "localizations" : {
@@ -2736,6 +2819,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在更新…"
+          }
+        }
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height." : {
+      "comment" : "Explanation under “Shorter floating sidebar” in Settings › Appearance.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ist die Seitenleiste ausgeblendet, erscheint sie über der Seite mit zwei Dritteln der Fensterhöhe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con la barra lateral oculta, aparece sobre la página con dos tercios de la altura de la ventana."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lorsque la barre latérale est masquée, elle apparaît par-dessus la page sur les deux tiers de la hauteur de la fenêtre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con la barra laterale nascosta, appare sopra la pagina alta due terzi della finestra."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サイドバーを非表示にしているとき、ウインドウの高さの3分の2でページの上に表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사이드바를 가렸을 때 윈도우 높이의 3분의 2 크기로 페이지 위에 나타납니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als de navigatiekolom verborgen is, verschijnt die boven de pagina op twee derde van de vensterhoogte."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gdy pasek boczny jest ukryty, wysuwa się nad stronę na dwie trzecie wysokości okna."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com a barra lateral oculta, ela aparece sobre a página com dois terços da altura da janela."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Когда боковое меню скрыто, оно появляется поверх страницы на две трети высоты окна."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kenar çubuğu gizliyken sayfanın üzerinde pencere yüksekliğinin üçte ikisi boyunda açılır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏隐藏时，会以窗口高度的三分之二浮现在页面上。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "側邊欄隱藏時，會以視窗高度的三分之二浮現在網頁上。"
           }
         }
       }

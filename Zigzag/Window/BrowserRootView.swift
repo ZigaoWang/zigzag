@@ -829,6 +829,7 @@ final class BrowserRootView: SpaceFrameView {
 
     private var trackingArea: NSTrackingArea?
     private var borderlessToken: NSObjectProtocol?
+    private var shortFloatingToken: NSObjectProtocol?
     /// Keeps the floating sidebar open, e.g. while a menu from it is showing.
     var holdReveal = false
     /// Also keeps it open: a panel that came out of it (the site panel, downloads) is still showing.
@@ -904,6 +905,9 @@ final class BrowserRootView: SpaceFrameView {
                     self.layoutSubtreeIfNeeded()
                 }
             }
+        }
+        shortFloatingToken = NotificationCenter.default.addObserver(forName: Self.shortFloatingChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.needsLayout = true }
         }
         // Questions arriving or answered toggle the glow.
         attentionToken = PendingQuestions.changed.observe { [weak self] _ in self?.needsLayout = true }
@@ -2046,13 +2050,27 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// The sidebar's frame: docked along the window's edge, floating a frame's inset in from it while slid out, or
-    /// out of sight past that edge.
-    static func sidebarFrame(in bounds: NSRect, width: CGFloat, visible: Bool, revealed: Bool, onRight: Bool) -> NSRect {
+    /// out of sight past that edge. `short`: floating at two thirds of the window's height (#538).
+    static func sidebarFrame(in bounds: NSRect, width: CGFloat, visible: Bool, revealed: Bool, onRight: Bool,
+                             short: Bool = shortFloatingSidebar) -> NSRect {
         let inset = Tokens.Metric.cardInset
         if visible { return mirrored(NSRect(x: bounds.minX, y: bounds.minY, width: width, height: bounds.height), in: bounds, if: onRight) }
         let x = bounds.minX + (revealed ? inset : -width - inset * 4)
-        return mirrored(NSRect(x: x, y: bounds.minY + inset, width: width, height: bounds.height - inset * 2), in: bounds, if: onRight)
+        let y = short ? bounds.minY + round(bounds.height / 6) : bounds.minY + inset
+        let height = short ? bounds.height - round(bounds.height / 6) * 2 : bounds.height - inset * 2
+        return mirrored(NSRect(x: x, y: y, width: width, height: height), in: bounds, if: onRight)
     }
+
+    /// Settings › Appearance › Shorter floating sidebar (#538). Off by default.
+    static var shortFloatingSidebar: Bool {
+        get { UserDefaults.standard.bool(forKey: shortFloatingKey) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: shortFloatingKey)
+            NotificationCenter.default.post(name: shortFloatingChanged, object: nil)
+        }
+    }
+    static let shortFloatingKey = "ShortFloatingSidebar"
+    static let shortFloatingChanged = Notification.Name("ShortFloatingSidebarChanged")
 
     /// Where a panel `width` wide goes beside the sidebar, a little way out over the page: right of it, or left of it
     /// when it's on the right (tab previews, the space editor, the icon picker).
@@ -2683,6 +2701,7 @@ final class BrowserRootView: SpaceFrameView {
         edgeTimer?.invalidate()
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
+        if let shortFloatingToken { NotificationCenter.default.removeObserver(shortFloatingToken) }
         if let touchListener { TouchPress.stopListening(touchListener) }
         grabberHideWork?.cancel()
         grabberRevealWork?.cancel()

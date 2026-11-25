@@ -2812,23 +2812,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let barKeepsLights = onRight && root.barHoldsAddress
         // An Autohide bar takes them with it as it goes (#359).
         let inBar = root.barOnScreen && (barKeepsLights || (!docked && !floating))
-        let room = Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
+        // The shorter card (#538) sits below the title bar, so the lights stay where they dock.
+        let shortCard = BrowserRootView.shortFloatingSidebar && !docked && !inBar
+        let room = shortCard ? 0 : Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
         // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
         // nothing in the row moves while it's on screen; until then their picture rides in it.
         if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
         sidebar.showTrafficLightsPicture(sliding && !fullScreen && sidebar.trafficLightsWidth > 0 ? trafficLightsPicture : nil)
         // A finger in use with the sidebar hidden: they show with its toggle, where the docked sidebar has them.
         let withGrabber = !root.isImmersive && root.grabberPlace == .lights && !docked && !floating && !inBar
-        window.trafficLightsHidden = sliding || !(docked || floating || inBar || withGrabber)
+        window.trafficLightsHidden = sliding || !(docked || (floating && !shortCard) || inBar || withGrabber)
         let container = root.sidebarContainer.frame
         let lightHeight = window.trafficLightHeight
         // Docked, from where the docked sidebar starts: the window's left edge, or on the right its width in from the
         // right edge.
         let dockedMinX = onRight ? root.bounds.width - root.sidebarWidth : 0
-        let x = (inBar ? 0 : docked || withGrabber ? dockedMinX : container.minX) + SidebarView.trafficLightsX
+        let atDock = docked || withGrabber || shortCard
+        let x = (inBar ? 0 : atDock ? dockedMinX : container.minX) + SidebarView.trafficLightsX
         // In the bar, on its middle line, wherever the bar starts or Autohide has it: not the sidebar's line, which is
         // still the docked one while it slides away.
-        let center = inBar ? root.barTop + Tokens.Sidebar.lightsCenter : (docked || withGrabber ? 0 : container.minY) + sidebar.trafficLightCenterY
+        let center = inBar ? root.barTop + Tokens.Sidebar.lightsCenter : (atDock ? 0 : container.minY) + sidebar.trafficLightCenterY
         let y = center - lightHeight / 2
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }

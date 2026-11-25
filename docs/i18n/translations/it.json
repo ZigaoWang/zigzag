@@ -151,6 +151,12 @@
         "value": "Quando punti un link, l’angolo in basso a sinistra della pagina mostra dove porta."
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Barra laterale fluttuante più corta"
+      }
+    },
     "Show link address on hover": {
       "stringUnit": {
         "state": "translated",
@@ -197,6 +203,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Aggiornamento in corso…"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Con la barra laterale nascosta, appare sopra la pagina alta due terzi della finestra."
       }
     },
     "compatibility.off": {

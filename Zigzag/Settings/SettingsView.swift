@@ -1611,6 +1611,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     static let sidebarSides = [false, true]
     private let doubleClickTabToggle = Toggle()
     private let linkStatusToggle = Toggle()
+    private let shortFloatingToggle = Toggle()
     private var sideToken: NSObjectProtocol?
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
@@ -2051,6 +2052,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               control: edgeSidebarToggle)
         edgeRow.keywords = String(localized: "edge dock hover reveal hidden sidebar over apps corner", comment: "Words that find the Sidebar from the screen edge setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(edgeRow)
+        shortFloatingToggle.onChange = { on in BrowserRootView.shortFloatingSidebar = on }
+        appearanceGroup.add(FormRow(title: String(localized: "Shorter floating sidebar", comment: "A setting in Settings › Appearance: the sidebar that comes out over the page while hidden is shorter than the window."),
+                                    detail: String(localized: "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.", comment: "Explanation under “Shorter floating sidebar” in Settings › Appearance."),
+                                    control: shortFloatingToggle))
         largeNamesToggle.onChange = { on in SpaceHeaderView.isLarge = on }
         appearanceGroup.add(FormRow(title: String(localized: "Large space names", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "Shows the space’s name large and light above its tabs. When off, it’s a plain heading.", comment: "Explanation under “Large space names” in Settings › Appearance."),
@@ -4814,6 +4819,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sidebarSide.selectedIndex = Self.sidebarSides.firstIndex(of: BrowserRootView.sidebarOnRight) ?? 0
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         linkStatusToggle.isOn = LinkStatusController.showsOnHover
+        shortFloatingToggle.isOn = BrowserRootView.shortFloatingSidebar
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript

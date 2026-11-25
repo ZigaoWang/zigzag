@@ -151,6 +151,12 @@
         "value": "Po wskazaniu linku w lewym dolnym rogu strony widać, dokąd prowadzi."
       }
     },
+    "Shorter floating sidebar": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Krótszy pływający pasek boczny"
+      }
+    },
     "Show link address on hover": {
       "stringUnit": {
         "state": "translated",
@@ -197,6 +203,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Aktualizowanie…"
+      }
+    },
+    "With the sidebar hidden, it comes out over the page at two thirds of the window’s height.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Gdy pasek boczny jest ukryty, wysuwa się nad stronę na dwie trzecie wysokości okna."
       }
     },
     "compatibility.off": {
