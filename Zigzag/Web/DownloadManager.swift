@@ -208,18 +208,18 @@ final class DownloadManager: NSObject {
         pendingFileHandoffs[key] = waiting
     }
 
-    /// The first File handoff waiting for this download, matched by its address when there are several.
-    private func takeFileHandoff(for download: WKDownload) -> PendingFileHandoff? {
+    /// The File handoff waiting for this download, matched by its address, before or after redirects. Never another
+    /// download's, so a handoff whose download never started can't take a later file.
+    private func takeFileHandoff(for download: WKDownload, response: URLResponse) -> PendingFileHandoff? {
         guard let webView = download.webView else { return nil }
         let key = ObjectIdentifier(webView)
         let cutoff = Date().addingTimeInterval(-60)
         var waiting = (pendingFileHandoffs[key] ?? []).filter { $0.at > cutoff }
-        guard !waiting.isEmpty else {
-            pendingFileHandoffs[key] = nil
+        let addresses = [download.originalRequest?.url, response.url].compactMap { $0 }
+        guard let index = waiting.firstIndex(where: { addresses.contains($0.request.url) }) else {
+            pendingFileHandoffs[key] = waiting.isEmpty ? nil : waiting
             return nil
         }
-        let url = download.originalRequest?.url
-        let index = waiting.firstIndex { $0.request.url == url } ?? 0
         let pending = waiting.remove(at: index)
         pendingFileHandoffs[key] = waiting.isEmpty ? nil : waiting
         return pending
@@ -655,7 +655,8 @@ extension DownloadManager: WKDownloadDelegate {
         }
         // A tab or pop-up already answered Hand Off for a File rule. Its download runs, then the saved file is handed
         // off; don't ask again.
-        var fileHandoff = takeFileHandoff(for: download)
+        // Save Page As and an extension's chosen file are never a rule's.
+        var fileHandoff = chosenDestinations[identifier] == nil ? takeFileHandoff(for: download, response: response) : nil
         // Download rules for downloads the navigation never saw: context-menu Download Linked File, or a page's
         // startDownload. Save Page As already chose its file. A URL handoff cancels WebKit's copy and removes its row;
         // a File handoff lets it finish. A rule-opened page's download and a just-put-off one aren't offered again, or
