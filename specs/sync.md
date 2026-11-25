@@ -137,3 +137,5 @@
   Test: SyncTests.manyRemovalsSentWhenAsked
 - Profiles.json gone while iCloud has this Mac's other profiles → read as a file that couldn't be read, and merged again as on a first sync; no profile is removed from iCloud.
   Test: SyncTests.aMissingProfilesFileIsUnreadableNotEveryProfileRemoved
+- A removal iCloud refuses because the record is already gone → taken as done, never asked again; one refused for another reason is asked again with the next sync.
+  Test: SyncTests.aRemovalOfWhatsAlreadyGoneIsntAskedAgain

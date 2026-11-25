@@ -67,6 +67,14 @@ struct SyncLeftover: Codable {
     static let kept: TimeInterval = 30 * 24 * 3600
 }
 
+/// Why the server didn't take a removal.
+enum SyncDeleteFailure {
+    /// It wasn't there any more.
+    case gone
+    /// The zone isn't there.
+    case zoneMissing
+}
+
 /// What sync keeps between launches, beside the server's own state.
 struct SyncState: Codable {
     /// The records as this Mac and iCloud last agreed on them, with what this Mac changed since on top.
@@ -650,6 +658,15 @@ final class SyncSession {
         }
         state.lastSynced = now()
         onChange?()
+    }
+
+    func deleteFailed(_ name: String, _ failure: SyncDeleteFailure) {
+        switch failure {
+        case .gone:
+            deleted([name])
+        case .zoneMissing:
+            if state.merged { onRemovedElsewhere?() } else { deleted([name]) }
+        }
     }
 
     func deleted(_ names: [String]) {

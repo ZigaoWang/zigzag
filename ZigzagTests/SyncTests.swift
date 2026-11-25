@@ -46,9 +46,12 @@ import Testing
         return .saved(remote(upload.name)!)
     }
 
-    func delete(_ name: String) {
-        records[name] = nil
+    /// Whether it was there.
+    @discardableResult
+    func delete(_ name: String) -> Bool {
+        let was = records.removeValue(forKey: name) != nil
         log.append(name)
+        return was
     }
 
     /// What changed since `token`: the records as they are now, and the names removed.
@@ -183,8 +186,11 @@ import Testing
             }
         }
         session.saved(saved)
-        for name in gone { cloud.delete(name) }
-        session.deleted(gone)
+        var removed: [String] = []
+        for name in gone {
+            if cloud.delete(name) { removed.append(name) } else { session.deleteFailed(name, .gone) }
+        }
+        session.deleted(removed)
     }
 }
 
@@ -1181,6 +1187,22 @@ extension SyncLibrary {
         b.sync()
         #expect(b.library.urls(in: "Personal") == ["b", "c"])
         #expect(cloud.records.count == a.session.state.base.count)
+    }
+
+    @Test func aRemovalOfWhatsAlreadyGoneIsntAskedAgain() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let page = try #require(a.session.state.base.keys.first { $0.hasPrefix("page.") && a.session.state.base[$0].map { String(decoding: $0.payload, as: UTF8.self).contains("/b") } == true })
+        // Both remove it; B's removal reaches iCloud first.
+        b.online = false
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeAll { $0.url.lastPathComponent == "b" } } }
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.removeAll { $0.url.lastPathComponent == "b" } } }
+        a.sync()
+        b.online = true
+        b.send()
+        #expect(b.session.state.serverPayloads[page] == nil)
+        b.session.requeue()
+        #expect(b.deletes.isEmpty)
+        #expect(cloud.records[page] == nil)
     }
 
     @Test func aRecordFetchedTwiceOrLateChangesNothing() throws {

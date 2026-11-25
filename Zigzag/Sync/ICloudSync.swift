@@ -722,6 +722,22 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                     owner?.engineEvent(.failed(failure.error.localizedDescription))
                 }
             }
+            for (id, error) in sent.failedRecordDeletes {
+                switch error.code {
+                case .unknownItem:
+                    session.deleteFailed(id.recordName, .gone)
+                case .zoneNotFound, .userDeletedZone:
+                    session.deleteFailed(id.recordName, .zoneMissing)
+                    if session.state.merged { return }
+                case .networkFailure, .networkUnavailable, .zoneBusy, .serviceUnavailable, .notAuthenticated, .operationCancelled, .requestRateLimited:
+                    // The engine tries these again itself.
+                    break
+                default:
+                    // Asked again with the next sync, from the state.
+                    Self.log.error("a removal failed: \(error.localizedDescription, privacy: .public)")
+                    owner?.engineEvent(.failed(error.localizedDescription))
+                }
+            }
         case .willFetchChanges, .willSendChanges:
             owner?.engineEvent(.syncing)
         case .didFetchChanges:
