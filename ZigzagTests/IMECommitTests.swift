@@ -170,4 +170,11 @@ import WebKit
         #expect(field.stringValue == "a b")
         window.close()
     }
+
+    /// A Zigzag field keeps ⌘Z for typing, as the window's own field editor does.
+    @Test func aFieldStillUndoesTyping() {
+        let editor = IMEFieldEditor.make()
+        #expect(editor.allowsUndo)
+        #expect(editor.isFieldEditor)
+    }
 }
