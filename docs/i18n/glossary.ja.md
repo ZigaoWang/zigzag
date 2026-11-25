@@ -47,7 +47,7 @@ Zigzag の日本語インターフェイスは `ja` です。意味は英語の�
 | Dark pages / Force dark | ダークページ／強制ダーク |
 | Cookie banners | Cookieバナー |
 | Zap Element / Edit Style… | 要素を非表示／スタイルを編集… |
-| Capture (a screenshot of the page) | スクリーンショット |
+| Capture (a screenshot of the page) | スクリーンショット（サイトパネルのボタンは幅が狭いのでキャプチャ） |
 | Developer / Developer Mode / Developer tools | デベロッパ／デベロッパモード／デベロッパツール |
 | Feature Flags / Disable Images / Disable Styles | 機能フラグ／画像を無効にする／スタイルを無効にする |
 | AI apps / Key / Setup / Prompt | AI App／キー／構成／プロンプト |
