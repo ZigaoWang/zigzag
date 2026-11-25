@@ -1,25 +1,30 @@
 import AppKit
 import Carbon
 
-/// Drops the spaces a Chinese input method puts between syllables when it commits them as letters, as Chrome does.
+/// Drops the spaces a pinyin input method puts between syllables when it commits them as letters, as Chrome does.
 nonisolated enum IMECommit {
     struct Source: Equatable, Sendable {
         var id: String
         var languages: [String]
 
-        /// A Chinese input method (Pinyin, Shuangpin, Wubi, or a third-party one), whose marked letters carry spaces.
-        var isChinese: Bool {
-            id.hasPrefix("com.apple.inputmethod.SCIM") || id.hasPrefix("com.apple.inputmethod.TCIM")
-                || languages.first.map { $0 == "zh" || $0.hasPrefix("zh-") } == true
+        /// A pinyin input method (Pinyin or Shuangpin, Apple's or a third party's), whose marked letters carry spaces.
+        var isPinyin: Bool {
+            Self.applePinyin.contains(id) || (!id.hasPrefix("com.apple.") && id.lowercased().contains("pinyin"))
         }
+
+        /// Apple's pinyin modes; Zhuyin, Cangjie, Wubi and Stroke aren't.
+        static let applePinyin: Set<String> = [
+            "com.apple.inputmethod.SCIM.ITABC", "com.apple.inputmethod.SCIM.Shuangpin",
+            "com.apple.inputmethod.TCIM.Pinyin", "com.apple.inputmethod.TCIM.Shuangpin",
+        ]
     }
 
     /// The keyboard input source in use; tests put their own in.
     nonisolated(unsafe) static var currentSource: () -> Source? = systemSource
 
-    /// `text` as it should land: the spaces gone from letters a Chinese input method commits from its marked text.
+    /// `text` as it should land: the spaces gone from letters a pinyin input method commits from its marked text.
     static func cleaned(_ text: String, composing: Bool, source: Source?) -> String {
-        guard composing, source?.isChinese == true, isSpacedLetters(text) else { return text }
+        guard composing, source?.isPinyin == true, isSpacedLetters(text) else { return text }
         return text.replacingOccurrences(of: " ", with: "")
     }
 
@@ -71,7 +76,12 @@ final class IMEFieldEditor: NSTextView {
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
-        let text = IMECommit.cleaned(string, composing: hasMarkedText(), source: composingSource ?? IMECommit.currentSource())
+        let range = markedRange()
+        let plain = (string as? String) ?? (string as? NSAttributedString)?.string
+        // Only the marked letters themselves, committed: never dictation or a text replacement.
+        let composing = hasMarkedText() && range.location != NSNotFound && NSMaxRange(range) <= (self.string as NSString).length
+            && plain == (self.string as NSString).substring(with: range)
+        let text = IMECommit.cleaned(string, composing: composing, source: composingSource ?? IMECommit.currentSource())
         composingSource = nil
         super.insertText(text, replacementRange: replacementRange)
     }
