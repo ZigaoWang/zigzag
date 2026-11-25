@@ -2,6 +2,12 @@
   <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Feels great. Weighs nothing. The lightweight browser for Mac, free and open source. A Zigzag window in split view, Fonts In Use beside Grilli Type, with the sidebar of spaces and pinned tabs."></a>
 </p>
 
+<div align="center">
+
+English | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md)
+
+</div>
+
 <p align="center">
   <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a><br>
   <sub>or <code>brew install --cask zigaowang/tap/zigzag</code></sub><br>
