@@ -2,7 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Release builds use ZigzagRelease.entitlements: this file plus passkeys. Change both together. -->
+	<!-- Release builds use ZigzagRelease.entitlements: this file plus passkeys and iCloud's production database. Change both together. -->
+	<!-- Sync with iCloud: CKSyncEngine on the private database of this container, and its pushes. -->
+	<key>com.apple.developer.aps-environment</key>
+	<string>development</string>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.wang.zigao.zigzag</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
 	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
 	<false/>
 	<key>com.apple.security.device.audio-input</key>

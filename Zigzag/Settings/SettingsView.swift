@@ -1616,6 +1616,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var sideToken: NSObjectProtocol?
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
+    let syncRows = SyncSettingsRows()
     private let scriptJavaScriptToggle = Toggle()
     private let aiAppsToggle = Toggle()
     private var aiAppsToken: SignalToken?
@@ -1902,6 +1903,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         generalGroup.add(FormRow(title: String(localized: "Save downloads to", comment: "A setting in Settings › General."),
                                  detail: String(localized: "Or have Zigzag ask where, each time.", comment: "Explanation under “Save downloads to” in Settings › General."),
                                  control: downloadPlace))
+
+        syncRows.onLayout = { [weak self] in
+            guard let self, self.pane == .general || self.isSearching else { return }
+            self.layoutDocument()
+        }
+        generalGroup.add(syncRows.row)
+        generalGroup.add(syncRows.statusRow)
 
         let importButton = PillButton(title: String(localized: "Import…", comment: "Button in Settings › General that opens the Import window."))
         importButton.onClick = { _ in ImportWindowController.show() }

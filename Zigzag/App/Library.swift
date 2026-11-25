@@ -2114,6 +2114,21 @@ final class Library {
         commit()
     }
 
+    /// Puts in what iCloud sync laid out, each space's folders and splits kept honest; nothing happens when it's what's
+    /// here already.
+    func applySynced(_ new: Contents) {
+        guard new.spaces != spaces || new.favorites != favorites || new.favoriteSplits.map(\.ids) != favoriteSplits.map(\.ids)
+                || new.siteRoutes != siteRoutes || new.directory != directory else { return }
+        spaces = new.spaces
+        favorites = new.favorites
+        favoriteSplits = new.favoriteSplits
+        siteRoutes = new.siteRoutes
+        directory = new.directory
+        for s in spaces.indices { tidyFolders(s) }
+        tidyFavorites()
+        commit()
+    }
+
     // MARK: Profiles
 
     /// Every profile, the first one first.

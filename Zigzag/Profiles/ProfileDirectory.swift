@@ -125,6 +125,14 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
         }
     }
 
+    /// Lists the profiles in `order` (iCloud's); ones it leaves out keep their places after them.
+    mutating func arrange(_ order: [UUID]) {
+        let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        others = others.enumerated().sorted { a, b in
+            (rank[a.element.id] ?? order.count + a.offset, a.offset) < (rank[b.element.id] ?? order.count + b.offset, b.offset)
+        }.map(\.element)
+    }
+
     mutating func assign(space: UUID, to profile: UUID) {
         spaces[space.uuidString] = profile == Profile.defaultID || !others.contains { $0.id == profile } ? nil : profile
     }
