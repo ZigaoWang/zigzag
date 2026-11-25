@@ -35,6 +35,8 @@
 ## Download rules
 - Rules in Settings › Downloads → the first one that matches, top to bottom, takes the download.
   Test: DownloadRuleTests.firstMatchWinsTopToBottom
+- Each rule in Settings › Downloads → a box headed by its name, switch, Change and Delete, its saved answers inside; dragging the box changes the order, and a rule with no answers is a box with no chevron.
+  Test: SettingsLazyBuildTests.eachDownloadRuleIsABoxWithItsAnswersInside
 - A rule that hands downloads to an app, a script or a service → asks first: Don't Allow, Save in Zigzag or Hand Off.
   No test yet.
 - Always for the rule on that question → the answer holds on every site.
