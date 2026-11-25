@@ -5418,13 +5418,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
 
             if SiteBoosts.all[site]?.compatible == true {
-                let toggle = Toggle(isOn: true)
-                toggle.onChange = { [weak self] on in
-                    SiteCompatibility.set(on, forSite: site)
-                    self?.reloadPrivacy()
-                    self?.layoutDocument()
+                add(SitePanel.compatibilityTitle) { [weak self] in
+                    let toggle = Toggle(isOn: true)
+                    toggle.onChange = { [weak self] on in
+                        SiteCompatibility.set(on, forSite: site)
+                        self?.reloadPrivacy()
+                        self?.layoutDocument()
+                    }
+                    return [makeRow(SitePanel.compatibilityTitle, control: toggle) { SiteCompatibility.set(false, forSite: site) }]
                 }
-                rows.append(makeRow(SitePanel.compatibilityTitle, control: toggle) { SiteCompatibility.set(false, forSite: site) })
             }
 
             if let boost = SiteBoosts.all[site], !boost.zaps.isEmpty {
