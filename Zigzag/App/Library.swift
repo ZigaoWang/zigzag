@@ -749,6 +749,8 @@ final class Library {
     /// Profiles.json was there but couldn't be read, so it was set aside (JSONStore) and every space is on the first
     /// profile for now. Said once, at launch.
     let profilesWereSetAside: Bool
+    /// Profiles.json was there at launch.
+    let profilesFileExisted: Bool
 
     /// Fires whenever spaces or bookmarks change.
     let changed = Signal<Void>()
@@ -760,6 +762,7 @@ final class Library {
         let readProfiles = hadProfiles ? JSONStore.load(ProfileDirectory.self, from: Paths.profiles) : nil
         directory = readProfiles ?? ProfileDirectory()
         profilesWereSetAside = hadProfiles && readProfiles == nil
+        profilesFileExisted = hadProfiles
         savedDirectory = directory
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = Self.keepingDefaultColors(stored.spaces.map(\.upgraded))

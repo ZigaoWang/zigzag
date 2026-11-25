@@ -6,6 +6,7 @@ final class SyncSettingsRows {
     let row: FormRow
     let statusRow: FormRow
     private let action = PillButton(title: "")
+    private let secondAction = PillButton(title: "")
     /// The page lays itself out again when the status line changes size.
     var onLayout: (() -> Void)?
     private var token: SignalToken?
@@ -20,12 +21,13 @@ final class SyncSettingsRows {
                       control: toggle)
         row.keywords = String(localized: "icloud sync cloud macs devices mac computers", comment: "Words that find the Sync with iCloud setting with Find a setting in Settings. Not shown.")
         // In a stack, so the line has the whole row when there's no button.
-        statusRow = FormRow(title: "", control: NSStackView(views: [action]))
+        statusRow = FormRow(title: "", control: NSStackView(views: [secondAction, action]))
         statusRow.isIndented = true
         statusRow.titleColor = Tokens.Color.textSecondary
         toggle.isOn = sync.isOn
         toggle.onChange = { [weak self] on in self?.switched(on) }
         action.onClick = { [weak self] _ in self?.act() }
+        secondAction.onClick = { [weak self] _ in self?.sync.sendRemovals(); self?.refresh() }
         token = sync.changed.observe { [weak self] in self?.refresh() }
         // "Last synced 2 minutes ago" keeps its minutes.
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
@@ -68,7 +70,7 @@ final class SyncSettingsRows {
     static var sheets: [(name: String, sheet: Sheet)] { [("turn on", turnOnSheet), ("remove", removeSheet)] }
     #endif
 
-    private enum Action { case none, openSettings, remove }
+    private enum Action { case none, openSettings, remove, bringBack }
     private var current: Action = .none
 
     private func act() {
@@ -85,13 +87,23 @@ final class SyncSettingsRows {
                     self.refresh()
                 }
             }
+        case .bringBack:
+            sync.bringBackRemovals()
+            refresh()
         case .none:
             break
         }
     }
 
     /// The status line and its button for what sync is doing now.
-    static func describe(_ status: ICloudSync.Status, hasCopy: Bool, now: Date = Date()) -> (text: String, detail: String, action: String?) {
+    static func describe(_ status: ICloudSync.Status, hasCopy: Bool, now: Date = Date()) -> (text: String, detail: String, action: String?, second: String?) {
+        let shown: (text: String, detail: String, action: String?) = describeOne(status, hasCopy: hasCopy, now: now)
+        guard status == .removalsHeld else { return (shown.text, shown.detail, shown.action, nil) }
+        return (shown.text, shown.detail, shown.action,
+                String(localized: "Remove Everywhere", comment: "Button beside “Many things were removed on this Mac, so sync is paused” in Settings › General: removes them from iCloud and the other Macs too."))
+    }
+
+    private static func describeOne(_ status: ICloudSync.Status, hasCopy: Bool, now: Date) -> (text: String, detail: String, action: String?) {
         let remove = String(localized: "Remove from iCloud…", comment: "Button beside the status of Sync with iCloud in Settings › General: removes the synced library from iCloud, after asking.")
         switch status {
         case .off:
@@ -129,6 +141,10 @@ final class SyncSettingsRows {
             return (String(localized: "This copy of Zigzag can’t use iCloud", comment: "Status under Sync with iCloud in Settings › General, for a build signed without iCloud."), "", nil)
         case .failed(let message):
             return (String(localized: "iCloud couldn’t sync: \(message)", comment: "Status under Sync with iCloud in Settings › General. The placeholder is iCloud's own explanation."), "", remove)
+        case .removalsHeld:
+            return (String(localized: "Many things were removed on this Mac, so sync is paused", comment: "Status under Sync with iCloud in Settings › General, when many spaces, pinned tabs or favorites went at once (an old copy of the library put back, say)."),
+                    String(localized: "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.", comment: "Explanation under “Many things were removed on this Mac, so sync is paused” in Settings › General. Restore and Remove Everywhere are the two buttons beside it."),
+                    String(localized: "Restore", comment: "Button beside “Many things were removed on this Mac, so sync is paused” in Settings › General: brings them back from iCloud."))
         }
     }
 
@@ -138,14 +154,16 @@ final class SyncSettingsRows {
     func show(_ status: ICloudSync.Status, isOn: Bool, hasCopy: Bool) {
         let shown = Self.describe(status, hasCopy: hasCopy)
         toggle.isOn = isOn
-        let was = (statusRow.isAvailable, statusRow.titleText, statusRow.detailText, action.isHidden)
+        let was = (statusRow.isAvailable, statusRow.titleText, statusRow.detailText, action.isHidden, secondAction.isHidden)
         statusRow.isAvailable = !shown.text.isEmpty
         statusRow.titleText = shown.text
         statusRow.detailText = shown.detail
         action.isHidden = shown.action == nil
         if let title = shown.action { action.title = title }
-        current = shown.action == nil ? .none : status == .notSignedIn ? .openSettings : .remove
-        if was != (statusRow.isAvailable, statusRow.titleText, statusRow.detailText, action.isHidden) { onLayout?() }
+        secondAction.isHidden = shown.second == nil
+        if let title = shown.second { secondAction.title = title }
+        current = shown.action == nil ? .none : status == .notSignedIn ? .openSettings : status == .removalsHeld ? .bringBack : .remove
+        if was != (statusRow.isAvailable, statusRow.titleText, statusRow.detailText, action.isHidden, secondAction.isHidden) { onLayout?() }
     }
 
     #if DEBUG
@@ -156,6 +174,7 @@ final class SyncSettingsRows {
         ("not signed in", .notSignedIn, true, true), ("other account", .otherAccount, true, true), ("restricted", .restricted, true, true),
         ("full", .full, true, true), ("offline", .offline, true, true), ("removed elsewhere", .removedElsewhere, false, false),
         ("not entitled", .notEntitled, true, false), ("backup failed", .backupFailed, false, false), ("failed", .failed("The request timed out."), true, true),
+        ("removals held", .removalsHeld, true, true),
     ]
     #endif
 }

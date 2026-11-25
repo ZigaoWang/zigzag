@@ -946,6 +946,54 @@ extension SyncLibrary {
         #expect(Date().timeIntervalSince(start) < 20)
     }
 
+    // MARK: Many removals at once
+
+    private func manyPages() -> (FakeCloud, FakeMac, FakeMac) {
+        twoMacs(Sample.library([Sample.space("Personal", (0..<40).map { Sample.page("p\($0)") })]))
+    }
+
+    @Test func aLibraryPutBackFromAnOldCopyIsntSentAsRemovals() {
+        let (cloud, a, b) = manyPages()
+        let records = cloud.records.count
+        // An old Library.json put back: 35 of 40 pages gone at once, and a page pinned since.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeLast(35) } }
+        #expect(a.session.state.heldRemovals == 35)
+        #expect(a.saves.isEmpty && a.deletes.isEmpty)
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("new")) } }
+        a.sync()
+        #expect(cloud.records.count == records)
+        #expect(SyncSettingsRows.describe(.removalsHeld, hasCopy: true).second != nil)
+        // Restore: iCloud's pages come back, and the page pinned since stays and goes up.
+        a.session.bringBackHeld()
+        a.sync(); b.sync()
+        #expect(a.session.state.heldRemovals == nil)
+        #expect(a.library.urls(in: "Personal").count == 41 && a.library.urls(in: "Personal").contains("new"))
+        #expect(b.library.urls(in: "Personal").count == 41)
+        // A few removed by hand go up as usual.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeLast(3) } }
+        #expect(a.session.state.heldRemovals == nil)
+    }
+
+    @Test func manyRemovalsSentWhenAsked() {
+        let (_, a, b) = manyPages()
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeLast(35) } }
+        a.session.sendHeld()
+        a.sync(); b.sync()
+        #expect(b.library.urls(in: "Personal").count == 5)
+    }
+
+    @Test func aMissingProfilesFileIsUnreadableNotEveryProfileRemoved() {
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work")
+        let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal")], directory: directory))
+        #expect(a.session.state.base[SyncName.profile(work.id)] != nil)
+        #expect(!ICloudSync.libraryWasRead(true, profilesFile: false, saved: a.session.state))
+        #expect(ICloudSync.libraryWasRead(true, profilesFile: true, saved: a.session.state))
+        // One profile only: there was never a file.
+        let (_, single, _) = twoMacs(Sample.library([Sample.space("Personal")]))
+        #expect(ICloudSync.libraryWasRead(true, profilesFile: false, saved: single.session.state))
+    }
+
     // MARK: Out of order
 
     @Test func aPageArrivingBeforeItsSpaceWaitsForIt() throws {

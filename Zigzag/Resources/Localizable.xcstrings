@@ -1246,6 +1246,89 @@
         }
       }
     },
+    "Many things were removed on this Mac, so sync is paused" : {
+      "comment" : "Status under Sync with iCloud in Settings › General, when many spaces, pinned tabs or favorites went at once (an old copy of the library put back, say).",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Mac wurde vieles entfernt, daher ist die Synchronisierung angehalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se eliminaron muchas cosas en este Mac, así que la sincronización está en pausa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beaucoup d’éléments ont été supprimés sur ce Mac, la synchronisation est donc en pause"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Molti elementi sono stati rimossi su questo Mac, quindi la sincronizzazione è in pausa"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacで多くの項目が削除されたため、同期を一時停止しています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac에서 많은 항목이 제거되어 동기화가 일시 정지되었습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er is veel verwijderd op deze Mac, dus synchronisatie is gepauzeerd"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na tym Macu usunięto wiele elementów, więc synchronizacja jest wstrzymana"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muitos itens foram removidos neste Mac, então a sincronização está pausada"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На этом Mac удалено много объектов, поэтому синхронизация приостановлена"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Mac’te çok sayıda öge kaldırıldı, bu yüzden eşzamanlama duraklatıldı"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上一次移除了许多内容，因此同步已暂停"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 上一次移除了許多內容，因此同步已暫停"
+          }
+        }
+      }
+    },
     "New pages from the feed, newest first." : {
       "comment" : "Under the fields of the New Live Folder sheet, for a feed.",
       "localizations" : {
@@ -2238,6 +2321,172 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "指向連結時，網頁左下角會顯示連結的去向。"
+          }
+        }
+      }
+    },
+    "Remove Everywhere" : {
+      "comment" : "Button beside “Many things were removed on this Mac, so sync is paused” in Settings › General: removes them from iCloud and the other Macs too.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überall entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar en todas partes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer partout"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi ovunque"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのMacで削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 Mac에서 제거"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwijder overal"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuń wszędzie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover em todos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить везде"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her Yerden Kaldır"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在所有 Mac 上移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在所有 Mac 上移除"
+          }
+        }
+      }
+    },
+    "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too." : {
+      "comment" : "Explanation under “Many things were removed on this Mac, so sync is paused” in Settings › General. Restore and Remove Everywhere are the two buttons beside it.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Wiederherstellen“ holt sie aus iCloud zurück. „Überall entfernen“ entfernt sie auch aus iCloud und von deinen anderen Macs."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar los recupera de iCloud. Eliminar en todas partes los elimina también de iCloud y de tus otros Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Restaurer » les récupère depuis iCloud. « Supprimer partout » les supprime aussi d’iCloud et de vos autres Mac."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina li recupera da iCloud. Rimuovi ovunque li rimuove anche da iCloud e dagli altri tuoi Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「復元」を選ぶとiCloudから元に戻します。「すべてのMacで削除」を選ぶとiCloudとほかのMacからも削除します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "복원을 누르면 iCloud에서 되돌립니다. 모든 Mac에서 제거를 누르면 iCloud와 다른 Mac에서도 제거됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herstel haalt ze terug uit iCloud. Verwijder overal verwijdert ze ook uit iCloud en van je andere Macs."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przywróć odzyskuje je z iCloud. Usuń wszędzie usuwa je także z iCloud i z innych Maców."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar os traz de volta do iCloud. Remover em todos os remove também do iCloud e dos seus outros Macs."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Восстановить» вернёт их из iCloud. «Удалить везде» удалит их также из iCloud и с других ваших Mac."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geri Yükle, bunları iCloud’dan geri getirir. Her Yerden Kaldır, bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“恢复”会从 iCloud 取回它们。“在所有 Mac 上移除”会把它们也从 iCloud 和你的其他 Mac 上移除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「還原」會從 iCloud 取回它們。「在所有 Mac 上移除」會把它們也從 iCloud 和你的其他 Mac 上移除。"
           }
         }
       }
@@ -136961,7 +137210,7 @@
       }
     },
     "Restore" : {
-      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nButton in the Import window's question when a Zigzag backup is opened from Finder.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.",
+      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nButton in the Import window's question when a Zigzag backup is opened from Finder.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.\nButton beside “Many things were removed on this Mac, so sync is paused” in Settings › General: brings them back from iCloud.",
       "localizations" : {
         "de" : {
           "stringUnit" : {

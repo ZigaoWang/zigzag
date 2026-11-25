@@ -95,12 +95,14 @@ struct SyncState: Codable {
     /// Favorites (by record name) and preferences (by key) of another profile removed elsewhere lately: when the
     /// profile's own removal follows, they come back with it.
     var leftovers: [String: SyncLeftover] = [:]
+    /// How many removals made here at once wait to be confirmed or brought back; nil while nothing waits.
+    var heldRemovals: Int?
     /// How far Zigzag's own fetch of the zone has read, beside CKSyncEngine's.
     var zoneToken: Data?
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldRemovals
     }
 
     init() {}
@@ -123,6 +125,7 @@ struct SyncState: Codable {
         serverDates = try c.decodeIfPresent([String: Date].self, forKey: .serverDates) ?? [:]
         zoneToken = try c.decodeIfPresent(Data.self, forKey: .zoneToken)
         leftovers = try c.decodeIfPresent([String: SyncLeftover].self, forKey: .leftovers) ?? [:]
+        heldRemovals = try c.decodeIfPresent(Int.self, forKey: .heldRemovals)
     }
 }
 
@@ -135,6 +138,8 @@ final class SyncSession {
     var now: () -> Date = Date.init
     /// Called whenever `state` changed and should be saved.
     var onChange: (() -> Void)?
+    /// Called when removals are held, or no longer are.
+    var onHeld: (() -> Void)?
     /// True while it writes into the library, so the change that causes isn't read as one made here.
     private(set) var isApplying = false
 
@@ -173,14 +178,54 @@ final class SyncSession {
     // MARK: Changes here
 
     /// Reads the library and queues what changed since.
-    func localChanged() {
-        guard state.merged, !isApplying else { return }
+    func localChanged(allowingManyRemovals: Bool = false) {
+        guard state.merged, !isApplying, state.heldRemovals == nil else { return }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: now())
+        if !allowingManyRemovals, let count = Self.manyRemovals(from: state.base, to: export.items) {
+            state.heldRemovals = count
+            onChange?()
+            onHeld?()
+            return
+        }
         state.emptyFolders = export.emptyFolders
         queue(diff(export.items, deletes: true))
         onChange?()
         if export.needsLayout { layOut() }
+    }
+
+    /// More than 10 of one kind, and more than a quarter of them, gone at once: a library file replaced or rolled
+    /// back (Time Machine, an old copy) rather than things removed by hand. Returns how many.
+    static func manyRemovals(from base: [String: SyncItem], to items: [String: SyncItem]) -> Int? {
+        var total: [Substring: Int] = [:], gone: [Substring: Int] = [:]
+        for name in base.keys where SyncName.id(name) != nil {
+            let kind = name.prefix { $0 != "." }
+            total[kind, default: 0] += 1
+            if items[name] == nil { gone[kind, default: 0] += 1 }
+        }
+        let many = gone.filter { kind, count in count > 10 && Double(count) > Double(total[kind] ?? 0) * 0.25 }
+        return many.isEmpty ? nil : gone.values.reduce(0, +)
+    }
+
+    /// Held removals brought back: what iCloud has is laid out here again, and what else changed here meanwhile goes up.
+    func bringBackHeld() {
+        guard state.heldRemovals != nil else { return }
+        state.heldRemovals = nil
+        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
+                                        kept: state.keptProfiles, unsent: state.unsent, now: now())
+        queue(diff(export.items, deletes: false))
+        layOut()
+        fetchFinished()
+        onHeld?()
+    }
+
+    /// Held removals sent: removed from iCloud, and so from every Mac.
+    func sendHeld() {
+        guard state.heldRemovals != nil else { return }
+        state.heldRemovals = nil
+        localChanged(allowingManyRemovals: true)
+        fetchFinished()
+        onHeld?()
     }
 
     /// Everything the server hasn't confirmed, from the state rather than the server's own queue: edits made while
@@ -237,6 +282,8 @@ final class SyncSession {
 
     /// A fetch is done: the first sync merges, later ones settle what came.
     func fetchFinished() {
+        // While removals are held, what comes waits too: laying it out would bring them back unasked.
+        if state.heldRemovals != nil { onChange?(); return }
         if !state.merged { mergeFirst() } else { settle() }
         state.lastSynced = now()
         onChange?()
@@ -246,6 +293,7 @@ final class SyncSession {
         guard !state.incoming.isEmpty || !state.incomingRemoved.isEmpty else { return }
         // What changed here first, so it isn't taken for something the server undid.
         localChanged()
+        guard state.heldRemovals == nil else { return }
         let arrived = incoming
         clearIncoming()
         var changed = false

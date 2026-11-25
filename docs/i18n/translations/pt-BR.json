@@ -15345,6 +15345,24 @@
         "state": "translated",
         "value": "Não foi possível salvar um backup antes, então a sincronização continua desativada."
       }
+    },
+    "Many things were removed on this Mac, so sync is paused": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Muitos itens foram removidos neste Mac, então a sincronização está pausada"
+      }
+    },
+    "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Restaurar os traz de volta do iCloud. Remover em todos os remove também do iCloud e dos seus outros Macs."
+      }
+    },
+    "Remove Everywhere": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Remover em todos"
+      }
     }
   },
   "language": "pt-BR"

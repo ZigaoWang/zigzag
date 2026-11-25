@@ -15039,6 +15039,24 @@
         "state": "translated",
         "value": "Impossible d’enregistrer d’abord une sauvegarde : la synchronisation reste désactivée."
       }
+    },
+    "Many things were removed on this Mac, so sync is paused": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Beaucoup d’éléments ont été supprimés sur ce Mac, la synchronisation est donc en pause"
+      }
+    },
+    "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "« Restaurer » les récupère depuis iCloud. « Supprimer partout » les supprime aussi d’iCloud et de vos autres Mac."
+      }
+    },
+    "Remove Everywhere": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Supprimer partout"
+      }
     }
   },
   "language": "fr"

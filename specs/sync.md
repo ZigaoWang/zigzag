@@ -126,3 +126,8 @@
   Test: SyncTests.whatsInsideARecordANewerZigzagWroteIsLeftAlone
 - A preference only a newer Zigzag knows, or one of a profile this Mac doesn't have → kept in iCloud as it is, never sent back as unset.
   Test: SyncTests.preferencesThisVersionDoesntKnowAreKeptAsTheyAre
+- Many things removed here at once (an old Library.json put back from Time Machine, say: more than 10 of one kind, and more than a quarter of them) → nothing is sent; sync pauses and Settings says so, with Restore, which brings them back from iCloud and keeps what else changed here, and Remove Everywhere, which removes them from iCloud and the other Macs. A few removed by hand go up as usual.
+  Test: SyncTests.aLibraryPutBackFromAnOldCopyIsntSentAsRemovals
+  Test: SyncTests.manyRemovalsSentWhenAsked
+- Profiles.json gone while iCloud has this Mac's other profiles → read as a file that couldn't be read, and merged again as on a first sync; no profile is removed from iCloud.
+  Test: SyncTests.aMissingProfilesFileIsUnreadableNotEveryProfileRemoved

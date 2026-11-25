@@ -28,10 +28,14 @@ final class ICloudSync {
         case notEntitled
         /// Turning it on couldn't save the backup first, so it stayed off.
         case backupFailed
+        /// Many things were removed here at once (an old copy of the library put back, say): nothing goes up until
+        /// asked whether to remove them everywhere or bring them back.
+        case removalsHeld
         case failed(String)
     }
 
-    private(set) var status: Status = .off { didSet { if oldValue != status { changed.send() } } }
+    var status: Status { session?.state.heldRemovals != nil ? .removalsHeld : shown }
+    private var shown: Status = .off { didSet { if oldValue != shown { changed.send() } } }
     /// Fires when the status changes.
     let changed = Signal<Void>()
 
@@ -76,8 +80,32 @@ final class ICloudSync {
     func startIfOn() {
         guard isOn, session == nil else { return }
         let library = Library.shared
-        start(state: Self.stateAtLaunch(saved: JSONStore.load(SyncState.self, from: Self.stateFile) ?? SyncState(),
-                                        libraryWasRead: library.wasRead && !library.profilesWereSetAside))
+        let saved = JSONStore.load(SyncState.self, from: Self.stateFile) ?? SyncState()
+        start(state: Self.stateAtLaunch(saved: saved, libraryWasRead: Self.libraryWasRead(library.wasRead && !library.profilesWereSetAside,
+                                                                                        profilesFile: library.profilesFileExisted, saved: saved)))
+    }
+
+    /// A Profiles.json that's gone while iCloud has this Mac's other profiles counts as unreadable, not as every
+    /// profile removed: Zigzag writes it once there's a second profile and never deletes it.
+    static func libraryWasRead(_ read: Bool, profilesFile: Bool, saved: SyncState) -> Bool {
+        guard read else { return false }
+        if profilesFile { return true }
+        return !saved.base.contains { name, item in
+            guard case .profile = item.body, let id = SyncName.id(name) else { return false }
+            return saved.aliases.local(id) != Profile.defaultID && !saved.keptProfiles.contains(saved.aliases.local(id))
+        }
+    }
+
+    /// Removals held: the library here as it was before them, from iCloud, with what else changed here kept.
+    func bringBackRemovals() {
+        session?.bringBackHeld()
+        changed.send()
+    }
+
+    /// Removals held: removed from iCloud and every Mac too.
+    func sendRemovals() {
+        session?.sendHeld()
+        changed.send()
     }
 
     /// What sync starts from at launch. A library that couldn't be read (and started afresh) is merged with iCloud as
@@ -97,7 +125,7 @@ final class ICloudSync {
     /// backup (a full disk), it stays off.
     func turnOn(backingUp: () -> URL? = { ICloudSync.shared.backUp() }) {
         guard !isOn else { return }
-        guard backingUp() != nil else { status = .backupFailed; return }
+        guard backingUp() != nil else { shown = .backupFailed; return }
         UserDefaults.standard.set(true, forKey: Self.enabledKey)
         stop()
         try? FileManager.default.removeItem(at: Self.stateFile)
@@ -110,12 +138,12 @@ final class ICloudSync {
         stop()
         NSApplication.shared.unregisterForRemoteNotifications()
         try? FileManager.default.removeItem(at: Self.stateFile)
-        status = .off
+        shown = .off
     }
 
     /// Remove from iCloud…: the synced copy goes from iCloud, for every Mac; this Mac keeps its own, and sync turns off.
     func removeFromICloud() async -> Bool {
-        guard Self.isEntitled else { status = .notEntitled; return false }
+        guard Self.isEntitled else { shown = .notEntitled; return false }
         // Stopped first, so nothing makes the zone again on its way out.
         stop()
         let container = CKContainer(identifier: Self.containerID)
@@ -125,7 +153,7 @@ final class ICloudSync {
         } catch {
             Self.log.error("removing the zone failed: \(error.localizedDescription, privacy: .public)")
             startIfOn()
-            status = Self.status(for: error) ?? .failed(error.localizedDescription)
+            shown = Self.status(for: error) ?? .failed(error.localizedDescription)
             return false
         }
         turnOff()
@@ -136,11 +164,12 @@ final class ICloudSync {
     private func start(state: SyncState) {
         let session = SyncSession(host: host, state: state)
         session.onChange = { [weak self] in self?.saveSoon() }
+        session.onHeld = { [weak self] in self?.changed.send() }
         self.session = session
         watchLibrary()
         // CKSyncEngine listens for pushes too, but its own fetch on one goes through a scheduler that can refuse it.
         NSApplication.shared.registerForRemoteNotifications()
-        status = .syncing
+        shown = .syncing
         Task { await connect() }
     }
 
@@ -161,7 +190,7 @@ final class ICloudSync {
 
     /// Checks the account before anything goes up: a different one than before pauses until sync is turned on again.
     private func connect() async {
-        guard Self.isEntitled else { status = .notEntitled; return }
+        guard Self.isEntitled else { shown = .notEntitled; return }
         // One engine at a time.
         guard !connecting, engine == nil else { return }
         connecting = true
@@ -171,13 +200,13 @@ final class ICloudSync {
             switch try await container.accountStatus() {
             case .available: break
             // Signing in, or iCloud allowed again, posts CKAccountChanged.
-            case .noAccount: status = .notSignedIn; return
-            case .restricted: status = .restricted; return
-            default: status = .offline; retry.failed(nil); return
+            case .noAccount: shown = .notSignedIn; return
+            case .restricted: shown = .restricted; return
+            default: shown = .offline; retry.failed(nil); return
             }
             let user = try await container.userRecordID().recordName
             guard let session, isOn else { return }
-            guard Self.mayUse(account: user, saved: session.state.account) else { status = .otherAccount; return }
+            guard Self.mayUse(account: user, saved: session.state.account) else { shown = .otherAccount; return }
             session.updateState { $0.account = user }
             let engine = CloudEngine(container: container, session: session, owner: self)
             self.engine = engine
@@ -201,7 +230,7 @@ final class ICloudSync {
                 guard let self else { return }
                 if first {
                     UserDefaults.standard.set(true, forKey: Self.copyKey)
-                    status = .synced(session.state.lastSynced)
+                    shown = .synced(session.state.lastSynced)
                 }
                 retry.succeeded()
             }
@@ -235,7 +264,7 @@ final class ICloudSync {
 
     /// The status for a failure, and the next try unless waiting won't help.
     private func failed(_ error: Error) {
-        status = Self.status(for: error) ?? (SyncRetry.isPermanent(error) ? .failed(error.localizedDescription) : .offline)
+        shown = Self.status(for: error) ?? (SyncRetry.isPermanent(error) ? .failed(error.localizedDescription) : .offline)
         retry.failed(error)
     }
 
@@ -342,7 +371,7 @@ final class ICloudSync {
 
     // MARK: From the engine
 
-    fileprivate func engineEvent(_ status: Status) { self.status = status }
+    fileprivate func engineEvent(_ status: Status) { shown = status }
 
     fileprivate func accountChanged() {
         // Signed out or another account: nothing more goes up or comes down; the library here stays.
@@ -377,7 +406,7 @@ final class ICloudSync {
             // the library here stays.
             turnOff()
             UserDefaults.standard.set(false, forKey: Self.copyKey)
-            status = .removedElsewhere
+            shown = .removedElsewhere
         }
     }
 
