@@ -64,9 +64,7 @@ targets:
       # The release notes the app shows after an update: this version's section of the changelog in the app's language.
       - path: CHANGELOG.md
         buildPhase: resources
-      - path: docs/i18n/changelog/CHANGELOG.zh-Hans.md
-        buildPhase: resources
-      - path: docs/i18n/changelog/CHANGELOG.zh-Hant.md
+      - path: docs/i18n/changelog
         buildPhase: resources
       # The licenses About Zigzag › Acknowledgments shows: the same files as the repository's, never a copy.
       - path: LICENSE

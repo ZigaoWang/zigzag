@@ -146,26 +146,31 @@ struct WhatsNewTests {
         #expect(!WhatsNew.sections.isEmpty)
     }
 
-    /// The two Chinese scripts use their own notes; other languages read CHANGELOG.md alone.
-    @Test func chineseReadsItsOwnChangelog() {
+    /// Every shipped language reads its own notes; English, and a language Zigzag doesn't ship, read CHANGELOG.md alone.
+    @Test func everyLanguageReadsItsOwnChangelog() {
         #expect(WhatsNew.notesFile(for: "zh-Hans") == "CHANGELOG.zh-Hans")
         #expect(WhatsNew.notesFile(for: "zh-Hans-CN") == "CHANGELOG.zh-Hans")
         #expect(WhatsNew.notesFile(for: "zh-Hant") == "CHANGELOG.zh-Hant")
         #expect(WhatsNew.notesFile(for: "zh-Hant-HK") == "CHANGELOG.zh-Hant")
+        #expect(WhatsNew.notesFile(for: "pt-BR") == "CHANGELOG.pt-BR")
         #expect(WhatsNew.notesFile(for: "en") == nil)
         #expect(WhatsNew.notesFile(for: "en-GB") == nil)
-        #expect(WhatsNew.notesFile(for: "ja") == nil)
+        #expect(WhatsNew.notesFile(for: "sv") == nil)
+        for language in Self.languages {
+            let file = WhatsNew.notesFile(for: language)
+            #expect(file == "CHANGELOG.\(language)")
+            #expect(Bundle.main.url(forResource: file, withExtension: "md") != nil, "\(language)'s notes aren't in the app")
+        }
     }
 
-    /// Languages other than Chinese have no changelog of their own, so they read the English notes, under headings
-    /// in their language.
+    /// A version with no notes in the language shows the English ones, under the app's headings in that language,
+    /// and the changelog's own headings are the ones What's New knows.
     @Test(arguments: [
         ("ja", "新機能", "修正"), ("de", "Neu", "Behoben"), ("es", "Nuevo", "Correcciones"), ("fr", "Nouveautés", "Corrections"),
         ("it", "Novità", "Correzioni"), ("ko", "새로운 기능", "수정 사항"), ("nl", "Nieuw", "Opgelost"), ("pl", "Nowe", "Naprawiono"),
         ("pt-BR", "Novo", "Corrigido"), ("ru", "Новое", "Исправлено"), ("tr", "Yeni Özellikler", "Düzeltmeler"),
-    ]) func otherLanguagesReadTheEnglishNotes(_ language: String, _ new: String, _ fixed: String) throws {
-        #expect(WhatsNew.notesFile(for: language) == nil)
-        #expect(WhatsNew.notesFile(for: "\(language)-XX") == nil)
+    ]) func aVersionNotTranslatedReadsTheEnglishNotes(_ language: String, _ new: String, _ fixed: String) throws {
+        #expect(WhatsNew.notesFile(for: "\(language)-XX") == "CHANGELOG.\(language)")
         let english = """
         ## [1.1.0] - 2026-11-01
 
@@ -175,12 +180,23 @@ struct WhatsNewTests {
         ### Fixed
         - Two
         """
-        let notes = WhatsNew.pick(english: english, localized: WhatsNew.notesFile(for: language), version: "1.1.0")
+        let older = """
+        ## [1.0.0] - 2026-10-01
+
+        ### \(new)
+        - Alt
+        """
+        let notes = WhatsNew.pick(english: english, localized: older, version: "1.1.0", requireCompleteTranslation: true)
         #expect(notes == WhatsNew.parse(english, version: "1.1.0"))
         #expect(notes.sections.map { $0.items.map(\.text) } == [["One"], ["Two"]])
+        let translated = english.replacingOccurrences(of: "### New", with: "### \(new)")
+            .replacingOccurrences(of: "### Fixed", with: "### \(fixed)")
+        #expect(WhatsNew.pick(english: english, localized: translated, version: "1.1.0", requireCompleteTranslation: true)
+                == WhatsNew.parse(translated, version: "1.1.0"))
         let bundle = try #require(Bundle(path: Bundle.main.path(forResource: language, ofType: "lproj") ?? ""))
         #expect(bundle.localizedString(forKey: "New", value: nil, table: nil) == new)
         #expect(bundle.localizedString(forKey: "Fixed", value: nil, table: nil) == fixed)
+        #expect(WhatsNew.sectionKind(new) == "New" && WhatsNew.sectionKind(fixed) == "Fixed")
     }
 
     /// The translated notes when they have the version, the English ones when they don't.
@@ -257,26 +273,29 @@ struct WhatsNewTests {
         #expect(WhatsNew.heading("Security") == "Security")
     }
 
-    /// Shipped Simplified Chinese notes match English. Traditional Chinese may lag and falls back at runtime.
-    @Test func shippedChineseNotesMatchTheEnglish() throws {
+    nonisolated private static let languages = ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt-BR", "ru", "tr", "zh-Hans", "zh-Hant"]
+
+    /// Each shipped language's notes match the English in every version they have: the day, the sections, and each
+    /// point's issues.
+    @Test(arguments: Self.languages) func shippedNotesMatchTheEnglish(_ language: String) throws {
         func text(_ name: String) throws -> String {
             let url = try #require(Bundle.main.url(forResource: name, withExtension: "md"))
             return try String(contentsOf: url, encoding: .utf8)
         }
-        let english = try text("CHANGELOG"), chinese = try text("CHANGELOG.zh-Hans")
-        let versions = chinese.components(separatedBy: .newlines).compactMap { line -> String? in
+        let english = try text("CHANGELOG"), translated = try text("CHANGELOG.\(language)")
+        let versions = translated.components(separatedBy: .newlines).compactMap { line -> String? in
             guard line.hasPrefix("## ["), let end = line.firstIndex(of: "]") else { return nil }
             return String(line[line.index(line.startIndex, offsetBy: 4)..<end])
         }.filter { $0 != "Unreleased" }
-        #expect(versions.count >= 6)
-        let names = ["New": "新功能", "Fixed": "修复"]
+        #expect(versions.count >= (language.hasPrefix("zh") ? 6 : 1))
         for version in versions {
-            let en = WhatsNew.parse(english, version: version), zh = WhatsNew.parse(chinese, version: version)
+            let en = WhatsNew.parse(english, version: version), notes = WhatsNew.parse(translated, version: version)
             #expect(!en.sections.isEmpty, "\(version) isn't in CHANGELOG.md")
-            #expect(zh.date == en.date, "\(version) has another day")
-            #expect(zh.sections.map(\.title) == en.sections.map { names[$0.title] ?? $0.title }, "\(version) has other sections")
-            #expect(zh.sections.map { $0.items.map { $0.issues.map(\.number) } } == en.sections.map { $0.items.map { $0.issues.map(\.number) } },
-                    "\(version) has other points or issues")
+            #expect(notes.date == en.date, "\(language) \(version) has another day")
+            #expect(notes.sections.map { WhatsNew.sectionKind($0.title) } == en.sections.map(\.title),
+                    "\(language) \(version) has other sections")
+            #expect(notes.sections.map { $0.items.map { $0.issues.map(\.number) } } == en.sections.map { $0.items.map { $0.issues.map(\.number) } },
+                    "\(language) \(version) has other points or issues")
         }
     }
 

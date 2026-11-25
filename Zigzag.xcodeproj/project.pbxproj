@@ -9,6 +9,10 @@
 /* Begin PBXBuildFile section */
 		002274F2A1CF4A93D4ADCC4D /* PageLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44F4A7AED8299B48EF5D9D5 /* PageLinkTests.swift */; };
 		002B25577DA7A6048EB83469 /* CommandClickedLinksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653F557876B05509C125FEB3 /* CommandClickedLinksTests.swift */; };
+		0DB6AAD1F794C121E96A9DE6 /* CHANGELOG.pt-BR.md in Resources */ = {isa = PBXBuildFile; fileRef = B7EA6EEFD4F757A2F64329AE /* CHANGELOG.pt-BR.md */; };
+		0E3092EE9B84071FD6C55804 /* CHANGELOG.tr.md in Resources */ = {isa = PBXBuildFile; fileRef = 0727315E0B656754DCB24D59 /* CHANGELOG.tr.md */; };
+		102556AA70DAAB1128585CC2 /* CHANGELOG.ko.md in Resources */ = {isa = PBXBuildFile; fileRef = C16605A7B6A547EFC7D7A8EF /* CHANGELOG.ko.md */; };
+		15090E132305084B55B04904 /* CHANGELOG.pl.md in Resources */ = {isa = PBXBuildFile; fileRef = 93E9174E9D12E27C710BD387 /* CHANGELOG.pl.md */; };
 		1E0C0A11B2C3D4E5F6A7B801 /* IMECommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E0C0A11B2C3D4E5F6A7B802 /* IMECommit.swift */; };
 		0100CD43A4B713911A1FC04E /* BrowserWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6A928496FC897893B22DF7 /* BrowserWebView.swift */; };
 		0104054FA97C0D01FC9A422C /* ExtensionHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */; };
@@ -48,7 +52,10 @@
 		0FFDB208CC831BB0246A6A7B /* SpaceFrameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2477477EEAA33212F1AA2281 /* SpaceFrameView.swift */; };
 		100451C092437BEBE1CA770F /* CHANGELOG.zh-Hans.md in Resources */ = {isa = PBXBuildFile; fileRef = B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */; };
 		10324776656E836D07CD1B27 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32289A47E7257A31AC82FCB0 /* Controls.swift */; };
+		2581F5B1763696A65EFBD821 /* CHANGELOG.de.md in Resources */ = {isa = PBXBuildFile; fileRef = 6BB267F3A21B639AE6B28836 /* CHANGELOG.de.md */; };
+		288A379DE3CDED3A3BB44C14 /* CHANGELOG.ru.md in Resources */ = {isa = PBXBuildFile; fileRef = A8B2ACF01DF6ACE192824319 /* CHANGELOG.ru.md */; };
 		4CAF5EE6BEC32484564068C7 /* SavePlaceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7AC1A3F548293C4FA3FD1D /* SavePlaceSheet.swift */; };
+		586FE02969B0D5E02F6901D3 /* CHANGELOG.nl.md in Resources */ = {isa = PBXBuildFile; fileRef = B818A6B8D5AF583E87031D9E /* CHANGELOG.nl.md */; };
 		7A3C0E1D2B4F0001C0FFEE01 /* TouchGestures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A3C0E1D2B4F0002C0FFEE01 /* TouchGestures.swift */; };
 		10ED316D4DDDE144EAA77A5D /* ProxyCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400EEF52096D1DE0A08306FF /* ProxyCheckTests.swift */; };
 		11436BB68F1FE91F774FF4A9 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7CC06A0253CAF1E0CAEA2F /* Profile.swift */; };
@@ -66,6 +73,9 @@
 		16F7373AE9B7F99DFDF0B287 /* MCPSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D229D91CCC8F7EB9E4E3D05 /* MCPSnapshot.swift */; };
 		171525799F035128A918483B /* KeptCookiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C6B60D88D8E4126E09FA34 /* KeptCookiesTests.swift */; };
 		5E551C00C0FFEE0000000003 /* SessionCookiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E551C00C0FFEE0000000004 /* SessionCookiesTests.swift */; };
+		7CD31322AE0F9DD97FC205F0 /* CHANGELOG.fr.md in Resources */ = {isa = PBXBuildFile; fileRef = 0EB2DAD7E8589F0198052D8A /* CHANGELOG.fr.md */; };
+		A25397AE3F4F0BB7B061A178 /* CHANGELOG.ja.md in Resources */ = {isa = PBXBuildFile; fileRef = C0EE86D2E925A5C8F8139358 /* CHANGELOG.ja.md */; };
+		D4E09A2A06DF879BA94B6DCE /* CHANGELOG.it.md in Resources */ = {isa = PBXBuildFile; fileRef = C53EA52122D624E7B9AF580E /* CHANGELOG.it.md */; };
 		F2A3E9AC0FF5000000000003 /* FramePacingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF5000000000004 /* FramePacingTests.swift */; };
 		F2A3E9AC0FF6000000000003 /* PageLocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */; };
 		1116ADE95186795EFF5297C6 /* Headless.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA5039BA8CA89B76CCF6C5B /* Headless.swift */; };
@@ -149,6 +159,7 @@
 		3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F512EE34F01C45AF2FE2C52 /* FirefoxImporter.swift */; };
 		4026E10B64D404C941974769 /* SidebarMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6567506B7F99FD1755289D6C /* SidebarMenuTests.swift */; };
 		91499BFF3936E2887958C6B1 /* LiveFoldersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E4BB1C664E00D06BD28458 /* LiveFoldersTests.swift */; };
+		FA35EB7E6A7CF0F30C781906 /* CHANGELOG.es.md in Resources */ = {isa = PBXBuildFile; fileRef = DC22D965DDA890AE63B06AA6 /* CHANGELOG.es.md */; };
 		FCBC7694CFDF99C8839253A1 /* LiveFeedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE16647854F4B119663E916E /* LiveFeedTests.swift */; };
 		4049A34E6137133411D1BC58 /* DeveloperBarToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64016A5E5662CB06CF07C33 /* DeveloperBarToolsTests.swift */; };
 		406211D9FE2D298CC49C3183 /* SafePDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6549370C4EBE20CEA25CD102 /* SafePDF.swift */; };
@@ -699,9 +710,13 @@
 		05942C5562AD233537EF434C /* TabSwitcherGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitcherGridTests.swift; sourceTree = "<group>"; };
 		059DC09EA2D5589CB98D676B /* ErrorPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorPage.swift; sourceTree = "<group>"; };
 		05D6F7B260C273A2579439E6 /* TrafficLightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficLightTests.swift; sourceTree = "<group>"; };
+		0727315E0B656754DCB24D59 /* CHANGELOG.tr.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.tr.md; sourceTree = "<group>"; };
+		0EB2DAD7E8589F0198052D8A /* CHANGELOG.fr.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.fr.md; sourceTree = "<group>"; };
+		6BB267F3A21B639AE6B28836 /* CHANGELOG.de.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.de.md; sourceTree = "<group>"; };
 		7A3C0E1D2B4F0004C0FFEE01 /* TouchGesturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchGesturesTests.swift; sourceTree = "<group>"; };
 		06AE52E198CC8E7B86B467BA /* BrowserWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindow.swift; sourceTree = "<group>"; };
 		07247B1D1C9B9FA9D7014B32 /* WebStoreButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebStoreButton.swift; sourceTree = "<group>"; };
+		93E9174E9D12E27C710BD387 /* CHANGELOG.pl.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.pl.md; sourceTree = "<group>"; };
 		A0D5E7B1C2F304152637485E /* AddonsStoreButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddonsStoreButton.swift; sourceTree = "<group>"; };
 		0737418196BB38BD7D36DDC5 /* WebSocketBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketBridge.swift; sourceTree = "<group>"; };
 		07632F352E115A10525D3A97 /* UpdateReady.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateReady.swift; sourceTree = "<group>"; };
@@ -713,7 +728,13 @@
 		0C054793F49E04AC36C79015 /* CertificateDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateDetails.swift; sourceTree = "<group>"; };
 		0C4237F81EED9D709728975F /* SiteDataBench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteDataBench.swift; sourceTree = "<group>"; };
 		0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageScreenshot.swift; sourceTree = "<group>"; };
+		A8B2ACF01DF6ACE192824319 /* CHANGELOG.ru.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.ru.md; sourceTree = "<group>"; };
 		B2D5F8031C4E6A79D8F20135 /* PageCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCapture.swift; sourceTree = "<group>"; };
+		B7EA6EEFD4F757A2F64329AE /* CHANGELOG.pt-BR.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "CHANGELOG.pt-BR.md"; sourceTree = "<group>"; };
+		B818A6B8D5AF583E87031D9E /* CHANGELOG.nl.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.nl.md; sourceTree = "<group>"; };
+		C0EE86D2E925A5C8F8139358 /* CHANGELOG.ja.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.ja.md; sourceTree = "<group>"; };
+		C16605A7B6A547EFC7D7A8EF /* CHANGELOG.ko.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.ko.md; sourceTree = "<group>"; };
+		C53EA52122D624E7B9AF580E /* CHANGELOG.it.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.it.md; sourceTree = "<group>"; };
 		D4F71A2E3E608C9BFA142357 /* CapturePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePreview.swift; sourceTree = "<group>"; };
 		0C67092285DC153FB7BBDFCE /* Materials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Materials.swift; sourceTree = "<group>"; };
 		0C6B64529E363AA584C30979 /* PasswordHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordHealth.swift; sourceTree = "<group>"; };
@@ -786,6 +807,7 @@
 		279F09EC606C2F8DBC1322C4 /* PageImageIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageImageIcon.swift; sourceTree = "<group>"; };
 		27C6B60D88D8E4126E09FA34 /* KeptCookiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesTests.swift; sourceTree = "<group>"; };
 		5E551C00C0FFEE0000000004 /* SessionCookiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCookiesTests.swift; sourceTree = "<group>"; };
+		DC22D965DDA890AE63B06AA6 /* CHANGELOG.es.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CHANGELOG.es.md; sourceTree = "<group>"; };
 		F2A3E9AC0FF5000000000004 /* FramePacingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FramePacingTests.swift; sourceTree = "<group>"; };
 		F2A3E9AC0FF6000000000004 /* PageLocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageLocationTests.swift; sourceTree = "<group>"; };
 		27F3073C0E2D268EC8C3B767 /* DockProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockProgress.swift; sourceTree = "<group>"; };
@@ -1307,6 +1329,17 @@
 			children = (
 				B239957460C6C2AA3079E793 /* CHANGELOG.zh-Hans.md */,
 				B657FD604243B45A30819412 /* CHANGELOG.zh-Hant.md */,
+				C0EE86D2E925A5C8F8139358 /* CHANGELOG.ja.md */,
+				C16605A7B6A547EFC7D7A8EF /* CHANGELOG.ko.md */,
+				6BB267F3A21B639AE6B28836 /* CHANGELOG.de.md */,
+				0EB2DAD7E8589F0198052D8A /* CHANGELOG.fr.md */,
+				C53EA52122D624E7B9AF580E /* CHANGELOG.it.md */,
+				DC22D965DDA890AE63B06AA6 /* CHANGELOG.es.md */,
+				B7EA6EEFD4F757A2F64329AE /* CHANGELOG.pt-BR.md */,
+				A8B2ACF01DF6ACE192824319 /* CHANGELOG.ru.md */,
+				B818A6B8D5AF583E87031D9E /* CHANGELOG.nl.md */,
+				93E9174E9D12E27C710BD387 /* CHANGELOG.pl.md */,
+				0727315E0B656754DCB24D59 /* CHANGELOG.tr.md */,
 			);
 			path = docs/i18n/changelog;
 			sourceTree = "<group>";
@@ -2430,6 +2463,17 @@
 				09844A022115C19F24950AE6 /* CHANGELOG.md in Resources */,
 				100451C092437BEBE1CA770F /* CHANGELOG.zh-Hans.md in Resources */,
 				A014B485FB3E1C487092B3D5 /* CHANGELOG.zh-Hant.md in Resources */,
+				A25397AE3F4F0BB7B061A178 /* CHANGELOG.ja.md in Resources */,
+				102556AA70DAAB1128585CC2 /* CHANGELOG.ko.md in Resources */,
+				2581F5B1763696A65EFBD821 /* CHANGELOG.de.md in Resources */,
+				7CD31322AE0F9DD97FC205F0 /* CHANGELOG.fr.md in Resources */,
+				D4E09A2A06DF879BA94B6DCE /* CHANGELOG.it.md in Resources */,
+				FA35EB7E6A7CF0F30C781906 /* CHANGELOG.es.md in Resources */,
+				0DB6AAD1F794C121E96A9DE6 /* CHANGELOG.pt-BR.md in Resources */,
+				288A379DE3CDED3A3BB44C14 /* CHANGELOG.ru.md in Resources */,
+				586FE02969B0D5E02F6901D3 /* CHANGELOG.nl.md in Resources */,
+				15090E132305084B55B04904 /* CHANGELOG.pl.md in Resources */,
+				0E3092EE9B84071FD6C55804 /* CHANGELOG.tr.md in Resources */,
 				1845DD30334A776382156546 /* InfoPlist.xcstrings in Resources */,
 				35D7E0C77E5DE66D9B871D4F /* LICENSE in Resources */,
 				E5748A1AC50809EA8B52CB6D /* Localizable.xcstrings in Resources */,
