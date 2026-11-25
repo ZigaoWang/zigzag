@@ -1975,7 +1975,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ファーン"
+            "value" : "ファーングリーン"
           }
         },
         "zh-Hans" : {
@@ -2067,7 +2067,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "シェル"
+            "value" : "シェルピンク"
           }
         },
         "zh-Hans" : {
@@ -2297,7 +2297,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パイン"
+            "value" : "パイングリーン"
           }
         },
         "zh-Hans" : {
@@ -4101,7 +4101,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@は自分のページに固定されたままです"
+            "value" : "%@は元のページに固定されたままです"
           }
         },
         "zh-Hans" : {
@@ -4523,7 +4523,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@、固定タブを隠しています"
+            "value" : "%@、固定タブを非表示中"
           }
         },
         "zh-Hans" : {
@@ -8420,7 +8420,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ページの上にアドレスバー"
+            "value" : "アドレスバーをページの上に表示"
           }
         },
         "zh-Hans" : {
@@ -8604,7 +8604,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "別のページに移動した固定タブを閉じたあとに表示します（新しいチャットなど）。"
+            "value" : "別のページ（新しいチャットなど）に移動した固定タブを閉じたときに表示します。"
           }
         },
         "zh-Hans" : {
@@ -11025,7 +11025,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「Cookieを消去…」やZigzagの終了時にも、このサイトのCookieはhttpとhttpsのすべてのサブドメインで消去されないため、ログインしたままでいられます。"
+            "value" : "「Cookieを消去…」を使ったときやZigzagを終了したときも、このサイトのCookieはhttp、https、すべてのサブドメインで消去されないため、ログインしたままでいられます。"
           }
         },
         "zh-Hans" : {
@@ -11048,7 +11048,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「Cookieを消去…」やZigzagの終了時にも消去されないため、ログインしたままでいられます。"
+            "value" : "「Cookieを消去…」を使ったときやZigzagを終了したときも消去されないため、ログインしたままでいられます。"
           }
         },
         "zh-Hans" : {
@@ -11071,7 +11071,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「Cookieを消去…」やZigzagの終了時にも消去されないため、ログインしたままでいられます。ここでサイトを追加するか、そのサイトのサイトコントロールで「Cookieを保持」をオンにしてください。"
+            "value" : "「Cookieを消去…」を使ったときやZigzagを終了したときも消去されないため、ログインしたままでいられます。ここでサイトを追加するか、そのサイトのサイトコントロールで「Cookieを保持」をオンにしてください。"
           }
         },
         "zh-Hans" : {
@@ -12115,7 +12115,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保持している1個のサイトを除いて、すべてのサイトからログアウトします。パスワード、固定タブ、履歴は残ります。"
+            "value" : "保持しているサイトを除いて、すべてのサイトからログアウトします。パスワード、固定タブ、履歴は残ります。"
           }
         },
         "zh-Hans" : {
@@ -16286,7 +16286,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "私のWebブラウザであるZigzagに、MCPサーバとして接続してください。%1$@のHTTPトランスポートを使い、すべてのリクエストにこのヘッダを付けて送信してください：%2$@。これはこのMacでのみ動作します。接続すると、私のタブの一覧表示、ページを開く、読み取る、スクリーンショットを撮る、ページ内でクリック、入力、スクロールすることができます。Zigzagはプライベートウインドウ、パスワード、Zigzag自身のページを使わせることはなく、私はどのタブでも操作を止めることができます。自分でMCPサーバを追加できない場合は、設定のどこに追加すればよいかを教えてください。"
+            "value" : "私のWebブラウザであるZigzagに、MCPサーバとして接続してください。%1$@のHTTPトランスポートを使い、すべてのリクエストにこのヘッダを付けて送信してください：%2$@。これはこのMacでのみ動作します。接続すると、私のタブを一覧表示したり、ページを開いて読み取ったり、スクリーンショットを撮ったり、ページ内でクリック、入力、スクロールしたりできます。Zigzagはプライベートウインドウ、パスワード、Zigzag自身のページを使わせることはなく、私はどのタブでも操作を止めることができます。自分でMCPサーバを追加できない場合は、設定のどこに追加すればよいかを教えてください。"
           }
         },
         "zh-Hans" : {
@@ -23404,7 +23404,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$@に追加できる%1$#@extensions@が見つかりました。"
+            "value" : "%2$@から追加できる%1$#@extensions@が見つかりました。"
           },
           "substitutions" : {
             "extensions" : {
@@ -33371,7 +33371,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "紙"
+            "value" : "ペーパー"
           }
         },
         "zh-Hans" : {
@@ -37767,7 +37767,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アップデートを確認"
+            "value" : "内容を確認"
           }
         },
         "zh-Hans" : {
@@ -38578,7 +38578,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@に保存、%2$@からのアップデート前"
+            "value" : "%1$@に保存（%2$@からのアップデート前）"
           }
         },
         "zh-Hans" : {
@@ -47828,7 +47828,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "オフにしても、Zigzagはアップデートを確認し、ダウンロードの前に確認します。"
+            "value" : "オフにしても、Zigzagはアップデートを確認し、ダウンロードする前に尋ねます。"
           }
         },
         "zh-Hans" : {
@@ -48308,7 +48308,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "WebRTCで通話"
+            "value" : "通話にWebRTCを使用"
           }
         },
         "zh-Hans" : {
