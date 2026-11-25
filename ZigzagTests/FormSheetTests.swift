@@ -125,3 +125,49 @@ extension NSView {
         #expect(Tokens.EmptyState.noMatchY(in: short, lineHeight: 20) == 50)
     }
 }
+
+/// In English every form sheet keeps its labels beside their controls; only a longer language puts them over.
+@MainActor @Suite(.serialized) struct FormSheetLabelTests {
+    @Test(.enabled(if: PseudoLocale.language == nil && !PseudoLocale.forTheRun)) func englishLabelsStayBeside() throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let url = URL(string: "https://example.com/")!
+        let tab = Tab(url: url, title: "Example", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 640))
+        defer { controller.window?.close() }
+        let host = try #require(controller.window?.contentView)
+        var stacked: [String] = []
+        func check(_ name: String, _ open: () -> Void) {
+            let before = Set(host.subviews.map(ObjectIdentifier.init))
+            open()
+            let opened = host.subviews.compactMap { $0 as? FormSheet }.filter { !before.contains(ObjectIdentifier($0)) }
+            if opened.isEmpty { stacked.append("\(name): no sheet opened") }
+            for sheet in opened {
+                sheet.layoutSubtreeIfNeeded()
+                if sheet.debugLabelsAbove { stacked.append(name) }
+                sheet.close()
+                sheet.removeFromSuperview()
+            }
+        }
+        check("live folder") { LiveFolderSheet.show(in: controller) }
+        for kind in DownloadRuleAction.Kind.allCases {
+            check("download rule \(kind)") { DownloadRuleSheet.show(in: host, kind: kind) }
+        }
+        check("space rule") { _ = SiteRouteSheet.edit(SiteRoutes.Route(site: "example.com", spaceID: space), in: host, isNew: true) }
+        check("kept cookies") { _ = KeptCookiesSheet.add(in: host, profile: Profiles.shared.default.id) }
+        check("development site") { _ = DevelopmentSiteSheet.add(in: host) }
+        check("local server") { _ = TrustedCertificateSheet.add(in: host) { _ in } }
+        check("custom page size") { _ = PageSizeSheet.custom(in: host, current: nil) { _ in } }
+        check("page size") { _ = PageSizeSheet.add(in: host) }
+        check("new profile") { _ = ProfileSheets.new(in: host) }
+        check("custom user agent") { _ = SiteUserAgents.showCustomSheet(for: url, in: host, tab: tab) }
+        check("extension site") { _ = ExtensionSiteAccessRows.addSite(id: "x", name: "Example", installs: Profiles.shared.default.installs, in: host) { _ in } }
+        check("save place") { _ = SavePlaceSheet.show(page: .init(url: url, title: "Example"), spaceID: space, in: host) { _ in } }
+        #expect(stacked.isEmpty, "\(stacked.joined(separator: "\n"))")
+    }
+}

@@ -335,16 +335,24 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         row.fills ? nil : (row.view as? DropdownButton)?.intrinsicContentSize.width ?? (row.view is Toggle ? row.view.intrinsicContentSize.width : nil)
     }
 
-    /// Labels too long to sit beside their controls (a longer language) go over them instead.
+    /// Labels too long to sit beside their controls (a longer language) go over them instead. A dropdown may shrink,
+    /// its choice ending in "…" with the whole of it in its tooltip.
     private func labelsAbove(_ inner: CGFloat) -> Bool {
         let column = labelColumn
         return zip(rows, labels).contains { row, label in
-            label != nil && !row.isHidden && column + (ownWidth(of: row) ?? Self.minimumFill) > inner
+            label != nil && !row.isHidden && column + (ownWidth(of: row).map { min($0, Self.minimumDropdown) } ?? Self.minimumFill) > inner
         }
     }
 
+    #if DEBUG
+    /// Whether the labels are over their controls, for tests.
+    var debugLabelsAbove: Bool { labelsAbove(width - Tokens.Dialog.padding * 2) }
+    #endif
+
     /// The narrowest a field beside its label may get.
     private static let minimumFill: CGFloat = 160
+    /// The narrowest a dropdown beside its label may get.
+    private static let minimumDropdown: CGFloat = 120
     /// Between a label and the control under it.
     private static let labelGap = Tokens.Space.x1
 
