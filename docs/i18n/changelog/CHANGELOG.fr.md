@@ -5,11 +5,20 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 ## [Unreleased]
 
 ### Nouveautés
+- La recherche dans l’historique ignore les accents et la casse, trouve chaque mot dans n’importe quel ordre et le met en évidence, et ne cache jamais un résultat dans un groupe ; chaque moment de la journée a un seul titre, deux pages d’un même site restent deux lignes, et la liste répond aux touches fléchées, Suppr, ⌘Return, ⌘F et à un clic droit qui supprime tout un site.
 - Pendant qu’un dossier dynamique cherche de nouvelles pages, la pastille de son icône affiche un anneau qui tourne, comme Mail montre une boîte en cours de relève, et s’arrête dès que c’est fini.
 - La feuille Nouveau dossier dynamique ou Modifier le dossier dynamique affiche l’icône du dossier, comme la barre latérale : celle de GitHub pour une liste GitHub, celle du site pour un flux, ou celle que vous avez choisie. Cliquez dessus pour changer l’icône, comme avec Modifier l’icône…, et un nouveau dossier garde l’icône choisie.
 
+### Modifications
+- Les balayages à deux doigts vers l’arrière et vers l’avant sont plus fluides, se déclenchent sur une distance plus courte ou d’un geste plus léger, empêchent la page de dériver vers le haut ou le bas, et ne laissent jamais la flèche affichée ni la page décalée, dans les onglets, la Split View et Zigzag Mini.
+
 ### Corrections
+- Avec la barre d’adresse au-dessus de la page et un espace transparent, une vidéo en lecture ne sollicite plus les graphismes du Mac bien plus qu’avec la barre désactivée. Le verre de la fenêtre reste désormais derrière la barre latérale, et non plus derrière toute la fenêtre.
+- Un onglet resté en veille pendant des heures alors que la mémoire du Mac était faible ne se réveille plus déconnecté de sites comme Azure DevOps et Microsoft 365 : si la partie de WebKit qui conserve les cookies de connexion s’arrête, comme macOS peut la forcer à le faire quand la mémoire manque, Zigzag les remet en place avant le chargement de la page. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Une vidéo en plein écran n’est plus recouverte par la barre supérieure ou la colonne latérale du site, comme sur Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Précédent, Suivant et Recharger ne laissent plus un espace vide pour les boutons de la fenêtre là où ils ne sont pas affichés, comme en plein écran avant que la barre des menus ne descende, et les boutons de la fenêtre restent dans la barre tant que la barre latérale flottante, plus courte, est sortie. Merci à [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - Le menu d’un dossier dynamique laissé ouvert pendant sa mise à jour passe désormais de Mise à jour… à Mis à jour à l’instant, ou à la raison de l’échec, sans se fermer.
+- Quand Favoris par ligne est sur Automatique, les favoris se répartissent également sur leurs lignes : six là où quatre tiendraient font deux lignes de trois, et non quatre et deux.
 
 ## [0.10.0] - 2026-11-25
 

@@ -5,11 +5,20 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 ## [Unreleased]
 
 ### Neu
+- Die Suche im Verlauf ignoriert Akzente und Groß- und Kleinschreibung, findet jedes Wort in beliebiger Reihenfolge, hebt es hervor und versteckt nie einen Treffer in einem Stapel; jeder Tagesabschnitt hat eine eigene Überschrift, zwei Seiten derselben Website bleiben zwei Zeilen, und die Liste reagiert auf die Pfeiltasten, Entf, ⌘Return, ⌘F und einen Rechtsklick, der eine ganze Website entfernt.
 - Während ein Live-Ordner nach neuen Seiten sucht, zeigt der Chip an seinem Symbol einen drehenden Ring, so wie Mail ein Postfach beim Abrufen zeigt, und hört auf, sobald die Suche fertig ist.
 - Das Fenster „Neuer Live-Ordner“ bzw. „Live-Ordner bearbeiten“ zeigt das Symbol des Ordners wie die Seitenleiste: das von GitHub für eine GitHub-Liste, das der Website für einen Feed oder das, das du gewählt hast. Klicke darauf, um das Symbol wie mit „Symbol ändern …“ zu ändern, und ein neuer Ordner behält das gewählte Symbol.
 
+### Geändert
+- Das Wischen mit zwei Fingern zurück und vorwärts ist flüssiger, funktioniert schon bei kürzerer Strecke oder leichterem Wischen, lässt die Seite nicht auf und ab wandern und lässt weder den Pfeil stehen noch die Seite verschoben, in Tabs, in der Split View und in Zigzag Mini.
+
 ### Behoben
+- Steht die Adressleiste über der Seite und ist ein Space durchsichtig, belastet ein laufendes Video die Grafik des Mac nicht mehr deutlich stärker als bei ausgeschalteter Leiste. Das Glas des Fensters bleibt jetzt nur hinter der Seitenleiste statt hinter dem ganzen Fenster.
+- Ein Tab, der stundenlang im Ruhezustand war, während dem Mac der Speicher knapp wurde, wacht nicht mehr abgemeldet von Websites wie Azure DevOps und Microsoft 365 auf: Wenn der Teil von WebKit, der die Anmelde-Cookies hält, stoppt, wie es macOS bei knappem Speicher erzwingen kann, stellt Zigzag sie wieder her, bevor die Seite lädt. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Ein Video im Vollbild wird nicht mehr von der oberen Leiste oder der Seitenspalte der Website verdeckt, etwa bei Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Zurück, Vorwärts und Neu laden lassen keinen leeren Platz mehr für die Fensterknöpfe, wo keine angezeigt werden, etwa im Vollbild, bevor die Menüleiste herunterkommt, und die Fensterknöpfe bleiben in der Leiste, solange die kürzere schwebende Seitenleiste offen ist. Danke an [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - Das Menü eines Live-Ordners, das beim Aktualisieren offen bleibt, wechselt jetzt von „Wird aktualisiert …“ zu „Gerade aktualisiert“ oder zum Grund, warum es nicht geklappt hat, ohne sich zu schließen.
+- Steht „Favoriten pro Reihe“ auf „Automatisch“, verteilen sich die Favoriten gleichmäßig auf ihre Reihen: Sechs, wo vier passen würden, werden zwei Reihen mit je drei, nicht vier und zwei.
 
 ## [0.10.0] - 2026-11-25
 
