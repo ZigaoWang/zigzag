@@ -1,6 +1,8 @@
 # Localizing Zigzag
 
-Zigzag ships in English, Simplified Chinese (zh-Hans) and Traditional Chinese (zh-Hant). Every word people read is in
+Zigzag ships in English, Simplified Chinese (zh-Hans), Traditional Chinese (zh-Hant), Japanese (ja), Korean (ko),
+German (de), French (fr), Italian (it), Spanish (es), Brazilian Portuguese (pt-BR), Russian (ru), Dutch (nl), Polish (pl)
+and Turkish (tr). Every word people read is in
 `Zigzag/Resources/Localizable.xcstrings`, and macOS's permission prompts are in `InfoPlist.xcstrings`.
 
 ## Adding a string
@@ -70,7 +72,10 @@ in its tooltip) is left as it is.
 ## The glossary
 
 Each language has a glossary in this folder: [Simplified Chinese](glossary.md),
-[Traditional Chinese](glossary.zh-Hant.md). It lists Zigzag's words with the one translation each gets, the words
+[Traditional Chinese](glossary.zh-Hant.md), [Japanese](glossary.ja.md), [Korean](glossary.ko.md),
+[German](glossary.de.md), [French](glossary.fr.md), [Italian](glossary.it.md), [Spanish](glossary.es.md),
+[Brazilian Portuguese](glossary.pt-BR.md), [Russian](glossary.ru.md), [Dutch](glossary.nl.md),
+[Polish](glossary.pl.md), [Turkish](glossary.tr.md). It lists Zigzag's words with the one translation each gets, the words
 that were considered and not used, and the language's typography rules. Translate from it, and add a word to it
 before using a new one.
 
@@ -94,13 +99,17 @@ before using a new one.
    ```
 
    It refuses a file with unknown or missing keys, a form that isn't `translated`, or format arguments that differ
-   from the English, and says which. `--allow-missing` merges a partial file.
+   from the English, and says which. `--allow-missing` merges a partial file. Commit the file with the catalogs: it
+   stays the record of that language, so a later fix goes into it and is merged again.
 3. Have someone who didn't translate it review it against the glossary, in the app.
 4. Run the pseudo-locale and the layout tests, then run the app in the language and take screenshots of the main
    surfaces. Fix anything cut off in the layout, not by shortening one translation.
 5. Add `README.<lang>.md`, translated from `README.md`, and link it from the other READMEs.
 6. Add the language's own name to `AppLanguage.ownName` (Settings › General › Language), and its code to
-   `knownRegions` in `Zigzag.xcodeproj/project.pbxproj`.
+   `knownRegions` in `Zigzag.xcodeproj/project.pbxproj`, `CFBundleLocalizations` in `project.yml` and
+   `Zigzag/Info.plist`, and `LocalizationTests.translated`. The code is the one Xcode and Bundle use (`pt-BR`, not
+   `pt_BR`). `LocalizationTests.everyLanguageKeepsNamesSymbolsAndPlurals` then checks it keeps product names,
+   keyboard symbols and addresses, ends "…" items in "…", and has CLDR's plural forms.
 
 ## The release gate
 

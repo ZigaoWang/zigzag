@@ -75,7 +75,8 @@ happens when a tab closes should work the way those users expect, unless an issu
 
 ## Localization
 
-Zigzag speaks English, Simplified Chinese, Traditional Chinese, and Japanese. Every word people read goes through
+Zigzag speaks English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Italian, Spanish,
+Brazilian Portuguese, Russian, Dutch, Polish, and Turkish. Every word people read goes through
 `String(localized: "…", comment: "…")`, with a comment that says where it appears. After adding or changing
 strings, build, bring the catalog in step and add Simplified Chinese in `Zigzag/Resources/Localizable.xcstrings`:
 
@@ -102,7 +103,7 @@ Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Han
 and credited names. Use `### 新功能` for New, `### 修复` for Fixed in Simplified Chinese, and `### 修正` in Traditional Chinese.
 `WhatsNewTests` compares shipped Simplified Chinese notes with English and skips Unreleased. If the Traditional
 Chinese notes for a version are incomplete or missing, the in-app What's New sheet shows its English notes.
-Japanese has no changelog of its own, so What's New shows the English notes under Japanese headings.
+The other languages have no changelog of their own, so What's New shows the English notes under headings in that language.
 Sparkle's pre-install notes still use Simplified Chinese for its single Chinese release-notes link.
 
 ## Commits and pull requests
