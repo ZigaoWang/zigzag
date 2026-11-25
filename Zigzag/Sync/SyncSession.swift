@@ -4,8 +4,6 @@ import Foundation
 protocol SyncHost: AnyObject {
     func read() -> SyncLibrary
     func write(_ library: SyncLibrary)
-    /// Profiles removed on another Mac, to remove here as removing one does.
-    func removeProfiles(_ ids: [UUID])
 }
 
 /// The server's side: CKSyncEngine, or a test's stand-in for iCloud.
@@ -62,11 +60,11 @@ struct SyncState: Codable {
     var lastSynced: Date?
     /// CKSyncEngine's own state.
     var engine: Data?
-    /// Profiles removed on another Mac and being removed here.
-    var goneProfiles: Set<UUID> = []
+    /// Profiles removed on another Mac: they stay here, with their spaces, favorites and data, as this Mac's own.
+    var keptProfiles: Set<UUID> = []
 
     private enum CodingKeys: String, CodingKey {
-        case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, goneProfiles
+        case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
     }
 
     init() {}
@@ -83,7 +81,7 @@ struct SyncState: Codable {
         account = try c.decodeIfPresent(String.self, forKey: .account)
         lastSynced = try c.decodeIfPresent(Date.self, forKey: .lastSynced)
         engine = try c.decodeIfPresent(Data.self, forKey: .engine)
-        goneProfiles = try c.decodeIfPresent(Set<UUID>.self, forKey: .goneProfiles) ?? []
+        keptProfiles = try c.decodeIfPresent(Set<UUID>.self, forKey: .keptProfiles) ?? []
     }
 }
 
@@ -117,7 +115,8 @@ final class SyncSession {
     /// Reads the library and queues what changed since.
     func localChanged() {
         guard state.merged, !isApplying else { return }
-        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders, now: now())
+        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
+                                        kept: state.keptProfiles, now: now())
         state.emptyFolders = export.emptyFolders
         queue(diff(export.items, deletes: true))
         onChange?()
@@ -130,9 +129,7 @@ final class SyncSession {
     }
 
     private func diff(_ exported: [String: SyncItem], deletes allowDeletes: Bool) -> (saves: [String], deletes: [String]) {
-        var items = exported
-        // A profile removed elsewhere isn't sent back while it's being removed here.
-        for id in state.goneProfiles { items[SyncName.profile(state.aliases.server(id))] = nil }
+        let items = exported
         var saves: [String] = [], deletes: [String] = []
         let stamp = now()
         for (name, var item) in items {
@@ -146,7 +143,6 @@ final class SyncSession {
             for (name, item) in state.base where items[name] == nil {
                 // A kind only a newer Zigzag reads is left as it is.
                 if case .unknown = item.body { continue }
-                if name.hasPrefix("profile."), let id = SyncName.id(name), state.goneProfiles.contains(state.aliases.local(id)) { continue }
                 state.base[name] = nil
                 state.unsent.remove(name)
                 deletes.append(name)
@@ -159,25 +155,9 @@ final class SyncSession {
     /// at the top of its space) goes up too.
     private func layOut() {
         isApplying = true
-        let applied = SyncMapping.apply(state.base, onto: host.read(), aliases: state.aliases)
-        host.write(applied.library)
+        host.write(SyncMapping.apply(state.base, onto: host.read(), aliases: state.aliases, kept: state.keptProfiles).library)
         isApplying = false
-        let gone = applied.goneProfiles.filter { id in state.base[SyncName.profile(state.aliases.server(id))] == nil && removedRemotely.contains(SyncName.profile(state.aliases.server(id))) }
-        removedRemotely = []
-        if !gone.isEmpty {
-            state.goneProfiles.formUnion(gone)
-            host.removeProfiles(gone)
-        }
         localChanged()
-    }
-
-    private var removedRemotely: Set<String> = []
-
-    /// A profile removed elsewhere is gone here too: it stops being held back.
-    func profileRemoved(_ id: UUID) {
-        state.goneProfiles.remove(id)
-        state.base[SyncName.profile(state.aliases.server(id))] = nil
-        onChange?()
     }
 
     // MARK: Changes from the server
@@ -213,7 +193,10 @@ final class SyncSession {
                 // Changed here since: it comes back rather than vanish.
                 if state.unsent.contains(name) { resend.append(name); continue }
                 if state.base.removeValue(forKey: name) != nil {
-                    removedRemotely.insert(name)
+                    // A profile removed elsewhere stays here, never its data erased: it's this Mac's own from now on.
+                    if name.hasPrefix("profile."), let id = SyncName.id(name).map(state.aliases.local), id != Profile.defaultID {
+                        state.keptProfiles.insert(id)
+                    }
                     changed = true
                 }
             }

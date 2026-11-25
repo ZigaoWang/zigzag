@@ -48,7 +48,6 @@ import Testing
 /// A library in memory, as a Mac's.
 @MainActor final class MemoryHost: SyncHost {
     var library: SyncLibrary
-    var removedProfiles: [UUID] = []
     init(_ library: SyncLibrary) { self.library = library }
     func read() -> SyncLibrary { library }
     func write(_ library: SyncLibrary) {
@@ -62,7 +61,6 @@ import Testing
         }
         self.library = library
     }
-    func removeProfiles(_ ids: [UUID]) { removedProfiles += ids }
 }
 
 /// One Mac: its library, its sync, and its link to the cloud, which can be cut.
@@ -535,16 +533,47 @@ extension SyncLibrary {
         let officeHere = b.library.space(named: "Office")
         #expect(officeHere.map { dir.profileID(ofSpace: $0.id) } == work.id)
         #expect(b.library.contents.favorites.filter { dir.profileID(ofFavorite: $0.id) == work.id }.map(\.url.lastPathComponent) == ["chat"])
-        // A profile removed on one Mac is removed on the other, as removing it there does.
+    }
+
+    @Test func aProfileRemovedOnAnotherMacStaysHereWithItsSpaces() {
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work")
+        let office = Sample.space("Office", [Sample.page("jira")])
+        directory.assign(space: office.id, to: work.id)
+        let chat = Sample.page("chat")
+        directory.assign(favorite: chat.id, to: work.id)
+        let offSites = "\(ProfileKey.extensionsOffSites.rawValue).\(work.id.uuidString)"
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal"), office], favorites: [chat], directory: directory,
+                                                   settings: [offSites: .array([.string("example.com")])]))
+        #expect(b.library.settings[offSites] == .array([.string("example.com")]))
+        // Removed on A as Profiles removes one: its spaces go to the first profile, its favorites and its own settings go.
         a.edit { lib in
             var d = lib.contents.directory
             d.remove(work.id)
             lib.contents.directory = d
             lib.contents.favorites.removeAll { $0.id == chat.id }
+            lib.settings[offSites] = nil
         }
+        a.sync(); b.sync(); a.sync(); b.sync()
+        // B keeps the profile, its space on it, its favorite and its settings.
+        let dir = b.library.contents.directory
+        #expect(dir.profile(work.id) != nil)
+        #expect(b.library.space(named: "Office").map { dir.profileID(ofSpace: $0.id) } == work.id)
+        #expect(b.library.contents.favorites.map(\.id) == [chat.id])
+        #expect(dir.profileID(ofFavorite: chat.id) == work.id)
+        #expect(b.library.settings[offSites] == .array([.string("example.com")]))
+        // The space still syncs; the profile isn't sent back to A, and nothing goes back and forth.
+        #expect(b.library.titles(in: "Office") == ["jira"])
+        #expect(a.library.contents.directory.profile(work.id) == nil)
+        #expect(cloud.records[SyncName.profile(work.id)] == nil)
+        #expect(cloud.records[SyncName.space(office.id)] != nil)
+        let sentA = a.sent, sentB = b.sent
+        a.sync(); b.sync(); b.session.localChanged(); b.sync(); a.sync()
+        #expect(a.sent == sentA && b.sent == sentB)
+        a.edit { $0.editSpace("Office") { $0.bookmarks.append(Sample.page("wiki")) } }
         a.sync(); b.sync()
-        #expect(b.host.removedProfiles == [work.id])
-        #expect(b.library.space(named: "Office").map { b.library.contents.directory.profileID(ofSpace: $0.id) } == Profile.defaultID)
+        #expect(b.library.titles(in: "Office") == ["jira", "wiki"])
+        #expect(b.library.space(named: "Office").map { b.library.contents.directory.profileID(ofSpace: $0.id) } == work.id)
     }
 
     @Test func aSecondMacsProfileOfTheSameNameIsTheSameProfile() {

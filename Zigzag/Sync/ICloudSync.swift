@@ -110,10 +110,7 @@ final class ICloudSync {
         let session = SyncSession(host: host, state: state)
         session.onChange = { [weak self] in self?.saveSoon() }
         self.session = session
-        host.session = session
         watchLibrary()
-        // A removal from another Mac that couldn't finish last time is tried again.
-        if !state.goneProfiles.isEmpty { host.removeProfiles(Array(state.goneProfiles)) }
         status = .syncing
         Task { await connect() }
     }
@@ -123,7 +120,6 @@ final class ICloudSync {
         engine?.stop()
         engine = nil
         session = nil
-        host.session = nil
         tokens = []
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
@@ -283,7 +279,6 @@ final class ICloudSync {
 
 /// Zigzag's own library and preferences, for sync.
 final class AppSyncHost: SyncHost {
-    weak var session: SyncSession?
     /// While it writes, the library's change signal isn't one made here.
     private(set) var isWriting = false
 
@@ -305,14 +300,6 @@ final class AppSyncHost: SyncHost {
             changes[key] = .some(synced.settings[key])
         }
         if !changes.isEmpty { SyncPreferences.write(changes, to: .standard) }
-    }
-
-    func removeProfiles(_ ids: [UUID]) {
-        Task {
-            for id in ids {
-                if await Profiles.shared.remove(id) || Library.shared.directory.profile(id) == nil { session?.profileRemoved(id) }
-            }
-        }
     }
 }
 

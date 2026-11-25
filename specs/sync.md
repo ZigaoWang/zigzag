@@ -58,8 +58,8 @@
   Test: SyncTests.aSpaceRemovedElsewhereKeepsAPageJustPinnedInIt
 - A page removed on one Mac while it's edited on another → the edited page comes back.
   Test: SyncTests.aPageEditedHereComesBackWhenRemovedElsewhere
-- A profile removed on one Mac → removed on the other as removing it there does, its spaces moving to the first profile.
-  Test: SyncTests.profilesAndTheirFavoritesSync
+- A profile removed on one Mac → stays on the others with its spaces, favorites, settings, sign-ins and website data, and from then on it's that Mac's own and no longer syncs. Its spaces keep syncing.
+  Test: SyncTests.aProfileRemovedOnAnotherMacStaysHereWithItsSpaces
 - Nothing changed → nothing is sent.
   Test: SyncTests.onceSettledNothingMoreIsSent
 - A thousand pinned pages → sync without a wait, and one edit sends one record.

@@ -137,8 +137,10 @@ enum SyncMapping {
 
     // MARK: Library to records
 
+    /// `kept`: profiles removed on another Mac and kept here. They and their favorites and settings aren't sent; their
+    /// spaces are, on the profile iCloud has them on.
     static func export(_ library: SyncLibrary, previous: [String: SyncItem], aliases: SyncAliases, emptyBefore: Set<UUID> = [],
-                       now: Date = Date()) -> Export {
+                       kept: Set<UUID> = [], now: Date = Date()) -> Export {
         let contents = library.contents
         let directory = contents.directory
         var items: [String: SyncItem] = [:]
@@ -163,7 +165,7 @@ enum SyncMapping {
         var export = Export(items: [:], emptyFolders: [])
 
         // Profiles
-        let profiles = directory.all.filter { !$0.isHeadless }
+        let profiles = directory.all.filter { !$0.isHeadless && !kept.contains($0.id) }
         let profileKeys = SyncOrder.keys(for: profiles.map(\.id), existing: existing(profiles.map(\.id), SyncName.profile))
         let favoriteSplits = contents.favoriteSplits
         for profile in profiles {
@@ -240,8 +242,12 @@ enum SyncMapping {
             var look = space
             look.id = serverSpace
             look.icon = sentIcon(space.icon)
+            var profile = aliases.server(directory.profileID(ofSpace: space.id))
+            if kept.contains(directory.profileID(ofSpace: space.id)) {
+                profile = if case .space(let v)? = previous[SyncName.space(serverSpace)]?.body { v.profile } else { Profile.defaultID }
+            }
             put(SyncName.space(serverSpace),
-                .space(SyncSpace(look: look, profile: aliases.server(directory.profileID(ofSpace: space.id)), position: spaceKeys[space.id] ?? "", splits: splits)))
+                .space(SyncSpace(look: look, profile: profile, position: spaceKeys[space.id] ?? "", splits: splits)))
         }
 
         // Site rules for the synced spaces
@@ -256,7 +262,7 @@ enum SyncMapping {
         var current: [String: SettingValue] = [:]
         for (key, value) in library.settings {
             let owner = SyncPreferences.owner(key)
-            guard owner.carried, !(owner.profile.map { isLocalOnly(profile: $0, in: directory) } ?? false) else { continue }
+            guard owner.carried, !(owner.profile.map { isLocalOnly(profile: $0, in: directory) || kept.contains($0) } ?? false) else { continue }
             current[SyncPreferences.renamed(key, aliases.server)] = value
         }
         if library.searchEngine != .fromExtension { current[SyncPreferences.searchEngineKey] = .string(library.searchEngine.rawValue) }
@@ -266,6 +272,8 @@ enum SyncMapping {
         // A preference set back to its default is sent as unset; the search engine chosen from an extension stays as it was.
         for (key, entry) in earlier where values[key] == nil {
             if key == SyncPreferences.searchEngineKey, library.searchEngine == .fromExtension { values[key] = entry; continue }
+            // A kept profile's settings stay as iCloud has them.
+            if let profile = SyncPreferences.owner(SyncPreferences.renamed(key, aliases.local)).profile, kept.contains(profile) { values[key] = entry; continue }
             values[key] = entry.value == nil ? entry : .init(value: nil, modified: now)
         }
         let settingsModified = values.values.map(\.modified).max() ?? previous[SyncName.settings]?.modified ?? now
@@ -283,11 +291,10 @@ enum SyncMapping {
 
     struct Applied {
         var library: SyncLibrary
-        /// Profiles here that iCloud no longer has: removed on another Mac.
-        var goneProfiles: [UUID] = []
     }
 
-    static func apply(_ items: [String: SyncItem], onto library: SyncLibrary, aliases: SyncAliases) -> Applied {
+    /// `kept`: profiles removed on another Mac and kept here, with their spaces, favorites and settings as they are.
+    static func apply(_ items: [String: SyncItem], onto library: SyncLibrary, aliases: SyncAliases, kept: Set<UUID> = []) -> Applied {
         var spaces: [(UUID, SyncSpace)] = [], profiles: [(UUID, SyncProfile)] = [], pages: [(UUID, SyncPage)] = []
         var folders: [(UUID, SyncFolder)] = [], favorites: [(UUID, SyncFavorite)] = []
         var rules: SyncRules?, settings: SyncSettings?
@@ -318,8 +325,8 @@ enum SyncMapping {
             directory.update(id, name: profile.name, color: profile.color)
             listed.insert(id)
         }
+        // A profile iCloud doesn't have stays, after the others.
         directory.arrange(profiles.map(\.0).filter(listed.contains))
-        result.goneProfiles = directory.all.filter { !listed.contains($0.id) && !$0.isHeadless }.map(\.id)
         func profileHere(_ id: UUID) -> UUID {
             let local = aliases.local(id)
             return directory.profile(local) != nil && local != headless?.id ? local : Profile.defaultID
@@ -343,7 +350,9 @@ enum SyncMapping {
             space.pinnedSplits = nil
             space.routedSites = nil
             newSpaces.append(space)
-            directory.assign(space: id, to: profileHere(record.profile))
+            // A space on a kept profile stays on it, unless iCloud puts it on another profile of its own.
+            let current = old.directory.profileID(ofSpace: id), target = profileHere(record.profile)
+            directory.assign(space: id, to: kept.contains(current) && (target == Profile.defaultID || kept.contains(target)) ? current : target)
         }
         let syncedSpaceIDs = Set(newSpaces.map(\.id))
         // Where what lost its space goes: the first space.
@@ -445,7 +454,10 @@ enum SyncMapping {
             newFavorites.append(Bookmark(id: id, url: record.url, title: record.title, icon: keptIcon(record.icon, local: oldFavorites[id]?.icon)))
             directory.assign(favorite: id, to: profileHere(record.profile))
         }
-        let keptFavorites = old.favorites.filter { favorite in headless.map { old.directory.profileID(ofFavorite: favorite.id) == $0.id } ?? false }
+        let keptFavorites = old.favorites.filter { favorite in
+            let profile = old.directory.profileID(ofFavorite: favorite.id)
+            return profile == headless?.id || kept.contains(profile)
+        }
         contents.favorites = newFavorites + keptFavorites
         let keptIDs = Set(keptFavorites.map(\.id))
         contents.favoriteSplits = profiles.flatMap { $0.1.favoriteSplits.compactMap { mapped($0, aliases.local) } }
@@ -473,7 +485,8 @@ enum SyncMapping {
                     continue
                 }
                 let local = SyncPreferences.renamed(key, aliases.local)
-                guard SyncPreferences.owner(local).carried else { continue }
+                let owner = SyncPreferences.owner(local)
+                guard owner.carried, !(owner.profile.map(kept.contains) ?? false) else { continue }
                 if local == "SiteIcons" {
                     // Picture icons set here stay.
                     let images: [String: SettingValue] = if case .dictionary(let d)? = library.settings[local] {
