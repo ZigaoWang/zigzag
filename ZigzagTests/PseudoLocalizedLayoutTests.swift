@@ -9,6 +9,11 @@ import Testing
     /// Text that's meant to end in a fade or "…": names and addresses people choose, which can be any length.
     private static let deliberatelyShortened: [AnyClass] = [TabRowView.self]
 
+    /// Words on screen that aren't Zigzag's to translate: brands, what the tests typed and opened, and what macOS and
+    /// WebKit name themselves (the Downloads folder, Edit › Emoji & Symbols, WebKit's feature flags).
+    private static let notOurs: Set<String> = ["Zigzag", "Google", "GitHub", "Downloads", "Emoji & Symbols", "Example", "example.com",
+                                               "split", "copy", "settings", "e"]
+
     /// Runs `body` with pseudo strings on, unless the whole process already has them.
     private func pseudo<T>(_ body: () throws -> T) rethrows -> T {
         PseudoLocale.install()
@@ -17,7 +22,8 @@ import Testing
 
     /// Every word under `root` that doesn't fit where it's drawn: wider than its frame on one line, taller than its
     /// frame when it wraps, or outside the view that holds it.
-    static func cutOff(under root: NSView, _ surface: String, expectsWords: Bool = true) -> [String] {
+    /// With every string pseudo from launch, words that aren't are words that skipped the catalog.
+    static func cutOff(under root: NSView, _ surface: String, expectsWords: Bool = true, othersWords: Bool = false) -> [String] {
         var found: [String] = [], checked = 0
         func shown(_ view: NSView) -> Bool {
             var view: NSView? = view
@@ -37,6 +43,10 @@ import Testing
         }
         for field in root.selfAndDescendants(of: NSTextField.self) where shown(field) && !field.isEditable && !deliberate(field) {
             let text = field.stringValue
+            if PseudoLocale.forTheRun, !othersWords, !PseudoLocale.isPseudo(text), !notOurs.contains(text),
+               text.filter(\.isLetter).count > 1, !text.contains(where: { "⌘⌃⌥⇧".contains($0) }) {
+                found.append("\(surface): “\(text)” in \(type(of: field.superview ?? field)) isn't localized")
+            }
             guard !text.isEmpty, PseudoLocale.isPseudo(text), let cell = field.cell else { continue }
             checked += 1
             if let label = field as? Label, label.fadesTail { continue }
@@ -148,7 +158,7 @@ import Testing
             settings.frame = NSRect(x: 0, y: 0, width: width, height: 776)
             window.contentView?.addSubview(settings)
             settings.layoutSubtreeIfNeeded()
-            let found = Self.cutOff(under: settings, "Settings › \(pane) at \(Int(width))")
+            let found = Self.cutOff(under: settings, "Settings › \(pane) at \(Int(width))", othersWords: pane == .developer)
             #expect(found.isEmpty, "\(found.joined(separator: "\n"))")
         }
     }
