@@ -223,6 +223,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             if #available(macOS 15.4, *) { ExtensionCenter.closePopups(in: self?.window) }
         }
         sidebar.address.onPinsReordered = { [weak self] in self?.installs.reorderPins(visible: $0) }
+        // Extensions with an icon for light bars and one for dark ones show the one for this bar (1Password).
+        sidebar.address.onAppearanceChanged = {
+            if #available(macOS 15.4, *) { ExtensionCenter.toolbarAppearanceChanged() }
+        }
         sidebar.address.siteControlsButton.onClick = { [weak self] _ in
             if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
         }
@@ -793,6 +797,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.sidebarContainer.windowGlass = root.windowGlass
         copyEdgeLook()
         root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
+        // Another profile's space, whose buttons this window shows now.
+        if #available(macOS 15.4, *) { ExtensionCenter.toolbarAppearanceChanged() }
     }
 
     #if DEBUG

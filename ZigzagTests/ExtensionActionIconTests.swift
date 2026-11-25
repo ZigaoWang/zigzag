@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import JavaScriptCore
 import Testing
 import WebKit
 @testable import Zigzag
@@ -104,6 +105,199 @@ struct ExtensionActionIconTests {
             #expect(tile.frame.contains(mark.frame))
             #expect(!mark.frame.intersects(iconFrame), "\(mark.frame) over \(iconFrame)")
         }
+    }
+
+    // MARK: 1Password's icon for Zigzag's bar
+
+    /// 1Password's icon names, as its package (8.12.46.29) ships them in images/icons.
+    private static let onePasswordIcons = [
+        "app_icon-light_bg-color-locked-12.png", "app_icon-light_bg-color-locked-16.png", "app_icon-light_bg-color-locked-19.png",
+        "app_icon-light_bg-color-locked-24.png", "app_icon-light_bg-color-locked-32.png", "app_icon-light_bg-color-locked-38.png",
+        "app_icon-light_bg-color-locked-48.png", "app_icon-light_bg-color-locked-72.png",
+        "app_icon-dark_bg-color-locked-12.png", "app_icon-dark_bg-color-locked-16.png", "app_icon-dark_bg-color-locked-19.png",
+        "app_icon-dark_bg-color-locked-24.png", "app_icon-dark_bg-color-locked-32.png", "app_icon-dark_bg-color-locked-38.png",
+        "app_icon-dark_bg-color-locked-48.png", "app_icon-dark_bg-color-locked-72.png",
+        "app_icon-light_bg-color-unlocked-19.png", "app_icon-dark_bg-color-unlocked-19.png",
+        "app_icon-light_bg-color-locked-notification-19.png", "app_icon-dark_bg-color-locked-notification-19.png",
+        "app_icon-light_bg-color-unlocked-notification-19.png", "app_icon-dark_bg-color-unlocked-notification-19.png",
+    ]
+
+    /// A background with a fake `action.setIcon` that records each call, and Zigzag's word on the bar (`dark`, or none).
+    private static func iconWorld(dark: Bool?) -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var calls = [], heard = [];
+        var chrome = { action: { setIcon(details) { calls.push(details); return Promise.resolve(); } } };
+        var browser = chrome;
+        """)
+        if let dark {
+            context.evaluateScript("var __zigzagToolbar = { get: () => Promise.resolve({ dark: \(dark) }), onChange: { addListener: (f) => heard.push(f) } };")
+        }
+        context.evaluateScript(ExtensionShims.onePasswordIconsPrelude)
+        return context
+    }
+
+    /// 1Password's call as it makes it: one name for each of its sizes.
+    private static func iconCall(_ base: String) -> String {
+        "chrome.action.setIcon({ path: {" + [12, 16, 19, 24, 32, 38, 48, 72].map { "\($0): '\(base)-\($0).png'" }.joined(separator: ", ") + "} })"
+    }
+
+    private static func lastPaths(_ context: JSContext) -> [String] {
+        (context.evaluateScript("Object.values(calls[calls.length - 1].path)").toArray() as? [String]) ?? []
+    }
+
+    @Test func onePasswordsIconFollowsTheBar() {
+        for state in ["locked", "unlocked", "locked-notification", "unlocked-notification"] {
+            let dark = Self.iconWorld(dark: true)
+            dark.evaluateScript(Self.iconCall("/images/icons/app_icon-light_bg-color-\(state)"))
+            #expect(Self.lastPaths(dark).count == 8)
+            #expect(Self.lastPaths(dark).allSatisfy { $0.hasPrefix("/images/icons/app_icon-dark_bg-color-\(state)-") }, "\(state) on a dark bar")
+            let light = Self.iconWorld(dark: false)
+            light.evaluateScript(Self.iconCall("/images/icons/app_icon-dark_bg-color-\(state)"))
+            #expect(Self.lastPaths(light).allSatisfy { $0.hasPrefix("/images/icons/app_icon-light_bg-color-\(state)-") }, "\(state) on a light bar")
+        }
+        // One path rather than a map of sizes.
+        let one = Self.iconWorld(dark: true)
+        one.evaluateScript("chrome.action.setIcon({ path: 'images/icons/app_icon-light_bg-color-locked-32.png' })")
+        #expect(one.evaluateScript("calls[0].path").toString() == "images/icons/app_icon-dark_bg-color-locked-32.png")
+    }
+
+    @Test func otherIconsGoThroughAsTheyWere() {
+        let context = Self.iconWorld(dark: true)
+        let untouched = [
+            "{ path: '/images/icons/onepassword-48.png' }",
+            "{ path: { 16: '/images/icons/app_icon-light_bg-color-locked-16.png', 32: '/images/icons/onepassword-48.png' } }",
+            "{ path: '/images/icons/app_icon-light_bg-mono-locked-16.png' }",
+            "{ path: '/icons/app_icon-light_bg-color-locked-16.png' }",
+            "{ path: 'https://example.com/images/icons/app_icon-light_bg-color-locked-16.png' }",
+            "{ imageData: {}, path: '/images/icons/app_icon-light_bg-color-locked-16.png' }",
+            "{ path: {} }",
+        ]
+        for (i, details) in untouched.enumerated() {
+            context.evaluateScript("var sent = \(details); chrome.action.setIcon(sent);")
+            #expect(context.evaluateScript("calls[\(i)] === sent").toBool(), "\(details)")
+        }
+        // No word from Zigzag: 1Password's own choice.
+        let alone = Self.iconWorld(dark: nil)
+        alone.evaluateScript("var sent = { path: '/images/icons/app_icon-light_bg-color-locked-16.png' }; chrome.action.setIcon(sent);")
+        #expect(alone.evaluateScript("calls[0] === sent").toBool())
+    }
+
+    @Test func theLastIconIsSetAgainWhenTheBarChanges() {
+        let context = Self.iconWorld(dark: true)
+        context.evaluateScript(Self.iconCall("/images/icons/app_icon-light_bg-color-unlocked"))
+        #expect(context.evaluateScript("calls.length").toInt32() == 1)
+        context.evaluateScript("heard.forEach((f) => f({ dark: false }))")
+        #expect(context.evaluateScript("calls.length").toInt32() == 2)
+        #expect(Self.lastPaths(context).allSatisfy { $0.hasPrefix("/images/icons/app_icon-light_bg-color-unlocked-") })
+        // The same look again sets nothing.
+        context.evaluateScript("heard.forEach((f) => f({ dark: false }))")
+        #expect(context.evaluateScript("calls.length").toInt32() == 2)
+        // A tab's own icon isn't the button's, so it isn't set again.
+        context.evaluateScript("chrome.action.setIcon({ tabId: 4, path: '/images/icons/app_icon-dark_bg-color-locked-16.png' })")
+        #expect(context.evaluateScript("calls[2].path").toString() == "/images/icons/app_icon-light_bg-color-locked-16.png")
+        context.evaluateScript("heard.forEach((f) => f({ dark: true }))")
+        #expect(context.evaluateScript("calls[3].tabId === undefined").toBool())
+        #expect(Self.lastPaths(context).allSatisfy { $0.hasPrefix("/images/icons/app_icon-dark_bg-color-unlocked-") })
+        // The fix is 1Password's alone.
+        #expect(ExtensionShims.shim(for: ExtensionStore.onePasswordID)?.backgroundPrelude?.contains(ExtensionShims.onePasswordIconsPrelude) == true)
+        #expect(ExtensionShims.shim(for: "anyextensionidaaaaaaaaaaaaaaaaaa")?.backgroundPrelude?.contains(ExtensionShims.onePasswordIconsPrelude) == false)
+    }
+
+    /// The names 1Password ships, built the way its background builds them ("/images/icons/app_icon-dark_bg-color-"
+    /// and its state), are the ones the shim knows, and each has its other-bar twin in the package.
+    @Test func theShimKnowsTheNamesOnePasswordShips() {
+        for name in Self.onePasswordIcons {
+            let dark = name.contains("dark_bg")
+            let context = Self.iconWorld(dark: !dark)
+            context.evaluateScript("chrome.action.setIcon({ path: '/images/icons/\(name)' })")
+            let twin = name.replacingOccurrences(of: dark ? "dark_bg" : "light_bg", with: dark ? "light_bg" : "dark_bg")
+            #expect(context.evaluateScript("calls[0].path").toString() == "/images/icons/\(twin)", "\(name)")
+            #expect(Self.onePasswordIcons.contains(twin))
+        }
+    }
+
+    /// In WebKit, on a real extension's button: the light bar's icon asked for on a dark bar draws the dark bar's, and
+    /// the bar turning light sets the light one.
+    @Test func onePasswordsIconFollowsTheBarInWebKit() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let icons = folder.appendingPathComponent("images/icons")
+        try FileManager.default.createDirectory(at: icons, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","action":{}}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        // The light bar's icon red, the dark bar's blue.
+        for size in [16, 32] {
+            try Self.solidPNG(side: size, red: 1, blue: 0).write(to: icons.appendingPathComponent("app_icon-light_bg-color-locked-\(size).png"))
+            try Self.solidPNG(side: size, red: 0, blue: 1).write(to: icons.appendingPathComponent("app_icon-dark_bg-color-locked-\(size).png"))
+        }
+        try Data("""
+            globalThis.__heard = [];
+            globalThis.__zigzagToolbar = { get: () => Promise.resolve({ dark: true }), onChange: { addListener: (f) => __heard.push(f) } };
+            """.utf8).write(to: folder.appendingPathComponent("toolbar.js"))
+        try Data(ExtensionShims.onePasswordIconsPrelude.utf8).write(to: folder.appendingPathComponent("prelude.js"))
+        try Data(#"<!doctype html><title>page</title><script src="toolbar.js"></script><script src="prelude.js"></script>"#.utf8)
+            .write(to: folder.appendingPathComponent("page.html"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        let controller = WKWebExtensionController(configuration: .nonPersistent())
+        let context = WKWebExtensionContext(for: ext)
+        try controller.load(context)
+        defer { try? controller.unload(context) }
+        let page = WKWebView(frame: .zero, configuration: try #require(context.webViewConfiguration))
+        page.load(URLRequest(url: context.baseURL.appendingPathComponent("page.html")))
+        for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(100)) }
+        #expect(page.title == "page")
+        #expect(try await page.callAsyncJavaScript("return chrome.action.setIcon.__zigzagIcons === true", in: nil, contentWorld: .page) as? Bool == true)
+
+        let set = try await page.callAsyncJavaScript("""
+            try {
+              await chrome.action.setIcon({ path: { 16: '/images/icons/app_icon-light_bg-color-locked-16.png', 32: '/images/icons/app_icon-light_bg-color-locked-32.png' } });
+              return 'ok';
+            } catch (error) { return String(error); }
+            """, in: nil, contentWorld: .page) as? String
+        #expect(set == "ok")
+        #expect(try await buttonColor(context, red: false))
+
+        _ = try await page.callAsyncJavaScript("__heard.forEach((f) => f({ dark: false }))", in: nil, contentWorld: .page)
+        #expect(try await buttonColor(context, red: true))
+    }
+
+    /// Waits for the button's icon to be red (or blue) in its middle.
+    private func buttonColor(_ context: WKWebExtensionContext, red: Bool) async throws -> Bool {
+        for _ in 0..<50 {
+            if let icon = context.action(for: nil)?.icon(for: NSSize(width: 16, height: 16)),
+               let rep = icon.cgImage(forProposedRect: nil, context: nil, hints: nil).map(NSBitmapImageRep.init(cgImage:)),
+               let color = rep.colorAt(x: rep.pixelsWide / 2, y: rep.pixelsHigh / 2)?.usingColorSpace(.sRGB) {
+                if red ? color.redComponent > 0.8 && color.blueComponent < 0.2 : color.blueComponent > 0.8 && color.redComponent < 0.2 { return true }
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        return false
+    }
+
+    private static func solidPNG(side: Int, red: CGFloat, blue: CGFloat) -> Data {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
+                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSColor(srgbRed: red, green: 0, blue: blue, alpha: 1).setFill()
+        NSRect(x: 0, y: 0, width: side, height: side).fill()
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .png, properties: [:])!
+    }
+
+    /// The address says when it turns light or dark, as its window's look changes.
+    @Test func theAddressSaysWhenItTurnsDark() {
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200, height: 30))
+        let window = NSWindow(contentRect: address.frame, styleMask: .borderless, backing: .buffered, defer: true)
+        window.appearance = NSAppearance(named: .aqua)
+        window.contentView?.addSubview(address)
+        var told = 0
+        address.onAppearanceChanged = { told += 1 }
+        window.appearance = NSAppearance(named: .darkAqua)
+        #expect(told >= 1)
+        #expect(address.effectiveAppearance.isDark)
     }
 
     // MARK: Helpers

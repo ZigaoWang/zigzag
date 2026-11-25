@@ -38,6 +38,8 @@ final class ExtensionBridge {
     let omnibox: BridgeOmnibox
     /// The browser's password saving, as password managers set it.
     let passwordSaving: BridgePasswordSaving
+    /// Whether the bar its buttons sit in is dark, which the windows report as it changes.
+    let toolbarAppearance: BridgeToolbarAppearance
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
@@ -55,6 +57,7 @@ final class ExtensionBridge {
         BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self,
         BridgeOffscreen.self, BridgeSidePanel.self, BridgeTabCapture.self, BridgeProxy.self,
         BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self, BridgePasswordSaving.self, BridgePageCapture.self,
+        BridgeToolbarAppearance.self,
     ]
 
     init(host: ExtensionHost) {
@@ -67,7 +70,8 @@ final class ExtensionBridge {
         userScripts = BridgeUserScripts(host: host)
         omnibox = BridgeOmnibox(host: host)
         passwordSaving = BridgePasswordSaving(host: host)
-        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts, omnibox, passwordSaving]
+        toolbarAppearance = BridgeToolbarAppearance(host: host)
+        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts, omnibox, passwordSaving, toolbarAppearance]
         let directNames = Set(direct.map { type(of: $0).name })
         let others = Self.handlerTypes.filter { !directNames.contains($0.name) }.map { $0.init(host: host) }
         let all: [any BridgeNamespace] = others + direct

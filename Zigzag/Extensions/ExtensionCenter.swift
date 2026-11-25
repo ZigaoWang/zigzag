@@ -69,8 +69,16 @@ enum ExtensionCenter {
     // MARK: Windows
 
     static func windowOpened(_ window: BrowserWindowController) { hosts.forEach { $0.windowOpened(window) } }
-    static func windowClosed(_ window: BrowserWindowController) { hosts.forEach { $0.windowClosed(window) } }
-    static func windowFocused(_ window: BrowserWindowController?) { hosts.forEach { $0.windowFocused(window) } }
+    static func windowClosed(_ window: BrowserWindowController) {
+        hosts.forEach { $0.windowClosed(window) }
+        toolbarAppearanceChanged()
+    }
+    static func windowFocused(_ window: BrowserWindowController?) {
+        hosts.forEach { $0.windowFocused(window) }
+        toolbarAppearanceChanged()
+    }
+    /// A window's address turned light or dark, or another window came forward.
+    static func toolbarAppearanceChanged() { Profiles.shared.all.compactMap(\.startedExtensions).forEach { $0.bridge.toolbarAppearance.refresh() } }
 
     // A sign-in popup is one page, so it belongs to one profile: the one its page was made in.
     static func popupOpened(_ popup: PopupWindowController) { host(of: popup)?.popupOpened(popup) }

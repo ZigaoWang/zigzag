@@ -525,6 +525,55 @@ final class BridgePasswordSaving: BridgeNamespace {
     }
 }
 
+// MARK: - Toolbar appearance
+
+/// Whether the profile's front window's address is dark; a button's icon is one for all windows, so the front one decides.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeToolbarAppearance: BridgeNamespace {
+    static let name = "toolbarAppearance"
+    static let permission = ""
+    /// One profile's extensions.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
+    /// What listeners last heard.
+    private var told: Bool?
+    private var scheduled = false
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "get": return Self.isDark(in: host.profile).map { ["dark": $0] }
+        default: throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+
+    /// Something that decides it may have changed: listeners hear the new look once the windows settle.
+    func refresh() {
+        guard !scheduled else { return }
+        scheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            scheduled = false
+            guard let dark = Self.isDark(in: host.profile), dark != told else { return }
+            told = dark
+            host.bridge.emit("toolbarAppearance.onChange", [["dark": dark]])
+        }
+    }
+
+    /// Nil with none of the profile's windows open.
+    static func isDark(in profile: Profile) -> Bool? {
+        frontWindow(of: profile)?.sidebar.address.effectiveAppearance.isDark
+    }
+
+    /// The key window when it's the profile's, else the profile's window nearest the front.
+    static func frontWindow(of profile: Profile) -> BrowserWindowController? {
+        let mine = WindowManager.shared.controllers.filter { $0.tabManager.profile === profile }
+        if let key = WindowManager.shared.keyController, mine.contains(where: { $0 === key }) { return key }
+        for window in NSApp.orderedWindows { if let front = mine.first(where: { $0.window === window }) { return front } }
+        return mine.last
+    }
+}
+
 // MARK: - Context menu items kept
 
 /// Extension context menu items, persisted across relaunches like Chrome. WebKit drops them on quit, and an

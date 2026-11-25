@@ -478,6 +478,12 @@
     configurable: true,
   });
 
+  // Whether the bar the extension's button sits in is dark ({ dark }), for icons drawn for one or the other (ExtensionShims).
+  Object.defineProperty(globalThis, '__zigzagToolbar', {
+    value: { get: () => send('toolbarAppearance', 'get', []), onChange: event('toolbarAppearance.onChange') },
+    configurable: true,
+  });
+
   // Messages from websites: Chrome says which site sent each (sender.origin) and extensions check it before answering
   // (Claude answers only claude.ai). WebKit gives the address; the origin comes from it.
   const external = api.runtime.onMessageExternal;
