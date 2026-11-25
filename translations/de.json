@@ -1881,7 +1881,7 @@
     "Apps you connect over MCP, on this Mac only, can open, read and use your tabs. Never private windows, passwords or Zigzag’s own pages.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Apps, die du über MCP verbindest, nur auf diesem Mac, können deine Tabs öffnen, lesen und verwenden. Nie private Fenster, Passwörter oder Zigzags eigene Seiten."
+        "value": "Apps, die du über MCP verbindest, nur auf diesem Mac, können deine Tabs öffnen, lesen und verwenden. Nie private Fenster, Passwörter oder die eigenen Seiten von Zigzag."
       }
     },
     "Apps, scripts, installers and archives are always saved, never opened.": {

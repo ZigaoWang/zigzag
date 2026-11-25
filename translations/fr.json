@@ -14155,7 +14155,7 @@
     "https://example.com/file.zip": {
       "stringUnit": {
         "state": "translated",
-        "value": "https://example.com/fichier.zip"
+        "value": "https://example.com/file.zip"
       }
     },
     "iCloud Passwords": {
