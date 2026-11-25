@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | 日本語
+[English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md) | 日本語 | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
 
 このページはREADME.mdの翻訳です。内容が異なる場合は英語版が優先されます。
 
@@ -90,7 +90,7 @@
 | **オートメーション** | AppleScript、ショートカット、`osascript` から、タブの一覧表示や開く操作、ページの読み取りができます。書き方はSafariやChromeと同じです。[docs/automation.md](docs/automation.md)を参照してください。 |
 | **AI App** | 初期状態ではオフです。オンにすると、MacのAI AppがMCPを通してタブを使えます。プライベートウインドウやパスワードは使えません。[docs/automation.md](docs/automation.md#ai-apps-mcp)を参照してください。 |
 | **自分のデータ** | 「ファイル › データを書き出す…」で、ブックマークをどのブラウザでも読み込める標準のHTMLファイルとして保存できます。別のMacで復元できる、Zigzag全体のバックアップも保存できます。 |
-| **言語** | 英語、簡体字中国語、繁体字中国語、日本語。 |
+| **言語** | 英語、簡体字中国語、繁体字中国語、日本語、韓国語、ドイツ語、フランス語、イタリア語、スペイン語、ポルトガル語（ブラジル）、ロシア語、オランダ語、ポーランド語、トルコ語。 |
 | **ほかにも** | リーダー、PDFビューア、iPhone、iPad、ほかのMacへのHandoff、範囲、ページの一部、ページ全体のスクリーンショット（⇧⌘2）、オンデバイスの翻訳、すべての一致箇所に印を付けるページ内検索、「最近閉じたもの」と過去7日間を含む履歴メニュー、既定のページズーム、好みで置けるページの上のアドレスバー、ピクチャ・イン・ピクチャ、プライベートウインドウ、Webインスペクタ。 |
 
 ## 足りないもの

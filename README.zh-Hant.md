@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[English](README.md) | [简体中文](README.zh-Hans.md) | 繁體中文 | [日本語](README.ja.md)
+[English](README.md) | [简体中文](README.zh-Hans.md) | 繁體中文 | [日本語](README.ja.md) | [한국어](README.ko.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Italiano](README.it.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md) | [Nederlands](README.nl.md) | [Polski](README.pl.md) | [Türkçe](README.tr.md)
 
 本文是 README.md 的翻譯；如有出入，以英文版為準。
 
@@ -90,7 +90,7 @@
 | **自動化** | AppleScript、捷徑和 `osascript` 可以列出和開啟分頁、讀取網頁，寫法和 Safari、Chrome 接受的一樣。請見 [docs/automation.md](docs/automation.md)。 |
 | **AI App** | 預設關閉，開啟後，你 Mac 上的 AI App 可以透過 MCP 使用你的分頁，但絕不會碰到私密瀏覽視窗和密碼。請見 [docs/automation.md](docs/automation.md#ai-apps-mcp)。 |
 | **你的資料** | 「檔案 › 匯出你的資料…」會把書籤存成任何瀏覽器都能匯入的標準 HTML 檔案，還有一份完整的 Zigzag 備份，可以在另一台 Mac 上還原。 |
-| **語言** | 英文、簡體中文、繁體中文和日文。 |
+| **語言** | 英文、簡體中文、繁體中文、日文、韓文、德文、法文、義大利文、西班牙文、巴西葡萄牙文、俄文、荷蘭文、波蘭文和土耳其文。 |
 | **還有** | 閱讀器、PDF 檢視器、接力到你的 iPhone、iPad 或另一台 Mac、截圖（區域、網頁的一部分或整個網頁，⇧⌘2）、裝置端翻譯、標出每個相符項目的網頁內尋找、帶「最近關閉」和最近七天的「瀏覽記錄」選單、預設網頁縮放、喜歡的話可以在網頁上方顯示網址列、子母畫面、私密瀏覽視窗、網頁檢查器。 |
 
 ## 還缺什麼

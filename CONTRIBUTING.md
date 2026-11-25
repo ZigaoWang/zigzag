@@ -95,8 +95,9 @@ Simplified Chinese, say so in the pull request.
 [docs/i18n/README.md](docs/i18n/README.md) has the whole workflow: one sentence per string, plurals, dates and
 numbers, the pseudo-locale for finding cut-off text, adding a language, and the release gate.
 
-A change to README.md updates [README.zh-Hans.md](README.zh-Hans.md), [README.zh-Hant.md](README.zh-Hant.md) and
-[README.ja.md](README.ja.md) in the same pull request, or the pull request says they still need it.
+A change to README.md updates every translation beside it (README.zh-Hans.md, README.ja.md and the others, one per
+language) in the same pull request, or the pull request says they still need it. Every README starts with the same
+language line.
 
 Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
 [CHANGELOG.zh-Hant.md](CHANGELOG.zh-Hant.md) can follow later. Keep the same version, date, order, issue links
