@@ -65,7 +65,7 @@ import Testing
 }
 
 /// One Mac: its library, its sync, and its link to the cloud, which can be cut.
-@MainActor final class FakeMac: SyncServer {
+@MainActor final class FakeMac: SyncServer, SyncTransport {
     let host: MemoryHost
     let session: SyncSession
     let cloud: FakeCloud
@@ -125,6 +125,20 @@ import Testing
         }
         sync()
     }
+
+    /// As CKSyncEngine: the records arrive, and once merged the fetch settles them itself.
+    func fetchChanges() async throws {
+        if failing > 0 {
+            failing -= 1
+            throw CKError(.serverRejectedRequest)
+        }
+        let changes = cloud.changes(since: token)
+        token = changes.token
+        session.fetched(changes.records, deleted: changes.deleted)
+        if session.state.merged { session.fetchFinished() }
+    }
+
+    func sendChanges() async throws { send() }
 
     func fetch() {
         let changes = cloud.changes(since: token)
@@ -839,6 +853,31 @@ extension SyncLibrary {
         b.sync()
         #expect(b.library.space(named: "Personal")?.bookmarks[500].title == "Changed")
         #expect(Date().timeIntervalSince(start) < 20)
+    }
+
+    // MARK: Connecting
+
+    @Test func aMacStartedAfterItsFirstSyncFetchesWhatChangedWhileItWasAway() async throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // A quits; B pins a page meanwhile.
+        let saved = a.session.state
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("new")) } }
+        b.sync()
+        #expect(saved.merged && cloud.records.count > saved.serverPayloads.count)
+        let relaunched = FakeMac(cloud, a.library, clock: b.clock, state: saved)
+        try await ICloudSync.catchUp(relaunched.session, through: relaunched)
+        #expect(relaunched.library.urls(in: "Personal") == ["a", "new"])
+        #expect(relaunched.session.state.serverPayloads.count == cloud.records.count)
+    }
+
+    @Test func aFirstConnectionMergesThenSends() async throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        var first: Bool?
+        try await ICloudSync.catchUp(a.session, through: a, fetched: { first = $0 })
+        #expect(first == true)
+        #expect(a.session.state.merged)
+        #expect(!cloud.records.isEmpty && a.saves.isEmpty)
     }
 
     // MARK: Trying again

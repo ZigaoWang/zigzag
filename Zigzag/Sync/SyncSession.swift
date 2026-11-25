@@ -12,6 +12,13 @@ protocol SyncServer: AnyObject {
     func queue(saves: [String], deletes: [String])
 }
 
+/// Fetching and sending, as CKSyncEngine does: what a fetch brings arrives through the session, and once the first
+/// sync has merged, the fetch settles it itself.
+protocol SyncTransport: AnyObject {
+    func fetchChanges() async throws
+    func sendChanges() async throws
+}
+
 /// A record as the server has it.
 struct SyncRemote {
     var name: String

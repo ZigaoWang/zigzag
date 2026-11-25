@@ -179,54 +179,44 @@ final class ICloudSync {
             self.engine = engine
             session.server = engine
             engine.start()
-            if !session.state.merged { await firstFetch() } else { retry.succeeded() }
+            await catchUp()
         } catch {
             Self.log.error("connecting failed: \(error.localizedDescription, privacy: .public)")
             failed(error)
         }
     }
 
-    /// The first sync merges only once everything in iCloud has been read.
-    private func firstFetch() async {
+    /// Every connection and every fetch: the first sync's merge, or what changed elsewhere while this Mac was away;
+    /// then what's waiting here goes up.
+    private func catchUp() async {
         guard let engine, let session else { return }
+        lastFetch = Date()
         do {
-            try await engine.fetch()
-            guard self.session === session, !session.state.merged else { return }
-            session.fetchFinished()
-            UserDefaults.standard.set(true, forKey: Self.copyKey)
-            status = .synced(session.state.lastSynced)
-            retry.succeeded()
-            await send()
+            try await Self.catchUp(session, through: engine, isCurrent: { [weak self] in self?.session === session }) { [weak self] first in
+                guard let self else { return }
+                if first {
+                    UserDefaults.standard.set(true, forKey: Self.copyKey)
+                    status = .synced(session.state.lastSynced)
+                }
+                retry.succeeded()
+            }
         } catch {
-            Self.log.error("first fetch failed: \(error.localizedDescription, privacy: .public)")
+            Self.log.error("syncing failed: \(error.localizedDescription, privacy: .public)")
             guard self.session === session else { return }
             failed(error)
         }
     }
 
-    @discardableResult
-    private func fetch() async -> Bool {
-        guard let engine, let session else { return false }
-        do {
-            try await engine.fetch()
-            retry.succeeded()
-            return true
-        } catch {
-            Self.log.error("fetching failed: \(error.localizedDescription, privacy: .public)")
-            if self.session === session { failed(error) }
-            return false
-        }
-    }
-
-    private func send() async {
-        guard let engine, let session else { return }
-        do {
-            try await engine.send()
-        } catch {
-            Self.log.error("sending failed: \(error.localizedDescription, privacy: .public)")
-            guard self.session === session else { return }
-            failed(error)
-        }
+    /// A fetch, merged as the first sync when it hasn't been yet, then a send. The first sync merges only once
+    /// everything in iCloud has been read; later fetches settle as their changes arrive.
+    static func catchUp(_ session: SyncSession, through server: SyncTransport, isCurrent: () -> Bool = { true },
+                        fetched: (_ first: Bool) -> Void = { _ in }) async throws {
+        try await server.fetchChanges()
+        guard isCurrent() else { return }
+        let first = !session.state.merged
+        if first { session.fetchFinished() }
+        fetched(first)
+        try await server.sendChanges()
     }
 
     /// The status for a failure, and the next try unless waiting won't help.
@@ -237,11 +227,10 @@ final class ICloudSync {
 
     /// What failed is tried again: connecting, the first sync, or a fetch and what's waiting to go up.
     private func tryAgain() {
-        guard isOn, let session else { return }
+        guard isOn, session != nil else { return }
         lastFetch = Date()
         guard engine != nil else { Task { await connect() }; return }
-        guard session.state.merged else { Task { await firstFetch() }; return }
-        Task { if await fetch() { await send() } }
+        Task { await catchUp() }
     }
 
     private func watchLibrary() {
@@ -275,12 +264,11 @@ final class ICloudSync {
 
     /// A fetch when the last was at least `after` seconds ago.
     private func fetchSoon(after seconds: TimeInterval) {
-        guard let session, Date().timeIntervalSince(lastFetch) > seconds else { return }
+        guard session != nil, Date().timeIntervalSince(lastFetch) > seconds else { return }
         lastFetch = Date()
         // Not connected yet (signed out, offline at launch), or the first sync didn't finish: tried again.
         guard engine != nil else { Task { await connect() }; return }
-        guard session.state.merged else { Task { await firstFetch() }; return }
-        Task { await fetch() }
+        Task { await catchUp() }
     }
 
     /// The network coming back tries again at once.
@@ -496,7 +484,7 @@ final class AppSyncHost: SyncHost {
 
 /// CKSyncEngine on the private database, one zone. Records carry their fields as JSON (`payload`) and their date
 /// (`modified`), so a newer Zigzag adds fields without a new schema.
-final class CloudEngine: SyncServer, CKSyncEngineDelegate {
+final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
     private let container: CKContainer
     private weak var session: SyncSession?
     private weak var owner: ICloudSync?
@@ -524,8 +512,8 @@ final class CloudEngine: SyncServer, CKSyncEngineDelegate {
         engine = nil
     }
 
-    func fetch() async throws { try await engine?.fetchChanges() }
-    func send() async throws { try await engine?.sendChanges() }
+    func fetchChanges() async throws { try await engine?.fetchChanges() }
+    func sendChanges() async throws { try await engine?.sendChanges() }
 
     func queue(saves: [String], deletes: [String]) {
         let changes = saves.map { CKSyncEngine.PendingRecordZoneChange.saveRecord(CKRecord.ID(recordName: $0, zoneID: ICloudSync.zoneID)) }
