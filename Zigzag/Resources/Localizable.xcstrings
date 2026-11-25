@@ -13125,19 +13125,19 @@
         }
       }
     },
-    "Websites you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to reach programs listening on this Mac, over loopback only.\n\nThe local network, other machines, images, scripts and stylesheets are not included, and a page cannot switch itself on.\n\nA local program may not have been written to be reachable by a web page, and a site you grant could use it in ways you did not intend. Only grant sites you trust.\n\nTurn one site off in its Site Controls, or turn this setting off for every site." : {
+    "Websites you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to reach programs listening on this Mac, over loopback only.\n\nThe local network, other machines, images, scripts and stylesheets are not included, and a page cannot switch itself on.\n\nA local program may not have been written to be reachable by a web page, and a site you grant could use it in ways you did not intend. Only grant sites you trust.\n\nTurn this setting on, then turn on each site in its Site Controls. Turning this setting off stops every site." : {
       "comment" : "The briefing shown before websites may reach apps on this Mac. fetch, XMLHttpRequest and WebSocket are API names: keep them as they are.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你在网站设置里开启的网站可以使用 fetch、XMLHttpRequest 和 WebSocket，与这台 Mac 上监听端口的程序通信，且只限本机回环。\n\n不包括本地网络、其他机器，也不包括图片、脚本和样式表，页面也无法自行开启。\n\n本机程序未必是按网页可以访问来设计的，你授予的网站可能会以你意料之外的方式使用它。只授予你信任的网站。\n\n在某个网站的网站设置里关掉它，或关掉这个设置，对所有网站生效。"
+            "value" : "你在网站设置里开启的网站可以使用 fetch、XMLHttpRequest 和 WebSocket，与这台 Mac 上监听端口的程序通信，且只限本机回环。\n\n不包括本地网络、其他机器，也不包括图片、脚本和样式表，页面也无法自行开启。\n\n本机程序未必是按网页可以访问来设计的，你授予的网站可能会以你意料之外的方式使用它。只授予你信任的网站。\n\n先开启这个设置，再在网站设置里开启每个网站。关闭这个设置会停止所有网站。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你在網站設定裡開啟的網站可以使用 fetch、XMLHttpRequest 和 WebSocket，與這台 Mac 上監聽連接埠的程式通訊，且只限本機回送介面。\n\n不包括區域網路、其他機器，也不包括圖片、腳本和樣式表，網頁也無法自行開啟。\n\n本機程式未必是按網頁可以存取來設計的，你授予的網站可能會以你意料之外的方式使用它。只授予你信任的網站。\n\n在某個網站的網站設定裡關掉它，或關掉這個設定，對所有網站生效。"
+            "value" : "你在網站設定裡開啟的網站可以使用 fetch、XMLHttpRequest 和 WebSocket，與這台 Mac 上監聽連接埠的程式通訊，且只限本機回送介面。\n\n不包括區域網路、其他機器，也不包括圖片、腳本和樣式表，網頁也無法自行開啟。\n\n本機程式未必是按網頁可以存取來設計的，你授予的網站可能會以你意料之外的方式使用它。只授予你信任的網站。\n\n先開啟這個設定，再在網站設定裡開啟每個網站。關閉這個設定會停止所有網站。"
           }
         }
       }
