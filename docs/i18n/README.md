@@ -5,6 +5,33 @@ German (de), French (fr), Italian (it), Spanish (es), Brazilian Portuguese (pt-B
 and Turkish (tr). Every word people read is in
 `Zigzag/Resources/Localizable.xcstrings`, and macOS's permission prompts are in `InfoPlist.xcstrings`.
 
+## Where things live
+
+English is the source of truth: `README.md` and `CHANGELOG.md` at the top of the repository, and the English in
+the catalogs. Everything translated lives in this folder, one file per language, named by its code:
+
+- `README.md`: this guide.
+- `glossaries/<code>.md`: each language's words and typography.
+- `translations/<code>.json`: each language's strings as the translator wrote them, folded into the catalogs by
+  `scripts/merge-translations.py`. Japanese and the two Chinese scripts were translated in the catalog itself and
+  have none.
+- `readme/README.<code>.md`: `README.md` in each language.
+- `changelog/CHANGELOG.<code>.md`: the release notes in each language, from 0.10.0 on. The app bundles them for
+  What's New, the update window links them, and versions before 0.10.0 are in English only (Simplified and
+  Traditional Chinese have more).
+
+Contributors write English only. The maintainers translate before each release.
+
+## Before a release
+
+1. Translate every new string into every shipped language (`scripts/check-strings.py` lists them), from the
+   language's glossary, and merge them.
+2. Translate the version's section of `CHANGELOG.md` into each `changelog/CHANGELOG.<code>.md`: the same version
+   heading and date, the summary line, and the app's own What's New headings in that language (`### Neu` and
+   `### Behoben` in German). Keep every point in its place, its issue links at the end and the people thanked, and
+   name each feature exactly as the app does in that language.
+3. Run the gate below. `WhatsNewTests` checks the same for every version a changelog has.
+
 ## Adding a string
 
 Write it with `String(localized:comment:)`. The comment says where the words appear and what any placeholder holds,
@@ -118,14 +145,21 @@ before using a new one.
    `Zigzag/Info.plist`, and `LocalizationTests.translated`. The code is the one Xcode and Bundle use (`pt-BR`, not
    `pt_BR`). `LocalizationTests.everyLanguageKeepsNamesSymbolsAndPlurals` then checks it keeps product names,
    keyboard symbols and addresses, ends "…" items in "…", and has CLDR's plural forms.
+7. Add `docs/i18n/changelog/CHANGELOG.<lang>.md` with the current version's notes, and add it to the `changelog`
+   group and the Zigzag target's resources in `Zigzag.xcodeproj/project.pbxproj` by hand. Add the code to
+   `WhatsNew.notesLanguages`, its New and Fixed headings to `WhatsNew.newHeadings` and `fixedHeadings`, and the code
+   to `WhatsNewTests.languages`.
 
 ## The release gate
 
 `scripts/release.sh`, stable and beta, stops before building when any shipped language has a string that is missing,
-empty, not `translated` (`new`, `needs_review`) or has the wrong format arguments, in either catalog. A shipped
-language is one in `knownRegions` or with any string in a catalog. To see what's left:
+empty, not `translated` (`new`, `needs_review`) or has the wrong format arguments, in either catalog. It also stops
+when a shipped language's `changelog/CHANGELOG.<code>.md` has no section for the version, or one with other
+sections, another number of points, or other issue links than `CHANGELOG.md`'s. A shipped language is one in
+`knownRegions` or with any string in a catalog. To see what's left:
 
 ```sh
-scripts/check-strings.py          # every shipped language
-scripts/check-strings.py ja       # one language, shipped or not
+scripts/check-strings.py                  # every shipped language, and the notes of project.yml's version
+scripts/check-strings.py ja               # one language, shipped or not
+scripts/check-strings.py --notes 0.10.0   # the notes of another version
 ```
