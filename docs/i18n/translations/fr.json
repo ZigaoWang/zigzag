@@ -8528,6 +8528,12 @@
         "value": "Pointez l’appareil photo de votre téléphone vers le code pour y ouvrir cette page."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Lorsque vous pointez un lien, sa destination s’affiche dans le coin inférieur gauche de la page."
+      }
+    },
     "Pop-ups": {
       "stringUnit": {
         "state": "translated",
@@ -10348,6 +10354,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Afficher sa propre page lorsque vous ouvrez un nouvel onglet"
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Afficher l’adresse des liens au survol"
       }
     },
     "Show notifications": {

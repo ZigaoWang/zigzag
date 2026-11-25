@@ -1993,6 +1993,172 @@
         }
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner." : {
+      "comment" : "Explanation under “Show link address on hover” in Settings › Appearance.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigst du auf einen Link, erscheint unten links auf der Seite, wohin er führt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al apuntar a un enlace, la esquina inferior izquierda de la página muestra adónde lleva."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lorsque vous pointez un lien, sa destination s’affiche dans le coin inférieur gauche de la page."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando punti un link, l’angolo in basso a sinistra della pagina mostra dove porta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクにポインタを置くと、ページの左下にリンク先が表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "링크를 가리키면 페이지 왼쪽 아래에 연결되는 주소가 표시됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als je een link aanwijst, zie je linksonder op de pagina waar die naartoe gaat."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Po wskazaniu linku w lewym dolnym rogu strony widać, dokąd prowadzi."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ao apontar para um link, o canto inferior esquerdo da página mostra para onde ele leva."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "При наведении на ссылку в левом нижнем углу страницы видно, куда она ведёт."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir bağlantının üzerine gelindiğinde nereye gittiği sayfanın sol alt köşesinde görünür."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指向链接时，页面左下角会显示链接的去向。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指向連結時，網頁左下角會顯示連結的去向。"
+          }
+        }
+      }
+    },
+    "Show link address on hover" : {
+      "comment" : "A setting in Settings › Appearance: pointing at a link shows where it goes in a small bar in the page's corner.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linkadresse beim Zeigen anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar la dirección del enlace al pasar el puntero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’adresse des liens au survol"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra l’indirizzo dei link al passaggio del puntatore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクにポインタを置いたときにアドレスを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "링크 위에 포인터를 올리면 주소 표시"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toon linkadres bij aanwijzen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuj adres linku po wskazaniu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar endereço do link ao passar o ponteiro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывать адрес ссылки при наведении"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Üzerine gelince bağlantı adresini göster"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指向链接时显示链接地址"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指向連結時顯示連結網址"
+          }
+        }
+      }
+    },
     "Site Controls, compatibility mode on" : {
       "comment" : "Tooltip of the Site Controls button by the address while Compatibility mode is on for the page's site.",
       "localizations" : {

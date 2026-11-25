@@ -25,8 +25,18 @@ final class LinkStatusController {
         }
     }
 
+    /// Settings › Appearance › Show link address on hover (#537). On by default.
+    static var showsOnHover: Bool {
+        get { UserDefaults.standard.object(forKey: defaultsKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
+    }
+    static let defaultsKey = "ShowLinkAddressOnHover"
+
+    /// Whether the pill is up now.
+    var isShowing: Bool { visible }
+
     func show(_ url: URL?, in area: NSRect) {
-        guard let url, let overlay else {
+        guard let url, Self.showsOnHover, let overlay else {
             hideDebouncer.call { [weak self] in self?.hide() }
             return
         }

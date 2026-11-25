@@ -145,6 +145,18 @@
         "value": "%@이(가) 소유한 공개 저장소의 열린 풀 리퀘스트를 최근 활동순으로 표시합니다."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "링크를 가리키면 페이지 왼쪽 아래에 연결되는 주소가 표시됩니다."
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "링크 위에 포인터를 올리면 주소 표시"
+      }
+    },
     "Site Controls, compatibility mode on": {
       "stringUnit": {
         "state": "translated",

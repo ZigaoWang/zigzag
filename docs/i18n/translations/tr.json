@@ -145,6 +145,18 @@
         "value": "Herkese açık depolarda şu kullanıcının sahip olduğu açık çekme istekleri, en son etkinlik üstte: %@"
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bir bağlantının üzerine gelindiğinde nereye gittiği sayfanın sol alt köşesinde görünür."
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Üzerine gelince bağlantı adresini göster"
+      }
+    },
     "Site Controls, compatibility mode on": {
       "stringUnit": {
         "state": "translated",

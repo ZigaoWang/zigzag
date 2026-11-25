@@ -9134,6 +9134,12 @@
         "value": "Наведите камеру телефона на код, чтобы открыть эту страницу на нём."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "При наведении на ссылку в левом нижнем углу страницы видно, куда она ведёт."
+      }
+    },
     "Pop-ups": {
       "stringUnit": {
         "state": "translated",
@@ -10966,6 +10972,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Показывать собственную страницу при открытии новой вкладки"
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Показывать адрес ссылки при наведении"
       }
     },
     "Show notifications": {

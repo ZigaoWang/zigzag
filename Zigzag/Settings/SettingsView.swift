@@ -1610,6 +1610,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Sidebar position's choices, Left then Right, as whether the sidebar is on the right (#360).
     static let sidebarSides = [false, true]
     private let doubleClickTabToggle = Toggle()
+    private let linkStatusToggle = Toggle()
     private var sideToken: NSObjectProtocol?
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
@@ -1981,6 +1982,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: addressPlaceMenu)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
+        linkStatusToggle.onChange = { on in LinkStatusController.showsOnHover = on }
+        appearanceGroup.add(FormRow(title: String(localized: "Show link address on hover", comment: "A setting in Settings › Appearance: pointing at a link shows where it goes in a small bar in the page's corner."),
+                                    detail: String(localized: "Pointing at a link shows where it goes in the page’s bottom-left corner.", comment: "Explanation under “Show link address on hover” in Settings › Appearance."),
+                                    control: linkStatusToggle))
         sidebarSide.options = [
             DropdownButton.Option(title: String(localized: "Left", comment: "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's left edge.")),
             DropdownButton.Option(title: String(localized: "Right", comment: "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's right edge.")),
@@ -4808,6 +4813,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         addressPlaceMenu.selectedIndex = BrowserRootView.addressBarPlace.menuIndex
         sidebarSide.selectedIndex = Self.sidebarSides.firstIndex(of: BrowserRootView.sidebarOnRight) ?? 0
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
+        linkStatusToggle.isOn = LinkStatusController.showsOnHover
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript

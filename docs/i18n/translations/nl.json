@@ -145,6 +145,18 @@
         "value": "Open pull requests in openbare repositories van %@, met de nieuwste activiteit bovenaan."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Als je een link aanwijst, zie je linksonder op de pagina waar die naartoe gaat."
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Toon linkadres bij aanwijzen"
+      }
+    },
     "Site Controls, compatibility mode on": {
       "stringUnit": {
         "state": "translated",

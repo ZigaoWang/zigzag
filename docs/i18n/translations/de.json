@@ -8528,6 +8528,12 @@
         "value": "Richte die Kamera deines Smartphones auf den Code, um diese Seite dort zu öffnen."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Zeigst du auf einen Link, erscheint unten links auf der Seite, wohin er führt."
+      }
+    },
     "Pop-ups": {
       "stringUnit": {
         "state": "translated",
@@ -10348,6 +10354,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Eigene Seite zeigen, wenn du einen neuen Tab öffnest"
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Linkadresse beim Zeigen anzeigen"
       }
     },
     "Show notifications": {

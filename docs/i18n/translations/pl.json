@@ -145,6 +145,18 @@
         "value": "Otwarte pull requesty w repozytoriach publicznych należących do %@, od ostatnio aktywnych."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Po wskazaniu linku w lewym dolnym rogu strony widać, dokąd prowadzi."
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Pokazuj adres linku po wskazaniu"
+      }
+    },
     "Site Controls, compatibility mode on": {
       "stringUnit": {
         "state": "translated",

@@ -145,6 +145,18 @@
         "value": "Pull requests abiertas en repositorios públicos de %@, con la actividad más reciente primero."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Al apuntar a un enlace, la esquina inferior izquierda de la página muestra adónde lleva."
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Mostrar la dirección del enlace al pasar el puntero"
+      }
+    },
     "Site Controls, compatibility mode on": {
       "stringUnit": {
         "state": "translated",

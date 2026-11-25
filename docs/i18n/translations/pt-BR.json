@@ -8756,6 +8756,12 @@
         "value": "Aponte a câmera do celular para o código para abrir esta página nele."
       }
     },
+    "Pointing at a link shows where it goes in the page’s bottom-left corner.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ao apontar para um link, o canto inferior esquerdo da página mostra para onde ele leva."
+      }
+    },
     "Pop-ups": {
       "stringUnit": {
         "state": "translated",
@@ -10582,6 +10588,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Mostrar a própria página ao abrir uma nova aba"
+      }
+    },
+    "Show link address on hover": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Mostrar endereço do link ao passar o ponteiro"
       }
     },
     "Show notifications": {
