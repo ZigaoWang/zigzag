@@ -123,6 +123,8 @@ final class SyncSettingsRows {
         case .removedElsewhere:
             return (String(localized: "Removed from iCloud on another Mac", comment: "Status under Sync with iCloud in Settings › General."),
                     String(localized: "Sync is off. Everything on this Mac stays as it is.", comment: "Explanation under “Removed from iCloud on another Mac” in Settings › General."), nil)
+        case .backupFailed:
+            return (String(localized: "Couldn’t save a backup first, so sync is still off.", comment: "Status under Sync with iCloud in Settings › General, when turning it on couldn't save the backup it makes first (the disk is full, say)."), "", nil)
         case .notEntitled:
             return (String(localized: "This copy of Zigzag can’t use iCloud", comment: "Status under Sync with iCloud in Settings › General, for a build signed without iCloud."), "", nil)
         case .failed(let message):
@@ -153,7 +155,7 @@ final class SyncSettingsRows {
         ("up to date", .synced(Date()), true, true), ("last synced", .synced(Date().addingTimeInterval(-120)), true, true),
         ("not signed in", .notSignedIn, true, true), ("other account", .otherAccount, true, true), ("restricted", .restricted, true, true),
         ("full", .full, true, true), ("offline", .offline, true, true), ("removed elsewhere", .removedElsewhere, false, false),
-        ("not entitled", .notEntitled, true, false), ("failed", .failed("The request timed out."), true, true),
+        ("not entitled", .notEntitled, true, false), ("backup failed", .backupFailed, false, false), ("failed", .failed("The request timed out."), true, true),
     ]
     #endif
 }

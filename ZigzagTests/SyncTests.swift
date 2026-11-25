@@ -730,6 +730,16 @@ extension SyncLibrary {
         #expect(backup.spaces.map(\.id) == Library.shared.spaces.map(\.id))
     }
 
+    @Test func withoutABackupSyncStaysOff() {
+        let sync = ICloudSync.shared
+        guard !sync.isOn else { return }
+        defer { if sync.isOn { sync.turnOff() } }
+        sync.turnOn(backingUp: { nil })
+        #expect(!sync.isOn)
+        #expect(sync.status == .backupFailed)
+        #expect(!SyncSettingsRows.describe(.backupFailed, hasCopy: false).text.isEmpty)
+    }
+
     /// With TEST_RUNNER_ZIGZAG_SYNC_SHOTS set to a folder: pictures of the row in each status and of its sheets.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ZIGZAG_SYNC_SHOTS"] != nil)) func picturesOfTheRowAndItsSheets() throws {
         let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["ZIGZAG_SYNC_SHOTS"]!)

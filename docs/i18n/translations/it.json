@@ -14984,6 +14984,12 @@
         "state": "translated",
         "value": "iCloud non è riuscito a sincronizzare: %@"
       }
+    },
+    "Couldn’t save a backup first, so sync is still off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Non è stato possibile salvare prima un backup, quindi la sincronizzazione è ancora disattivata."
+      }
     }
   },
   "InfoPlist": {

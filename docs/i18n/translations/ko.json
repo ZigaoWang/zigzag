@@ -14678,6 +14678,12 @@
         "state": "translated",
         "value": "iCloud에서 동기화할 수 없음: %@"
       }
+    },
+    "Couldn’t save a backup first, so sync is still off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "먼저 백업을 저장할 수 없어서 동기화가 아직 꺼져 있습니다."
+      }
     }
   },
   "InfoPlist": {

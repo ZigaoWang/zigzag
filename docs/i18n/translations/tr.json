@@ -14984,6 +14984,12 @@
         "state": "translated",
         "value": "iCloud eşzamanlanamadı: %@"
       }
+    },
+    "Couldn’t save a backup first, so sync is still off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Önce bir yedek kaydedilemedi, bu yüzden eşzamanlama hâlâ kapalı."
+      }
     }
   },
   "InfoPlist": {

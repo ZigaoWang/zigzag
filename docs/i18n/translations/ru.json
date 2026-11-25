@@ -15645,6 +15645,12 @@
         "state": "translated",
         "value": "Ошибка синхронизации iCloud: %@"
       }
+    },
+    "Couldn’t save a backup first, so sync is still off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Не удалось сначала сохранить резервную копию, поэтому синхронизация по-прежнему выключена."
+      }
     }
   },
   "language": "ru"

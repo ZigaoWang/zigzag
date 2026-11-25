@@ -7,6 +7,8 @@
   No test yet.
 - Continue → a Zigzag backup of this Mac's library is saved in Backups first, then the first sync merges this Mac with iCloud.
   Test: SyncTests.aBackupIsSavedBeforeTheFirstSync
+- The backup can't be saved (a full disk) → sync stays off and says so; nothing goes to iCloud.
+  Test: SyncTests.withoutABackupSyncStaysOff
 - Turn it off → everything stays on this Mac as it is, and iCloud keeps its copy.
   No test yet.
 - Remove from iCloud…, then Remove → iCloud's copy is removed for every Mac and sync turns off; this Mac keeps everything. Another Mac syncing with it turns sync off too and keeps its own.

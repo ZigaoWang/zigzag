@@ -209451,6 +209451,89 @@
           }
         }
       }
+    },
+    "Couldn’t save a backup first, so sync is still off." : {
+      "comment" : "Status under Sync with iCloud in Settings › General, when turning it on couldn't save the backup it makes first (the disk is full, say).",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es konnte vorher kein Backup gesichert werden, deshalb ist die Synchronisierung weiterhin aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo guardar antes una copia de seguridad, así que la sincronización sigue desactivada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer d’abord une sauvegarde : la synchronisation reste désactivée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile salvare prima un backup, quindi la sincronizzazione è ancora disattivata."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "먼저 백업을 저장할 수 없어서 동기화가 아직 꺼져 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er kon eerst geen reservekopie worden bewaard, dus synchronisatie staat nog uit."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się najpierw zapisać kopii zapasowej, więc synchronizacja jest nadal wyłączona."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível salvar um backup antes, então a sincronização continua desativada."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось сначала сохранить резервную копию, поэтому синхронизация по-прежнему выключена."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Önce bir yedek kaydedilemedi, bu yüzden eşzamanlama hâlâ kapalı."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先にバックアップを保存できなかったため、同期はオフのままです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能先存一份备份，所以同步仍是关闭的。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法先儲存一份備份，所以同步仍是關閉的。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

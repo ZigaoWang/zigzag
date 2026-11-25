@@ -25,6 +25,8 @@ final class ICloudSync {
         case offline
         case removedElsewhere
         case notEntitled
+        /// Turning it on couldn't save the backup first, so it stayed off.
+        case backupFailed
         case failed(String)
     }
 
@@ -83,10 +85,11 @@ final class ICloudSync {
         return state
     }
 
-    /// Turned on in Settings: a backup first, then the first sync merges this Mac's library with iCloud's.
-    func turnOn() {
+    /// Turned on in Settings: a backup first, then the first sync merges this Mac's library with iCloud's. Without the
+    /// backup (a full disk), it stays off.
+    func turnOn(backingUp: () -> URL? = { ICloudSync.shared.backUp() }) {
         guard !isOn else { return }
-        backUp()
+        guard backingUp() != nil else { status = .backupFailed; return }
         UserDefaults.standard.set(true, forKey: Self.enabledKey)
         stop()
         try? FileManager.default.removeItem(at: Self.stateFile)
