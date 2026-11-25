@@ -454,6 +454,13 @@ final class CloudEngine: SyncServer, CKSyncEngineDelegate {
     func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext, syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
         let pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
         guard !pending.isEmpty else { return nil }
-        return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [weak self] id in await self?.record(for: id) }
+        return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [weak self] id in
+            guard let record = await self?.record(for: id) else {
+                // Nothing to send (removed here since, or too big for iCloud): dropped, so it isn't asked for again.
+                syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(id)])
+                return nil
+            }
+            return record
+        }
     }
 }
