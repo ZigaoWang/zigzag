@@ -69,10 +69,8 @@ final class MiniQuickOpen: NSWindowController, NSWindowDelegate {
 
     private init() {
         let panel = QuickOpenPanel(contentRect: NSRect(origin: .zero, size: Self.size), styleMask: [.borderless], backing: .buffered, defer: false)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
         // The bar casts its own shadow; the window would add a second one around nothing.
-        panel.hasShadow = false
+        panel.setSeeThrough(shadow: false)
         panel.level = .floating
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false

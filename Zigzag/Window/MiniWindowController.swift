@@ -1630,8 +1630,7 @@ final class MiniRootView: SpaceFrameView {
             return
         }
         wantsLayer = true
-        window?.isOpaque = false
-        window?.backgroundColor = .clear
+        window?.setSeeThrough(shadow: false)
         layer?.cornerRadius = Tokens.Radius.card
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true

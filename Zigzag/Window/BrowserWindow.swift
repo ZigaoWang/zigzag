@@ -708,6 +708,16 @@ final class TrafficLightKeeper: NSView {
 }
 
 extension NSWindow {
+    /// Clear to the eye; a wholly clear window with a shadow is redrawn by the window server every frame.
+    static let seeThroughBackground = NSColor(white: 0, alpha: 1.0 / 255)
+
+    /// See-through around what it draws; without a shadow it stays wholly clear, so clicks there pass through.
+    func setSeeThrough(shadow: Bool) {
+        isOpaque = false
+        hasShadow = shadow
+        backgroundColor = shadow ? Self.seeThroughBackground : .clear
+    }
+
     /// Places the system buttons with the close button's top left at `origin` (window coordinates from the top left).
     /// `spacing` is measured once from AppKit's layout and kept by the caller: read mid-move it can be wrong. Moving
     /// can re-enter, so it's not inout.

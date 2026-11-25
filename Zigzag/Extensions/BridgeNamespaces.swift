@@ -1086,9 +1086,7 @@ final class BridgeOffscreen: BridgeNamespace {
             // Never seen, wherever macOS puts it: a video going full screen brings windows onto its space, and this
             // one would show there as a white box. Clear, it still counts as shown, so the page's sound keeps playing.
             window.alphaValue = 0
-            window.isOpaque = false
-            window.backgroundColor = .clear
-            window.hasShadow = false
+            window.setSeeThrough(shadow: false)
             window.collectionBehavior = [.transient, .ignoresCycle, .fullScreenNone, .stationary]
             window.orderBack(nil)
             self.window = window

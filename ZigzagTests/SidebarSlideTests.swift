@@ -157,13 +157,23 @@ struct SidebarSlideTests {
         window.contentView = frame
         var space = SpaceInfo(name: "See-through", color: .sky)
         space.translucency = 0.6
-        let faint = SpaceFrameView.seeThroughBackground.alphaComponent
+        let faint = NSWindow.seeThroughBackground.alphaComponent
         #expect(faint > 0 && faint <= 1.0 / 255 + 0.0001)
         frame.paint(space, isPrivate: false, animated: false)
         // On battery or before macOS 26 the glass is frosted and the window opaque.
-        guard !window.isOpaque else { return }
-        #expect(window.hasShadow)
-        #expect(window.backgroundColor.alphaComponent == faint)
+        if !window.isOpaque {
+            #expect(window.hasShadow)
+            #expect(window.backgroundColor.alphaComponent == faint)
+        }
+        let panel = MiniPlayerPanel(card: MiniPlayerView())
+        defer { panel.close() }
+        #expect(panel.hasShadow && !panel.isOpaque)
+        // No window of Zigzag's casts a shadow around a wholly clear background, and one without a shadow stays clear.
+        for shown in NSApp.windows + [window, panel] where !shown.isOpaque && shown.hasShadow {
+            #expect(shown.backgroundColor.alphaComponent > 0, "\(type(of: shown))")
+        }
+        panel.setSeeThrough(shadow: false)
+        #expect(!panel.hasShadow && panel.backgroundColor.alphaComponent == 0)
     }
 
     /// A window that sits still gives the window server nothing to redraw: no animation that never ends, and no layer
