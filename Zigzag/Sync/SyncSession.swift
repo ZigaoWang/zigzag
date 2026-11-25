@@ -163,7 +163,7 @@ final class SyncSession {
     func localChanged() {
         guard state.merged, !isApplying else { return }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, now: now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: now())
         state.emptyFolders = export.emptyFolders
         queue(diff(export.items, deletes: true))
         onChange?()
@@ -179,7 +179,7 @@ final class SyncSession {
 
     private func queue(_ changes: (saves: [String], deletes: [String])) {
         guard !changes.saves.isEmpty || !changes.deletes.isEmpty else { return }
-        server?.queue(saves: changes.saves.sorted(), deletes: changes.deletes.sorted())
+        server?.queue(saves: SyncName.ordered(changes.saves), deletes: SyncName.ordered(changes.deletes))
     }
 
     private func diff(_ exported: [String: SyncItem], deletes allowDeletes: Bool) -> (saves: [String], deletes: [String]) {
@@ -209,7 +209,7 @@ final class SyncSession {
     /// at the top of its space) goes up too.
     private func layOut() {
         isApplying = true
-        host.write(SyncMapping.apply(state.base, onto: host.read(), aliases: state.aliases, kept: state.keptProfiles).library)
+        host.write(SyncMapping.apply(state.base, onto: host.read(), aliases: state.aliases, kept: state.keptProfiles, unsent: state.unsent).library)
         isApplying = false
         localChanged()
     }

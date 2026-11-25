@@ -113,3 +113,7 @@
   Test: SyncTests.aRecordFetchedTwiceOrLateChangesNothing
 - Edits made before sync connects (offline at launch, signed out for a while) or not yet sent when Zigzag quit → sent once it connects, from what this Mac knows is unsent, never only from the server's own queue.
   Test: SyncTests.editsMadeBeforeConnectingAreSentOnceConnected
+- A page, folder or favorite read before its space, folder or profile (a send read halfway) → waits on this Mac until its parent arrives, and nothing is moved or sent back meanwhile. Each Mac sends spaces before folders before pages.
+  Test: SyncTests.aPageArrivingBeforeItsSpaceWaitsForIt
+- Something inside a space, folder or profile only a newer Zigzag can read → left as it is, never moved or rewritten here.
+  Test: SyncTests.whatsInsideARecordANewerZigzagWroteIsLeftAlone

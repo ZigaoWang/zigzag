@@ -695,7 +695,16 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
     }
 
     func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext, syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
-        let pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
+        let pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }.sorted { a, b in
+            func key(_ change: CKSyncEngine.PendingRecordZoneChange) -> (Int, Int, String) {
+                switch change {
+                case .saveRecord(let id): (0, SyncName.rank(id.recordName), id.recordName)
+                case .deleteRecord(let id): (1, SyncName.rank(id.recordName), id.recordName)
+                @unknown default: (2, 0, "")
+                }
+            }
+            return key(a) < key(b)
+        }
         guard !pending.isEmpty else { return nil }
         return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [weak self] id in
             guard let record = await self?.record(for: id) else {

@@ -866,6 +866,43 @@ extension SyncLibrary {
         #expect(Date().timeIntervalSince(start) < 20)
     }
 
+    // MARK: Out of order
+
+    @Test func aPageArrivingBeforeItsSpaceWaitsForIt() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        b.edit { $0.contents.spaces.append(Sample.space("New", [Sample.page("n")])) }
+        // Parents go first.
+        #expect(b.saves.map { $0.prefix { $0 != "." } } == ["space", "page"])
+        b.sync()
+        let page = try #require(cloud.records.keys.first { name in
+            name.hasPrefix("page.") && cloud.remote(name).map { String(decoding: $0.payload, as: UTF8.self).contains("/n") } == true
+        })
+        let before = cloud.records[page]?.payload
+        // A reads the page before its space.
+        a.session.fetched([try #require(cloud.remote(page))], deleted: [])
+        a.session.fetchFinished()
+        #expect(a.library.spaceNames == ["Personal"] && a.library.urls(in: "Personal") == ["a"])
+        #expect(a.saves.isEmpty && a.deletes.isEmpty)
+        a.sync()
+        #expect(a.library.spaceNames == ["Personal", "New"] && a.library.urls(in: "New") == ["n"])
+        #expect(cloud.records[page]?.payload == before)
+    }
+
+    @Test func whatsInsideARecordANewerZigzagWroteIsLeftAlone() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let space = try #require(a.library.contents.spaces.first?.id)
+        let folder = UUID(), page = UUID()
+        // A folder this version can't read, and a page in it.
+        cloud.save(SyncUpload(name: SyncName.folder(folder), type: SyncBody.folderType, payload: Data(#"{"name":"New","space":7}"#.utf8), modified: Date(), systemFields: nil))
+        let inside = SyncBody.page(SyncPage(url: URL(string: "https://example.com/inside")!, title: "Inside", icon: nil, space: space, parent: folder, position: "n")).encoded()
+        cloud.save(SyncUpload(name: SyncName.page(page), type: SyncBody.pageType, payload: inside, modified: Date(), systemFields: nil))
+        let sent = a.sent + b.sent
+        a.sync(); b.sync(); a.session.localChanged(); a.sync()
+        #expect(a.library.urls(in: "Personal") == ["a"])
+        #expect(cloud.records[SyncName.page(page)]?.payload == inside)
+        #expect(a.sent + b.sent == sent)
+    }
+
     // MARK: Connecting
 
     /// The state as State.json keeps it.

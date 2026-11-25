@@ -148,12 +148,47 @@ enum SyncMapping {
         var needsLayout = false
     }
 
+    // MARK: Waiting for a parent
+
+    /// Records that wait for their space, folder or profile before they're shown, since one fetch can bring a page
+    /// before its space. One changed here whose parent is gone is shown where it can be, and sent from there; one whose
+    /// parent this version can't read always waits, so nothing here rewrites it. `kept`: kept profiles' record names.
+    static func waiting(_ items: [String: SyncItem], unsent: Set<String>, kept: Set<String> = []) -> Set<String> {
+        var memo: [String: Bool] = [:]
+        func parents(_ body: SyncBody) -> [String] {
+            switch body {
+            case .page(let p): [SyncName.space(p.space)] + (p.parent.map { [SyncName.folder($0)] } ?? [])
+            case .folder(let f): [SyncName.space(f.space)] + (f.parent.map { [SyncName.folder($0)] } ?? [])
+            case .space(let s): s.profile == Profile.defaultID ? [] : [SyncName.profile(s.profile)]
+            case .favorite(let f): f.profile == Profile.defaultID ? [] : [SyncName.profile(f.profile)]
+            default: []
+            }
+        }
+        func waits(_ name: String) -> Bool {
+            if let known = memo[name] { return known }
+            guard let item = items[name] else { return false }
+            // A loop reads as placed; apply untangles it.
+            memo[name] = false
+            var result = false
+            for parent in parents(item.body) where !kept.contains(parent) {
+                guard let record = items[parent] else {
+                    if !unsent.contains(name) { result = true }
+                    continue
+                }
+                if case .unknown = record.body { result = true } else if waits(parent), !unsent.contains(name) { result = true }
+            }
+            memo[name] = result
+            return result
+        }
+        return Set(items.keys.filter(waits))
+    }
+
     // MARK: Library to records
 
     /// `kept`: profiles removed on another Mac and kept here. They and their favorites and settings aren't sent; their
     /// spaces are, on the profile iCloud has them on.
     static func export(_ library: SyncLibrary, previous: [String: SyncItem], aliases: SyncAliases, emptyBefore: Set<UUID> = [],
-                       kept: Set<UUID> = [], now: Date = Date()) -> Export {
+                       kept: Set<UUID> = [], unsent: Set<String> = [], now: Date = Date()) -> Export {
         let contents = library.contents
         let directory = contents.directory
         var items: [String: SyncItem] = [:]
@@ -267,6 +302,17 @@ enum SyncMapping {
         let synced = Set(spaces.map(\.id))
         var routes = contents.siteRoutes.filter { synced.contains($0.spaceID) }
         for i in routes.indices { routes[i].spaceID = aliases.server(routes[i].spaceID) }
+        // Waiting records, and the rules for spaces not here yet, stay as they are.
+        let held = waiting(previous, unsent: unsent, kept: Set(kept.map { SyncName.profile(aliases.server($0)) }))
+        if case .rules(let earlier)? = previous[SyncName.rules]?.body {
+            let here = Set(spaces.map { aliases.server($0.id) })
+            for (i, route) in earlier.routes.rules.enumerated() where !here.contains(route.spaceID) && !routes.contains(where: { $0.id == route.id }) {
+                let space = SyncName.space(route.spaceID)
+                let readable = previous[space].map { if case .unknown = $0.body { false } else { true } } ?? false
+                guard !readable || held.contains(space) else { continue }
+                routes.insert(route, at: min(i, routes.count))
+            }
+        }
         put(SyncName.rules, .rules(SyncRules(routes: routes)))
 
         // Preferences, each with the date it was last seen to change
@@ -294,6 +340,7 @@ enum SyncMapping {
         let settingsModified = values.values.map(\.modified).max() ?? previous[SyncName.settings]?.modified ?? now
         items[SyncName.settings] = SyncItem(.settings(SyncSettings(values: values)), modified: settingsModified)
 
+        for name in held where items[name] == nil { items[name] = previous[name] }
         export.items = items
         return export
     }
@@ -309,7 +356,10 @@ enum SyncMapping {
     }
 
     /// `kept`: profiles removed on another Mac and kept here, with their spaces, favorites and settings as they are.
-    static func apply(_ items: [String: SyncItem], onto library: SyncLibrary, aliases: SyncAliases, kept: Set<UUID> = []) -> Applied {
+    static func apply(_ items: [String: SyncItem], onto library: SyncLibrary, aliases: SyncAliases, kept: Set<UUID> = [],
+                      unsent: Set<String> = []) -> Applied {
+        let held = waiting(items, unsent: unsent, kept: Set(kept.map { SyncName.profile(aliases.server($0)) }))
+        let items = items.filter { !held.contains($0.key) }
         var spaces: [(UUID, SyncSpace)] = [], profiles: [(UUID, SyncProfile)] = [], pages: [(UUID, SyncPage)] = []
         var folders: [(UUID, SyncFolder)] = [], favorites: [(UUID, SyncFavorite)] = []
         var rules: SyncRules?, settings: SyncSettings?

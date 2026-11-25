@@ -132,6 +132,14 @@ enum SyncName {
     static func folder(_ id: UUID) -> String { "folder.\(id.uuidString)" }
     static func favorite(_ id: UUID) -> String { "favorite.\(id.uuidString)" }
 
+    /// Parents before children, so another Mac reading part of a send has a page's space before the page.
+    nonisolated static func rank(_ name: String) -> Int {
+        let kind = name.prefix { $0 != "." }
+        return ["profile": 0, "space": 1, "folder": 2, "page": 3, "favorite": 4][String(kind)] ?? 5
+    }
+
+    nonisolated static func ordered(_ names: [String]) -> [String] { names.sorted { (rank($0), $0) < (rank($1), $1) } }
+
     /// The ID in a record's name, if it has one.
     static func id(_ name: String) -> UUID? {
         guard let dot = name.firstIndex(of: ".") else { return nil }
