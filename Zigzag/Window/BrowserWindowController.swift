@@ -2790,7 +2790,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Beside a sidebar on the right they're in the bar holding the address the whole time, slid out or not; with
         // only a page's tools there, they ride in the sidebar at the window's other edge, and go with it.
         let barKeepsLights = root.sidebarOnRight && root.barHoldsAddress
-        let stays = root.chromeBarShown && (barKeepsLights || (!root.sidebarOnRight && !root.isSidebarFloatingVisible))
+        // In the bar before and after, as beside the shorter card: they stay put.
+        let stays = root.chromeBarShown && (barKeepsLights || (!root.sidebarOnRight && !root.isSidebarFloatingVisible)
+                                            || (lightsInBar && lightsGoInBar))
         // On either side the bar's toggle is where the sidebar's lands (on the right, both at the window's right end).
         if stays, duration > 0 {
             toggleHeldUntil = Date().addingTimeInterval(duration)
@@ -2821,11 +2823,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // (#166), and a bar there for a page's tools alone leaves them be, as on the left.
         let onRight = root.sidebarOnRight
         let barKeepsLights = onRight && root.barHoldsAddress
-        // An Autohide bar takes them with it as it goes (#359).
-        let inBar = root.barOnScreen && (barKeepsLights || (!docked && !floating))
-        // The shorter card (#538) sits below the title bar, so the lights stay where they dock.
-        let shortCard = BrowserRootView.shortFloatingSidebar && !docked && !inBar
-        let room = shortCard ? 0 : Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
+        // An Autohide bar takes them with it as it goes (#359); the shorter card (#538) leaves them in the bar.
+        let short = BrowserRootView.shortFloatingSidebar && !docked
+        let inBar = lightsGoInBar
+        lightsInBar = inBar
+        // Without the bar the shorter card leaves them where they dock.
+        let shortCard = short && !inBar
+        let room = short ? 0 : Self.trafficLightRoom(fullScreen: fullScreen, barKeepsLights: barKeepsLights, width: window.trafficLightsWidth)
         // Their room in the sidebar's row comes at once as it slides out, and goes only once it's out of sight, so
         // nothing in the row moves while it's on screen; until then their picture rides in it.
         if switchingSides || !(sliding && room < sidebar.trafficLightsWidth) { sidebar.trafficLightsWidth = room }
@@ -3042,6 +3046,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The lights' room at the bar's leading end: none while they're elsewhere or off screen (#542).
     nonisolated static func barTrafficLightRoom(barShown: Bool, docked: Bool, barKeepsLights: Bool, onScreen: Bool, width: CGFloat) -> CGFloat {
         barShown && (!docked || barKeepsLights) && onScreen ? width : 0
+    }
+
+    /// The lights sat in the bar at the last layout.
+    private var lightsInBar = false
+
+    /// Whether the lights go in the bar now.
+    private var lightsGoInBar: Bool {
+        let docked = root.chromeSidebarShown, floating = root.isSidebarFloatingVisible
+        let barKeepsLights = root.sidebarOnRight && root.barHoldsAddress
+        return root.barOnScreen && (barKeepsLights || (!docked && (!floating || BrowserRootView.shortFloatingSidebar)))
     }
 
     /// The lights came on or off screen: the bar's controls glide to their new place.

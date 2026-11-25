@@ -81,6 +81,37 @@ struct AppearanceSwitchesTests {
         }
     }
 
+    /// The shorter card comes out below the bar, and the lights stay in the bar (#542).
+    @Test func theLightsStayInTheBarBesideTheShorterCard() throws {
+        try fresh(BrowserRootView.shortFloatingKey) {
+            BrowserRootView.shortFloatingSidebar = true
+            let before = Library.shared.snapshot
+            defer { Library.shared.restore(before) }
+            let space = Library.shared.spaces[0].id
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let root = controller.root
+            root.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+            root.showsTopBar = true
+            root.barHoldsAddress = true
+            root.setSidebarVisible(false, animated: false)
+            root.layoutSubtreeIfNeeded()
+            controller.layoutTrafficLights()
+            let close = try #require(controller.browserWindow.standardWindowButton(.closeButton))
+            #expect(!close.isHidden)
+            root.holdReveal = true
+            defer { root.holdReveal = false }
+            root.reveal(true)
+            #expect(root.isSidebarFloatingVisible)
+            controller.layoutTrafficLights()
+            #expect(!close.isHidden, "the lights stay in the bar")
+            #expect(root.topBar.trafficLightsWidth == controller.browserWindow.trafficLightsWidth)
+            #expect(controller.sidebar.trafficLightsWidth == 0, "the card's own row keeps no room for them")
+        }
+    }
+
     // MARK: Pinned tabs as tiles (#539)
 
     /// A window over the first space with pinned pages A and B in no folder and C in a folder.
