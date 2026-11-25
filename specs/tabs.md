@@ -83,6 +83,8 @@
   Test: InPageMiniHostTests.theDockedMiniTakesEscFromThePageButNotFromPickedRows
 - ⌘T from the Mini over a page → the browser's new tab bar opens, with the Mini out of its way.
   Test: InPageMiniHostTests.commandTOpensTheBrowsersNewTabBarAndDropsTheDockedMini
+- A scroll over the dimmed page around the Mini stays out of the page behind it.
+  Test: InPageMiniHostTests.aScrollOverTheDimLeavesThePageBehindStill
 - Expand on the Mini over the page → the same live page goes into a Mini window of its own, without reloading.
   Test: InPageMiniHostTests.promotingTakesTheMiniOutIntoAWindowOfItsOwn
   Test: InPageMiniHostTests.expandKeepsTheSameLivePage

@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- With Zigzag Mini open over a page, scrolling over the dimmed page no longer moves the page behind it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
+
 ## [0.9.5] - 2026-11-25
 
 Export Your Data so you can always take everything with you, live folders, nesting tabs by dragging, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.
