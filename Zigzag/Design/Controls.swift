@@ -794,6 +794,7 @@ final class IconButton: InteractiveView {
         didSet {
             imageView.image = image ?? Tokens.Symbol.image(symbol, size: symbolSize)
             imageView.imageScaling = image == nil ? .scaleNone : .scaleProportionallyDown
+            needsLayout = true
         }
     }
     /// A glyph drawn in code in place of the symbol: a template image, centered and tinted exactly like one.

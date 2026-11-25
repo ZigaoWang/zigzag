@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Holding Back or Forward with the mouse or trackpad, then sliding onto a page in the list and letting go, goes to that page again, as with a finger. Before, letting go there did nothing in the sidebar's top row and the bar above the page. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
+- An extension pinned to the address, like 1Password, shows its whole icon centered in its button. Before, an icon that arrived after the button was drawn sat a little off and soft. In Site Controls the pin mark sits in the tile's corner instead of over the icon.
 
 ## [0.9.5] - 2026-11-24
 

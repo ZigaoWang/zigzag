@@ -63,6 +63,10 @@
   Test: SiteExtensionsTests.theMenuPinsAndUnpinsToTheAddress
 - A pinned extension's tile in Site Controls → wears a pin mark.
   Test: SiteExtensionsTests.thePinMarkFollowsThePins
+- The pin mark on a tile → in the tile's corner, never over the extension's icon.
+  Test: ExtensionActionIconTests.thePinMarkIsClearOfTheIcon
+- An icon an extension sets with setIcon, as 1Password does → its pinned button draws it whole and centered.
+  Test: ExtensionActionIconTests.setIconImageDataDrawsWholeAndCentered
 - Pinning → up to three; a new pin goes to the left of the others.
   Test: AddressTests.atMostThreeExtensionsArePinned
 - A chrome-extension://<id>/… address, typed or given by an extension → opens that extension's page; an extension that isn't installed → "This extension isn't here".
