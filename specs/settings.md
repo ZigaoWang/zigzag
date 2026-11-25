@@ -17,3 +17,9 @@
   Test: AppearanceSwitchesTests.theLinkAddressShowsUntilTurnedOff
 - Show link address on hover off → nothing shows in that corner while pointing at a link; the choice is kept.
   Test: AppearanceSwitchesTests.offNoLinkAddressShowsAndTheChoiceIsKept
+- Shorter floating sidebar, off by default → the sidebar that comes out over the page while hidden runs the window's height, a frame's inset from its edges.
+  Test: AppearanceSwitchesTests.theFloatingSidebarIsFullHeightUntilTurnedOn
+- Shorter floating sidebar on → it's two thirds of the window's height with a sixth free above and below, the same card; docked, it runs the window's height. It comes and goes as before, and the traffic lights stay out of it.
+  Test: AppearanceSwitchesTests.onTheFloatingSidebarIsTwoThirdsHighInTheMiddle
+- Shorter floating sidebar → the choice is kept.
+  Test: AppearanceSwitchesTests.theShorterFloatingSidebarIsKept
