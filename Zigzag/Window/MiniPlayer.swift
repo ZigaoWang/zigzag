@@ -1723,6 +1723,15 @@ final class MiniPlayerPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    #if DEBUG
+    /// A test copy started with `ZIGZAG_ORDER_BACK=1` keeps the card behind every other app's windows.
+    override func orderFrontRegardless() {
+        guard BrowserWindow.ordersBack else { return super.orderFrontRegardless() }
+        level = .normal
+        orderBack(nil)
+    }
+    #endif
 }
 
 /// The panel's view, running down as the card's places on screen do.

@@ -4709,8 +4709,8 @@ enum PerfBench {
 #endif
 
 #if DEBUG
-/// idle audit <path> | idle back | idle stopanims | idle clearbg: what keeps the window server drawing windows that
-/// sit still; `back` orders them behind every other app's, `clearbg` makes see-through windows wholly clear again.
+/// idle audit <path> | idle back | idle stopanims | idle clearbg [class]: what keeps the window server drawing windows
+/// that sit still; `back` orders them behind every other app's, `clearbg` makes shadowed see-through windows wholly clear again.
 @MainActor
 enum IdleWorkCommand {
     static func run(_ arg: String) {
@@ -4729,7 +4729,9 @@ enum IdleWorkCommand {
                 try? data.write(to: URL(fileURLWithPath: path))
             }
         case "back": windows.forEach { $0.orderBack(nil) }
-        case "clearbg": WindowManager.shared.controllers.compactMap(\.window).filter { !$0.isOpaque }.forEach { $0.backgroundColor = .clear }
+        case "clearbg":
+            let only = f.dropFirst().first
+            windows.filter { !$0.isOpaque && $0.hasShadow && (only == nil || "\(type(of: $0))" == only) }.forEach { $0.backgroundColor = .clear }
         case "stopanims":
             func walk(_ layer: CALayer) {
                 for key in layer.animationKeys() ?? [] where layer.animation(forKey: key).map(IdleWork.isEndless) == true {
