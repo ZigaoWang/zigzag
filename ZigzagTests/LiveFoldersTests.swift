@@ -71,6 +71,14 @@ struct LiveFoldersTests {
 
     // MARK: Schedule
 
+    @Test func itWearsItsSitesIcon() throws {
+        #expect(LiveSource.gitHub(.issues, user: "octocat").iconSite?.absoluteString == "https://github.com/")
+        let typed = LiveSource.feed(try #require(URL(string: "https://example.com/blog")), found: URL(string: "https://feeds.example.net/x.xml"))
+        #expect(typed.iconSite?.absoluteString == "https://example.com/")
+        #expect(LiveSource.feed(try #require(URL(string: "http://localhost:8080/feed.xml"))).iconSite?.absoluteString == "http://localhost:8080/")
+        #expect(LiveSource().iconSite == nil)
+    }
+
     @Test func fetchesEveryHalfHourAndBacksOffAfterFailures() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         func wait(_ failures: Int, lowPower: Bool = false, retryAfter: TimeInterval? = nil) -> TimeInterval {

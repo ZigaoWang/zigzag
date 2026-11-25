@@ -25,6 +25,18 @@ nonisolated struct LiveSource: Codable, Equatable, Sendable {
         guard let host = (feed ?? address)?.host() else { return nil }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
+
+    /// The site whose icon the folder wears: GitHub's, or the typed address's (else the feed's) front page.
+    var iconSite: URL? {
+        if gitHub != nil { return URL(string: "https://github.com/") }
+        guard let page = address ?? feed, let scheme = page.scheme, let host = page.host() else { return nil }
+        var parts = URLComponents()
+        parts.scheme = scheme
+        parts.host = host
+        parts.port = page.port
+        parts.path = "/"
+        return parts.url
+    }
 }
 
 nonisolated extension LiveSource {

@@ -8,7 +8,7 @@ enum LiveFolderSheet {
     #endif
 
     static var newTitle: String { String(localized: "New Live Folder…", comment: "Item in the menu of the sidebar's +, its empty space, a space's menu and a folder's menu: a folder that fills itself from a feed or GitHub.") }
-    /// The live folder's mark, inside its folder icon and on its menu items.
+    /// The live folder's mark on its menu items and sheet.
     static let symbol = "dot.radiowaves.up.forward"
 
     /// What's typed, as a web address: "example.com" is https, a feed: address is its https one.
