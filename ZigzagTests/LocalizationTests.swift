@@ -310,7 +310,7 @@ struct LocalizationTests {
         }
         #expect(Self.chinese("New Tab", language: language) == "新規タブ")
         #expect(Self.chinese("New Private Window", language: language) == "新規プライベートウインドウ")
-        #expect(Self.chinese("key.space-bar", language: language) == "スペースバー")
+        #expect(Self.chinese("key.space-bar", language: language) == "スペース")
         #expect(String.localizedStringWithFormat(Self.chinese("%lld tabs", language: language), 1) == "1個のタブ")
         #expect(String.localizedStringWithFormat(Self.chinese("%lld tabs", language: language), 3) == "3個のタブ")
         #expect(String(format: Self.chinese("%@ (%@)", language: language), "再読み込み", "⌘R") == "再読み込み（⌘R）")
@@ -329,7 +329,7 @@ struct LocalizationTests {
             ("Private [Ww]indow", "プライベートウインドウ"), (#"\bArchive"#, "アーカイブ"), ("Live Folder", "ライブフォルダ"),
         ]
         let avoided = ["あなた", "ウィンドウ", "フォルダー", "ブラウザー", "ユーザー", "サーバー", "デベロッパー", "拡張機能", "新しいタブ",
-                       "インポート", "エクスポート", "ウェブサイト", "印刷"]
+                       "インポート", "エクスポート", "ウェブサイト", "印刷", "貼り付け", "ネストされた", "聴", "もう一度試して", "アプリの"]
         var off: [String] = []
         for name in ["Localizable", "InfoPlist"] {
             for (key, entry) in try Self.catalog(name) {

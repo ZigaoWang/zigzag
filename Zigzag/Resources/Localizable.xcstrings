@@ -651,7 +651,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Appがこのウインドウを使用中です。閉じると、作業中はふたたび非表示になります。"
+            "value" : "AI Appがこのウインドウを使用中です。閉じると、作業中は再び非表示になります。"
           }
         },
         "zh-Hans" : {
@@ -3184,7 +3184,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$@がこのタブを聴いているあいだは、%1$@は聴くことができません。このタブで%3$@をオフにしてから、もう一度試してください。"
+            "value" : "%2$@がこのタブを聞いているあいだは、%1$@は聞くことができません。このタブで%3$@をオフにしてから、もう一度お試しください。"
           }
         },
         "zh-Hans" : {
@@ -3334,7 +3334,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@にはマスターパスワードが設定されています。パスワードを移行するには、マスターパスワードを入力してください。"
+            "value" : "%@にはプライマリパスワードが設定されています。パスワードを移行するには、プライマリパスワードを入力してください。"
           }
         },
         "zh-Hans" : {
@@ -3403,7 +3403,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@がこのタブを聴いています"
+            "value" : "%@がこのタブを聞いています"
           }
         },
         "zh-Hans" : {
@@ -3732,7 +3732,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@が変更または移動された可能性があります。一度開いてから、もう一度試してください。"
+            "value" : "%@が変更または移動された可能性があります。一度開いてから、もう一度お試しください。"
           }
         },
         "zh-Hans" : {
@@ -3888,7 +3888,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ / %2$@"
+            "value" : "%1$@／%2$@"
           }
         },
         "zh-Hans" : {
@@ -4633,7 +4633,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@：アプリの設定で「ブラウザ」を選び、「ブラウザを追加」を選択してください"
+            "value" : "%@：Appの設定で「ブラウザ」を選び、「ブラウザを追加」を選択してください"
           }
         },
         "zh-Hans" : {
@@ -5077,7 +5077,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Firefoxアドオンから応答がなかったため、この機能拡張を確認できず、追加しませんでした。少し待ってからもう一度試してください。"
+            "value" : "Firefoxアドオンから応答がなかったため、この機能拡張を確認できず、追加しませんでした。少し待ってからもう一度お試しください。"
           }
         },
         "zh-Hans" : {
@@ -5664,7 +5664,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld個を非表示"
+            "value" : "%lld個非表示"
           }
         },
         "zh-Hans" : {
@@ -6238,7 +6238,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld件のパスワードを保存できませんでした。もう一度試してください。"
+                  "value" : "%lld件のパスワードを保存できませんでした。もう一度お試しください。"
                 }
               }
             }
@@ -6304,7 +6304,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%#@passwords@を%2$@から開けませんでした。%3$@を終了してから、もう一度試してください。"
+            "value" : "%#@passwords@を%2$@から開けませんでした。%3$@を終了してから、もう一度お試しください。"
           },
           "substitutions" : {
             "passwords" : {
@@ -6821,7 +6821,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld個を非表示"
+            "value" : "%lld個非表示"
           }
         },
         "zh-Hans" : {
@@ -6959,7 +6959,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コンテンツブロッカーがこのページの読み込みを許可していません。サイトを信頼できる場合は、ブロッカーで許可してから、もう一度試してください。"
+            "value" : "コンテンツブロッカーがこのページの読み込みを許可していません。サイトを信頼できる場合は、ブロッカーで許可してから、もう一度お試しください。"
           }
         },
         "zh-Hans" : {
@@ -7005,7 +7005,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "タブの下の空いている場所をダブルクリックすると新規タブが開きます。オフにすると、タイトルバーと同じようにウインドウが拡大/縮小されます。"
+            "value" : "タブの下の空いている場所をダブルクリックすると新規タブが開きます。オフにすると、タイトルバーと同じようにウインドウが拡大／縮小されます。"
           }
         },
         "zh-Hans" : {
@@ -7448,7 +7448,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI AppはZigzagを使えなくなりました。「設定 › オートメーション」でふたたびオンにできます。"
+            "value" : "AI AppはZigzagを使えなくなりました。「設定 › オートメーション」で再びオンにできます。"
           }
         },
         "zh-Hans" : {
@@ -8489,7 +8489,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "広告はふたたびすべてのサイトでブロックされ、機能拡張はすべてのサイトで動作し、カメラ、マイク、位置情報、通知、証明書についてサイトがふたたび確認するようになります。拡大/縮小、JavaScript、ダークページ、フルスクリーン、Cookieバナーは設定どおりに戻り、すべてのサイトのタブがバックグラウンドでスリープできるようになり、Cookieを消去したときに保持されるサイトはなくなります。非表示にした要素、サイトのスタイル、サイトのアイコンは削除されます。"
+            "value" : "広告は再びすべてのサイトでブロックされ、機能拡張はすべてのサイトで動作し、カメラ、マイク、位置情報、通知、証明書についてサイトが再び確認するようになります。拡大／縮小、JavaScript、ダークページ、フルスクリーン、Cookieバナーは設定どおりに戻り、すべてのサイトのタブがバックグラウンドでスリープできるようになり、Cookieを消去したときに保持されるサイトはなくなります。非表示にした要素、サイトのスタイル、サイトのアイコンは削除されます。"
           }
         },
         "zh-Hans" : {
@@ -9087,7 +9087,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "常に表示"
+            "value" : "常に"
           }
         },
         "zh-Hans" : {
@@ -14504,7 +14504,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "消去"
+            "value" : "クリア"
           }
         },
         "zh-Hans" : {
@@ -18446,7 +18446,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画面の収録"
+            "value" : "画面収録"
           }
         },
         "zh-Hans" : {
@@ -21205,7 +21205,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "どれもサイドバーの一番上に表示されます。"
+            "value" : "どれもサイドバーのいちばん上に表示されます。"
           }
         },
         "zh-Hans" : {
@@ -24529,7 +24529,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ネストされたタブを非表示"
+            "value" : "入れ子のタブを非表示"
           }
         },
         "zh-Hans" : {
@@ -25806,7 +25806,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このスペースの一番上に表示されます"
+            "value" : "このスペースのいちばん上に表示されます"
           }
         },
         "zh-Hans" : {
@@ -26762,7 +26762,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "今日の深夜"
+            "value" : "昨夜遅く"
           }
         },
         "zh-Hans" : {
@@ -27642,7 +27642,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld項目をスペースに移動"
+            "value" : "%lld個をスペースに移動"
           }
         },
         "zh-Hans" : {
@@ -28499,7 +28499,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld項目を「%2$@」に移動しました"
+            "value" : "%1$lld個を「%2$@」に移動しました"
           }
         },
         "zh-Hans" : {
@@ -32606,7 +32606,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "または、これをAppのチャットに貼り付けると、App自身で設定できます。"
+            "value" : "または、これをAppのチャットにペーストすると、App自身で設定できます。"
           }
         },
         "zh-Hans" : {
@@ -33049,7 +33049,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ページサイズ：ウインドウ全体"
+            "value" : "ページサイズ：ウインドウいっぱいに表示"
           }
         },
         "zh-Hans" : {
@@ -33854,7 +33854,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AppでMCPサーバを追加する場所に貼り付けてください。ほとんどのAppはこの形式に対応しています。"
+            "value" : "AppでMCPサーバを追加する場所にペーストしてください。ほとんどのAppはこの形式に対応しています。"
           }
         },
         "zh-Hans" : {
@@ -34310,7 +34310,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アドレスに固定"
+            "value" : "アドレスバーに固定"
           }
         },
         "zh-Hans" : {
@@ -35720,7 +35720,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リーダーのテキストとカラー"
+            "value" : "リーダーのテキストと色"
           }
         },
         "zh-Hans" : {
@@ -40556,7 +40556,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ネストされたタブを表示"
+            "value" : "入れ子のタブを表示"
           }
         },
         "zh-Hans" : {
@@ -41706,7 +41706,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "テキストを小さく"
+            "value" : "文字を小さく"
           }
         },
         "zh-Hans" : {
@@ -42793,7 +42793,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "いつでもスワイプするか点をクリック"
+            "value" : "いつでもスワイプするかドットをクリック"
           }
         },
         "zh-Hans" : {
@@ -42822,7 +42822,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "いつでもスワイプするか点をクリック、または%1$@と%2$@を押す"
+            "value" : "いつでもスワイプするかドットをクリック、または%1$@と%2$@を押す"
           }
         },
         "zh-Hans" : {
@@ -44346,7 +44346,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安全な接続が切断されました。多くの場合、使用中のネットワークが原因です。もう一度試すか、別のネットワークをお試しください。"
+            "value" : "安全な接続が切断されました。多くの場合、使用中のネットワークが原因です。もう一度お試しいただくか、別のネットワークをお試しください。"
           }
         },
         "zh-Hans" : {
@@ -45266,7 +45266,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "今日の午前"
+            "value" : "今朝"
           }
         },
         "zh-Hans" : {
@@ -47219,7 +47219,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lldページを解放"
+                  "value" : "%lld個のページを解放"
                 }
               }
             }
@@ -47592,7 +47592,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "名称未設定のファイルタイプ"
+            "value" : "名称未設定のファイルの種類"
           }
         },
         "zh-Hans" : {
@@ -50133,7 +50133,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "昨日の午前"
+            "value" : "昨日の朝"
           }
         },
         "zh-Hans" : {
@@ -51496,7 +51496,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拡大/縮小"
+            "value" : "拡大／縮小"
           }
         },
         "zh-Hans" : {
@@ -51519,7 +51519,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拡大/縮小%@、実際のサイズ"
+            "value" : "拡大／縮小%@、実際のサイズ"
           }
         },
         "zh-Hans" : {
@@ -51588,7 +51588,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パネルを拡大"
+            "value" : "ペインを拡大"
           }
         },
         "zh-Hans" : {
@@ -53195,7 +53195,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スペースバー"
+            "value" : "スペース"
           }
         },
         "zh-Hans" : {
