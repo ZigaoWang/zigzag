@@ -1145,6 +1145,10 @@ enum ZoomLevels {
     }
 }
 
+extension BrowserWindowController: SideButtonHistory {
+    func sideButtonHistory(back: Bool) -> NSMenu? { Self.historyMenu(of: selectedWebView, back: back) }
+}
+
 /// Calls on WebKit's private inspector object, each checked first, so a name WebKit drops does nothing rather than crash.
 extension NSObject {
     func callIfPresent(_ name: String) {

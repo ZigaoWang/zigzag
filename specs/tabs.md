@@ -243,6 +243,11 @@
   Test: SidebarRowMenuTests.aDisabledBackOpensNothing
 - A finger held on Back or Forward → the same list; slide onto a page and lift to go there.
   Test: SidebarRowMenuTests.aFingerHeldOnBackOpensTheSameList
+- Hold the mouse's Back or Forward button for half a second anywhere in a page window → the same list at the pointer; slide onto a page and let go to go there, let go anywhere else and it stays open to click. A quick press → one page that way, no list. The browser window, a split's pane under the pointer, Zigzag Mini and a web app.
+  Test: SideButtonTests.holdingBackOpensItsListAtThePointerAfterTheDelay
+  Test: SideButtonTests.aQuickSideButtonPressGoesOneStepWithNoList
+  Test: SideButtonTests.holdSlideAndReleaseOnAPageGoesThere
+  Test: SideButtonTests.everyPageWindowListsItsPagesForASideButton
 - Two fingers sideways on the trackpad over a page with nothing that scrolls sideways under the pointer → the arrow shows with the first steps, before the page has answered; a page that pans itself takes it back, and up and down never shows it.
   Test: BookmarkFolderTests.swipeArrowLeansInWhileThePageAnswers
   Test: BookmarkFolderTests.swipeArrowShowsWithTheFirstMovement
