@@ -254,6 +254,7 @@ final class FormRow: NSView, SettingsSearchable {
         self.detail.textColor = Tokens.Color.textSecondary
         self.detail.isSelectable = false
         self.detail.isHidden = (detail ?? "").isEmpty
+        self.title.wrapWhenLong()
         [self.icon, self.title, self.detail, control].forEach { addSubview($0) }
         // The row's title names its switch or menu for VoiceOver, which otherwise reads just "checkbox, 1".
         if (control.accessibilityLabel() ?? "").isEmpty { control.setAccessibilityLabel(title) }
@@ -372,14 +373,25 @@ final class FormRow: NSView, SettingsSearchable {
         detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width, control) + Label.inset * 2, height: 400)).height)
     }
 
-    private var titleAndGap: CGFloat { title.stringValue.isEmpty ? 0 : title.lineHeight + Self.lineGap }
+    /// The title's height at the row's `width`: one line, or more for a name longer than its room.
+    private func titleHeight(for width: CGFloat, _ control: NSSize) -> CGFloat {
+        title.height(forWidth: textWidth(for: width, control) + Label.inset * 2)
+    }
+
+    private func titleAndGap(for width: CGFloat, _ control: NSSize) -> CGFloat {
+        title.stringValue.isEmpty ? 0 : titleHeight(for: width, control) + Self.lineGap
+    }
 
     /// The height this row needs at `width`.
     func height(for width: CGFloat) -> CGFloat {
         let size = controlSize
         let stack = isStacked(width, size) ? Tokens.Space.x3 + size.height : 0
-        guard !detail.isHidden else { return stack > 0 ? Tokens.Page.groupRowPad * 2 + title.lineHeight + stack : Tokens.Page.groupRowHeight }
-        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + titleAndGap + detailHeight(for: width, size) + stack)
+        let titleHeight = titleHeight(for: width, size)
+        guard !detail.isHidden else {
+            if stack > 0 { return Tokens.Page.groupRowPad * 2 + titleHeight + stack }
+            return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + titleHeight)
+        }
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + titleAndGap(for: width, size) + detailHeight(for: width, size) + stack)
     }
 
     override func layout() {
@@ -395,11 +407,15 @@ final class FormRow: NSView, SettingsSearchable {
         }
         let x = textInset - Label.inset
         let width = textWidth(for: bounds.width, size) + Label.inset * 2
+        title.fitLines(width)
+        let titleHeight = titleHeight(for: bounds.width, size)
+        let titleAndGap = titleAndGap(for: bounds.width, size)
         let detailHeight = detailHeight(for: bounds.width, size)
-        let block = detail.isHidden ? title.lineHeight : titleAndGap + detailHeight
-        // A lone title centers its caps, level with the control's text.
-        let top = stacked ? Tokens.Page.groupRowPad : detail.isHidden ? title.centeredY(in: bounds.height) : round((bounds.height - block) / 2)
-        title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
+        let block = detail.isHidden ? titleHeight : titleAndGap + detailHeight
+        // A lone title on one line centers its caps, level with the control's text.
+        let oneLine = titleHeight == title.lineHeight
+        let top = stacked ? Tokens.Page.groupRowPad : detail.isHidden && oneLine ? title.centeredY(in: bounds.height) : round((bounds.height - block) / 2)
+        title.frame = NSRect(x: x, y: top, width: width, height: titleHeight)
         detail.frame = NSRect(x: x, y: top + titleAndGap, width: width, height: detailHeight)
     }
 }
@@ -3974,15 +3990,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             if title != nil || accessory != nil {
                 let size = accessory.map { $0.fittingSize } ?? .zero
-                let slot = max(Tokens.Metric.sectionLabelHeight, size.height + Tokens.Space.x2)
                 let label = made(title ?? "") { Label.groupHeading(title ?? "") }
-                let labelY = y + slot - Tokens.Space.x2 - label.lineHeight
-                label.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: labelY,
-                                     width: max(0, contentWidth - size.width - Tokens.Space.x4 - Tokens.Page.groupPad), height: label.lineHeight)
+                // A heading longer than the room beside its button wraps, and the slot grows to fit.
+                label.wrapWhenLong()
+                let width = max(0, contentWidth - size.width - Tokens.Space.x4 - Tokens.Page.groupPad)
+                label.fitLines(width)
+                let labelHeight = label.height(forWidth: width)
+                let slot = max(Tokens.Metric.sectionLabelHeight, size.height + Tokens.Space.x2, Tokens.Metric.sectionLabelHeight - label.lineHeight + labelHeight)
+                let labelY = y + slot - Tokens.Space.x2 - labelHeight
+                label.frame = NSRect(x: pad + Tokens.Page.groupPad - Label.inset, y: labelY, width: width, height: labelHeight)
                 place(label)
                 if let accessory {
-                    // Centered on the heading's caps, which the system font draws below the line's middle.
-                    let capsMiddle = label.frame.midY + Label.capsBelowMiddle(of: label.font ?? Tokens.Font.label(), lineHeight: label.lineHeight)
+                    // Centered on the first line's caps, which the system font draws below the line's middle.
+                    let capsMiddle = label.frame.minY + label.lineHeight / 2 + Label.capsBelowMiddle(of: label.font ?? Tokens.Font.label(), lineHeight: label.lineHeight)
                     accessory.frame = NSRect(x: pad + contentWidth - Tokens.Page.groupPad - size.width, y: round(capsMiddle - size.height / 2),
                                              width: size.width, height: size.height)
                     place(accessory)
@@ -5705,7 +5725,7 @@ final class KeyCaps: NSView {
 }
 
 /// One shortcut: what it does, and its keys drawn as small keycaps. Click it to give it new keys.
-final class ShortcutRow: InteractiveView, SettingsSearchable {
+final class ShortcutRow: InteractiveView, SettingsSearchable, SettingsSizedRow {
     /// By name, and by its keys whichever way you type them: "⌘L", "⌘ L", or "command L".
     var searchText: String {
         let names = [
@@ -5768,6 +5788,7 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
 
     private func setup(keys: [String]) {
         self.keys = keys
+        title.wrapWhenLong()
         layer?.cornerRadius = Tokens.Radius.group
         layer?.cornerCurve = .continuous
         addSubview(title)
@@ -5842,14 +5863,40 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
             x -= b + Tokens.Space.x2
             resetButton.frame.origin = NSPoint(x: x, y: (bounds.height - b) / 2)
         }
-        let width = max(0, x - pad - Tokens.Space.x4)
-        if note.isHidden {
-            title.frame = NSRect(x: pad - Label.inset, y: title.centeredY(in: bounds.height), width: width, height: title.lineHeight)
+        let width = titleWidth(for: bounds.width)
+        title.fitLines(width)
+        let titleHeight = title.height(forWidth: width)
+        if note.isHidden && titleHeight == title.lineHeight {
+            title.frame = NSRect(x: pad - Label.inset, y: title.centeredY(in: bounds.height), width: width, height: titleHeight)
         } else {
-            let block = title.lineHeight + note.lineHeight
-            title.frame = NSRect(x: pad - Label.inset, y: (bounds.height - block) / 2, width: width, height: title.lineHeight)
+            let block = titleHeight + (note.isHidden ? 0 : note.lineHeight)
+            title.frame = NSRect(x: pad - Label.inset, y: (bounds.height - block) / 2, width: width, height: titleHeight)
             note.frame = NSRect(x: pad - Label.inset, y: title.frame.maxY, width: width, height: note.lineHeight)
         }
+    }
+
+    /// The room its name has at `width`, left of the keys and buttons.
+    private func titleWidth(for width: CGFloat) -> CGFloat {
+        let pad = Tokens.Page.groupPad
+        var x = width - pad
+        if isRecording {
+            x -= 168
+        } else if caps.isEmpty && item != nil {
+            x -= fieldLabel.inkWidth + Tokens.Space.x2
+        } else {
+            x -= caps.map { $0.width + Tokens.Space.x1 }.reduce(0, +)
+        }
+        // The × shows on hover: its room is kept, so a long name doesn't rewrap under the pointer.
+        if item != nil && !caps.isEmpty { x -= removeButton.frame.width + Tokens.Space.x2 }
+        if !resetButton.isHidden { x -= resetButton.frame.width + Tokens.Space.x2 }
+        return max(0, x - pad - Tokens.Space.x4)
+    }
+
+    /// One row's height, or more for a name longer than its room.
+    func height(for width: CGFloat) -> CGFloat {
+        let titleHeight = title.height(forWidth: titleWidth(for: width))
+        guard titleHeight > title.lineHeight else { return Tokens.Page.groupRowHeight }
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + titleHeight + (note.isHidden ? 0 : note.lineHeight))
     }
 
     override func stateDidChange(animated: Bool) {

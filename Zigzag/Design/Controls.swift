@@ -1078,7 +1078,49 @@ final class Label: NSTextField {
     static let inset: CGFloat = 2
 
     /// Height of one line in this label's font.
-    var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
+    var lineHeight: CGFloat {
+        guard wrapsWhenLong else { return ceil(intrinsicContentSize.height) }
+        return ceil(Self.oneLineProbe(font ?? Tokens.Font.body()).intrinsicContentSize.height)
+    }
+
+    /// Text longer than the label's width runs onto more lines instead of being cut short, as a longer language
+    /// needs. The owner sizes it with `height(forWidth:)` and calls `fitLines(_:)` with its width before placing it.
+    private(set) var wrapsWhenLong = false
+
+    func wrapWhenLong() { wrapsWhenLong = true }
+
+    /// Whether the text fits on one line at `width` (the label's frame width).
+    func fitsOneLine(_ width: CGFloat) -> Bool { inkWidth <= width - Label.inset * 2 + 0.5 }
+
+    /// The height its text needs at `width` (its frame width): one line when it fits, else every line it wraps to.
+    func height(forWidth width: CGFloat) -> CGFloat {
+        guard wrapsWhenLong, !fitsOneLine(width) else { return lineHeight }
+        let probe = NSTextField(wrappingLabelWithString: "")
+        probe.font = font
+        probe.attributedStringValue = attributedStringValue
+        return ceil(probe.sizeThatFits(NSSize(width: width, height: 10_000)).height)
+    }
+
+    /// One line, cut at its end, while the text fits `width`; wrapping once it doesn't.
+    func fitLines(_ width: CGFloat) {
+        guard wrapsWhenLong else { return }
+        let wraps = !fitsOneLine(width)
+        guard (cell?.wraps ?? false) != wraps else { return }
+        usesSingleLineMode = !wraps
+        maximumNumberOfLines = wraps ? 0 : 1
+        lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
+        cell?.wraps = wraps
+        cell?.truncatesLastVisibleLine = !wraps
+    }
+
+    /// A single-line label in `font`, to read one line's height from.
+    private static func oneLineProbe(_ font: NSFont) -> Label {
+        if let probe = probes[font] { return probe }
+        let probe = Label("Hg", font: font)
+        probes[font] = probe
+        return probe
+    }
+    private static var probes: [NSFont: Label] = [:]
 
     private struct CapsKey: Hashable {
         var fontName: String
@@ -2706,12 +2748,13 @@ final class MenuPanel: FloatingPanelView {
 }
 
 /// A state, said calmly: a check in its window's accent and a few words ("Zigzag is your default browser").
-final class StatusLabel: NSView {
+final class StatusLabel: NSView, FormSheetSizing {
     private let check = NSImageView()
     private let label: Label
     init(_ text: String, symbol: String = "checkmark.circle.fill") {
         label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
+        label.wrapWhenLong()
         check.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
         [check, label].forEach { addSubview($0) }
     }
@@ -2725,10 +2768,23 @@ final class StatusLabel: NSView {
 
     override var intrinsicContentSize: NSSize { NSSize(width: 16 + Tokens.Space.x2 + label.inkWidth + Label.inset, height: Tokens.Space.x7Height) }
 
+    /// Where its words start, past the icon.
+    private static let textX = 16 + Tokens.Space.x2 - Label.inset
+
+    /// One line beside its icon, or more for words longer than the row.
+    func height(for width: CGFloat) -> CGFloat {
+        let room = width - Self.textX
+        return label.fitsOneLine(room) ? Tokens.Metric.controlHeight : label.height(forWidth: room)
+    }
+
     override func layout() {
         super.layout()
-        check.frame = NSRect(x: 0, y: (bounds.height - 16) / 2, width: 16, height: 16)
-        label.frame = NSRect(x: 16 + Tokens.Space.x2 - Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+        let room = min(label.inkWidth + Label.inset * 2, bounds.width - Self.textX)
+        label.fitLines(room)
+        let height = label.height(forWidth: room)
+        let y = height == label.lineHeight ? label.centeredY(in: bounds.height) : round((bounds.height - height) / 2)
+        label.frame = NSRect(x: Self.textX, y: y, width: max(0, room), height: height)
+        check.frame = NSRect(x: 0, y: height == label.lineHeight ? (bounds.height - 16) / 2 : y + (label.lineHeight - 16) / 2, width: 16, height: 16)
     }
 }
 

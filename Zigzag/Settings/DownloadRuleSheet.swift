@@ -180,7 +180,7 @@ enum DownloadRuleSheet {
                                             view: StatusLabel(String(localized: "Run directly, never through a shell",
                                                                      comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line, since the script is run directly."),
                                                               symbol: "checkmark.shield.fill"),
-                                            height: Tokens.Metric.controlHeight))
+                                            height: 0))
         case .jsonRPC:
             let endpoint = FilledField(placeholder: "http://127.0.0.1:6800/jsonrpc")
             endpoint.stringValue = action.rpcEndpoint
