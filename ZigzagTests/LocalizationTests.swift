@@ -77,32 +77,69 @@ struct LocalizationTests {
         #expect(missing.isEmpty, "Chinese without a space beside Latin letters or digits: \(missing.prefix(10))")
     }
 
-    /// No control, menu item, tooltip or accessibility label is set from a bare English literal: each goes through
-    /// String(localized:). Debug-only code is left out.
-    @Test func noBareStringsInControls() {
-        let pattern = try! NSRegularExpression(pattern: #"(?:toolTip\s*[:=]|setAccessibilityLabel\(|setAccessibilityValue\(|setAccessibilityHelp\(|NSMenuItem\(title:|NSMenu\(title:|\.stringValue\s*=|placeholderString\s*=|messageText\s*=|informativeText\s*=|PillButton\(title:|TextButton\(title:|confirmTitle:|alternateTitle:|allowTitle:|denyTitle:|SidebarMenus\.Item\(|\bItem\(title:|\bItem\(|\bitem\(|FormRow\(title:|addButton\(withTitle:|setActionName\()\s*"([A-Z][^"\\]*[a-z][^"\\]*)""#)
+    /// Where a literal becomes words people read: controls, menu items, tooltips, accessibility, alerts, form and
+    /// settings rows, Zigzag's own Label, PillButton and TextButton, and its menu and row builders.
+    private static let wordSinks = [
+        #"toolTip\s*[:=]"#, #"setAccessibility(?:Label|Value|Help|Title|RoleDescription)\("#, #"accessibilityLabel:"#,
+        #"NSMenuItem\(title:"#, #"NSMenu\(title:"#, #"\.stringValue\s*="#, #"placeholderString\s*="#, #"messageText\s*="#,
+        #"informativeText\s*="#, #"\.title\s*="#, #"titleText\s*="#, #"detailText\s*="#, #"\bLabel\("#, #"\.section\("#,
+        #"\.groupHeading\("#, #"PillButton\(title:"#, #"TextButton\(title:"#, #"IconButton\([^)\n]*toolTip:"#, #"confirmTitle:"#,
+        #"alternateTitle:"#, #"allowTitle:"#, #"denyTitle:"#, #"SidebarMenus\.Item\("#, #"\bItem\(title:"#, #"\bItem\("#,
+        #"\bitem\("#, #"\bSubmenu\("#, #"(?<![\w)\]])\.header\("#, #"(?<![\w)\]])\.note\("#, #"Option\(title:"#, #"FormRow\(title:"#,
+        #"\bdetail:"#, #"Row\(label:"#, #"PanelRow\.(?:toggle|choice|custom)\("#, #"PanelLinkRow\("#, #"addButton\(withTitle:"#,
+        #"setActionName\("#, #"placeholder:"#, #"StatusLabel\("#, #"\btitle:"#, #"\bmessage:"#, #"NSTextField\((?:labelWithString|wrappingLabelWithString):"#,
+        #"\.dialogText\("#, #"NSButton\(title:"#, #"NSAttributedString\(string:"#, #"AttributedString\("#,
+    ]
+
+    /// No words people read come from a bare literal: each goes through String(localized:). Debug-only code is left
+    /// out, and literals that aren't words: no letters, a web address, an identifier or a host (no space, with a dot,
+    /// slash or underscore). ZigzagTests/LocalizationAllowlist.txt keeps the rest that are meant: brands, probes.
+    @Test func noBareStringsInControls() throws {
+        let sink = try NSRegularExpression(pattern: "(?:" + Self.wordSinks.joined(separator: "|") + #")\s*"((?:[^"\\\n]|\\.)*)""#)
+        let allowed = try Self.allowlist()
         let root = Self.repo.appendingPathComponent("Zigzag")
         let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.compactMap { $0 as? URL } ?? []
         var found: [String] = []
-        for url in files where url.pathExtension == "swift" && !["DebugBridge.swift", "MaterialsShowcase.swift"].contains(url.lastPathComponent) {
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
-            // How deep inside #if DEBUG this line is.
-            var debug = 0
-            for (i, line) in text.components(separatedBy: "\n").enumerated() {
+        for url in files where url.pathExtension == "swift" {
+            let name = url.lastPathComponent
+            guard !allowed.contains("\(name): *"), let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            let lines = text.components(separatedBy: "\n")
+            // Lines inside #if DEBUG, and comments.
+            var skipped = Set<Int>(), debug = 0
+            for (i, line) in lines.enumerated() {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if trimmed.hasPrefix("#if") { if debug > 0 || trimmed.contains("DEBUG") { debug += 1 }; continue }
-                if trimmed.hasPrefix("#endif") { if debug > 0 { debug -= 1 }; continue }
-                guard debug == 0, !trimmed.hasPrefix("//") else { continue }
-                let range = NSRange(line.startIndex..., in: line)
-                for match in pattern.matches(in: line, range: range) {
-                    guard let r = Range(match.range(at: 1), in: line) else { continue }
-                    // A brand on its own ("Zigzag") is the same in every language.
-                    if ["Zigzag", "Zigzag Dev"].contains(String(line[r])) { continue }
-                    found.append("\(url.lastPathComponent):\(i + 1) “\(line[r])”")
-                }
+                if trimmed.hasPrefix("#if") { if debug > 0 || trimmed.contains("DEBUG") { debug += 1 } }
+                else if trimmed.hasPrefix("#endif"), debug > 0 { debug -= 1; skipped.insert(i) }
+                if debug > 0 || trimmed.hasPrefix("//") { skipped.insert(i) }
+            }
+            let ns = text as NSString
+            var lineStarts: [Int] = [0]
+            for (i, unit) in text.utf16.enumerated() where unit == 10 { lineStarts.append(i + 1) }
+            for match in sink.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+                let range = match.range(at: 1)
+                let line = (lineStarts.lastIndex { $0 <= range.location } ?? 0)
+                guard !skipped.contains(line) else { continue }
+                let literal = ns.substring(with: range)
+                guard Self.isWords(literal), !allowed.contains("\(name): \(literal)"), !allowed.contains("*: \(literal)") else { continue }
+                found.append("\(name):\(line + 1) “\(literal)”")
             }
         }
-        #expect(found.isEmpty, "Not localizable:\n\(found.joined(separator: "\n"))")
+        #expect(found.isEmpty, "Not localizable (localize it, or add it to ZigzagTests/LocalizationAllowlist.txt):\n\(found.joined(separator: "\n"))")
+    }
+
+    /// Whether a literal reads as words: two letters in a row outside its interpolations, and not a web address,
+    /// identifier, host or path.
+    private static func isWords(_ literal: String) -> Bool {
+        let plain = literal.replacingOccurrences(of: #"\\\([^)]*\)"#, with: "", options: .regularExpression)
+        guard plain.range(of: "[A-Za-z]{2,}", options: .regularExpression) != nil, !literal.contains("://") else { return false }
+        let spaced = plain.contains(" ")
+        return spaced || plain.rangeOfCharacter(from: CharacterSet(charactersIn: "._/")) == nil
+    }
+
+    /// The allowlist's lines, "File.swift: literal", "*: literal" or "File.swift: *", without comments.
+    private static func allowlist() throws -> Set<String> {
+        let text = try String(contentsOf: repo.appendingPathComponent("ZigzagTests/LocalizationAllowlist.txt"), encoding: .utf8)
+        return Set(text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.hasPrefix("#") })
     }
 
     /// Sentences join per language: no space after a full-width stop, one after an English one.
@@ -118,20 +155,31 @@ struct LocalizationTests {
         #expect(Words.sentences("它顯示「已允許。」", "接著重新載入。") == "它顯示「已允許。」接著重新載入。")
     }
 
-    /// Localized sentences are never joined with a literal space; use `Words.sentences`.
-    @Test func noSentencesGluedWithASpace() {
-        let pattern = try! NSRegularExpression(pattern: #"\+\s*" "\s*\+\s*String\(localized:"#)
+    /// A sentence is one string with placeholders, so each language can order its words: localized fragments are
+    /// never glued to each other with a space or punctuation, interpolated into a literal that adds words or
+    /// punctuation, or nested in another localized string. Two sentences join with `Words.sentences`.
+    @Test func noSentencesBuiltFromFragments() throws {
+        let patterns = try [
+            // "…" + " " + String(localized:), and += " " + String(localized:).
+            #"\+=?\s*"[\s:,;.!?—–-]*"\s*\+\s*String\(localized:"#,
+            // String(localized: …) + ": " + …
+            #"String\(localized:[^\n]*"\)\s*\+\s*"[\s:,;.!?—–-]+""#,
+            // "\(String(localized: …)): \(detail)", a literal that starts with a localized fragment.
+            #"(?<!localized: )(?<!localized:)"\\\(String\(localized:"#,
+            // String(localized: "Close \(String(localized: "Tab"))").
+            #"String\(localized:\s*"[^"\n]*\\\(\s*String\(localized:"#,
+        ].map { try NSRegularExpression(pattern: $0) }
         let root = Self.repo.appendingPathComponent("Zigzag")
         let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.compactMap { $0 as? URL } ?? []
         var found: [String] = []
-        for url in files where url.pathExtension == "swift" {
+        for url in files where url.pathExtension == "swift" && !["DebugBridge.swift", "MaterialsShowcase.swift"].contains(url.lastPathComponent) {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
-            for (i, line) in text.components(separatedBy: "\n").enumerated()
-            where pattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil {
-                found.append("\(url.lastPathComponent):\(i + 1)")
+            for (i, line) in text.components(separatedBy: "\n").enumerated() where !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
+                let range = NSRange(line.startIndex..., in: line)
+                if patterns.contains(where: { $0.firstMatch(in: line, range: range) != nil }) { found.append("\(url.lastPathComponent):\(i + 1)") }
             }
         }
-        #expect(found.isEmpty, "Use Words.sentences:\n\(found.joined(separator: "\n"))")
+        #expect(found.isEmpty, "Make it one sentence with placeholders, or join sentences with Words.sentences:\n\(found.joined(separator: "\n"))")
     }
 
     @Test func onlyEnglishLimitNamesLowercaseForASubsequentListItem() {

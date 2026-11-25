@@ -1,0 +1,24 @@
+# Literals LocalizationTests.noBareStringsInControls lets through on purpose, one a line:
+#   File.swift: literal      that literal in that file
+#   *: literal               that literal anywhere
+#   File.swift: *            the whole file
+# Keep it short: everything people read goes through String(localized:). Say why above each group.
+
+# Brands read the same in every language.
+*: Zigzag
+*: Zigzag Dev
+*: GitHub
+
+# Debug-only tools, never in a release.
+DebugBridge.swift: *
+MaterialsShowcase.swift: *
+
+# Text measured, never shown: one line's height, a font's capitals.
+Controls.swift: Hg
+Controls.swift: HOEX
+
+# Errors JSON-RPC sends AI apps over MCP: read by the app, in the protocol's English.
+MCPEndpoint.swift: *
+
+# Column names in other apps' password exports, matched as they're written.
+CSVImporter.swift: *
