@@ -5,11 +5,20 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 ## [Unreleased]
 
 ### Nuevo
+- La búsqueda del historial ignora acentos y mayúsculas, encuentra cada palabra en cualquier orden y la resalta, y nunca oculta una coincidencia dentro de una pila; cada parte del día tiene un solo encabezado, dos páginas del mismo sitio siguen siendo dos filas, y la lista responde a las flechas, Suprimir, ⌘Return, ⌘F y a un clic derecho que quita un sitio entero.
 - Mientras una carpeta dinámica busca páginas nuevas, la insignia de su icono muestra un anillo que gira, como Mail muestra un buzón mientras lo comprueba, y se detiene en cuanto termina.
 - Las ventanas Nueva carpeta dinámica y Editar carpeta dinámica muestran el icono de la carpeta, como la barra lateral: el de GitHub para una lista de GitHub, el del sitio para un feed o el que elegiste. Haz clic en él para cambiar el icono, como con Cambiar icono…, y una carpeta nueva conserva el icono que elijas.
 
+### Cambios
+- Los deslizamientos con dos dedos hacia atrás y hacia adelante son más fluidos, se activan con menos recorrido o un gesto más ligero, evitan que la página se desplace arriba y abajo, y nunca dejan la flecha a la vista ni la página movida, en pestañas, en Split View y en Zigzag Mini.
+
 ### Correcciones
+- Con la barra de direcciones sobre la página y un espacio con transparencia, un video en reproducción ya no mantiene los gráficos del Mac mucho más ocupados que con la barra desactivada. Ahora el cristal de la ventana queda detrás de la barra lateral, y no detrás de toda la ventana.
+- Una pestaña suspendida durante horas mientras tu Mac tenía poca memoria ya no se reactiva sin la sesión iniciada en sitios como Azure DevOps y Microsoft 365: si la parte de WebKit que guarda las cookies de inicio de sesión se detiene, como macOS puede hacer cuando falta memoria, Zigzag las restablece antes de que cargue la página. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Un video en pantalla completa ya no queda tapado por la barra superior o la columna lateral del propio sitio, como en Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Atrás, Adelante y Recargar ya no dejan un hueco para los botones de la ventana donde no se muestran, como en pantalla completa antes de que baje la barra de menús, y los botones de la ventana se quedan en la barra mientras está abierta la barra lateral flotante, más corta. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - El menú de una carpeta dinámica abierto mientras se actualiza ahora pasa de Actualizando… a Actualizado ahora mismo, o al motivo por el que no se pudo actualizar, sin cerrarse.
+- Con Favoritos por fila en Automático, los favoritos se reparten por igual entre sus filas: seis donde cabrían cuatro son dos filas de tres, no cuatro y dos.
 
 ## [0.10.0] - 2026-11-25
 

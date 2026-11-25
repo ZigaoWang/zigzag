@@ -5,11 +5,20 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 ## [Unreleased]
 
 ### Novo
+- A busca do histórico ignora acentos e maiúsculas, encontra cada palavra em qualquer ordem e a destaca, e nunca esconde um resultado dentro de uma pilha; cada parte do dia tem um só título, duas páginas do mesmo site continuam sendo duas linhas, e a lista responde às setas, a Delete, ⌘Return, ⌘F e a um clique com o botão direito que remove um site inteiro.
 - Enquanto uma pasta dinâmica procura páginas novas, o selo no ícone dela mostra um anel girando, como o Mail mostra uma caixa sendo verificada, e para assim que a verificação termina.
 - As janelas Nova pasta dinâmica e Editar pasta dinâmica mostram o ícone da pasta, como a barra lateral: o do GitHub para uma lista do GitHub, o do site para um feed ou o que você escolheu. Clique nele para mudar o ícone, como em Alterar ícone…, e uma pasta nova fica com o ícone escolhido.
 
+### Alterado
+- Os deslizes de dois dedos para voltar e avançar ficam mais suaves, funcionam com uma distância menor ou um toque mais leve, impedem que a página se mova para cima e para baixo e nunca deixam a seta visível nem a página deslocada, em abas, na Split View e no Zigzag Mini.
+
 ### Corrigido
+- Com a barra de endereço acima da página e um espaço com transparência, um vídeo em reprodução não deixa mais os gráficos do Mac muito mais ocupados do que com a barra desativada. Agora o vidro da janela fica atrás da barra lateral, e não atrás da janela toda.
+- Uma aba que ficou suspensa por horas enquanto o Mac estava com pouca memória não volta mais desconectada de sites como Azure DevOps e Microsoft 365: se a parte do WebKit que guarda os cookies de login parar, como o macOS pode fazer quando falta memória, o Zigzag os restaura antes de a página carregar. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Um vídeo em tela cheia não fica mais coberto pela barra superior ou pela coluna lateral do próprio site, como no Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Voltar, avançar e recarregar não deixam mais um espaço vazio para os botões da janela onde eles não aparecem, como em tela cheia antes de a barra de menus descer, e os botões da janela ficam na barra enquanto a barra lateral flutuante, mais curta, está aberta. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - O menu de uma pasta dinâmica deixado aberto durante a atualização agora passa de Atualizando… para Atualizada agora mesmo, ou para o motivo de não ter sido possível atualizar, sem fechar.
+- Com Favoritos por linha em Automático, os favoritos se distribuem igualmente pelas linhas: seis onde caberiam quatro viram duas linhas de três, e não quatro e duas.
 
 ## [0.10.0] - 2026-11-25
 

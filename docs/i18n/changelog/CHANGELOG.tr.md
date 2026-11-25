@@ -5,11 +5,20 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 ## [Unreleased]
 
 ### Yeni Özellikler
+- Geçmişteki arama aksanları ve harf büyüklüğünü yok sayar, her sözcüğü herhangi bir sırada bulup işaretler ve hiçbir eşleşmeyi bir yığının içinde gizlemez; günün her bölümünün tek bir başlığı vardır, aynı siteden iki sayfa iki satır olarak kalır ve liste ok tuşlarına, Sil’e, ⌘Return’e, ⌘F’ye ve bir sitenin tamamını kaldıran sağ tıklamaya yanıt verir.
 - Canlı klasör yeni sayfaları denetlerken simgesindeki rozet, Mail’in denetlenen bir posta kutusunu gösterdiği gibi dönen bir halka gösterir ve denetim biter bitmez durur.
 - “Yeni Canlı Klasör” ve “Canlı Klasörü Düzenle” penceresi klasörün simgesini kenar çubuğundaki gibi gösterir: GitHub listesi için GitHub’ınkini, akış için sitenin simgesini veya seçtiğiniz simgeyi. Simgeyi “Simgeyi Değiştir…” ile olduğu gibi değiştirmek için üzerine tıklayın; yeni klasör seçtiğiniz simgeyi korur.
 
+### Değişiklikler
+- İki parmakla geri ve ileri kaydırmalar daha akıcıdır, daha kısa bir mesafede veya daha hafif bir fırlatmada çalışır, sayfanın yukarı aşağı kaymasını önler ve sekmelerde, Bölünmüş Görünümde ve Zigzag Mini’de oku ekranda veya sayfayı kaymış halde bırakmaz.
+
 ### Düzeltmeler
+- Adres çubuğu sayfanın üstündeyken ve Space saydamken, oynatılan bir video artık Mac’in grafiklerini çubuk kapalıyken olduğundan çok daha fazla meşgul etmez. Pencerenin camı artık tüm pencerenin değil, kenar çubuğunun arkasında kalır.
+- Düşük bellekli Mac’te saatlerce uykuya alınmış bir sekme artık Azure DevOps ve Microsoft 365 gibi sitelerde giriş yapılmamış olarak uyanmaz: giriş çerezlerini tutan WebKit parçası, macOS’un bellek azken yapabileceği gibi durursa Zigzag onları sayfa yüklenmeden önce geri koyar. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Tam ekrandaki bir video artık Bilibili’de olduğu gibi sitenin kendi üst çubuğu veya yan sütunuyla örtülmez. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Geri, ileri ve yeniden yükle artık pencere düğmeleri gösterilmeyen yerde, örneğin menü çubuğu inmeden önceki tam ekranda, boş yer bırakmaz; daha kısa kayan kenar çubuğu açıkken de pencere düğmeleri çubukta kalır. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - Güncellenirken açık bırakılan canlı klasör menüsü artık kapanmadan “Güncelleniyor…” durumundan “Az Önce Güncellendi” durumuna veya neden yenilenemediğine geçer.
+- Satır başına favori Otomatik olduğunda favoriler satırlara eşit dağılır: dördün sığacağı yerde altı favori, dört ve iki değil, üçer favorilik iki satır olur.
 
 ## [0.10.0] - 2026-11-25
 
