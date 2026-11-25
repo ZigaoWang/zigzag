@@ -52,6 +52,8 @@ struct SyncUpload {
 enum SyncSaveFailure {
     /// Another Mac changed it first: here's its version.
     case conflict(SyncRemote)
+    /// Another Mac changed it first, without its version: it's fetched, then merged and sent again.
+    case conflictUnread
     /// It was removed from the server since.
     case gone
     /// The zone isn't there (removed, or never made).
@@ -157,6 +159,8 @@ final class SyncSession {
     var onHeld: (() -> Void)?
     /// Called when a save finds the zone gone after the first sync: removed from iCloud on another Mac.
     var onRemovedElsewhere: (() -> Void)?
+    /// Called when the server's version of something is needed before it can be sent again.
+    var onNeedsFetch: (() -> Void)?
     /// True while it writes into the library, so the change that causes isn't read as one made here.
     private(set) var isApplying = false
 
@@ -683,6 +687,10 @@ final class SyncSession {
         case .conflict(let record):
             arrive(name, record)
             if state.merged { settle() }
+        case .conflictUnread:
+            // Stays unsent, so it goes up again once the fetch has merged it.
+            if state.base[name] != nil { state.unsent.insert(name) }
+            onNeedsFetch?()
         case .gone:
             // Removed elsewhere while it changed here: the change wins and it comes back.
             state.systemFields[name] = nil

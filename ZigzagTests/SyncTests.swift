@@ -1205,6 +1205,26 @@ extension SyncLibrary {
         #expect(cloud.records[page] == nil)
     }
 
+    @Test func aConflictWithoutTheServersVersionIsFetchedThenSentAgain() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let page = try #require(a.session.state.base.keys.first { $0.hasPrefix("page.") })
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "B" } }
+        b.sync()
+        a.clock += 10
+        a.edit { $0.contents.spaces[0].bookmarks[0].title = "A" }
+        var fetched = false
+        a.session.onNeedsFetch = { fetched = true }
+        // iCloud refuses A's save as stale, without sending its own version.
+        a.session.saveFailed(page, .conflictUnread)
+        #expect(fetched && a.session.state.unsent.contains(page))
+        a.fetch()
+        a.session.requeue()
+        a.send()
+        b.sync()
+        #expect(cloud.remote(page).map { String(decoding: $0.payload, as: UTF8.self).contains("\"title\":\"A\"") } == true)
+        #expect(b.library.titles(in: "Personal") == ["A"])
+    }
+
     @Test func aRecordFetchedTwiceOrLateChangesNothing() throws {
         let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
         let old = try #require(cloud.remote(cloud.records.keys.first { $0.hasPrefix("page.") }!))

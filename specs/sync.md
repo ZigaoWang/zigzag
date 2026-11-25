@@ -139,3 +139,5 @@
   Test: SyncTests.aMissingProfilesFileIsUnreadableNotEveryProfileRemoved
 - A removal iCloud refuses because the record is already gone → taken as done, never asked again; one refused for another reason is asked again with the next sync.
   Test: SyncTests.aRemovalOfWhatsAlreadyGoneIsntAskedAgain
+- iCloud refuses a save as stale without sending its own version → Zigzag fetches it, merges, and sends again; the change isn't dropped.
+  Test: SyncTests.aConflictWithoutTheServersVersionIsFetchedThenSentAgain

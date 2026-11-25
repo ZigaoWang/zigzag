@@ -176,6 +176,7 @@ final class ICloudSync {
         session.onChange = { [weak self] in self?.saveSoon() }
         session.onHeld = { [weak self] in self?.changed.send() }
         session.onRemovedElsewhere = { [weak self] in self?.zoneDeleted(reset: false) }
+        session.onNeedsFetch = { [weak self] in self?.pushDebouncer.call { self?.fetchSoon(after: 0) } }
         self.session = session
         watchLibrary()
         // CKSyncEngine listens for pushes too, but its own fetch on one goes through a scheduler that can refuse it.
@@ -705,7 +706,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                 let name = failure.record.recordID.recordName
                 switch failure.error.code {
                 case .serverRecordChanged:
-                    if let server = failure.error.serverRecord { session.saveFailed(name, .conflict(Self.remote(server))) }
+                    if let server = failure.error.serverRecord { session.saveFailed(name, .conflict(Self.remote(server))) } else { session.saveFailed(name, .conflictUnread) }
                 case .zoneNotFound, .userDeletedZone:
                     if !session.state.merged { syncEngine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: ICloudSync.zoneID))]) }
                     session.saveFailed(name, .zoneMissing)
