@@ -852,7 +852,7 @@ final class ExtensionHost: NSObject {
         let approved = (state?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
         let requested = (state?.requestedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
         Self.applySiteAccess(state?.siteAccess, approved: approved, sites: profile.installs.accessSites(id), requested: requested,
-                             offSites: ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)),
+                             offSites: ExtensionStore.extensionsOffSitesInEffect(in: profile).union(profile.installs.offSites(id)),
                              approvesActiveTab: state?.grantedPermissions?.contains(WKWebExtension.Permission.activeTab.rawValue) ?? false,
                              to: context)
     }

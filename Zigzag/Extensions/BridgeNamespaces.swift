@@ -2369,7 +2369,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         guard let context = host.context(for: extensionID),
               PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate || tab.isPrivate, allowed: context.hasAccessToPrivateData),
               let webView = tab.webView, let url = webView.url ?? tab.url else { throw BridgeError("Cannot capture a tab here") }
-        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites(in: host.profile),
+        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSitesInEffect(in: host.profile),
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: host.profile.installs.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
         }

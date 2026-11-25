@@ -278,7 +278,7 @@ final class BridgePageCapture: BridgeNamespace {
 
     /// The extension may save the page at this address in this tab (`reaches`), as WebKit decides its access.
     private func mayReach(_ url: URL, in tab: any WKWebExtensionTab, context: WKWebExtensionContext) -> Bool {
-        Self.reaches(url, hasAccess: context.hasAccess(to: url, in: tab), offSites: ExtensionStore.extensionsOffSites(in: host.profile))
+        Self.reaches(url, hasAccess: context.hasAccess(to: url, in: tab), offSites: ExtensionStore.extensionsOffSitesInEffect(in: host.profile))
     }
 
     /// A web page on a site the extension has (what it asked for and you allowed, or the tab through activeTab:
