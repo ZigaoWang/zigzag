@@ -71,13 +71,15 @@ final class ICloudSync {
     }
 
     /// What sync starts from at launch. A library that couldn't be read (and started afresh) is merged with iCloud as
-    /// on a first sync, so iCloud fills it in rather than its missing spaces being removed from every Mac.
+    /// on a first sync, so iCloud fills it in rather than its missing spaces being removed from every Mac. A first
+    /// sync that didn't finish reads all of iCloud again, not only what changed since it was cut short.
     static func stateAtLaunch(saved: SyncState, libraryWasRead: Bool) -> SyncState {
         var state = saved
         if !libraryWasRead {
             state = SyncState()
             state.account = saved.account
         }
+        if !state.merged { state.engine = nil }
         return state
     }
 

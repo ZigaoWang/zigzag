@@ -344,7 +344,7 @@ extension SyncLibrary {
         let records = cloud.records.count
         // Zigzag starts again with a new library (the file couldn't be read): what sync kept is put aside, and it merges again.
         let state = ICloudSync.stateAtLaunch(saved: a.session.state, libraryWasRead: false)
-        #expect(!state.merged && state.base.isEmpty && state.account == a.session.state.account)
+        #expect(!state.merged && state.base.isEmpty && state.engine == nil && state.account == a.session.state.account)
         let again = FakeMac(cloud, Sample.library([Sample.space("Personal")]), clock: a.clock, state: state)
         again.sync()
         #expect(cloud.records.count == records)
@@ -353,6 +353,16 @@ extension SyncLibrary {
         #expect(again.library.contents.favorites.map(\.url.lastPathComponent) == ["fav"])
         // Read as usual, it carries on.
         #expect(ICloudSync.stateAtLaunch(saved: a.session.state, libraryWasRead: true).merged)
+    }
+
+    @Test func aFirstSyncCutShortReadsICloudAgainFromTheStart() {
+        var state = SyncState()
+        state.engine = Data("token".utf8)
+        state.account = "_abc"
+        let next = ICloudSync.stateAtLaunch(saved: state, libraryWasRead: true)
+        #expect(next.engine == nil && next.account == "_abc")
+        state.merged = true
+        #expect(ICloudSync.stateAtLaunch(saved: state, libraryWasRead: true).engine == state.engine)
     }
 
     @Test func turningSyncOnAgainAddsNothingTwice() {
