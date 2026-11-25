@@ -1349,6 +1349,7 @@ final class SidebarView: NSView {
         }
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
+        SitePanel.markCompatibility(address.siteControlsButton, url: tab?.url)
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

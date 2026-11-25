@@ -43,6 +43,12 @@
         "value": "Controleert elke %lld minuten, of elk uur in de energiebesparingsmodus."
       }
     },
+    "Compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Compatibiliteitsmodus"
+      }
+    },
     "Downloads ending in %@": {
       "stringUnit": {
         "state": "translated",
@@ -97,6 +103,12 @@
         "value": "Nieuwe pagina’s uit “%@”, nieuwste eerst."
       }
     },
+    "Off in compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Uit in compatibiliteitsmodus"
+      }
+    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE.": {
       "stringUnit": {
         "state": "translated",
@@ -133,6 +145,12 @@
         "value": "Open pull requests in openbare repositories van %@, met de nieuwste activiteit bovenaan."
       }
     },
+    "Site Controls, compatibility mode on": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Website-instellingen, compatibiliteitsmodus aan"
+      }
+    },
     "The download didn’t finish.": {
       "stringUnit": {
         "state": "translated",
@@ -143,6 +161,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} en {file_url} vereisen dat een bestand wordt doorgegeven."
+      }
+    },
+    "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Zet extensies, het blokkeren van advertenties, cookiebanners en verborgen elementen uit op deze website. Je keuzes komen terug als je hem uitzet."
       }
     },
     "Updated %@": {
@@ -161,6 +185,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Bezig met bijwerken…"
+      }
+    },
+    "compatibility.off": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Uit"
       }
     },
     "handed this file to %@": {

@@ -3742,6 +3742,12 @@
         "value": "Входит в %@"
       }
     },
+    "Compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Режим совместимости"
+      }
+    },
     "Connect 1Password to Zigzag": {
       "stringUnit": {
         "state": "translated",
@@ -7814,6 +7820,12 @@
         "value": "Выкл. здесь"
       }
     },
+    "Off in compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Выключено в режиме совместимости"
+      }
+    },
     "Off on %@": {
       "stringUnit": {
         "state": "translated",
@@ -10932,6 +10944,12 @@
         "value": "Настройки сайта"
       }
     },
+    "Site Controls, compatibility mode on": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Настройки сайта, режим совместимости включен"
+      }
+    },
     "Site Permissions": {
       "stringUnit": {
         "state": "translated",
@@ -12594,6 +12612,12 @@
         "value": "Включить режим разработчика для этого сайта"
       }
     },
+    "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Выключает расширения, блокировку рекламы, баннеры cookie и скрытые элементы на этом сайте. Когда вы его выключите, ваши настройки для них вернутся."
+      }
+    },
     "Two Pages": {
       "stringUnit": {
         "state": "translated",
@@ -14234,6 +14258,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "проверка предпросмотр правило тест"
+      }
+    },
+    "compatibility.off": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Выкл."
       }
     },
     "control tab ctrl tab switcher recent order next previous cycle keyboard shortcut chrome arc": {

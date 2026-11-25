@@ -582,6 +582,89 @@
         }
       }
     },
+    "Compatibility mode" : {
+      "comment" : "Row in the site panel's This Site group and in Settings › Privacy › Sites: for a site that doesn't work right, turns off extensions, ad blocking, cookie banners and zapped elements on it, keeping those choices for later.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容模式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相容模式"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "互換モード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "호환성 모드"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kompatibilitätsmodus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode de compatibilité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modalità compatibilità"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo de compatibilidad"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo de compatibilidade"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Режим совместимости"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatibiliteitsmodus"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tryb zgodności"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uyumluluk modu"
+          }
+        }
+      }
+    },
     "Downloads ending in %@" : {
       "comment" : "Part of a download rule's sentence for a File handoff: the files whose address ends this way. The placeholder is the end of the address, such as .torrent.",
       "localizations" : {
@@ -1329,6 +1412,89 @@
         }
       }
     },
+    "Off in compatibility mode" : {
+      "comment" : "Under a row in the site panel (Ad blocking, Cookie banners, Extensions) while Compatibility mode is on for the site: it's off, and its own choice comes back when that's turned off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容模式下已关闭"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相容模式下已關閉"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "互換モードでオフ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "호환성 모드에서 끔"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Kompatibilitätsmodus aus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactivé en mode de compatibilité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato in modalità compatibilità"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivado en modo de compatibilidad"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado no modo de compatibilidade"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключено в режиме совместимости"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uit in compatibiliteitsmodus"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyłączone w trybie zgodności"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uyumluluk modunda kapalı"
+          }
+        }
+      }
+    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE." : {
       "comment" : "Under the arguments of a Run Script download rule: one argument a line, and the names the link, the cookies and a File handoff's saved file arrive under.",
       "localizations" : {
@@ -1827,6 +1993,89 @@
         }
       }
     },
+    "Site Controls, compatibility mode on" : {
+      "comment" : "Tooltip of the Site Controls button by the address while Compatibility mode is on for the page's site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站设置（兼容模式已打开）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "網站設定（相容模式已開啟）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サイトコントロール（互換モード：オン）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사이트 제어, 호환성 모드 켬"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Website-Einstellungen, Kompatibilitätsmodus an"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages du site, mode de compatibilité activé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlli del sito, modalità compatibilità attiva"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes del sitio, modo de compatibilidad activado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes do site, modo de compatibilidade ativado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройки сайта, режим совместимости включен"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Website-instellingen, compatibiliteitsmodus aan"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ustawienia witryny, tryb zgodności włączony"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site Ayarları, uyumluluk modu açık"
+          }
+        }
+      }
+    },
     "The download didn’t finish." : {
       "comment" : "Why a File handoff didn't run: the download failed or was cancelled.",
       "localizations" : {
@@ -1989,6 +2238,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "權杖：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}、{file}、{file_url}。{file} 和 {file_url} 需要選擇「檔案」轉交。"
+          }
+        }
+      }
+    },
+    "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off." : {
+      "comment" : "Tooltip of the Compatibility mode row in the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此网站上关闭扩展、广告拦截、Cookie 弹窗和已隐藏的元素。关闭兼容模式后，你对它们的选择会恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此網站上關閉延伸功能、廣告阻擋、Cookie 彈出式視窗和已隱藏的元素。關閉相容模式後，你對它們的選擇會恢復。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサイトで機能拡張、広告ブロック、Cookieバナー、非表示にした要素をオフにします。互換モードをオフにすると、それぞれの設定が元に戻ります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 사이트에서 확장 프로그램, 광고 차단, 쿠키 배너, 숨긴 요소를 끕니다. 호환성 모드를 끄면 각각 선택한 대로 돌아갑니다."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schaltet Erweiterungen, Werbeblocker, Cookie-Banner und ausgeblendete Elemente auf dieser Website aus. Wenn du ihn ausschaltest, gelten wieder deine Entscheidungen dafür."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactive les extensions, le blocage des publicités, les bannières de cookies et les éléments masqués sur ce site. Vos choix reviennent quand vous le désactivez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattiva estensioni, blocco pubblicità, banner dei cookie ed elementi nascosti su questo sito. Le tue scelte tornano quando la disattivi."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactiva las extensiones, el bloqueo de anuncios, los avisos de cookies y los elementos ocultos en este sitio. Tus opciones vuelven cuando lo desactivas."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativa extensões, bloqueio de anúncios, banners de cookies e elementos ocultados neste site. Suas escolhas voltam quando você o desativa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выключает расширения, блокировку рекламы, баннеры cookie и скрытые элементы на этом сайте. Когда вы его выключите, ваши настройки для них вернутся."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet extensies, het blokkeren van advertenties, cookiebanners en verborgen elementen uit op deze website. Je keuzes komen terug als je hem uitzet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyłącza rozszerzenia, blokowanie reklam, banery cookie i ukryte elementy w tej witrynie. Po jego wyłączeniu wracają wcześniejsze wybory."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu sitede genişletmeleri, reklam engellemeyi, çerez uyarılarını ve gizlenen öğeleri kapatır. Kapattığınızda bunlar için yaptığınız seçimler geri gelir."
           }
         }
       }
@@ -2241,6 +2573,96 @@
           }
         }
       }
+    },
+    "compatibility.off" : {
+      "comment" : "Short, at the end of a row in the site panel (3 zapped, Custom style) while Compatibility mode is on for the site: those changes aren't applied.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已關閉"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "끔"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactivé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выкл."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uit"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyłączone"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapalı"
+          }
+        }
+      },
+      "extractionState" : "extracted_with_value"
     },
     "handed this file to %@" : {
       "comment" : "An automation's notice over the page: what a rule did with the file it downloaded first. The placeholder is the app's own name, like mpv.",

@@ -43,6 +43,12 @@
         "value": "%lld분마다 확인하며, 저전력 모드에서는 1시간마다 확인합니다."
       }
     },
+    "Compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "호환성 모드"
+      }
+    },
     "Downloads ending in %@": {
       "stringUnit": {
         "state": "translated",
@@ -97,6 +103,12 @@
         "value": "‘%@’의 새로운 페이지를 최신순으로 표시합니다."
       }
     },
+    "Off in compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "호환성 모드에서 끔"
+      }
+    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE.": {
       "stringUnit": {
         "state": "translated",
@@ -133,6 +145,12 @@
         "value": "%@이(가) 소유한 공개 저장소의 열린 풀 리퀘스트를 최근 활동순으로 표시합니다."
       }
     },
+    "Site Controls, compatibility mode on": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "사이트 제어, 호환성 모드 켬"
+      }
+    },
     "The download didn’t finish.": {
       "stringUnit": {
         "state": "translated",
@@ -143,6 +161,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "토큰: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} 및 {file_url}은 파일 전달이 필요합니다."
+      }
+    },
+    "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "이 사이트에서 확장 프로그램, 광고 차단, 쿠키 배너, 숨긴 요소를 끕니다. 호환성 모드를 끄면 각각 선택한 대로 돌아갑니다."
       }
     },
     "Updated %@": {
@@ -161,6 +185,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "업데이트 중…"
+      }
+    },
+    "compatibility.off": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "끔"
       }
     },
     "handed this file to %@": {

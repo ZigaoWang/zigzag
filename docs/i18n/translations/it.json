@@ -43,6 +43,12 @@
         "value": "Controlla ogni %lld minuti, oppure ogni ora in modalità Risparmio energetico."
       }
     },
+    "Compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Modalità compatibilità"
+      }
+    },
     "Downloads ending in %@": {
       "stringUnit": {
         "state": "translated",
@@ -97,6 +103,12 @@
         "value": "Nuove pagine da “%@”, prima le più recenti."
       }
     },
+    "Off in compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Disattivato in modalità compatibilità"
+      }
+    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE.": {
       "stringUnit": {
         "state": "translated",
@@ -133,6 +145,12 @@
         "value": "Pull request aperte nei repository pubblici di %@, prima le più recenti."
       }
     },
+    "Site Controls, compatibility mode on": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Controlli del sito, modalità compatibilità attiva"
+      }
+    },
     "The download didn’t finish.": {
       "stringUnit": {
         "state": "translated",
@@ -143,6 +161,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Token: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} e {file_url} richiedono il trasferimento del file."
+      }
+    },
+    "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Disattiva estensioni, blocco pubblicità, banner dei cookie ed elementi nascosti su questo sito. Le tue scelte tornano quando la disattivi."
       }
     },
     "Updated %@": {
@@ -161,6 +185,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Aggiornamento in corso…"
+      }
+    },
+    "compatibility.off": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Disattivato"
       }
     },
     "handed this file to %@": {

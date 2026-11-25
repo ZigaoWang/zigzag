@@ -2869,6 +2869,8 @@ enum DebugBridge {
         case "webrtcoffer": if let tab = controller.tabManager.selectedTab { Task { let allowed = await WebRTCProtection.offer(in: tab); debugLog("webrtcoffer => \(allowed)") } }
         // sitedark <automatic|on|off|force>: the Dark page row's dropdown.
         case "sitedark": SitePanel.shown?.debugDark(arg)
+        // sitecompat <on|off>: the Compatibility mode switch.
+        case "sitecompat": SitePanel.shown?.debugCompatibility(arg)
         // sitejs <allowed|blocked>: the JavaScript row. javascript <on|off>: Settings › Privacy › JavaScript.
         case "sitejs": SitePanel.shown?.debugJavaScript(arg)
         case "javascript": if arg == "on" || arg == "off" { SiteJavaScript.isAllowed = arg == "on" }

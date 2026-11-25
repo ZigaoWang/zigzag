@@ -3382,6 +3382,12 @@
         "value": "Gehört zu %@"
       }
     },
+    "Compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Kompatibilitätsmodus"
+      }
+    },
     "Connect 1Password to Zigzag": {
       "stringUnit": {
         "state": "translated",
@@ -7382,6 +7388,12 @@
         "value": "Hier aus"
       }
     },
+    "Off in compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Im Kompatibilitätsmodus aus"
+      }
+    },
     "Off on %@": {
       "stringUnit": {
         "state": "translated",
@@ -10464,6 +10476,12 @@
         "value": "Website-Einstellungen"
       }
     },
+    "Site Controls, compatibility mode on": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Website-Einstellungen, Kompatibilitätsmodus an"
+      }
+    },
     "Site Permissions": {
       "stringUnit": {
         "state": "translated",
@@ -12114,6 +12132,12 @@
         "value": "Entwicklermodus für diese Website einschalten"
       }
     },
+    "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Schaltet Erweiterungen, Werbeblocker, Cookie-Banner und ausgeblendete Elemente auf dieser Website aus. Wenn du ihn ausschaltest, gelten wieder deine Entscheidungen dafür."
+      }
+    },
     "Two Pages": {
       "stringUnit": {
         "state": "translated",
@@ -13676,6 +13700,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "check prüfen preview vorschau rule regel test testen"
+      }
+    },
+    "compatibility.off": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Aus"
       }
     },
     "control tab ctrl tab switcher recent order next previous cycle keyboard shortcut chrome arc": {

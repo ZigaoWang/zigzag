@@ -270,6 +270,7 @@ final class PaneHeaderView: NSView {
         reload.toolTip = loading ? String(localized: "Stop", comment: "Tooltip of a button in the strip on top of each page of a split view: stops the page loading.") : String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page.")
         address.text = tab?.url.map(Self.addressText) ?? ""
         address.notSecure = tab?.isNotSecure ?? false
+        SitePanel.markCompatibility(address.siteControls, url: tab?.url)
         needsLayout = true
     }
 

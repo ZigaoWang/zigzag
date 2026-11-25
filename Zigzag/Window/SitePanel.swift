@@ -741,6 +741,11 @@ final class SitePanel: FloatingPanelView {
                    "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? CGFloat(-1)]]
     }
 
+    /// sitecompat on|off: the Compatibility mode switch.
+    func debugCompatibility(_ arg: String) {
+        rows.first { $0.debugTitle.hasPrefix(Self.compatibilityTitle + ":") }?.debugChoose(arg == "on" ? 1 : 0)
+    }
+
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
     func debugDark(_ arg: String) {
         guard let index = DarkPages.SiteChoice.allCases.firstIndex(where: { $0.rawValue == arg }) else { return }
@@ -830,7 +835,7 @@ final class SitePanel: FloatingPanelView {
         let actions = host.actions(for: tab).filter { PrivateAccess.sees(isPrivate: isPrivate, allowed: $0.context.hasAccessToPrivateData) }
         if isPrivate, actions.isEmpty { return }
         let installs = tab.profile.installs
-        let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
+        let offHere = !isBlank && (ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) || compatible)
         let web = ["http", "https"].contains(url.scheme ?? "")
         let tab = tab, url = url
         var items: [SiteExtensionsSection.Item] = actions.map { action in
@@ -888,6 +893,26 @@ final class SitePanel: FloatingPanelView {
     // What the rows of This Site say they're set to.
     private static let onHere = String(localized: "On for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: on.")
     private static let offHere = String(localized: "Off for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: off.")
+
+    /// Compatibility mode (#497): its row's name, here and in Settings › Privacy › Sites.
+    static let compatibilityTitle = String(localized: "Compatibility mode", comment: "Row in the site panel's This Site group and in Settings › Privacy › Sites: for a site that doesn't work right, turns off extensions, ad blocking, cookie banners and zapped elements on it, keeping those choices for later.")
+    static let compatibilityTip = String(localized: "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.", comment: "Tooltip of the Compatibility mode row in the site panel.")
+    /// Under a row compatibility mode sets aside.
+    static let offInCompatibility = String(localized: "Off in compatibility mode", comment: "Under a row in the site panel (Ad blocking, Cookie banners, Extensions) while Compatibility mode is on for the site: it's off, and its own choice comes back when that's turned off.")
+    /// At the end of the zapped elements and Custom style rows while compatibility mode is on.
+    static let offShort = String(localized: "compatibility.off", defaultValue: "Off", comment: "Short, at the end of a row in the site panel (3 zapped, Custom style) while Compatibility mode is on for the site: those changes aren't applied.")
+
+    /// A Site Controls button in the accent while compatibility mode is on for its page's site, as the star is while pinned.
+    static func markCompatibility(_ button: IconButton, url: URL?) {
+        let on = SiteCompatibility.isOn(for: url)
+        button.tint = on ? Brand.Theme.for(button).accent : Tokens.Color.icon
+        button.toolTip = on ? String(localized: "Site Controls, compatibility mode on", comment: "Tooltip of the Site Controls button by the address while Compatibility mode is on for the page's site.")
+            : PaneHeaderView.siteControlsTitle
+        button.setAccessibilityValue(on ? compatibilityTitle : nil)
+    }
+
+    /// Compatibility mode is on for this page's site.
+    private var compatible: Bool { !isBlank && SiteCompatibility.isOn(for: url) }
 
     /// A choice in the Dark page row's dropdown.
     static func title(of choice: DarkPages.SiteChoice) -> String {
@@ -1003,6 +1028,7 @@ final class SitePanel: FloatingPanelView {
         rows = []
         zoomStepper = nil
         keepCookiesRow = nil
+        let compatible = self.compatible
         // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
         // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
         // Privacy › Sites. Its tabs still follow the ones made elsewhere.
@@ -1020,20 +1046,23 @@ final class SitePanel: FloatingPanelView {
                 zoomStepper = stepper
                 rows.append(.custom(String(localized: "Zoom", comment: "Row in the site panel's This Site group."), control: stepper))
             case .adBlocking:
+                let title = String(localized: "Ad blocking", comment: "Row in the site panel's This Site group.")
+                if compatible { rows.append(.overridden(title)); break }
                 let blocked = !ContentBlocker.isAllowed(on: url)
-                rows.append(.toggle(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."), on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                rows.append(.toggle(title, on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     ContentBlocker.setAllowed(!on, on: self.url)
                     self.tab.reload()
                 })
             case .cookieBanners:
                 // Cookie banners (#175), for this site alone. What was done says so quietly, under its name.
+                let title = String(localized: "Cookie banners", comment: "Row in the site panel's This Site group: whether Zigzag answers this site's cookie consent pop-ups with no.")
+                if compatible { rows.append(.overridden(title)); break }
                 let banner = CookieBanners.outcome(in: tab.webView, site: site)
                 let rejected = String(localized: "Rejected on this site", comment: "Under Cookie banners in the site panel's This Site group: Zigzag said no to the cookies the site's consent pop-up asked for.")
                 let hidden = String(localized: "Hidden on this site", comment: "Under Cookie banners in the site panel's This Site group: the site's cookie notice was only hidden, since there was nothing to say no to.")
                 let handledNow = CookieBanners.handles(url)
-                rows.append(.toggle(String(localized: "Cookie banners", comment: "Row in the site panel's This Site group: whether Zigzag answers this site's cookie consent pop-ups with no."),
-                                    on: handledNow, status: { on in
+                rows.append(.toggle(title, on: handledNow, status: { on in
                                         guard on, on == handledNow else { return on ? Self.onHere : Self.offHere }
                                         return banner == .rejected ? rejected : banner == .hidden ? hidden : Self.onHere
                                     }) { [weak self] on in
@@ -1042,6 +1071,17 @@ final class SitePanel: FloatingPanelView {
                     if let webView = self.tab.webView { CookieBanners.forget(in: webView) }
                     self.tab.reload()
                 })
+            case .compatibility:
+                // One switch for a site that breaks (#497): the rows it sets aside say so, and keep their choices.
+                let row = PanelRow.toggle(Self.compatibilityTitle, on: compatible, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    SiteCompatibility.set(on, for: self.url)
+                    self.tab.reload()
+                    // After the switch has moved, the rows it overrides show it.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.state) { [weak self] in self?.rebuildAll() }
+                }
+                row.toolTip = Self.compatibilityTip
+                rows.append(row)
             case .darkPage:
                 // Dark pages for this site alone (#134): Automatic follows Settings, On and Off hold whatever it says,
                 // Force darkens it even where it looks dark on its own. Under the name, what that means here now.
@@ -1169,8 +1209,8 @@ final class SitePanel: FloatingPanelView {
            !(extensionsSection?.items.isEmpty ?? true) || ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) {
             let profile = tab.profile
             let enabled = !ExtensionStore.extensionsOffSites(in: profile).contains(site)
-            let row = PanelRow.toggle(String(localized: "Extensions", comment: "Row in the site panel's Permissions page: whether extensions run on this site."),
-                                      on: enabled, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+            let title = String(localized: "Extensions", comment: "Row in the site panel's Permissions page: whether extensions run on this site.")
+            let row = compatible ? PanelRow.overridden(title) : PanelRow.toggle(title, on: enabled, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }
                 var sites = ExtensionStore.extensionsOffSites(in: profile)
                 if on { sites.remove(self.site) } else { sites.insert(self.site) }
@@ -1266,6 +1306,15 @@ final class SitePanel: FloatingPanelView {
         resize()
     }
 
+    /// Rows and extension tiles again, after a change that touches both.
+    private func rebuildAll() {
+        extensionsSection?.removeFromSuperview()
+        extensionsSection = nil
+        extensionsToken = nil
+        buildExtensions()
+        rebuildRows()
+    }
+
     // MARK: Boosts
 
     /// The site's boosts, including a private window's.
@@ -1301,12 +1350,14 @@ final class SitePanel: FloatingPanelView {
         if zapsGroup.superview == nil { zapsBox.addSubview(zapsGroup) }
         if styleRow == nil {
             let row = PanelLinkRow(String(localized: "Custom style", comment: "Row in the site panel, there while the site has CSS of your own: opens Edit Style. Its value says Edit…."),
-                                   value: String(localized: "Edit…", comment: "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.")) { [weak self] in self?.editStyle() }
+                                   value: Self.editStyleValue) { [weak self] in self?.editStyle() }
             addSubview(row)
             styleRow = row
         }
         refreshBoostRows()
     }
+
+    static let editStyleValue = String(localized: "Edit…", comment: "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.")
 
     static let restoreAllTitle = String(localized: "Restore All", comment: "Under the list of elements zapped on the site, on its page in the site panel: shows them all again.")
 
@@ -1315,6 +1366,8 @@ final class SitePanel: FloatingPanelView {
         zappedRow?.titleText = SiteBoosts.zapped(zaps.count)
         zappedRow?.isHidden = zaps.isEmpty
         styleRow?.isHidden = !boost.hasStyle
+        zappedRow?.value = compatible ? Self.offShort : ""
+        styleRow?.value = compatible ? Self.offShort : Self.editStyleValue
         if zappedRow != nil, listedZaps != zaps || listedNames != boost.names {
             let boost = boost
             listedZaps = zaps
@@ -1884,6 +1937,16 @@ final class PanelRow: NSView {
         return row
     }
 
+    /// A switch compatibility mode holds off (#497): dimmed, and saying so under its name.
+    static func overridden(_ title: String) -> PanelRow {
+        let toggle = Toggle(isOn: false)
+        toggle.isEnabled = false
+        toggle.setAccessibilityLabel(title)
+        let row = PanelRow(title, control: toggle, value: SitePanel.offInCompatibility)
+        row.title.textColor = Tokens.Color.textDisabled
+        return row
+    }
+
     /// A name and a dropdown of choices: a permission's Ask, Allow or Block. With `status`, what the choice means
     /// right now sits under the name, read again once a choice has been made (Dark page's "On, following Settings").
     static func choice(_ title: String, options: [String], selected: Int, actions: [DropdownButton.Action] = [], status: ((Int) -> String?)? = nil,
@@ -1934,7 +1997,7 @@ final class PanelRow: NSView {
         if let dropdown = control as? DropdownButton {
             return "\(title.stringValue): \(dropdown.accessibilityValue() as? String ?? "")" + (value.flatMap { $0.isHidden ? nil : " (\($0.stringValue))" } ?? "")
         }
-        if let toggle = control as? Toggle { return "\(title.stringValue): \(toggle.isOn ? "on" : "off")" }
+        if let toggle = control as? Toggle { return "\(title.stringValue): \(toggle.isOn ? "on" : "off")" + (toggle.isEnabled ? "" : ", dimmed") }
         return title.stringValue
     }
 
@@ -2482,7 +2545,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, compatibility, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2524,6 +2587,8 @@ enum SitePanelRows {
         if c.isWeb, !c.coveredPage { rows.append(.zoom) }
         if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
+        // Kept for the site: private windows follow it, as they do allowing ads.
+        if c.isWeb, !c.isPrivate { rows.append(.compatibility) }
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)

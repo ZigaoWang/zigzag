@@ -43,6 +43,12 @@
         "value": "Her %lld dakikada bir veya Düşük Güç Modunda saatte bir denetlenir."
       }
     },
+    "Compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Uyumluluk modu"
+      }
+    },
     "Downloads ending in %@": {
       "stringUnit": {
         "state": "translated",
@@ -97,6 +103,12 @@
         "value": "“%@” akışındaki yeni sayfalar, en yeniden başlayarak."
       }
     },
+    "Off in compatibility mode": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Uyumluluk modunda kapalı"
+      }
+    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE.": {
       "stringUnit": {
         "state": "translated",
@@ -133,6 +145,12 @@
         "value": "Herkese açık depolarda şu kullanıcının sahip olduğu açık çekme istekleri, en son etkinlik üstte: %@"
       }
     },
+    "Site Controls, compatibility mode on": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Site Ayarları, uyumluluk modu açık"
+      }
+    },
     "The download didn’t finish.": {
       "stringUnit": {
         "state": "translated",
@@ -143,6 +161,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Belirteçler: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} ve {file_url} için Dosya devri gerekir."
+      }
+    },
+    "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu sitede genişletmeleri, reklam engellemeyi, çerez uyarılarını ve gizlenen öğeleri kapatır. Kapattığınızda bunlar için yaptığınız seçimler geri gelir."
       }
     },
     "Updated %@": {
@@ -161,6 +185,12 @@
       "stringUnit": {
         "state": "translated",
         "value": "Güncelleniyor…"
+      }
+    },
+    "compatibility.off": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Kapalı"
       }
     },
     "handed this file to %@": {
