@@ -337,4 +337,59 @@ struct InPageMiniHostTests {
             #expect(!browser.hasInPageMiniEscMonitor)
         }
     }
+
+    // MARK: ⌘W and window.close() through the Mini's own actions
+
+    @Test func commandWClosesTheDockedMini() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            // No fade to wait for, so a locked screen's stalled animations can't hold the close.
+            try #require(mini.window).alphaValue = 0
+            // ⌘W in the Mini is its own Close Tab, which presses the borderless window's close.
+            mini.closeTab(nil)
+            #expect(!mini.isDockedInPage)
+            #expect(mini.window?.isVisible != true)
+            #expect(mini.tab.isClosed)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.root.hasInPageMini)
+        }
+    }
+
+    @Test func aPagesWindowCloseClosesTheDockedMini() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            try #require(mini.window).alphaValue = 0
+            mini.tabDidRequestClose(mini.tab)
+            #expect(!mini.isDockedInPage)
+            #expect(mini.window?.isVisible != true)
+            #expect(mini.tab.isClosed)
+            #expect(browser.inPageMini.record == nil)
+        }
+    }
+
+    @Test func commandWOnAStandaloneMiniStillClosesItsWindow() async throws {
+        try await inWindowAsync { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab, in: browser, by: .page)
+            #expect(!mini.isDockedInPage)
+            #expect(mini.window?.styleMask.contains(.closable) == true)
+            mini.closeTab(nil)
+            try await Task.sleep(for: .milliseconds(800))
+            #expect(mini.window?.isVisible != true)
+            #expect(mini.tab.isClosed)
+            #expect(!MiniWindowController.all.contains { $0 === mini })
+        }
+    }
+
+    @Test func performCloseOnABrowserWindowStillClosesIt() throws {
+        try inWindow { browser, _ in
+            let window = try #require(browser.window)
+            window.performClose(nil)
+            #expect(browser.windowClosed)
+            #expect(!window.isVisible)
+        }
+    }
 }
