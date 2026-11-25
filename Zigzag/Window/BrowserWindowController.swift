@@ -812,7 +812,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Back, Forward, Reload, the address and its star for the page you're on, in the sidebar or the bar above the
     /// page: the one place every path refreshes them, so none shows another's state.
     func refreshAddress(for tab: Tab?) {
-        sidebar.update(tab: tab)
+        bothSidebars { $0.update(tab: tab) }
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         root.topBar.showPin(sidebar.address.canSave)
     }
@@ -4402,9 +4402,41 @@ extension BrowserWindowController {
         if let edgeSidebar, let edgeContainer { return (edgeSidebar, edgeContainer) }
         let mirror = SidebarView(frame: .zero)
         mirror.delegate = self
-        // A list to pick from: the address row stays in the window, and rows don't drag out of the panel.
-        mirror.showsAddressRow = false
+        // The panel is over another app, with no top bar to hold the address: its own row keeps the URL, the site
+        // controls and the sidebar button, as the window's sidebar does when the address is not above the page.
+        mirror.showsAddressRow = true
         mirror.list.allowsDragging = false
+        // The row's controls act on this window, as the list's do; the ones that open something in the page bring
+        // the window forward, since there is nowhere over the panel for their UI to open.
+        mirror.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
+        mirror.forwardButton.onClick = { [weak self] _ in self?.goForward(nil) }
+        mirror.reloadButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            if self.tabManager.selectedTab?.isLoading == true { self.stopLoading(nil) } else { self.reloadPage(nil) }
+        }
+        mirror.address.readerButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.bringForwardForEdge()
+            self.toggleReader()
+        }
+        mirror.address.translateButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.bringForwardForEdge()
+            self.showTranslateMenu()
+        }
+        mirror.address.siteControlsButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.bringForwardForEdge()
+            SitePanel.toggle(in: self, from: self.sidebar.address)
+        }
+        mirror.address.siteControlsButton.onRightClick = { [weak self] _ in
+            guard let self else { return nil }
+            self.bringForwardForEdge()
+            SitePanel.toggle(in: self, from: self.sidebar.address)
+            return nil
+        }
+        mirror.address.saveButton.onClick = { [weak self] _ in self?.saveFromStar() }
+        mirror.sidebarButton.onClick = { [weak self] event in self?.sidebar.sidebarButton.onClick?(event) }
         mirror.list.refusesSystemPages = true
         mirror.hoversWhileInactive = true
         mirror.onEditSpace = { [weak self] id in self?.openSpaceEditor(id, anchor: self?.sidebar.dot(for: id)) }

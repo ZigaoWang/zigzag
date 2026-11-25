@@ -124,6 +124,19 @@ struct EdgeSidebarTests {
         #expect(EdgeSidebar.shared.dockHasShadow)
     }
 
+    @Test func aSpaceSwitchKeepsThePreviewAndKnowsWhichWayItSlides() {
+        #expect(EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: true))
+        #expect(!EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: false))
+        let one = UUID(), two = UUID(), three = UUID()
+        let order = [one, two, three]
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: two, order: order) == 1)
+        #expect(EdgePreviewRouting.spaceSlide(from: two, to: one, order: order) == -1)
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: three, order: order) == 1)
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: one, order: order) == 0)
+        #expect(EdgePreviewRouting.spaceSlide(from: nil, to: two, order: order) == 0)
+        #expect(EdgePreviewRouting.spaceSlide(from: one, to: UUID(), order: order) == 0)
+    }
+
     @Test func theEdgePreviewRestsLikeTheOneItReplaces() {
         #expect(EdgePreviewHoverPolicy.dwell == 0.2)
         #expect(EdgePreviewHoverPolicy.check == 0.05)
@@ -144,7 +157,7 @@ struct EdgeSidebarTests {
         #expect(!panel.canBecomeMain)
     }
 
-    @Test func theEdgesSidebarIsAListWithoutTheAddressRow() {
+    @Test func theAddressRowCanBeHiddenForAList() {
         let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 800))
         sidebar.showsAddressRow = false
         #expect(!sidebar.holdsAddress)
@@ -178,11 +191,11 @@ struct EdgeSidebarTests {
 
     /// A running page is lent to the preview; a sleeping or not-yet-loaded one shows its snapshot instead, so a hover
     /// never wakes it. The card says why and how to wake it, and leaves the tab unloaded.
-    @Test func aPagePreviewsItsSnapshotWhileItIsNotRunning() {
+    @Test func aPageShowsItsCardWhileItIsNotRunning() {
         #expect(EdgeLensPolicy.previewKind(isLoaded: true, isAsleep: false) == .live)
-        #expect(EdgeLensPolicy.previewKind(isLoaded: false, isAsleep: false) == .snapshot)
-        #expect(EdgeLensPolicy.previewKind(isLoaded: false, isAsleep: true) == .snapshot)
-        #expect(EdgeLensPolicy.previewKind(isLoaded: true, isAsleep: true) == .snapshot)
+        #expect(EdgeLensPolicy.previewKind(isLoaded: false, isAsleep: false) == .card)
+        #expect(EdgeLensPolicy.previewKind(isLoaded: false, isAsleep: true) == .card)
+        #expect(EdgeLensPolicy.previewKind(isLoaded: true, isAsleep: true) == .card)
 
         let tab = Tab(url: URL(string: "https://example.com/quiet")!, title: "Quiet page", spaceID: UUID())
         #expect(!tab.isLoaded)

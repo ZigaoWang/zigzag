@@ -19,8 +19,8 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.theDockAndStageManagerKeepTheirSide
 
 ## Using it
-- It shows the spaces, favorites, tabs and what's playing, without the address row; rows don't drag out of it.
-  Test: EdgeSidebarTests.theEdgesSidebarIsAListWithoutTheAddressRow
+- It shows the address, spaces, favorites, tabs and what's playing; rows don't drag out of it.
+  Test: EdgeSidebarTests.theAddressRowCanBeHiddenForAList
 - Its rows and buttons light up under the pointer with the other app still in front.
   Test: EdgeSidebarTests.itsControlsAnswerHoverWithAnotherAppInFront
 - Click a tab, a favorite, New Tab or a menu item → the panel goes and the browser window comes forward and does it there.
@@ -34,8 +34,8 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.thePreviewWidensThePanelAndLeavesTheSidebarWhereItIs
   Test: EdgeSidebarTests.thePreviewIsItsOwnFloorToCeilingPill
   Test: InPageMiniHostTests.theEdgePreviewBorrowsTheRowsLivePage
-- A row whose page isn't running — asleep, or not loaded since Zigzag reopened → the card shows the tab's stored snapshot, blurred, with its name, why it isn't running and “Click the tab to wake it.” Resting on the row never wakes the page; only a click loads it.
-  Test: EdgeSidebarTests.aPagePreviewsItsSnapshotWhileItIsNotRunning
+- A row whose page isn't running — asleep, or not loaded since Zigzag reopened → the card shows the moon, the tab's name, why it isn't running and “Click the tab to wake it.” No page picture is drawn. Resting on the row never wakes the page; only a click loads it.
+  Test: EdgeSidebarTests.aPageShowsItsCardWhileItIsNotRunning
 - Move across a split's or a tile group's parts without leaving the row → each part previews as it comes under the pointer. Only the edge panel follows the parts; the window's own hover card stays on the row's page.
   Test: EdgeSidebarTests.aMultiPageRowReportsThePartUnderThePointer
 - Click a row → the browser's tab becomes active there, but Zigzag doesn't come forward and the panel stays out. A sleeping or not-loaded tab wakes. The clicked page is the one a later hover comes back to.
@@ -44,8 +44,8 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: InPageMiniHostTests.swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack
 - Leave the rows with nothing picked, press Esc, or click away → the page folds back behind the sidebar as the panel narrows; the sidebar stays out.
   No test yet.
-- Switch spaces in the panel while a page or a snapshot is out → the preview and the pick go; the preview does not follow the space that comes next.
-  No test yet.
+- Switch spaces in the panel while a page or a card is out → the panel stays out and the new space's selected tab takes its place, folding from the side the list slid in on: right for the next space, left for the one before. A space with no page puts the preview away.
+  Test: EdgeSidebarTests.aSpaceSwitchKeepsThePreviewAndKnowsWhichWayItSlides
 - A page Zigzag serves itself, like Settings or History → it doesn't preview; the row behaves as before and a click opens it in the browser window.
   Test: EdgeSidebarTests.thePanelTakesWebPagesAndNotZigzagsOwn
 - A borrowed page returns to its card working, even if the card had cleared it while the Mini had it (the “shown in another window” state).
