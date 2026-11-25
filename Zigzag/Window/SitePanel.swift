@@ -1413,8 +1413,9 @@ final class SitePanel: FloatingPanelView {
         // A page's box covers the panel, so what's in it is placed in the panel's own terms.
         for box in [mainBox, permissionsBox, zapsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
         func group(_ group: PanelGroup) {
-            place(group, NSRect(x: pad, y: y, width: inner, height: group.height))
-            y += group.height
+            let height = group.height(for: inner)
+            place(group, NSRect(x: pad, y: y, width: inner, height: height))
+            y += height
         }
 
         switch page {
@@ -1563,8 +1564,9 @@ final class SitePanel: FloatingPanelView {
         if !rows.isEmpty {
             heading(siteLabel)
             let y = top(self.group.topSlack)
-            place(self.group, NSRect(x: pad, y: y, width: inner, height: self.group.height))
-            ended(y + self.group.height - self.group.bottomSlack)
+            let height = self.group.height(for: inner)
+            place(self.group, NSRect(x: pad, y: y, width: inner, height: height))
+            ended(y + height - self.group.bottomSlack)
         }
         return finishMain()
     }
@@ -1777,17 +1779,20 @@ final class PanelGroup: NSView {
         }
     }
 
-    var height: CGFloat { CGFloat(rows.count) * PanelRow.height }
+    func height(for width: CGFloat) -> CGFloat { rows.map { $0.height(for: width) }.reduce(0, +) }
     /// The room above the first row's ink and below the last's: the panel spaces by the ink.
     var topSlack: CGFloat { rows.first?.topSlack ?? 0 }
-    var bottomSlack: CGFloat { rows.last?.bottomSlack ?? 0 }
+    var bottomSlack: CGFloat { rows.last?.bottomSlack(for: bounds.width) ?? 0 }
 
     override var isFlipped: Bool { true }
 
     override func layout() {
         super.layout()
-        for (i, row) in rows.enumerated() {
-            row.frame = NSRect(x: 0, y: CGFloat(i) * PanelRow.height, width: bounds.width, height: PanelRow.height)
+        var y: CGFloat = 0
+        for row in rows {
+            let height = row.height(for: bounds.width)
+            row.frame = NSRect(x: 0, y: y, width: bounds.width, height: height)
+            y += height
         }
     }
 }
@@ -1804,7 +1809,35 @@ final class PanelRow: NSView {
     /// From the row's top to its first ink: the caps of its name, or a control's box.
     var topSlack: CGFloat { min(textInk.top, controlSlack) }
     /// From the row's last ink to its bottom: the baseline of its words, or a control's box.
-    var bottomSlack: CGFloat { min(Self.height - textInk.bottom, controlSlack) }
+    var bottomSlack: CGFloat { bottomSlack(for: bounds.width) }
+    func bottomSlack(for width: CGFloat) -> CGFloat {
+        isStacked(width) ? textTop : min(Self.height - textInk.bottom, controlSlack)
+    }
+
+    /// Its height at `width`: one line of the panel, or more with its control under its name.
+    func height(for width: CGFloat) -> CGFloat {
+        isStacked(width) ? textTop + contentHeight + Tokens.Space.x2 + wantedSize.height + textTop : Self.height
+    }
+
+    /// Where its words start, centered in a row's height.
+    private var textTop: CGFloat { (Self.height - contentHeight) / 2 }
+
+    private var wantedSize: NSSize { control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize }
+
+    /// The width its name and the line under it need on one line.
+    private var namedWidth: CGFloat { ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0)) }
+
+    /// A name longer than the room its menu leaves it (a longer language) puts the menu under the name instead.
+    /// A short name keeps the menu beside it, squeezed as before, with its choice whole in a tooltip.
+    private func isStacked(_ width: CGFloat) -> Bool {
+        guard width > 0, control is DropdownButton else { return false }
+        return namedWidth > width - sideBySideWidth(width) - Tokens.Space.x2
+    }
+
+    /// The control's width beside the name.
+    private func sideBySideWidth(_ width: CGFloat) -> CGFloat {
+        min(wantedSize.width, max(0, width - min(namedWidth, Self.minimumTitle) - Tokens.Space.x2))
+    }
 
     private var textInk: (top: CGFloat, bottom: CGFloat) {
         guard let value, !value.isHidden else {
@@ -1936,12 +1969,23 @@ final class PanelRow: NSView {
         super.layout()
         // Not placed yet: a control sized by its frame (an icon button) would be squeezed to nothing for good.
         guard bounds.width > 0 else { return }
-        let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
-        // Shorter titles keep only their own width, so they never squeeze the control.
-        let named = ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0))
-        let size = NSSize(width: min(wanted.width, max(0, bounds.width - min(named, Self.minimumTitle) - Tokens.Space.x2)), height: wanted.height)
-        control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
+        let wanted = wantedSize
         let x = -Label.inset
+        if isStacked(bounds.width) {
+            title.usesSingleLineMode = true
+            title.maximumNumberOfLines = 1
+            title.lineBreakMode = .byTruncatingTail
+            title.cell?.wraps = false
+            title.frame = NSRect(x: x, y: textTop, width: bounds.width + Label.inset * 2, height: title.lineHeight)
+            if let value, !value.isHidden {
+                value.frame = NSRect(x: x, y: title.frame.maxY, width: bounds.width + Label.inset * 2, height: value.lineHeight)
+            }
+            control.frame = NSRect(x: 0, y: textTop + contentHeight + Tokens.Space.x2, width: min(wanted.width, bounds.width), height: wanted.height)
+            return
+        }
+        // Shorter titles keep only their own width, so they never squeeze the control.
+        let size = NSSize(width: sideBySideWidth(bounds.width), height: wanted.height)
+        control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
         let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value, !value.isHidden else {
             // A long title beside its control wraps to a second line instead of truncating; the row fits two.
