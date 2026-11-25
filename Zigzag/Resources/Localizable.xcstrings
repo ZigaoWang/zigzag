@@ -2621,6 +2621,12 @@
     "Web App" : {
       "comment" : "Name of a site installed as an app, in the Applications folder, when the site has neither a name nor an address to name it by.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web App"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9938,7 +9944,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ダウンロードとして"
+            "value" : "ダウンロードとして：%@"
           }
         },
         "zh-Hans" : {
