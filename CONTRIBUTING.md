@@ -89,6 +89,9 @@ Traditional Chinese is welcome but optional: leave untranslated entries out so t
 See the [Simplified Chinese](docs/i18n/glossary.md) and [Traditional Chinese](docs/i18n/glossary.zh-Hant.md)
 glossaries for wording and typography. If you can't write the Simplified Chinese, say so in the pull request.
 
+A change to README.md updates [README.zh-Hans.md](README.zh-Hans.md) and [README.zh-Hant.md](README.zh-Hant.md) in the
+same pull request, or the pull request says they still need it.
+
 Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
 [CHANGELOG.zh-Hant.md](CHANGELOG.zh-Hant.md) can follow later. Keep the same version, date, order, issue links
 and credited names. Use `### 新功能` for New, `### 修复` for Fixed in Simplified Chinese, and `### 修正` in Traditional Chinese.
