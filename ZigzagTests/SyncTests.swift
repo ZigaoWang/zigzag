@@ -654,8 +654,19 @@ extension SyncLibrary {
                                                        "CommandBarPosition", "MiniWindowSize", "MiniPlayerPlace", "SyncWithICloud", "MCPPort"]))
         // A profile's own choice travels under its profile.
         let work = UUID()
-        #expect(SyncPreferences.owner("PasswordsAutofill.\(work.uuidString)") == (true, work))
+        #expect(SyncPreferences.owner("ExtensionsOffSites.\(work.uuidString)") == (true, work))
         #expect(SyncPreferences.owner("PasswordsManager").carried == false)
+    }
+
+    @Test func permissionsPasswordFillingAndCookieClearingStayOnEachMac() {
+        let work = UUID()
+        for key in ["SitePermissions", "SitePermissionActions", "SiteAsksBeforeDownloads", "JavaScriptOnSites",
+                    "PasswordsAutofill.\(work.uuidString)", "PasswordsOfferToSave.\(work.uuidString)",
+                    "CookiesClearOnQuit.\(work.uuidString)", "CookiesKeptSites.\(work.uuidString)", "CookiesClearOnQuit"] {
+            #expect(!SyncPreferences.owner(key).carried, "\(key)")
+        }
+        // Blocking scripts on a site still travels; allowing them where they're off doesn't.
+        #expect(SyncPreferences.owner("JavaScriptOffSites").carried)
     }
 
     // MARK: Account and settling

@@ -58,20 +58,23 @@ enum SyncPreferences {
         // Search
         "SearchSuggestions", "CustomSearchTemplate", "pdfTwoPages",
         // Privacy
-        "BlockAdsAndTrackers", "AdsAllowedSites", "ProtectsIPFromWebRTC", "JavaScriptAllowed", "JavaScriptOnSites", "JavaScriptOffSites",
-        "CookieBanners", "CookieBannersHandledSites", "CookieBannersLeftSites", "SiteAsksBeforeDownloads",
+        "BlockAdsAndTrackers", "AdsAllowedSites", "ProtectsIPFromWebRTC", "JavaScriptAllowed", "JavaScriptOffSites",
+        "CookieBanners", "CookieBannersHandledSites", "CookieBannersLeftSites",
         // Translation and Reader
         "TranslateInto", "TranslateOffers", "TranslateAlways", "TranslateNever", "TranslateNeverSites",
         "ReaderFace", "ReaderSize", "ReaderTheme", "ReaderWidth",
-        // Per site: zaps and compatibility mode (SiteBoosts), permissions, zoom, dark pages, user agents, icons
-        "SiteBoosts", "ZoomLevels", "DarkPagesOnSites", "DarkPagesOffSites", "DarkPagesForcedSites", "SitePermissions", "SitePermissionActions",
+        // Per site: zaps and compatibility mode (SiteBoosts), zoom, dark pages, user agents, icons. Never what a site may
+        // use (camera, microphone, location, notifications, downloads) or scripts allowed where they're off: as in
+        // Safari, a grant is made on the Mac it's for.
+        "SiteBoosts", "ZoomLevels", "DarkPagesOnSites", "DarkPagesOffSites", "DarkPagesForcedSites",
         "UserAgentSites", "KeepAwakeSites", "FullScreenPageSites", "FullScreenScreenSites", "SiteIcons",
         // Developer
         "DeveloperTools", "DeveloperToolsInBar", "DeveloperPageSizes", "DevelopmentSites",
     ]
 
-    /// Each profile's own choices, named with the profile's ID after a dot (`ProfileKey`).
-    static let profileKeys: [ProfileKey] = [.extensionsOffSites, .offersToSavePasswords, .fillsPasswords, .keptCookieSites, .clearsCookiesOnQuit]
+    /// Each profile's own choices, named with the profile's ID after a dot (`ProfileKey`). Not filling passwords, which
+    /// follows the password app each Mac has, nor clearing cookies on quit, which would sign you out on another Mac.
+    static let profileKeys: [ProfileKey] = [.extensionsOffSites]
 
     /// The search engine, kept in the library, travels as one more preference.
     static let searchEngineKey = "searchEngine"

@@ -25,8 +25,10 @@
   Test: SyncTests.profilesAndTheirFavoritesSync
 - A live folder → its source, its count and its name, never the pages it fetched; each Mac fetches its own.
   Test: SyncTests.aLiveFolderSyncsItsSourceNotItsPages
-- Settings → preferences about how Zigzag behaves, sites in spaces, and per-site choices like permissions, zaps and compatibility mode; never ones about this Mac (window sizes, the download folder, the update channel, debug switches) or what lets other apps in.
+- Settings → preferences about how Zigzag behaves, sites in spaces, and per-site choices like zaps, compatibility mode, zoom and dark pages; never ones about this Mac (window sizes, the download folder, the update channel, debug switches) or what lets other apps in.
   Test: SyncTests.onlyPreferencesTravelNeverWhatIsAboutThisMac
+- Site permissions (camera, microphone, location, notifications, pop-ups, downloads), scripts allowed on a site where they're off, password filling and clearing cookies on quit → stay on each Mac. A grant is made on the Mac it's for, as in Safari; password filling follows the password app each Mac has; clearing cookies on quit turned on elsewhere would sign you out here. Blocking scripts on a site does travel.
+  Test: SyncTests.permissionsPasswordFillingAndCookieClearingStayOnEachMac
 - Open tabs, history, cookies and website data, passwords, extensions, downloads, picture icons and space pictures → stay on this Mac. Passwords sync through iCloud Keychain as before.
   Test: SyncTests.onlyPreferencesTravelNeverWhatIsAboutThisMac
 
