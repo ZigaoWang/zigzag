@@ -5,12 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- With a link open in Zigzag Mini over its page, ⌘T opens the browser's new tab bar with the Mini out of the way instead of acting behind it, and Esc goes to the sidebar's picked rows, its fields or the command bar when one of them has the keys. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#528](https://github.com/ZigaoWang/zigzag/pull/528))
+## [0.9.5] - 2026-11-25
 
-## [0.9.5] - 2026-11-24
-
-Export Your Data so you can always take everything with you, live folders, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.
+Export Your Data so you can always take everything with you, live folders, nesting tabs by dragging, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.
 
 ### New
 - Importing from Dia brings its sidebar too, as from Arc. Each Dia profile's pinned tabs are pinned in the space its bookmarks go in, split views stay side by side, Dia's favorites become favorites, and with Open Tabs on, the tabs open there come over and wait to load until clicked. Importing again adds only what's new. ([#511](https://github.com/ZigaoWang/zigzag/issues/511))
@@ -63,6 +60,7 @@ Export Your Data so you can always take everything with you, live folders, Tradi
 - An extension pinned to the address, like 1Password, shows its whole icon centered in its button. Before, an icon that arrived after the button was drawn sat a little off and soft. In Site Controls the pin mark sits in the tile's corner instead of over the icon.
 - 1Password's toolbar icon now matches Zigzag's toolbar: on a dark space it shows its dark-toolbar icon even when the Mac is in light mode, and the other way around.
 - Pressing and holding Back or Forward in the sidebar, then sliding down, no longer drags the whole window: the list opens and you can slide onto a page and let go, with the mouse as with a finger.
+- With a link open in Zigzag Mini over its page, ⌘T opens the browser's new tab bar with the Mini out of the way instead of acting behind it, and Esc goes to the sidebar's picked rows, its fields or the command bar when one of them has the keys. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#528](https://github.com/ZigaoWang/zigzag/pull/528))
 
 ## [0.9.4] - 2026-11-24
 
@@ -1658,8 +1656,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...HEAD
-[0.9.5]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/ZigaoWang/zigzag/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...v0.9.2
