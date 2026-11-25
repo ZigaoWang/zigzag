@@ -11,6 +11,12 @@
             "value" : "Extensions you use, like Shazam, can hear what a tab plays, only while they listen."
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shazamなど、使用している機能拡張は、聞き取っているあいだだけ、タブで再生中の音を聞くことができます。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -33,6 +39,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask to use your camera."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセスしたWebサイトが、カメラの使用を求めることがあります。"
           }
         },
         "zh-Hans" : {
@@ -59,6 +71,12 @@
             "value" : "Zigzag fills your name, email, phone and address into forms from your own card in Contacts."
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzagは「連絡先」の自分のカードから、名前、メール、電話番号、住所をフォームに入力します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -81,6 +99,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Zigzag saves the files you download here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzagは、ダウンロードしたファイルをここに保存します。"
           }
         },
         "zh-Hans" : {
@@ -107,6 +131,12 @@
             "value" : "Websites you visit can ask to connect to devices on your local network."
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセスしたWebサイトが、ローカルネットワーク上のデバイスへの接続を求めることがあります。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -129,6 +159,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask for your location."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセスしたWebサイトが、位置情報を求めることがあります。"
           }
         },
         "zh-Hans" : {
@@ -155,6 +191,12 @@
             "value" : "Websites you visit can ask for your location."
           }
         },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセスしたWebサイトが、位置情報を求めることがあります。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -177,6 +219,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Websites you visit can ask to use your microphone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセスしたWebサイトが、マイクの使用を求めることがあります。"
           }
         },
         "zh-Hans" : {

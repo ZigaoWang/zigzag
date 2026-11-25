@@ -6032,6 +6032,7 @@ enum AppLanguage {
     static func ownName(_ code: String) -> String {
         switch code {
         case "en": "English"
+        case "ja": "日本語"
         case "zh-Hans": "简体中文"
         case "zh-Hant": "繁體中文"
         default: Locale(identifier: code).localizedString(forIdentifier: code) ?? code

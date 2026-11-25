@@ -2345,6 +2345,7 @@
 			knownRegions = (
 				Base,
 				en,
+				ja,
 				"zh-Hans",
 				"zh-Hant",
 			);
