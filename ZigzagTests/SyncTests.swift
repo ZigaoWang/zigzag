@@ -773,6 +773,37 @@ extension SyncLibrary {
         }
     }
 
+    @Test func aPreferenceTooBigForICloudStaysOnThisMac() {
+        let big = SettingValue.data(Data(repeating: 65, count: 300_000))
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal")], settings: ["SiteBoosts": big, "ReaderSize": .int(18)]))
+        a.sync()
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal")], settings: ["SiteBoosts": .data(Data("small".utf8))]), clock: a.clock)
+        b.sync(); a.sync(); b.sync()
+        // The rest of the settings travel; each Mac keeps its own styles.
+        #expect(b.library.settings["ReaderSize"] == .int(18))
+        #expect(a.library.settings["SiteBoosts"] == big)
+        #expect(b.library.settings["SiteBoosts"] == .data(Data("small".utf8)))
+        #expect((cloud.records[SyncName.settings]?.payload.count ?? 0) < SyncSession.largestPayload)
+        let sentA = a.sent, sentB = b.sent
+        a.session.localChanged(); b.session.localChanged()
+        a.sync(); b.sync(); a.sync()
+        #expect(a.sent == sentA && b.sent == sentB)
+    }
+
+    @Test func aRecordTooBigForICloudIsntSentAndStaysHere() {
+        let huge = Bookmark(url: URL(string: "data:text/plain," + String(repeating: "a", count: 1_000_000))!, title: "Huge")
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a"), huge])]))
+        a.sync()
+        #expect(cloud.records[SyncName.page(huge.id)] == nil)
+        #expect(cloud.records.keys.contains(where: { $0.hasPrefix("page.") }))
+        let sent = a.sent
+        a.sync(); a.session.localChanged(); a.sync()
+        #expect(a.sent == sent)
+        #expect(a.library.titles(in: "Personal") == ["a", "Huge"])
+    }
+
     @Test func aThousandPinnedPagesSyncQuickly() {
         let pages = (0..<1000).map { Sample.page("p\($0)") }
         let start = Date()

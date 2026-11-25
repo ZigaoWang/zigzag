@@ -77,6 +77,15 @@ enum SyncPreferences {
     /// follows the password app each Mac has, nor clearing cookies on quit, which would sign you out on another Mac.
     static let profileKeys: [ProfileKey] = [.extensionsOffSites]
 
+    /// A preference bigger than this (a site's long styles, say) stays on this Mac: all of them share one record, and
+    /// iCloud takes a record up to 1 MB.
+    static let largestValue = 200_000
+
+    static func isTooBig(_ value: SettingValue?) -> Bool {
+        guard let value else { return false }
+        return ((try? JSONEncoder().encode(value))?.count ?? 0) > largestValue
+    }
+
     /// The search engine, kept in the library, travels as one more preference.
     static let searchEngineKey = "searchEngine"
 
@@ -271,6 +280,8 @@ enum SyncMapping {
         }
         if library.searchEngine != .fromExtension { current[SyncPreferences.searchEngineKey] = .string(library.searchEngine.rawValue) }
         for (key, value) in current {
+            // Too big to send: iCloud keeps what it has, and this Mac its own.
+            if SyncPreferences.isTooBig(value) { if let entry = earlier[key] { values[key] = entry }; continue }
             values[key] = earlier[key].flatMap { $0.value == value ? $0 : nil } ?? .init(value: value, modified: now)
         }
         // A preference set back to its default is sent as unset; the search engine chosen from an extension stays as it was.
@@ -490,7 +501,7 @@ enum SyncMapping {
                 }
                 let local = SyncPreferences.renamed(key, aliases.local)
                 let owner = SyncPreferences.owner(local)
-                guard owner.carried, !(owner.profile.map(kept.contains) ?? false) else { continue }
+                guard owner.carried, !(owner.profile.map(kept.contains) ?? false), !SyncPreferences.isTooBig(library.settings[local]) else { continue }
                 if local == "SiteIcons" {
                     // Picture icons set here stay.
                     let images: [String: SettingValue] = if case .dictionary(let d)? = library.settings[local] {

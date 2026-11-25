@@ -262,12 +262,17 @@ final class SyncSession {
 
     // MARK: Sending
 
-    /// The record to send for `name`, or nil when there's nothing to send (it was removed here since).
+    /// iCloud takes a record up to 1 MB, its own fields included.
+    static let largestPayload = 900_000
+
+    /// The record to send for `name`, or nil when there's nothing to send (it was removed here since), or it's too big
+    /// for iCloud and stays on this Mac until it's smaller.
     func upload(_ name: String) -> SyncUpload? {
         guard let item = state.base[name] else { return nil }
         if case .unknown = item.body { return nil }
-        return SyncUpload(name: name, type: item.type, payload: SyncBody.overlay(item.payload, on: state.serverPayloads[name], type: item.type),
-                          modified: item.modified, systemFields: state.systemFields[name])
+        let payload = SyncBody.overlay(item.payload, on: state.serverPayloads[name], type: item.type)
+        guard payload.count <= Self.largestPayload else { return nil }
+        return SyncUpload(name: name, type: item.type, payload: payload, modified: item.modified, systemFields: state.systemFields[name])
     }
 
     func saved(_ records: [SyncRemote]) {
