@@ -80,4 +80,153 @@ struct AppearanceSwitchesTests {
             #expect(BrowserRootView.sidebarFrame(in: bounds, width: 260, visible: false, revealed: true, onRight: false).height == 400)
         }
     }
+
+    // MARK: Pinned tabs as tiles (#539)
+
+    /// A window over the first space with pinned pages A and B in no folder and C in a folder.
+    private func pinned(_ body: (BrowserWindowController, [Bookmark], UUID) throws -> Void) throws {
+        try fresh(SidebarView.pinnedTilesKey) {
+            let before = Library.shared.snapshot
+            defer { Library.shared.restore(before) }
+            let space = Library.shared.spaces[0].id
+            let marks = try ["A", "B", "C"].map { title in
+                try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/tiles/\(title)")!, title: title, to: space))
+            }
+            _ = try #require(Library.shared.addFolder(named: "Folder", with: [marks[2].id], in: space))
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            try body(controller, marks, space)
+        }
+    }
+
+    private func rows(_ controller: BrowserWindowController) -> [SidebarItem] {
+        controller.sidebar.list.reload(animated: false)
+        return controller.sidebar.list.pageRows
+    }
+
+    @Test func pinnedTabsAreRowsUntilTurnedOn() throws {
+        try pinned { controller, marks, _ in
+            #expect(!SidebarView.pinnedTabsAsTiles)
+            #expect(rows(controller) == marks.map { .bookmark($0.id) })
+            #expect(controller.sidebar.pinnedTiles.tileIDs.isEmpty)
+            #expect(controller.sidebar.pinnedTiles.isHidden)
+        }
+    }
+
+    @Test func onPagesOutsideFoldersAreTilesUnderTheFavorites() throws {
+        try pinned { controller, marks, _ in
+            SidebarView.pinnedTabsAsTiles = true
+            #expect(UserDefaults.standard.bool(forKey: SidebarView.pinnedTilesKey))
+            // The folder's page stays a row; the others are tiles, in their order.
+            #expect(rows(controller) == [.bookmark(marks[2].id)])
+            #expect(controller.sidebar.pinnedTiles.tileIDs == [marks[0].id, marks[1].id])
+            controller.sidebar.layoutSubtreeIfNeeded()
+            #expect(!controller.sidebar.pinnedTiles.isHidden)
+            // ⌘1 and the row keys count them after the favorites, before the rows.
+            #expect(Array(controller.tabRowStops.prefix(3)) == [.bookmark(marks[0].id), .bookmark(marks[1].id), .bookmark(marks[2].id)])
+            SidebarView.pinnedTabsAsTiles = false
+            #expect(rows(controller) == marks.map { .bookmark($0.id) })
+            #expect(controller.sidebar.pinnedTiles.tileIDs.isEmpty)
+        }
+    }
+
+    @Test func aTileOpensUnloadsAndHasThePinnedTabsMenu() throws {
+        try pinned { controller, marks, _ in
+            SidebarView.pinnedTabsAsTiles = true
+            let grid = controller.sidebar.pinnedTiles
+            grid.onOpen?(marks[0])
+            let page = try #require(controller.tabManager.bookmarkTab(for: marks[0].id))
+            #expect(controller.tabManager.selectedTab === page)
+            let menu = try #require(grid.onMenu?(marks[0]))
+            let pinnedMenu = SidebarMenus.bookmarkMenu(for: marks[0], controller: controller)
+            #expect(menu.items.map(\.title) == pinnedMenu.items.map(\.title))
+            grid.onClose?(marks[0])
+            #expect(controller.tabManager.bookmarkTab(for: marks[0].id) == nil)
+            #expect(Library.shared.bookmark(marks[0].id) != nil)
+        }
+    }
+
+    @Test func draggingATileReordersThePinnedPages() throws {
+        try pinned { controller, marks, space in
+            SidebarView.pinnedTabsAsTiles = true
+            controller.sidebar.pinnedTiles.onReorder?(marks[1], 0)
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == [marks[1].id, marks[0].id, marks[2].id])
+            #expect(Library.shared.folderID(containing: marks[1].id) == nil)
+            #expect(controller.sidebar.pinnedTiles.tileIDs == [marks[1].id, marks[0].id])
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == marks.map(\.id))
+        }
+    }
+
+    /// Aims the pinned tiles' drop bar just inside the first tile's leading edge.
+    private func aimAtFirstTile(_ controller: BrowserWindowController) throws {
+        let grid = controller.sidebar.pinnedTiles
+        controller.sidebar.layoutSubtreeIfNeeded()
+        let first = try #require(grid.tile(for: grid.tileIDs[0]))
+        grid.isDropTarget = true
+        grid.hoverDrop(at: first.convert(NSPoint(x: 1, y: first.bounds.midY), to: nil), carrying: nil)
+        #expect(grid.dropIndex == 0)
+    }
+
+    @Test func aFoldersPageDroppedOnTheTilesIsPinnedThereOutOfItsFolder() throws {
+        try pinned { controller, marks, space in
+            SidebarView.pinnedTabsAsTiles = true
+            try aimAtFirstTile(controller)
+            #expect(controller.listDropOnFavorites([.bookmark(marks[2].id)], dragged: .bookmark(marks[2].id)))
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == [marks[2].id, marks[0].id, marks[1].id])
+            #expect(Library.shared.folderID(containing: marks[2].id) == nil)
+            #expect(controller.sidebar.pinnedTiles.tileIDs == [marks[2].id, marks[0].id, marks[1].id])
+            #expect(!controller.sidebar.pinnedTiles.isDropTarget)
+        }
+    }
+
+    @Test func aFavoriteDroppedOnTheTilesIsPinnedThereAndLeavesFavorites() throws {
+        try pinned { controller, marks, space in
+            SidebarView.pinnedTabsAsTiles = true
+            let favorite = Library.shared.addFavorite(url: URL(string: "https://example.com/tiles/F")!, title: "F",
+                                                      in: Library.shared.profileID(ofSpace: space))
+            try aimAtFirstTile(controller)
+            let dropped = controller.sidebar.favorites.onDrop?(favorite, NSPoint(x: -20000, y: -20000))
+            #expect(dropped?.handled == true)
+            #expect(!Library.shared.isFavorite(favorite.id))
+            #expect(Library.shared.bookmarks(in: space).map(\.id).first == favorite.id)
+            #expect(controller.sidebar.pinnedTiles.tileIDs.first == favorite.id)
+        }
+    }
+
+    @Test func aPinnedSplitIsOneTileAndAFoldedSectionKeepsOnlyOpenOnes() throws {
+        try pinned { controller, marks, space in
+            SidebarView.pinnedTabsAsTiles = true
+            Library.shared.joinPinned(marks[1].id, beside: marks[0].id, onRight: true)
+            controller.reloadPinnedTiles()
+            #expect(controller.sidebar.pinnedTiles.tileIDs == [marks[0].id])
+            #expect(controller.sidebar.tile(for: marks[1].id) === controller.sidebar.tile(for: marks[0].id))
+            let saved = SidebarListView.debugCollapsed
+            defer { SidebarListView.debugCollapsed = saved }
+            SidebarListView.debugCollapsed = [space.uuidString]
+            controller.reloadPinnedTiles()
+            #expect(controller.sidebar.pinnedTiles.tileIDs.isEmpty)
+        }
+    }
+
+    @Test func aTilesSlotIsAPlaceAmongThePinnedPages() {
+        let a = UUID(), b = UUID(), c = UUID(), d = UUID(), e = UUID()
+        // C is in a folder, between the tiles; D and E are a split.
+        let order = [a, c, b, d, e]
+        let tiles = [[a], [b], [d, e]]
+        #expect(Library.pinnedIndex(forTile: 0, tiles: tiles, order: order) == 0)
+        #expect(Library.pinnedIndex(forTile: 1, tiles: tiles, order: order) == 2)
+        #expect(Library.pinnedIndex(forTile: 2, tiles: tiles, order: order) == 3)
+        #expect(Library.pinnedIndex(forTile: 3, tiles: tiles, order: order) == 5)
+        #expect(Library.pinnedIndex(forTile: 0, tiles: [], order: order) == 0)
+    }
+
+    @Test func theGridsShareTheirColumnsOnlyWhileBothHaveTiles() {
+        #expect(SidebarView.sharedColumns(width: 220, favorites: 0, pinned: 5) == nil)
+        #expect(SidebarView.sharedColumns(width: 220, favorites: 5, pinned: 0) == nil)
+        let shared = SidebarView.sharedColumns(width: 220, favorites: 2, pinned: 6)
+        #expect(shared.map { $0 >= 2 && $0 <= 6 } == true)
+    }
 }
