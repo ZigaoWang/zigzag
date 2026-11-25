@@ -29,16 +29,16 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.thePanelRunsDownTheScreensEdgeAndStaysWhileThePointerIsOnIt
 
 ## The preview
-- Rest the pointer on a tab's row → after a short rest, that tab's running page comes in beside the sidebar, in the same docked Mini that peeks over a page, taking the page's room. The panel widens to it from the sidebar's side, so it opens in place rather than sliding over the sidebar.
+- Rest the pointer on a tab's row → after a short rest, that tab's running page comes in beside the sidebar, in the same docked Mini that peeks over a page, taking the page's room. The panel takes its full width before the page is placed; the page is laid out once at its final size and only the fold moves, so its contents never reflow through a widening animation.
   Test: EdgeSidebarTests.theEdgePreviewRestsLikeTheOneItReplaces
   Test: EdgeSidebarTests.thePreviewWidensThePanelAndLeavesTheSidebarWhereItIs
   Test: EdgeSidebarTests.thePreviewIsItsOwnFloorToCeilingPill
   Test: InPageMiniHostTests.theEdgePreviewBorrowsTheRowsLivePage
 - A row whose page isn't running — asleep, or not loaded since Zigzag reopened → the card shows the moon, the tab's name, why it isn't running and “Click the tab to wake it.” No page picture is drawn. Resting on the row never wakes the page; only a click loads it.
   Test: EdgeSidebarTests.aPageShowsItsCardWhileItIsNotRunning
-- Move across a split's or a tile group's parts without leaving the row → each part previews as it comes under the pointer. Only the edge panel follows the parts; the window's own hover card stays on the row's page.
+- Move across a split's or a tile group's parts without leaving the row → each part previews as it comes under the pointer, in the one Mini already out. Only the edge panel follows the parts; the window's own hover card stays on the row's page.
   Test: EdgeSidebarTests.aMultiPageRowReportsThePartUnderThePointer
-- Click a row → the browser's tab becomes active there, but Zigzag doesn't come forward and the panel stays out. A sleeping or not-loaded tab wakes. The clicked page is the one a later hover comes back to.
+- Click a row, or a pinned link → the browser's tab becomes active there, but Zigzag doesn't come forward and the panel stays out. A sleeping or not-loaded tab wakes. The clicked page is the one a later hover comes back to.
   No test yet for the selection without bringing the window forward.
 - Rest on another row → that page takes the picked page's place; leaving the rows returns to the picked page.
   Test: InPageMiniHostTests.swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack

@@ -3483,7 +3483,15 @@ extension BrowserWindowController: SidebarDelegate {
         root.endTouchHold()
     }
     func listOpenBookmark(_ bookmark: Bookmark) {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        // The edge panel's pinned links mark their tab active without bringing the browser forward, as its rows do.
+        if EdgeSidebar.shared.isShowing {
+            tabManager.openBookmark(bookmark)
+            if let selected = tabManager.selectedTab {
+                EdgeSidebar.shared.markActive(selected, in: self)
+            }
+            root.endTouchHold()
+            return
+        }
         tabManager.openBookmark(bookmark)
         root.endTouchHold()
     }
@@ -4449,8 +4457,12 @@ extension BrowserWindowController {
         }
         mirror.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
         mirror.favorites.onOpen = { [weak self] favorite in
-            self?.bringForwardForEdge()
-            self?.tabManager.openBookmark(favorite)
+            guard let self else { return }
+            // A pinned link in the panel marks its tab active like a tab row does: the browser stays where it is.
+            self.tabManager.openBookmark(favorite)
+            if let selected = self.tabManager.selectedTab {
+                EdgeSidebar.shared.markActive(selected, in: self)
+            }
         }
         mirror.favorites.onMenu = { [weak self] favorite in
             guard let self else { return nil }

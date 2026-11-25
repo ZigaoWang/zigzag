@@ -436,9 +436,8 @@ final class EdgeSidebar {
         // the next fold start over an empty Mini.
         let previous = preview
         guard previous?.tab !== tab else { return }
-        // A page replacing a page already has the room: only the page folds in. The first page out widens the panel,
-        // and does it in place, with the page already at its final frame.
-        let wasWide = previous != nil || sleepingTab != nil
+        // The panel takes its full width at once, before the page is opened: the page is laid out at its final size
+        // and the fold is the only thing moving, so its content never reflows through a widening animation.
         if sleepingTab != nil {
             sleepingTab = nil
             host.sleepingShowing = false
@@ -448,11 +447,7 @@ final class EdgeSidebar {
         previewPanelFrame = EdgeSidebarLayout.frame(in: shownVisible, width: wide, onRight: shownOnRight)
         host.cardWidth = sidebar
         host.pageShowing = true
-        if wasWide {
-            panel.setFrame(previewPanelFrame, display: true)
-        } else {
-            widenPanel()
-        }
+        panel.setFrame(previewPanelFrame, display: true)
         host.placeCard()
         host.layoutSubtreeIfNeeded()
         guard let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self, reveal: false) else {
@@ -488,8 +483,8 @@ final class EdgeSidebar {
         closeWork?.cancel()
         closeWork = nil
         guard sleepingTab !== tab else { return }
-        // A page already out has the room: the card takes its place without the panel moving again.
-        let wasWide = preview != nil || sleepingTab != nil
+        // A page or card already out has the room; the panel is set to its full width before the card is placed, so
+        // the card is laid out once and never stretches with a widening animation.
         if let mini = preview {
             preview = nil
             previewTab = nil
@@ -505,11 +500,7 @@ final class EdgeSidebar {
         host.pageShowing = true
         host.sleeping.show(tab: tab)
         host.sleepingShowing = true
-        if wasWide {
-            panel.setFrame(previewPanelFrame, display: true)
-        } else {
-            widenPanel()
-        }
+        panel.setFrame(previewPanelFrame, display: true)
         host.placeCard()
         host.layoutSubtreeIfNeeded()
         if let foldFromRight {
@@ -624,10 +615,9 @@ final class EdgeSidebar {
         preview = nil
         previewTab = nil
         if animated {
-            // The panel edge and the page's fold go together: the page keeps its final layout and is covered from
-            // the card's side as the panel narrows, rather than vanishing first and leaving the panel to jump.
+            // The page folds out while the panel is still its full width; only once it has gone does the panel
+            // narrow, so the page is never resized through the close.
             notePreviewMove()
-            narrowPanel(animated: true)
             mini.closeInPage(focusBack: false, animated: true)
         } else {
             mini.onInPageMiniClosed = nil
@@ -698,19 +688,6 @@ final class EdgeSidebar {
 
     /// Widens the panel to the page's room in place: the page already sits at its final frame, so the panel's edge
     /// moving out uncovers it rather than the page sliding over the sidebar.
-    private func widenPanel() {
-        guard let panel else { return }
-        guard !Tokens.Motion.reduceMotion else {
-            panel.setFrame(previewPanelFrame, display: true)
-            return
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Tokens.Motion.Role.drawer.duration(entering: true)
-            context.timingFunction = Tokens.Motion.Role.drawer.timing
-            panel.animator().setFrame(previewPanelFrame, display: true)
-        }
-    }
-
     /// The panel shows the window's list, so a change to that list is a change to the panel. A space switch puts the
     /// hover preview away, as the row it came from is no longer the one under the pointer; a page closed under it
     /// puts the preview away too.
