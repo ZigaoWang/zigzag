@@ -66,9 +66,10 @@ status=0
 for pid in "${pids[@]}"; do wait "$pid" || status=1; done
 
 # Suite times for the next run's split, and the summary.
-[ ${#only[@]} -eq 0 ] && cat "$logs"/shard-*.log | grep -a -o -E '^[✔✘] Suite [A-Za-z0-9_]+ (passed|failed) after [0-9.]+ seconds' \
+[ ${#only[@]} -eq 0 ] && cat "$logs"/shard-*.log | grep -a -o -E '[✔✘] Suite [A-Za-z0-9_]+ (passed|failed) after [0-9.]+ seconds' \
   | awk '{ print $(NF-1), $3 }' > build/test-times
-cat "$logs"/shard-*.log | grep -a -E '^[✔✘] Test run with' | awk -v failed=$status '
+# Matched anywhere on a line: other output can run into the result without a line break.
+cat "$logs"/shard-*.log | grep -a -o -E '[✔✘] Test run with [0-9]+ tests? in [0-9]+ suites? (passed|failed)( after [0-9.]+ seconds)?.*' | awk -v failed=$status '
   { for (i = 1; i <= NF; i++) { if ($i ~ /^tests?$/) t += $(i-1); if ($i ~ /^suites?$/) s += $(i-1); if ($i == "after" && $(i+1) + 0 > secs) secs = $(i+1) + 0 }
     if ($0 ~ /failed after/) failed = 1 }
   END { printf "%d tests in %d suites %s, the slowest process %.1f s\n", t, s, failed ? "failed" : "passed", secs }'
