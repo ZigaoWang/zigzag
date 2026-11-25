@@ -273,6 +273,28 @@ struct InPageMiniHostTests {
         }
     }
 
+    @Test func aCardLayoutDoesNotStealAPageDockedInAMini() throws {
+        try inWindow(pageAt: "https://example.test/docked") { browser, tab in
+            let host = SlidingDockHost(browser: browser)
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: host))
+            let holder = try #require(tab.pageHolder)
+            // A space switch lays the browser's cards out again while the preview has the page. The card must keep
+            // saying which page it is for, but must not move the holder out of the Mini and leave the preview blank.
+            #expect(holder.window === mini.window)
+            browser.root.card.show(nil)
+            #expect(holder.window === mini.window)
+            #expect(mini.root.card.webView === tab.webView)
+            browser.root.card.show(tab.webView)
+            #expect(browser.root.card.webView === tab.webView)
+            #expect(mini.root.card.webView === tab.webView)
+            #expect(holder.window === mini.window)
+            #expect(holder.superview != nil)
+            mini.closeInPage(focusBack: false, animated: false)
+            #expect(holder.window === browser.window)
+            #expect(holder.superview != nil)
+        }
+    }
+
     @Test func swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack() throws {
         try inWindow(pageAt: "https://example.test/one", and: "https://example.test/two") { browser, first, second in
             let mini = try #require(MiniWindowController.openPreview(of: first, from: browser, dockedIn: browser))

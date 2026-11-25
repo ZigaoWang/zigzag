@@ -795,7 +795,13 @@ final class PageCardView: NSView {
             newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
             // The Web Inspector docking beside a page with a size of its own makes room for itself.
             newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
-            if newHolder.superview !== clip { clip.addSubview(newHolder, positioned: .below, relativeTo: placeholder) }
+            // A page in a Mini (the in-page peek or the edge preview) is the Mini's to show; a card laid out again
+            // under it must say the page is its own without pulling the holder out of the Mini. Pulling it back made
+            // the preview blank while the card had the page.
+            let inMini = newHolder.window?.windowController is MiniWindowController
+            if newHolder.superview !== clip, !inMini {
+                clip.addSubview(newHolder, positioned: .below, relativeTo: placeholder)
+            }
         }
         webView = newWebView
         holder = newHolder
