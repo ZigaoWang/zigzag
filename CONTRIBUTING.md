@@ -85,9 +85,14 @@ scripts/sync-strings.sh build/dev
 ```
 
 `LocalizationTests` requires Simplified Chinese and checks the formatting of every translation where present.
-Traditional Chinese and Japanese are welcome but optional: leave untranslated entries out so they use the English
-source. See the [Simplified Chinese](docs/i18n/glossary.md), [Traditional Chinese](docs/i18n/glossary.zh-Hant.md)
-and [Japanese](docs/i18n/glossary.ja.md) glossaries for wording and typography. If you can't write the Simplified Chinese, say so in the pull request.
+Other languages can follow in a later pull request: until then those strings use the English source. A release
+needs every shipped language complete, and `scripts/release.sh` stops until it is. Each language has a glossary in
+[docs/i18n](docs/i18n) for wording and typography, such as [Simplified Chinese](docs/i18n/glossary.md),
+[Traditional Chinese](docs/i18n/glossary.zh-Hant.md) and [Japanese](docs/i18n/glossary.ja.md). If you can't write the
+Simplified Chinese, say so in the pull request.
+
+[docs/i18n/README.md](docs/i18n/README.md) has the whole workflow: one sentence per string, plurals, dates and
+numbers, the pseudo-locale for finding cut-off text, adding a language, and the release gate.
 
 A change to README.md updates [README.zh-Hans.md](README.zh-Hans.md), [README.zh-Hant.md](README.zh-Hant.md) and
 [README.ja.md](README.ja.md) in the same pull request, or the pull request says they still need it.
