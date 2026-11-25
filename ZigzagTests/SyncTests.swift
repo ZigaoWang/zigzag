@@ -669,6 +669,10 @@ extension SyncLibrary {
         #expect(SyncPreferences.owner("JavaScriptOffSites").carried)
     }
 
+    @Test func theNewestAppearanceChoicesTravel() {
+        for key in [SidebarView.pinnedTilesKey, "ShortFloatingSidebar", "ShowLinkAddressOnHover"] { #expect(SyncPreferences.owner(key).carried, "\(key)") }
+    }
+
     // MARK: Account and settling
 
     @Test func anotherAccountIsNeverSyncedWithoutAsking() {

@@ -50,7 +50,8 @@ enum SyncPreferences {
         "CaptureMode", "CardFinish",
         // Appearance and sidebar
         "borderlessPage", "addressBarPlace", "addressAbovePage", "sidebarOnRight", "sidebarDoubleClickNewTab", "LargeSpaceNames",
-        "FavoritesPerRow", "DefaultZoom", "ReduceMotion", "DarkPages", "DarkPagesPureBlack", "EdgeSidebar",
+        "FavoritesPerRow", "PinnedTabsAsTiles", "ShortFloatingSidebar", "ShowLinkAddressOnHover", "DefaultZoom", "ReduceMotion", "DarkPages",
+        "DarkPagesPureBlack", "EdgeSidebar",
         // Tabs and windows
         "ControlTabOrder", "NestsOpenedLinks", "WindowsShareTabs", "ArchiveTabsAfter", "SleepsBusyTabs", "NewTabPlace", "NewTabPlaceOtherwise",
         "PictureInPictureFollowsTabs", "PictureInPictureWhenLeaving", "FullScreenFills", "SwipeBetweenPages", "OffersToPinWanderedPage",
