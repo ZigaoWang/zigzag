@@ -191,6 +191,28 @@ import WebKit
             && sleeper.webView?.title?.hasPrefix("v") == true && sleeper.webView?.title != "v1" })
     }
 
+    /// WebKit's network process ends while the tab sleeps: the woken page still has its session cookie and sessionStorage.
+    @Test func aWokenTabStaysSignedInAfterWebKitsNetworkProcessEnds() async throws {
+        let server = try VersionServer()
+        defer { server.stop() }
+        let page = try await server.start().appendingPathComponent("account")
+        let (manager, sleeper, other, controller) = try sessionTabs(on: page)
+        defer { manager.invalidate(); controller.window?.close() }
+        #expect(await until { sleeper.webView?.title == "out v1" && sleeper.webView?.isLoading == false })
+        let store = try #require(sleeper.webView?.configuration.websiteDataStore)
+        await NetworkProcessCookies.note(store)
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep })
+        let before = NetworkProcessCookies.process(of: store)
+        #expect(before > 0)
+        store.perform(NSSelectorFromString("_terminateNetworkProcess"))
+        #expect(await until { NetworkProcessCookies.process(of: store) != before })
+        manager.select(sleeper)
+        #expect(await until { server.served >= 2 && sleeper.webView?.isLoading == false && sleeper.webView?.title?.isEmpty == false })
+        #expect(sleeper.webView?.title == "in v1")
+    }
+
     /// The same for a page that arrives after its headers: it's put back once the page runs, not lost at the commit.
     @Test func aWokenSlowPageKeepsItsSessionStorage() async throws {
         let server = try VersionServer()
@@ -591,7 +613,8 @@ nonisolated private final class VersionServer: @unchecked Sendable {
                 if !complete && error == nil && bytes.count < 65536 { receive(connection, bytes: bytes, served: served) } else { connection.cancel() }
                 return
             }
-            let line = String(decoding: bytes[..<boundary.lowerBound], as: UTF8.self).components(separatedBy: "\r\n").first ?? ""
+            let lines = String(decoding: bytes[..<boundary.lowerBound], as: UTF8.self).components(separatedBy: "\r\n")
+            let line = lines.first ?? ""
             let path = line.components(separatedBy: " ").dropFirst().first ?? "/"
             let head: String, body: Data
             switch path {
@@ -604,6 +627,13 @@ nonisolated private final class VersionServer: @unchecked Sendable {
                 let n = served.withLock { $0 += 1; return $0 }
                 body = Data("<title></title><script>sessionStorage.k ||= 'v\(n)'; document.title = sessionStorage.k;</script>".utf8)
                 head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: no-store\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            case "/account":
+                // Sets a session cookie on the first visit; titled "in" or "out" by the request's cookie, then sessionStorage.
+                let n = served.withLock { $0 += 1; return $0 }
+                let signedIn = lines.contains { $0.lowercased().hasPrefix("cookie:") && $0.contains("sid=1") }
+                body = Data("<title></title><script>sessionStorage.k ||= 'v\(n)'; document.title = '\(signedIn ? "in" : "out") ' + sessionStorage.k;</script>".utf8)
+                let cookie = n == 1 ? "Set-Cookie: sid=1; Path=/; HttpOnly\r\n" : ""
+                head = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: no-store\r\n\(cookie)Content-Length: \(body.count)\r\nConnection: close\r\n\r\n"
             default:
                 body = Data("not found".utf8)
                 head = "HTTP/1.1 404 Not Found\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"

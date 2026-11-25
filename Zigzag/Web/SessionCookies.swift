@@ -138,13 +138,18 @@ enum SessionCookies {
     static func prepare(_ url: URL, resumes: Bool, for store: AnyObject, jar: () -> any SessionCookieJar) -> Bool {
         guard FileManager.default.fileExists(atPath: url.path) else { return false }
         guard resumes else { remove(url); return false }
-        let key = ObjectIdentifier(store)
         let jar = jar()
+        putBack(for: store) { await restore(from: url, into: jar) }
+        return true
+    }
+
+    /// Runs `work` as a restore: pages wait for it and nothing is saved meanwhile.
+    static func putBack(for store: AnyObject, _ work: @escaping @MainActor () async -> Void) {
+        let key = ObjectIdentifier(store)
         restoring[key] = Task { @MainActor in
-            await restore(from: url, into: jar)
+            await work()
             restoring[key] = nil
         }
-        return true
     }
 
     static func isRestoring(_ store: AnyObject) -> Bool { restoring[ObjectIdentifier(store)] != nil }
@@ -203,6 +208,7 @@ enum SessionCookies {
         timer = Timer.scheduledTimer(withTimeInterval: saveInterval, repeats: true) { _ in
             MainActor.assumeIsolated { Profiles.shared.opened.forEach { profile in Task { await save(profile) } } }
         }
+        NetworkProcessCookies.start()
     }
 
     /// A profile's store was made: its cookie changes are saved from now on.
@@ -225,12 +231,17 @@ enum SessionCookies {
     /// Writes the profile's session cookies now, from its store; none if it has none.
     static func save(_ profile: Profile, forQuit: Bool = false) async {
         guard isOn, !quitting || forQuit, let store = profile.storeIfMade, store.isPersistent, !isRestoring(store) else { return }
+        // Cookies an ended network process took go back before any are written.
+        await NetworkProcessCookies.recover(store)
         let id = profile.id
         let turn = generation[id, default: 0] + 1
         generation[id] = turn
+        let process = NetworkProcessCookies.process(of: store)
         let cookies = await store.httpCookieStore.allCookies()
         // A later save is under way, or the profile was removed meanwhile.
         guard generation[id] == turn, Profiles.shared.listed(id) != nil else { return }
+        // Read from a process that ended or just started: the next save writes them.
+        guard NetworkProcessCookies.noted(store, cookies: cookies, process: process) else { return }
         let kept = KeptCookies.clearsOnQuit(in: id) ? KeptCookies.sites(in: id) : nil
         let chosen = toSave(cookies, keeping: kept)
         let data = chosen.isEmpty ? nil : encode(chosen)
@@ -258,6 +269,7 @@ enum SessionCookies {
     /// A site's cookies, or every site's but the kept ones, were cleared in a store: they leave its saved file too.
     static func cleared(site: String?, keeping kept: Set<String> = [], in store: WKWebsiteDataStore) {
         guard let profile = profile(of: store) else { return }
+        NetworkProcessCookies.forget(store)
         forget(site: site, keeping: kept, in: file(in: profile.folder))
         written[profile.id] = nil
         Task { await save(profile) }
@@ -271,6 +283,94 @@ enum SessionCookies {
         nonisolated func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
             MainActor.assumeIsolated { SessionCookies.changed(profile) }
         }
+    }
+}
+
+/// Session cookies live only in WebKit's network process; when it ends, the last ones read go back into the new one (#502).
+@MainActor
+enum NetworkProcessCookies {
+    private struct Known {
+        let process: Int
+        let cookies: [HTTPCookie]
+    }
+
+    private static var known: [ObjectIdentifier: Known] = [:]
+    private static var timer: Timer?
+    /// How often the stores in use are checked, besides each navigation.
+    static let checkInterval: TimeInterval = 5
+
+    private static let processKey = "_networkProcessIdentifier"
+
+    /// The network process the store's cookies are in now; 0 when none is running.
+    static func process(of store: WKWebsiteDataStore) -> Int {
+        guard store.responds(to: NSSelectorFromString(processKey)) else { return 0 }
+        return (store.value(forKey: processKey) as? NSNumber)?.intValue ?? 0
+    }
+
+    /// Starts checking the stores in use every few seconds.
+    static func start() {
+        guard timer == nil else { return }
+        let timer = Timer(timeInterval: checkInterval, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                for profile in Profiles.shared.opened {
+                    if let store = profile.storeIfMade { check(store) }
+                }
+            }
+        }
+        timer.tolerance = checkInterval / 2
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    /// Reads the store's session cookies now, and which process holds them.
+    static func note(_ store: WKWebsiteDataStore) async {
+        await recover(store)
+        let process = process(of: store)
+        noted(store, cookies: await store.httpCookieStore.allCookies(), process: process)
+    }
+
+    /// Keeps `cookies` read from `store`, unless the process they were read from (`before`) ended or just started.
+    @discardableResult
+    static func noted(_ store: WKWebsiteDataStore, cookies: [HTTPCookie], process before: Int) -> Bool {
+        guard store.isPersistent, before > 0, process(of: store) == before, !SessionCookies.isRestoring(store) else { return false }
+        known[ObjectIdentifier(store)] = Known(process: before, cookies: cookies.filter(\.isSessionOnly))
+        return true
+    }
+
+    /// If the process holding the noted cookies ended, puts them back; pages wait for it (`SessionCookies.ready`).
+    @discardableResult
+    static func check(_ store: WKWebsiteDataStore) -> Bool {
+        let key = ObjectIdentifier(store)
+        guard let noted = known[key], process(of: store) != noted.process, !SessionCookies.isRestoring(store) else { return false }
+        known[key] = nil
+        SessionCookies.putBack(for: store) { await setBack(noted.cookies, into: store) }
+        return true
+    }
+
+    /// `check`, then waits for what it put back.
+    static func recover(_ store: WKWebsiteDataStore) async {
+        check(store)
+        if SessionCookies.isRestoring(store) { await SessionCookies.ready(store) }
+    }
+
+    /// The store's cookies were cleared: what was noted goes.
+    static func forget(_ store: WKWebsiteDataStore) {
+        known[ObjectIdentifier(store)] = nil
+    }
+
+    /// Sets the cookies the new process lacks, then notes its own.
+    private static func setBack(_ cookies: [HTTPCookie], into store: WKWebsiteDataStore) async {
+        let jar = store.httpCookieStore
+        func key(_ cookie: HTTPCookie) -> String { "\(cookie.domain)\n\(cookie.path)\n\(cookie.name)" }
+        let there = Set(await jar.allCookies().map(key))
+        let missing = cookies.filter { !there.contains(key($0)) }
+        await jar.setSessionCookies(missing)
+        let process = process(of: store)
+        let now = await jar.allCookies()
+        if process > 0, self.process(of: store) == process {
+            known[ObjectIdentifier(store)] = Known(process: process, cookies: now.filter(\.isSessionOnly))
+        }
+        Diagnostics.note("Session cookies put back", "\(missing.count), after WebKit's network process ended")
     }
 }
 

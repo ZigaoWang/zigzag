@@ -130,6 +130,8 @@
   Test: UnloadedTabTests.aWokenTabKeepsItsSessionStorage
 - A sleeping tab's sessionStorage with an item too big to carry → the rest of it is still kept.
   Test: UnloadedTabTests.aBigItemDoesntCostTheRestOfTheSession
+- WebKit's network process ends while a tab sleeps (macOS ends it when memory is short) → woken, its page still has its session cookies and its sessionStorage, so it's still signed in.
+  Test: UnloadedTabTests.aWokenTabStaysSignedInAfterWebKitsNetworkProcessEnds
 - A sleeping tab woken, or one restored after a relaunch → its page plays nothing with sound until you use it.
   Test: UnloadedTabTests.aWokenOrRestoredPageStartsNoSoundOnItsOwn
 - A sleeping tab woken, or one restored after a relaunch → its page is the site's page now, not a copy kept from before.
