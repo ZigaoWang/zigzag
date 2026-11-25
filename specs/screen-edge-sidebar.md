@@ -29,26 +29,30 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: EdgeSidebarTests.thePanelRunsDownTheScreensEdgeAndStaysWhileThePointerIsOnIt
 
 ## The preview
-- Rest the pointer on a tab's row → after a short rest, that tab's live page comes in beside the sidebar, in the same docked Mini that peeks over a page. The page is at its final frame; the panel widens to it from the sidebar's side, so it opens in place rather than sliding over the sidebar.
+- Rest the pointer on a tab's row → after a short rest, that tab's running page comes in beside the sidebar, in the same docked Mini that peeks over a page. The page is at its final frame; the panel widens to it from the sidebar's side, so it opens in place rather than sliding over the sidebar.
   Test: EdgeSidebarTests.theEdgePreviewRestsLikeTheOneItReplaces
   Test: EdgeSidebarTests.thePreviewWidensThePanelAndLeavesTheSidebarWhereItIs
   Test: EdgeSidebarTests.thePreviewIsItsOwnFloorToCeilingPill
   Test: InPageMiniHostTests.theEdgePreviewBorrowsTheRowsLivePage
-- Move across a split's or a tile group's parts without leaving the row → each part previews as it comes under the pointer.
+- A row whose page isn't running — asleep, or not loaded since Zigzag reopened → the page pill shows the tab's stored snapshot, blurred, with its name, why it isn't running and “Click the tab to wake it.” Resting on the row never wakes the page; only a click loads it.
+  Test: EdgeSidebarTests.aPagePreviewsItsSnapshotWhileItIsNotRunning
+- Move across a split's or a tile group's parts without leaving the row → each part previews as it comes under the pointer. Only the edge panel follows the parts; the window's own hover card stays on the row's page.
   Test: EdgeSidebarTests.aMultiPageRowReportsThePartUnderThePointer
-- Click the previewed row → the page stays, is locked, and takes the keyboard; leaving the rows comes back to it.
-  Test: EdgeSidebarTests.aPickOpensReplacesOrLocksThePageOut
-  No test yet for the lock itself.
+- Click any row → today's behavior stays: the panel goes and the browser window comes forward on that tab. The preview is a hover only; a click neither locks it nor keeps it in the panel.
+  No test yet.
 - Rest on another row → that page takes the first one's place with the same fold from the sidebar's side.
   Test: InPageMiniHostTests.swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack
-- Leave the rows without a pick, press Esc, or click away → the page folds back behind the sidebar as the panel narrows; the sidebar stays out.
+- Leave the rows, press Esc, or click away → the page folds back behind the sidebar as the panel narrows; the sidebar stays out.
   No test yet.
-- Switch spaces in the panel while a page is out → the panel stays out and previews the new space's selected tab, folding from the side the list slid in on: right for the next space, left for the one before. A space with no page puts the preview away.
-  Test: EdgeSidebarTests.aSpaceSwitchKeepsThePreviewAndKnowsWhichWayItSlides
-- A page Zigzag serves itself, like Settings or History → its row stays greyed and takes no pick; the page area says “Zigzag's own pages only work in the browser window.” with Return to Zigzag, which tucks the panel toward its edge and brings the browser forward on that page.
+- Switch spaces in the panel while a page or a snapshot is out → the preview goes; it does not follow the space that comes next.
+  No test yet.
+- A page Zigzag serves itself, like Settings or History → it doesn't preview; the row behaves as before and a click opens it in the browser window.
   Test: EdgeSidebarTests.thePanelTakesWebPagesAndNotZigzagsOwn
-  Test: EdgeSidebarTests.theNoteStandsInThePagePillAndOffersTheWindow
 - A borrowed page returns to its card working, even if the card had cleared it while the Mini had it (the “shown in another window” state).
   Test: InPageMiniHostTests.aBorrowedPageComesBackToACardThatHadClearedIt
+- Reopening the same row while its preview folds out → the leaving Mini gives the page back at once, so the new Mini owns it and the tab never ends with no host.
+  Test: InPageMiniHostTests.reopeningDuringTheFoldOutEndsTheOldBorrowFirst
+- An edge preview borrows the tab already in the browser's list → extensions hear nothing of its window opening, closing or focus, and the preview's space chip stays hidden so it cannot move the tab behind the list's back.
+  Test: InPageMiniHostTests.aBorrowedPreviewKeepsTheSpaceChipHidden
 - A screen too narrow for the sidebar and the page's third → the panel stops at the screen and the page takes the room left.
   Test: EdgeSidebarTests.thePanelAndPageNeverWidenPastTheScreen

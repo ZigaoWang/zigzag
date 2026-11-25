@@ -41984,53 +41984,53 @@
         }
       }
     },
-    "Return to Zigzag" : {
-      "comment" : "Button in the edge sidebar's note for one of Zigzag's own pages: brings the browser forward on that page.",
+    "Click the tab to load it." : {
+      "comment" : "At the foot of the edge sidebar's card for a tab whose page hasn't loaded since Zigzag reopened: hovering only shows its snapshot, and a click loads the page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "返回 Zigzag"
+            "value" : "点按标签页即可载入。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "返回 Zigzag"
+            "value" : "按一下標籤頁即可載入。"
           }
         }
       }
     },
-    "This page opens in Zigzag" : {
-      "comment" : "The edge sidebar's note for one of Zigzag's own pages when the page's name is not known yet.",
+    "Click the tab to wake it." : {
+      "comment" : "At the foot of the edge sidebar's card for a sleeping tab: hovering only shows its snapshot, and a click loads the page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此页面在 Zigzag 中打开"
+            "value" : "点按标签页即可唤醒。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此頁面在 Zigzag 中開啟"
+            "value" : "按一下標籤頁即可喚醒。"
           }
         }
       }
     },
-    "Zigzag's own pages only work in the browser window." : {
-      "comment" : "Under the page's name in the edge sidebar's note for one of Zigzag's own pages, which the panel can't show.",
+    "This page is asleep." : {
+      "comment" : "In the edge sidebar's card for a tab whose page isn't running, when the app has no more specific reason to give.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zigzag 自己的页面只能在浏览器窗口中打开。"
+            "value" : "此页面已休眠。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zigzag 自己的頁面只能在瀏覽器視窗中開啟。"
+            "value" : "此頁面已休眠。"
           }
         }
       }

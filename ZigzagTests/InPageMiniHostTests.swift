@@ -295,6 +295,39 @@ struct InPageMiniHostTests {
         }
     }
 
+    @Test func aBorrowedPreviewKeepsTheSpaceChipHidden() throws {
+        try inWindow(pageAt: "https://example.test/space-chip") { browser, tab in
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))
+            #expect(mini.isBorrowingPage)
+            // The tab still belongs to the browser's list: moving it from the preview would move it there without
+            // that list knowing.
+            #expect(mini.root.strip.spaceChip.isHidden)
+            mini.closeInPage(focusBack: false, animated: false)
+        }
+    }
+
+    @Test func reopeningDuringTheFoldOutEndsTheOldBorrowFirst() throws {
+        try inWindow(pageAt: "https://example.test/reopen") { browser, tab in
+            let first = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))
+            // Start the fold-out without waiting for it: the leaving Mini still has the page for a moment.
+            first.closeInPage(focusBack: false, animated: true)
+            #expect(first.isLeavingDock)
+            #expect(tab.host === first)
+            // Reopening the same row must take the page back from the leaving Mini now. Left to finish on its own, it
+            // records itself as the page's host after the new Mini borrowed it, and then gives the page back under
+            // the new one, leaving the tab with no host and a blank page.
+            let second = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))
+            #expect(tab.host === second)
+            #expect(second.root.card.webView === tab.webView)
+            #expect(!MiniWindowController.all.contains { $0 === first })
+            second.closeInPage(focusBack: false, animated: false)
+            #expect(tab.host === browser)
+            #expect(browser.root.card.webView === tab.webView)
+            #expect(tab.pageHolder?.superview != nil)
+            #expect(!tab.isClosed)
+        }
+    }
+
     @Test func swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack() throws {
         try inWindow(pageAt: "https://example.test/one", and: "https://example.test/two") { browser, first, second in
             let mini = try #require(MiniWindowController.openPreview(of: first, from: browser, dockedIn: browser))

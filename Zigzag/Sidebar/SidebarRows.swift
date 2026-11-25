@@ -430,7 +430,16 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         var icon: NSImage? = nil
     }
     /// The row's other pages in the group's order: a split's other half, or a tile group's other two or three.
-    private(set) var parts: [Part] = []
+    private(set) var parts: [Part] = [] {
+        didSet {
+            // A row that stops being a split has no parts to point at. A part left over would keep the edge preview
+            // on a page the row no longer shows, and the next move would report the same part again.
+            if parts.isEmpty {
+                pointedPart = nil
+                reportedPart = nil
+            }
+        }
+    }
     private var partTokens: [SignalToken] = []
     /// The second part's page.
     var partner: Tab? { parts.first?.page }
@@ -572,6 +581,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     #if DEBUG
     /// The debug bridge's pointer over one part of the row (`half(at:)`'s numbering).
     func debugPoint(atPart part: Int?) { pointedPart = part }
+    /// The part the pointer is on, as the row would draw it.
+    var debugPointedPart: Int? { pointedPart }
     /// The chevron of a tab with tabs under it, while it shows.
     var debugNestedButton: IconButton? { madeNestedButton?.isHidden == false ? madeNestedButton : nil }
     #endif

@@ -1724,7 +1724,10 @@ final class SidebarListView: NSView {
             if hovering {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
-                self.delegate?.listHover(row.pageUnderPointer ?? row.tab, row: row, bookmark: bookmark)
+                // Only the edge panel previews the part under the pointer; the window's own hover card stays on the
+                // row's page, whichever half the pointer came in on.
+                let pointed = EdgeSidebar.shared.isPanel(row.window) ? row.pageUnderPointer : nil
+                self.delegate?.listHover(pointed ?? row.tab, row: row, bookmark: bookmark)
             } else {
                 self.delegate?.listHover(nil, row: nil, bookmark: nil)
             }

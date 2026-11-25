@@ -195,6 +195,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
     /// Fading away before it closes or moves into Zigzag: nothing more to do in it.
     private var isLeaving = false
+    /// The borrowed page was given back early; this window is closing, not the tab.
+    private var isEndingBorrow = false
     /// Opened for a link from another app.
     private var fromAnotherApp = false
     /// Opened from a link on a page (⇧-click, Open Link in Zigzag Mini): the window and tab it came from.
@@ -417,6 +419,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
                             dockedIn edge: any MiniDockHosting, reveal: Bool = true) -> MiniWindowController? {
         guard let url = tab.url, !tab.isPrivate,
               ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        // In a browser's page card the page is the card's; a Mini has borrowed it. The preview's page must go home
+        // before it is borrowed again, even if this Mini is still folding away.
+        if let old = tab.host as? MiniWindowController { old.endBorrowingNow() }
         let holder = tab.pageHolder
         let borrow = BorrowedPage(host: tab.host, wasOutsideTabList: tab.isOutsideTabList,
                                   origin: holder?.superview, originFrame: holder?.frame ?? .zero,
@@ -436,7 +441,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             controller.window?.close()
             return nil
         }
-        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+        // A borrowed page is the browser's tab already: extensions hear nothing for a preview that only glances at it.
         return controller
     }
 
@@ -523,7 +528,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func commitBorrowedPage() -> Bool {
         guard let borrowed, let browser = borrowed.browser, !tab.isClosed,
               browser.tabManager.tab(with: tab.id) === tab else { return false }
-        if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
         guard browser.tabManager.release(tab) != nil else { return false }
         self.borrowed = nil
         tab.host = self
@@ -580,6 +584,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         pageSlideGeneration += 1
+        let generation = pageSlideGeneration
         let size = root.bounds.size
         let mask = pageSlideMask(fromRight: fromRight, size: size, width: size.width)
         rootLayer.mask = mask
@@ -595,8 +600,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         CATransaction.setDisableActions(true)
         mask.bounds = CGRect(x: 0, y: 0, width: 0, height: size.height)
         CATransaction.commit()
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-            MainActor.assumeIsolated { done() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.pageSlideGeneration == generation else { return }
+                done()
+            }
         }
     }
 
@@ -736,6 +744,20 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             dim.animator().alphaValue = 0
         }, completionHandler: finish)
         return true
+    }
+
+    func endBorrowingNow() {
+        guard isBorrowingPage else { return }
+        // The page is about to be borrowed again: finish this Mini now, not when its fold would have ended, or it
+        // gives the page back under the new Mini and leaves the tab without a host.
+        pageSlideGeneration += 1
+        isEndingBorrow = true
+        isLeaving = true
+        onInPageMiniClosed = nil
+        onInPageMiniDetached = nil
+        giveBackBorrowedPage()
+        releaseDock()
+        window?.close()
     }
 
     /// Lets go of the docked presentation without making the window a standalone one again: it is closing.
@@ -1064,8 +1086,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// The spaces, from the strip's space: the one chosen is where Open in takes the page, and the window wears it.
     private func showSpaceMenu() {
-        // A private page keeps to its private window's space.
-        guard !isLeaving, !isPrivate else { return }
+        // A private page keeps to its private window's space; a borrowed page stays in its browser's list.
+        guard !isLeaving, !isPrivate, !isBorrowingPage else { return }
         let current = space.id
         func entry(_ other: SpaceInfo) -> MenuPanel.Entry {
             let symbol = other.icon.flatMap { IconChoice.isSymbol($0) ? $0 : nil }
@@ -1215,6 +1237,10 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func refreshStrip() {
         strip.title.show(tab)
         strip.spaceChip.show(space, name: isPrivate ? placeName : nil)
+        // A borrowed tab keeps its place in the browser's list: moving it from the preview would move it there
+        // without that list knowing.
+        strip.hidesSpaceChip = isBorrowingPage
+        strip.spaceChip.isHidden = isBorrowingPage
         // A private page keeps to its window's space: nothing to choose.
         strip.spaceChip.isEnabled = !isPrivate
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
@@ -1689,11 +1715,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         pageGone.send()
         linkStatus.hide()
         Autofill.shared.forget(windowOf: window)
+        let wasBorrowed = isBorrowingPage || isEndingBorrow
         if isBorrowingPage {
             // The row's page goes back to its tab; closing the preview is not closing the page.
             giveBackBorrowedPage()
-            tokens.removeAll()
-        } else if !movedOut {
+        } else if !wasBorrowed, !movedOut {
             tokens.removeAll()
             tabToken?.cancel()
             tabToken = nil
@@ -1702,16 +1728,19 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
                 tab.close()
             }
         }
-        if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
-        // Getting started's ⇧-click step is done once a Mini from a page closes or moves into a tab.
-        if fromPage { Tutorial.complete("peek") }
+        if wasBorrowed { tokens.removeAll() }
+        if #available(macOS 15.4, *), !wasBorrowed { ExtensionCenter.miniClosed(self) }
+        // Getting started's ⇧-click step is done once a Mini from a page closes or moves into a tab. The edge
+        // preview borrows a tab that was never a ⇧-click Mini, so closing it is not that step.
+        if fromPage, !wasBorrowed { Tutorial.complete("peek") }
         keepOnTopToken.map(NotificationCenter.default.removeObserver)
         keepOnTopToken = nil
         Self.all.removeAll { $0 === self }
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
-        if #available(macOS 15.4, *) { ExtensionCenter.miniFocused(self) }
+        // A borrowed page is the browser's tab, not a Mini the extensions know: only a Mini of its own tells them.
+        if #available(macOS 15.4, *), !isBorrowingPage { ExtensionCenter.miniFocused(self) }
         // Became key: show a held question.
         promptFrontChanged.send()
     }
@@ -2002,10 +2031,15 @@ final class MiniRootView: SpaceFrameView {
     var pageOverlayRadius: CGFloat = Tokens.Radius.card { didSet { applyPageOverlay() } }
     /// The docked card's ground, where the host lends one: the edge preview's pill stands on the card's own color.
     var pageOverlayColor: NSColor? { didSet { applyPageOverlay() } }
+    /// The space's own paint, remembered before a host's ground stands on it. Without it, letting go of the host's
+    /// ground would clear the layer and leave the in-page peek without its space's color.
+    private var paintedSpaceGround: NSColor?
     private(set) var chromeRevealed = true
 
     private func applyPageOverlay() {
         guard isPageOverlay else {
+            // Back in a window of its own: the space's paint again, not the pill's ground.
+            if let paintedSpaceGround { layer?.backgroundColor = cgColor(paintedSpaceGround) }
             layer?.cornerRadius = 0
             layer?.masksToBounds = false
             return
@@ -2013,7 +2047,9 @@ final class MiniRootView: SpaceFrameView {
         wantsLayer = true
         window?.isOpaque = false
         window?.backgroundColor = .clear
-        layer?.backgroundColor = pageOverlayColor.map { cgColor($0) }
+        if let ground = pageOverlayColor ?? paintedSpaceGround {
+            layer?.backgroundColor = cgColor(ground)
+        }
         layer?.cornerRadius = pageOverlayRadius
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
@@ -2024,6 +2060,8 @@ final class MiniRootView: SpaceFrameView {
     override func paint(_ space: SpaceInfo, isPrivate: Bool, animated: Bool,
                         crossFadesMode: Bool = true) -> (color: NSColor, end: NSColor?) {
         let painted = super.paint(space, isPrivate: isPrivate, animated: animated, crossFadesMode: crossFadesMode)
+        // The space's paint is on the layer now; keep it before a docked host's ground replaces it.
+        paintedSpaceGround = layer?.backgroundColor.flatMap { NSColor(cgColor: $0) }
         applyPageOverlay()
         return painted
     }
@@ -2179,6 +2217,9 @@ final class MiniStripView: NSView {
                                             toolTip: String(localized: "Open in Window", comment: "Tooltip on the button that turns the Mini docked in a page into a window of its own."))
     /// Docked in a page: no Keep on Top pin, since the Mini goes with the page's window.
     var hidesPin = false { didSet { needsLayout = true } }
+    /// Borrowed from the browser's list: no space chip, since moving the page from here would move it there without
+    /// the list knowing.
+    var hidesSpaceChip = false { didSet { needsLayout = true } }
 
     private static var backTip: String { Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))) }
     private static var forwardTip: String { Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))) }
@@ -2264,7 +2305,8 @@ final class MiniStripView: NSView {
         let icons = b * 3 + gap * 2 + Tokens.Space.x2
         // Narrow, the shortcut goes first, then the space's name shortens.
         openButton.showsKeys = true
-        if right - left < spaceChip.fittingWidth + icons + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
+        let chipRoom = hidesSpaceChip ? 0 : spaceChip.fittingWidth
+        if right - left < chipRoom + icons + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
         let openWidth = min(openButton.fittingWidth, max(0, right - left - icons))
         openButton.frame = NSRect(x: right - openWidth, y: y, width: openWidth, height: h)
         copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x2 - b, y: y, width: b, height: b)
@@ -2278,9 +2320,10 @@ final class MiniStripView: NSView {
         // editing it also leaves the field its narrowest.
         let field = isEditing ? Self.narrowestField + Tokens.Space.x2 : 0
         var chipWidth = max(0, min(spaceChip.fittingWidth, buttons - Tokens.Space.x2 - left - field))
+        if hidesSpaceChip { chipWidth = 0 }
         if chipWidth < Tokens.Space.x8 { chipWidth = 0 }
         spaceChip.frame = NSRect(x: left, y: y, width: chipWidth, height: h)
-        spaceChip.isHidden = chipWidth == 0
+        spaceChip.isHidden = hidesSpaceChip || chipWidth == 0
         // The site stays in the middle of the window, as wide on both sides as the room beside it allows; with too
         // little room it steps aside.
         let half = max(0, min(bounds.midX - spaceChip.frame.maxX, buttons - bounds.midX) - Tokens.Space.x2)

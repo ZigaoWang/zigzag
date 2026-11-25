@@ -176,55 +176,22 @@ struct EdgeSidebarTests {
         #expect(EdgeLensPolicy.takesPage(url: nil))
     }
 
-    @Test func aPickOpensReplacesOrLocksThePageOut() {
-        #expect(EdgeLensPolicy.pickAction(isVisible: false, sameTab: false) == .open)
-        #expect(EdgeLensPolicy.pickAction(isVisible: true, sameTab: true) == .lock)
-        #expect(EdgeLensPolicy.pickAction(isVisible: true, sameTab: false) == .replace)
-    }
+    /// A running page is lent to the preview; a sleeping or not-yet-loaded one shows its snapshot instead, so a hover
+    /// never wakes it. The card says why and how to wake it, and leaves the tab unloaded.
+    @Test func aPagePreviewsItsSnapshotWhileItIsNotRunning() {
+        #expect(EdgeLensPolicy.previewKind(isLoaded: true, isAsleep: false) == .live)
+        #expect(EdgeLensPolicy.previewKind(isLoaded: false, isAsleep: false) == .snapshot)
+        #expect(EdgeLensPolicy.previewKind(isLoaded: false, isAsleep: true) == .snapshot)
+        #expect(EdgeLensPolicy.previewKind(isLoaded: true, isAsleep: true) == .snapshot)
 
-    @Test func aSpaceSwitchKeepsThePreviewAndKnowsWhichWayItSlides() {
-        #expect(EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: true))
-        #expect(!EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: false))
-        let one = UUID(), two = UUID(), three = UUID()
-        let order = [one, two, three]
-        #expect(EdgePreviewRouting.spaceSlide(from: one, to: two, order: order) == 1)
-        #expect(EdgePreviewRouting.spaceSlide(from: two, to: one, order: order) == -1)
-        #expect(EdgePreviewRouting.spaceSlide(from: one, to: three, order: order) == 1)
-        #expect(EdgePreviewRouting.spaceSlide(from: one, to: one, order: order) == 0)
-        #expect(EdgePreviewRouting.spaceSlide(from: nil, to: two, order: order) == 0)
-        #expect(EdgePreviewRouting.spaceSlide(from: one, to: UUID(), order: order) == 0)
-    }
-
-    /// The note for one of Zigzag's own pages stands where the page pill would, says which page it is, and its one
-    /// button brings the browser forward on it.
-    @Test func theNoteStandsInThePagePillAndOffersTheWindow() throws {
-        let host = EdgeSidebarHost(frame: visible)
-        let container = SidebarContainer(sidebar: SidebarView(frame: .zero))
-        host.cardWidth = 240
-        host.set(container)
-        host.pageShowing = true
-        host.noticeShowing = true
-        host.placeCard()
-        #expect(!host.notice.isHidden)
-        #expect(host.notice.frame == host.pageFrame)
-
-        let tab = Tab(url: URL(string: "zigzag://settings")!, title: "Settings", spaceID: UUID())
-        host.notice.show(tab: tab)
-        #expect(host.notice.subviews.contains { ($0 as? Label)?.stringValue == "Settings" })
-        #expect(host.notice.returnButton.title == String(localized: "Return to Zigzag"))
-
-        var returned = false
-        host.notice.onReturn = { returned = true }
-        let press = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [],
-                                                    timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,
-                                                    clickCount: 1, pressure: 0))
-        host.notice.returnButton.onClick?(press)
-        #expect(returned)
-
-        // A page taking the pill's place takes the note's too.
-        host.noticeShowing = false
-        host.placeCard()
-        #expect(host.notice.isHidden)
+        let tab = Tab(url: URL(string: "https://example.com/quiet")!, title: "Quiet page", spaceID: UUID())
+        #expect(!tab.isLoaded)
+        let card = EdgeAsleepPageView(frame: NSRect(x: 0, y: 0, width: 420, height: 700))
+        card.show(tab: tab)
+        #expect(card.shownTitle == "Quiet page")
+        #expect(!card.shownNote.isEmpty)
+        // Showing the card did not wake the tab.
+        #expect(tab.webView == nil)
     }
 
     /// A screen too narrow for the sidebar and the page's third: the panel stops at the screen, and the page takes
@@ -275,6 +242,14 @@ struct EdgeSidebarTests {
         #expect(reported.count == 2)
         #expect(reported[0] === left)
         #expect(reported[1] === right)
+
+        // The split closes under the pointer: the row has no parts left, so no stale part stays lit or under the
+        // edge panel's preview.
+        row.debugPoint(atPart: 1)
+        #expect(row.debugPointedPart == 1)
+        row.configure(parts: [])
+        #expect(!row.isSplit)
+        #expect(row.debugPointedPart == nil)
     }
 }
 
