@@ -16,6 +16,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “网站设置”新增“兼容模式”，给不能正常使用的网站用：一个开关就能在这个网站上关掉扩展、广告拦截、Cookie 弹窗和已隐藏的元素，关掉兼容模式后，你之前对它们的选择都会恢复。打开时“网站设置”按钮会变成强调色，“设置 › 隐私 › 网站”也会列出它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 - “设置 › 外观 › 指向链接时显示链接地址”：关掉后，指向链接时页面角落不会再显示链接地址，浏览器窗口、Zigzag Mini、网页应用和标签页概览都一样。默认仍然打开。感谢 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
 - “设置 › 外观 › 较短的浮动边栏”：边栏隐藏时，浮现在页面上的边栏高度是窗口的三分之二，上下各留出六分之一。停靠的边栏不变。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
+- “设置 › 外观 › 已固定标签页显示为方块”：不在文件夹里的已固定标签页会以方块显示在收藏下方，和收藏在同一个网格里，中间隔一条细线；打开、卸载、右键菜单和拖移都和原来的行一样。文件夹和里面的页面仍然是行。默认关闭。感谢 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
 - “设置”里的长列表现在像“网站权限”一样折叠成方框：“快捷键”的每个菜单、每条下载规则（保存的回答在里面）、每类功能标志，以及超过三项时的“开发者模式中的网站”“受信任的证书”和“网页尺寸”。“查找设置”仍会展开匹配项所在的方框。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 - “网站权限”自带的搜索和“查找设置”现在也能按权限和选择找网站：输入“摄像头”“通知”或“阻止”，就能看到做了这个选择的每个网站，各自在网站名称下面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
 
