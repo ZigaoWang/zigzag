@@ -892,6 +892,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Typing an address
 
+    /// ⌘T from the Mini: the new tab belongs to the browser, and a docked Mini steps aside first so the bar it opens
+    /// isn't hidden under the page it was over.
+    @objc func newTab(_ sender: Any?) {
+        let target = browserTarget
+        if isDockedInPage { closeInPage(focusBack: false, animated: false) }
+        target.newTab(sender)
+        Self.bringForward(target)
+    }
+
     /// ⌘L: the command bar over the page's site, the address in it to change; again, it goes.
     @objc func openLocation(_ sender: Any?) {
         guard !isLeaving else { return }

@@ -79,6 +79,10 @@
   Test: InPageMiniHostTests.closeWindowStaysOnForADockedMini
   Test: InPageMiniHostTests.aPagesWindowCloseClosesTheDockedMini
   Test: InPageMiniHostTests.aTabSwitchClosesTheDockedMini
+- Esc closes the Mini only while the page has the keys: rows picked in the sidebar, its fields and the command bar keep Esc for themselves.
+  Test: InPageMiniHostTests.theDockedMiniTakesEscFromThePageButNotFromPickedRows
+- ⌘T from the Mini over a page → the browser's new tab bar opens, with the Mini out of its way.
+  Test: InPageMiniHostTests.commandTOpensTheBrowsersNewTabBarAndDropsTheDockedMini
 - Expand on the Mini over the page → the same live page goes into a Mini window of its own, without reloading.
   Test: InPageMiniHostTests.promotingTakesTheMiniOutIntoAWindowOfItsOwn
   Test: InPageMiniHostTests.expandKeepsTheSameLivePage
