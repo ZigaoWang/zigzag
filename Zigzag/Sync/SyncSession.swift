@@ -325,6 +325,8 @@ final class SyncSession {
         // An older copy than the one here (two fetches crossing): nothing to do.
         if let date = record.serverModified, let known = state.serverDates[record.name], date < known { return (false, false) }
         if let date = record.serverModified { state.serverDates[record.name] = date }
+        // What both Macs started from, for merging the rules and splits entry by entry.
+        let ancestor = state.serverPayloads[record.name].map { SyncItem(type: record.type, payload: $0, modified: .distantPast) }
         state.systemFields[record.name] = record.systemFields
         state.serverPayloads[record.name] = record.payload
         let theirs = SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified)
@@ -336,7 +338,7 @@ final class SyncSession {
             state.base[record.name] = theirs
             return (!mine.sameContent(as: theirs), false)
         }
-        let resolved = Self.resolve(mine, theirs)
+        let resolved = Self.resolve(mine, theirs, ancestor: ancestor)
         if resolved.sameContent(as: theirs) {
             state.base[record.name] = theirs
             state.unsent.remove(record.name)
@@ -347,12 +349,69 @@ final class SyncSession {
     }
 
     /// Last writer wins, by date; a tie goes to the server's. Preferences meet key by key.
-    static func resolve(_ mine: SyncItem, _ theirs: SyncItem) -> SyncItem {
-        if case .settings(let a) = mine.body, case .settings(let b) = theirs.body {
-            let values = SyncSettings.merged(b.values, a.values)
-            return SyncItem(.settings(SyncSettings(values: values)), modified: max(mine.modified, theirs.modified))
+    /// The site rules meet rule by rule, and a space's or profile's splits split by split, against what both started
+    /// from (`ancestor`), so an edit on each Mac keeps both.
+    static func resolve(_ mine: SyncItem, _ theirs: SyncItem, ancestor: SyncItem? = nil) -> SyncItem {
+        let modified = max(mine.modified, theirs.modified)
+        let mineWins = mine.modified > theirs.modified
+        switch (mine.body, theirs.body, ancestor?.body) {
+        case (.settings(let a), .settings(let b), _):
+            return SyncItem(.settings(SyncSettings(values: SyncSettings.merged(b.values, a.values))), modified: modified)
+        case (.rules(let m), .rules(let t), let base):
+            let a: [SiteRoutes.Route] = if case .rules(let r)? = base { r.routes.rules } else { [] }
+            var routes = t.routes
+            routes.rules = merged(a, m.routes.rules, t.routes.rules, id: { $0.id.uuidString }, mineWins: mineWins)
+            var rules = t
+            rules.routes = routes
+            return SyncItem(.rules(rules), modified: modified)
+        case (.space(let m), .space(let t), let base):
+            var winner = mineWins ? m : t
+            let a: [PinnedSplit] = if case .space(let s)? = base { s.splits } else { [] }
+            winner.splits = merged(a, m.splits, t.splits, id: splitKey, mineWins: mineWins)
+            return SyncItem(.space(winner), modified: modified)
+        case (.profile(let m), .profile(let t), let base):
+            var winner = mineWins ? m : t
+            let a: [PinnedSplit] = if case .profile(let p)? = base { p.favoriteSplits } else { [] }
+            winner.favoriteSplits = merged(a, m.favoriteSplits, t.favoriteSplits, id: splitKey, mineWins: mineWins)
+            return SyncItem(.profile(winner), modified: modified)
+        default:
+            return mineWins ? mine : theirs
         }
-        return mine.modified > theirs.modified ? mine : theirs
+    }
+
+    private static func splitKey(_ split: PinnedSplit) -> String { split.ids.map(\.uuidString).joined(separator: " ") }
+
+    /// A three-way merge of lists by `id`: what only one side changed takes that side's, what both changed the later
+    /// side's; theirs keep their order, and what only mine has goes after what it follows in mine.
+    static func merged<T: Encodable>(_ ancestor: [T], _ mine: [T], _ theirs: [T], id: (T) -> String, mineWins: Bool) -> [T] {
+        func index(_ list: [T]) -> [String: T] { Dictionary(list.map { (id($0), $0) }, uniquingKeysWith: { a, _ in a }) }
+        let a = index(ancestor), m = index(mine), t = index(theirs)
+        let encoder = SyncBody.encoder()
+        func same(_ x: T?, _ y: T?) -> Bool {
+            switch (x, y) {
+            case (nil, nil): true
+            case let (x?, y?): (try? encoder.encode(x)) == (try? encoder.encode(y))
+            default: false
+            }
+        }
+        func chosen(_ key: String) -> T? {
+            if same(m[key], a[key]) { return t[key] }
+            if same(t[key], a[key]) { return m[key] }
+            return mineWins ? m[key] : t[key]
+        }
+        var result = theirs.compactMap { chosen(id($0)) }
+        var placed = Set(result.map(id))
+        var after: String?
+        for item in mine {
+            let key = id(item)
+            if placed.contains(key) { after = key; continue }
+            guard let value = chosen(key) else { continue }
+            let at = after.flatMap { k in result.firstIndex { id($0) == k } }.map { $0 + 1 } ?? 0
+            result.insert(value, at: at)
+            placed.insert(key)
+            after = key
+        }
+        return result
     }
 
     /// The first sync on this Mac: iCloud's records and the library here merged, never replaced.

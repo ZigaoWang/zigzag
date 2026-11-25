@@ -58,6 +58,10 @@
   Test: SyncTests.aMoveAndAnInsertAtOnceBothKeepTheirPlaces
 - Preferences changed on two Macs → each keeps the later value of each preference.
   Test: SyncTests.preferencesMeetKeyByKey
+- Site rules or pinned splits changed on two Macs at once → each Mac's changes are kept, rule by rule and split by split.
+  Test: SyncTests.siteRulesAndSplitsEditedOnTwoMacsKeepBoth
+- Many pages added at one spot → only the places around it change, never the whole list's, so other Macs' edits to the rest aren't overwritten.
+  Test: SyncTests.aMoveChangesOnlyThePlaceOfWhatMoved
 - Edits made offline → sent when the Mac is back online, merged with what changed meanwhile.
   Test: SyncTests.editsMadeOfflineArriveWhenBackOnline
 - Something removed on one Mac → removed on the other.

@@ -479,9 +479,22 @@ enum SyncOrder {
             for (offset, key) in spread(j - i, after: low, before: high).enumerated() { result[free[i + offset]] = key }
             i = j
         }
-        if result.values.contains(where: { $0.count > longest }) {
-            let fresh = spread(free.count, after: nil, before: nil)
-            for (id, key) in zip(free, fresh) { result[id] = key }
+        // Places grown too long are given out afresh only around them, widening until they fit, so a busy spot doesn't
+        // renumber (and send again) the whole list.
+        while let bad = free.indices.first(where: { (result[free[$0]] ?? "").count > longest }) {
+            var lo = bad, hi = bad + 1
+            // The whole crowded run first, then outward from it.
+            while hi < free.count, (result[free[hi]] ?? "").count > longest / 2 { hi += 1 }
+            while lo > 0, (result[free[lo - 1]] ?? "").count > longest / 2 { lo -= 1 }
+            while true {
+                let keys = spread(hi - lo, after: lo > 0 ? result[free[lo - 1]] : nil, before: hi < free.count ? result[free[hi]] : nil)
+                if keys.allSatisfy({ $0.count <= longest / 2 }) || (lo == 0 && hi == free.count) {
+                    for (offset, key) in keys.enumerated() { result[free[lo + offset]] = key }
+                    break
+                }
+                lo = max(0, lo - 1)
+                hi = min(free.count, hi + 1)
+            }
         }
         return result
     }

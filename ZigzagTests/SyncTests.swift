@@ -318,6 +318,16 @@ extension SyncLibrary {
         for _ in 0..<1000 { many.append(UUID()); keys = SyncOrder.keys(for: many, existing: keys) }
         #expect(keys.values.allSatisfy { $0.count <= SyncOrder.longest })
         #expect(many.map { keys[$0]! } == many.map { keys[$0]! }.sorted())
+        // Pages added again and again at one spot renumber only around it, never the whole list.
+        let original = (0..<100).map { _ in UUID() }
+        var list = original
+        var places = SyncOrder.keys(for: list, existing: [:])
+        let start = places
+        for _ in 0..<300 { list.insert(UUID(), at: 51); places = SyncOrder.keys(for: list, existing: places) }
+        #expect(list.map { places[$0]! } == list.map { places[$0]! }.sorted())
+        #expect(places.values.allSatisfy { $0.count <= SyncOrder.longest })
+        let far = original.prefix(20) + original.suffix(20)
+        #expect(far.allSatisfy { places[$0] == start[$0] }, "\(far.filter { places[$0] != start[$0] }.count) far from the spot renumbered")
     }
 
     // MARK: The first sync
@@ -703,6 +713,30 @@ extension SyncLibrary {
     }
 
     // MARK: Preferences
+
+    @Test func siteRulesAndSplitsEditedOnTwoMacsKeepBoth() throws {
+        let one = Sample.page("one"), two = Sample.page("two"), three = Sample.page("three")
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [one, two, three])]))
+        let space = try #require(a.library.contents.spaces.first?.id)
+        let old = SiteRoutes.Route(site: "old.com", spaceID: space)
+        a.edit { $0.contents.siteRoutes = [old] }
+        a.sync(); b.sync()
+        // At once: A adds a rule and renames the space, B adds another rule, removes the old one and pins a split.
+        a.edit { $0.contents.siteRoutes.append(SiteRoutes.Route(site: "a.com", spaceID: space)); $0.editSpace("Personal") { $0.name = "Home" } }
+        b.edit { lib in
+            lib.contents.siteRoutes = [SiteRoutes.Route(site: "b.com", spaceID: lib.contents.spaces[0].id)]
+            lib.editSpace("Personal") { s in
+                let ids = s.bookmarks.map(\.id)
+                s.pinnedSplits = [PinnedSplit(left: ids[1], right: ids[2])]
+            }
+        }
+        b.sync(); a.sync(); b.sync(); a.sync()
+        for mac in [a, b] {
+            #expect(Set(mac.library.contents.siteRoutes.map(\.site)) == ["a.com", "b.com"], "\(mac.library.contents.siteRoutes.map(\.site))")
+            #expect(mac.library.spaceNames == ["Home"])
+            #expect(mac.library.contents.spaces[0].pinnedSplits?.count == 1)
+        }
+    }
 
     @Test func preferencesMeetKeyByKey() {
         let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal")], settings: ["ReaderSize": .int(16)]))
