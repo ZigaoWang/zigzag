@@ -49,6 +49,12 @@
   Test: ExtensionPermissionRequestTests.sitesOutsideAccessAreAskedAbout
 - A site you allowed it → kept under any site access, until the extension removes it or you choose another site access; a site where extensions are off stays off.
   Test: ExtensionPermissionRequestTests.allowedSitesAreGrantedUnderAnySiteAccess
+- An extension that lists native messaging as optional, as Bitwarden does → it doesn't hold it until it asks (`permissions.request`) right after you used it and you Allow it in the more-access sheet; then it can reach its app on your Mac.
+  Test: ExtensionScriptTests.optionalNativeMessagingIsHeldOnlyAsThePersonAllowedIt
+- An extension's app on your Mac → found from its setup file in Chrome's, Edge's, Brave's, Vivaldi's or Arc's folder, the first one that names the extension and a program that's there.
+  Test: SecurityFixesTests.aStaleManifestInOneFolderGivesWayToAWorkingOne
+- That app's helper → started as Chrome starts one: in its own folder, with the extension's origin as its one argument, speaking Chrome's length-prefixed messages.
+  Test: SecurityFixesTests.aHostIsStartedAsChromeStartsOne
 
 ## Private windows
 - A new extension → off in private windows until Allow in private windows is on for it in Settings › Extensions.

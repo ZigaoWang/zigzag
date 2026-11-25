@@ -16,6 +16,7 @@
 
 ### 修正
 - 「設定」開啟得更快了。每個部分在第一次開啟時才產生，收合的方框在展開或被搜尋時才產生，所以在「一般」開啟「設定」時不會再產生「下載項目」「鍵盤快速鍵」或「開發者」。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- Bitwarden 的「使用生物辨識解鎖」現在能連上 Bitwarden App 了。之前 Zigzag 告訴 Bitwarden 它已經能和 App 溝通，所以 Bitwarden 從不申請，Zigzag 卻又不讓它連上 App。現在 Bitwarden 會申請，Zigzag 會詢問你是否允許。如果之前開啟過生物辨識，請在 Bitwarden 的設定裡把「使用生物辨識解鎖」關閉再開啟。感謝 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 
 ## [0.10.0] - 2026-11-25
 

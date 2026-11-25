@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Settings opens faster. A section's rows are made the first time you open it, and a folded box's when you open it or a search looks in it, so opening Settings on General no longer builds Downloads, Shortcuts or Developer. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- Bitwarden's Unlock with biometrics now reaches the Bitwarden app. Zigzag told Bitwarden it could already talk to the app, so Bitwarden never asked, and Zigzag then kept it from the app. Now Bitwarden asks and Zigzag asks you to allow it. If you turned biometrics on before, turn Unlock with biometrics off and on again in Bitwarden's settings. Thanks to [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 
 ## [0.10.0] - 2026-11-25
 

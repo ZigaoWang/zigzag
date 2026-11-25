@@ -19,6 +19,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ### 修复
 - “设置”打开得更快了。每个部分在第一次打开时才生成，折叠的方框在展开或被搜索时才生成，所以在“通用”打开“设置”时不会再生成“下载”“快捷键”或“开发者”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- Bitwarden 的“使用生物识别解锁”现在能连上 Bitwarden App 了。之前 Zigzag 告诉 Bitwarden 它已经能和 App 通信，所以 Bitwarden 从不申请，Zigzag 却又不让它连 App。现在 Bitwarden 会申请，Zigzag 会问你是否允许。如果之前打开过生物识别，请在 Bitwarden 的设置里把“使用生物识别解锁”关掉再打开。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 
 ## [0.10.0] - 2026-11-25
 
