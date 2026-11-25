@@ -447,20 +447,22 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// Swaps the previewed page without making a new Mini or resizing the card. The page it was showing goes back to
     /// its tab first; the next comes in live, with its scroll, form and media state as it was.
-    func loadPreview(_ tab: Tab, fromRight: Bool? = nil) {
-        guard isDockedInPage, tab.spaceID == self.tab.spaceID, let url = tab.url, !tab.isPrivate else { return }
+    @discardableResult
+    func loadPreview(_ tab: Tab, fromRight: Bool? = nil) -> Bool {
+        guard isDockedInPage, tab.spaceID == self.tab.spaceID, let url = tab.url, !tab.isPrivate else { return false }
         if isBorrowingPage {
-            guard tab !== self.tab else { return }
+            guard tab !== self.tab else { return true }
             giveBackBorrowedPage()
             adoptBorrowedPage(tab)
             // Another page takes this one's place: unfold it from the sidebar's side, or from the side a space
             // switch's list came from.
             root.layoutSubtreeIfNeeded()
             revealDockedPage(fromRight: fromRight ?? dockedHost?.dockPageOnRight ?? false)
-            return
+            return true
         }
         sourceTab = tab
         if self.tab.url != url { self.tab.load(url, by: .page) }
+        return true
     }
 
     /// Takes the row's tab into this Mini, remembering where its page came from and how the tab was listed.

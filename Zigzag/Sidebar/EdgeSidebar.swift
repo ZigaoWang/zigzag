@@ -168,6 +168,8 @@ final class EdgeSidebar {
     private var previewPanelFrame: NSRect = .zero
     /// The space the panel last showed: a switch moves the page in from the side the list came from.
     private var lastSpaceID: UUID?
+    /// When the page's last move lands. A space switch waits for it, so two folds never run over each other.
+    private var previewMoveUntil: TimeInterval = 0
 
     private init() {}
 
@@ -417,6 +419,19 @@ final class EdgeSidebar {
             showSleepingPreview(tab, in: controller, foldFromRight: foldFromRight)
             return
         }
+        // A page in the same space takes the Mini already out: the window, its size and its place stay, and only
+        // the borrowed page changes. Opening a new Mini here made a tile group's parts jitter as each came in.
+        if let preview, preview.tab !== tab, preview.loadPreview(tab, fromRight: foldFromRight) {
+            if sleepingTab != nil {
+                sleepingTab = nil
+                host.sleepingShowing = false
+            }
+            previewTab = tab
+            host.pageShowing = true
+            host.placeCard()
+            notePreviewMove()
+            return
+        }
         // The page already out stays under the next one until its fold has covered it. Giving it back first made
         // the next fold start over an empty Mini.
         let previous = preview
@@ -452,6 +467,7 @@ final class EdgeSidebar {
         // The page is at its final place already; the fold uncovers it as the panel edge reaches it, or over the page
         // it replaces.
         mini.revealDockedPage(fromRight: foldFromRight ?? shownOnRight)
+        notePreviewMove()
         if let previous {
             // Off the bookkeeping first: the old Mini is closing under the new one, not taking the panel with it.
             previous.onInPageMiniClosed = nil
@@ -499,6 +515,7 @@ final class EdgeSidebar {
         if let foldFromRight {
             let offset = (foldFromRight ? 1 : -1) * host.pageFrame.width
             Tokens.Motion.slide(host.sleeping, fromOffsetX: offset, curve: Tokens.Motion.edgeSlide)
+            notePreviewMove()
         }
     }
 
@@ -609,6 +626,7 @@ final class EdgeSidebar {
         if animated {
             // The panel edge and the page's fold go together: the page keeps its final layout and is covered from
             // the card's side as the panel narrows, rather than vanishing first and leaving the panel to jump.
+            notePreviewMove()
             narrowPanel(animated: true)
             mini.closeInPage(focusBack: false, animated: true)
         } else {
@@ -756,9 +774,27 @@ final class EdgeSidebar {
         }
     }
 
+    private var isPreviewMoving: Bool { ProcessInfo.processInfo.systemUptime < previewMoveUntil }
+
+    /// A page move started: the panel's widen or the page's fold. The next space switch waits out the same beat.
+    private func notePreviewMove() {
+        let settle = max(Tokens.Motion.Role.drawer.duration(entering: true), Tokens.Motion.spaceSwitch.duration)
+        previewMoveUntil = ProcessInfo.processInfo.systemUptime + settle + 0.02
+    }
+
     /// A space was picked in the panel while a page or card was out: the new space's selected tab takes its place,
     /// folding from the side the list came from, as the old lens did.
     private func followSpace(from before: UUID?, to after: UUID, in controller: BrowserWindowController) {
+        // The list and the page move together; starting the next pick's fold before this one lands makes the two
+        // fight. Wait for the page it is replacing to finish, then take the new space.
+        guard !isPreviewMoving else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self, weak controller] in
+                guard let self, let controller, self.isShowing, self.target === controller,
+                      controller.tabManager.currentSpaceID == after else { return }
+                self.followSpace(from: before, to: after, in: controller)
+            }
+            return
+        }
         let slide = EdgePreviewRouting.spaceSlide(from: before, to: after, order: controller.tabManager.listedSpaces.map(\.id))
         let fold: Bool? = slide == 0 ? nil : slide > 0
         guard let shown = controller.tabManager.selectedTab, !shown.isPrivate,
@@ -806,6 +842,7 @@ final class EdgeSidebar {
         host.onRight = onRight
         host.cardWidth = target.edgeSidebarWidth
         lastSpaceID = target.tabManager.currentSpaceID
+        previewMoveUntil = 0
         host.set(container)
         generation += 1
         cardPanelFrame = EdgeSidebarLayout.frame(in: visible, width: host.cardWidth + host.inset, onRight: onRight)
@@ -835,6 +872,7 @@ final class EdgeSidebar {
         managerToken?.cancel()
         managerToken = nil
         lastSpaceID = nil
+        previewMoveUntil = 0
         activeTab = nil
         activeLoadToken?.cancel()
         activeLoadToken = nil

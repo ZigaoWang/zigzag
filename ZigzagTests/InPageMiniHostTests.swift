@@ -332,7 +332,9 @@ struct InPageMiniHostTests {
         try inWindow(pageAt: "https://example.test/one", and: "https://example.test/two") { browser, first, second in
             let mini = try #require(MiniWindowController.openPreview(of: first, from: browser, dockedIn: browser))
             let firstHolder = try #require(first.pageHolder)
-            mini.loadPreview(second, fromRight: true)
+            let window = mini.window
+            #expect(mini.loadPreview(second, fromRight: true))
+            #expect(mini.window === window)
             #expect(mini.tab === second)
             #expect(mini.lastRevealFromRight == true)
             #expect(second.host === mini)
