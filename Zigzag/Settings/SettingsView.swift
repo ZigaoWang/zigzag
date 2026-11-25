@@ -2256,8 +2256,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: String(localized: "Sign-in pages and links from scripts and other apps open in a small window instead of a new tab.", comment: "Explanation under “Open links from other apps in Zigzag Mini” in Settings › Zigzag Mini."),
                               control: miniToggle))
         inPageMiniToggle.onChange = { on in InPageMiniSettings.isEnabled = on }
-        miniGroup.add(FormRow(title: String(localized: "Open shift-clicked links in the page", comment: "A setting in Settings › Zigzag Mini."),
-                              detail: String(localized: "The Mini stays over the page you clicked from. When off, shift-clicked links open in a separate Mini window instead. Expand turns the inline one into a window.", comment: "Explanation under “Open shift-clicked links in the page” in Settings › Zigzag Mini."),
+        miniGroup.add(FormRow(title: String(localized: "Open ⇧-clicked links in the page", comment: "A setting in Settings › Zigzag Mini."),
+                              detail: String(localized: "The Mini stays over the page you clicked from. When off, ⇧-clicked links open in a separate Mini window instead. Expand turns the inline one into a window.", comment: "Explanation under “Open ⇧-clicked links in the page” in Settings › Zigzag Mini."),
                               control: inPageMiniToggle))
 
         // Privacy

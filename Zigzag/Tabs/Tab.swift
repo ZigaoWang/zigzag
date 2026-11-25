@@ -2144,6 +2144,13 @@ extension Tab: WKNavigationDelegate {
         return followed ?? .page
     }
 
+    /// A ⇧-click the page handled itself: no web view comes back for WebKit's configuration to belong to, so the Mini
+    /// gets none, matching the off path that opens the standalone Mini.
+    @discardableResult
+    func openPageHandledMini(_ url: URL) -> Bool {
+        host?.tab(self, openInPageMini: url, configuration: nil, by: .page) == true
+    }
+
     /// Where a request for a new window opens. A real link click uses `linkActivation`'s precedence (⌘ wins, ⇧ alone is
     /// Zigzag Mini); a page that handled the click itself (`window.open`, YouTube and parts of Google) is known by the
     /// URL-scoped click record, taken once.
@@ -2770,7 +2777,7 @@ extension Tab: WKUIDelegate {
                                                  modifiers: navigationAction.modifierFlags,
                                                  buttonNumber: navigationAction.buttonNumber)
             if activation == .mini, let url = navigationAction.request.url {
-                if host?.tab(self, openInPageMini: url, configuration: configuration, by: .page) == true { return nil }
+                if openPageHandledMini(url) { return nil }
                 host?.tab(self, openURL: url, disposition: .mini)
                 return nil
             }

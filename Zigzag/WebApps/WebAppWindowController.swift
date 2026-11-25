@@ -344,6 +344,10 @@ extension WebAppWindowController: NSMenuItemValidation {
     }
 }
 
+extension WebAppWindowController: SideButtonHistory {
+    func sideButtonHistory(back: Bool) -> NSMenu? { BrowserWindowController.historyMenu(of: tab.webView, back: back) }
+}
+
 extension WebAppWindowController: SitePanelPageHost {
     var listsExtensions: Bool { true }
 }

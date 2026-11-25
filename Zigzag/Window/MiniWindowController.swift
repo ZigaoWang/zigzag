@@ -498,22 +498,23 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         window.makeFirstResponder(tab.webView)
     }
 
-    /// Closes the docked Mini and its page, and gives the keyboard back to the page it was over.
-    func closeInPage(focusBack: Bool = true, animated: Bool = true) {
-        guard isDockedInPage, let host = dockedHost else { return }
+    /// Closes the docked Mini and its page, and gives the keyboard back to the page it was over. The window closes
+    /// first, so the page still exists when the extension host hears `tabClosed`; the window's own close closes the page.
+    @discardableResult
+    func closeInPage(focusBack: Bool = true, animated: Bool = true) -> Bool {
+        guard isDockedInPage, !isLeaving, let host = dockedHost, let window else { return false }
         isLeaving = true
         onInPageMiniClosed?()
-        let finish = { [weak self] in
+        let finish = { [weak self, weak host, weak window] in
             guard let self else { return }
-            if focusBack { host.dockFocusPage() }
+            if focusBack { host?.dockFocusPage() }
             self.endDockPresentation()
-            self.tab.close()
-            self.window?.close()
+            window?.close()
         }
         // Ordered out under the browser's chrome or before its first frame, there is nothing on screen to fade away.
-        guard animated, let dim = inPageMiniDim, let window, window.isVisible, window.alphaValue > 0.001 else {
+        guard animated, let dim = inPageMiniDim, window.isVisible, window.alphaValue > 0.001 else {
             finish()
-            return
+            return true
         }
         dim.passesClicks = true
         NSAnimationContext.runAnimationGroup({ context in
@@ -521,6 +522,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             window.animator().alphaValue = 0
             dim.animator().alphaValue = 0
         }, completionHandler: finish)
+        return true
     }
 
     /// Lets go of the docked presentation without making the window a standalone one again: it is closing.
@@ -550,6 +552,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         // A standalone Mini never goes full screen itself; one taken out over a full-screen browser stays in that Space.
         let overFullScreen = dockedHost?.dockIsFullScreen == true
         releaseDock()
+        // A child of a Keep on Top browser window inherits its level; out of the page it is an ordinary window again.
         window.level = .normal
         root.chromeOverlay = false
         root.setChromeRevealed(true, animated: false)
@@ -596,6 +599,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         observe(NSWindow.didExitFullScreenNotification) { [weak self] _ in
             MainActor.assumeIsolated { self?.parentTransition(waiting: false) }
         }
+
         for name in [NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification,
                      NSWindow.didChangeScreenNotification] {
             observe(name) { [weak self] _ in
@@ -619,6 +623,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             relayoutAfterParent()
         }
     }
+
+    /// A full-screen transition that failed never sends did-enter or did-exit: the Mini comes back instead of
+    /// staying ordered out forever.
+    func parentFullScreenTransitionFailed() { parentTransition(waiting: false) }
+
+    /// Whether the docked Mini is waiting for the browser window's full-screen transition to land, for tests.
+    var isWaitingForParentFullScreen: Bool { isTransitioningWithParent }
 
     private func relayoutAfterParent() {
         guard isDockedInPage else { return }
@@ -985,10 +996,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.siteButton.isEnabled = tab.url != nil
         strip.showNavigation(canGoBack: tab.canGoBack, canGoForward: tab.canGoForward, isLoading: tab.isLoading)
         KeepOnTop.refresh(strip.pinButton, for: window)
-        if isDockedInPage {
-            strip.pinButton.isEnabled = false
-            strip.pinButton.toolTip = String(localized: "Not while docked", comment: "Tooltip on Zigzag Mini's Keep on Top pin while the Mini is docked over a page.")
-        }
+        // Docked, the pin has nothing to keep on top of: it steps aside rather than explaining itself.
+        strip.hidesPin = isDockedInPage
         strip.expandButton.isHidden = !isDockedInPage
         strip.needsLayout = true
     }
@@ -1470,7 +1479,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 extension MiniWindowController {
     /// This window as an update's restart brings it back: its page, back/forward list, space, place and Keep on Top.
     var savedForRelaunch: UpdateRelaunch.Mini? {
-        guard !isLeaving, !isPrivate, let window, let url = tab.url else { return nil }
+        // A docked Mini belongs to its page: reopening it as a window would strand a second copy of the page.
+        guard !isLeaving, !isDockedInPage, !isPrivate, let window, let url = tab.url else { return nil }
         let frame = window.frame
         return UpdateRelaunch.Mini(url: url, title: tab.title, spaceID: tab.spaceID,
                                    frame: [frame.origin.x, frame.origin.y, frame.width, frame.height],
@@ -1495,6 +1505,10 @@ extension MiniWindowController {
         if saved.keepOnTop, let window = controller.window { KeepOnTop.set(true, for: window) }
         return controller
     }
+}
+
+extension MiniWindowController: SideButtonHistory {
+    func sideButtonHistory(back: Bool) -> NSMenu? { BrowserWindowController.historyMenu(of: tab.webView, back: back) }
 }
 
 extension MiniWindowController: SitePanelPageHost {
@@ -1701,7 +1715,12 @@ final class MiniRootView: SpaceFrameView {
     /// Clicking the glow focuses the window so the question shows.
     var attentionClicked: (() -> Void)?
     /// True while the Mini is docked: the page fills the card and the strip is an overlay.
-    var chromeOverlay = false { didSet { needsLayout = true } }
+    var chromeOverlay = false {
+        didSet {
+            orderChrome()
+            needsLayout = true
+        }
+    }
     /// Docked in a page: the Mini's window is a borderless child, so the window itself stays clear and the rounded card
     /// is the root's own shape.
     var isPageOverlay = false { didSet { applyPageOverlay() } }
@@ -1734,19 +1753,17 @@ final class MiniRootView: SpaceFrameView {
         applyPageOverlay()
         return painted
     }
-    /// The strip and its bar, moved as one: hidden above the page until the pointer reaches the top edge.
-    private let chrome = NSView()
     private var chromeHideWork: DispatchWorkItem?
 
     private var tokens: [SignalToken] = []
     private var keyTokens: [NSObjectProtocol] = []
 
+    private var chromeViews: [NSView] { [bar, strip] }
+
     init() {
         super.init(color: SpaceColor.sky.background)
-        chrome.wantsLayer = true
-        [card, chrome, overlay].forEach(addSubview)
-        chrome.addSubview(bar)
-        chrome.addSubview(strip)
+        // The standalone Mini's order, as it has always been: bar, strip, page, then what floats over it.
+        [bar, strip, card, overlay].forEach(addSubview)
         addSubview(attentionEdge)
         addSubview(barLayer)
         attentionEdge.isHidden = true
@@ -1757,6 +1774,17 @@ final class MiniRootView: SpaceFrameView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Docked, the page fills the window under the strip, so the card goes behind it; standalone, the strip sits above
+    /// the page as it always has.
+    private func orderChrome() {
+        if chromeOverlay {
+            addSubview(card, positioned: .below, relativeTo: bar)
+        } else {
+            addSubview(bar, positioned: .below, relativeTo: card)
+            addSubview(strip, positioned: .below, relativeTo: card)
+        }
+    }
 
     var cardFrame: NSRect {
         MiniChromeLayout.cardFrame(in: bounds, stripHeight: Tokens.Metric.miniStripHeight, overlays: chromeOverlay)
@@ -1780,25 +1808,30 @@ final class MiniRootView: SpaceFrameView {
         chromeHideWork = nil
         guard chromeOverlay else {
             chromeRevealed = true
-            chrome.isHidden = false
-            chrome.alphaValue = 1
-            chrome.frame = NSRect(x: bounds.minX, y: 0, width: bounds.width, height: Tokens.Metric.miniStripHeight)
+            let frame = NSRect(x: bounds.minX, y: 0, width: bounds.width, height: Tokens.Metric.miniStripHeight)
+            for view in chromeViews {
+                view.isHidden = false
+                view.alphaValue = 1
+                view.frame = frame
+            }
             return
         }
         chromeRevealed = revealed
         let height = Tokens.Metric.miniStripHeight
         let target = NSRect(x: bounds.minX, y: revealed ? 0 : -height, width: bounds.width, height: height)
-        chrome.isHidden = false
+        for view in chromeViews { view.isHidden = false }
         let duration = animated && !Tokens.Motion.reduceMotion ? Tokens.Motion.state : 0
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = duration * Tokens.Motion.debugSlowdown
             context.timingFunction = Tokens.Motion.easeOut
-            chrome.animator().frame = target
-            chrome.animator().alphaValue = revealed ? 1 : 0
+            for view in chromeViews {
+                view.animator().frame = target
+                view.animator().alphaValue = revealed ? 1 : 0
+            }
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, !self.chromeRevealed else { return }
-                self.chrome.isHidden = true
+                for view in self.chromeViews { view.isHidden = true }
             }
         })
     }
@@ -1838,9 +1871,9 @@ final class MiniRootView: SpaceFrameView {
         super.layout()
         let height = Tokens.Metric.miniStripHeight
         let y = chromeOverlay && !chromeRevealed ? -height : 0
-        chrome.frame = NSRect(x: bounds.minX, y: y, width: bounds.width, height: height)
-        bar.frame = chrome.bounds
-        strip.frame = chrome.bounds
+        let chromeFrame = NSRect(x: bounds.minX, y: y, width: bounds.width, height: height)
+        bar.frame = chromeFrame
+        strip.frame = chromeFrame
         card.frame = cardFrame
         overlay.frame = card.frame
         attentionEdge.frame = AttentionEdge.frame(forPage: card.frame, sidebarOnRight: BrowserRootView.sidebarOnRight)
@@ -1869,6 +1902,8 @@ final class MiniStripView: NSView {
     /// Expand a docked Mini into a window of its own; hidden in a standalone Mini.
     let expandButton = MiniStripView.button("arrow.up.left.and.arrow.down.right",
                                             toolTip: String(localized: "Open in Window", comment: "Tooltip on the button that turns the Mini docked in a page into a window of its own."))
+    /// Docked in a page: no Keep on Top pin, since the Mini goes with the page's window.
+    var hidesPin = false { didSet { needsLayout = true } }
 
     private static var backTip: String { Shortcuts.tooltip(String(localized: "Back", comment: "Tooltip of the sidebar's back button."), for: #selector(MiniWindowController.goBack(_:))) }
     private static var forwardTip: String { Shortcuts.tooltip(String(localized: "Forward", comment: "Tooltip of the sidebar's forward button."), for: #selector(MiniWindowController.goForward(_:))) }
@@ -1983,7 +2018,9 @@ final class MiniStripView: NSView {
         var fieldRight = buttons - Tokens.Space.x2
         // Too narrow even so: the buttons beside it step aside while you type, rather than lie under the field.
         let crowded = isEditing && fieldRight - fieldLeft < Self.narrowestField
-        for view in [siteButton, pinButton, copyButton, openButton] as [NSView] { view.isHidden = crowded }
+        for view in [siteButton, pinButton, copyButton, openButton] as [NSView] {
+            view.isHidden = crowded || (view === pinButton && hidesPin)
+        }
         if crowded {
             spaceChip.isHidden = true
             fieldLeft = left

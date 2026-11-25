@@ -107,6 +107,10 @@
   Test: LiveFoldersTests.aSitesAddressFindsItsFeed
 - A live folder → its feed's pages, newest first, at most its count (10, 25 or 50), each new one with a dot.
   Test: LiveFoldersTests.aFetchFillsTheFolderNewestFirstWithDots
+- A GitHub live folder → one of five lists for a username: pull requests opened, issues assigned, review requests, or the open issues or pull requests in repositories they own, whoever opened them.
+  Test: LiveFeedTests.asksGitHubForTheListsOfAUser
+- A live folder in the sidebar → its site's icon (GitHub's for a GitHub list) with a small live chip; the plain folder with the chip until an icon is there.
+  Test: LiveFoldersTests.itWearsItsSitesIcon
 - Opening one of its pages → it opens in place as a pinned page does, and its dot goes; Mark All as Read takes every dot off. A private window shows no live folders and reads nothing.
   Test: LiveFoldersTests.openingAPageReadsIt
 - A page that leaves the feed and comes back → it isn't new again.

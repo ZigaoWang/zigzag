@@ -1,6 +1,11 @@
 import AppKit
 import WebKit
 
+/// A window controller whose Back and Forward list their pages for a held side button (#515).
+@MainActor protocol SideButtonHistory: AnyObject {
+    func sideButtonHistory(back: Bool) -> NSMenu?
+}
+
 /// A window with no title bar and no toolbar. The traffic lights live in the sidebar's top row.
 final class BrowserWindow: NSWindow {
     /// Where the traffic lights should sit, in window coordinates (top-left of the close button), or nil to hide them.
@@ -46,6 +51,16 @@ final class BrowserWindow: NSWindow {
 
     override var canBecomeKey: Bool { !isParked }
     override var canBecomeMain: Bool { !isParked && !isOverlayChild }
+
+    /// A Mini docked over a page is borderless and has no close button for AppKit to press, so ⌘W, ⇧⌘W, a page's
+    /// `window.close()` and an extension closing it all take this one way out.
+    override func performClose(_ sender: Any?) {
+        if let mini = windowController as? MiniWindowController, mini.isDockedInPage {
+            mini.closeInPage()
+            return
+        }
+        super.performClose(sender)
+    }
 
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         isParked ? frameRect : super.constrainFrameRect(frameRect, to: screen)
@@ -233,9 +248,14 @@ final class BrowserWindow: NSWindow {
         }
         if let eventInterceptor, eventInterceptor(event) { return }
         if let side = SideButton(event.type, button: event.buttonNumber) {
-            if let controller = windowController as? BrowserWindowController,
+            // Over a docked Mini that is ordered out under the chrome, the button is the Mini's own Back and Forward.
+            if sideHeldMenu == nil, let controller = windowController as? BrowserWindowController,
                controller.peekHandlesSideButton(side, at: event.locationInWindow) { return }
-            if let action = side.action { windowController?.tryToPerform(action, with: nil) }
+            handleSideButton(side, event)
+            return
+        }
+        if event.type == .otherMouseDragged, let sideHeldMenu, MenuPanel.current === sideHeldMenu {
+            sideHeldMenu.track(windowPoint: event.locationInWindow)
             return
         }
         if movesWindow(for: event) { return }
@@ -296,6 +316,47 @@ final class BrowserWindow: NSWindow {
             UndoClock.lastPageEdit = Date()
             UndoClock.lastPageInput = Date()
         }
+    }
+
+    /// The side button held down now, and where it went down, while its hold runs (#515).
+    private var sideHold: (back: Bool, point: NSPoint)?
+    private var sideHoldTimer: Timer?
+    /// The list a held side button opened, while that button is still down.
+    private(set) weak var sideHeldMenu: MenuPanel?
+
+    /// A quick press goes one step on release; held, the pages that way open at the pointer, as Back's do (#515).
+    private func handleSideButton(_ side: SideButton, _ event: NSEvent) {
+        sideHoldTimer?.invalidate()
+        sideHoldTimer = nil
+        guard side != .press else {
+            sideHold = (event.buttonNumber == 3, event.locationInWindow)
+            sideHeldMenu = nil
+            let timer = Timer(timeInterval: InteractiveView.holdMenuDelay, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.sideHoldElapsed() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            sideHoldTimer = timer
+            return
+        }
+        sideHold = nil
+        if let sideHeldMenu {
+            self.sideHeldMenu = nil
+            // Let go over a page, it's chosen; anywhere else the list stays open to click.
+            if MenuPanel.current === sideHeldMenu { sideHeldMenu.chooseTracked(windowPoint: event.locationInWindow) }
+            return
+        }
+        if let action = side.action { windowController?.tryToPerform(action, with: nil) }
+    }
+
+    /// Still held once the hold is up: the window's pages that way open under the pointer.
+    func sideHoldElapsed() {
+        sideHoldTimer?.invalidate()
+        sideHoldTimer = nil
+        guard let (back, point) = sideHold, MenuPanel.current == nil, let anchor = contentView,
+              let menu = (windowController as? SideButtonHistory)?.sideButtonHistory(back: back) else { return }
+        let entries = MenuPanel.entries(from: menu)
+        guard !entries.isEmpty else { return }
+        sideHeldMenu = MenuPanel.show(entries, from: anchor, placement: .at(point))
     }
 
     /// Side buttons go back and forward in every page window, as in Chrome; on release, with the press taken too (#345).

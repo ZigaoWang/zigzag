@@ -110,7 +110,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.onInPageMiniSlide = { [weak self] show, duration in
             self?.inPageMini.sidebarSlid(show: show, duration: duration)
         }
-        installInPageMiniEscMonitor()
+        // Only a docked Mini needs the window's Esc monitor: with the setting off, none is installed.
+        inPageMini.onRecordChanged = { [weak self] in self?.inPageMiniRecordChanged() }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onTouchPull = { [weak self] pulling in
             guard let self else { return }
@@ -3050,6 +3051,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // The space never came: the chrome comes back and the page keeps its fill in the window.
         endWholeScreen()
         fullScreenChanged(.didFailToEnter)
+        inPageMini.fullScreenTransitionFailed()
         // The browser's space never came: the page can still go to WebKit's own full screen.
         if let tab = pageFullScreenNativeAfterSpace {
             pageFullScreenNativeAfterSpace = nil
@@ -3080,6 +3082,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Diagnostics.note("Full screen didn't end")
         pageFullScreenNativeAfterSpace = nil
         fullScreenChanged(.didFailToExit)
+        inPageMini.fullScreenTransitionFailed()
     }
 
     /// One place for the title bar through full screen: what each phase wants, and the buttons laid out once AppKit
@@ -3114,12 +3117,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Set as the window closes, for what holds on to this controller past that (Zigzag Mini's source).
     private(set) var windowClosed = false
 
+    /// Whether the window is watching for Esc over a docked Mini, for the off path's sake.
+    var hasInPageMiniEscMonitor: Bool { inPageMiniEscMonitor != nil }
+
+    private func inPageMiniRecordChanged() {
+        if inPageMini.record == nil { removeInPageMiniEscMonitor() } else { installInPageMiniEscMonitor() }
+    }
+
     private func installInPageMiniEscMonitor() {
+        guard inPageMiniEscMonitor == nil else { return }
         inPageMiniEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.keyCode == 53, !event.isARepeat,
                   self.window?.isKeyWindow == true, self.inPageMini.record != nil else { return event }
             return self.inPageMini.escapePressed(event) ? nil : event
         }
+    }
+
+    private func removeInPageMiniEscMonitor() {
+        if let monitor = inPageMiniEscMonitor { NSEvent.removeMonitor(monitor) }
+        inPageMiniEscMonitor = nil
     }
 
     /// Closing the AI apps' window while they work hides it again instead (Headless).
@@ -3128,9 +3144,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         EdgeSidebar.shared.windowClosed(self)
         windowClosed = true
+        inPageMini.onRecordChanged = nil
         inPageMini.windowClosing()
-        if let monitor = inPageMiniEscMonitor { NSEvent.removeMonitor(monitor) }
-        inPageMiniEscMonitor = nil
+        removeInPageMiniEscMonitor()
         fadeTimer?.invalidate()
         numberHints?.stop()
         Autofill.shared.forget(windowOf: window)
@@ -3222,8 +3238,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     @discardableResult
     func openInPageMini(_ url: URL, configuration: WKWebViewConfiguration?, opener: Tab,
                         by sender: Tab.LoadSender = .page) -> Bool {
+        // The setting is checked first: with it off, the command bar closes in `openInMini` on the path that opens one,
+        // exactly as it did before.
+        guard inPageMini.openURL(url: url, configuration: configuration, opener: opener, by: sender) else { return false }
         commandBar.dismiss(restoringFocus: false)
-        return inPageMini.openURL(url: url, configuration: configuration, opener: opener, by: sender)
+        return true
     }
 
     private func sidebarContains(_ event: NSEvent) -> Bool {

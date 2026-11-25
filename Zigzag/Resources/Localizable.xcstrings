@@ -41950,24 +41950,7 @@
         }
       }
     },
-    "Not while docked" : {
-      "comment" : "Tooltip on Zigzag Mini's Keep on Top pin while the Mini is docked over a page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "停靠时不可用"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "停靠時無法使用"
-          }
-        }
-      }
-    },
-    "Open shift-clicked links in the page" : {
+    "Open ⇧-clicked links in the page" : {
       "comment" : "A setting in Settings › Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
@@ -41984,8 +41967,8 @@
         }
       }
     },
-    "The Mini stays over the page you clicked from. When off, shift-clicked links open in a separate Mini window instead. Expand turns the inline one into a window." : {
-      "comment" : "Explanation under “Open shift-clicked links in the page” in Settings › Zigzag Mini.",
+    "The Mini stays over the page you clicked from. When off, ⇧-clicked links open in a separate Mini window instead. Expand turns the inline one into a window." : {
+      "comment" : "Explanation under “Open ⇧-clicked links in the page” in Settings › Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
