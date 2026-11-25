@@ -14152,6 +14152,12 @@
         "value": "a transféré ce lien à %@"
       }
     },
+    "handoff.file": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Fichier"
+      }
+    },
     "headless background hidden window": {
       "stringUnit": {
         "state": "translated",

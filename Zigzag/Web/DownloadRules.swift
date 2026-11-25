@@ -95,7 +95,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         var title: String {
             switch self {
             case .url: String(localized: "URL", comment: "Choice of what a download rule hands off: the link or download's address, as before.")
-            case .file: String(localized: "File", comment: "Choice of what a download rule hands off: Zigzag downloads it first, then hands off the saved file.")
+            case .file: String(localized: "handoff.file", defaultValue: "File", comment: "Choice of what a download rule hands off: the saved file, not its address. The noun for a file, as in Finder.")
             }
         }
     }

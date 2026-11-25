@@ -14710,6 +14710,12 @@
         "value": "ссылка передана в %@"
       }
     },
+    "handoff.file": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Файл"
+      }
+    },
     "headless background hidden window": {
       "stringUnit": {
         "state": "translated",

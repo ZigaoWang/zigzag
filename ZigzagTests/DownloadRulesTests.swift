@@ -783,6 +783,14 @@ struct DownloadRuleTests {
         #expect(!DownloadHandoff.defersToSavedFile(rule, forDownload: false))
     }
 
+    /// The Hand off choice is a file, as in Finder, not the File menu (German Datei, not Ablage).
+    @Test func theFileChoiceIsAFileNotTheMenu() throws {
+        let bundle = try #require(Bundle.main.path(forResource: "de", ofType: "lproj").flatMap(Bundle.init(path:)))
+        #expect(bundle.localizedString(forKey: "handoff.file", value: nil, table: nil) == "Datei")
+        #expect(bundle.localizedString(forKey: "File", value: nil, table: nil) == "Ablage")
+        #expect(DownloadRule.HandoffType.file.title == String(localized: "handoff.file", defaultValue: "File", comment: ""))
+    }
+
     /// A File handoff's download you cancel or remove goes quietly; only a failure says the download didn't finish.
     @MainActor @Test func aCancelledFileHandoffSaysNothing() {
         let rule = DownloadRule(name: "Quiet \(UUID().uuidString)", match: .any, action: DownloadRuleAction(kind: .openApp), handoffType: .file)

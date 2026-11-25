@@ -169,6 +169,12 @@
         "value": "이 파일을 %@에 전달함"
       }
     },
+    "handoff.file": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "파일"
+      }
+    },
     "sent this file to %@": {
       "stringUnit": {
         "state": "translated",

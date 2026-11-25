@@ -169,6 +169,12 @@
         "value": "bu dosyayı şuraya devretti: %@"
       }
     },
+    "handoff.file": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Dosya"
+      }
+    },
     "sent this file to %@": {
       "stringUnit": {
         "state": "translated",

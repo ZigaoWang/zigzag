@@ -14428,6 +14428,12 @@
         "value": "entregou este link a %@"
       }
     },
+    "handoff.file": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Arquivo"
+      }
+    },
     "headless background hidden window": {
       "stringUnit": {
         "state": "translated",

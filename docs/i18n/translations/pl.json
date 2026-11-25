@@ -169,6 +169,12 @@
         "value": "przekazano ten plik do: %@"
       }
     },
+    "handoff.file": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Plik"
+      }
+    },
     "sent this file to %@": {
       "stringUnit": {
         "state": "translated",
