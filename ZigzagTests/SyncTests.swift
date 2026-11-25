@@ -653,6 +653,40 @@ extension SyncLibrary {
         #expect(b.library.space(named: "Office").map { b.library.contents.directory.profileID(ofSpace: $0.id) } == work.id)
     }
 
+    @Test func aProfilesFavoritesRemovedBeforeItStayWithItHere() throws {
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work")
+        let chat = Sample.page("chat")
+        directory.assign(favorite: chat.id, to: work.id)
+        let offSites = "\(ProfileKey.extensionsOffSites.rawValue).\(work.id.uuidString)"
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal")], favorites: [chat], directory: directory,
+                                                   settings: [offSites: .array([.string("example.com")])]))
+        a.edit { lib in
+            var d = lib.contents.directory
+            d.remove(work.id)
+            lib.contents.directory = d
+            lib.contents.favorites.removeAll { $0.id == chat.id }
+            lib.settings[offSites] = nil
+        }
+        a.sync()
+        // B reads the favorite's removal and the settings first, and the profile's removal in a later fetch.
+        let all = cloud.changes(since: 0)
+        let profile = SyncName.profile(work.id)
+        b.session.fetched(all.records, deleted: all.deleted.filter { $0 != profile })
+        b.session.fetchFinished()
+        #expect(b.library.contents.favorites.isEmpty)
+        b.session.fetched([], deleted: [profile])
+        b.session.fetchFinished()
+        let dir = b.library.contents.directory
+        #expect(dir.profile(work.id) != nil)
+        #expect(b.library.contents.favorites.map(\.id) == [chat.id])
+        #expect(dir.profileID(ofFavorite: chat.id) == work.id)
+        #expect(b.library.settings[offSites] == .array([.string("example.com")]))
+        let sent = b.sent
+        b.sync(); a.sync()
+        #expect(b.sent == sent && cloud.records[SyncName.favorite(chat.id)] == nil)
+    }
+
     @Test func aSecondMacsProfileOfTheSameNameIsTheSameProfile() {
         var one = ProfileDirectory()
         let workA = one.add(name: "Work")

@@ -58,6 +58,15 @@ enum SyncSaveFailure {
     case zoneMissing
 }
 
+/// A favorite or a preference of a profile, removed on another Mac before the profile itself was.
+struct SyncLeftover: Codable {
+    var at: Date
+    var favorite: SyncItem?
+    var value: SettingValue?
+    /// How long one waits for its profile's removal.
+    static let kept: TimeInterval = 30 * 24 * 3600
+}
+
 /// What sync keeps between launches, beside the server's own state.
 struct SyncState: Codable {
     /// The records as this Mac and iCloud last agreed on them, with what this Mac changed since on top.
@@ -83,12 +92,15 @@ struct SyncState: Codable {
     var incomingRemoved: Set<String> = []
     /// When the server last saved each record, as this Mac last had it.
     var serverDates: [String: Date] = [:]
+    /// Favorites (by record name) and preferences (by key) of another profile removed elsewhere lately: when the
+    /// profile's own removal follows, they come back with it.
+    var leftovers: [String: SyncLeftover] = [:]
     /// How far Zigzag's own fetch of the zone has read, beside CKSyncEngine's.
     var zoneToken: Data?
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers
     }
 
     init() {}
@@ -110,6 +122,7 @@ struct SyncState: Codable {
         incomingRemoved = try c.decodeIfPresent(Set<String>.self, forKey: .incomingRemoved) ?? []
         serverDates = try c.decodeIfPresent([String: Date].self, forKey: .serverDates) ?? [:]
         zoneToken = try c.decodeIfPresent(Data.self, forKey: .zoneToken)
+        leftovers = try c.decodeIfPresent([String: SyncLeftover].self, forKey: .leftovers) ?? [:]
     }
 }
 
@@ -237,6 +250,9 @@ final class SyncSession {
         clearIncoming()
         var changed = false
         var resend: [String] = []
+        var profilesGone: Set<UUID> = []
+        let stamp = now()
+        state.leftovers = state.leftovers.filter { stamp.timeIntervalSince($0.value.at) < SyncLeftover.kept }
         for (name, record) in arrived {
             if let record {
                 let outcome = take(record)
@@ -248,17 +264,59 @@ final class SyncSession {
                 state.serverDates[name] = nil
                 // Changed here since: it comes back rather than vanish.
                 if state.unsent.contains(name) { resend.append(name); continue }
-                if state.base.removeValue(forKey: name) != nil {
+                if let item = state.base.removeValue(forKey: name) {
                     // A profile removed elsewhere stays here, never its data erased: it's this Mac's own from now on.
                     if name.hasPrefix("profile."), let id = SyncName.id(name).map(state.aliases.local), id != Profile.defaultID {
                         state.keptProfiles.insert(id)
+                        profilesGone.insert(id)
+                    }
+                    // Another profile's favorite: kept a while, in case its profile's removal comes next.
+                    if case .favorite(let favorite) = item.body, favorite.profile != Profile.defaultID {
+                        state.leftovers[name] = SyncLeftover(at: stamp, favorite: item)
                     }
                     changed = true
                 }
             }
         }
         queue((resend, []))
-        if changed { layOut() }
+        guard changed else { return }
+        let before = host.read().settings
+        layOut()
+        // Another profile's preferences unset from elsewhere: kept a while too.
+        let after = host.read().settings
+        for (key, value) in before where after[key] == nil {
+            if let profile = SyncPreferences.owner(key).profile, profile != Profile.defaultID {
+                state.leftovers["setting:" + key] = SyncLeftover(at: stamp, value: value)
+            }
+        }
+        if !profilesGone.isEmpty { bringBack(profilesGone) }
+    }
+
+    /// A profile removed elsewhere stays here with what was removed from it just before.
+    private func bringBack(_ profiles: Set<UUID>) {
+        var library = host.read()
+        var directory = library.contents.directory
+        var brought = false
+        for (name, leftover) in state.leftovers {
+            if case .favorite(let favorite)? = leftover.favorite?.body, profiles.contains(state.aliases.local(favorite.profile)),
+               let id = SyncName.id(name).map(state.aliases.local), !library.contents.favorites.contains(where: { $0.id == id }) {
+                library.contents.favorites.append(Bookmark(id: id, url: favorite.url, title: favorite.title, icon: favorite.icon))
+                directory.assign(favorite: id, to: state.aliases.local(favorite.profile))
+            } else if name.hasPrefix("setting:"), let value = leftover.value {
+                let key = String(name.dropFirst("setting:".count))
+                guard let profile = SyncPreferences.owner(key).profile, profiles.contains(profile), library.settings[key] == nil else { continue }
+                library.settings[key] = value
+            } else {
+                continue
+            }
+            state.leftovers[name] = nil
+            brought = true
+        }
+        guard brought else { return }
+        library.contents.directory = directory
+        isApplying = true
+        host.write(library)
+        isApplying = false
     }
 
     /// The server's version of a record meets this Mac's. Returns whether the library changes, and whether this
