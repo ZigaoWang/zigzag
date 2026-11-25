@@ -909,6 +909,19 @@ extension SyncLibrary {
         #expect(!cloud.records.isEmpty && a.saves.isEmpty)
     }
 
+    @Test func editsMadeBeforeConnectingAreSentOnceConnected() async throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        // Offline at launch, or before connecting: no server to queue for.
+        a.session.server = nil
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeFirst(); $0.bookmarks.append(Sample.page("c")) } }
+        a.session.server = a
+        #expect(a.saves.isEmpty && a.deletes.isEmpty)
+        try await ICloudSync.catchUp(a.session, through: a)
+        b.sync()
+        #expect(b.library.urls(in: "Personal") == ["b", "c"])
+        #expect(cloud.records.count == a.session.state.base.count)
+    }
+
     @Test func aRecordFetchedTwiceOrLateChangesNothing() throws {
         let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
         let old = try #require(cloud.remote(cloud.records.keys.first { $0.hasPrefix("page.") }!))

@@ -170,6 +170,13 @@ final class SyncSession {
         if export.needsLayout { layOut() }
     }
 
+    /// Everything the server hasn't confirmed, from the state rather than the server's own queue: edits made while
+    /// there was no server (offline, before connecting) and what a quit before the server saved its queue lost.
+    func requeue() {
+        let deletes = state.serverPayloads.keys.filter { state.base[$0] == nil }
+        queue((Array(state.unsent), deletes))
+    }
+
     private func queue(_ changes: (saves: [String], deletes: [String])) {
         guard !changes.saves.isEmpty || !changes.deletes.isEmpty else { return }
         server?.queue(saves: changes.saves.sorted(), deletes: changes.deletes.sorted())

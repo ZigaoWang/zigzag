@@ -111,3 +111,5 @@
 - No push arrives (CloudKit's scheduler refused it, or the Mac was off) → Zigzag reads the zone's changes itself, from where it last read, at launch, on waking, when brought forward after a minute away and every 15 minutes. A record read twice, or an older copy read late, changes nothing.
   Test: SyncTests.aMacStartedAfterItsFirstSyncFetchesWhatChangedWhileItWasAway
   Test: SyncTests.aRecordFetchedTwiceOrLateChangesNothing
+- Edits made before sync connects (offline at launch, signed out for a while) or not yet sent when Zigzag quit → sent once it connects, from what this Mac knows is unsent, never only from the server's own queue.
+  Test: SyncTests.editsMadeBeforeConnectingAreSentOnceConnected

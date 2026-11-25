@@ -183,6 +183,7 @@ final class ICloudSync {
             self.engine = engine
             session.server = engine
             engine.start()
+            session.requeue()
             await catchUp()
         } catch {
             Self.log.error("connecting failed: \(error.localizedDescription, privacy: .public)")
@@ -228,6 +229,7 @@ final class ICloudSync {
         let first = !session.state.merged
         if first { session.fetchFinished() }
         fetched(first)
+        session.requeue()
         try await server.sendChanges()
     }
 
