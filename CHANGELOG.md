@@ -8,6 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Live folders can follow the open issues or pull requests in the repositories a GitHub user owns, whoever opened them, so a maintainer's folder fills with what comes in. The other GitHub lists now say what they hold: Pull Requests Opened, Issues Assigned and Review Requests.
 - A live folder shows its site's icon in the sidebar, GitHub's for a GitHub list, with a small live mark on the corner so it still reads as live.
+- Hold your mouse's Back or Forward button to see the pages that way at the pointer, as with the on-screen arrows. Slide onto a page and let go to go there, or let go and click one. A quick press still goes one step. Thanks to [Lakeland97](https://github.com/Lakeland97) for the idea. ([#515](https://github.com/ZigaoWang/zigzag/issues/515))
 
 ### Fixed
 - A tab's chevron goes away once the last tab nested under it leaves, instead of staying behind and doing nothing, and dragging a tab right to nest it under the tab just above now shows the line at the depth it will land. Thanks to [bkonia](https://github.com/bkonia). ([#526](https://github.com/ZigaoWang/zigzag/issues/526))
