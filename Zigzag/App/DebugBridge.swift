@@ -2054,6 +2054,11 @@ enum DebugBridge {
                let made = Library.shared.addLiveFolder(named: url.host() ?? "Live", source: .feed(url), limit: 25, namedByFeed: true, in: controller.tabManager.currentSpaceID) {
                 LiveFolders.shared.refreshNow(made.id)
             }
+        case "livegithub":
+            // livegithub <user>: a live folder of that user's pull requests at the top of the pins, fetched now.
+            if let made = Library.shared.addLiveFolder(named: "Pull Requests", source: .gitHub(.pullRequests, user: arg), limit: 10, namedByFeed: false, in: controller.tabManager.currentSpaceID) {
+                LiveFolders.shared.refreshNow(made.id)
+            }
         case "livesheet":
             // livesheet: the New Live Folder sheet.
             controller.newLiveFolder()
