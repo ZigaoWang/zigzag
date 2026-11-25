@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Compatibility mode in Site Controls, for a site that doesn't work right: one switch turns off extensions, ad blocking, cookie banners and zapped elements on that site, and turning it off brings back every choice you made for them. Site Controls shows it in the accent while it's on, and Settings › Privacy › Sites lists it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
