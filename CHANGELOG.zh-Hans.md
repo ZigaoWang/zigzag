@@ -22,6 +22,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 网页上打开 Zigzag Mini 时，在变暗的网页上滚动不会再把后面的网页滚走。感谢 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 - 允许网站访问这台 Mac 上的 App 之前的说明，现在按顺序写清楚了：先开启这个设置，再在网站设置里开启每个网站，关闭这个设置会停止所有网站。感谢 [Lakeland97](https://github.com/Lakeland97)。([#533](https://github.com/ZigaoWang/zigzag/issues/533))
 - 在“设置”中，标题旁边有按钮或搜索框的列表，比如“网站存储的数据”或“转交下载和链接”，不会再紧贴在这些控件下面，和其他标题下面留出一样的间距。感谢 [Lakeland97](https://github.com/Lakeland97)。([#527](https://github.com/ZigaoWang/zigzag/issues/527))
+- 拼音输入到一半切换到英文时，字母之间不再留下空格，网页和地址栏里都是，与 Chrome 一致。
 
 ## [0.9.5] - 2026-11-25
 

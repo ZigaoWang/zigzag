@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - With Zigzag Mini open over a page, scrolling over the dimmed page no longer moves the page behind it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 - The briefing before websites may reach apps on this Mac now says the steps in order: turn the setting on, then turn on each site in its Site Controls, and turning the setting off stops every site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#533](https://github.com/ZigaoWang/zigzag/issues/533))
 - In Settings, a list under a heading with buttons or a search beside it, like Stored by Websites or Hand Off Downloads and Links, no longer starts right under those controls. It keeps the same space below them as every other heading has. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#527](https://github.com/ZigaoWang/zigzag/issues/527))
+- Switching from Chinese Pinyin to English mid-word no longer leaves spaces between the letters, on a page or in the address bar, as in Chrome.
 
 ## [0.9.5] - 2026-11-25
 
