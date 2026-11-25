@@ -13,13 +13,17 @@ struct LiveFoldersTests {
         nonisolated(unsafe) private static var answers: [String: Answer] = [:]
         nonisolated(unsafe) private static var heard: [URLRequest] = []
 
+        /// While set, each request waits for it before it's answered.
+        nonisolated(unsafe) static var gate: DispatchSemaphore?
+
         static func answer(_ url: String, _ answer: Answer) { lock.withLock { answers[url] = answer } }
-        static func reset() { lock.withLock { answers = [:]; heard = [] } }
+        static func reset() { lock.withLock { answers = [:]; heard = [] }; gate = nil }
         static var requests: [URLRequest] { lock.withLock { heard } }
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
         override func startLoading() {
+            Self.gate?.wait()
             let url = request.url!
             let answer = Self.lock.withLock { () -> Answer? in
                 Self.heard.append(request)
