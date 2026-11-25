@@ -5,6 +5,23 @@ import WebKit
 @testable import Zigzag
 
 @MainActor
+private final class SlidingDockHost: MiniDockHosting {
+    let browser: BrowserWindowController
+    init(browser: BrowserWindowController) { self.browser = browser }
+    var dockParentWindow: NSWindow? { browser.window }
+    var dockPageView: NSView { browser.root }
+    var dockPageFrame: NSRect { browser.root.cardFrame }
+    var dockHasShadow: Bool { true }
+    var dockSlidesPage: Bool { true }
+    var dockPageOnRight: Bool { false }
+    var dockIsCovered: Bool { false }
+    var dockIsFullScreen: Bool { false }
+    func dockShowDim(owner: AnyObject, onClick: @escaping () -> Void) -> MiniPeekDimView? { nil }
+    func dockHideDim(owner: AnyObject) {}
+    func dockFocusPage() {}
+}
+
+@MainActor
 struct InPageMiniHostTests {
     private func inWindow(_ body: (BrowserWindowController, Tab) throws -> Void) rethrows {
         let space = Library.shared.spaces[0].id
@@ -43,6 +60,19 @@ struct InPageMiniHostTests {
         defer { controller.window?.close() }
         controller.window?.layoutIfNeeded()
         try body(controller, tab)
+    }
+
+    private func inWindowAsync(pageAt url: String, _ body: (BrowserWindowController, Tab) async throws -> Void) async rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = manager.newTab(url: URL(string: url), spaceID: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        try await body(controller, tab)
     }
 
     private func inWindow(pageAt url: String, and second: String,
@@ -238,6 +268,28 @@ struct InPageMiniHostTests {
             #expect(tab.host === mini)
             mini.window?.close()
             #expect(tab.isClosed)
+        }
+    }
+
+    @Test func theEdgePreviewSlidesInAndOutFromTheSidebarsSide() async throws {
+        try await inWindowAsync(pageAt: "https://example.test/slide") { browser, tab in
+            let host = SlidingDockHost(browser: browser)
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: host))
+            // Coming in: the page is already at its final layout, masked from the sidebar's side.
+            #expect(mini.root.layer?.mask != nil)
+            #expect(mini.window?.hasShadow == false)
+            try await Task.sleep(for: .milliseconds(400))
+            #expect(mini.root.layer?.mask == nil)
+            #expect(mini.window?.hasShadow == true)
+            // Going: covered again from the sidebar's side, then the window closes.
+            mini.closeInPage(focusBack: false, animated: true)
+            #expect(mini.root.layer?.mask != nil)
+            #expect(mini.window?.hasShadow == false)
+            try await Task.sleep(for: .milliseconds(400))
+            #expect(!mini.isDockedInPage)
+            #expect(mini.window?.isVisible != true)
+            #expect(!tab.isClosed)
+            #expect(tab.host === browser)
         }
     }
 

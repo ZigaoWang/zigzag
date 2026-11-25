@@ -277,7 +277,7 @@ final class EdgeSidebar {
         guard isShowing, target === controller else {
             previewWork?.cancel()
             previewWork = nil
-            closePreview()
+            closePreview(animated: false)
             return
         }
         previewWork?.cancel()
@@ -375,8 +375,8 @@ final class EdgeSidebar {
         if let preview {
             preview.loadPreview(tab)
         } else if let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self) {
-            mini.onInPageMiniClosed = { [weak self] in self?.previewClosed() }
-            mini.onInPageMiniDetached = { [weak self] in self?.previewDetached() }
+            mini.onInPageMiniClosed = { [weak self, weak mini] in self?.previewClosed(mini) }
+            mini.onInPageMiniDetached = { [weak self, weak mini] in self?.previewDetached(mini) }
             preview = mini
         } else {
             narrowPanel()
@@ -401,25 +401,35 @@ final class EdgeSidebar {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
     }
 
-    /// Puts the page away and brings the panel back to the sidebar's own width. The panel stays out.
-    private func closePreview() {
+    /// Puts the page away and brings the panel back to the sidebar's own width. The panel stays out. `animated`: the
+    /// page slides back behind the sidebar first, and `previewClosed` narrows the panel after it; a panel that is
+    /// going away itself closes the page at once.
+    private func closePreview(animated: Bool = true) {
         previewWork?.cancel()
         previewWork = nil
         closeWork?.cancel()
         closeWork = nil
         guard let mini = preview else { return }
+        // Already on its way out: the first close brings the panel back.
+        if mini.isLeavingDock { return }
         preview = nil
         previewTab = nil
         lockedTab = nil
-        mini.onInPageMiniClosed = nil
-        mini.onInPageMiniDetached = nil
-        mini.closeInPage(focusBack: false, animated: false)
-        narrowPanel()
+        if animated {
+            mini.closeInPage(focusBack: false, animated: true)
+        } else {
+            mini.onInPageMiniClosed = nil
+            mini.onInPageMiniDetached = nil
+            mini.closeInPage(focusBack: false, animated: false)
+            narrowPanel()
+        }
     }
 
     /// The Mini closed itself (Esc, its close button, or Open in Zigzag): the sidebar is alone again, and goes when
-    /// the page went to Zigzag rather than just closing.
-    private func previewClosed() {
+    /// the page went to Zigzag rather than just closing. A page that closed after another preview took the panel
+    /// leaves the new one alone.
+    private func previewClosed(_ closing: MiniWindowController?) {
+        if let closing, let preview, preview !== closing { return }
         let moved = preview?.pageMovedOut == true
         previewWork?.cancel()
         previewWork = nil
@@ -436,8 +446,10 @@ final class EdgeSidebar {
         }
     }
 
-    /// Expand took the page out into a window of its own: the panel has done its job and goes.
-    private func previewDetached() {
+    /// Expand took the page out into a window of its own: the panel has done its job and goes. A page that left after
+    /// another preview took the panel leaves the new one alone.
+    private func previewDetached(_ closing: MiniWindowController?) {
+        if let closing, let preview, preview !== closing { return }
         previewWork?.cancel()
         previewWork = nil
         closeWork?.cancel()
@@ -501,7 +513,7 @@ final class EdgeSidebar {
         followTimer?.invalidate()
         followTimer = nil
         guard isShowing, let panel else { return }
-        if preview != nil { closePreview() }
+        if preview != nil { closePreview(animated: false) }
         isShowing = false
         generation += 1
         if MenuPanel.current?.window === panel { MenuPanel.current?.close(animated: false) }
@@ -523,7 +535,7 @@ final class EdgeSidebar {
     /// A menu is opening in the panel: it widens on the inner side, the card staying put, so the menu isn't cut off.
     func makeRoomForMenu() {
         guard isShowing, let panel else { return }
-        if preview != nil { closePreview() }
+        if preview != nil { closePreview(animated: false) }
         let width = cardPanelFrame.width + EdgeSidebarLayout.menuRoom
         panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
     }
@@ -661,6 +673,9 @@ extension EdgeSidebar: MiniDockHosting {
     var dockCardRadius: CGFloat { Tokens.Radius.large }
     var dockCardColor: NSColor? { Tokens.Color.cardBackground }
     var dockHasShadow: Bool { true }
+    /// The preview's page comes in and goes out from the sidebar's side; a page card's peek just fades.
+    var dockSlidesPage: Bool { true }
+    var dockPageOnRight: Bool { shownOnRight }
     var dockIsCovered: Bool { !isShowing || !(host?.pageShowing ?? false) }
     var dockIsFullScreen: Bool { false }
 

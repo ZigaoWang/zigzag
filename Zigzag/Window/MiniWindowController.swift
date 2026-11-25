@@ -76,6 +76,11 @@ final class MiniPeekDimView: ColorView {
     var dockCardColor: NSColor? { get }
     /// Whether the docked card casts its own shadow, as the edge preview's pill does.
     var dockHasShadow: Bool { get }
+    /// The page comes in and goes out from the sidebar's side, its layout already final, rather than with the Mini's
+    /// own fade. The edge preview does; a page card's peek does not.
+    var dockSlidesPage: Bool { get }
+    /// The side it slides from: the sidebar's.
+    var dockPageOnRight: Bool { get }
     /// Host chrome over the page: the child is ordered out under it.
     var dockIsCovered: Bool { get }
     var dockIsFullScreen: Bool { get }
@@ -91,6 +96,8 @@ extension MiniDockHosting {
     var dockCardRadius: CGFloat { Tokens.Radius.card }
     var dockCardColor: NSColor? { nil }
     var dockHasShadow: Bool { false }
+    var dockSlidesPage: Bool { false }
+    var dockPageOnRight: Bool { false }
 }
 
 extension BrowserWindowController: MiniDockHosting {
@@ -149,6 +156,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var isTransitioningWithParent = false
     private var dockedParentObservers: [NSObjectProtocol] = []
     private var chromePointerToken: Any?
+    /// Counts page slides, so an older slide's end doesn't clear a newer one's mask.
+    private var pageSlideGeneration = 0
     /// The host clears its record when the docked Mini closes or is promoted.
     var onInPageMiniClosed: (() -> Void)?
     var onInPageMiniDetached: (() -> Void)?
@@ -205,6 +214,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var tabToken: SignalToken?
     /// The preview is showing a row's live tab rather than a page of its own.
     var isBorrowingPage: Bool { borrowed != nil }
+    /// The docked page is sliding away already: a second close would only restart it.
+    var isLeavingDock: Bool { isLeaving }
 
     /// From a private window: its own store, nothing written down.
     var isPrivate: Bool { tab.isPrivate }
@@ -508,6 +519,79 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return true
     }
 
+    // MARK: The docked page's slide
+
+    /// Uncovers the docked page from the sidebar's side. Its layout is already the final one, so a live page doesn't
+    /// reflow through the slide; the window's shadow comes back once the page is whole.
+    func revealDockedPage(fromRight: Bool) {
+        guard dockedHost?.dockSlidesPage == true, !Tokens.Motion.reduceMotion,
+              let rootLayer = root.layer, root.bounds.width > 1 else { return }
+        pageSlideGeneration += 1
+        let generation = pageSlideGeneration
+        let size = root.bounds.size
+        let mask = pageSlideMask(fromRight: fromRight, size: size, width: 0)
+        rootLayer.mask = mask
+        window?.hasShadow = false
+        let duration = Tokens.Motion.Role.drawer.duration(entering: true)
+        let slide = CABasicAnimation(keyPath: "bounds.size.width")
+        slide.fromValue = 0
+        slide.toValue = size.width
+        slide.duration = duration
+        slide.timingFunction = Tokens.Motion.Role.drawer.timing
+        mask.add(slide, forKey: "pageSlideIn")
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        mask.bounds = CGRect(origin: .zero, size: size)
+        CATransaction.commit()
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.pageSlideGeneration == generation else { return }
+                self.root.layer?.mask = nil
+                self.window?.hasShadow = self.dockedHost?.dockHasShadow ?? false
+            }
+        }
+    }
+
+    /// Covers the docked page from the sidebar's side, then runs `done`; the window closes there. The page stays at
+    /// its final layout the whole way, so a live page doesn't reflow as it goes.
+    func concealDockedPage(fromRight: Bool, then done: @escaping @MainActor () -> Void) {
+        guard dockedHost?.dockSlidesPage == true, !Tokens.Motion.reduceMotion,
+              let window, window.isVisible, window.alphaValue > 0.001,
+              let rootLayer = root.layer, root.bounds.width > 1 else {
+            done()
+            return
+        }
+        pageSlideGeneration += 1
+        let size = root.bounds.size
+        let mask = pageSlideMask(fromRight: fromRight, size: size, width: size.width)
+        rootLayer.mask = mask
+        window.hasShadow = false
+        let duration = Tokens.Motion.Role.drawer.duration(entering: false)
+        let slide = CABasicAnimation(keyPath: "bounds.size.width")
+        slide.fromValue = size.width
+        slide.toValue = 0
+        slide.duration = duration
+        slide.timingFunction = Tokens.Motion.Role.drawer.timing
+        mask.add(slide, forKey: "pageSlideOut")
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        mask.bounds = CGRect(x: 0, y: 0, width: 0, height: size.height)
+        CATransaction.commit()
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            MainActor.assumeIsolated { done() }
+        }
+    }
+
+    private func pageSlideMask(fromRight: Bool, size: NSSize, width: CGFloat) -> CALayer {
+        let mask = CALayer()
+        mask.backgroundColor = NSColor.black.cgColor
+        // Anchored at the sidebar's side: the covered part stays beside it and the page grows away from it.
+        mask.anchorPoint = CGPoint(x: fromRight ? 1 : 0, y: 0.5)
+        mask.position = CGPoint(x: fromRight ? size.width : 0, y: size.height / 2)
+        mask.bounds = CGRect(x: 0, y: 0, width: width, height: size.height)
+        return mask
+    }
+
     // MARK: - In the page
 
     /// Presents this Mini in `host`'s page area. The Mini keeps its own window, root, tab and web view: only the
@@ -550,6 +634,10 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         } else {
             window.makeKeyAndOrderFront(nil)
             window.makeFirstResponder(tab.webView)
+        }
+        if host.dockSlidesPage {
+            root.layoutSubtreeIfNeeded()
+            revealDockedPage(fromRight: host.dockPageOnRight)
         }
     }
 
@@ -602,13 +690,22 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func closeInPage(focusBack: Bool = true, animated: Bool = true) -> Bool {
         guard isDockedInPage, !isLeaving, let host = dockedHost, let window else { return false }
         isLeaving = true
-        onInPageMiniClosed?()
         let finish = { [weak self, weak host, weak window] in
             guard let self else { return }
             if focusBack { host?.dockFocusPage() }
             self.endDockPresentation()
             window?.close()
         }
+        // The edge preview slides its page back behind the sidebar first; the host hears once it has gone.
+        if animated, host.dockSlidesPage, window.isVisible {
+            concealDockedPage(fromRight: host.dockPageOnRight) { [weak self] in
+                guard let self else { return }
+                self.onInPageMiniClosed?()
+                finish()
+            }
+            return true
+        }
+        onInPageMiniClosed?()
         // Ordered out under the browser's chrome or before its first frame, there is nothing on screen to fade away.
         guard animated, let dim = inPageMiniDim, window.isVisible, window.alphaValue > 0.001 else {
             finish()
