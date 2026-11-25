@@ -712,8 +712,15 @@ final class EdgeSidebar {
             let before = lastSpaceID
             let after = controller.tabManager.currentSpaceID
             lastSpaceID = after
-            guard preview != nil || sleepingTab != nil || activeTab != nil else { return }
-            followSpace(from: before, to: after, in: controller)
+            // Only a page or card already beside the list follows the switch. Its tab is prepared later in
+            // `switchToSpace`, so wait a turn: the new space's selected page is then ready to lend.
+            let hadPreview = preview != nil || sleepingTab != nil
+            guard hadPreview, EdgePreviewRouting.keepsPreviewOnSpaceChange(previewOpen: hadPreview) else { return }
+            DispatchQueue.main.async { [weak self, weak controller] in
+                guard let self, let controller, self.isShowing, self.target === controller,
+                      controller.tabManager.currentSpaceID == after else { return }
+                self.followSpace(from: before, to: after, in: controller)
+            }
             return
         }
         guard preview != nil || sleepingTab != nil || activeTab != nil else { return }
@@ -771,6 +778,8 @@ final class EdgeSidebar {
             showPreview(shown, in: controller, foldFromRight: fold)
         case .card:
             showSleepingPreview(shown, in: controller, foldFromRight: fold)
+            // The switch is already preparing the page; it replaces the card when it arrives.
+            watchActiveLoad(shown, in: controller)
         }
     }
 
