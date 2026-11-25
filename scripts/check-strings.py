@@ -11,6 +11,7 @@ value, or format arguments that differ from the English. Exits 1 when any langua
 import os
 import sys
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import xcstrings  # noqa: E402
 
