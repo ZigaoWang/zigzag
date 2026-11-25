@@ -711,16 +711,20 @@ final class PageCardView: NSView {
             swipeBackdrop.layer?.addSublayer(swipeShade)
         }
         Tokens.Motion.withoutAnimation {
-            swipeBackdrop.frame = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - contentTop)
-            swipeBackdrop.isHidden = false
-            // Clip to the page: WebKit can draw past it (a header color extended sideways) into the gap.
-            holder?.layer?.masksToBounds = true
-            swipeShade.frame = holder.map { swipeBackdrop.convert($0.frame, from: clip) } ?? swipeBackdrop.bounds
-            swipeShade.shadowPath = CGPath(rect: swipeShade.bounds, transform: nil)
-            swipeShade.shadowColor = cgColor(Tokens.Color.panelShadow)
-            swipeShade.shadowOpacity = 1
-            swipeShade.shadowRadius = Tokens.Shadow.sheetRadius
-            swipeShade.shadowOffset = .zero
+            // Set up as the swipe starts; each step after only moves layers, so the shadow isn't drawn again.
+            let backdrop = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - contentTop)
+            if swipeBackdrop.isHidden || swipeBackdrop.frame != backdrop {
+                swipeBackdrop.frame = backdrop
+                swipeBackdrop.isHidden = false
+                // Clip to the page: WebKit can draw past it (a header color extended sideways) into the gap.
+                holder?.layer?.masksToBounds = true
+                swipeShade.frame = holder.map { swipeBackdrop.convert($0.frame, from: clip) } ?? swipeBackdrop.bounds
+                swipeShade.shadowPath = CGPath(rect: swipeShade.bounds, transform: nil)
+                swipeShade.shadowColor = cgColor(Tokens.Color.panelShadow)
+                swipeShade.shadowOpacity = 1
+                swipeShade.shadowRadius = Tokens.Shadow.sheetRadius
+                swipeShade.shadowOffset = .zero
+            }
             for layer in swipeMoving {
                 layer.removeAnimation(forKey: "swipe.settle")
                 layer.setAffineTransform(CGAffineTransform(translationX: offset, y: 0))

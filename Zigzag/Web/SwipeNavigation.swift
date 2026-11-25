@@ -590,7 +590,8 @@ final class SwipeNavigator {
             Tokens.Motion.withoutAnimation { webView.layer?.setAffineTransform(CGAffineTransform(translationX: offset, y: 0)) }
         }
         let page = overlay.convert(webView.bounds, from: webView)
-        arrow.frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
+        let frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
+        if arrow.frame != frame { arrow.frame = frame }
         // Ring and fill follow the distance only, so fingers resting keep both where they are (#377).
         // One tap as it arms; hovering at the line doesn't arm it again.
         if arming.step(progress: progress) { Haptics.snap() }
@@ -1002,7 +1003,7 @@ final class SwipeArrowView: NSView {
     private let symbol = NSImageView()
     /// How far along the swipe is, drawn around the edge.
     private let ring = CAShapeLayer()
-    var progress: CGFloat = 0 { didSet { refresh() } }
+    var progress: CGFloat = 0 { didSet { if progress != oldValue { refreshProgress() } } }
     var isArmed = false { didSet { refresh(animated: true) } }
 
     /// The arrow, for a page at `page` shifted `offset` points: centered in the gap at its edge, at least a margin
@@ -1077,8 +1078,14 @@ final class SwipeArrowView: NSView {
             Tokens.Motion.withoutAnimation(apply)
         }
         symbol.contentTintColor = isArmed ? theme.onAccent : Tokens.Color.icon
+        refreshProgress()
+    }
+
+    /// Each step of the swipe: the ring and opacity only.
+    private func refreshProgress() {
         Tokens.Motion.withoutAnimation { ring.strokeEnd = min(max(progress, 0), 1) }
-        alphaValue = Self.opacity(progress: progress, armed: isArmed)
+        let opacity = Self.opacity(progress: progress, armed: isArmed)
+        if alphaValue != opacity { alphaValue = opacity }
     }
 
     /// Shows at once as the swipe starts and is fully there a fifth of the way; once letting go will move, it fills.
