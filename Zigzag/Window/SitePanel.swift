@@ -1606,9 +1606,9 @@ final class SitePanel: FloatingPanelView {
     }
 }
 
-/// The mark on a pinned extension's button in Site Controls: a small round chip with a hairline and a filled pin, in
-/// the tile's top-right corner (top-left beside an attention dot), concentric with the tile's. It only shows what's
-/// pinned and takes no clicks: the whole tile opens the extension, and pinning is in its menu.
+/// The mark on a pinned extension's button in Site Controls: a small round chip with a hairline and a filled pin at a
+/// row's end, or the pin alone in a tile's top-right corner (top-left beside an attention dot), clear of the icon. It
+/// only shows what's pinned and takes no clicks: the whole tile opens the extension, and pinning is in its menu.
 final class PinMark: NSView {
     enum State { case unpinned, pinned, atLimit }
 
@@ -1620,19 +1620,18 @@ final class PinMark: NSView {
 
     static let symbol = "pin.fill"
 
-    /// Where it goes on a tile, in the tile's superview's terms: its corner's curve and the mark's share a center.
-    static func frame(on tile: NSRect, left: Bool) -> NSRect {
-        let side = Tokens.Sidebar.pinMark
-        let inset = Tokens.Radius.tile - side / 2
-        let x = left ? tile.minX + inset : tile.maxX - side - inset
-        return NSRect(x: x, y: tile.minY + inset, width: side, height: side)
+    /// Where it goes on a tile, in the tile's superview's terms: the corner square outside the icon centered in it.
+    static func frame(on tile: NSRect, iconSide: CGFloat, left: Bool) -> NSRect {
+        let side = max(0, (tile.width - iconSide) / 2)
+        return NSRect(x: left ? tile.minX : tile.maxX - side, y: tile.minY, width: side, height: side)
     }
 
-    init() {
+    /// On a tile it's the pin alone: there's no icon under it to set it apart from.
+    init(onTile: Bool = false) {
         let side = Tokens.Sidebar.pinMark
         super.init(frame: NSRect(x: 0, y: 0, width: side, height: side))
         isHidden = true
-        for view in [ground, chip] {
+        for view in [ground, chip] where !onTile {
             view.frame = bounds
             view.layer?.cornerRadius = side / 2
             view.autoresizingMask = [.width, .height]
@@ -1646,9 +1645,16 @@ final class PinMark: NSView {
         icon.contentTintColor = Tokens.Color.textSecondary
         // The glyph's ink, not its image, in the chip's middle.
         let ink = Tokens.Symbol.inkOffset(Self.symbol, size: glyph)
-        icon.frame = bounds.offsetBy(dx: -ink.width, dy: ink.height)
+        glyphInk = ink
         addSubview(icon)
         setAccessibilityElement(false)
+    }
+
+    private var glyphInk = CGSize.zero
+
+    override func layout() {
+        super.layout()
+        icon.frame = bounds.offsetBy(dx: -glyphInk.width, dy: glyphInk.height)
     }
 
     required init?(coder: NSCoder) { fatalError() }
