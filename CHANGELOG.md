@@ -21,6 +21,7 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - The briefing before websites may reach apps on this Mac now says the steps in order: turn the setting on, then turn on each site in its Site Controls, and turning the setting off stops every site. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#533](https://github.com/ZigaoWang/zigzag/issues/533))
 - In Settings, a list under a heading with buttons or a search beside it, like Stored by Websites or Hand Off Downloads and Links, no longer starts right under those controls. It keeps the same space below them as every other heading has. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#527](https://github.com/ZigaoWang/zigzag/issues/527))
 - Switching from Chinese Pinyin to English mid-word no longer leaves spaces between the letters, on a page or in the address bar, as in Chrome.
+- A see-through space with Clear glass no longer keeps the Mac's graphics busy while Zigzag sits still, even on a blank page or in Settings. macOS was redrawing the whole window and its shadow every frame; it now draws it only when something changes. The update card's progress bar also stops sliding while it's hidden.
 
 ## [0.9.5] - 2026-11-25
 
