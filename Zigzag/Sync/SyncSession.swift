@@ -15,8 +15,15 @@ protocol SyncServer: AnyObject {
 /// Fetching and sending, as CKSyncEngine does: what a fetch brings arrives through the session, and once the first
 /// sync has merged, the fetch settles it itself.
 protocol SyncTransport: AnyObject {
-    func fetchChanges() async throws
+    func fetchChanges(_ scope: SyncFetchScope) async throws
     func sendChanges() async throws
+}
+
+enum SyncFetchScope {
+    /// Only what a push said changed.
+    case pending
+    /// The zone's changes since the last fetch, asked of the server whether or not a push came.
+    case zone
 }
 
 /// A record as the server has it.

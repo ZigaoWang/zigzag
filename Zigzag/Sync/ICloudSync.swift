@@ -203,6 +203,10 @@ final class ICloudSync {
         } catch {
             Self.log.error("syncing failed: \(error.localizedDescription, privacy: .public)")
             guard self.session === session else { return }
+            if Self.isZoneGone(error) {
+                zoneMissing(error)
+                return
+            }
             failed(error)
         }
     }
@@ -211,7 +215,11 @@ final class ICloudSync {
     /// everything in iCloud has been read; later fetches settle as their changes arrive.
     static func catchUp(_ session: SyncSession, through server: SyncTransport, isCurrent: () -> Bool = { true },
                         fetched: (_ first: Bool) -> Void = { _ in }) async throws {
-        try await server.fetchChanges()
+        do {
+            try await server.fetchChanges(.zone)
+        } catch where isZoneGone(error) && !session.state.merged {
+            // No zone yet before the first sync: iCloud has nothing, and the send makes it.
+        }
         guard isCurrent() else { return }
         let first = !session.state.merged
         if first { session.fetchFinished() }
@@ -322,6 +330,18 @@ final class ICloudSync {
         engine = nil
         session?.server = nil
         Task { await connect() }
+    }
+
+    /// Our zone isn't in iCloud. Before the first sync that's an empty iCloud; after it, the zone was removed.
+    fileprivate func zoneMissing(_ error: Error) {
+        guard session?.state.merged == true else { return }
+        zoneDeleted(reset: false)
+    }
+
+    static func isZoneGone(_ error: Error) -> Bool {
+        guard let error = error as? CKError else { return false }
+        if error.code == .zoneNotFound || error.code == .userDeletedZone { return true }
+        return error.partialErrorsByItemID?.values.contains { isZoneGone($0) } == true
     }
 
     fileprivate func zoneDeleted(reset: Bool) {
@@ -512,7 +532,13 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         engine = nil
     }
 
-    func fetchChanges() async throws { try await engine?.fetchChanges() }
+    func fetchChanges(_ scope: SyncFetchScope) async throws {
+        switch scope {
+        case .pending: try await engine?.fetchChanges()
+        // Without a push the engine knows of no changed zone and asks nothing, so the zone is named.
+        case .zone: try await engine?.fetchChanges(CKSyncEngine.FetchChangesOptions(scope: .zoneIDs([ICloudSync.zoneID])))
+        }
+    }
     func sendChanges() async throws { try await engine?.sendChanges() }
 
     func queue(saves: [String], deletes: [String]) {
@@ -574,6 +600,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                 owner?.zoneDeleted(reset: deletion.reason == .encryptedDataReset)
                 return
             }
+        case .didFetchRecordZoneChanges(let fetched):
+            if fetched.zoneID == ICloudSync.zoneID, let error = fetched.error, ICloudSync.isZoneGone(error) { owner?.zoneMissing(error) }
         case .fetchedRecordZoneChanges(let changes):
             let records = changes.modifications.map(\.record).filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(Self.remote)
             session.fetched(records, deleted: changes.deletions.filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(\.recordID.recordName))

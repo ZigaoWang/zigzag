@@ -101,3 +101,6 @@
 - Zigzag opened on a Mac that was off while things changed elsewhere → it fetches them as it connects, then sends what's waiting here, without waiting to be brought forward.
   Test: SyncTests.aMacStartedAfterItsFirstSyncFetchesWhatChangedWhileItWasAway
   Test: SyncTests.aFirstConnectionMergesThenSends
+- The first sync on an iCloud that has no Zigzag library yet → this Mac's library goes up and makes it. iCloud's library gone after a sync (removed on another Mac, or iCloud's data deleted in System Settings) → sync turns off here and says so, without trying again; this Mac keeps everything.
+  Test: SyncTests.aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing
+  Test: SyncTests.aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain

@@ -72,6 +72,10 @@ import Testing
     var online = true
     /// Syncs that fail before one gets through, as iCloud refusing them (HTTP 500).
     var failing = 0
+    /// A push said something changed: only then does a fetch of what's pending ask the server.
+    var pushed = false
+    /// The zone isn't in iCloud.
+    var zoneMissing = false
     private var token = 0
     private(set) var saves: [String] = []
     private(set) var deletes: [String] = []
@@ -127,18 +131,24 @@ import Testing
     }
 
     /// As CKSyncEngine: the records arrive, and once merged the fetch settles them itself.
-    func fetchChanges() async throws {
+    func fetchChanges(_ scope: SyncFetchScope) async throws {
         if failing > 0 {
             failing -= 1
             throw CKError(.serverRejectedRequest)
         }
+        guard scope == .zone || pushed else { return }
+        pushed = false
+        if zoneMissing { throw CKError(.zoneNotFound) }
         let changes = cloud.changes(since: token)
         token = changes.token
         session.fetched(changes.records, deleted: changes.deleted)
         if session.state.merged { session.fetchFinished() }
     }
 
-    func sendChanges() async throws { send() }
+    func sendChanges() async throws {
+        zoneMissing = false
+        send()
+    }
 
     func fetch() {
         let changes = cloud.changes(since: token)
@@ -878,6 +888,27 @@ extension SyncLibrary {
         #expect(first == true)
         #expect(a.session.state.merged)
         #expect(!cloud.records.isEmpty && a.saves.isEmpty)
+    }
+
+    @Test func aFirstSyncIntoAnICloudWithoutTheZoneMergesWithNothing() async throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        a.zoneMissing = true
+        try await ICloudSync.catchUp(a.session, through: a)
+        #expect(a.session.state.merged)
+        #expect(!cloud.records.isEmpty)
+    }
+
+    @Test func aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain() async {
+        let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        a.zoneMissing = true
+        await #expect(throws: CKError.self) { try await ICloudSync.catchUp(a.session, through: a) }
+        let gone = CKError(.zoneNotFound)
+        #expect(ICloudSync.isZoneGone(gone) && ICloudSync.isZoneGone(CKError(.userDeletedZone)))
+        #expect(ICloudSync.isZoneGone(CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [ICloudSync.zoneID: gone]])))
+        #expect(!ICloudSync.isZoneGone(CKError(.serverRejectedRequest)))
+        // Handled as removed from iCloud, never as an error to wait out.
+        #expect(!SyncRetry.isPermanent(gone))
     }
 
     // MARK: Trying again
