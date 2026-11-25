@@ -184,7 +184,7 @@ final class BrowserWebView: WKWebView {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
         if TouchSwipeRecognizer.claims(event) || swipe.handle(event) { return }
         owner?.scrolledSinceSave = true
-        super.scrollWheel(with: event)
+        super.scrollWheel(with: swipe.forPage(event))
     }
 
     // Keys (space, arrows, Page Down) and clicks (the scroll bar, a link to a heading) move the page too: the next

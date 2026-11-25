@@ -227,6 +227,16 @@ final class SwipeNavigator {
         }
     }
 
+    /// What the page gets of `event`: while the arrow leans in, its sideways part only, so the page doesn't move up
+    /// or down under a swipe that's under way.
+    func forPage(_ event: NSEvent) -> NSEvent {
+        guard state == .leaning, event.scrollingDeltaY != 0, let copy = event.cgEvent?.copy() else { return event }
+        copy.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
+        copy.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
+        copy.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0)
+        return NSEvent(cgEvent: copy) ?? event
+    }
+
     /// A scroll that neither begins nor ends a gesture: a step, the glide after it, or a wheel's turn.
     nonisolated static func isMidGesture(_ phase: NSEvent.Phase) -> Bool {
         phase != .began && phase != .ended && phase != .cancelled
