@@ -116,7 +116,7 @@
 - 來自 Chrome 線上應用程式商店或 Firefox 附加元件的主題，以及用「從資料夾安裝」選的主題資料夾，不會再被安裝。Zigzag 不使用瀏覽器主題，所以會直接說明，並提示可以改空間的顏色；以前會把主題當成延伸功能裝上，裝好後什麼也不做。在應用店的主題網頁上點提示欄的「新增」，也只顯示這一行說明，不再出現「重試」按鈕，因為重試也只會得到同樣的結果。感謝 [Lakeland97](https://github.com/Lakeland97)。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
 - 翻譯很長的網頁不會再在 45 秒後放棄了。螢幕上看得到的部分先翻，翻好一段就換上一段，提示裡會顯示翻到多少了；只有連續 45 秒什麼都沒翻出來才會報錯。感謝 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
 - 紅黃綠按鈕和旁邊的按鈕現在正好在視窗頂部和網址列中間，上下留白一樣，不再偏下。
-- 為了修好 macOS 26 上 Mac 的密碼清單，Zigzag 會在你的 Mac 上記一份很小的步驟日誌，絕不記你的登入資訊，放在 ~/Library/Logs/Zigzag/passwords.log。「幫助 › 報告問題」會附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+- 為了修好 macOS 26 上 Mac 的密碼清單，Zigzag 會在你的 Mac 上記一份很小的步驟日誌，絕不記你的登入資訊，放在 ~/Library/Logs/Zigzag/passwords.log。「輔助說明 › 報告問題」會附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 輕掃後退或前進時，箭頭不會再掃到一半就變成實心，手指一停又變回空心。現在只有掃得夠遠箭頭才會變實心，手指停住不動時箭頭保持原樣。手指還在移動時快速一掃鬆手，照樣會後退或前進。感謝 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - 空間編輯器裡的色塊，滑鼠移上去不再放大，只顯示一圈淡淡的邊，和閱讀器裡一樣。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 - 在「顯示所有分頁」裡，卡片滾到搜尋框下面時會出現一條細線，不會再像被硬切掉一樣。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
@@ -599,7 +599,7 @@
 - 給空間、資料夾或分頁選圖示時，可以在圖示網格下面的輸入欄位裡輸入「cat」或「rocket」這樣的名稱，找到對應的表情符號。點一下一個或按 Return 選中，按 Esc 回到圖示。以前輸入的字母會消失。感謝 [thekevinbrown](https://github.com/thekevinbrown)。([#163](https://github.com/ZigaoWang/zigzag/issues/163))
 - 用滑鼠中鍵點一下地址可以關閉目前分頁，和中鍵點一下側邊欄裡它那一行一樣。感謝 [Lakeland97](https://github.com/Lakeland97)。([#171](https://github.com/ZigaoWang/zigzag/issues/171))
 - 休眠分頁的預覽會說明它為什麼休眠、大約釋放了多少記憶體，例如「為省記憶體已休眠，釋放了約 180 MB。」。它的圖示外面換成了一圈均勻的細虛線，不再是粗點。([#140](https://github.com/ZigaoWang/zigzag/issues/140))
-- 「Zigzag 已更新」的提示 15 秒後會自己消失，和通知一樣，滑鼠指標停在上面時不會消失。「新功能」仍然在「幫助」選單裡。
+- 「Zigzag 已更新」的提示 15 秒後會自己消失，和通知一樣，滑鼠指標停在上面時不會消失。「新功能」仍然在「輔助說明」選單裡。
 - 「變更圖示」裡的第一個選項顯示網站自己的圖示，一看就知道它是用來恢復網站圖示的。
 
 ### 修正
@@ -718,7 +718,7 @@
 - 「密碼…」會在網頁的輸入欄旁直接開啟 Mac 的自動填寫面板，由 macOS 填寫登入資訊。它也在輸入欄右鍵選單的「自動填寫」下，以及登入欄的鑰匙圖示上。([#132](https://github.com/ZigaoWang/zigzag/issues/132))
 - Zigzag 會阻擋 YouTube 廣告，而且不會影響 YouTube 自己的對話方塊和捲動。如果你用了 uBlock Origin Lite 或 AdGuard 這類廣告阻擋延伸功能，在 YouTube 上會交給它處理。([#129](https://github.com/ZigaoWang/zigzag/issues/129))
 - 從有多份個人資料的 Chrome 或其他瀏覽器匯入時，每份個人資料都會變成一個以它命名的空間。再次匯入會加到同樣的空間裡。([#131](https://github.com/ZigaoWang/zigzag/issues/131))
-- 「幫助 › 鍵盤鍵盤快速鍵」會開啟鍵盤快速鍵清單。([#122](https://github.com/ZigaoWang/zigzag/issues/122))
+- 「輔助說明 › 鍵盤快速鍵」會開啟鍵盤快速鍵清單。([#122](https://github.com/ZigaoWang/zigzag/issues/122))
 - 設定搜尋可以用你習慣的說法找到啟動、主頁、深色模式和預設瀏覽器的設定。([#121](https://github.com/ZigaoWang/zigzag/issues/121))
 - 被 Zigzag 休眠的分頁，圖示外面會有一圈虛線，和 Chrome 一樣，指標指向時會說明原因。([#140](https://github.com/ZigaoWang/zigzag/issues/140))
 
@@ -761,4 +761,4 @@
 - 「密碼…」會一直開著，直到你選了一個登入資訊或去做別的事，不會一開啟就關上。([#96](https://github.com/ZigaoWang/zigzag/issues/96))
 - 你開啟過的固定網頁，即使所在的資料夾合上了，也會顯示在資料夾下面，和 Arc 一樣。([#94](https://github.com/ZigaoWang/zigzag/issues/94))
 - 按住 ⌥⌘ 拖移可以從視窗的任何地方移動視窗，設定和空視窗也一樣。([#95](https://github.com/ZigaoWang/zigzag/issues/95))
-- Zigzag 啟動快了一點，「幫助 › 報告問題」產生的卡頓報告會說明當時在執行什麼。([#89](https://github.com/ZigaoWang/zigzag/issues/89))
+- Zigzag 啟動快了一點，「輔助說明 › 報告問題」產生的卡頓報告會說明當時在執行什麼。([#89](https://github.com/ZigaoWang/zigzag/issues/89))
