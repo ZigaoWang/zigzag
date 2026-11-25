@@ -71,6 +71,10 @@
   Test: SettingsFoldingTests.findASettingOpensTheBoxAMatchIsIn
 - Eight or more sites → a search beside the heading narrows the list to the sites that match.
   Test: SettingsFoldingTests.manySitesGetASearchOfTheirOwn
+- A permission's name or its choice in that search or Find a setting (camera, notifications, block) → every site with a matching choice, each under its own name, its box opened to the rows that match.
+  Test: SettingsFoldingTests.aPermissionsNameFindsItsSites
+- Zigzag in another language → the names and choices as its rows say them find the sites.
+  Test: SettingsFoldingTests.aPermissionsNameFindsItsSitesInItsLanguage
 - A box's header → a click, Space, → or ← opens or folds it, ↑ and ↓ move to the box above or below; VoiceOver reads it as a disclosure triangle.
   Test: FoldBoxTests.keysOpenFoldAndMoveBetweenBoxes
 

@@ -8,6 +8,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Compatibility mode in Site Controls, for a site that doesn't work right: one switch turns off extensions, ad blocking, cookie banners and zapped elements on that site, and turning it off brings back every choice you made for them. Site Controls shows it in the accent while it's on, and Settings › Privacy › Sites lists it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 - In Settings, long lists fold into boxes the way Site Permissions does: each menu in Shortcuts, each download rule with its saved answers inside, each kind of feature flag, and Sites in Developer Mode, Trusted Certificates and Page Sizes once they list more than three. Find a setting still opens the box a match is in. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+<<<<<<< HEAD
+=======
+- Site Permissions' own search and Find a setting now find sites by permission and by choice: type camera, notifications or block to see every site with that choice, each under its site's name. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#532](https://github.com/ZigaoWang/zigzag/issues/532))
+
+### Fixed
+>>>>>>> 5c1b4fe5 (docs: spec and release note lines for searching by permission (#532))
 - Settings opens faster. A section's rows are made the first time you open it, and a folded box's when you open it or a search looks in it, so opening Settings on General no longer builds Downloads, Shortcuts or Developer. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 
 ## [0.10.0] - 2026-11-25
