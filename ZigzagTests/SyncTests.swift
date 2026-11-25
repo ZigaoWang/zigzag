@@ -357,6 +357,18 @@ extension SyncLibrary {
         #expect(a.library.urls(in: "Work") == b.library.urls(in: "Work"))
     }
 
+    @Test func pinsThatDifferOnlyAfterTheHashStayTwo() {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("app#inbox")])], favorites: [Sample.page("mail#one")]))
+        a.sync()
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("app#sent"), Sample.page("app#inbox")])], favorites: [Sample.page("mail#two")]))
+        b.sync(); a.sync()
+        for mac in [a, b] {
+            #expect(mac.library.space(named: "Personal")?.bookmarks.map { $0.url.fragment ?? "" }.sorted() == ["inbox", "sent"])
+            #expect(mac.library.contents.favorites.map { $0.url.fragment ?? "" }.sorted() == ["one", "two"])
+        }
+    }
+
     @Test func theFirstSyncNeverRemovesWhatIsOnlyHere() {
         let cloud = FakeCloud()
         let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a")])]))

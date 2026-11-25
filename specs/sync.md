@@ -38,6 +38,8 @@
 - A second Mac with its own library → merged, never replaced: a space of the same name on the same profile, a folder of the same name in the same place and a pinned page with the same address in the same place are one, as iCloud has them, and what's only on this Mac is added beside where it was.
   Test: SyncTests.theFirstSyncMergesDuplicatesByNameAndAddress
   Test: SyncTests.aSecondMacsFirstSpaceIsMatchedByNameNotCopied
+- Two pinned pages or favorites whose addresses differ only after the # (a web app's views) → stay two.
+  Test: SyncTests.pinsThatDifferOnlyAfterTheHashStayTwo
 - Something iCloud doesn't have → added to iCloud, never removed from this Mac.
   Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
 - Sync turned on again, or iCloud's copy reset → merged again, and nothing is added twice.

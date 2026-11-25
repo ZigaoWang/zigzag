@@ -85,11 +85,11 @@ extension ZigzagBackup {
         }
 
         var knownFavorites: [UUID: Set<String>] = [:]
-        for favorite in contents.favorites { knownFavorites[directory.profileID(ofFavorite: favorite.id), default: []].insert(TabManager.normalize(favorite.url)) }
+        for favorite in contents.favorites { knownFavorites[directory.profileID(ofFavorite: favorite.id), default: []].insert(TabManager.pinnedKey(favorite.url)) }
         var favoriteIDs: [UUID: UUID] = [:]
         for favorite in favorites {
             let profile = profileHere(favoriteProfiles[favorite.id.uuidString])
-            let key = TabManager.normalize(favorite.url)
+            let key = TabManager.pinnedKey(favorite.url)
             guard knownFavorites[profile]?.contains(key) != true else { continue }
             var copy = favorite
             copy.id = Self.fresh(favorite.id, in: &pageIDs)
@@ -118,10 +118,10 @@ extension ZigzagBackup {
     /// Adds `source`'s pinned pages that `here` doesn't have, with their folders and splits. Returns how many.
     private static func mergePages(of source: SpaceInfo, into here: inout SpaceInfo, pageIDs: inout Set<UUID>, folderIDs: inout Set<UUID>,
                                    icon: (String?) -> String?) -> Int {
-        var known = Set(here.bookmarks.map { TabManager.normalize($0.url) })
+        var known = Set(here.bookmarks.map { TabManager.pinnedKey($0.url) })
         var added: [UUID: UUID] = [:]
         var list = here.bookmarks
-        for page in source.bookmarks where known.insert(TabManager.normalize(page.url)).inserted {
+        for page in source.bookmarks where known.insert(TabManager.pinnedKey(page.url)).inserted {
             var copy = page
             copy.id = fresh(page.id, in: &pageIDs)
             copy.icon = icon(page.icon)

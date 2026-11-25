@@ -83,18 +83,18 @@ enum SyncMerge {
         // Pinned pages: by ID, then by address in the same space and folder. Looked up by place, for big libraries.
         var serverPages: [String: [String]] = [:], serverFavorites: [String: [String]] = [:]
         for n in serverNodes {
-            if case .page(let p) = n.body { serverPages["\(p.space) \(p.parent?.uuidString ?? "") \(TabManager.normalize(p.url))", default: []].append(n.name) }
-            if case .favorite(let f) = n.body { serverFavorites["\(f.profile) \(TabManager.normalize(f.url))", default: []].append(n.name) }
+            if case .page(let p) = n.body { serverPages["\(p.space) \(p.parent?.uuidString ?? "") \(TabManager.pinnedKey(p.url))", default: []].append(n.name) }
+            if case .favorite(let f) = n.body { serverFavorites["\(f.profile) \(TabManager.pinnedKey(f.url))", default: []].append(n.name) }
         }
         for node in localNodes.filter({ if case .page = $0.body { true } else { false } }) {
             guard !byID(node), case .page(let mine) = node.body else { continue }
-            let key = "\(aliases.server(mine.space)) \(mine.parent.map(aliases.server)?.uuidString ?? "") \(TabManager.normalize(mine.url))"
+            let key = "\(aliases.server(mine.space)) \(mine.parent.map(aliases.server)?.uuidString ?? "") \(TabManager.pinnedKey(mine.url))"
             if let other = serverPages[key]?.first(where: { !serverTaken.contains($0) }) { link(node, to: other) }
         }
         // Favorites: by ID, then by address in the same profile.
         for node in localNodes.filter({ if case .favorite = $0.body { true } else { false } }) {
             guard !byID(node), case .favorite(let mine) = node.body else { continue }
-            let key = "\(aliases.server(mine.profile)) \(TabManager.normalize(mine.url))"
+            let key = "\(aliases.server(mine.profile)) \(TabManager.pinnedKey(mine.url))"
             if let other = serverFavorites[key]?.first(where: { !serverTaken.contains($0) }) { link(node, to: other) }
         }
 
