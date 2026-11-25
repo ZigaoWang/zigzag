@@ -60,6 +60,10 @@ final class SwipeNavigator {
     /// While the fingers rest mid-swipe no events come at all, which looks the same as a lost end. A rest keeps the
     /// swipe where it is; only doing something else (moving the pointer, a click, a key) shows the fingers are gone.
     private var restMonitor: Any?
+    private var restObservers: [NSObjectProtocol] = []
+    private var restTimer: Timer?
+    /// Where the pointer is on screen.
+    var pointer: () -> NSPoint = { NSEvent.mouseLocation }
     /// Gone back or forward: the page carries on the swipe's way until the next one arrives, or this runs out.
     private var arrival: DispatchWorkItem?
     /// The card that carried the page on, if it moved in one.
@@ -104,13 +108,17 @@ final class SwipeNavigator {
               webView.fullscreenState == .notInFullscreen else { return false }
         // Momentum after a swipe that navigated (or was abandoned) is part of it, not a scroll.
         if !event.momentumPhase.isEmpty {
+            // Still tracking: the fingers lifted and the gesture's end was lost, so this is the release.
+            if state == .tracking || state == .leaning { release(at: event.timestamp, ended: true) }
             if event.momentumPhase == .ended || event.momentumPhase == .cancelled { if state == .finishing { state = .idle } }
             return state == .finishing
         }
         switch event.phase {
         case .began:
-            // A new gesture: anything left from the last one goes now.
+            // A new gesture: anything left from the last one goes now, a page left shifted included.
+            if state == .tracking || state == .leaning { cancel() }
             if let arrow { arrow.removeFromSuperview(); self.arrow = nil }
+            stopPageListening()
             pageArrived()
             watchdog?.cancel()
             stopWatchingRest()
@@ -151,8 +159,7 @@ final class SwipeNavigator {
             switch state {
             case .deciding, .leaning:
                 if room == nil { listenIfSideways() }
-                let decision = SwipeDecision.decide(dx: dx, dy: dy, canGoBack: webView.owner?.canGoBackOrReturn ?? webView.canGoBack,
-                                                    canGoForward: webView.canGoForward, pageScrolls: pageScrolls, page: page,
+                let decision = SwipeDecision.decide(dx: dx, dy: dy, canGoBack: canGo.back, canGoForward: canGo.forward, pageScrolls: pageScrolls, page: page,
                                                     waited: event.timestamp - began, overFrame: overFrame,
                                                     leans: keptOn == nil || webView.url != keptOn)
                 switch decision {
@@ -194,22 +201,29 @@ final class SwipeNavigator {
                 return false
             }
         case .ended, .cancelled:
-            let wasTracking = state == .tracking
-            watchdog?.cancel()
-            stopWatchingRest()
-            // Let go before the page answered: it never navigates, as before the arrow showed this early.
-            if state == .leaning { cancel() }
-            if wasTracking {
-                // Letting go goes when the arrow is filled, or with a flick still moving as the fingers lift.
-                if event.phase == .ended, arming.release(progress: progress, speed: speed(at: event.timestamp)) { go() } else { cancel() }
-                state = .finishing
-            } else {
-                state = .idle
-            }
+            release(at: event.timestamp, ended: event.phase == .ended)
             // The page saw the gesture begin, so it sees it end too (an end carries no movement to scroll by).
             return false
         default:
             return state == .tracking
+        }
+    }
+
+    /// The fingers lifted (`ended`) or the gesture was called off: it goes or springs back, and nothing is left over.
+    private func release(at time: TimeInterval, ended: Bool) {
+        let wasTracking = state == .tracking
+        watchdog?.cancel()
+        watchdog = nil
+        stopWatchingRest()
+        stopPageListening()
+        // Let go before the page answered: it never navigates, as before the arrow showed this early.
+        if state == .leaning { cancel() }
+        if wasTracking {
+            // Letting go goes when the arrow is filled, or with a flick still moving as the fingers lift.
+            if ended, arming.release(progress: progress, speed: speed(at: time)) { go() } else { cancel() }
+            state = .finishing
+        } else {
+            state = .idle
         }
     }
 
@@ -278,6 +292,19 @@ final class SwipeNavigator {
 
     #if DEBUG
     var isTracking: Bool { state == .tracking }
+    /// Showing the arrow, tracking or leaning.
+    var isShowing: Bool { arrow != nil || state == .tracking || state == .leaning }
+    /// Nothing of a gesture left: no arrow, no page shifted, no listener, no timer.
+    var isClean: Bool {
+        arrow == nil && state != .tracking && state != .leaning && state != .deciding && !pageListens && watchdog == nil
+            && restMonitor == nil && (webView?.layer?.affineTransform() ?? .identity) == .identity
+    }
+    /// Where the page could go, in place of its history.
+    var debugCanGo: (back: Bool, forward: Bool)?
+    /// The probe's answer, as if the page had said it.
+    func debugHeard(left: Bool, right: Bool, frame: Bool = false, still: Bool = false) { heard([left, right, frame, still], early: false) }
+    /// Runs the watchdog's timer now, as if the fingers had been still that long.
+    func debugRest() { watchdog?.perform() }
     /// Gone, with the page carried on and waiting for the next one.
     var isCarryingOn: Bool { arrival != nil }
     #endif
@@ -289,6 +316,14 @@ final class SwipeNavigator {
         self.arrival = nil
         if let carried { carried.endSwipe() } else if let layer = webView?.layer { SwipeExit.rest(layer) }
         carried = nil
+    }
+
+    private var canGo: (back: Bool, forward: Bool) {
+        #if DEBUG
+        if let debugCanGo { return debugCanGo }
+        #endif
+        guard let webView else { return (false, false) }
+        return (webView.owner?.canGoBackOrReturn ?? webView.canGoBack, webView.canGoForward)
     }
 
     private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / threshold }
@@ -306,14 +341,37 @@ final class SwipeNavigator {
             guard let self, self.state == .tracking || self.state == .leaning else { return }
             // Not shown any more: there's no resting on a page that's gone.
             guard self.webView?.window != nil else { self.abandonRest(); return }
-            self.restMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
-                MainActor.assumeIsolated { self?.abandonRest() }
+            let gone: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown,
+                                               .magnify, .rotate, .swipe, .smartMagnify, .scrollWheel]
+            self.restMonitor = NSEvent.addLocalMonitorForEvents(matching: gone) { [weak self] event in
+                // This gesture's own steps carry on; only a new gesture or a wheel's turn shows it ended.
+                if event.type != .scrollWheel || SwipeNavigator.startsAnother(event) {
+                    MainActor.assumeIsolated { self?.abandonRest() }
+                }
                 return event
             }
+            // Pointer moves reach a window only when it tracks them (a Zigzag Mini that isn't key doesn't), so it's watched.
+            let pointer = self.pointer()
+            self.restTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let now = self?.pointer() else { return }
+                    if hypot(now.x - pointer.x, now.y - pointer.y) > 2 { self?.abandonRest() }
+                }
+            }
+            // The window or the app going to the back ends it too.
+            let center = NotificationCenter.default
+            self.restObservers = [
+                center.addObserver(forName: NSWindow.didResignKeyNotification, object: self.webView?.window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.abandonRest() }
+                },
+                center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.abandonRest() }
+                },
+            ]
             // A rest that long is a lost gesture, not a pause.
             let lost = DispatchWorkItem { [weak self] in self?.abandonRest() }
             self.watchdog = lost
-            DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: lost)
+            DispatchQueue.main.asyncAfter(deadline: .now() + SwipeDecision.lostAfter, execute: lost)
         }
         watchdog = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
@@ -321,6 +379,9 @@ final class SwipeNavigator {
 
     private func abandonRest() {
         stopWatchingRest()
+        watchdog?.cancel()
+        watchdog = nil
+        stopPageListening()
         guard state == .tracking || state == .leaning else { return }
         cancel()
         state = .idle
@@ -329,6 +390,15 @@ final class SwipeNavigator {
     private func stopWatchingRest() {
         if let restMonitor { NSEvent.removeMonitor(restMonitor) }
         restMonitor = nil
+        restObservers.forEach(NotificationCenter.default.removeObserver)
+        restObservers = []
+        restTimer?.invalidate()
+        restTimer = nil
+    }
+
+    /// A scroll that isn't a step of a gesture under way: a new one touching down or starting, or a wheel's turn.
+    nonisolated static func startsAnother(_ event: NSEvent) -> Bool {
+        event.phase == .mayBegin || event.phase == .began || (event.phase.isEmpty && event.momentumPhase.isEmpty)
     }
 
     private func pageTakes(_ direction: Int) -> Bool {
@@ -532,6 +602,7 @@ final class SwipeNavigator {
 
     private func go() {
         watchdog?.cancel()
+        watchdog = nil
         stopWatchingRest()
         // Let go after its tab went to the back: it isn't where you're looking, so it doesn't move.
         guard let webView, webView.window != nil else { cancel(); return }
@@ -573,6 +644,7 @@ final class SwipeNavigator {
 
     private func cancel() {
         watchdog?.cancel()
+        watchdog = nil
         stopWatchingRest()
         pageArrived()
         settlePage()
@@ -694,6 +766,9 @@ enum SwipeDecision: Equatable {
     static func commits(progress: CGFloat, touchSpeed speed: CGFloat) -> Bool {
         progress >= 1 || (progress >= 0.3 && speed > 300)
     }
+
+    /// Fingers still this long mid-swipe with nothing else happening: the gesture's end was lost.
+    static let lostAfter: TimeInterval = 3
 
     /// Whether a swipe already armed stays armed: a little short of the distance still counts, so fingers hovering at
     /// the line don't flip it back and forth (#377).
