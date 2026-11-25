@@ -14444,6 +14444,66 @@
         "state": "translated",
         "value": "웹 앱"
       }
+    },
+    "%lld shortcuts": {
+      "variations": {
+        "plural": {
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "단축키 %lld개"
+            }
+          }
+        }
+      }
+    },
+    "%lld flags": {
+      "variations": {
+        "plural": {
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "플래그 %lld개"
+            }
+          }
+        }
+      }
+    },
+    "%lld sites": {
+      "variations": {
+        "plural": {
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "사이트 %lld개"
+            }
+          }
+        }
+      }
+    },
+    "%lld sizes": {
+      "variations": {
+        "plural": {
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "크기 %lld개"
+            }
+          }
+        }
+      }
+    },
+    "%lld servers": {
+      "variations": {
+        "plural": {
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "서버 %lld개"
+            }
+          }
+        }
+      }
     }
   },
   "InfoPlist": {

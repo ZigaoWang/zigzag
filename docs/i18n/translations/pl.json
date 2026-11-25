@@ -15272,6 +15272,156 @@
         "state": "translated",
         "value": "Jako pobranie: %@"
       }
+    },
+    "%lld shortcuts": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld skróty"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld skrótów"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld skrót"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld skrótu"
+            }
+          }
+        }
+      }
+    },
+    "%lld flags": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld flagi"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld flag"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld flaga"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld flagi"
+            }
+          }
+        }
+      }
+    },
+    "%lld sites": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld witryny"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld witryn"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld witryna"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld witryny"
+            }
+          }
+        }
+      }
+    },
+    "%lld sizes": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld rozmiary"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld rozmiarów"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld rozmiar"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld rozmiaru"
+            }
+          }
+        }
+      }
+    },
+    "%lld servers": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld serwery"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld serwerów"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld serwer"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld serwera"
+            }
+          }
+        }
+      }
     }
   },
   "InfoPlist": {

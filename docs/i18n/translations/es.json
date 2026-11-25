@@ -14996,6 +14996,126 @@
         "state": "translated",
         "value": "App web"
       }
+    },
+    "%lld shortcuts": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld atajos"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld atajo"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld atajos"
+            }
+          }
+        }
+      }
+    },
+    "%lld flags": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld indicadores"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld indicador"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld indicadores"
+            }
+          }
+        }
+      }
+    },
+    "%lld sites": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld sitios"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld sitio"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld sitios"
+            }
+          }
+        }
+      }
+    },
+    "%lld sizes": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld tamaños"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld tamaño"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld tamaños"
+            }
+          }
+        }
+      }
+    },
+    "%lld servers": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld servidores"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld servidor"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld servidores"
+            }
+          }
+        }
+      }
     }
   },
   "InfoPlist": {

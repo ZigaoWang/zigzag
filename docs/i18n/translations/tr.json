@@ -14720,6 +14720,96 @@
         "state": "translated",
         "value": "Web Uygulaması"
       }
+    },
+    "%lld shortcuts": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld kısayol"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld kısayol"
+            }
+          }
+        }
+      }
+    },
+    "%lld flags": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld bayrak"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld bayrak"
+            }
+          }
+        }
+      }
+    },
+    "%lld sites": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld site"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld site"
+            }
+          }
+        }
+      }
+    },
+    "%lld sizes": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld boyut"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld boyut"
+            }
+          }
+        }
+      }
+    },
+    "%lld servers": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld sunucu"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld sunucu"
+            }
+          }
+        }
+      }
     }
   },
   "InfoPlist": {

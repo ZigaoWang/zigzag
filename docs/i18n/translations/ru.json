@@ -758,6 +758,36 @@
         }
       }
     },
+    "%lld flags": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld флага"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld флагов"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld флаг"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld флага"
+            }
+          }
+        }
+      }
+    },
     "%lld hidden": {
       "stringUnit": {
         "state": "translated",
@@ -1164,6 +1194,36 @@
         }
       }
     },
+    "%lld servers": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сервера"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld серверов"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сервер"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сервера"
+            }
+          }
+        }
+      }
+    },
     "%lld set": {
       "stringUnit": {
         "state": "translated",
@@ -1200,6 +1260,66 @@
         }
       }
     },
+    "%lld shortcuts": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сочетания клавиш"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сочетаний клавиш"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сочетание клавиш"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сочетания клавиш"
+            }
+          }
+        }
+      }
+    },
+    "%lld sites": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сайта"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сайтов"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сайт"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld сайта"
+            }
+          }
+        }
+      }
+    },
     "%lld sites with sign-ins": {
       "variations": {
         "plural": {
@@ -1225,6 +1345,36 @@
             "stringUnit": {
               "state": "translated",
               "value": "%lld сайта со входами"
+            }
+          }
+        }
+      }
+    },
+    "%lld sizes": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld размера"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld размеров"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld размер"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld размера"
             }
           }
         }

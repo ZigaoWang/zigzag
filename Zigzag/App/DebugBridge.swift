@@ -2809,9 +2809,8 @@ enum DebugBridge {
         // getextensions: Settings › Extensions' Get Extensions menu, open.
         case "getextensions": controller.tabManager.selectedTab?.settingsView?.debugShowGetExtensionsMenu()
         case "shortcutrecord":
-            // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts.
-            func rows(in view: NSView) -> [ShortcutRow] { view.subviews.flatMap { ($0 as? ShortcutRow).map { [$0] } ?? rows(in: $0) } }
-            if let content = controller.window?.contentView { rows(in: content).first { $0.debugTitle == arg }?.debugRecord() }
+            // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts, its menu's box opened.
+            controller.tabManager.selectedTab?.settingsView?.debugRecordShortcut(arg)
         case "engine": if let engine = SearchEngine(rawValue: arg) { Library.shared.searchEngine = engine }
         case "engineinfo":
             // The engine searched with, its address for "zigzag test", and the engines extensions give.

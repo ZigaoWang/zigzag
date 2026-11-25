@@ -15045,6 +15045,126 @@
         "state": "translated",
         "value": "App web"
       }
+    },
+    "%lld shortcuts": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld atalhos"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld atalho"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld atalhos"
+            }
+          }
+        }
+      }
+    },
+    "%lld flags": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld recursos"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld recurso"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld recursos"
+            }
+          }
+        }
+      }
+    },
+    "%lld sites": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld sites"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld site"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld sites"
+            }
+          }
+        }
+      }
+    },
+    "%lld sizes": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld tamanhos"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld tamanho"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld tamanhos"
+            }
+          }
+        }
+      }
+    },
+    "%lld servers": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld servidores"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld servidor"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld servidores"
+            }
+          }
+        }
+      }
     }
   },
   "language": "pt-BR"
