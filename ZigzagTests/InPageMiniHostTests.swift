@@ -406,6 +406,40 @@ struct InPageMiniHostTests {
 
     // MARK: What puts it away
 
+    @Test func commandTOpensTheBrowsersNewTabBarAndDropsTheDockedMini() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            try #require(mini.window).alphaValue = 0
+            // The menu bar's ⌘T reaches the Mini, which hands it to the browser rather than letting it act behind
+            // the page it's over.
+            mini.newTab(nil)
+            #expect(!mini.isDockedInPage)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.root.hasInPageMini)
+            #expect(browser.commandBar.isVisible)
+            #expect(browser.commandBar.mode == .newTab)
+        }
+    }
+
+    @Test func theDockedMiniTakesEscFromThePageButNotFromPickedRows() throws {
+        try inWindow { browser, tab in
+            let other = browser.tabManager.newTab(url: URL(string: "about:blank"), select: false)
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            let window = try #require(browser.window)
+            let page = try #require(browser.root.paneCards.compactMap(\.webView).first)
+            window.makeFirstResponder(page)
+            #expect(browser.inPageMiniPageHasKeyboard)
+            // Picked rows keep Esc to clear the pick, rather than closing the Mini first.
+            browser.sidebar.list.mark(pages: [tab, other])
+            #expect(!browser.inPageMiniPageHasKeyboard)
+            mini.closeInPage(animated: false)
+        }
+    }
+
     @Test func escClosesTheDockedMini() async throws {
         try await inWindowAsync { browser, tab in
             let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,

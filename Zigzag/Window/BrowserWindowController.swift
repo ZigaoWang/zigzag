@@ -3120,6 +3120,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Whether the window is watching for Esc over a docked Mini, for the off path's sake.
     var hasInPageMiniEscMonitor: Bool { inPageMiniEscMonitor != nil }
 
+    /// Whether the keys are the page's: a docked Mini takes Esc from the page, but the sidebar's picked rows, its
+    /// fields and the command bar have Esc's own work to do, so it leaves those to them.
+    var inPageMiniPageHasKeyboard: Bool {
+        guard let window, let focused = window.firstResponder as? NSView else { return false }
+        return root.paneCards.contains { card in
+            guard let webView = card.webView else { return false }
+            return focused === webView || focused.isDescendant(of: webView)
+        }
+    }
+
     private func inPageMiniRecordChanged() {
         if inPageMini.record == nil { removeInPageMiniEscMonitor() } else { installInPageMiniEscMonitor() }
     }
@@ -3128,7 +3138,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard inPageMiniEscMonitor == nil else { return }
         inPageMiniEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.keyCode == 53, !event.isARepeat,
-                  self.window?.isKeyWindow == true, self.inPageMini.record != nil else { return event }
+                  self.window?.isKeyWindow == true, self.inPageMini.record != nil,
+                  self.inPageMiniPageHasKeyboard else { return event }
             return self.inPageMini.escapePressed(event) ? nil : event
         }
     }

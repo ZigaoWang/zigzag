@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- With a link open in Zigzag Mini over its page, ⌘T opens the browser's new tab bar instead of acting behind the Mini, and Esc over the Mini goes to the sidebar's picked rows, its fields or the command bar when one of them has the keys. ([#501](https://github.com/ZigaoWang/zigzag/issues/501))
 - Pressing and holding Back or Forward in the sidebar, then sliding down, no longer drags the whole window: the list opens and you can slide onto a page and let go, with the mouse as with a finger.
 
 ## [0.9.5] - 2026-11-24
