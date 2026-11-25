@@ -526,3 +526,17 @@ main, .nav { max-width: 1240px; }
   .hero .actions { flex-wrap: wrap; justify-content: center; row-gap: 14px; }
   .hero .actions > * { white-space: nowrap; }
 }
+
+/* Dark mode, following the Mac's setting: the same quiet page in night colors. The sky, the clips and the pictures stay as they are. */
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0F141B; --ink: #E7ECF2; --soft: #97A2B2; --line: rgba(231, 236, 242, .12); color-scheme: dark; }
+  .wm { background-image: url(/assets/wordmark-light.svg?v=1); }
+  .hero .wm, .sky-card .wm { background-image: url(/assets/wordmark-ink.svg?v=1); }
+  .tile, .bento .tile { background: #171E28; }
+  .label, .intro .label { color: #7FAEF2; }
+  .intro p.statement .w { color: #3B4656; } .intro p.statement .w.on { color: var(--ink); }
+  .weight .bars .fill { background: rgba(231, 236, 242, .2); }
+  .weight .bars .us .fill, .bars .us .fill { background: #5B97EE; }
+  .dl-folder .back { fill: #5E8FC4; } .dl-folder .front { fill: #7FAEDF; }
+  .pitch.sky-card p:not(.fine) { color: rgba(31, 45, 64, .72); }
+}
