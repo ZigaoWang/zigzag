@@ -5,7 +5,7 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 ## [Unreleased]
 
 ### Nuevo
-- La búsqueda del historial ignora acentos y mayúsculas, encuentra cada palabra en cualquier orden y la resalta, y nunca oculta una coincidencia dentro de una pila; cada parte del día tiene un solo encabezado, dos páginas del mismo sitio siguen siendo dos filas, y la lista responde a las flechas, Suprimir, ⌘Return, ⌘F y a un clic derecho que quita un sitio entero.
+- La búsqueda del historial ignora acentos y mayúsculas, encuentra cada palabra en cualquier orden y la resalta, y nunca oculta una coincidencia dentro de una pila; cada parte del día tiene un solo encabezado, dos páginas del mismo sitio siguen siendo dos filas, y la lista responde a las flechas, la tecla Eliminar, ⌘Return, ⌘F y a un clic derecho que quita un sitio entero.
 - Mientras una carpeta dinámica busca páginas nuevas, la insignia de su icono muestra un anillo que gira, como Mail muestra un buzón mientras lo comprueba, y se detiene en cuanto termina.
 - Las ventanas Nueva carpeta dinámica y Editar carpeta dinámica muestran el icono de la carpeta, como la barra lateral: el de GitHub para una lista de GitHub, el del sitio para un feed o el que elegiste. Haz clic en él para cambiar el icono, como con Cambiar icono…, y una carpeta nueva conserva el icono que elijas.
 

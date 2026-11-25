@@ -5,7 +5,7 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 ## [Unreleased]
 
 ### Neu
-- Die Suche im Verlauf ignoriert Akzente und Groß- und Kleinschreibung, findet jedes Wort in beliebiger Reihenfolge, hebt es hervor und versteckt nie einen Treffer in einem Stapel; jeder Tagesabschnitt hat eine eigene Überschrift, zwei Seiten derselben Website bleiben zwei Zeilen, und die Liste reagiert auf die Pfeiltasten, Entf, ⌘Return, ⌘F und einen Rechtsklick, der eine ganze Website entfernt.
+- Die Suche im Verlauf ignoriert Akzente und Groß- und Kleinschreibung, findet jedes Wort in beliebiger Reihenfolge, hebt es hervor und versteckt nie einen Treffer in einem Stapel; jeder Tagesabschnitt hat eine eigene Überschrift, zwei Seiten derselben Website bleiben zwei Zeilen, und die Liste reagiert auf die Pfeiltasten, die Rückschritttaste, ⌘Return, ⌘F und einen Rechtsklick, der eine ganze Website entfernt.
 - Während ein Live-Ordner nach neuen Seiten sucht, zeigt der Chip an seinem Symbol einen drehenden Ring, so wie Mail ein Postfach beim Abrufen zeigt, und hört auf, sobald die Suche fertig ist.
 - Das Fenster „Neuer Live-Ordner“ bzw. „Live-Ordner bearbeiten“ zeigt das Symbol des Ordners wie die Seitenleiste: das von GitHub für eine GitHub-Liste, das der Website für einen Feed oder das, das du gewählt hast. Klicke darauf, um das Symbol wie mit „Symbol ändern …“ zu ändern, und ein neuer Ordner behält das gewählte Symbol.
 

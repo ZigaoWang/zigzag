@@ -5,7 +5,7 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 ## [Unreleased]
 
 ### Nouveautés
-- La recherche dans l’historique ignore les accents et la casse, trouve chaque mot dans n’importe quel ordre et le met en évidence, et ne cache jamais un résultat dans un groupe ; chaque moment de la journée a un seul titre, deux pages d’un même site restent deux lignes, et la liste répond aux touches fléchées, Suppr, ⌘Return, ⌘F et à un clic droit qui supprime tout un site.
+- La recherche dans l’historique ignore les accents et la casse, trouve chaque mot dans n’importe quel ordre et le met en évidence, et ne cache jamais un résultat dans un groupe ; chaque moment de la journée a un seul titre, deux pages d’un même site restent deux lignes, et la liste répond aux touches fléchées, la touche Supprimer, ⌘Return, ⌘F et à un clic droit qui supprime tout un site.
 - Pendant qu’un dossier dynamique cherche de nouvelles pages, la pastille de son icône affiche un anneau qui tourne, comme Mail montre une boîte en cours de relève, et s’arrête dès que c’est fini.
 - La feuille Nouveau dossier dynamique ou Modifier le dossier dynamique affiche l’icône du dossier, comme la barre latérale : celle de GitHub pour une liste GitHub, celle du site pour un flux, ou celle que vous avez choisie. Cliquez dessus pour changer l’icône, comme avec Modifier l’icône…, et un nouveau dossier garde l’icône choisie.
 

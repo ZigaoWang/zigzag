@@ -5,7 +5,7 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 ## [Unreleased]
 
 ### Novo
-- A busca do histórico ignora acentos e maiúsculas, encontra cada palavra em qualquer ordem e a destaca, e nunca esconde um resultado dentro de uma pilha; cada parte do dia tem um só título, duas páginas do mesmo site continuam sendo duas linhas, e a lista responde às setas, a Delete, ⌘Return, ⌘F e a um clique com o botão direito que remove um site inteiro.
+- A busca do histórico ignora acentos e maiúsculas, encontra cada palavra em qualquer ordem e a destaca, e nunca esconde um resultado dentro de uma pilha; cada parte do dia tem um só título, duas páginas do mesmo site continuam sendo duas linhas, e a lista responde às setas, à tecla Delete, ⌘Return, ⌘F e a um clique com o botão direito que remove um site inteiro.
 - Enquanto uma pasta dinâmica procura páginas novas, o selo no ícone dela mostra um anel girando, como o Mail mostra uma caixa sendo verificada, e para assim que a verificação termina.
 - As janelas Nova pasta dinâmica e Editar pasta dinâmica mostram o ícone da pasta, como a barra lateral: o do GitHub para uma lista do GitHub, o do site para um feed ou o que você escolheu. Clique nele para mudar o ícone, como em Alterar ícone…, e uma pasta nova fica com o ícone escolhido.
 

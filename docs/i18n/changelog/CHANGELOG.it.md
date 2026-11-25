@@ -5,7 +5,7 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 ## [Unreleased]
 
 ### Novità
-- La ricerca nella Cronologia ignora accenti e maiuscole, trova ogni parola in qualsiasi ordine e la evidenzia, e non nasconde mai un risultato in una pila; ogni parte della giornata ha un solo titolo, due pagine dello stesso sito restano due righe, e l’elenco risponde ai tasti freccia, Canc, ⌘Return, ⌘F e a un clic destro che rimuove un intero sito.
+- La ricerca nella Cronologia ignora accenti e maiuscole, trova ogni parola in qualsiasi ordine e la evidenzia, e non nasconde mai un risultato in una pila; ogni parte della giornata ha un solo titolo, due pagine dello stesso sito restano due righe, e l’elenco risponde ai tasti freccia, il tasto Elimina, ⌘Return, ⌘F e a un clic destro che rimuove un intero sito.
 - Mentre una cartella live cerca nuove pagine, il badge sulla sua icona mostra un anello che gira, come Mail mostra una casella mentre la controlla, e si ferma appena il controllo finisce.
 - Le finestre Nuova cartella live e Modifica cartella live mostrano l’icona della cartella, come la barra laterale: quella di GitHub per un elenco GitHub, quella del sito per un feed o quella che hai scelto. Fai clic per cambiare l’icona, come con Cambia icona…, e una nuova cartella mantiene l’icona scelta.
 
