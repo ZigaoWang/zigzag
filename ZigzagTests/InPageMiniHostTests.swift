@@ -403,4 +403,79 @@ struct InPageMiniHostTests {
             mini.closeInPage(animated: false)
         }
     }
+
+    // MARK: What puts it away
+
+    @Test func escClosesTheDockedMini() async throws {
+        try await inWindowAsync { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            let esc = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                    windowNumber: 0, context: nil, characters: "\u{1b}",
+                                                    charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+            try #require(mini.window).alphaValue = 0
+            #expect(browser.inPageMini.escapePressed(esc))
+            // The page is asked first whether it keeps Esc, so the close can come a moment later.
+            for _ in 0..<50 where mini.isDockedInPage { try await Task.sleep(for: .milliseconds(100)) }
+            #expect(!mini.isDockedInPage)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.root.hasInPageMini)
+        }
+    }
+
+    @Test func aClickOnTheDimClosesTheDockedMini() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            let dim = try #require(browser.root.inPageMiniDim as? MiniPeekDimView)
+            try #require(mini.window).alphaValue = 0
+            dim.onClick?()
+            #expect(!mini.isDockedInPage)
+            #expect(mini.tab.isClosed)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.root.hasInPageMini)
+        }
+    }
+
+    @Test func aTabSwitchClosesTheDockedMini() throws {
+        try inWindow { browser, tab in
+            let other = browser.tabManager.newTab(url: URL(string: "about:blank"), select: false)
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            browser.inPageMini.debugAdopt(mini, from: tab)
+            try #require(mini.window).alphaValue = 0
+            browser.tabManager.select(other)
+            #expect(!mini.isDockedInPage)
+            #expect(mini.tab.isClosed)
+            #expect(browser.inPageMini.record == nil)
+        }
+    }
+
+    @Test func expandKeepsTheSameLivePage() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: URL(string: "about:blank#kept"), configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let page = try #require(mini.tab.webView)
+            mini.promoteFromPage()
+            #expect(!mini.isDockedInPage)
+            #expect(mini.tab.webView === page)
+            #expect(!mini.tab.isClosed)
+            mini.window?.close()
+        }
+    }
+
+    @Test func withTheSettingOffAShiftClickIsTheStandaloneMini() throws {
+        try inWindow { browser, tab in
+            let before = InPageMiniSettings.isEnabled
+            InPageMiniSettings.isEnabled = false
+            defer { InPageMiniSettings.isEnabled = before }
+            let count = MiniWindowController.all.count
+            #expect(!browser.openInPageMini(URL(string: "about:blank#off")!, configuration: nil, opener: tab))
+            #expect(MiniWindowController.all.count == count)
+            #expect(browser.inPageMini.record == nil)
+            #expect(!browser.hasInPageMiniEscMonitor)
+        }
+    }
 }
