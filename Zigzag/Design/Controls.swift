@@ -324,10 +324,9 @@ class InteractiveView: NSView {
         holdTimer = nil
         guard isEnabled, isPressed, !dragging, let press = mouseDownEvent, let onRightClick, window != nil,
               MenuPanel.current == nil, let menu = onRightClick(press) else { return }
-        let entries = MenuPanel.entries(from: menu)
-        guard !entries.isEmpty else { return }
+        guard !MenuPanel.entries(from: menu).isEmpty else { return }
         isPressed = false
-        heldMenu = MenuPanel.show(entries, from: self, placement: .below)
+        heldMenu = MenuPanel.show(menu: menu, from: self, placement: .below)
         if heldMenu != nil { startHeldFollow() }
     }
 
@@ -547,9 +546,7 @@ class InteractiveView: NSView {
     }
 
     private func showDrawnMenu(_ menu: NSMenu, at windowPoint: NSPoint) {
-        let entries = MenuPanel.entries(from: menu)
-        guard !entries.isEmpty else { return }
-        MenuPanel.show(entries, from: self, placement: .at(windowPoint))
+        MenuPanel.show(menu: menu, from: self, placement: .at(windowPoint))
     }
 
     override func accessibilityPerformShowMenu() -> Bool { showContextMenu() }
@@ -1984,6 +1981,22 @@ protocol MenuItemStyle: AnyObject {
     var isDestructive: Bool { get }
 }
 
+/// What keeps a drawn menu up to date while it's open: each time `changes` fires, `rebuild` makes its AppKit menu again.
+final class MenuUpdates {
+    let changes: Signal<Void>
+    let rebuild: () -> NSMenu?
+    init(changes: Signal<Void>, rebuild: @escaping () -> NSMenu?) { self.changes = changes; self.rebuild = rebuild }
+}
+
+extension NSMenu {
+    private static var updatesKey: UInt8 = 0
+    /// Set on a menu shown as a drawn one (`MenuPanel.show(menu:)`), it changes in place while open.
+    var updates: MenuUpdates? {
+        get { objc_getAssociatedObject(self, &Self.updatesKey) as? MenuUpdates }
+        set { objc_setAssociatedObject(self, &Self.updatesKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+}
+
 /// Zigzag's own menu, drawn rather than the system's, for choosing from a list (a dropdown's options) or acting on
 /// something (a button's few actions): a solid panel with a hairline edge and the panel shadow, 15pt items, a soft gray
 /// row under the pointer or the arrow keys, a check at the trailing end of the chosen one. It arrives in a quick fade
@@ -2058,8 +2071,9 @@ final class MenuPanel: FloatingPanelView {
     static weak var current: MenuPanel?
     private(set) weak var anchor: NSView?
 
-    private let entries: [Entry]
+    private var entries: [Entry]
     private var rows: [Row] = []
+    private var followToken: SignalToken?
     private var notes: [NSTextField] = []
     /// The width notes wrap to, set once the menu's width is known.
     private var noteWidth: CGFloat = 0
@@ -2115,6 +2129,14 @@ final class MenuPanel: FloatingPanelView {
         scroll.documentView = list
         addSubview(scroll)
         list.addSubview(pill)
+        buildContent()
+        setAccessibilityElement(true)
+        // Only words to read: a popover, not a menu to choose from.
+        setAccessibilityRole(rows.isEmpty && !notes.isEmpty ? .popover : .menu)
+    }
+
+    /// A row, heading, line or note for each entry.
+    private func buildContent() {
         let hasImages = entries.contains { if case .item(let item) = $0 { return item.image != nil || item.symbol != nil }; return false }
         for entry in entries {
             switch entry {
@@ -2147,9 +2169,6 @@ final class MenuPanel: FloatingPanelView {
                 list.addSubview(note)
             }
         }
-        setAccessibilityElement(true)
-        // Only words to read: a popover, not a menu to choose from.
-        setAccessibilityRole(rows.isEmpty && !notes.isEmpty ? .popover : .menu)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -2330,6 +2349,78 @@ final class MenuPanel: FloatingPanelView {
     /// Pressed, the highlight darkens a step.
     fileprivate func showPressed(_ pressed: Bool) { pill.showPressed(pressed) }
 
+    // MARK: Keeping up
+
+    /// Opens an AppKit menu as a drawn one; with `updates`, it keeps up while it's open.
+    @discardableResult
+    static func show(menu: NSMenu, from anchor: NSView, placement: Placement = .below) -> MenuPanel? {
+        let entries = Self.entries(from: menu)
+        guard !entries.isEmpty, let panel = show(entries, from: anchor, placement: placement) else { return nil }
+        if let updates = menu.updates {
+            panel.followToken = updates.changes.observe { [weak panel] in
+                guard let panel, let fresh = updates.rebuild() else { return }
+                panel.update(Self.entries(from: fresh))
+            }
+        }
+        return panel
+    }
+
+    /// New entries in the open menu, as a system menu changes while open: items that only changed their title,
+    /// state or action change in place; otherwise the rows are made again in the same panel. The lit item stays lit.
+    func update(_ fresh: [Entry]) {
+        let lit = highlighted.map { rows[$0].item.title }
+        if Self.sameShape(entries, fresh) {
+            entries = fresh
+            var index = 0
+            for entry in fresh {
+                guard case .item(let item) = entry else { continue }
+                rows[index].apply(item)
+                index += 1
+            }
+            if let highlighted, !rows[highlighted].item.isEnabled { self.highlighted = nil }
+            if fittingWidth > bounds.width { resizeToFit() }
+            return
+        }
+        closeChild(animated: false)
+        entries = fresh
+        list.subviews.filter { $0 !== pill }.forEach { $0.removeFromSuperview() }
+        rows = []
+        notes = []
+        buildContent()
+        highlighted = lit.flatMap { title in rows.firstIndex { $0.item.title == title && $0.item.isEnabled } }
+        resizeToFit()
+    }
+
+    /// The same rows in the same places, each item with the same picture and kind.
+    private static func sameShape(_ a: [Entry], _ b: [Entry]) -> Bool {
+        guard a.count == b.count else { return false }
+        return zip(a, b).allSatisfy { pair in
+            switch pair {
+            case (.item(let x), .item(let y)):
+                x.symbol == y.symbol && (x.image == nil) == (y.image == nil) && x.isDestructive == y.isDestructive
+                    && (x.submenu == nil) == (y.submenu == nil) && x.shortcut == y.shortcut
+            case (.header(let x), .header(let y)): x == y
+            case (.separator, .separator): true
+            default: false
+            }
+        }
+    }
+
+    /// Its top edge stays where it is; it grows wider when an item needs it, and as tall as its items, inside the window.
+    private func resizeToFit() {
+        guard let host = superview, window != nil else { return }
+        let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
+        var rect = convert(bounds, to: nil)
+        let width = ceil(max(rect.width, fittingWidth))
+        if width != rect.width { noteWidth = width - (Self.pad + Self.rowInset) * 2 }
+        let height = min(contentHeight, area.height)
+        rect = NSRect(x: min(rect.minX, max(area.minX, area.maxX - width)), y: rect.maxY - height, width: width, height: height)
+        if rect.minY < area.minY { rect.origin.y = area.minY }
+        frame = host.convert(rect, from: nil)
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
     // MARK: Closing
 
     private func watch(_ window: NSWindow) {
@@ -2358,6 +2449,7 @@ final class MenuPanel: FloatingPanelView {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
         if Self.current === self { Self.current = nil }
+        followToken = nil
         let closed = onClose
         onClose = nil
         if animated { leave() } else { removeFromSuperview() }
@@ -2582,6 +2674,9 @@ final class MenuPanel: FloatingPanelView {
         return row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
     }
 
+    /// Whether the item with this title can be chosen; nil when there's none.
+    func debugIsEnabled(_ title: String) -> Bool? { rows.first { $0.item.title == title }?.item.isEnabled }
+
     /// Opens the submenu of the item with this title, as hovering it does.
     func debugOpenSubmenu(_ title: String) {
         if let index = rows.firstIndex(where: { $0.item.title == title }) { highlighted = index; openChild(index, fromKey: false) }
@@ -2665,7 +2760,7 @@ final class MenuPanel: FloatingPanelView {
     // MARK: Rows
 
     fileprivate final class Row: InteractiveView {
-        let item: Item
+        private(set) var item: Item
         let reservesIcon: Bool
         private let icon = NSImageView()
         private let label: Label
@@ -2714,6 +2809,17 @@ final class MenuPanel: FloatingPanelView {
         }
 
         required init?(coder: NSCoder) { fatalError() }
+
+        /// The same kind of item with a new title, check, state or action.
+        func apply(_ new: Item) {
+            item = new
+            label.stringValue = new.title
+            check.isHidden = !new.isChecked && new.submenu == nil
+            isEnabled = new.isEnabled
+            setAccessibilityLabel(new.title)
+            setAccessibilityValue(new.isChecked ? String(localized: "selected", comment: "What VoiceOver says after a checked item in one of Zigzag's menus.") : nil)
+            stateDidChange(animated: false)
+        }
 
         override func layout() {
             super.layout()

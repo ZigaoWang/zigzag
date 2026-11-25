@@ -697,7 +697,7 @@ enum DebugBridge {
 
     /// A sidebar menu as a right-click at `point` in `view` shows it.
     private static func showDrawn(_ menu: NSMenu, from view: NSView, at point: NSPoint) {
-        MenuPanel.show(MenuPanel.entries(from: menu), from: view, placement: .at(view.convert(point, to: nil)))
+        MenuPanel.show(menu: menu, from: view, placement: .at(view.convert(point, to: nil)))
     }
     private static var trackedMenu: NSMenu?
 

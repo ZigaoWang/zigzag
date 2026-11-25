@@ -304,7 +304,12 @@ extension SidebarMenus {
             Item(changeIconTitle, symbol: Symbol.changeIcon) { controller.chooseFolderIcon(folder.id) },
         ]
         let close = [Item(String(localized: "Delete Live Folder", comment: "Item in a live folder's menu in the sidebar: the folder and its pages go."), symbol: Symbol.remove, destructive: true) { controller.deleteLiveFolderWithUndo(folder.id) }]
-        return menu([updated, problem, open, view, reading, edit, close])
+        let result = menu([updated, problem, open, view, reading, edit, close])
+        result.updates = MenuUpdates(changes: live.changed) { [weak controller] in
+            guard let controller, let now = Library.shared.folder(folder.id), now.live != nil else { return nil }
+            return liveFolderMenu(for: now, controller: controller)
+        }
+        return result
     }
 
     /// A live folder's page belongs to its feed: no renaming, filing or removing, but read or unread, and copies
