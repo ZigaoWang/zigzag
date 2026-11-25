@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.

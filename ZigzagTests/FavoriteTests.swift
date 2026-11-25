@@ -111,6 +111,18 @@ struct FavoriteTests {
         #expect(FavoritesView.columns(for: usual, count: 9) == 3)
     }
 
+    /// Rows come out even rather than a full one and a short one: six where four fit are 3 and 3, not 4 and 2. When
+    /// all of them fit in one row they stay in one.
+    @Test func rowsComeOutEven() {
+        for width in [usual, 240, 250, 260, 280] {
+            #expect(FavoritesView.columns(for: width, count: 6) == 3, "width \(width)")
+            #expect(FavoritesView.columns(for: width, count: 7) == 4, "width \(width)")
+            #expect(FavoritesView.columns(for: width, count: 8) == 4, "width \(width)")
+        }
+        #expect(FavoritesView.columns(for: 250, count: 5) == 3)
+        #expect(FavoritesView.columns(for: 400, count: 6) == 6)
+    }
+
     @Test func noLoneTileOnTheLastRow() {
         for count in 2...24 {
             for width in [narrow, usual, 260, 320, 400] {
