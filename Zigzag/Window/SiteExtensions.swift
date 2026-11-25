@@ -212,7 +212,7 @@ final class SiteExtensionsSection: NSView {
                 button = tile(side: SiteExtensionsLayout.iconSide)
             }
             buttons.append(button)
-            pins.append((item.id, button, PinMark()))
+            pins.append((item.id, button, PinMark(onTile: !listed)))
             stripTiles.append(tile(side: Tokens.Space.x4))
         }
         // Over its button; it takes no clicks.
@@ -408,7 +408,7 @@ final class SiteExtensionsSection: NSView {
             if let row = entry.button as? SiteExtensionRow {
                 entry.mark.frame = row.pinFrame.offsetBy(dx: row.frame.minX, dy: row.frame.minY)
             } else if let tile = entry.button as? PanelTile {
-                entry.mark.frame = PinMark.frame(on: tile.frame, left: tile.isAttention)
+                entry.mark.frame = PinMark.frame(on: tile.frame, iconSide: SiteExtensionsLayout.iconSide, left: tile.isAttention)
             }
         }
     }

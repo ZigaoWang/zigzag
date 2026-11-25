@@ -1437,7 +1437,7 @@ enum ExtensionShims {
     }
 
     private static let shims: [String: Shim] = [
-        ExtensionStore.onePasswordID: Shim(backgroundPrelude: onePasswordPrelude, pagePrelude: diagnostics,
+        ExtensionStore.onePasswordID: Shim(backgroundPrelude: onePasswordPrelude + "\n" + onePasswordIconsPrelude, pagePrelude: diagnostics,
                                               coveredPermissions: ["management", "privacy", "idle"]),
         // Bitwarden: its popup loop is answered by the prelude; its popup draws again (checked 2026-11-08).
         "nngceckbapebfimnlniiiahkandclblb": Shim(backgroundPrelude: bitwardenPrelude, pagePrelude: bitwardenPrelude, coveredPermissions: ["idle"],
@@ -1966,6 +1966,75 @@ function useIframeNavigation(e) {
     addTo('permissions', { addHostAccessRequest: async () => {}, removeHostAccessRequest: async () => {} });
     addTo('storage', { managed: { get: async () => ({}), getBytesInUse: async () => 0, onChanged: event() } });
     """
+}
+
+extension ExtensionShims {
+    /// 1Password's light_bg/dark_bg icons follow Zigzag's bar, not the Mac; anything else goes through unchanged.
+    static let onePasswordIconsPrelude = #"""
+    (() => {
+      const icon = /^(\/?images\/icons\/app_icon-)(light|dark)(_bg-color-[a-z]+(?:-[a-z]+)*-\d+\.png)$/;
+      // A path or a map of sizes to paths, every one of them 1Password's, for the bar's look; else null.
+      const swap = (path, dark) => {
+        if (typeof path === 'string') { const m = icon.exec(path); return m ? m[1] + (dark ? 'dark' : 'light') + m[3] : null; }
+        if (!path || typeof path !== 'object' || Array.isArray(path)) return null;
+        const keys = Object.keys(path);
+        if (!keys.length) return null;
+        const out = {};
+        for (const key of keys) {
+          const one = typeof path[key] === 'string' ? swap(path[key], dark) : null;
+          if (one === null) return null;
+          out[key] = one;
+        }
+        return out;
+      };
+      const rewritten = (details, dark) => {
+        if (!details || typeof details !== 'object' || details.imageData !== undefined) return null;
+        const path = swap(details.path, dark);
+        return path ? Object.assign({}, details, { path }) : null;
+      };
+      let dark = null;
+      // The last call for the whole button (no tab or window), set again when the bar changes.
+      let last = null;
+      let asked = false;
+      const apply = () => {
+        const details = last && dark !== null ? rewritten(last.details, dark) : null;
+        if (!details) return;
+        try { const sent = last.setIcon.call(last.target, details); if (sent && sent.catch) sent.catch(() => {}); } catch (e) {}
+      };
+      const heard = (answer) => {
+        if (!answer || typeof answer.dark !== 'boolean' || answer.dark === dark) return;
+        dark = answer.dark;
+        apply();
+      };
+      const ask = () => {
+        const toolbar = globalThis.__zigzagToolbar;
+        if (asked || !toolbar) return;
+        asked = true;
+        try { toolbar.onChange.addListener(heard); } catch (e) {}
+        try { Promise.resolve(toolbar.get()).then(heard, () => {}); } catch (e) {}
+      };
+      const held = (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []);
+      for (const api of new Set([globalThis.browser, globalThis.chrome])) {
+        for (const name of ['action', 'browserAction']) {
+          const action = api && api[name];
+          if (!action || typeof action.setIcon !== 'function' || action.setIcon.__zigzagIcons) continue;
+          const setIcon = action.setIcon;
+          const wrapped = function (details, ...rest) {
+            if (rewritten(details, true) === null) return setIcon.call(this, details, ...rest);
+            ask();
+            if (details.tabId === undefined && details.windowId === undefined) last = { target: this, setIcon, details };
+            return setIcon.call(this, dark === null ? details : rewritten(details, dark), ...rest);
+          };
+          Object.defineProperty(wrapped, '__zigzagIcons', { value: true });
+          try {
+            Object.defineProperty(action, 'setIcon', { value: wrapped, configurable: true, writable: true });
+            held.push(action);
+          } catch (e) {}
+        }
+      }
+      ask();
+    })();
+    """#
 }
 
 extension ExtensionStore {

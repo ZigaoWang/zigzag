@@ -5,9 +5,12 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-## [0.9.5] - 2026-11-24
+### Fixed
+- With Zigzag Mini open over a page, scrolling over the dimmed page no longer moves the page behind it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 
-Export Your Data so you can always take everything with you, live folders, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.
+## [0.9.5] - 2026-11-25
+
+Export Your Data so you can always take everything with you, live folders, nesting tabs by dragging, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.
 
 ### New
 - Importing from Dia brings its sidebar too, as from Arc. Each Dia profile's pinned tabs are pinned in the space its bookmarks go in, split views stay side by side, Dia's favorites become favorites, and with Open Tabs on, the tabs open there come over and wait to load until clicked. Importing again adds only what's new. ([#511](https://github.com/ZigaoWang/zigzag/issues/511))
@@ -25,6 +28,7 @@ Export Your Data so you can always take everything with you, live folders, Tradi
 - Live folders can follow the open issues or pull requests in the repositories a GitHub user owns, whoever opened them, so a maintainer's folder fills with what comes in. The other GitHub lists now say what they hold: Pull Requests Opened, Issues Assigned and Review Requests.
 - A live folder shows its site's icon in the sidebar, GitHub's for a GitHub list, with a small live mark on the corner so it still reads as live.
 - Hold your mouse's Back or Forward button to see the pages that way at the pointer, as with the on-screen arrows. Slide onto a page and let go to go there, or let go and click one. A quick press still goes one step. Thanks to [Lakeland97](https://github.com/Lakeland97) for the idea. ([#515](https://github.com/ZigaoWang/zigzag/issues/515))
+- Turn on Settings › Zigzag Mini › Open ⇧-clicked links in the page and a ⇧-clicked link opens in Zigzag Mini right over the page you clicked from, the page dimmed behind it, instead of in a window of its own. Esc, a click on the dimmed page, ⌘W or switching tabs puts it away, and Open in Window gives the same page a Mini window of its own without reloading it. Off until you turn it on, so ⇧-click works as before. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#481](https://github.com/ZigaoWang/zigzag/issues/481), [#501](https://github.com/ZigaoWang/zigzag/issues/501))
 
 ### Fixed
 - An English page no longer offers to translate from Hindi or Marathi because of a list of language names on it, and a few short lines like place names no longer make a page read as another language. Pages in any language in your list in System Settings › Language & Region aren't offered for translation, unless you set that language to Always Translate. ([#510](https://github.com/ZigaoWang/zigzag/issues/510))
@@ -55,6 +59,11 @@ Export Your Data so you can always take everything with you, live folders, Tradi
 - A rule that hands downloads to an app, a script or a service can now match the file's own type, like torrent or pdf, not only its address. A tracker's download address often names no file, so its .torrent downloads can now reach the downloader whatever the address looks like. ([#524](https://github.com/ZigaoWang/zigzag/issues/524))
 - Opened for a Zigzag Mini link, an installed site or AI apps alone, Zigzag no longer drops the last session's sign-ins: when you open a browser window and the session comes back, its session cookies and sessionStorage come back with it, so Microsoft 365 and similar sites keep you signed in. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 - A tab's chevron goes away once the last tab nested under it leaves, instead of staying behind and doing nothing, and dragging a tab right to nest it under the tab just above now shows the line at the depth it will land. Thanks to [bkonia](https://github.com/bkonia). ([#526](https://github.com/ZigaoWang/zigzag/issues/526))
+- Holding Back or Forward with the mouse or trackpad, then sliding onto a page in the list and letting go, goes to that page again, as with a finger. Before, letting go there did nothing in the sidebar's top row and the bar above the page. ([#509](https://github.com/ZigaoWang/zigzag/issues/509))
+- An extension pinned to the address, like 1Password, shows its whole icon centered in its button. Before, an icon that arrived after the button was drawn sat a little off and soft. In Site Controls the pin mark sits in the tile's corner instead of over the icon.
+- 1Password's toolbar icon now matches Zigzag's toolbar: on a dark space it shows its dark-toolbar icon even when the Mac is in light mode, and the other way around.
+- Pressing and holding Back or Forward in the sidebar, then sliding down, no longer drags the whole window: the list opens and you can slide onto a page and let go, with the mouse as with a finger.
+- With a link open in Zigzag Mini over its page, ⌘T opens the browser's new tab bar with the Mini out of the way instead of acting behind it, and Esc goes to the sidebar's picked rows, its fields or the command bar when one of them has the keys. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#528](https://github.com/ZigaoWang/zigzag/pull/528))
 
 ## [0.9.4] - 2026-11-24
 
@@ -1650,8 +1659,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...HEAD
-[0.9.5]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/ZigaoWang/zigzag/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/ZigaoWang/zigzag/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...v0.9.2

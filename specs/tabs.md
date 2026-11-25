@@ -66,6 +66,28 @@
   Test: MiniFromPageTests.aPrivateWindowsMiniIsPrivate
 - ⌘O in a Mini opened from a page → the same live page becomes a tab right after the one it came from.
   Test: MiniFromPageTests.openInZigzagPutsItRightAfterTheTabItCameFrom
+- Settings › Zigzag Mini › Open ⇧-clicked links in the page off, as it starts → ⇧-click opens the standalone Zigzag Mini as above.
+  Test: InPageMiniPolicyTests.theSettingIsOffUntilTurnedOn
+  Test: InPageMiniHostTests.withTheSettingOffAShiftClickIsTheStandaloneMini
+- The same setting on → ⇧-click opens the Mini over the page you clicked from, the page dimmed behind it, following the page as the window moves or resizes.
+  Test: InPageMiniHostTests.aDockedMiniIsABorderlessChildOfTheBrowserWindow
+  Test: InPageMiniHostTests.theDockedMiniFollowsThePageCard
+- Esc, a click on the dimmed page, ⌘W, the page's `window.close()` or switching tabs → the Mini over the page closes.
+  Test: InPageMiniHostTests.escClosesTheDockedMini
+  Test: InPageMiniHostTests.aClickOnTheDimClosesTheDockedMini
+  Test: InPageMiniHostTests.commandWClosesTheDockedMini
+  Test: InPageMiniHostTests.closeWindowStaysOnForADockedMini
+  Test: InPageMiniHostTests.aPagesWindowCloseClosesTheDockedMini
+  Test: InPageMiniHostTests.aTabSwitchClosesTheDockedMini
+- Esc closes the Mini only while the page has the keys: rows picked in the sidebar, its fields and the command bar keep Esc for themselves.
+  Test: InPageMiniHostTests.theDockedMiniTakesEscFromThePageButNotFromPickedRows
+- ⌘T from the Mini over a page → the browser's new tab bar opens, with the Mini out of its way.
+  Test: InPageMiniHostTests.commandTOpensTheBrowsersNewTabBarAndDropsTheDockedMini
+- A scroll over the dimmed page around the Mini stays out of the page behind it.
+  Test: InPageMiniHostTests.aScrollOverTheDimLeavesThePageBehindStill
+- Expand on the Mini over the page → the same live page goes into a Mini window of its own, without reloading.
+  Test: InPageMiniHostTests.promotingTakesTheMiniOutIntoAWindowOfItsOwn
+  Test: InPageMiniHostTests.expandKeepsTheSameLivePage
 
 ## Order and sidebar keys
 - ⌥⌘↓ / ⌥⌘↑ or ⇧⌘] / ⇧⌘[ → next or previous row as the sidebar shows it, wrapping, never another space.
@@ -239,6 +261,10 @@
   Test: SidebarRowMenuTests.aQuickClickOnBackGoesOneStepWithNoList
 - Hold, slide onto a page in the list and let go → that page.
   Test: SidebarRowMenuTests.pressDragAndReleaseOnAPageGoesThere
+  Test: BackHoldEventTests.pressDragAndReleaseOnTheSidebarsBackGoesThere
+  Test: BackHoldEventTests.pressDragAndReleaseGoesThereWhenTheDragNeverArrives
+  Test: BackHoldEventTests.backAndForwardAreNotWindowDragArea
+  Test: BackHoldEventTests.pressDragAndReleaseOnTheTopBarsBackGoesThere
 - Back or Forward dimmed, with no pages that way → holding it opens nothing.
   Test: SidebarRowMenuTests.aDisabledBackOpensNothing
 - A finger held on Back or Forward → the same list; slide onto a page and lift to go there.

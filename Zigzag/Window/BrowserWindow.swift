@@ -62,6 +62,14 @@ final class BrowserWindow: NSWindow {
         super.performClose(sender)
     }
 
+    /// AppKit turns Close Window off for a window with no close button; a docked Mini still closes (`performClose`).
+    override func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(performClose(_:)), (windowController as? MiniWindowController)?.isDockedInPage == true {
+            return true
+        }
+        return super.validateMenuItem(item)
+    }
+
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         isParked ? frameRect : super.constrainFrameRect(frameRect, to: screen)
     }

@@ -130,6 +130,13 @@ final class AddressView: InteractiveView {
 
     /// Pinned buttons moved, or some started or stopped showing.
     var onPinsMoved: (() -> Void)?
+    /// Turned light or dark, with its window or with the bar above the page it moved into.
+    var onAppearanceChanged: (() -> Void)?
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        onAppearanceChanged?()
+    }
 
     func pinButton(for id: String) -> IconButton? { pinEntries.first { $0.pin.id == id }?.button }
 

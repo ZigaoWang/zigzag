@@ -53,6 +53,9 @@ final class MiniPeekDimView: ColorView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
+    /// A wheel over the dimmed page stays there: the page behind the Mini doesn't move under it.
+    override func scrollWheel(with event: NSEvent) {}
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         passesClicks ? nil : super.hitTest(point)
     }
@@ -1217,6 +1220,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Typing an address
 
+    /// ⌘T from the Mini: the new tab belongs to the browser, and a docked Mini steps aside first so the bar it opens
+    /// isn't hidden under the page it was over.
+    @objc func newTab(_ sender: Any?) {
+        let target = browserTarget
+        if isDockedInPage { closeInPage(focusBack: false, animated: false) }
+        target.newTab(sender)
+        Self.bringForward(target)
+    }
+
     /// ⌘L: the command bar over the page's site, the address in it to change; again, it goes.
     @objc func openLocation(_ sender: Any?) {
         guard !isLeaving else { return }
@@ -2246,7 +2258,9 @@ final class MiniStripView: NSView {
         copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x2 - b, y: y, width: b, height: b)
         pinButton.frame = NSRect(x: copyButton.frame.minX - gap - b, y: y, width: b, height: b)
         // Site Controls first of the strip's end, as it ends the address in a browser window.
-        siteButton.frame = NSRect(x: pinButton.frame.minX - gap - b, y: y, width: b, height: b)
+        // Docked, the pin is hidden: Site Controls takes its place beside Copy Link.
+        let beforeSite = hidesPin ? copyButton.frame.minX : pinButton.frame.minX
+        siteButton.frame = NSRect(x: beforeSite - gap - b, y: y, width: b, height: b)
         let buttons = siteButton.frame.minX
         // At the narrowest the space's name gives way before anything overlaps; Open in still names the space. While
         // editing it also leaves the field its narrowest.

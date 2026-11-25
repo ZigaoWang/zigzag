@@ -344,18 +344,20 @@ struct AddressTests {
         #expect(tile.bounds.contains(tileBadge.frame))
     }
 
-    /// The pin mark on a tile: inside the tile, its curve sharing a center with the tile's corner (top-left beside
-    /// an attention dot), and never a target.
-    @Test func aTilesPinMarkIsConcentricAndTakesNoClicks() {
-        let tile = NSRect(x: 100, y: 50, width: 36, height: 36)
-        let r = Tokens.Radius.tile
+    /// The pin mark on a tile: inside the tile in its corner (top-left beside an attention dot), clear of the icon
+    /// even when the icon fills its square, and never a target.
+    @Test func aTilesPinMarkIsClearOfTheIconAndTakesNoClicks() {
+        let tile = NSRect(x: 100, y: 50, width: SiteExtensionsLayout.tileSide, height: SiteExtensionsLayout.tileSide)
+        let side = SiteExtensionsLayout.iconSide
+        let icon = NSRect(x: tile.midX - side / 2, y: tile.midY - side / 2, width: side, height: side)
         for left in [false, true] {
-            let frame = PinMark.frame(on: tile, left: left)
+            let frame = PinMark.frame(on: tile, iconSide: side, left: left)
             #expect(tile.contains(frame))
-            #expect(frame.midY == tile.minY + r)
-            #expect(frame.midX == (left ? tile.minX + r : tile.maxX - r))
+            #expect(!frame.intersects(icon))
+            #expect(frame.width > 0 && frame.minY == tile.minY)
+            #expect(left ? frame.minX == tile.minX : frame.maxX == tile.maxX)
         }
-        let mark = PinMark()
+        let mark = PinMark(onTile: true)
         #expect(mark.hitTest(NSPoint(x: mark.bounds.midX, y: mark.bounds.midY)) == nil)
         #expect(!mark.isAccessibilityElement())
     }
