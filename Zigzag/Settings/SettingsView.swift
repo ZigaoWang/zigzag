@@ -5221,6 +5221,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 })
             }
 
+            if SiteBoosts.all[site]?.compatible == true {
+                let toggle = Toggle(isOn: true)
+                toggle.onChange = { [weak self] on in
+                    SiteCompatibility.set(on, forSite: site)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(SitePanel.compatibilityTitle, control: toggle) { SiteCompatibility.set(false, forSite: site) })
+            }
+
             if let boost = SiteBoosts.all[site], !boost.zaps.isEmpty {
                 let zaps = boost.zaps
                 rows.append(makeRow(String(localized: "Zapped elements", comment: "Row in Settings › Privacy › Sites: elements hidden on this site."),
