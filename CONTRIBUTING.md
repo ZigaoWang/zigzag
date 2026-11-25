@@ -98,6 +98,8 @@ numbers, the pseudo-locale for finding cut-off text, adding a language, and the 
 A change to README.md is in English too. The maintainers bring its translations in
 [docs/i18n/readme](docs/i18n/readme) in step. Every README starts with the same small language line.
 
+[docs/releasing.md](docs/releasing.md) explains version numbers, what each kind of release needs, and the bug labels.
+
 Add each release's section to [CHANGELOG.md](CHANGELOG.md) in English. The maintainers translate it into every
 language in [docs/i18n/changelog](docs/i18n/changelog) before the release, and the release gate checks each has the
 same points and issue links. [docs/i18n/README.md](docs/i18n/README.md) says where every translated file lives.
