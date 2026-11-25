@@ -1536,6 +1536,9 @@ final class SidebarListView: NSView {
     /// The rows the list holds, top to bottom, laid out or not.
     var debugItems: [SidebarItem] { items }
 
+    /// Where the drop line is, while it shows.
+    var debugInsertionLine: NSRect? { insertionLine.superview === self && !insertionLine.isHidden ? insertionLine.frame : nil }
+
     /// Every row as it's laid out: a name a test can find it by, and where it is in the window.
     func debugRows() -> [(String, NSRect)] {
         guard let manager else { return [] }
@@ -2146,8 +2149,15 @@ final class SidebarListView: NSView {
         }
         let before = placed[..<gap].last { shownFrames[$0] != nil }
         let after = placed[(gap + 1)...].first { shownFrames[$0] != nil }
+        // On the carried rows' own place, under the row above them, clear of their copy (#526).
+        let carriedHere: Bool = {
+            guard let before, let at = items.firstIndex(of: before), at + 1 < items.count else { return false }
+            return carried.contains(items[at + 1])
+        }()
         var y: CGFloat
-        if let after, after != .separator, let next = shownFrames[after] {
+        if carriedHere, let before, let previous = shownFrames[before] {
+            y = previous.maxY + rowGap / 2
+        } else if let after, after != .separator, let next = shownFrames[after] {
             y = next.minY - rowGap / 2
         } else if let before, let previous = shownFrames[before] {
             y = previous.maxY + rowGap / 2

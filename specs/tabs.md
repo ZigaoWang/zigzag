@@ -82,6 +82,10 @@
   Test: NestedTabsTests.setInPastTheRowAboveADropGoesUnderIt
 - While dragging, how far the pointer moved across since the row was picked up sets the level, the same by finger; half a step back left takes it back out.
   Test: NestedTabsTests.movingAcrossSetsTheCarriedRowInAndOut
+- Drag a tab right in its own place → the line shows set in, right under the row above.
+  Test: NestedTabRowsTests.draggedRightTheLineSetsInRightUnderTheRowAbove
+- The last tab under a tab leaves → that tab's chevron goes too.
+  Test: NestedTabRowsTests.theChevronGoesWithTheLastTabUnderIt
 - ⌃⇧→ (View › Nest Tab) → the tab you're on goes under the tab above it at its level, with the tabs under it; ⌃⇧← (Unnest Tab) → it goes a level out, just after the tab it was under and that tab's run.
   Test: NestedTabsTests.nestTabGoesUnderTheTabAboveAtItsLevel
 - ⌘Z after nesting or unnesting → the tab is back where it was; a relaunch keeps the nesting.
@@ -239,6 +243,11 @@
   Test: SidebarRowMenuTests.aDisabledBackOpensNothing
 - A finger held on Back or Forward → the same list; slide onto a page and lift to go there.
   Test: SidebarRowMenuTests.aFingerHeldOnBackOpensTheSameList
+- Hold the mouse's Back or Forward button for half a second anywhere in a page window → the same list at the pointer; slide onto a page and let go to go there, let go anywhere else and it stays open to click. A quick press → one page that way, no list. The browser window, a split's pane under the pointer, Zigzag Mini and a web app.
+  Test: SideButtonTests.holdingBackOpensItsListAtThePointerAfterTheDelay
+  Test: SideButtonTests.aQuickSideButtonPressGoesOneStepWithNoList
+  Test: SideButtonTests.holdSlideAndReleaseOnAPageGoesThere
+  Test: SideButtonTests.everyPageWindowListsItsPagesForASideButton
 - Two fingers sideways on the trackpad over a page with nothing that scrolls sideways under the pointer → the arrow shows with the first steps, before the page has answered; a page that pans itself takes it back, and up and down never shows it.
   Test: BookmarkFolderTests.swipeArrowLeansInWhileThePageAnswers
   Test: BookmarkFolderTests.swipeArrowShowsWithTheFirstMovement

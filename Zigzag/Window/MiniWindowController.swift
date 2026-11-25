@@ -1381,6 +1381,10 @@ extension MiniWindowController {
     }
 }
 
+extension MiniWindowController: SideButtonHistory {
+    func sideButtonHistory(back: Bool) -> NSMenu? { BrowserWindowController.historyMenu(of: tab.webView, back: back) }
+}
+
 extension MiniWindowController: SitePanelPageHost {
     var listsExtensions: Bool { false }
 }
