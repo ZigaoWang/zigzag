@@ -40,6 +40,8 @@
   Test: SyncTests.aSecondMacsFirstSpaceIsMatchedByNameNotCopied
 - Two pinned pages or favorites whose addresses differ only after the # (a web app's views) → stay two.
   Test: SyncTests.pinsThatDifferOnlyAfterTheHashStayTwo
+- Sync turned on on two Macs at the same moment, both finding iCloud empty → for an hour after, their profiles, spaces, folders, pages and favorites are matched by name and address as they arrive, and each pair becomes one on both Macs. A space of the same name made on purpose on the other Mac in that hour is taken for the same one too.
+  Test: SyncTests.twoMacsTurningSyncOnAtOnceMakeNoCopies
 - Something iCloud doesn't have → added to iCloud, never removed from this Mac.
   Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
 - Sync turned on again, or iCloud's copy reset → merged again, and nothing is added twice.

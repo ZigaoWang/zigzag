@@ -387,6 +387,36 @@ extension SyncLibrary {
         }
     }
 
+    @Test func twoMacsTurningSyncOnAtOnceMakeNoCopies() {
+        // Whichever Mac's IDs sort first.
+        for _ in 0..<12 { twoFirstSyncsAtOnce() }
+    }
+
+    private func twoFirstSyncsAtOnce() {
+        let cloud = FakeCloud()
+        var one = ProfileDirectory(), two = ProfileDirectory()
+        _ = one.add(name: "Work")
+        _ = two.add(name: "Work")
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])], favorites: [Sample.page("mail")], directory: one))
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("y"), Sample.page("z")])], favorites: [Sample.page("mail")], directory: two))
+        // Both read an empty iCloud before either sends.
+        a.fetch(); b.fetch()
+        a.send(); b.send()
+        for _ in 0..<3 { a.sync(); b.sync() }
+        for (n, mac) in [("a", a), ("b", b)] {
+            #expect(mac.library.spaceNames == ["Personal"], "\(n) \(mac.library.contents.spaces.map { "\($0.id) \($0.bookmarks.map(\.url.lastPathComponent))" }) \(mac.session.state.base.keys.sorted()) \(mac.session.state.copies) \(mac.session.state.aliases.toServer) cloud \(cloud.records.keys.sorted())")
+            #expect(mac.library.urls(in: "Personal").sorted() == ["x", "y", "z"])
+            #expect(mac.library.contents.favorites.count == 1)
+            #expect(mac.library.contents.directory.all.filter { $0.name == "Work" }.count == 1)
+        }
+        #expect(cloud.records.keys.filter { $0.hasPrefix("space.") }.count == 1)
+        #expect(cloud.records.keys.filter { $0.hasPrefix("page.") }.count == 3)
+        #expect(cloud.records.keys.filter { $0.hasPrefix("profile.") }.count == 2)
+        let sent = a.sent + b.sent
+        a.sync(); b.sync()
+        #expect(a.sent + b.sent == sent)
+    }
+
     @Test func theFirstSyncNeverRemovesWhatIsOnlyHere() {
         let cloud = FakeCloud()
         let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a")])]))
