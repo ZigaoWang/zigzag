@@ -11,8 +11,9 @@
 
 ### 修正
 - 網頁上開啟 Zigzag Mini 時，在變暗的網頁上捲動不會再把後面的網頁捲走。感謝 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
-
 - 允許網站存取這台 Mac 上的 App 之前的說明，現在按順序寫清楚了：先開啟這個設定，再在網站設定裡開啟每個網站，關閉這個設定會停止所有網站。感謝 [Lakeland97](https://github.com/Lakeland97)。([#533](https://github.com/ZigaoWang/zigzag/issues/533))
+- 在「設定」中，標題旁有按鈕或搜尋欄位的清單，例如「網站儲存的資料」或「轉交下載和連結」，不會再緊貼在這些控制項下方，與其他標題下方保留相同的間距。感謝 [Lakeland97](https://github.com/Lakeland97)。([#527](https://github.com/ZigaoWang/zigzag/issues/527))
+
 ## [0.9.5] - 2026-11-25
 
 可以匯出你的資料，隨時帶走一切；即時資料夾；拖動就能巢狀放置分頁；繁體中文介面；影片全螢幕留在瀏覽器裡；網址列可以自動隱藏；從螢幕邊緣拉出側邊欄；Zigzag 在每個網頁裡做的事更少，捲動更順暢；網頁以螢幕完整的 120 Hz 繪製；觸控操作更順手；從 Dia 匯入時會一併帶入已固定分頁；按住上一頁或下一頁按鈕就能瀏覽記錄；重新啟動後會保留登入狀態和 YouTube 的劇院模式；設定裡可以選取密碼管理器延伸功能。
