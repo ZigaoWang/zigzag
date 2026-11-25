@@ -108,7 +108,9 @@
   Test: SyncTests.iCloudRefusingOrLosingARequestShowsItTriesAgain
   Test: SyncTests.theNetworkComingBackTriesAtOnceButNotInALoop
   Test: SyncTests.turningSyncOffStopsTryingAgain
-- Not signed in, iCloud restricted, iCloud full, or a Zigzag iCloud can't take → says so and doesn't try again on its own until the account or the network changes, or the Mac wakes.
+- iCloud full → says so; changes wait on this Mac and are sent again after the same waits as when iCloud can't be reached, never at once.
+  Test: SyncTests.aFullICloudIsTriedAgainWithTheUsualWaits
+- Not signed in, iCloud restricted, or a Zigzag iCloud can't take → says so and doesn't try again on its own until the account or the network changes, or the Mac wakes.
   Test: SyncTests.anErrorWaitingWontFixWaitsForTheAccountOrNetwork
 - Zigzag opened on a Mac that was off while things changed elsewhere → it fetches them as it connects, then sends what's waiting here, without waiting to be brought forward.
   Test: SyncTests.aMacStartedAfterItsFirstSyncFetchesWhatChangedWhileItWasAway

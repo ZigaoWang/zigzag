@@ -1348,7 +1348,7 @@ extension SyncLibrary {
     @Test func anErrorWaitingWontFixWaitsForTheAccountOrNetwork() {
         let waits = Waits()
         let retry = makeRetry(waits)
-        for code in [CKError.Code.notAuthenticated, .managedAccountRestricted, .quotaExceeded, .incompatibleVersion, .badContainer] {
+        for code in [CKError.Code.notAuthenticated, .managedAccountRestricted, .incompatibleVersion, .badContainer] {
             #expect(SyncRetry.isPermanent(CKError(code)))
             #expect(retry.failed(CKError(code)) == nil)
             #expect(!retry.isWaiting && retry.isStopped)
@@ -1360,6 +1360,16 @@ extension SyncLibrary {
         // The network coming back tries once more.
         retry.soon()
         #expect(waits.delays == [0])
+    }
+
+    @Test func aFullICloudIsTriedAgainWithTheUsualWaits() {
+        let waits = Waits()
+        let retry = makeRetry(waits)
+        #expect(!SyncRetry.isPermanent(CKError(.quotaExceeded)))
+        retry.failed(CKError(.quotaExceeded))
+        retry.failed(CKError(.quotaExceeded))
+        #expect(waits.delays == [30, 60])
+        #expect(ICloudSync.status(for: CKError(.quotaExceeded)) == .full)
     }
 
     @Test func theNetworkComingBackTriesAtOnceButNotInALoop() {

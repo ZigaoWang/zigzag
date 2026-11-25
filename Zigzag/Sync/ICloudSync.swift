@@ -385,6 +385,12 @@ final class ICloudSync {
 
     fileprivate func engineEvent(_ status: Status) { shown = status }
 
+    /// iCloud is full: changes wait here, tried again with the usual waits.
+    fileprivate func iCloudFull() {
+        shown = .full
+        retry.failed(CKError(.quotaExceeded))
+    }
+
     fileprivate func accountChanged() {
         // Signed out or another account: nothing more goes up or comes down; the library here stays.
         retry.reset()
@@ -475,11 +481,12 @@ final class SyncRetry {
         return max(min(doubled, longest) * jitter, retryAfter ?? 0)
     }
 
-    /// Waiting won't fix these: they show their status and wait for the account, the network or a wake.
+    /// Waiting won't fix these: they show their status and wait for the account, the network or a wake. A full iCloud
+    /// isn't one: room is made without a sign, so it's tried again on the usual schedule.
     static func isPermanent(_ error: Error) -> Bool {
         guard let error = error as? CKError else { return false }
         switch error.code {
-        case .notAuthenticated, .managedAccountRestricted, .quotaExceeded, .incompatibleVersion, .badContainer,
+        case .notAuthenticated, .managedAccountRestricted, .incompatibleVersion, .badContainer,
              .badDatabase, .missingEntitlement, .permissionFailure:
             return true
         default:
@@ -702,6 +709,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         case .sentRecordZoneChanges(let sent):
             session.saved(sent.savedRecords.map(Self.remote))
             session.deleted(sent.deletedRecordIDs.map(\.recordName))
+            var full = false
+            defer { if full { owner?.iCloudFull() } }
             for failure in sent.failedRecordSaves {
                 let name = failure.record.recordID.recordName
                 switch failure.error.code {
@@ -714,8 +723,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                 case .unknownItem:
                     session.saveFailed(name, .gone)
                 case .quotaExceeded:
-                    owner?.engineEvent(.full)
-                    queue(saves: [name], deletes: [])
+                    // Stays unsent and goes up again after a wait.
+                    full = true
                 case .networkFailure, .networkUnavailable, .zoneBusy, .serviceUnavailable, .notAuthenticated, .operationCancelled, .requestRateLimited:
                     break
                 default:
