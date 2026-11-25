@@ -11,3 +11,9 @@
   Test: SettingsFoldingTests.findASettingReachesAFoldedRowAndOpensItsBox
 - Feature Flags in Settings › Developer → a box for each kind (Stable, Preview and the rest), headed by how many flags it has, folded when it has more than three; its own search opens the boxes to the flags that match.
   No test yet.
+
+## Appearance
+- Show link address on hover, on by default → pointing at a link shows where it goes in the page's bottom-left corner: in browser windows, Zigzag Mini, web apps and the tab overview.
+  Test: AppearanceSwitchesTests.theLinkAddressShowsUntilTurnedOff
+- Show link address on hover off → nothing shows in that corner while pointing at a link; the choice is kept.
+  Test: AppearanceSwitchesTests.offNoLinkAddressShowsAndTheChoiceIsKept
