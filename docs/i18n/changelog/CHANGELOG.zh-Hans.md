@@ -15,12 +15,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 新功能
 - “网站设置”新增“兼容模式”，给不能正常使用的网站用：一个开关就能在这个网站上关掉扩展、广告拦截、Cookie 弹窗和已隐藏的元素，关掉兼容模式后，你之前对它们的选择都会恢复。打开时“网站设置”按钮会变成强调色，“设置 › 隐私 › 网站”也会列出它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 - “设置”里的长列表现在像“网站权限”一样折叠成方框：“快捷键”的每个菜单、每条下载规则（保存的回答在里面）、每类功能标志，以及超过三项时的“开发者模式中的网站”“受信任的证书”和“网页尺寸”。“查找设置”仍会展开匹配项所在的方框。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
-<<<<<<< HEAD:docs/i18n/changelog/CHANGELOG.zh-Hans.md
-=======
 - “网站权限”自带的搜索和“查找设置”现在也能按权限和选择找网站：输入“摄像头”“通知”或“阻止”，就能看到做了这个选择的每个网站，各自在网站名称下面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
 
 ### 修复
->>>>>>> 5c1b4fe5 (docs: spec and release note lines for searching by permission (#532)):CHANGELOG.zh-Hans.md
 - “设置”打开得更快了。每个部分在第一次打开时才生成，折叠的方框在展开或被搜索时才生成，所以在“通用”打开“设置”时不会再生成“下载”“快捷键”或“开发者”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 
 ## [0.10.0] - 2026-11-25

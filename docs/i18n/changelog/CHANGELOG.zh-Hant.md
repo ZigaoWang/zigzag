@@ -12,12 +12,9 @@
 ### 新功能
 - 「網站設定」新增「相容模式」，給無法正常使用的網站用：一個開關就能在這個網站上關閉延伸功能、廣告阻擋、Cookie 彈出式視窗和已隱藏的元素，關閉相容模式後，你之前對它們的選擇都會恢復。開啟時「網站設定」按鈕會變成強調色，「設定 › 隱私 › 網站」也會列出它。感謝 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 - 「設定」裡的長列表現在像「網站權限」一樣收合成方框：「鍵盤快速鍵」的每個選單、每條下載規則（儲存的回答在裡面）、每類功能旗標，以及超過三項時的「開發者模式中的網站」「受信任的憑證」和「網頁尺寸」。「搜尋設定」仍會展開符合項目所在的方框。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
-<<<<<<< HEAD:docs/i18n/changelog/CHANGELOG.zh-Hant.md
-=======
 - 「網站權限」本身的搜尋和「搜尋設定」現在也能依權限和選擇找網站：輸入「相機」「通知」或「阻擋」，就能看到做了這個選擇的每個網站，各自在網站名稱下面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
 
 ### 修正
->>>>>>> 5c1b4fe5 (docs: spec and release note lines for searching by permission (#532)):CHANGELOG.zh-Hant.md
 - 「設定」開啟得更快了。每個部分在第一次開啟時才產生，收合的方框在展開或被搜尋時才產生，所以在「一般」開啟「設定」時不會再產生「下載項目」「鍵盤快速鍵」或「開發者」。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
 
 ## [0.10.0] - 2026-11-25
