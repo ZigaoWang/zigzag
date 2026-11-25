@@ -1875,7 +1875,9 @@ final class MiniStripView: NSView {
         copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x2 - b, y: y, width: b, height: b)
         pinButton.frame = NSRect(x: copyButton.frame.minX - gap - b, y: y, width: b, height: b)
         // Site Controls first of the strip's end, as it ends the address in a browser window.
-        siteButton.frame = NSRect(x: pinButton.frame.minX - gap - b, y: y, width: b, height: b)
+        // Docked, the pin is hidden: Site Controls takes its place beside Copy Link.
+        let beforeSite = hidesPin ? copyButton.frame.minX : pinButton.frame.minX
+        siteButton.frame = NSRect(x: beforeSite - gap - b, y: y, width: b, height: b)
         let buttons = siteButton.frame.minX
         // At the narrowest the space's name gives way before anything overlaps; Open in still names the space. While
         // editing it also leaves the field its narrowest.
