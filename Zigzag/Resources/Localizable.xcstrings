@@ -52,6 +52,23 @@
         }
       }
     },
+    "Checks every %lld minutes, or hourly in Low Power Mode." : {
+      "comment" : "Under the fields of the New Live Folder sheet: how often a live folder fetches its feed or list. The number is minutes (30).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 分钟检查一次，低电量模式下每小时一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 分鐘檢查一次，低耗電模式下每小時一次。"
+          }
+        }
+      }
+    },
     "Downloads ending in %@" : {
       "comment" : "Part of a download rule's sentence for a File handoff: the files whose address ends this way. The placeholder is the end of the address, such as .torrent.",
       "localizations" : {
@@ -137,6 +154,23 @@
         }
       }
     },
+    "GitHub usernames have only letters, numbers and single hyphens." : {
+      "comment" : "Tooltip on the username field of the New Live Folder sheet when what's typed can't be a GitHub username, so its button can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 用户名只能包含字母、数字和单个连字符。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 使用者名稱只能包含字母、數字和單一連字號。"
+          }
+        }
+      }
+    },
     "Hand off" : {
       "comment" : "Label of the choice between handing off a download rule's URL or its saved file, in its sheet.",
       "localizations" : {
@@ -154,6 +188,40 @@
         }
       }
     },
+    "New pages from the feed, newest first." : {
+      "comment" : "Under the fields of the New Live Folder sheet, for a feed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "订阅源中的新页面，最新的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "訂閱來源中的新頁面，最新的排在前面。"
+          }
+        }
+      }
+    },
+    "New pages from “%@”, newest first." : {
+      "comment" : "Under the address in the New Live Folder sheet: the feed found there, by its name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”中的新页面，最新的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」中的新頁面，最新的排在前面。"
+          }
+        }
+      }
+    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE." : {
       "comment" : "Under the arguments of a Run Script download rule: one argument a line, and the names the link, the cookies and a File handoff's saved file arrive under.",
       "localizations" : {
@@ -167,6 +235,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每行一個引數。連結和 Cookie 透過 ZIGZAG_LINK 和 ZIGZAG_COOKIES 傳入；轉交檔案時還會設定 ZIGZAG_FILE。"
+          }
+        }
+      }
+    },
+    "Open issues assigned to %@ in public repositories, newest activity first." : {
+      "comment" : "Under the fields of the New Live Folder sheet, for the Issues Assigned list. The placeholder is a GitHub username.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开仓库中分配给 %@ 的未关闭议题，最近有动态的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開儲存庫中指派給 %@ 的未關閉議題，最近有動態的排在前面。"
+          }
+        }
+      }
+    },
+    "Open issues in public repositories %@ owns, newest activity first." : {
+      "comment" : "Under the fields of the New Live Folder sheet, for the Issues in Owned Repositories list. The placeholder is a GitHub username.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 拥有的公开仓库中未关闭的议题，最近有动态的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 擁有的公開儲存庫中未關閉的議題，最近有動態的排在前面。"
+          }
+        }
+      }
+    },
+    "Open pull requests %@ is asked to review in public repositories, newest activity first." : {
+      "comment" : "Under the fields of the New Live Folder sheet, for the Review Requests list. The placeholder is a GitHub username.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开仓库中请 %@ 审查的未关闭拉取请求，最近有动态的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開儲存庫中請 %@ 審查的未關閉提取要求，最近有動態的排在前面。"
+          }
+        }
+      }
+    },
+    "Open pull requests %@ opened in public repositories, newest activity first." : {
+      "comment" : "Under the fields of the New Live Folder sheet, for the Pull Requests Opened list. The placeholder is a GitHub username.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 在公开仓库中发起的未关闭拉取请求，最近有动态的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 在公開儲存庫中發起的未關閉提取要求，最近有動態的排在前面。"
+          }
+        }
+      }
+    },
+    "Open pull requests in public repositories %@ owns, newest activity first." : {
+      "comment" : "Under the fields of the New Live Folder sheet, for the Pull Requests in Owned Repositories list. The placeholder is a GitHub username.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 拥有的公开仓库中未关闭的拉取请求，最近有动态的排在前面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 擁有的公開儲存庫中未關閉的提取要求，最近有動態的排在前面。"
           }
         }
       }
@@ -1676,6 +1829,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "珊瑚"
+          }
+        }
+      }
+    },
+    "this user" : {
+      "comment" : "Stands in for a GitHub username in the New Live Folder sheet's note until one is typed, as in “Open issues assigned to this user…”.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该用户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該使用者"
           }
         }
       }
@@ -41573,23 +41743,6 @@
         }
       }
     },
-    "Found “%@”." : {
-      "comment" : "Under the address in the New Live Folder sheet: the feed found there, by its name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找到了“%@”。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找到了「%@」。"
-          }
-        }
-      }
-    },
     "GitHub asked Zigzag to wait. It tries again later." : {
       "comment" : "Why a live folder of GitHub pull requests or issues couldn't refresh, in its menu in the sidebar: too many requests.",
       "localizations" : {
@@ -41807,23 +41960,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新增即時資料夾…"
-          }
-        }
-      }
-    },
-    "Open ones in public repositories, newest activity first." : {
-      "comment" : "Under the fields of the New Live Folder sheet, for a GitHub list.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公开仓库中未关闭的项目，最近有动态的排在前面。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公開儲存庫中未關閉的項目，最近有動態的排在前面。"
           }
         }
       }

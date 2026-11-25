@@ -39,6 +39,27 @@ enum LiveFolderSheet {
         String(localized: "Latest \(count)", comment: "Choice of how many pages a live folder shows, in its sheet: the newest 10, 25 or 50.")
     }
 
+    /// What a GitHub list shows, for the sheet's note.
+    static func listNote(_ list: GitHubList, user: String?) -> String {
+        let user = user ?? String(localized: "this user", comment: "Stands in for a GitHub username in the New Live Folder sheet's note until one is typed, as in “Open issues assigned to this user…”.")
+        return switch list {
+        case .pullRequests: String(localized: "Open pull requests \(user) opened in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Pull Requests Opened list. The placeholder is a GitHub username.")
+        case .issues: String(localized: "Open issues assigned to \(user) in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Issues Assigned list. The placeholder is a GitHub username.")
+        case .reviewRequests: String(localized: "Open pull requests \(user) is asked to review in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Review Requests list. The placeholder is a GitHub username.")
+        case .repositoryIssues: String(localized: "Open issues in public repositories \(user) owns, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Issues in Owned Repositories list. The placeholder is a GitHub username.")
+        case .repositoryPullRequests: String(localized: "Open pull requests in public repositories \(user) owns, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Pull Requests in Owned Repositories list. The placeholder is a GitHub username.")
+        }
+    }
+
+    /// How often it checks, from `LiveSchedule`.
+    static var scheduleNote: String {
+        String(localized: "Checks every \(Int(LiveSchedule.interval / 60)) minutes, or hourly in Low Power Mode.", comment: "Under the fields of the New Live Folder sheet: how often a live folder fetches its feed or list. The number is minutes (30).")
+    }
+
+    /// What it shows, then how often it checks.
+    static func withSchedule(_ note: String) -> String {
+        String(localized: "\(note) \(scheduleNote)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
+    }
 
     /// `editing`: the live folder to change; nil makes one, inside `parent` when given.
     static func show(in controller: BrowserWindowController, editing: UUID? = nil, parent: UUID? = nil) {
@@ -54,6 +75,7 @@ enum LiveFolderSheet {
             form.commit(in: controller, parent: parent)
         }
         form.sheet = sheet
+        sheet.heldUpNote = { [weak form] in form?.usernameProblem }
         #if DEBUG
         current = sheet
         #endif
@@ -100,10 +122,10 @@ enum LiveFolderSheet {
         var rows: [FormSheet.Row] {
             [.init(label: nil, view: kind),
              .init(label: String(localized: "Address", comment: "Label of the address field in the New Live Folder sheet."), view: address, isHidden: isGitHub),
-             .init(label: String(localized: "List", comment: "Label of the GitHub list menu in the New Live Folder sheet."), view: list, isHidden: !isGitHub),
              .init(label: String(localized: "Username", comment: "Label of the GitHub username field in the New Live Folder sheet."), view: user, isHidden: !isGitHub),
+             .init(label: String(localized: "List", comment: "Label of the GitHub list menu in the New Live Folder sheet."), view: list, isHidden: !isGitHub, fills: true),
              .init(label: String(localized: "Name", comment: "Label of the name field in the New Live Folder sheet."), view: name),
-             .init(label: String(localized: "Show", comment: "Label of the menu in the New Live Folder sheet that picks how many pages it shows."), view: count),
+             .init(label: String(localized: "Show", comment: "Label of the menu in the New Live Folder sheet that picks how many pages it shows."), view: count, fills: true),
              .init(label: nil, view: note, height: 0)]
         }
 
@@ -117,11 +139,11 @@ enum LiveFolderSheet {
 
         private var typedAddress: URL? { LiveFolderSheet.address(from: address.stringValue) }
 
+        /// The username as typed, without spaces or an @.
+        private var login: String { user.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "@", with: "") }
+
         var source: LiveSource? {
-            if isGitHub {
-                let login = user.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "@", with: "")
-                return GitHubList.isUsername(login) ? .gitHub(lists[list.selectedIndex], user: login) : nil
-            }
+            if isGitHub { return GitHubList.isUsername(login) ? .gitHub(lists[list.selectedIndex], user: login) : nil }
             guard let url = typedAddress else { return nil }
             if let lookup, lookup.url == url, case .found(let feed, _)? = lookup.result { return .feed(url, found: feed) }
             return .feed(url)
@@ -138,9 +160,24 @@ enum LiveFolderSheet {
                 ?? String(localized: "Live Folder", comment: "Name of a new live folder whose feed has no name.")
         }
 
+        /// The name an empty Name field gives, as Save names it.
+        var emptyName: String {
+            if let existing, !isGitHub, existing.live?.namedByFeed == true, existing.live?.source == source { return existing.name }
+            return defaultName
+        }
+
+        /// Why what's typed can't be a GitHub username; nil while it can, or while it's empty.
+        var usernameProblem: String? {
+            guard isGitHub, !login.isEmpty, !GitHubList.isUsername(login) else { return nil }
+            return String(localized: "GitHub usernames have only letters, numbers and single hyphens.", comment: "Tooltip on the username field of the New Live Folder sheet when what's typed can't be a GitHub username, so its button can't be pressed.")
+        }
+
         func canConfirm() -> Bool {
             lookUp()
             showNote()
+            if name.placeholder != emptyName { name.placeholder = emptyName }
+            user.isInvalid = usernameProblem != nil
+            user.toolTip = usernameProblem
             guard source != nil else { return false }
             if !isGitHub, let lookup, lookup.url == typedAddress, case .problem? = lookup.result { return false }
             return true
@@ -164,14 +201,18 @@ enum LiveFolderSheet {
         private func showNote() {
             var text = ""
             var problem = false
+            let fromFeed = String(localized: "New pages from the feed, newest first.", comment: "Under the fields of the New Live Folder sheet, for a feed.")
             if isGitHub {
-                text = String(localized: "Open ones in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for a GitHub list.")
+                text = LiveFolderSheet.withSchedule(LiveFolderSheet.listNote(lists[list.selectedIndex], user: GitHubList.isUsername(login) ? login : nil))
             } else if let lookup, lookup.url == typedAddress {
                 switch lookup.result {
-                case .found(_, let title)?: text = title.map { String(localized: "Found “\($0)”.", comment: "Under the address in the New Live Folder sheet: the feed found there, by its name.") } ?? ""
+                case .found(_, let title)?:
+                    text = LiveFolderSheet.withSchedule(title.map { String(localized: "New pages from “\($0)”, newest first.", comment: "Under the address in the New Live Folder sheet: the feed found there, by its name.") } ?? fromFeed)
                 case .problem(let reason)?: text = reason.message; problem = true
                 case nil: text = String(localized: "Looking for a feed…", comment: "Under the address in the New Live Folder sheet, while Zigzag looks for the feed.")
                 }
+            } else {
+                text = LiveFolderSheet.withSchedule(fromFeed)
             }
             note.textColor = problem ? Tokens.Color.destructive : Tokens.Color.textSecondary
             guard note.stringValue != text else { return }

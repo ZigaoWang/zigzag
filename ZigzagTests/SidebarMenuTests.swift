@@ -720,6 +720,73 @@ struct SidebarRowMenuTests {
         }
     }
 
+    /// A live folder's menu opens with when it was last updated, or Updating… while it fetches, and Refresh Now
+    /// fetches it.
+    @Test func aLiveFoldersMenuSaysWhenItWasUpdated() throws {
+        let live = LiveFolders.shared
+        let (clock, fetcher) = (live.now, live.fetcher)
+        defer { live.now = clock; live.fetcher = fetcher; LiveFoldersTests.Server.reset() }
+        let config = LiveFetcher.configuration(userAgent: "Zigzag tests")
+        config.protocolClasses = [LiveFoldersTests.Server.self]
+        live.fetcher = LiveFetcher(configuration: config)
+        try inWindow(["A"]) { controller, _, space in
+            let folder = try #require(Library.shared.addLiveFolder(named: "News", source: .feed(URL(string: "https://example.com/menu/updated")!), limit: 25,
+                                                                   namedByFeed: false, in: space))
+            // Never fetched: no line.
+            #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first == "Close Folder")
+            let fetched = Date()
+            live.now = { fetched }
+            live.apply(.unchanged, to: folder.id)
+            live.now = { fetched.addingTimeInterval(5 * 60) }
+            let menu = SidebarMenus.folderMenu(for: folder, controller: controller)
+            #expect(Array(titles(menu).prefix(2)) == ["Updated 5 Minutes Ago", "-"])
+            #expect(menu.items.first?.isEnabled == false)
+            // Refresh Now fetches, and the menu says so while it does.
+            try run(menu.items.first { $0.title == "Refresh Now" })
+            let until = Date().addingTimeInterval(2)
+            while !live.isRefreshing(folder.id), Date() < until { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+            #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first == "Updating…")
+            while live.isRefreshing(folder.id), Date() < until { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+            #expect(LiveFoldersTests.Server.requests.last?.url?.absoluteString == "https://example.com/menu/updated")
+        }
+    }
+
+    /// The live folder sheet: the source first, then what to show; dropdowns as wide as the fields; a note that says
+    /// what the list shows and how often it checks; the name it will use when left empty; a username GitHub can't
+    /// have keeps Save off.
+    @Test func theLiveFolderSheetSaysWhatItShowsAndHowOften() throws {
+        try inWindow(["A"]) { controller, _, space in
+            let folder = try #require(Library.shared.addLiveFolder(named: "Mine", source: .gitHub(.repositoryIssues, user: "octocat"), limit: 10,
+                                                                   namedByFeed: false, in: space))
+            controller.editLiveFolder(folder.id)
+            let sheet = try #require(LiveFolderSheet.current)
+            defer { sheet.close() }
+            sheet.layoutSubtreeIfNeeded()
+            func all<T: NSView>(_ kind: T.Type, in view: NSView) -> [T] { view.subviews.flatMap { (($0 as? T).map { [$0] } ?? []) + all(kind, in: $0) } }
+            func note() -> String? { all(NSTextField.self, in: sheet).map { $0.stringValue }.first { $0.contains("Checks every") } }
+            #expect(note() == "Open issues in public repositories octocat owns, newest activity first. Checks every 30 minutes, or hourly in Low Power Mode.")
+            let fields = all(FilledField.self, in: sheet)
+            let user = try #require(fields.first { $0.stringValue == "octocat" })
+            let name = try #require(fields.first { $0.stringValue == "Mine" })
+            let dropdowns = all(DropdownButton.self, in: sheet).filter { !$0.isHidden }
+            #expect(dropdowns.count == 2)
+            // Username above List, every control the width of the fields.
+            for dropdown in dropdowns {
+                #expect(dropdown.frame.width == user.frame.width)
+                #expect(dropdown.frame.minY > user.frame.minY)
+            }
+            name.stringValue = ""
+            sheet.revalidate()
+            #expect(name.placeholder == LiveFolderSheet.listTitle(.repositoryIssues))
+            user.stringValue = "not a user!"
+            sheet.revalidate()
+            #expect(user.isInvalid)
+            #expect(note()?.hasPrefix("Open issues in public repositories this user owns") == true)
+            sheet.debugAnswer(true)
+            #expect(Library.shared.folder(folder.id)?.live?.source == .gitHub(.repositoryIssues, user: "octocat"))
+        }
+    }
+
     /// Every item of a drawn menu, submenus' too, with whether it has a picture.
     private func drawn(_ menu: NSMenu) -> [(title: String, pictured: Bool)] {
         func walk(_ entries: [MenuPanel.Entry]) -> [(title: String, pictured: Bool)] {

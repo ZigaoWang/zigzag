@@ -17,6 +17,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         /// Hidden rows take no room and Tab skips them. Toggle with `setHidden(_:forRow:)` when a choice makes a row
         /// pointless, rather than graying it.
         var isHidden = false
+        /// A dropdown as wide as the fields, not its own width.
+        var fills = false
 
         /// A quiet line of words, wrapped to the form's width.
         static func note(_ text: String) -> Row {
@@ -363,7 +365,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
                 label.frame = NSRect(x: 0, y: rowY + round((height - lh) / 2), width: labelWidth, height: lh)
                 // Controls keep their own width at the row's end, as in Settings; other views fill the row. Switches
                 // too, or they'd stretch.
-                let own = (row.view as? DropdownButton)?.intrinsicContentSize.width
+                let own = row.fills ? nil : (row.view as? DropdownButton)?.intrinsicContentSize.width
                     ?? (row.view is Toggle ? row.view.intrinsicContentSize.width : nil)
                 let width = min(own ?? inner - labelWidth, inner - labelWidth)
                 row.view.frame = NSRect(x: inner - width, y: rowY, width: width, height: height)
