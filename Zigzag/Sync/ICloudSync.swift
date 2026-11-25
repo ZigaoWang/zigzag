@@ -128,16 +128,26 @@ final class ICloudSync {
         guard backingUp() != nil else { shown = .backupFailed; return }
         UserDefaults.standard.set(true, forKey: Self.enabledKey)
         stop()
-        try? FileManager.default.removeItem(at: Self.stateFile)
-        start(state: SyncState())
+        start(state: Self.stateTurningOn(saved: JSONStore.load(SyncState.self, from: Self.stateFile)))
     }
+
+    /// What's kept while sync is off: only which items here match which in iCloud, so turning it on again, after a
+    /// rename, finds them instead of adding copies.
+    static func stateTurningOff(_ state: SyncState?) -> SyncState {
+        var kept = SyncState()
+        kept.aliases = state?.aliases ?? SyncAliases()
+        return kept
+    }
+
+    static func stateTurningOn(saved: SyncState?) -> SyncState { stateTurningOff(saved) }
 
     /// Turned off: everything stays on this Mac, and iCloud keeps its copy.
     func turnOff() {
         UserDefaults.standard.set(false, forKey: Self.enabledKey)
+        let state = session?.state ?? JSONStore.load(SyncState.self, from: Self.stateFile)
         stop()
         NSApplication.shared.unregisterForRemoteNotifications()
-        try? FileManager.default.removeItem(at: Self.stateFile)
+        JSONStore.save(Self.stateTurningOff(state), to: Self.stateFile)
         shown = .off
     }
 

@@ -472,7 +472,7 @@ final class SyncSession {
             server[name] = SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified)
         }
         clearIncoming()
-        let merge = SyncMerge.merge(local: host.read(), server: server, now: now())
+        let merge = SyncMerge.merge(local: host.read(), server: server, previous: state.aliases, now: now())
         state.aliases = merge.aliases
         state.base = server
         state.merged = true
@@ -540,9 +540,10 @@ final class SyncSession {
 
     /// Everything here goes up again from scratch (iCloud's copy was reset): merged again on the next fetch.
     func startOver() {
-        let account = state.account
+        let account = state.account, aliases = state.aliases
         state = SyncState()
         state.account = account
+        state.aliases = aliases
         clearIncoming()
         onChange?()
     }

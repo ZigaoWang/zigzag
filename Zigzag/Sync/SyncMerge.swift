@@ -20,7 +20,8 @@ enum SyncMerge {
         var position: String
     }
 
-    static func merge(local library: SyncLibrary, server: [String: SyncItem], now: Date = Date()) -> Result {
+    /// `previous`: the matches an earlier first sync made (sync turned off and on, iCloud's copy reset), tried first.
+    static func merge(local library: SyncLibrary, server: [String: SyncItem], previous: SyncAliases = SyncAliases(), now: Date = Date()) -> Result {
         let local = SyncMapping.export(library, previous: [:], aliases: SyncAliases(), now: now).items
         var aliases = SyncAliases()
         var items = server
@@ -37,8 +38,15 @@ enum SyncMerge {
             if let serverID = SyncName.id(serverName) { aliases.link(local: node.id, server: serverID) }
         }
         func byID(_ node: Node) -> Bool {
-            guard serverNames.contains(node.name), !serverTaken.contains(node.name) else { return false }
-            link(node, to: node.name)
+            if serverNames.contains(node.name), !serverTaken.contains(node.name) {
+                link(node, to: node.name)
+                return true
+            }
+            let earlier = previous.server(node.id)
+            guard earlier != node.id else { return false }
+            let name = "\(node.name.prefix { $0 != "." }).\(earlier.uuidString)"
+            guard serverNames.contains(name), !serverTaken.contains(name) else { return false }
+            link(node, to: name)
             return true
         }
         func normalized(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }

@@ -396,6 +396,21 @@ extension SyncLibrary {
         #expect(a.library.contents.favorites.map(\.url.lastPathComponent) == ["fav"])
     }
 
+    @Test func turningSyncOffRenamingAndOnAgainAddsNoCopy() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // B's space matched A's by name; sync turns off on B, the space is renamed, and sync turns on again.
+        let off = try saved(ICloudSync.stateTurningOff(b.session.state))
+        #expect(!off.merged && off.base.isEmpty && off.account == nil)
+        var library = b.library
+        library.editSpace("Personal") { $0.name = "Home" }
+        let again = FakeMac(cloud, library, clock: b.clock, state: ICloudSync.stateTurningOn(saved: off))
+        again.sync(); a.sync()
+        // One space, as iCloud has it, as any first sync's match.
+        #expect(again.library.spaceNames == ["Personal"] && again.library.urls(in: "Personal") == ["a"])
+        #expect(a.library.spaceNames == ["Personal"])
+        #expect(cloud.records.keys.filter { $0.hasPrefix("space.") }.count == 1)
+    }
+
     @Test func aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto() {
         let cloud = FakeCloud()
         let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a")]), Sample.space("Work", [Sample.page("b")])], favorites: [Sample.page("fav")]))
