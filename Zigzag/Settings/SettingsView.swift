@@ -5257,8 +5257,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                             comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence.")
                         }
                     }
+                    // Found by the permission's name and by its choice, as the menu and the site panel say it (#532).
                     let choice = SitePermissions.choice(permission, origin: origin)
-                    add(permission.title, detail ?? "") { [weak self] in
+                    let choiceWords = "\(choice.title) \(PermissionChoice.summary([choice]))"
+                    add(permission.title, detail ?? "", choiceWords) { [weak self] in
                         let options = permission.choices
                         let dropdown = DropdownButton()
                         dropdown.options = options.map { DropdownButton.Option(title: $0.title) }
@@ -5269,7 +5271,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                             self?.reloadPrivacy()
                             self?.layoutDocument()
                         }
-                        return [makeRow(permission.title, detail: detail, control: dropdown) { [weak self] in
+                        return [makeRow(permission.title, detail: detail, keywords: choiceWords, control: dropdown) { [weak self] in
                             SitePermissions.setChoice(.ask, for: permission, origin: origin)
                             self?.permissionsChangedHere.remove("\(origin)|\(permission.rawValue)")
                         }]
