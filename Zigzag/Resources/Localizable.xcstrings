@@ -73,6 +73,12 @@
     "Checks every %lld minutes, or hourly in Low Power Mode." : {
       "comment" : "Under the fields of the New Live Folder sheet: how often a live folder fetches its feed or list. The number is minutes (30).",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld分ごとに確認します。低電力モードでは1時間ごとです。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -205,6 +211,12 @@
     "GitHub usernames have only letters, numbers and single hyphens." : {
       "comment" : "Tooltip on the username field of the New Live Folder sheet when what's typed can't be a GitHub username, so its button can't be pressed.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHubのユーザ名に使えるのは、英字、数字、連続しないハイフンだけです。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -245,6 +257,12 @@
     "New pages from the feed, newest first." : {
       "comment" : "Under the fields of the New Live Folder sheet, for a feed.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィードの新しいページを、新しい順に表示します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -262,6 +280,12 @@
     "New pages from “%@”, newest first." : {
       "comment" : "Under the address in the New Live Folder sheet: the feed found there, by its name.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の新しいページを、新しい順に表示します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -302,6 +326,12 @@
     "Open issues assigned to %@ in public repositories, newest activity first." : {
       "comment" : "Under the fields of the New Live Folder sheet, for the Issues Assigned list. The placeholder is a GitHub username.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開リポジトリで%@に割り当てられたオープンなIssueを、最近のアクティビティ順に表示します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -319,6 +349,12 @@
     "Open issues in public repositories %@ owns, newest activity first." : {
       "comment" : "Under the fields of the New Live Folder sheet, for the Issues in Owned Repositories list. The placeholder is a GitHub username.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が所有する公開リポジトリのオープンなIssueを、最近のアクティビティ順に表示します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -336,6 +372,12 @@
     "Open pull requests %@ is asked to review in public repositories, newest activity first." : {
       "comment" : "Under the fields of the New Live Folder sheet, for the Review Requests list. The placeholder is a GitHub username.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開リポジトリで%@にレビューが依頼されたオープンなプルリクエストを、最近のアクティビティ順に表示します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -353,6 +395,12 @@
     "Open pull requests %@ opened in public repositories, newest activity first." : {
       "comment" : "Under the fields of the New Live Folder sheet, for the Pull Requests Opened list. The placeholder is a GitHub username.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開リポジトリで%@が作成したオープンなプルリクエストを、最近のアクティビティ順に表示します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -370,6 +418,12 @@
     "Open pull requests in public repositories %@ owns, newest activity first." : {
       "comment" : "Under the fields of the New Live Folder sheet, for the Pull Requests in Owned Repositories list. The placeholder is a GitHub username.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が所有する公開リポジトリのオープンなプルリクエストを、最近のアクティビティ順に表示します。"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -433,6 +487,12 @@
     "Updated %@" : {
       "comment" : "Line at the top of a live folder's menu in the sidebar: when it was last fetched. The placeholder is a relative time, like “5 Minutes Ago”.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に更新"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -450,6 +510,12 @@
     "Updated Just Now" : {
       "comment" : "Line at the top of a live folder's menu in the sidebar: it was fetched less than a minute ago.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "たった今更新"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -467,6 +533,12 @@
     "Updating…" : {
       "comment" : "Line at the top of a live folder's menu in the sidebar, while it's being fetched.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新中…"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2406,6 +2478,12 @@
     "this user" : {
       "comment" : "Stands in for a GitHub username in the New Live Folder sheet's note until one is typed, as in “Open issues assigned to this user…”.",
       "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このユーザ"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
