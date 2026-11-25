@@ -4727,7 +4727,7 @@ enum IdleWorkCommand {
                  "background": window.backgroundColor.description, "shadow": window.hasShadow,
                  "occlusionVisible": window.occlusionState.contains(.visible), "key": window.isKeyWindow,
                  "animations": IdleWork.animations(in: window, longerThan: 1), "blurs": IdleWork.liveBlurs(in: window),
-                 "hdr": IdleWork.extendedRangeLayers(in: window)]
+                 "hdr": IdleWork.extendedRangeLayers(in: window), "glass": (window.contentView as? SpaceFrameView)?.debugGlass ?? [:]]
             }
             if let path = f.dropFirst().first, let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys]) {
                 try? data.write(to: URL(fileURLWithPath: path))

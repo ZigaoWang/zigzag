@@ -197,7 +197,7 @@ class SpaceFrameView: ColorView {
     var debugGlass: [String: Any] {
         ["opaque": window?.isOpaque ?? false, "wanted": glassWanted, "frosted": !glassView.isHidden, "frostedAlpha": glassView.alphaValue,
          "clear": clearGlass.map { !$0.isHidden } ?? false, "clearAlpha": clearGlass?.alphaValue ?? -1,
-         "clearFrame": NSStringFromRect(clearGlass?.frame ?? .zero), "occlusionVisible": window?.occlusionState.contains(.visible) ?? false,
+         "clearFrame": NSStringFromRect(clearGlass?.frame ?? .zero), "frostedFrame": NSStringFromRect(glassView.frame), "occlusionVisible": window?.occlusionState.contains(.visible) ?? false,
          "background": window?.backgroundColor.description ?? ""]
     }
     #endif
