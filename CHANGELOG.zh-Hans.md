@@ -14,6 +14,8 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ### 新功能
 - 下载规则可以转交文件而不是地址：把“转交”设为“文件”，Zigzag 会先用网页的登录状态下载，再把保存好的文件交给 App、脚本或服务。链接仍然转交地址；转交文件时，模板可以用 {file} 或 {file_url} 取得保存的文件。感谢 [Lakeland97](https://github.com/Lakeland97)。([#529](https://github.com/ZigaoWang/zigzag/issues/529))
+- 实时文件夹的菜单顶部现在会显示上次更新的时间，比如“5分钟前更新”；正在获取时显示“正在更新…”。
+- “新建实时文件夹”和“编辑实时文件夹”先问来源，下拉菜单和输入框对齐，下方会说明文件夹会显示什么，以及每 30 分钟检查一次（低电量模式下每小时一次）。名称留空时会显示将使用的名称，不可能是 GitHub 用户名的输入会被标出。
 
 ### 修复
 - 网页上打开 Zigzag Mini 时，在变暗的网页上滚动不会再把后面的网页滚走。感谢 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
