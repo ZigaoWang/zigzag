@@ -392,4 +392,15 @@ struct InPageMiniHostTests {
             #expect(!window.isVisible)
         }
     }
+
+    @Test func closeWindowStaysOnForADockedMini() throws {
+        try inWindow { browser, tab in
+            let mini = MiniWindowController.open(fromPage: nil, configuration: nil, opener: tab,
+                                                in: browser, by: .page, dockedIn: browser)
+            let window = try #require(mini.window)
+            let item = NSMenuItem(title: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "W")
+            #expect(window.validateMenuItem(item))
+            mini.closeInPage(animated: false)
+        }
+    }
 }
