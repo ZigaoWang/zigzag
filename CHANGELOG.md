@@ -5,20 +5,21 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
-- A video in full screen is no longer covered by the site's own top bar or side column, as on Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
-- Back, forward and reload no longer leave an empty space for the window buttons where none are shown, as in full screen before the menu bar comes down, and the window buttons stay in the bar while the shorter floating sidebar is out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
-- A tab that slept for hours while your Mac was low on memory no longer wakes signed out of sites like Azure DevOps and Microsoft 365: if the part of WebKit that holds sign-in cookies stops, as macOS may make it when memory is short, Zigzag puts them back before the page loads. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
 ### New
+- History's search ignores accents and case, finds every word in any order and marks it, and never hides a match in a stack; each part of the day has one heading, two pages from one site stay two rows, and the list answers the arrow keys, Delete, ⌘Return, ⌘F and a right-click that removes a whole site.
 - While a live folder checks for new pages, the chip on its icon shows a turning ring, the way Mail shows a mailbox being checked, and it stops the moment the check ends.
 - The New and Edit Live Folder sheet shows the folder's own icon, as the sidebar does: GitHub's for a GitHub list, the site's for a feed, or the one you chose. Click it to change the icon, as Change Icon… does, and a new folder keeps the icon you pick.
 
-- A live folder's menu left open while it updates now changes from Updating… to Updated Just Now, or to why it couldn't refresh, without closing it.
-
-- History's search ignores accents and case, finds every word in any order and marks it, and never hides a match in a stack; each part of the day has one heading, two pages from one site stay two rows, and the list answers the arrow keys, Delete, ⌘Return, ⌘F and a right-click that removes a whole site.
+### Changed
 - Two-finger swipes back and forward are smoother, go at a shorter distance or a lighter flick, keep the page from drifting up and down, and never leave the arrow up or the page shifted, in tabs, split view and Zigzag Mini.
+
+### Fixed
 - With the address bar above the page and a see-through space, a playing video no longer keeps the Mac's graphics much busier than with the bar off. The window's glass now stays behind the sidebar instead of the whole window.
+- A tab that slept for hours while your Mac was low on memory no longer wakes signed out of sites like Azure DevOps and Microsoft 365: if the part of WebKit that holds sign-in cookies stops, as macOS may make it when memory is short, Zigzag puts them back before the page loads. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- A video in full screen is no longer covered by the site's own top bar or side column, as on Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Back, forward and reload no longer leave an empty space for the window buttons where none are shown, as in full screen before the menu bar comes down, and the window buttons stay in the bar while the shorter floating sidebar is out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- A live folder's menu left open while it updates now changes from Updating… to Updated Just Now, or to why it couldn't refresh, without closing it.
+- With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
 
 ## [0.10.0] - 2026-11-25
 
