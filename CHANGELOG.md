@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- 1Password's toolbar icon now matches Zigzag's toolbar: on a dark space it shows its dark-toolbar icon even when the Mac is in light mode, and the other way around.
 - Pressing and holding Back or Forward in the sidebar, then sliding down, no longer drags the whole window: the list opens and you can slide onto a page and let go, with the mouse as with a finger.
 
 ## [0.9.5] - 2026-11-24
