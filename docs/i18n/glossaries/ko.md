@@ -13,6 +13,7 @@ Zigzag의 한국어 인터페이스는 `ko`입니다. 의미는 영어 원문과
 | Space / Profile | 스페이스／프로필 |
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | 고정됨／탭 고정／탭 고정 해제／고정된 페이지로 돌아가기 |
 | Favorites / Bookmarks / Folder / Group | 즐겨찾기／책갈피／폴더／그룹 |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | 동기화／iCloud와 동기화／iCloud 저장 공간이 가득 참／라이브러리 |
 | Nest Tab / Unnest Tab | 탭 중첩／탭 중첩 해제 |
 | Live Folder | 라이브 폴더 |
 | Command Bar / Site Controls | 명령 막대／사이트 제어 |

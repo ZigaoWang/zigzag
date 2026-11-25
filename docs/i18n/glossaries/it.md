@@ -16,6 +16,7 @@ L’interfaccia italiana di Zigzag è `it`. Controlla il significato di ogni str
 | Unpinned (toast) | Non più fissato |
 | Pin to Address / Unpin from Address (an extension’s button) | Fissa nella barra degli indirizzi / Rimuovi dalla barra degli indirizzi |
 | Favorites / Bookmarks / Folder / Group | preferiti / segnalibri / cartella / gruppo |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | sincronizzare / sincronizzazione / Sincronizza con iCloud / Spazio iCloud esaurito / libreria |
 | Live Folder | cartella live |
 | Command Bar / Site Controls | barra dei comandi / Controlli del sito |
 | Zigzag Mini / Mini player | Zigzag Mini / mini player |

@@ -15201,6 +15201,144 @@
           }
         }
       }
+    },
+    "Sync with iCloud": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sincronizar com o iCloud"
+      }
+    },
+    "Your spaces, pinned tabs, favorites and settings on every Mac signed in to your iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Seus espaços, abas fixadas, favoritos e ajustes em todo Mac conectado à sua conta do iCloud."
+      }
+    },
+    "icloud sync cloud macs devices mac computers": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "icloud sincronizar sincronização sync nuvem cloud mac dispositivos computadores"
+      }
+    },
+    "Sync with iCloud?": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sincronizar com o iCloud?"
+      }
+    },
+    "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s on this Mac is merged with what’s in iCloud, never replaced, and a backup is saved first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes são sincronizados pelo seu próprio iCloud. As abas abertas, o histórico, as senhas, os dados de sites, as extensões e os downloads ficam neste Mac. O que está neste Mac é mesclado com o que está no iCloud, nunca substituído, e um backup é salvo antes."
+      }
+    },
+    "Remove your library from iCloud?": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Remover sua biblioteca do iCloud?"
+      }
+    },
+    "Your spaces, pinned tabs, favorites and settings are removed from iCloud and stop syncing on all your Macs. Everything on this Mac stays as it is.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Seus espaços, abas fixadas, favoritos e ajustes são removidos do iCloud e deixam de ser sincronizados em todos os seus Macs. Tudo neste Mac continua como está."
+      }
+    },
+    "Remove from iCloud…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Remover do iCloud…"
+      }
+    },
+    "Not syncing": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sem sincronização"
+      }
+    },
+    "Syncing…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sincronizando…"
+      }
+    },
+    "Up to date": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Tudo atualizado"
+      }
+    },
+    "Last synced %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Última sincronização %@"
+      }
+    },
+    "Not signed in to iCloud": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Você não iniciou sessão no iCloud"
+      }
+    },
+    "Signed in to a different iCloud account": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sessão iniciada em outra conta do iCloud"
+      }
+    },
+    "Turn sync off and on again to merge with this account. Nothing on this Mac has changed.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Desative e ative novamente a sincronização para mesclar com esta conta. Nada mudou neste Mac."
+      }
+    },
+    "iCloud isn’t available on this Mac": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "O iCloud não está disponível neste Mac"
+      }
+    },
+    "iCloud is full": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Armazenamento do iCloud cheio"
+      }
+    },
+    "Changes wait on this Mac until there’s room.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "As alterações aguardam neste Mac até haver espaço."
+      }
+    },
+    "Can’t reach iCloud. Zigzag tries again.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Não é possível acessar o iCloud. O Zigzag tentará novamente."
+      }
+    },
+    "Removed from iCloud on another Mac": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Removido do iCloud em outro Mac"
+      }
+    },
+    "Sync is off. Everything on this Mac stays as it is.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "A sincronização está desativada. Tudo neste Mac continua como está."
+      }
+    },
+    "This copy of Zigzag can’t use iCloud": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Esta cópia do Zigzag não pode usar o iCloud"
+      }
+    },
+    "iCloud couldn’t sync: %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "O iCloud não conseguiu sincronizar: %@"
+      }
     }
   },
   "language": "pt-BR"

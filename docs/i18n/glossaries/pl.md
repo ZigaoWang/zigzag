@@ -13,6 +13,7 @@ Interfejs Zigzag w języku polskim to `pl`. Znaczenie wynika z angielskiego oryg
 | Space / Profile | przestrzeń (rodzaj żeński, odmienna) / profil |
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Przypięte / Przypnij kartę / Odepnij kartę / Wróć do przypiętej strony |
 | Favorites / a favorite / Bookmarks / Folder / Group | ulubione / ulubiona (np. „Otwórz ulubioną”) / zakładki / folder / grupa |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | synchronizować / synchronizacja / Synchronizuj z iCloud / Pamięć iCloud jest pełna / biblioteka |
 | Live Folder | folder na żywo |
 | Command Bar / Site Controls | pasek poleceń / Ustawienia witryny |
 | Zigzag Mini / Mini player | Zigzag Mini / miniodtwarzacz |

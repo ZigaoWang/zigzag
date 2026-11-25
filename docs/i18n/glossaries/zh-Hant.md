@@ -9,6 +9,7 @@ Zigzag 使用 `zh-Hant` 提供繁體中文介面。請以英文原文和字串�
 | Sidebar / Toolbar / Address Bar | 側邊欄／工具列／網址列 |
 | Space / Profile | 空間／個人資料 |
 | Pinned / Favorites / Bookmarks | 已固定／收藏／書籤 |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | 同步／與 iCloud 同步／iCloud 儲存空間已滿／資料庫 |
 | Split View / Private Browsing | 分割顯示／私密瀏覽 |
 | Reader / Picture in Picture | 閱讀器／子母畫面 |
 | Handoff / Continuity / Sidecar | 接力／接續互通／並行 |

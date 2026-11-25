@@ -14,6 +14,7 @@
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Закреплённые / Закрепить вкладку / Открепить вкладку / Назад на закреплённую страницу |
 | Pin to Address (extension) | Закрепить в адресной строке |
 | Favorites / Bookmarks / Folder / Group | Избранное / Закладки / Папка / Группа |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | синхронизировать / синхронизация / Синхронизировать с iCloud / Хранилище iCloud заполнено / библиотека |
 | Live Folder | Живая папка |
 | Command Bar / Site Controls | Командная панель / Настройки сайта |
 | Zigzag Mini / Mini player | Zigzag Mini (не склоняется) / Мини-плеер |

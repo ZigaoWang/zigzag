@@ -13,6 +13,7 @@ Zigzag biedt zijn interface als `nl` in het Nederlands aan. De betekenis staat i
 | Space / Profile | Space (de, mv. spaces) / Profiel |
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Vastgezet / Zet tabblad vast / Maak tabblad los / Terug naar vastgezette pagina |
 | Favorites / Bookmarks / Folder / Group | Favorieten / Bladwijzers / Map / Groep |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | synchroniseren / synchronisatie / Synchroniseer met iCloud / iCloud-opslag is vol / bibliotheek |
 | Live Folder | Livemap (de, mv. livemappen) |
 | Command Bar / Site Controls | Opdrachtbalk / Website-instellingen |
 | Zigzag Mini / Mini player | Zigzag Mini (de Mini) / Minispeler |

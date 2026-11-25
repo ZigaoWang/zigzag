@@ -14846,6 +14846,144 @@
           }
         }
       }
+    },
+    "Sync with iCloud": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud ile eşzamanla"
+      }
+    },
+    "Your spaces, pinned tabs, favorites and settings on every Mac signed in to your iCloud.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Space’leriniz, sabitlenmiş sekmeleriniz, favorileriniz ve ayarlarınız, iCloud hesabınızla giriş yapılmış her Mac’te."
+      }
+    },
+    "icloud sync cloud macs devices mac computers": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "icloud eşzamanla eşzamanlama senkronizasyon sync bulut cloud mac aygıtlar cihazlar bilgisayarlar"
+      }
+    },
+    "Sync with iCloud?": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud ile eşzamanlansın mı?"
+      }
+    },
+    "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s on this Mac is merged with what’s in iCloud, never replaced, and a backup is saved first.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Space’leriniz, profilleriniz, sabitlenmiş sekmeleriniz, klasörleriniz, favorileriniz, canlı klasörleriniz ve ayarlarınız kendi iCloud hesabınız üzerinden eşzamanlanır. Açık sekmeler, geçmiş, parolalar, web sitesi verileri, genişletmeler ve indirilenler bu Mac’te kalır. Bu Mac’teki içerik iCloud’dakiyle birleştirilir, hiçbir zaman üzerine yazılmaz ve önce bir yedek kaydedilir."
+      }
+    },
+    "Remove your library from iCloud?": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Kitaplığınız iCloud’dan kaldırılsın mı?"
+      }
+    },
+    "Your spaces, pinned tabs, favorites and settings are removed from iCloud and stop syncing on all your Macs. Everything on this Mac stays as it is.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Space’leriniz, sabitlenmiş sekmeleriniz, favorileriniz ve ayarlarınız iCloud’dan kaldırılır ve tüm Mac’lerinizde eşzamanlanması durur. Bu Mac’teki her şey olduğu gibi kalır."
+      }
+    },
+    "Remove from iCloud…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud’dan Kaldır…"
+      }
+    },
+    "Not syncing": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Eşzamanlanmıyor"
+      }
+    },
+    "Syncing…": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Eşzamanlanıyor…"
+      }
+    },
+    "Up to date": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Güncel"
+      }
+    },
+    "Last synced %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Son eşzamanlama: %@"
+      }
+    },
+    "Not signed in to iCloud": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud’a giriş yapılmadı"
+      }
+    },
+    "Signed in to a different iCloud account": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Farklı bir iCloud hesabına giriş yapıldı"
+      }
+    },
+    "Turn sync off and on again to merge with this account. Nothing on this Mac has changed.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu hesapla birleştirmek için eşzamanlamayı kapatıp yeniden açın. Bu Mac’te hiçbir şey değişmedi."
+      }
+    },
+    "iCloud isn’t available on this Mac": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud bu Mac’te kullanılamıyor"
+      }
+    },
+    "iCloud is full": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud saklama alanı dolu"
+      }
+    },
+    "Changes wait on this Mac until there’s room.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Değişiklikler yer açılana kadar bu Mac’te bekler."
+      }
+    },
+    "Can’t reach iCloud. Zigzag tries again.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud’a ulaşılamıyor. Zigzag yeniden deneyecek."
+      }
+    },
+    "Removed from iCloud on another Mac": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Başka bir Mac’te iCloud’dan kaldırıldı"
+      }
+    },
+    "Sync is off. Everything on this Mac stays as it is.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Eşzamanlama kapalı. Bu Mac’teki her şey olduğu gibi kalır."
+      }
+    },
+    "This copy of Zigzag can’t use iCloud": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Zigzag’in bu kopyası iCloud’u kullanamaz"
+      }
+    },
+    "iCloud couldn’t sync: %@": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "iCloud eşzamanlanamadı: %@"
+      }
     }
   },
   "InfoPlist": {
