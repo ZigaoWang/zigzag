@@ -2454,7 +2454,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Each group's heading shows only with names beside the symbols; as symbols alone, the gaps say it.
         let headed = arrangement == .column
         groupHeadings.values.forEach { $0.isHidden = !headed }
-        let headingRoom = headed ? (groupHeadings.values.first?.lineHeight ?? 0) + Tokens.Space.x1 : 0
+        // A heading longer than the column, as in a longer language, wraps onto a second line.
+        let headingWidth = room.width - Tokens.Page.gutter * 2
         // The heading and the menu take about two sections' room.
         let count = CGFloat(items.count + (grouped ? 2 : 0))
         // A small gap before each group after the first, no label: how System Settings sets its groups apart.
@@ -2466,7 +2467,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // so all of them fit under the title.
         let top = Tokens.Page.headerHeight + Tokens.Space.x1
         func height(_ tallest: CGFloat) -> CGFloat {
-            let headings = CGFloat(groupHeadings.count) * headingRoom
+            let headings = headed ? groupHeadings.values.map { $0.height(forWidth: headingWidth) + Tokens.Space.x1 }.reduce(0, +) : 0
             return max(Tokens.Page.controlHeight, min(tallest, floor((room.height - top - Tokens.Space.x2 - gaps * gap - headings) / count) - 2))
         }
         var bottom: CGFloat = 0
@@ -2487,7 +2488,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
                 if groupStarts.contains(item.pane) { y += gap }
                 if let heading = groupHeadings[item.pane] {
-                    heading.frame = NSRect(x: gutter - Label.inset, y: y, width: room.width - gutter * 2, height: heading.lineHeight)
+                    heading.fitLines(headingWidth)
+                    heading.frame = NSRect(x: gutter - Label.inset, y: y, width: headingWidth, height: heading.height(forWidth: headingWidth))
                     y = heading.frame.maxY + Tokens.Space.x1
                 }
                 item.frame = NSRect(x: gutter - inset, y: y, width: room.width - (gutter - inset) * 2, height: rowHeight)
@@ -2653,6 +2655,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         groupHeadings = Dictionary(uniqueKeysWithValues: SettingsPane.headed(manyProfiles: many).compactMap { pane in
             SettingsPane.groupTitle(startingAt: pane).map { title in
                 let label = Label.groupHeading(title)
+                label.wrapWhenLong()
                 column.addSubview(label)
                 return (pane, label)
             }
