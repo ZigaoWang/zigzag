@@ -27,7 +27,7 @@ enum SyncFetchScope {
 }
 
 /// A record as the server has it.
-struct SyncRemote {
+struct SyncRemote: Codable {
     var name: String
     var type: String
     /// Its fields as the server holds them, a newer Zigzag's included.
@@ -76,9 +76,13 @@ struct SyncState: Codable {
     var engine: Data?
     /// Profiles removed on another Mac: they stay here, with their spaces, favorites and data, as this Mac's own.
     var keptProfiles: Set<UUID> = []
+    /// What a fetch brought that isn't in the library yet, saved with the server's token so a quit can't lose it.
+    var incoming: [String: SyncRemote] = [:]
+    var incomingRemoved: Set<String> = []
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
+        case incoming, incomingRemoved
     }
 
     init() {}
@@ -96,6 +100,8 @@ struct SyncState: Codable {
         lastSynced = try c.decodeIfPresent(Date.self, forKey: .lastSynced)
         engine = try c.decodeIfPresent(Data.self, forKey: .engine)
         keptProfiles = try c.decodeIfPresent(Set<UUID>.self, forKey: .keptProfiles) ?? []
+        incoming = try c.decodeIfPresent([String: SyncRemote].self, forKey: .incoming) ?? [:]
+        incomingRemoved = try c.decodeIfPresent(Set<String>.self, forKey: .incomingRemoved) ?? []
     }
 }
 
@@ -112,7 +118,26 @@ final class SyncSession {
     private(set) var isApplying = false
 
     /// What the server sent since the last settle: a record, or nil for one removed.
-    private var incoming: [String: SyncRemote?] = [:]
+    private var incoming: [String: SyncRemote?] {
+        var all: [String: SyncRemote?] = state.incoming.mapValues { .some($0) }
+        for name in state.incomingRemoved { all[name] = .some(nil) }
+        return all
+    }
+
+    private func arrive(_ name: String, _ record: SyncRemote?) {
+        if let record {
+            state.incoming[name] = record
+            state.incomingRemoved.remove(name)
+        } else {
+            state.incoming[name] = nil
+            state.incomingRemoved.insert(name)
+        }
+    }
+
+    private func clearIncoming() {
+        state.incoming = [:]
+        state.incomingRemoved = []
+    }
 
     init(host: SyncHost, state: SyncState = SyncState()) {
         self.host = host
@@ -177,8 +202,9 @@ final class SyncSession {
     // MARK: Changes from the server
 
     func fetched(_ records: [SyncRemote], deleted: [String]) {
-        for record in records { incoming[record.name] = .some(record) }
-        for name in deleted { incoming[name] = .some(nil) }
+        for record in records { arrive(record.name, record) }
+        for name in deleted { arrive(name, nil) }
+        if !records.isEmpty || !deleted.isEmpty { onChange?() }
     }
 
     /// A fetch is done: the first sync merges, later ones settle what came.
@@ -189,11 +215,11 @@ final class SyncSession {
     }
 
     private func settle() {
-        guard !incoming.isEmpty else { return }
+        guard !state.incoming.isEmpty || !state.incomingRemoved.isEmpty else { return }
         // What changed here first, so it isn't taken for something the server undid.
         localChanged()
         let arrived = incoming
-        incoming = [:]
+        clearIncoming()
         var changed = false
         var resend: [String] = []
         for (name, record) in arrived {
@@ -260,7 +286,7 @@ final class SyncSession {
             state.serverPayloads[name] = record.payload
             server[name] = SyncItem(SyncBody.decode(type: record.type, payload: record.payload), modified: record.modified)
         }
-        incoming = [:]
+        clearIncoming()
         let merge = SyncMerge.merge(local: host.read(), server: server, now: now())
         state.aliases = merge.aliases
         state.base = server
@@ -310,7 +336,7 @@ final class SyncSession {
     func saveFailed(_ name: String, _ failure: SyncSaveFailure) {
         switch failure {
         case .conflict(let record):
-            incoming[name] = .some(record)
+            arrive(name, record)
             if state.merged { settle() }
         case .gone:
             // Removed elsewhere while it changed here: the change wins and it comes back.
@@ -330,7 +356,7 @@ final class SyncSession {
         let account = state.account
         state = SyncState()
         state.account = account
-        incoming = [:]
+        clearIncoming()
         onChange?()
     }
 }

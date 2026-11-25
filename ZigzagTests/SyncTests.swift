@@ -867,6 +867,24 @@ extension SyncLibrary {
 
     // MARK: Connecting
 
+    /// The state as State.json keeps it.
+    private func saved(_ state: SyncState) throws -> SyncState {
+        try JSONDecoder().decode(SyncState.self, from: JSONEncoder().encode(state))
+    }
+
+    @Test func whatAFetchBroughtBeforeAQuitArrivesAfterIt() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("new")) } }
+        b.sync()
+        // A's fetch brings B's page and the server's token is saved, then Zigzag quits before the fetch ends.
+        let changes = cloud.changes(since: 0)
+        a.session.fetched(changes.records, deleted: changes.deleted)
+        let relaunched = FakeMac(cloud, a.library, clock: b.clock, state: try saved(a.session.state))
+        relaunched.session.fetchFinished()
+        #expect(relaunched.library.urls(in: "Personal") == ["a", "new"])
+    }
+
+
     @Test func aMacStartedAfterItsFirstSyncFetchesWhatChangedWhileItWasAway() async throws {
         let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
         // A quits; B pins a page meanwhile.

@@ -106,3 +106,5 @@
   Test: SyncTests.aZoneRemovedAfterTheFirstSyncIsRemovedElsewhereNotTriedAgain
 - Something changed on another Mac while Zigzag is open here → iCloud's push fetches it within seconds; pushes for other apps are ignored.
   Test: SyncTests.onlyZigzagsOwnPushesFromICloudFetch
+- Zigzag quits in the middle of a fetch → what the fetch brought is saved with how far it read, and arrives at the next launch; nothing is skipped.
+  Test: SyncTests.whatAFetchBroughtBeforeAQuitArrivesAfterIt
