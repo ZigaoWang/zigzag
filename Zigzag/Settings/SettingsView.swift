@@ -3811,6 +3811,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// section's groups, and whether Zigzag saves and fills passwords in that profile.
     /// How many times the page has been laid out, for a check that it isn't laid out more than it needs.
     private(set) var debugLayouts = 0
+    /// Each heading's controls and label as last laid out, by heading.
+    private(set) var debugHeadingControls: [String: (controls: NSRect, label: NSRect, inset: CGFloat)] = [:]
+    /// The space from a heading's controls to the top of its group, and from its label, less any inset the group asked for.
+    func debugHeadingGaps(_ heading: String) -> (controls: CGFloat, label: CGFloat)? {
+        guard let parts = debugHeadingControls[heading], let group = groups(of: pane).first(where: { $0.title == heading })?.group else { return nil }
+        return (group.frame.minY - parts.inset - parts.controls.maxY, group.frame.minY - parts.inset - parts.label.maxY)
+    }
 
     var debugState: [String: Any] {
         let profile = profile
@@ -3980,7 +3987,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                              width: size.width, height: size.height)
                     place(accessory)
                 }
-                y += slot
+                // Controls taller than the label keep the heading gap below their own bottom too.
+                y = max(y + slot, (accessory?.frame.maxY ?? 0) + Tokens.Space.x2)
+                #if DEBUG
+                debugHeadingControls[title ?? ""] = accessory.map { ($0.frame, label.frame, groupTopInset) }
+                #endif
             }
             y += groupTopInset
             group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight(for: contentWidth))

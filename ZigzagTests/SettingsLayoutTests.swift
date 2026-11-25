@@ -240,4 +240,31 @@ struct SettingsLayoutTests {
         #expect(Tokens.Sidebar.size == .medium)
         #expect(stepper?.isHidden == true)
     }
+
+    /// A heading with controls beside it (Add Rule…, Find a site) keeps the heading gap below the controls, not just
+    /// below its label (#527).
+    @Test func headingControlsKeepTheGapToTheirGroup() throws {
+        let library = Library.shared
+        let info = library.addProfile(name: "Heading controls test")
+        defer {
+            _ = library.removeProfile(info.id)
+            library.finishedRemovingProfile(info.id)
+        }
+        var checked = 0
+        for pane in [SettingsPane.downloads, .spaces, .profiles, .translation, .developer, .websiteData] {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+            let settings = SettingsView(pane: pane)
+            settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+            window.contentView?.addSubview(settings)
+            settings.debugReadNow()
+            settings.layoutSubtreeIfNeeded()
+            for heading in settings.debugHeadingControls.keys.sorted() {
+                guard let gaps = settings.debugHeadingGaps(heading) else { continue }
+                checked += 1
+                // The nearer of the two is exactly the heading gap: neither the label nor the controls crowd the group.
+                #expect(min(gaps.controls, gaps.label) == Tokens.Space.x2, "\(heading)")
+            }
+        }
+        #expect(checked >= 4)
+    }
 }
