@@ -4,6 +4,13 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
+### Nowe
+- Gdy folder na żywo sprawdza nowe strony, plakietka na jego ikonie pokazuje obracający się pierścień, tak jak Mail pokazuje sprawdzaną skrzynkę, i zatrzymuje się, gdy tylko sprawdzanie się skończy.
+- Arkusz „Nowy folder na żywo” i „Edytuj folder na żywo” pokazuje ikonę folderu tak jak pasek boczny: ikonę GitHuba dla listy z GitHuba, ikonę witryny dla kanału albo wybraną przez Ciebie. Kliknij ją, aby zmienić ikonę jak przez „Zmień ikonę…”, a nowy folder zachowa wybraną ikonę.
+
+### Naprawiono
+- Menu folderu na żywo otwarte w trakcie aktualizacji zmienia się teraz z „Aktualizowanie…” na „Zaktualizowano przed chwilą” albo na powód, dla którego nie udało się odświeżyć, bez zamykania.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.

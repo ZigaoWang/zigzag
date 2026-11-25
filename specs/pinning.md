@@ -131,8 +131,14 @@
   Test: LiveFoldersTests.itSaysWhenItWasLastUpdated
 - Refresh Now in a live folder's menu → it fetches at once, and its menu says Updating… until it's done.
   Test: SidebarRowMenuTests.aLiveFoldersMenuSaysWhenItWasUpdated
+- A live folder's menu open while it fetches → its first line follows the fetch without the menu closing, Updating… then Updated Just Now, or Couldn’t Refresh with Try Again; Mark All as Read turns on when new pages come; the item under the keys stays lit.
+  Test: SidebarRowMenuTests.anOpenLiveFoldersMenuFollowsItsFetch
+- While a live folder fetches → the chip on its icon's corner shows a turning ring in place of the feed mark, standing still with Reduce Motion, and the feed mark again the moment the fetch ends, done or failed; nothing turns while it's idle.
+  Test: SidebarRowMenuTests.aLiveFoldersRowSpinsOnlyWhileItFetches
 - The New and Edit Live Folder sheet → the source first (address, or username then list), then name and count, each control as wide as the fields; a note under them says what the folder shows and that it checks every 30 minutes, hourly in Low Power Mode; an empty name shows the name it will get; a username GitHub can't have is marked and keeps the button off.
   Test: SidebarRowMenuTests.theLiveFolderSheetSaysWhatItShowsAndHowOften
+- The New and Edit Live Folder sheet's icon → the folder's own, as its sidebar row shows it (a chosen icon, else its site's), the feed mark while a new one has no source yet; clicking it opens the grid Change Icon… opens, and the icon picked there is kept on Save or Add.
+  Test: SidebarRowMenuTests.theLiveFolderSheetsIconIsTheFoldersAndChangesIt
 
 ## Pinned tabs as tiles
 - Settings › Appearance › Pinned tabs as tiles, off by default → pinned pages are rows under the space's name.

@@ -4,6 +4,13 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
+### Novità
+- Mentre una cartella live cerca nuove pagine, il badge sulla sua icona mostra un anello che gira, come Mail mostra una casella mentre la controlla, e si ferma appena il controllo finisce.
+- Le finestre Nuova cartella live e Modifica cartella live mostrano l’icona della cartella, come la barra laterale: quella di GitHub per un elenco GitHub, quella del sito per un feed o quella che hai scelto. Fai clic per cambiare l’icona, come con Cambia icona…, e una nuova cartella mantiene l’icona scelta.
+
+### Correzioni
+- Il menu di una cartella live lasciato aperto durante l’aggiornamento ora passa da Aggiornamento in corso… ad Aggiornata proprio ora, o al motivo per cui non è stato possibile aggiornare, senza chiudersi.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, francese, spagnolo e russo; regole di download che trasferiscono il file salvato; cartelle live che dicono quando si sono aggiornate l’ultima volta; e niente più spazi di troppo quando scrivi in pinyin cinese e passi all’inglese.

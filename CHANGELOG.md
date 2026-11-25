@@ -7,6 +7,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
+### New
+- While a live folder checks for new pages, the chip on its icon shows a turning ring, the way Mail shows a mailbox being checked, and it stops the moment the check ends.
+- The New and Edit Live Folder sheet shows the folder's own icon, as the sidebar does: GitHub's for a GitHub list, the site's for a feed, or the one you chose. Click it to change the icon, as Change Icon… does, and a new folder keeps the icon you pick.
+
+- A live folder's menu left open while it updates now changes from Updating… to Updated Just Now, or to why it couldn't refresh, without closing it.
 
 ## [0.10.0] - 2026-11-25
 

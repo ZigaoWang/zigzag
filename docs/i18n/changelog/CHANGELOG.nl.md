@@ -4,6 +4,13 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
+### Nieuw
+- Terwijl een livemap op nieuwe pagina’s controleert, toont het badge op het pictogram een draaiende ring, zoals Mail een mailbox toont die wordt gecontroleerd, en die stopt zodra de controle klaar is.
+- Het venster Nieuwe livemap en Wijzig livemap toont het pictogram van de map, zoals de navigatiekolom: dat van GitHub voor een GitHub-lijst, dat van de website voor een feed, of het pictogram dat je koos. Klik erop om het pictogram te wijzigen, zoals met Wijzig pictogram…, en een nieuwe map houdt het gekozen pictogram.
+
+### Opgelost
+- Het menu van een livemap dat openblijft tijdens het bijwerken, gaat nu van Bezig met bijwerken… naar Zojuist bijgewerkt, of naar de reden waarom vernieuwen mislukte, zonder te sluiten.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans en Russisch; downloadregels die het bewaarde bestand doorgeven; livemappen die laten zien wanneer ze voor het laatst zijn bijgewerkt; en na Chinees Pinyin overschakelen naar Engels zonder losse spaties.

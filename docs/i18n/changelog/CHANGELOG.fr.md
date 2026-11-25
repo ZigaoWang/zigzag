@@ -4,6 +4,13 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Nouveautés
+- Pendant qu’un dossier dynamique cherche de nouvelles pages, la pastille de son icône affiche un anneau qui tourne, comme Mail montre une boîte en cours de relève, et s’arrête dès que c’est fini.
+- La feuille Nouveau dossier dynamique ou Modifier le dossier dynamique affiche l’icône du dossier, comme la barre latérale : celle de GitHub pour une liste GitHub, celle du site pour un flux, ou celle que vous avez choisie. Cliquez dessus pour changer l’icône, comme avec Modifier l’icône…, et un nouveau dossier garde l’icône choisie.
+
+### Corrections
+- Le menu d’un dossier dynamique laissé ouvert pendant sa mise à jour passe désormais de Mise à jour… à Mis à jour à l’instant, ou à la raison de l’échec, sans se fermer.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, au français, à l’espagnol et au russe ; des règles de téléchargement qui transfèrent le fichier enregistré ; des dossiers dynamiques qui indiquent leur dernière mise à jour ; et la saisie en pinyin chinois suivie d’un passage à l’anglais sans espaces parasites.

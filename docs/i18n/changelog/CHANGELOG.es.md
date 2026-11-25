@@ -4,6 +4,13 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
+### Nuevo
+- Mientras una carpeta dinámica busca páginas nuevas, la insignia de su icono muestra un anillo que gira, como Mail muestra un buzón mientras lo comprueba, y se detiene en cuanto termina.
+- Las ventanas Nueva carpeta dinámica y Editar carpeta dinámica muestran el icono de la carpeta, como la barra lateral: el de GitHub para una lista de GitHub, el del sitio para un feed o el que elegiste. Haz clic en él para cambiar el icono, como con Cambiar icono…, y una carpeta nueva conserva el icono que elijas.
+
+### Correcciones
+- El menú de una carpeta dinámica abierto mientras se actualiza ahora pasa de Actualizando… a Actualizado ahora mismo, o al motivo por el que no se pudo actualizar, sin cerrarse.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés, el español y el ruso; reglas de descarga que envían el archivo guardado; carpetas dinámicas que dicen cuándo se actualizaron por última vez, y escribir en pinyin chino y pasar al inglés sin espacios de más.

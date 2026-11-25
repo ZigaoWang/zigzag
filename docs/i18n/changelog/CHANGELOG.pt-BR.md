@@ -4,6 +4,13 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ## [Unreleased]
 
+### Novo
+- Enquanto uma pasta dinâmica procura páginas novas, o selo no ícone dela mostra um anel girando, como o Mail mostra uma caixa sendo verificada, e para assim que a verificação termina.
+- As janelas Nova pasta dinâmica e Editar pasta dinâmica mostram o ícone da pasta, como a barra lateral: o do GitHub para uma lista do GitHub, o do site para um feed ou o que você escolheu. Clique nele para mudar o ícone, como em Alterar ícone…, e uma pasta nova fica com o ícone escolhido.
+
+### Corrigido
+- O menu de uma pasta dinâmica deixado aberto durante a atualização agora passa de Atualizando… para Atualizada agora mesmo, ou para o motivo de não ter sido possível atualizar, sem fechar.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanhol e russo; regras de download que entregam o arquivo salvo; pastas dinâmicas que mostram quando foram atualizadas pela última vez; e digitar em pinyin chinês e mudar para o inglês sem espaços sobrando.

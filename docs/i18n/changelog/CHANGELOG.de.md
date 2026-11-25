@@ -4,6 +4,13 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 
 ## [Unreleased]
 
+### Neu
+- Während ein Live-Ordner nach neuen Seiten sucht, zeigt der Chip an seinem Symbol einen drehenden Ring, so wie Mail ein Postfach beim Abrufen zeigt, und hört auf, sobald die Suche fertig ist.
+- Das Fenster „Neuer Live-Ordner“ bzw. „Live-Ordner bearbeiten“ zeigt das Symbol des Ordners wie die Seitenleiste: das von GitHub für eine GitHub-Liste, das der Website für einen Feed oder das, das du gewählt hast. Klicke darauf, um das Symbol wie mit „Symbol ändern …“ zu ändern, und ein neuer Ordner behält das gewählte Symbol.
+
+### Behoben
+- Das Menü eines Live-Ordners, das beim Aktualisieren offen bleibt, wechselt jetzt von „Wird aktualisiert …“ zu „Gerade aktualisiert“ oder zum Grund, warum es nicht geklappt hat, ohne sich zu schließen.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, Französisch, Spanisch und Russisch; Downloadregeln, die die gesicherte Datei übergeben; Live-Ordner, die zeigen, wann sie zuletzt aktualisiert wurden; und chinesisches Pinyin tippen und dann zu Englisch wechseln, ohne dass Leerzeichen übrig bleiben.

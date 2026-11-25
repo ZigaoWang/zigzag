@@ -4,6 +4,13 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ## [Unreleased]
 
+### Yeni Özellikler
+- Canlı klasör yeni sayfaları denetlerken simgesindeki rozet, Mail’in denetlenen bir posta kutusunu gösterdiği gibi dönen bir halka gösterir ve denetim biter bitmez durur.
+- “Yeni Canlı Klasör” ve “Canlı Klasörü Düzenle” penceresi klasörün simgesini kenar çubuğundaki gibi gösterir: GitHub listesi için GitHub’ınkini, akış için sitenin simgesini veya seçtiğiniz simgeyi. Simgeyi “Simgeyi Değiştir…” ile olduğu gibi değiştirmek için üzerine tıklayın; yeni klasör seçtiğiniz simgeyi korur.
+
+### Düzeltmeler
+- Güncellenirken açık bırakılan canlı klasör menüsü artık kapanmadan “Güncelleniyor…” durumundan “Az Önce Güncellendi” durumuna veya neden yenilenemediğine geçer.
+
 ## [0.10.0] - 2026-11-25
 
 Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç yeni dilde Zigzag; kaydedilen dosyayı devreden indirme kuralları; en son ne zaman güncellendiğini gösteren canlı klasörler; ve Çince Pinyin yazarken İngilizceye geçince fazladan boşluk kalmaması.
