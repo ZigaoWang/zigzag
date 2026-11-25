@@ -13,7 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
-- 下载规则可以转交文件而不是地址：把“转交”设为“文件”，Zigzag 会先用网页的登录状态下载，再把保存好的文件交给 App、脚本或服务。链接仍然转交地址；转交文件时，模板可以用 {file} 或 {file_url} 取得保存的文件。([#530](https://github.com/ZigaoWang/zigzag/pull/530))
+- 下载规则可以转交文件而不是地址：把“转交”设为“文件”，Zigzag 会先用网页的登录状态下载，再把保存好的文件交给 App、脚本或服务。链接仍然转交地址；转交文件时，模板可以用 {file} 或 {file_url} 取得保存的文件。感谢 [Lakeland97](https://github.com/Lakeland97)。([#529](https://github.com/ZigaoWang/zigzag/issues/529))
 
 ### 修复
 - 网页上打开 Zigzag Mini 时，在变暗的网页上滚动不会再把后面的网页滚走。感谢 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
