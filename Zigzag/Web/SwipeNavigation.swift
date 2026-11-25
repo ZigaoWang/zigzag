@@ -585,6 +585,8 @@ final class SwipeNavigator {
         if let card {
             card.setSwipeOffset(offset)
         } else {
+            // A spring back from the last swipe still running would hide this one's movement.
+            webView.layer?.removeAnimation(forKey: "swipe.settle")
             Tokens.Motion.withoutAnimation { webView.layer?.setAffineTransform(CGAffineTransform(translationX: offset, y: 0)) }
         }
         let page = overlay.convert(webView.bounds, from: webView)
