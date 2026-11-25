@@ -12,6 +12,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 新功能
+- 从屏幕边缘拉出的侧边栏现在可以预览网页。把指针停在标签页、分屏或平铺组上，它正在显示的那个网页就会出现在侧边栏旁边，和在网页上方打开的是同一个 Zigzag Mini，并从侧边栏一侧滑出。点一下会保留这个网页，把键盘交给它；移到别的页面会用同样的折叠效果换页；把指针移开，网页就会收起。Zigzag 自己的页面（比如设置和历史记录）只能在浏览器窗口中使用，所以页面区域会显示这条说明，并提供一个返回按钮。在面板里切换空间时，预览也会跟着换。感谢 [Lakeland97](https://github.com/Lakeland97)。([#365](https://github.com/ZigaoWang/zigzag/issues/365))
+
 ### 修复
 - 网页上打开 Zigzag Mini 时，在变暗的网页上滚动不会再把后面的网页滚走。感谢 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 

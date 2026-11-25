@@ -9,6 +9,9 @@
 
 ## [Unreleased]
 
+### 新功能
+- 從螢幕邊緣拉出的側邊欄現在可以預覽網頁。把指標停在分頁、分割顯示或平鋪群組上，它正在顯示的那個網頁就會出現在側邊欄旁邊，和在網頁上方開啟的是同一個 Zigzag Mini，並從側邊欄一側滑出。按一下會保留這個網頁，把鍵盤交給它；移到別的頁面會用同樣的折疊效果換頁；把指標移開，網頁就會收起。Zigzag 自己的頁面（例如設定和瀏覽記錄）只能在瀏覽器視窗中使用，所以頁面區域會顯示這則說明，並提供一個返回按鈕。在面板裡切換空間時，預覽也會跟著換。感謝 [Lakeland97](https://github.com/Lakeland97)。([#365](https://github.com/ZigaoWang/zigzag/issues/365))
+
 ### 修正
 - 網頁上開啟 Zigzag Mini 時，在變暗的網頁上捲動不會再把後面的網頁捲走。感謝 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 

@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- The sidebar from the screen edge previews pages now. Rest the pointer on a tab, a split view or a group of tiles and its live page comes in beside the sidebar — the same Mini that opens over a page — sliding out from the sidebar's side. A click keeps the page and gives it the keyboard, another row swaps it with the same fold, and moving the pointer away puts it back. Zigzag's own pages, like Settings and History, can only work in the browser window, so the page area says so and offers a button back to them. Switching spaces moves the preview with the list. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365))
+
 ### Fixed
 - With Zigzag Mini open over a page, scrolling over the dimmed page no longer moves the page behind it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
 
