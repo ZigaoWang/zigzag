@@ -1353,6 +1353,92 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("__other").toBool() == false)
     }
 
+    @Test func optionalNativeMessagingIsHeldOnlyAsThePersonAllowedIt() {
+        // WebKit grants native messaging to every extension for Zigzag's bridge; Bitwarden lists it as optional and
+        // asks for it before Touch ID unlock, so Zigzag answers for it (#484).
+        let page = Self.workerWorld(worker: false, setup: """
+        var __webkit = [];
+        chrome.permissions = {
+          contains: (q) => { __webkit.push('contains ' + (q.permissions || []).join('+')); return Promise.resolve(true); },
+          request: (q) => { __webkit.push('request ' + (q.permissions || []).join('+')); return Promise.resolve(true); },
+          remove: (q) => { __webkit.push('remove ' + (q.permissions || []).join('+')); return Promise.resolve(true); },
+          getAll: () => Promise.resolve({ permissions: ['storage', 'nativeMessaging'], origins: [] }),
+        };
+        var __held = false, __zigzag = [];
+        globalThis.__zigzagNativeHosts = {
+          held: () => Promise.resolve(__held),
+          request: () => { __zigzag.push('request'); __held = true; return Promise.resolve(true); },
+          remove: () => { __zigzag.push('remove'); const was = __held; __held = false; return Promise.resolve(was); },
+        };
+        """)
+        page.evaluateScript("""
+        chrome.permissions.contains({ permissions: ['nativeMessaging'] }).then((v) => { globalThis.__before = v; });
+        chrome.permissions.getAll().then((all) => { globalThis.__allBefore = all.permissions.join('+'); });
+        """)
+        #expect(page.evaluateScript("__before").toBool() == false)
+        #expect(page.evaluateScript("__allBefore").toString() == "storage")
+        #expect(page.evaluateScript("__webkit.length").toInt32() == 0)
+        // Asked for: Zigzag's sheet answers, WebKit isn't asked; then it's held, and the rest still goes to WebKit.
+        page.evaluateScript("""
+        chrome.permissions.request({ permissions: ['nativeMessaging'] }, (v) => { globalThis.__granted = v; });
+        """)
+        #expect(page.evaluateScript("__granted").toBool() == true)
+        #expect(page.evaluateScript("__zigzag.join()").toString() == "request")
+        page.evaluateScript("""
+        chrome.permissions.contains({ permissions: ['nativeMessaging', 'tabs'] }).then((v) => { globalThis.__after = v; });
+        chrome.permissions.getAll((all) => { globalThis.__allAfter = all.permissions.join('+'); });
+        """)
+        #expect(page.evaluateScript("__after").toBool() == true)
+        #expect(page.evaluateScript("__allAfter").toString() == "storage+nativeMessaging")
+        #expect(page.evaluateScript("__webkit.join()").toString() == "contains tabs")
+        // Removed: no longer held, and WebKit keeps its grant for the bridge.
+        page.evaluateScript("""
+        chrome.permissions.remove({ permissions: ['nativeMessaging'] }).then((v) => { globalThis.__removed = v; });
+        chrome.permissions.contains({ permissions: ['nativeMessaging'] }).then((v) => { globalThis.__gone = v; });
+        """)
+        #expect(page.evaluateScript("__removed").toBool() == true)
+        #expect(page.evaluateScript("__gone").toBool() == false)
+        #expect(page.evaluateScript("__webkit.join()").toString() == "contains tabs")
+        // Other permissions are WebKit's as before.
+        page.evaluateScript("chrome.permissions.request({ permissions: ['tabs'] }).then((v) => { globalThis.__tabs = v; });")
+        #expect(page.evaluateScript("__tabs").toBool() == true)
+        #expect(page.evaluateScript("__webkit.join()").toString() == "contains tabs,request tabs")
+    }
+
+    @Test func theBridgeAnswersForNativeMessagingOnlyWhenItIsOptional() {
+        let bridged = { (manifest: String) -> JSContext in
+            let context = JSContext()!
+            context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+            context.evaluateScript("""
+            var setTimeout = () => 0, clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+            var console = { log: () => {}, warn: () => {}, error: () => {} };
+            const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false });
+            var __sent = [];
+            var chrome = { runtime: { id: 'x', getManifest: () => (\(manifest)), onMessage: event(), onConnect: event(),
+              sendNativeMessage: (host, m) => { if (host === 'zigzag.bridge') __sent.push(m.ns + '.' + m.fn); return Promise.resolve({ value: true }); },
+              connectNative: () => ({ onMessage: event(), onDisconnect: event(), postMessage: () => {} }) } };
+            var browser = chrome;
+            """)
+            context.evaluateScript(ExtensionBridgeScript.source)
+            return context
+        }
+        let optional = bridged("{ manifest_version: 3, permissions: ['storage', 'nativeMessaging'], optional_permissions: ['nativeMessaging'] }")
+        optional.evaluateScript("__zigzagNativeHosts.held().then((v) => { globalThis.__held = v; }); __zigzagNativeHosts.request(); __zigzagNativeHosts.remove();")
+        #expect(optional.evaluateScript("__held").toBool() == true)
+        #expect(optional.evaluateScript("__sent.join()").toString() == "nativeHosts.held,nativeHosts.request,nativeHosts.remove")
+        let required = bridged("{ manifest_version: 3, permissions: ['nativeMessaging'] }")
+        #expect(required.evaluateScript("typeof __zigzagNativeHosts").toString() == "undefined")
+    }
+
+    @Test func nativeMessagingIsWebKitsToAnswerWithoutAnOptionalListing() {
+        // 1Password requires it outright: the bridge sets no stand-in, and WebKit's answer stands.
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.permissions = { contains: () => Promise.resolve(true), request: () => Promise.resolve(true) };
+        """)
+        page.evaluateScript("chrome.permissions.contains({ permissions: ['nativeMessaging'] }).then((v) => { globalThis.__held = v; });")
+        #expect(page.evaluateScript("__held").toBool() == true)
+    }
+
     @Test func webRequestListenersForMainFramesHearThem() {
         // WebKit's filters: only main_frame hears nothing, only sub_frame hears main frames too. Violentmonkey watches
         // main_frame for .user.js loads; it hears those and nothing else, as in Chrome.

@@ -115,6 +115,78 @@ struct SecurityFixesTests {
         #expect(NativeMessagingHost.manifest(named: "../arc/com.example.host", in: [first]) == nil)
     }
 
+    @Test func hostFoldersCoverWhereBitwardenWrites() {
+        let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
+        let paths = NativeMessagingHost.searchFolders(home: home).map(\.path)
+        let support = "/Users/someone/Library/Application Support/"
+        for browser in ["Google/Chrome", "Chromium", "Microsoft Edge", "BraveSoftware/Brave-Browser",
+                        "BraveSoftware/Brave-Browser-Beta", "BraveSoftware/Brave-Browser-Nightly", "Vivaldi"] {
+            #expect(paths.contains(support + browser + "/NativeMessagingHosts"), "\(browser)")
+        }
+    }
+
+    @Test func aStaleManifestInOneFolderGivesWayToAWorkingOne() throws {
+        // An old app's manifest left in Chrome's folder, the current one in Edge's: the one that works is used (#484).
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("SecurityFixesTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let chrome = root.appendingPathComponent("chrome"), edge = root.appendingPathComponent("edge")
+        for dir in [chrome, edge] { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+        let program = root.appendingPathComponent("desktop_proxy")
+        try Data("#!/bin/sh\n".utf8).write(to: program)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: program.path)
+        let origin = "chrome-extension://\(id)/"
+        let manifest = { (path: String, origins: [String]) in
+            try JSONSerialization.data(withJSONObject: ["name": "com.8bit.bitwarden", "path": path, "type": "stdio", "allowed_origins": origins])
+        }
+        try manifest(root.appendingPathComponent("gone").path, [origin]).write(to: chrome.appendingPathComponent("com.8bit.bitwarden.json"))
+        try manifest(program.path, [origin]).write(to: edge.appendingPathComponent("com.8bit.bitwarden.json"))
+        #expect(NativeMessagingHost.host(named: "com.8bit.bitwarden", for: id, in: [chrome, edge])?.executable.path == program.standardizedFileURL.path)
+        // One that doesn't list this extension gives way too; none that works is no host.
+        try manifest(program.path, ["chrome-extension://other/"]).write(to: chrome.appendingPathComponent("com.8bit.bitwarden.json"))
+        #expect(NativeMessagingHost.host(named: "com.8bit.bitwarden", for: id, in: [chrome, edge]) != nil)
+        #expect(NativeMessagingHost.host(named: "com.8bit.bitwarden", for: id, in: [chrome]) == nil)
+        #expect(NativeMessagingHost.host(named: "../edge/com.8bit.bitwarden", for: id, in: [chrome]) == nil)
+    }
+
+    @Test func aHostIsStartedAsChromeStartsOne() async throws {
+        // A fake host speaking Chrome's protocol: it answers with what it was started with and echoes the message.
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SecurityFixesTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let program = folder.appendingPathComponent("fake_host")
+        try Data(#"""
+        #!/usr/bin/perl
+        use strict; use Cwd;
+        binmode STDIN; binmode STDOUT; $| = 1;
+        read(STDIN, my $length, 4) == 4 or exit 1;
+        read(STDIN, my $body, unpack("L<", $length));
+        my $reply = '{"args":' . scalar(@ARGV) . ',"origin":"' . $ARGV[0] . '","cwd":"' . getcwd() . '","echo":' . $body . '}';
+        print pack("L<", length($reply)) . $reply;
+        """#.utf8).write(to: program)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: program.path)
+        let origin = "chrome-extension://\(id)/"
+        let host = NativeMessagingHost(executable: program, origin: origin, extensionID: id)
+        let data: Data = try await withCheckedThrowingContinuation { continuation in
+            host.sendOnce(["command": "probe", "n": 1]) { response, error in
+                if let error { continuation.resume(throwing: error); return }
+                continuation.resume(returning: (try? JSONSerialization.data(withJSONObject: response ?? [:])) ?? Data())
+            }
+        }
+        let reply = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(reply["args"] as? Int == 1)
+        #expect(reply["origin"] as? String == origin)
+        #expect((reply["cwd"] as? String).map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path } == folder.resolvingSymlinksInPath().path)
+        #expect((reply["echo"] as? [String: Any])?["command"] as? String == "probe")
+    }
+
+    @Test func optionalNativeMessagingIsAskedForOnlyAfterAUse() {
+        // Held already: yes without asking. Asked for with no recent use, or never listed as optional: no.
+        #expect(ExtensionHost.nativeHostsAnswer(optional: true, allowed: true, recentGesture: false) == true)
+        #expect(ExtensionHost.nativeHostsAnswer(optional: true, allowed: false, recentGesture: true) == nil)
+        #expect(ExtensionHost.nativeHostsAnswer(optional: true, allowed: false, recentGesture: false) == false)
+        #expect(ExtensionHost.nativeHostsAnswer(optional: false, allowed: true, recentGesture: true) == false)
+    }
+
     @Test func extensionSiteRequestsStayWithinAccess() throws {
         let pattern = { (s: String) in try WKWebExtension.MatchPattern(string: s) }
         let all = try pattern("<all_urls>")
