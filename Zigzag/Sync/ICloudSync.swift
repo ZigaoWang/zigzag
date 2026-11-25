@@ -1,5 +1,6 @@
 import AppKit
 import CloudKit
+import Network
 import os
 
 /// Settings › General › Sync with iCloud: spaces, profiles, pinned pages, folders, favorites, live folders and
@@ -57,10 +58,16 @@ final class ICloudSync {
     private var timer: Timer?
     private var lastFetch = Date.distantPast
     private var connecting = false
+    /// A fetch or send that failed is tried again on its own.
+    let retry = SyncRetry()
+    private var network: NWPathMonitor?
+    private var reachable: Bool?
 
     private static var stateFile: URL { Paths.directory("Sync").appendingPathComponent("State.json") }
 
-    private init() {}
+    private init() {
+        retry.onRetry = { [weak self] in self?.tryAgain() }
+    }
 
     // MARK: Starting and stopping
 
@@ -143,6 +150,9 @@ final class ICloudSync {
         observers = []
         timer?.invalidate()
         timer = nil
+        network?.cancel()
+        network = nil
+        retry.reset()
     }
 
     /// Checks the account before anything goes up: a different one than before pauses until sync is turned on again.
@@ -156,9 +166,10 @@ final class ICloudSync {
         do {
             switch try await container.accountStatus() {
             case .available: break
+            // Signing in, or iCloud allowed again, posts CKAccountChanged.
             case .noAccount: status = .notSignedIn; return
             case .restricted: status = .restricted; return
-            default: status = .offline; return
+            default: status = .offline; retry.failed(nil); return
             }
             let user = try await container.userRecordID().recordName
             guard let session, isOn else { return }
@@ -168,10 +179,10 @@ final class ICloudSync {
             self.engine = engine
             session.server = engine
             engine.start()
-            if !session.state.merged { await firstFetch() }
+            if !session.state.merged { await firstFetch() } else { retry.succeeded() }
         } catch {
             Self.log.error("connecting failed: \(error.localizedDescription, privacy: .public)")
-            status = Self.status(for: error) ?? .offline
+            failed(error)
         }
     }
 
@@ -184,11 +195,53 @@ final class ICloudSync {
             session.fetchFinished()
             UserDefaults.standard.set(true, forKey: Self.copyKey)
             status = .synced(session.state.lastSynced)
-            try? await engine.send()
+            retry.succeeded()
+            await send()
         } catch {
             Self.log.error("first fetch failed: \(error.localizedDescription, privacy: .public)")
-            status = Self.status(for: error) ?? .offline
+            guard self.session === session else { return }
+            failed(error)
         }
+    }
+
+    @discardableResult
+    private func fetch() async -> Bool {
+        guard let engine, let session else { return false }
+        do {
+            try await engine.fetch()
+            retry.succeeded()
+            return true
+        } catch {
+            Self.log.error("fetching failed: \(error.localizedDescription, privacy: .public)")
+            if self.session === session { failed(error) }
+            return false
+        }
+    }
+
+    private func send() async {
+        guard let engine, let session else { return }
+        do {
+            try await engine.send()
+        } catch {
+            Self.log.error("sending failed: \(error.localizedDescription, privacy: .public)")
+            guard self.session === session else { return }
+            failed(error)
+        }
+    }
+
+    /// The status for a failure, and the next try unless waiting won't help.
+    private func failed(_ error: Error) {
+        status = Self.status(for: error) ?? (SyncRetry.isPermanent(error) ? .failed(error.localizedDescription) : .offline)
+        retry.failed(error)
+    }
+
+    /// What failed is tried again: connecting, the first sync, or a fetch and what's waiting to go up.
+    private func tryAgain() {
+        guard isOn, let session else { return }
+        lastFetch = Date()
+        guard engine != nil else { Task { await connect() }; return }
+        guard session.state.merged else { Task { await firstFetch() }; return }
+        Task { if await fetch() { await send() } }
     }
 
     private func watchLibrary() {
@@ -205,7 +258,11 @@ final class ICloudSync {
             NotificationCenter.default.addObserver(forName: .CKAccountChanged, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.accountChanged() }
             },
+            NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.retry.soon() }
+            },
         ]
+        watchNetwork()
         timer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.fetchSoon(after: 5 * 60) }
         }
@@ -221,9 +278,25 @@ final class ICloudSync {
         guard let session, Date().timeIntervalSince(lastFetch) > seconds else { return }
         lastFetch = Date()
         // Not connected yet (signed out, offline at launch), or the first sync didn't finish: tried again.
-        guard let engine else { Task { await connect() }; return }
+        guard engine != nil else { Task { await connect() }; return }
         guard session.state.merged else { Task { await firstFetch() }; return }
-        Task { try? await engine.fetch() }
+        Task { await fetch() }
+    }
+
+    /// The network coming back tries again at once.
+    private func watchNetwork() {
+        let monitor = NWPathMonitor()
+        reachable = nil
+        monitor.pathUpdateHandler = { [weak self] path in
+            let now = path.status == .satisfied
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if now, self.reachable == false { self.retry.soon() }
+                self.reachable = now
+            }
+        }
+        monitor.start(queue: .main)
+        network = monitor
     }
 
     // MARK: Saving the state
@@ -256,6 +329,7 @@ final class ICloudSync {
 
     fileprivate func accountChanged() {
         // Signed out or another account: nothing more goes up or comes down; the library here stays.
+        retry.reset()
         engine?.stop()
         engine = nil
         session?.server = nil
@@ -286,10 +360,107 @@ final class ICloudSync {
         switch error.code {
         case .notAuthenticated: return .notSignedIn
         case .quotaExceeded: return .full
-        case .networkFailure, .networkUnavailable, .serviceUnavailable, .requestRateLimited, .zoneBusy: return .offline
+        case .networkFailure, .networkUnavailable, .serviceUnavailable, .requestRateLimited, .zoneBusy,
+             .serverRejectedRequest, .internalError, .serverResponseLost: return .offline
         case .managedAccountRestricted: return .restricted
         default: return nil
         }
+    }
+}
+
+// MARK: - Trying again
+
+/// A fetch or send that failed is tried again: after 30 seconds, then twice as long each time up to 30 minutes, a
+/// little sooner at random so Macs don't all ask at once, and never sooner than iCloud asks. The network coming back
+/// or the Mac waking tries at once. An error that waiting won't fix waits for one of those, or for the account.
+final class SyncRetry {
+    static let first: TimeInterval = 30
+    static let longest: TimeInterval = 30 * 60
+    /// A try at once still waits this long after the last, so a flapping network isn't a loop.
+    static let shortest: TimeInterval = 5
+
+    /// Runs the work after the delay and returns what cancels it; tests run it by hand.
+    var schedule: (TimeInterval, @escaping @MainActor () -> Void) -> () -> Void = { delay, work in
+        let item = DispatchWorkItem { MainActor.assumeIsolated { work() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+        return { item.cancel() }
+    }
+    /// A share of the wait, from 0.8 to 1.
+    var jitter: () -> Double = { .random(in: 0.8...1) }
+    var now: () -> Date = Date.init
+    /// The try itself.
+    var onRetry: (() -> Void)?
+
+    /// Failures in a row since the last success.
+    private(set) var failures = 0
+    /// Stopped by an error waiting won't fix.
+    private(set) var isStopped = false
+    private var cancelPending: (() -> Void)?
+    private var lastTry = Date.distantPast
+    var isWaiting: Bool { cancelPending != nil }
+
+    /// The wait before the next try after `failures` failures in a row.
+    static func delay(afterFailures failures: Int, retryAfter: TimeInterval? = nil, jitter: Double = 1) -> TimeInterval {
+        let doubled = first * pow(2, Double(max(0, min(failures - 1, 16))))
+        return max(min(doubled, longest) * jitter, retryAfter ?? 0)
+    }
+
+    /// Waiting won't fix these: they show their status and wait for the account, the network or a wake.
+    static func isPermanent(_ error: Error) -> Bool {
+        guard let error = error as? CKError else { return false }
+        switch error.code {
+        case .notAuthenticated, .managedAccountRestricted, .quotaExceeded, .incompatibleVersion, .badContainer,
+             .badDatabase, .missingEntitlement, .permissionFailure:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// After a failure (nil for one without an error, like an account iCloud can't check yet): the wait before the
+    /// next try, or nil when there's none.
+    @discardableResult
+    func failed(_ error: Error?) -> TimeInterval? {
+        cancel()
+        if let error, Self.isPermanent(error) {
+            isStopped = true
+            return nil
+        }
+        isStopped = false
+        failures += 1
+        let delay = Self.delay(afterFailures: failures, retryAfter: (error as? CKError)?.retryAfterSeconds, jitter: jitter())
+        wait(delay)
+        return delay
+    }
+
+    func succeeded() {
+        cancel()
+        failures = 0
+        isStopped = false
+    }
+
+    /// The network came back or the Mac woke: what failed is tried now, without starting the waits over.
+    func soon() {
+        guard failures > 0 || isStopped else { return }
+        cancel()
+        wait(max(0, Self.shortest - now().timeIntervalSince(lastTry)))
+    }
+
+    /// Sync turned off or started again: nothing waits.
+    func reset() { succeeded() }
+
+    private func wait(_ delay: TimeInterval) {
+        cancelPending = schedule(delay) { [weak self] in
+            guard let self else { return }
+            self.cancelPending = nil
+            self.lastTry = self.now()
+            self.onRetry?()
+        }
+    }
+
+    private func cancel() {
+        cancelPending?()
+        cancelPending = nil
     }
 }
 
@@ -446,6 +617,7 @@ final class CloudEngine: SyncServer, CKSyncEngineDelegate {
         case .didFetchChanges:
             guard session.state.merged else { break }
             session.fetchFinished()
+            owner?.retry.succeeded()
             owner?.engineEvent(.synced(session.state.lastSynced))
         case .didSendChanges:
             if session.state.merged, owner?.status == .syncing { owner?.engineEvent(.synced(session.state.lastSynced)) }

@@ -1,4 +1,5 @@
 import AppKit
+import CloudKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -69,6 +70,8 @@ import Testing
     let session: SyncSession
     let cloud: FakeCloud
     var online = true
+    /// Syncs that fail before one gets through, as iCloud refusing them (HTTP 500).
+    var failing = 0
     private var token = 0
     private(set) var saves: [String] = []
     private(set) var deletes: [String] = []
@@ -112,6 +115,15 @@ import Testing
             if saves.isEmpty && deletes.isEmpty { return }
             send()
         }
+    }
+
+    /// A sync that throws while iCloud refuses it.
+    func trySync() throws {
+        if failing > 0 {
+            failing -= 1
+            throw CKError(.serverRejectedRequest)
+        }
+        sync()
     }
 
     func fetch() {
@@ -827,5 +839,120 @@ extension SyncLibrary {
         b.sync()
         #expect(b.library.space(named: "Personal")?.bookmarks[500].title == "Changed")
         #expect(Date().timeIntervalSince(start) < 20)
+    }
+
+    // MARK: Trying again
+
+    /// A retry whose waits are noted and run by hand.
+    private final class Waits {
+        var delays: [TimeInterval] = []
+        var pending: (() -> Void)?
+        func runAll() { while let work = pending { pending = nil; work() } }
+    }
+
+    private func makeRetry(_ waits: Waits) -> SyncRetry {
+        let retry = SyncRetry()
+        retry.jitter = { 1 }
+        retry.schedule = { [waits] delay, work in
+            waits.delays.append(delay)
+            waits.pending = work
+            return { [weak waits] in waits?.pending = nil }
+        }
+        return retry
+    }
+
+    @Test func aFirstSyncICloudRefusesIsTriedAgainUntilItGoesThrough() {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        a.failing = 4
+        let waits = Waits()
+        let retry = makeRetry(waits)
+        retry.onRetry = {
+            do { try a.trySync(); retry.succeeded() } catch { retry.failed(error) }
+        }
+        retry.onRetry?()
+        #expect(!a.session.state.merged)
+        #expect(retry.isWaiting)
+        waits.runAll()
+        #expect(waits.delays == [30, 60, 120, 240])
+        #expect(a.session.state.merged)
+        #expect(!cloud.records.isEmpty)
+        #expect(retry.failures == 0 && !retry.isWaiting)
+    }
+
+    @Test func theWaitDoublesUpToHalfAnHourAndIsNeverSoonerThanICloudAsks() {
+        #expect((1...8).map { SyncRetry.delay(afterFailures: $0) } == [30, 60, 120, 240, 480, 960, 1800, 1800])
+        #expect(SyncRetry.delay(afterFailures: 1000) == 1800)
+        #expect(SyncRetry.delay(afterFailures: 1, jitter: 0.8) == 24)
+        #expect(SyncRetry.delay(afterFailures: 1, retryAfter: 300) == 300)
+        #expect(SyncRetry.delay(afterFailures: 7, retryAfter: 300) == 1800)
+        let waits = Waits()
+        let retry = makeRetry(waits)
+        retry.failed(CKError(.requestRateLimited, userInfo: [CKErrorRetryAfterKey: NSNumber(value: 600.0)]))
+        #expect(waits.delays == [600])
+    }
+
+    @Test func iCloudRefusingOrLosingARequestShowsItTriesAgain() {
+        for code in [CKError.Code.serverRejectedRequest, .internalError, .serverResponseLost, .networkFailure, .serviceUnavailable] {
+            #expect(ICloudSync.status(for: CKError(code)) == .offline)
+            #expect(!SyncRetry.isPermanent(CKError(code)))
+        }
+        #expect(SyncSettingsRows.describe(.offline, hasCopy: true).text
+                == String(localized: "Can’t reach iCloud. Zigzag tries again.", comment: "Status under Sync with iCloud in Settings › General: no connection, or iCloud is busy."))
+    }
+
+    @Test func anErrorWaitingWontFixWaitsForTheAccountOrNetwork() {
+        let waits = Waits()
+        let retry = makeRetry(waits)
+        for code in [CKError.Code.notAuthenticated, .managedAccountRestricted, .quotaExceeded, .incompatibleVersion, .badContainer] {
+            #expect(SyncRetry.isPermanent(CKError(code)))
+            #expect(retry.failed(CKError(code)) == nil)
+            #expect(!retry.isWaiting && retry.isStopped)
+        }
+        #expect(waits.delays.isEmpty)
+        #expect(ICloudSync.status(for: CKError(.notAuthenticated)) == .notSignedIn)
+        #expect(ICloudSync.status(for: CKError(.quotaExceeded)) == .full)
+        #expect(ICloudSync.status(for: CKError(.managedAccountRestricted)) == .restricted)
+        // The network coming back tries once more.
+        retry.soon()
+        #expect(waits.delays == [0])
+    }
+
+    @Test func theNetworkComingBackTriesAtOnceButNotInALoop() {
+        let waits = Waits()
+        let retry = makeRetry(waits)
+        var clock = Date(timeIntervalSince1970: 1_800_000_000)
+        retry.now = { clock }
+        var tries = 0
+        retry.onRetry = { tries += 1; retry.failed(CKError(.networkUnavailable)) }
+        // Nothing failed: nothing to try.
+        retry.soon()
+        #expect(waits.delays.isEmpty)
+        retry.failed(CKError(.networkUnavailable))
+        retry.failed(CKError(.networkUnavailable))
+        #expect(waits.delays == [30, 60])
+        retry.soon()
+        #expect(waits.delays.last == 0)
+        waits.pending?()
+        #expect(tries == 1)
+        // The waits go on from where they were.
+        #expect(waits.delays.last == 120)
+        // Back again two seconds after a try: the rest of the five seconds first.
+        clock += 2
+        retry.soon()
+        #expect(waits.delays.last == 3)
+        retry.reset()
+        #expect(!retry.isWaiting && retry.failures == 0)
+        retry.soon()
+        #expect(waits.delays.last == 3)
+    }
+
+    @Test func turningSyncOffStopsTryingAgain() {
+        let sync = ICloudSync.shared
+        guard !sync.isOn else { return }
+        sync.retry.failed(CKError(.networkUnavailable))
+        #expect(sync.retry.isWaiting)
+        sync.turnOff()
+        #expect(!sync.retry.isWaiting && sync.retry.failures == 0)
     }
 }

@@ -90,3 +90,11 @@
   Test: SyncTests.anotherAccountIsNeverSyncedWithoutAsking
 - iCloud full, unreachable or unavailable → says so in plain words; changes wait on this Mac.
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
+- iCloud unreachable or refusing a request (an outage, a flaky network, an account not ready yet) → Zigzag tries again on its own after 30 seconds, then twice as long each time up to 30 minutes, never sooner than iCloud asks; at once when the network comes back, the account changes or the Mac wakes. It stops when sync is turned off.
+  Test: SyncTests.aFirstSyncICloudRefusesIsTriedAgainUntilItGoesThrough
+  Test: SyncTests.theWaitDoublesUpToHalfAnHourAndIsNeverSoonerThanICloudAsks
+  Test: SyncTests.iCloudRefusingOrLosingARequestShowsItTriesAgain
+  Test: SyncTests.theNetworkComingBackTriesAtOnceButNotInALoop
+  Test: SyncTests.turningSyncOffStopsTryingAgain
+- Not signed in, iCloud restricted, iCloud full, or a Zigzag iCloud can't take → says so and doesn't try again on its own until the account or the network changes, or the Mac wakes.
+  Test: SyncTests.anErrorWaitingWontFixWaitsForTheAccountOrNetwork
