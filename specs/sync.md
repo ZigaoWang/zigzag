@@ -1,0 +1,80 @@
+# Sync with iCloud
+
+## Turning it on and off
+- A new Zigzag, or one updated → Settings › General › Sync with iCloud is off, with nothing under it, and nothing touches iCloud.
+  Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
+- Turn on Sync with iCloud → a sheet says what syncs, what stays on this Mac, and that it merges; Continue turns it on, Cancel leaves it off.
+  No test yet.
+- Continue → a Zigzag backup of this Mac's library is saved in Backups first, then the first sync merges this Mac with iCloud.
+  Test: SyncTests.aBackupIsSavedBeforeTheFirstSync
+- Turn it off → everything stays on this Mac as it is, and iCloud keeps its copy.
+  No test yet.
+- Remove from iCloud…, then Remove → iCloud's copy is removed for every Mac and sync turns off; this Mac keeps everything. Another Mac syncing with it turns sync off too and keeps its own.
+  No test yet.
+
+## What syncs
+- Spaces → their name, color, glass, icon, order and profile.
+  Test: SyncTests.editsToDifferentThingsBothArrive
+- Profiles → their name, color and order, matched by name on a second Mac; never their sign-ins, history or other website data.
+  Test: SyncTests.profilesAndTheirFavoritesSync
+  Test: SyncTests.aSecondMacsProfileOfTheSameNameIsTheSameProfile
+- Pinned pages and folders → title, address, emoji or symbol, order, nesting, and whether a folder is open; a pinned split stays a split.
+  Test: SyncTests.foldersNestingIconsAndFoldStateSync
+  Test: SyncTests.aPinnedSplitStaysASplit
+- Favorites → each profile's, in their order.
+  Test: SyncTests.profilesAndTheirFavoritesSync
+- A live folder → its source, its count and its name, never the pages it fetched; each Mac fetches its own.
+  Test: SyncTests.aLiveFolderSyncsItsSourceNotItsPages
+- Settings → preferences about how Zigzag behaves, sites in spaces, and per-site choices like permissions, zaps and compatibility mode; never ones about this Mac (window sizes, the download folder, the update channel, debug switches) or what lets other apps in.
+  Test: SyncTests.onlyPreferencesTravelNeverWhatIsAboutThisMac
+- Open tabs, history, cookies and website data, passwords, extensions, downloads, picture icons and space pictures → stay on this Mac. Passwords sync through iCloud Keychain as before.
+  Test: SyncTests.onlyPreferencesTravelNeverWhatIsAboutThisMac
+
+## The first sync
+- A second Mac with its own library → merged, never replaced: a space of the same name on the same profile, a folder of the same name in the same place and a pinned page with the same address in the same place are one, as iCloud has them, and what's only on this Mac is added beside where it was.
+  Test: SyncTests.theFirstSyncMergesDuplicatesByNameAndAddress
+  Test: SyncTests.aSecondMacsFirstSpaceIsMatchedByNameNotCopied
+- Something iCloud doesn't have → added to iCloud, never removed from this Mac.
+  Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
+- Sync turned on again, or iCloud's copy reset → merged again, and nothing is added twice.
+  Test: SyncTests.turningSyncOnAgainAddsNothingTwice
+
+## Two Macs at once
+- Edits to different things on two Macs → both arrive on both.
+  Test: SyncTests.editsToDifferentThingsBothArrive
+- The same thing edited on two Macs → the later edit wins on both.
+  Test: SyncTests.theLastEditToOnePageWins
+- A page moved on one Mac while another pins a new one → both keep their places.
+  Test: SyncTests.aMoveAndAnInsertAtOnceBothKeepTheirPlaces
+- Preferences changed on two Macs → each keeps the later value of each preference.
+  Test: SyncTests.preferencesMeetKeyByKey
+- Edits made offline → sent when the Mac is back online, merged with what changed meanwhile.
+  Test: SyncTests.editsMadeOfflineArriveWhenBackOnline
+- Something removed on one Mac → removed on the other.
+  Test: SyncTests.removalsReachTheOtherMac
+- A folder removed on one Mac while a page is filed into it on another → the page stays, at the top level of its space.
+  Test: SyncTests.aPageAddedToAFolderRemovedElsewhereMovesToTheTopOfItsSpace
+- A space removed on one Mac while a page is pinned in it on another → the page stays, in the first space.
+  Test: SyncTests.aSpaceRemovedElsewhereKeepsAPageJustPinnedInIt
+- A page removed on one Mac while it's edited on another → the edited page comes back.
+  Test: SyncTests.aPageEditedHereComesBackWhenRemovedElsewhere
+- A profile removed on one Mac → removed on the other as removing it there does, its spaces moving to the first profile.
+  Test: SyncTests.profilesAndTheirFavoritesSync
+- Nothing changed → nothing is sent.
+  Test: SyncTests.onceSettledNothingMoreIsSent
+- A thousand pinned pages → sync without a wait, and one edit sends one record.
+  Test: SyncTests.aThousandPinnedPagesSyncQuickly
+- Records a newer Zigzag wrote → read, and their new fields and kinds are kept when this Mac edits or removes around them.
+  Test: SyncTests.olderAndNewerRecordsStillRead
+  Test: SyncTests.aNewerZigzagsFieldsSurviveAnEditHere
+  Test: SyncTests.aKindOnlyANewerZigzagKnowsIsLeftAlone
+
+## iCloud's state
+- Under the switch → Syncing…, Up to date, or Last synced and how long ago, with Remove from iCloud….
+  Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
+- Not signed in to iCloud → says so, with Open System Settings; nothing on this Mac changes.
+  Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
+- Signed in to a different iCloud account → sync stops and says so; this Mac's library is never sent to that account until sync is turned off and on again.
+  Test: SyncTests.anotherAccountIsNeverSyncedWithoutAsking
+- iCloud full, unreachable or unavailable → says so in plain words; changes wait on this Mac.
+  Test: SyncTests.theStatusLineSaysWhatSyncIsDoing

@@ -96,7 +96,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Downloads** | Send files of a type to a folder of their own, or open safe ones like PDFs once they're saved. Rules hand a link or a download to an app, a script or a download manager like aria2, asking you first. See [docs/download-rules.md](docs/download-rules.md). |
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
-| **Your data** | File › Export Your Data… saves your bookmarks as a standard HTML file any browser imports, and a full Zigzag backup you can restore on another Mac. |
+| **Your data** | Turn on Sync with iCloud in Settings › General, and your spaces, profiles, pinned tabs, favorites and settings are the same on every Mac signed in to your iCloud. File › Export Your Data… saves your bookmarks as a standard HTML file any browser imports, and a full Zigzag backup you can restore on another Mac. |
 | **Languages** | English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Italian, Spanish, Brazilian Portuguese, Russian, Dutch, Polish, and Turkish. |
 | **And** | Reader, PDF viewer, Handoff to your iPhone, iPad or other Mac, Capture of an area, a part of the page or the whole page (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
 
@@ -104,7 +104,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 
 It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc users will notice:
 
-- No sync between Macs or to iPhone. Passwords sync through iCloud Keychain; spaces and tabs don't.
+- No iPhone or iPad app. Spaces, pinned tabs, favorites and settings sync between Macs through iCloud, but open tabs and history stay on each Mac.
 - Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
 - No Easels or Notes, and Boosts are CSS only (Zap Element and Edit Style, no per-site scripts). No AI built into the browser: AI apps can use Zigzag over MCP only if you turn it on.
 - A few Chrome extension APIs aren't there yet: the tab groups API, debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work.
@@ -128,7 +128,7 @@ with macOS updates rather than from me.
 | **Cookie pop-ups** | DuckDuckGo's Autoconsent and its rules, bundled, in a script world of its own. |
 | **Passwords** | Saved as Keychain items, so iCloud Keychain syncs them and Touch ID unlocks them. Passkeys go through Apple's browser passkey entitlement. Autofill is a small content script that only fills fields you can see. |
 | **Import** | Reads each browser's own files: Arc's `StorableSidebar.json`, Chromium's bookmarks and SQLite history, Safari's `Bookmarks.plist`, Firefox's `places.sqlite`, Orion's `favourites.plist` and `history`. Chromium passwords are decrypted with the key from that browser's Keychain item, after macOS asks you. |
-| **Your data** | Spaces, pins and favorites in `Library.json`, profiles in `Profiles.json`, open tabs in `Session.json`, history in SQLite (one file per profile), all under `~/Library/Application Support/Zigzag`. Writes are debounced and atomic, and a file that can't be read is set aside, never overwritten. |
+| **Your data** | Spaces, pins and favorites in `Library.json`, profiles in `Profiles.json`, open tabs in `Session.json`, history in SQLite (one file per profile), all under `~/Library/Application Support/Zigzag`. Writes are debounced and atomic, and a file that can't be read is set aside, never overwritten. Sync with iCloud uses `CKSyncEngine`: each space, profile, pinned page, folder and favorite is a record in one zone of your iCloud's private database, the last edit wins per record, and the first sync on a Mac merges rather than replaces. |
 | **Reader** | Mozilla's Readability, run in the page, shown in Zigzag's own typography. |
 | **Web apps** | A site installed as an app is a small app of its own in `~/Applications/Zigzag Apps` that hands every launch to Zigzag, so the page runs in Zigzag with your sign-ins, extensions and blocking. |
 | **Updates** | Sparkle 2, with EdDSA-signed updates from zigzagbrowser.com, on a stable or a beta feed. Releases are signed with Developer ID and notarized. |
@@ -158,6 +158,10 @@ connections Zigzag makes on its own, apart from the pages you open:
   asks the store whether your extensions have updates, which sends their IDs and versions to Google.
 - **Setup.** The welcome screens show a few site icons from Google's icon service and load Wikipedia's front page
   as a preview.
+- **iCloud sync.** Off until you turn on Sync with iCloud in Settings › General. Then your spaces, profiles' names,
+  pinned tabs, folders, favorites, live folders' sources and settings go to the private database of your own iCloud
+  account, which only you can read; nothing goes to me. Open tabs, history, cookies, website data, extensions and
+  downloads stay on your Mac.
 
 Translation runs on your Mac, with Apple's on-device Translation. Fraudulent website warnings are WebKit's own,
 the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
