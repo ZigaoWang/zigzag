@@ -17,6 +17,8 @@ dd=build/dd
 logs=build/test-logs
 rm -rf "$logs" && mkdir -p "$logs"
 export TEST_RUNNER_ZIGZAG_TEST_VAULT=memory
+# Suites run in a process of their own with every string pseudo-localized from launch (docs/i18n/README.md).
+pseudo=(PseudoLocalizedLayoutTests)
 xcb=(xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -destination 'platform=macOS' -derivedDataPath "$dd")
 
 if ! "${xcb[@]}" build-for-testing -allowProvisioningUpdates > "$logs/build.log" 2>&1; then
@@ -26,18 +28,22 @@ fi
 
 # One list of -only-testing suites per worker, the slowest suites (by the last run's times) shared out first.
 if [ ${#only[@]} -gt 0 ]; then
-  printf '%s\n' "${only[@]}" | sed 's|^|-only-testing:ZigzagTests/|' | tr '\n' ' ' > "$logs/shard-0"
+  for suite in "${only[@]}"; do
+    if printf '%s\n' "${pseudo[@]}" | grep -qx "$suite"; then shard=shard-pseudo; else shard=shard-0; fi
+    printf -- '-only-testing:ZigzagTests/%s ' "$suite" >> "$logs/$shard"
+  done
 else
   "${xcb[@]}" test-without-building -enumerate-tests -test-enumeration-style flat -test-enumeration-format json \
     -test-enumeration-output-path "$logs/tests.json" > "$logs/enumerate.log" 2>&1 || { echo "couldn't list the tests"; exit 1; }
-  python3 -I - "$logs/tests.json" build/test-times "$workers" "$logs" <<'EOF'
+  python3 -I - "$logs/tests.json" build/test-times "$workers" "$logs" "${pseudo[@]}" <<'EOF'
 import json, os, sys
 tests, times_file, workers, logs = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+pseudo = sys.argv[5:]
 counts = {}
 for value in json.load(open(tests))["values"]:
     for test in value["enabledTests"]:
         suite = test["identifier"].split("/")[1]
-        counts[suite] = counts.get(suite, 0) + 1
+        if suite not in pseudo: counts[suite] = counts.get(suite, 0) + 1
 times = {}
 if os.path.exists(times_file):
     for line in open(times_file):
@@ -49,19 +55,23 @@ for suite in sorted(counts, key=lambda s: -times.get(s, 0.1 * counts[s])):
     shard[0] += times.get(suite, 0.1 * counts[suite])
     shard[1].append(suite)
 # The first worker runs everything the others don't, so a test -only-testing can't name still runs.
-others = [s for _, suites in shards[1:] for s in suites]
+others = [s for _, suites in shards[1:] for s in suites] + pseudo
 open(f"{logs}/shard-0", "w").write(" ".join(f"-skip-testing:ZigzagTests/{s}" for s in others))
+open(f"{logs}/shard-pseudo", "w").write(" ".join(f"-only-testing:ZigzagTests/{s}" for s in pseudo))
 for i, (_, suites) in enumerate(shards[1:], 1):
     if suites: open(f"{logs}/shard-{i}", "w").write(" ".join(f"-only-testing:ZigzagTests/{s}" for s in suites))
 EOF
 fi
 
 pids=()
-for shard in $(ls "$logs" | grep -E '^shard-[0-9]+$' | sed "s|^|$logs/|"); do
+for shard in $(ls "$logs" | grep -E '^shard-([0-9]+|pseudo)$' | sed "s|^|$logs/|"); do
+  # The pseudo shard's test host starts with every string pseudo-localized.
+  case "$shard" in *-pseudo) export TEST_RUNNER_ZIGZAG_PSEUDO_LOCALIZE=1 ;; *) unset TEST_RUNNER_ZIGZAG_PSEUDO_LOCALIZE ;; esac
   # shellcheck disable=SC2046
   "${xcb[@]}" test-without-building -parallel-testing-enabled NO -resultBundlePath "$shard.xcresult" $(cat "$shard") > "$shard.log" 2>&1 &
   pids+=($!)
 done
+unset TEST_RUNNER_ZIGZAG_PSEUDO_LOCALIZE
 status=0
 for pid in "${pids[@]}"; do wait "$pid" || status=1; done
 
