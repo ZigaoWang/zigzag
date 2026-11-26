@@ -1808,4 +1808,22 @@ extension SyncTests {
         #expect(b.library.urls(in: "Personal").contains("pinned last"))
         #expect(!b.library.urls(in: "Personal").contains(gone.url.lastPathComponent))
     }
+
+    @Test func endingBeforeLibraryJsonIsSavedDoesntRemoveWhatJustArrived() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let onDisk = a.library
+        let saved0 = a.clock
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.append(contentsOf: [Sample.page("n1"), Sample.page("n2"), Sample.page("n3")]) } }
+        b.sync()
+        a.clock += 10
+        a.sync()
+        #expect(a.library.urls(in: "Personal").count == 4)
+        // Zigzag ended after State.json was saved, before Library.json was.
+        let again = FakeMac(cloud, onDisk, clock: a.clock + 60, state: try saved(a.session.state))
+        again.host.libraryStamp = saved0
+        again.session.checkAfterLaunch()
+        again.sync(); b.sync()
+        #expect(b.library.urls(in: "Personal").count == 4)
+        #expect(again.library.urls(in: "Personal").count == 4)
+    }
 }

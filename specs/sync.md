@@ -172,3 +172,5 @@
   Test: SyncTests.aRemovalAfterThisMacsOwnSaveIsntTakenForStale
 - Zigzag quit right after an edit → the edit is read before quitting; one found at the next launch counts from when the library was last saved, never from the launch, so it doesn't beat a later edit on another Mac.
   Test: SyncTests.anEditFoundAtLaunchCountsFromWhenItWasMade
+- Zigzag ended (a crash, a power cut) after sync saved its state but before Library.json was saved → at the next launch what had just arrived is laid out again from iCloud, never sent as removed. Library.json is saved before sync's state.
+  Test: SyncTests.endingBeforeLibraryJsonIsSavedDoesntRemoveWhatJustArrived

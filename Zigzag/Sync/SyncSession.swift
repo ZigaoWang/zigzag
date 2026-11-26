@@ -125,6 +125,8 @@ struct SyncState: Codable {
     var heldRemovals: Int? { heldNames.isEmpty ? nil : heldNames.count }
     /// Library.json's own date when sync last read it, so one put back from an older copy is told apart.
     var libraryStamp: Date?
+    /// When sync last wrote into the library.
+    var wroteLibrary: Date?
     /// While off: the account the kept state was synced with.
     var resumeAccount: String?
     /// Turned on again with what was kept while off, until the first catch-up.
@@ -138,7 +140,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, resumeAccount, resumed, ownFirstSync, copies, savedSeen, fetches
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, ownFirstSync, copies, savedSeen, fetches
     }
 
     init() {}
@@ -164,6 +166,7 @@ struct SyncState: Codable {
         heldNames = try c.decodeIfPresent(Set<String>.self, forKey: .heldNames) ?? []
         removed = try c.decodeIfPresent([String: Date].self, forKey: .removed) ?? [:]
         libraryStamp = try c.decodeIfPresent(Date.self, forKey: .libraryStamp)
+        wroteLibrary = try c.decodeIfPresent(Date.self, forKey: .wroteLibrary)
         resumeAccount = try c.decodeIfPresent(String.self, forKey: .resumeAccount)
         resumed = try c.decodeIfPresent(Bool.self, forKey: .resumed) ?? false
         ownFirstSync = try c.decodeIfPresent(String.self, forKey: .ownFirstSync)
@@ -257,8 +260,12 @@ final class SyncSession {
         guard !isClosed, state.merged, !isApplying else { return }
         // What changed since the last sync was changed when Library.json was last saved, never later than now.
         let changedAt = host.libraryStamp.map { min($0, now()) }
-        if let synced = state.libraryStamp, synced <= now().addingTimeInterval(60), let stamp = host.libraryStamp,
-           stamp < synced.addingTimeInterval(-1) {
+        // Older than the file sync last read, or than sync's last write into it (Zigzag ended before saving it).
+        func older(than date: Date?) -> Bool {
+            guard let date, date <= now().addingTimeInterval(60), let stamp = host.libraryStamp else { return false }
+            return stamp < date.addingTimeInterval(-1)
+        }
+        if older(than: state.libraryStamp) || older(than: state.wroteLibrary) {
             takeICloudKeepingNew(stamp: changedAt)
             return
         }
@@ -360,13 +367,19 @@ final class SyncSession {
         return (saves, deletes)
     }
 
+    /// Into the library, noting when, so a Library.json that didn't get it (Zigzag ended before saving) is told apart.
+    private func write(_ library: SyncLibrary) {
+        isApplying = true
+        host.write(library)
+        isApplying = false
+        state.wroteLibrary = now()
+    }
+
     /// The library laid out from the records, then read back: what that changed (a page whose folder is gone, now
     /// at the top of its space) goes up too.
     private func layOut() {
-        isApplying = true
-        host.write(SyncMapping.apply(state.base.filter { !state.heldNames.contains($0.key) }, onto: host.read(), aliases: state.aliases,
-                                     kept: state.keptProfiles, unsent: state.unsent).library)
-        isApplying = false
+        write(SyncMapping.apply(state.base.filter { !state.heldNames.contains($0.key) }, onto: host.read(), aliases: state.aliases,
+                                kept: state.keptProfiles, unsent: state.unsent).library)
         localChanged()
     }
 
@@ -486,9 +499,7 @@ final class SyncSession {
         if !copiesGone.isEmpty {
             var library = host.read()
             for id in copiesGone { _ = library.contents.directory.remove(id) }
-            isApplying = true
-            host.write(library)
-            isApplying = false
+            write(library)
         }
     }
 
@@ -518,9 +529,7 @@ final class SyncSession {
         }
         guard brought else { return }
         library.contents.directory = directory
-        isApplying = true
-        host.write(library)
-        isApplying = false
+        write(library)
     }
 
     /// The server's version of a record meets this Mac's. Returns whether the library changes, and whether this
@@ -633,9 +642,7 @@ final class SyncSession {
         state.aliases = merge.aliases
         state.base = server
         state.merged = true
-        isApplying = true
-        host.write(SyncMapping.apply(merge.items, onto: host.read(), aliases: state.aliases).library)
-        isApplying = false
+        write(SyncMapping.apply(merge.items, onto: host.read(), aliases: state.aliases).library)
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, now: now())
         state.emptyFolders = export.emptyFolders
         // Nothing in iCloud is removed because this Mac lacks it.
@@ -773,9 +780,7 @@ final class SyncSession {
         if !profilesGone.isEmpty {
             var library = host.read()
             for id in profilesGone where id != Profile.defaultID { _ = library.contents.directory.remove(id) }
-            isApplying = true
-            host.write(library)
-            isApplying = false
+            write(library)
         }
     }
 
