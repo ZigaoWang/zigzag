@@ -4,16 +4,6 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
-### Nieuw
-- “Synchroniseer met iCloud”, in Instellingen › Algemeen: je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen blijven hetzelfde op elke Mac die bij je iCloud is aangemeld en staan in je eigen privédatabase in iCloud. Open tabbladen, geschiedenis, websitegegevens en extensies blijven op elke Mac, en wachtwoorden blijven synchroniseren via de iCloud-sleutelhanger. Als je het aanzet, wordt de bibliotheek van de Mac samengevoegd met die van iCloud: staat iets in beide, dan wint de nieuwste wijziging, wordt er niets verwijderd zonder het te vragen en wordt eerst een reservekopie bewaard. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-
-### Gewijzigd
-- De compatibiliteitsmodus is nu de eerste rij van Deze website in de Website-instellingen, boven de rijen die hij uitzet. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
-
-### Opgelost
-- Als je een extensie-update goedkeurt die meer vraagt, wordt wat je had toegestaan later niet meer ingetrokken, zoals de verbinding van Bitwarden met zijn app voor “Ontgrendelen met biometrie”. Met dank aan [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
-- Als je een profiel verwijdert terwijl de extensies nog opstarten, sluit Zigzag niet meer af.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans en Russisch; downloadregels die het bewaarde bestand doorgeven; livemappen die laten zien wanneer ze voor het laatst zijn bijgewerkt; en na Chinees Pinyin overschakelen naar Engels zonder losse spaties.
@@ -33,9 +23,11 @@ Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans e
 - Zoeken in de geschiedenis negeert accenten en hoofdletters, vindt elk woord in willekeurige volgorde en markeert het, en verbergt nooit een resultaat in een stapel; elk deel van de dag heeft één kop, twee pagina’s van één website blijven twee rijen, en de lijst reageert op de pijltoetsen, Delete, ⌘Return, ⌘F en een klik met de rechtermuisknop die een hele website verwijdert.
 - Terwijl een livemap op nieuwe pagina’s controleert, toont het badge op het pictogram een draaiende ring, zoals Mail een mailbox toont die wordt gecontroleerd, en die stopt zodra de controle klaar is.
 - Het venster Nieuwe livemap en Wijzig livemap toont het pictogram van de map, zoals de navigatiekolom: dat van GitHub voor een GitHub-lijst, dat van de website voor een feed, of het pictogram dat je koos. Klik erop om het pictogram te wijzigen, zoals met Wijzig pictogram…, en een nieuwe map houdt het gekozen pictogram.
+- “Synchroniseer met iCloud”, in Instellingen › Algemeen: je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen blijven hetzelfde op elke Mac die bij je iCloud is aangemeld en staan in je eigen privédatabase in iCloud. Open tabbladen, geschiedenis, websitegegevens en extensies blijven op elke Mac, en wachtwoorden blijven synchroniseren via de iCloud-sleutelhanger. Als je het aanzet, wordt de bibliotheek van de Mac samengevoegd met die van iCloud: staat iets in beide, dan wint de nieuwste wijziging, wordt er niets verwijderd zonder het te vragen en wordt eerst een reservekopie bewaard. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
 ### Gewijzigd
 - Swipes met twee vingers terug en vooruit gaan soepeler, werken al bij een kortere afstand of een lichtere veeg, houden de pagina van op en neer schuiven af en laten nooit de pijl in beeld of de pagina verschoven achter, in tabbladen, Split View en Zigzag Mini.
+- De compatibiliteitsmodus is nu de eerste rij van Deze website in de Website-instellingen, boven de rijen die hij uitzet. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
 ### Opgelost
 - Als Zigzag Mini boven een pagina open is, verschuift scrollen over de gedimde pagina de pagina erachter niet meer. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -51,4 +43,6 @@ Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans e
 - Terug, vooruit en opnieuw laden laten niet langer een lege plek over voor de vensterknoppen waar die niet worden getoond, zoals in schermvullende weergave voordat de menubalk omlaag komt, en de vensterknoppen blijven in de balk terwijl de kortere zwevende navigatiekolom openstaat. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - Het menu van een livemap dat openblijft tijdens het bijwerken, gaat nu van Bezig met bijwerken… naar Zojuist bijgewerkt, of naar de reden waarom vernieuwen mislukte, zonder te sluiten.
 - Met Favorieten per rij op Automatisch worden favorieten gelijk over hun rijen verdeeld: zes waar er vier passen zijn twee rijen van drie, niet vier en twee.
+- Als je een extensie-update goedkeurt die meer vraagt, wordt wat je had toegestaan later niet meer ingetrokken, zoals de verbinding van Bitwarden met zijn app voor “Ontgrendelen met biometrie”. Met dank aan [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Als je een profiel verwijdert terwijl de extensies nog opstarten, sluit Zigzag niet meer af.
 

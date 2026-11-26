@@ -4,16 +4,6 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
-### Nuevo
-- «Sincronizar con iCloud», en Ajustes › General: tus espacios, perfiles, pestañas fijadas, carpetas, favoritos, carpetas dinámicas y ajustes se mantienen iguales en cada Mac con la sesión iniciada en tu iCloud, guardados en tu propia base de datos privada de iCloud. Las pestañas abiertas, el historial, los datos de sitios web y las extensiones se quedan en cada Mac, y las contraseñas siguen sincronizándose con el llavero de iCloud. Al activarla, la biblioteca de este Mac se une a la de iCloud: lo que está en las dos se queda con la edición más reciente, no se quita nada sin preguntar y antes se guarda una copia de seguridad. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-
-### Cambios
-- El modo de compatibilidad es ahora la primera fila de Este sitio en los Ajustes del sitio, encima de las filas que desactiva. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
-
-### Correcciones
-- Aprobar la actualización de una extensión que pide más permisos ya no te quita después lo que habías permitido, como la conexión de Bitwarden con su app para «Desbloquear con biometría». Gracias a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
-- Eliminar un perfil mientras sus extensiones aún se están iniciando ya no cierra Zigzag.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés, el español y el ruso; reglas de descarga que envían el archivo guardado; carpetas dinámicas que dicen cuándo se actualizaron por última vez, y escribir en pinyin chino y pasar al inglés sin espacios de más.
@@ -33,9 +23,11 @@ Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés,
 - La búsqueda del historial ignora acentos y mayúsculas, encuentra cada palabra en cualquier orden y la resalta, y nunca oculta una coincidencia dentro de una pila; cada parte del día tiene un solo encabezado, dos páginas del mismo sitio siguen siendo dos filas, y la lista responde a las flechas, la tecla Eliminar, ⌘Return, ⌘F y a un clic derecho que quita un sitio entero.
 - Mientras una carpeta dinámica busca páginas nuevas, la insignia de su icono muestra un anillo que gira, como Mail muestra un buzón mientras lo comprueba, y se detiene en cuanto termina.
 - Las ventanas Nueva carpeta dinámica y Editar carpeta dinámica muestran el icono de la carpeta, como la barra lateral: el de GitHub para una lista de GitHub, el del sitio para un feed o el que elegiste. Haz clic en él para cambiar el icono, como con Cambiar icono…, y una carpeta nueva conserva el icono que elijas.
+- «Sincronizar con iCloud», en Ajustes › General: tus espacios, perfiles, pestañas fijadas, carpetas, favoritos, carpetas dinámicas y ajustes se mantienen iguales en cada Mac con la sesión iniciada en tu iCloud, guardados en tu propia base de datos privada de iCloud. Las pestañas abiertas, el historial, los datos de sitios web y las extensiones se quedan en cada Mac, y las contraseñas siguen sincronizándose con el llavero de iCloud. Al activarla, la biblioteca de este Mac se une a la de iCloud: lo que está en las dos se queda con la edición más reciente, no se quita nada sin preguntar y antes se guarda una copia de seguridad. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
 ### Cambios
 - Los deslizamientos con dos dedos hacia atrás y hacia adelante son más fluidos, se activan con menos recorrido o un gesto más ligero, evitan que la página se desplace arriba y abajo, y nunca dejan la flecha a la vista ni la página movida, en pestañas, en Split View y en Zigzag Mini.
+- El modo de compatibilidad es ahora la primera fila de Este sitio en los Ajustes del sitio, encima de las filas que desactiva. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
 ### Correcciones
 - Con Zigzag Mini abierto sobre una página, desplazarte sobre la página atenuada ya no mueve la página de detrás. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -51,4 +43,6 @@ Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés,
 - Atrás, Adelante y Recargar ya no dejan un hueco para los botones de la ventana donde no se muestran, como en pantalla completa antes de que baje la barra de menús, y los botones de la ventana se quedan en la barra mientras está abierta la barra lateral flotante, más corta. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - El menú de una carpeta dinámica abierto mientras se actualiza ahora pasa de Actualizando… a Actualizado ahora mismo, o al motivo por el que no se pudo actualizar, sin cerrarse.
 - Con Favoritos por fila en Automático, los favoritos se reparten por igual entre sus filas: seis donde cabrían cuatro son dos filas de tres, no cuatro y dos.
+- Aprobar la actualización de una extensión que pide más permisos ya no te quita después lo que habías permitido, como la conexión de Bitwarden con su app para «Desbloquear con biometría». Gracias a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Eliminar un perfil mientras sus extensiones aún se están iniciando ya no cierra Zigzag.
 

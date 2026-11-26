@@ -4,16 +4,6 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
-### Nouveautés
-- « Synchroniser avec iCloud », dans Réglages › Général : vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages restent identiques sur chaque Mac connecté à votre iCloud, dans votre propre base de données privée iCloud. Les onglets ouverts, l’historique, les données de sites web et les extensions restent sur chaque Mac, et les mots de passe continuent de se synchroniser via le trousseau iCloud. L’activer réunit la bibliothèque du Mac et celle d’iCloud : quand un élément est dans les deux, la modification la plus récente l’emporte, rien n’est supprimé sans demander, et une sauvegarde est enregistrée d’abord. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-
-### Modifications
-- Le mode de compatibilité est désormais la première ligne de Ce site dans Réglages du site, au-dessus des lignes qu’il désactive. Merci à [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
-
-### Corrections
-- Approuver la mise à jour d’une extension qui demande davantage ne retire plus ensuite ce que vous aviez autorisé, comme la connexion de Bitwarden à son app pour « Déverrouiller avec la biométrie ». Merci à [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
-- Supprimer un profil pendant que ses extensions démarrent encore ne fait plus quitter Zigzag.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, au français, à l’espagnol et au russe ; des règles de téléchargement qui transfèrent le fichier enregistré ; des dossiers dynamiques qui indiquent leur dernière mise à jour ; et la saisie en pinyin chinois suivie d’un passage à l’anglais sans espaces parasites.
@@ -33,9 +23,11 @@ Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, a
 - La recherche dans l’historique ignore les accents et la casse, trouve chaque mot dans n’importe quel ordre et le met en évidence, et ne cache jamais un résultat dans un groupe ; chaque moment de la journée a un seul titre, deux pages d’un même site restent deux lignes, et la liste répond aux touches fléchées, la touche Supprimer, ⌘Return, ⌘F et à un clic droit qui supprime tout un site.
 - Pendant qu’un dossier dynamique cherche de nouvelles pages, la pastille de son icône affiche un anneau qui tourne, comme Mail montre une boîte en cours de relève, et s’arrête dès que c’est fini.
 - La feuille Nouveau dossier dynamique ou Modifier le dossier dynamique affiche l’icône du dossier, comme la barre latérale : celle de GitHub pour une liste GitHub, celle du site pour un flux, ou celle que vous avez choisie. Cliquez dessus pour changer l’icône, comme avec Modifier l’icône…, et un nouveau dossier garde l’icône choisie.
+- « Synchroniser avec iCloud », dans Réglages › Général : vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages restent identiques sur chaque Mac connecté à votre iCloud, dans votre propre base de données privée iCloud. Les onglets ouverts, l’historique, les données de sites web et les extensions restent sur chaque Mac, et les mots de passe continuent de se synchroniser via le trousseau iCloud. L’activer réunit la bibliothèque du Mac et celle d’iCloud : quand un élément est dans les deux, la modification la plus récente l’emporte, rien n’est supprimé sans demander, et une sauvegarde est enregistrée d’abord. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
 ### Modifications
 - Les balayages à deux doigts vers l’arrière et vers l’avant sont plus fluides, se déclenchent sur une distance plus courte ou d’un geste plus léger, empêchent la page de dériver vers le haut ou le bas, et ne laissent jamais la flèche affichée ni la page décalée, dans les onglets, la Split View et Zigzag Mini.
+- Le mode de compatibilité est désormais la première ligne de Ce site dans Réglages du site, au-dessus des lignes qu’il désactive. Merci à [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
 ### Corrections
 - Quand Zigzag Mini est ouvert au-dessus d’une page, faire défiler la page assombrie ne fait plus bouger la page derrière. Merci à [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -51,4 +43,6 @@ Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, a
 - Précédent, Suivant et Recharger ne laissent plus un espace vide pour les boutons de la fenêtre là où ils ne sont pas affichés, comme en plein écran avant que la barre des menus ne descende, et les boutons de la fenêtre restent dans la barre tant que la barre latérale flottante, plus courte, est sortie. Merci à [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - Le menu d’un dossier dynamique laissé ouvert pendant sa mise à jour passe désormais de Mise à jour… à Mis à jour à l’instant, ou à la raison de l’échec, sans se fermer.
 - Quand Favoris par ligne est sur Automatique, les favoris se répartissent également sur leurs lignes : six là où quatre tiendraient font deux lignes de trois, et non quatre et deux.
+- Approuver la mise à jour d’une extension qui demande davantage ne retire plus ensuite ce que vous aviez autorisé, comme la connexion de Bitwarden à son app pour « Déverrouiller avec la biométrie ». Merci à [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Supprimer un profil pendant que ses extensions démarrent encore ne fait plus quitter Zigzag.
 
