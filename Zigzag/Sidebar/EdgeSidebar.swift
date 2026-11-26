@@ -101,11 +101,12 @@ final class EdgeSidebar {
     #if DEBUG
     /// The debug bridge keeps the panel out with the pointer elsewhere.
     static var debugHoldsOpen = false
-    /// Where tests put the pointer, on screen.
+    /// Where tests put the pointer, on screen. While set, rows' own hover reports, which follow the real mouse, are
+    /// left out.
     static var debugPointer: NSPoint?
     #endif
 
-    /// The pointer on screen.
+    /// The pointer on screen: every read of it here comes through this.
     private var pointer: NSPoint {
         #if DEBUG
         if let point = Self.debugPointer { return point }
@@ -174,7 +175,7 @@ final class EdgeSidebar {
         }
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.hide(animated: false) }
+            MainActor.assumeIsolated { self?.systemPutsAway() }
         })
         // A pick brings Zigzag forward, and so does anything else: the panel has done its job. A click into the
         // preview's page brings Zigzag forward too, and keeps the panel.
@@ -186,14 +187,25 @@ final class EdgeSidebar {
             MainActor.assumeIsolated { self?.activationChanged() }
         })
         workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.hide(animated: false) }
+            MainActor.assumeIsolated { self?.systemPutsAway() }
         })
         if let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { target = key }
+    }
+
+    /// Another Space or a display change puts the panel away; a held one stays.
+    private func systemPutsAway() {
+        #if DEBUG
+        if Self.debugHoldsOpen { return }
+        #endif
+        hide(animated: false)
     }
 
     /// The preview's Mini takes the keyboard a moment after a click activates Zigzag, so the verdict waits.
     private func activationChanged() {
         guard isShowing else { return }
+        #if DEBUG
+        if Self.debugHoldsOpen { return }
+        #endif
         activationWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
@@ -254,7 +266,7 @@ final class EdgeSidebar {
 
     /// The pointer against the edge now, on a side no part of macOS uses.
     private func atEdge(target: BrowserWindowController) -> Bool {
-        let point = NSEvent.mouseLocation
+        let point = pointer
         let onRight = target.edgeSidebarOnRight
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(point, $0.frame, false) }),
               EdgeSidebarLayout.opens(at: point, screen: screen.frame, visible: screen.visibleFrame, onRight: onRight,
@@ -274,7 +286,7 @@ final class EdgeSidebar {
         dwellTimer = nil
         guard !isShowing, let target, atEdge(target: target),
               EdgeSidebarLayout.canShow(appIsActive: NSApp.isActive, buttonsPressed: NSEvent.pressedMouseButtons != 0),
-              let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) })
+              let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) })
         else { return }
         show(on: screen.visibleFrame, for: target)
     }
@@ -292,9 +304,10 @@ final class EdgeSidebar {
         let frame = preview == nil ? cardPanelFrame : previewPanelFrame
         if MenuPanel.current == nil, panel.frame != frame { panel.setFrame(frame, display: true) }
         // The panel gets no mouse moves with another app in front, so the preview's strip follows from here.
-        preview?.pointerMoved(toScreen: NSEvent.mouseLocation)
+        let point = pointer
+        preview?.pointerMoved(toScreen: point)
         followPreviewPointer()
-        if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: frame) {
+        if held || EdgeSidebarLayout.keeps(at: point, panel: frame) {
             leftAt = nil
             return
         }
@@ -328,6 +341,14 @@ final class EdgeSidebar {
         }
         scheduleHoverCheck(tab: tab, in: controller, pointer: pointer,
                            since: ProcessInfo.processInfo.systemUptime, token: hoverCheck)
+    }
+
+    /// A sidebar row's own hover report, from the real mouse's tracking areas.
+    func rowHovered(_ tab: Tab?, in controller: BrowserWindowController) {
+        #if DEBUG
+        if Self.debugPointer != nil { return }
+        #endif
+        hover(tab, in: controller)
     }
 
     /// Esc in the panel puts the page away first.

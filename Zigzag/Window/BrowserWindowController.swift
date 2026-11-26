@@ -3706,10 +3706,10 @@ extension BrowserWindowController: SidebarDelegate {
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         // The edge panel's rows preview the page beside the panel; the window's card would show behind another app.
         if let row, EdgeSidebar.shared.isPanel(row.window) {
-            EdgeSidebar.shared.hover(tab, in: self)
+            EdgeSidebar.shared.rowHovered(tab, in: self)
             return
         }
-        if tab == nil { EdgeSidebar.shared.hover(nil, in: self) }
+        if tab == nil { EdgeSidebar.shared.rowHovered(nil, in: self) }
         guard row?.window === window || tab == nil else { return }
         previews.hover(tab, row: row, bookmark: bookmark)
     }
