@@ -4,17 +4,6 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
-### Nouveautés
-- La barre latérale depuis le bord de l’écran affiche un aperçu des pages : laissez le pointeur sur un onglet et sa page apparaît à côté de la barre latérale, par-dessus l’app où vous êtes. Un onglet en veille montre son nom et reste en veille, et un clic vous amène à l’onglet dans Zigzag. Merci à [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-
-### Modifications
-- « Synchroniser avec iCloud », dans Réglages › Général, indique la date de la dernière synchronisation, comme « Dernière synchronisation il y a 5 minutes », et n’affiche « Synchronisation… » que pour la première synchronisation ou une synchronisation un peu longue, pas à chaque vérification rapide. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- « Votre carte Zigzag », dans À propos de Zigzag, est redessinée comme une vraie carte : votre nom plus grand, « Depuis » avec le mois et l’année, le Z embossé dans le coin, et des finitions en verre dépoli, feuille nacrée, graphite anodisé et papier de lin, chacune nommée à côté de son échantillon. « Enregistrer en tant qu’image » et « Partager » créent une image de 2400 × 1500 avec la carte sur un fond assorti.
-
-### Corrections
-- Mots de passe iCloud s’installe sur les pages de connexion même quand des onglets sont en veille : demander les cadres d’un onglet en veille n’échoue plus, comme dans Chrome.
-- The Marvellous Suspender et d’autres extensions qui programment des alarmes fonctionnent de nouveau : programmer une alarme leur renvoie maintenant une promesse, comme dans Chrome.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, au français, à l’espagnol et au russe ; des règles de téléchargement qui transfèrent le fichier enregistré ; des dossiers dynamiques qui indiquent leur dernière mise à jour ; et la saisie en pinyin chinois suivie d’un passage à l’anglais sans espaces parasites.
@@ -35,10 +24,13 @@ Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, a
 - Pendant qu’un dossier dynamique cherche de nouvelles pages, la pastille de son icône affiche un anneau qui tourne, comme Mail montre une boîte en cours de relève, et s’arrête dès que c’est fini.
 - La feuille Nouveau dossier dynamique ou Modifier le dossier dynamique affiche l’icône du dossier, comme la barre latérale : celle de GitHub pour une liste GitHub, celle du site pour un flux, ou celle que vous avez choisie. Cliquez dessus pour changer l’icône, comme avec Modifier l’icône…, et un nouveau dossier garde l’icône choisie.
 - « Synchroniser avec iCloud », dans Réglages › Général : vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages restent identiques sur chaque Mac connecté à votre iCloud, dans votre propre base de données privée iCloud. Les onglets ouverts, l’historique, les données de sites web et les extensions restent sur chaque Mac, et les mots de passe continuent de se synchroniser via le trousseau iCloud. L’activer réunit la bibliothèque du Mac et celle d’iCloud : quand un élément est dans les deux, la modification la plus récente l’emporte, rien n’est supprimé sans demander, et une sauvegarde est enregistrée d’abord. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- La barre latérale depuis le bord de l’écran affiche un aperçu des pages : laissez le pointeur sur un onglet et sa page apparaît à côté de la barre latérale, par-dessus l’app où vous êtes. Un onglet en veille montre son nom et reste en veille, et un clic vous amène à l’onglet dans Zigzag. Merci à [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
 
 ### Modifications
 - Les balayages à deux doigts vers l’arrière et vers l’avant sont plus fluides, se déclenchent sur une distance plus courte ou d’un geste plus léger, empêchent la page de dériver vers le haut ou le bas, et ne laissent jamais la flèche affichée ni la page décalée, dans les onglets, la Split View et Zigzag Mini.
 - Le mode de compatibilité est désormais la première ligne de Ce site dans Réglages du site, au-dessus des lignes qu’il désactive. Merci à [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- « Synchroniser avec iCloud », dans Réglages › Général, indique la date de la dernière synchronisation, comme « Dernière synchronisation il y a 5 minutes », et n’affiche « Synchronisation… » que pour la première synchronisation ou une synchronisation un peu longue, pas à chaque vérification rapide. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- « Votre carte Zigzag », dans À propos de Zigzag, est redessinée comme une vraie carte : votre nom plus grand, « Depuis » avec le mois et l’année, le Z embossé dans le coin, et des finitions en verre dépoli, feuille nacrée, graphite anodisé et papier de lin, chacune nommée à côté de son échantillon. « Enregistrer en tant qu’image » et « Partager » créent une image de 2400 × 1500 avec la carte sur un fond assorti.
 
 ### Corrections
 - Quand Zigzag Mini est ouvert au-dessus d’une page, faire défiler la page assombrie ne fait plus bouger la page derrière. Merci à [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -56,4 +48,6 @@ Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, a
 - Quand Favoris par ligne est sur Automatique, les favoris se répartissent également sur leurs lignes : six là où quatre tiendraient font deux lignes de trois, et non quatre et deux.
 - Approuver la mise à jour d’une extension qui demande davantage ne retire plus ensuite ce que vous aviez autorisé, comme la connexion de Bitwarden à son app pour « Déverrouiller avec la biométrie ». Merci à [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - Supprimer un profil pendant que ses extensions démarrent encore ne fait plus quitter Zigzag.
+- Mots de passe iCloud s’installe sur les pages de connexion même quand des onglets sont en veille : demander les cadres d’un onglet en veille n’échoue plus, comme dans Chrome.
+- The Marvellous Suspender et d’autres extensions qui programment des alarmes fonctionnent de nouveau : programmer une alarme leur renvoie maintenant une promesse, comme dans Chrome.
 

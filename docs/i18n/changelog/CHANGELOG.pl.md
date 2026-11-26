@@ -4,17 +4,6 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
-### Nowe
-- Pasek boczny wysuwany od krawędzi ekranu pokazuje podgląd stron: zatrzymaj wskaźnik na karcie, a jej strona pojawi się obok paska bocznego, nad aplikacją, w której jesteś. Uśpiona karta pokazuje swoją nazwę i zostaje uśpiona, a kliknięcie przenosi cię do karty w Zigzag. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-
-### Zmieniono
-- „Synchronizuj z iCloud” w „Ustawienia” › „Ogólne” pokazuje, kiedy ostatnio synchronizowano, na przykład „Zsynchronizowano 5 minut temu”, a „Synchronizowanie…” pojawia się tylko przy pierwszej synchronizacji albo takiej, która trwa dłużej, nie przy każdym szybkim sprawdzeniu. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- „Twoja karta Zigzag” w „O Zigzag” jest narysowana na nowo jak prawdziwa karta: większe imię, „Od” z miesiącem i rokiem, litera Z wytłoczona w rogu oraz wykończenia z matowego szkła, perłowej folii, anodowanego grafitu i lnianego papieru, każde z nazwą obok próbki. „Zachowaj jako obraz” i „Udostępnij” tworzą obraz 2400 × 1500 z kartą na pasującym tle.
-
-### Naprawiono
-- Hasła iCloud konfigurują się na stronach logowania także przy uśpionych kartach: pobieranie ramek uśpionej karty już się nie kończy się błędem, tak jak w Chrome.
-- The Marvellous Suspender i inne rozszerzenia, które ustawiają alarmy, znów działają: ustawienie alarmu zwraca im teraz obietnicę, tak jak w Chrome.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.
@@ -35,10 +24,13 @@ Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemi
 - Gdy folder na żywo sprawdza nowe strony, plakietka na jego ikonie pokazuje obracający się pierścień, tak jak Mail pokazuje sprawdzaną skrzynkę, i zatrzymuje się, gdy tylko sprawdzanie się skończy.
 - Arkusz „Nowy folder na żywo” i „Edytuj folder na żywo” pokazuje ikonę folderu tak jak pasek boczny: ikonę GitHuba dla listy z GitHuba, ikonę witryny dla kanału albo wybraną przez Ciebie. Kliknij ją, aby zmienić ikonę jak przez „Zmień ikonę…”, a nowy folder zachowa wybraną ikonę.
 - „Synchronizuj z iCloud” w „Ustawienia” › „Ogólne”: twoje przestrzenie, profile, przypięte karty, foldery, ulubione, foldery na żywo i ustawienia są takie same na każdym Macu zalogowanym do twojego iCloud i leżą w twojej prywatnej bazie danych iCloud. Otwarte karty, historia, dane witryn i rozszerzenia zostają na każdym Macu, a hasła nadal synchronizują się przez pęk kluczy iCloud. Włączenie łączy bibliotekę tego Maca z biblioteką w iCloud: gdy coś jest w obu, wygrywa nowsza zmiana, nic nie jest usuwane bez pytania, a wcześniej zapisywana jest kopia zapasowa. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- Pasek boczny wysuwany od krawędzi ekranu pokazuje podgląd stron: zatrzymaj wskaźnik na karcie, a jej strona pojawi się obok paska bocznego, nad aplikacją, w której jesteś. Uśpiona karta pokazuje swoją nazwę i zostaje uśpiona, a kliknięcie przenosi cię do karty w Zigzag. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
 
 ### Zmieniono
 - Przesunięcia dwoma palcami wstecz i do przodu są płynniejsze, działają przy krótszym dystansie lub lżejszym machnięciu, nie pozwalają stronie przesuwać się w górę i w dół i nigdy nie zostawiają strzałki na ekranie ani przesuniętej strony, w kartach, w Split View i w Zigzag Mini.
 - Tryb zgodności jest teraz pierwszym wierszem sekcji „Ta witryna” w „Ustawieniach witryny”, nad wierszami, które wyłącza. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- „Synchronizuj z iCloud” w „Ustawienia” › „Ogólne” pokazuje, kiedy ostatnio synchronizowano, na przykład „Zsynchronizowano 5 minut temu”, a „Synchronizowanie…” pojawia się tylko przy pierwszej synchronizacji albo takiej, która trwa dłużej, nie przy każdym szybkim sprawdzeniu. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- „Twoja karta Zigzag” w „O Zigzag” jest narysowana na nowo jak prawdziwa karta: większe imię, „Od” z miesiącem i rokiem, litera Z wytłoczona w rogu oraz wykończenia z matowego szkła, perłowej folii, anodowanego grafitu i lnianego papieru, każde z nazwą obok próbki. „Zachowaj jako obraz” i „Udostępnij” tworzą obraz 2400 × 1500 z kartą na pasującym tle.
 
 ### Naprawiono
 - Gdy Zigzag Mini jest otwarty nad stroną, przewijanie nad przyciemnioną stroną nie przesuwa już strony pod spodem. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -56,4 +48,6 @@ Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemi
 - Gdy „Ulubione w wierszu” ma wartość „Automatycznie”, ulubione rozkładają się równo na wiersze: sześć tam, gdzie zmieściłoby się cztery, to dwa wiersze po trzy, a nie cztery i dwa.
 - Zatwierdzenie aktualizacji rozszerzenia, które prosi o więcej, nie odbiera już później tego, na co się zgodzono, jak połączenie Bitwardena z jego aplikacją do „Odblokuj za pomocą biometrii”. Podziękowania dla [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - Usunięcie profilu, gdy jego rozszerzenia jeszcze się uruchamiają, nie zamyka już Zigzaga.
+- Hasła iCloud konfigurują się na stronach logowania także przy uśpionych kartach: pobieranie ramek uśpionej karty już się nie kończy się błędem, tak jak w Chrome.
+- The Marvellous Suspender i inne rozszerzenia, które ustawiają alarmy, znów działają: ustawienie alarmu zwraca im teraz obietnicę, tak jak w Chrome.
 

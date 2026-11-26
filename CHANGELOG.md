@@ -5,17 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- The sidebar from the screen edge previews pages: rest the pointer on a tab and its page comes out beside the sidebar, over the app you're in. A sleeping tab shows its name and stays asleep, and a click still takes you to the tab in Zigzag. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-
-### Changed
-- Sync with iCloud in Settings › General says when it last synced, like Last synced 5 minutes ago, and shows Syncing… only for the first sync or one that takes a while, not every quick check. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- Your Zigzag Card in About is redrawn as a real card: your name larger, Since with the month and year, the Z pressed into its corner, and finishes of frosted glass, pearl foil, anodized graphite and linen paper, each named beside its swatch. Save as Image and Share make a 2400 × 1500 picture with the card on a matching background.
-
-### Fixed
-- iCloud Passwords sets up on login pages even with tabs asleep: asking for an asleep tab's frames no longer fails, as in Chrome.
-- The Marvellous Suspender and other extensions that set alarms work again: setting an alarm now gives them back a promise, as in Chrome.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
@@ -36,10 +25,13 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - While a live folder checks for new pages, the chip on its icon shows a turning ring, the way Mail shows a mailbox being checked, and it stops the moment the check ends.
 - The New and Edit Live Folder sheet shows the folder's own icon, as the sidebar does: GitHub's for a GitHub list, the site's for a feed, or the one you chose. Click it to change the icon, as Change Icon… does, and a new folder keeps the icon you pick.
 - Sync with iCloud, in Settings › General: your spaces, profiles, pinned tabs, folders, favorites, live folders and settings stay the same on every Mac signed in to your iCloud, kept in your own iCloud's private database. Open tabs, history, website data and extensions stay on each Mac, and passwords keep syncing through iCloud Keychain. Turning it on puts the Mac's library together with iCloud's: where something is in both, the newer edit wins, nothing is removed without asking, and a backup is saved first. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- The sidebar from the screen edge previews pages: rest the pointer on a tab and its page comes out beside the sidebar, over the app you're in. A sleeping tab shows its name and stays asleep, and a click still takes you to the tab in Zigzag. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
 
 ### Changed
 - Two-finger swipes back and forward are smoother, go at a shorter distance or a lighter flick, keep the page from drifting up and down, and never leave the arrow up or the page shifted, in tabs, split view and Zigzag Mini.
 - Compatibility mode is now the first row of This Site in Site Controls, above the rows it turns off. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- Sync with iCloud in Settings › General says when it last synced, like Last synced 5 minutes ago, and shows Syncing… only for the first sync or one that takes a while, not every quick check. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- Your Zigzag Card in About is redrawn as a real card: your name larger, Since with the month and year, the Z pressed into its corner, and finishes of frosted glass, pearl foil, anodized graphite and linen paper, each named beside its swatch. Save as Image and Share make a 2400 × 1500 picture with the card on a matching background.
 
 ### Fixed
 - With Zigzag Mini open over a page, scrolling over the dimmed page no longer moves the page behind it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -57,6 +49,8 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
 - Approving an extension update that asks for more no longer takes back what you allowed it later, like Bitwarden's connection to its app for Unlock with biometrics. Thanks to [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - Removing a profile while its extensions are still starting no longer quits Zigzag.
+- iCloud Passwords sets up on login pages even with tabs asleep: asking for an asleep tab's frames no longer fails, as in Chrome.
+- The Marvellous Suspender and other extensions that set alarms work again: setting an alarm now gives them back a promise, as in Chrome.
 
 ## [0.9.5] - 2026-11-25
 

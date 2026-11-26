@@ -4,17 +4,6 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
-### Novità
-- La barra laterale dal bordo dello schermo mostra le anteprime delle pagine: tieni il puntatore fermo su un pannello e la sua pagina esce accanto alla barra laterale, sopra l’app in cui ti trovi. Un pannello sospeso mostra il suo nome e resta sospeso, e un clic ti porta al pannello in Zigzag. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-
-### Modifiche
-- «Sincronizza con iCloud», in Impostazioni › Generali, indica quando è avvenuta l’ultima sincronizzazione, come «Ultima sincronizzazione 5 minuti fa», e mostra «Sincronizzazione…» solo per la prima sincronizzazione o per una che richiede tempo, non a ogni controllo veloce. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- «La tua carta Zigzag», in Informazioni su Zigzag, è ridisegnata come una vera carta: il tuo nome più grande, «Da» con mese e anno, la Z impressa nell’angolo e finiture in vetro satinato, lamina perlata, grafite anodizzata e carta di lino, ognuna con il nome accanto al campione. «Salva come immagine» e «Condividi» creano un’immagine di 2400 × 1500 con la carta su uno sfondo coordinato.
-
-### Correzioni
-- Password di iCloud si configura nelle pagine di accesso anche con pannelli sospesi: richiedere i frame di un pannello sospeso non fallisce più, come in Chrome.
-- The Marvellous Suspender e altre estensioni che impostano sveglie tornano a funzionare: impostare una sveglia ora restituisce loro una promise, come in Chrome.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, francese, spagnolo e russo; regole di download che trasferiscono il file salvato; cartelle live che dicono quando si sono aggiornate l’ultima volta; e niente più spazi di troppo quando scrivi in pinyin cinese e passi all’inglese.
@@ -35,10 +24,13 @@ Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, frances
 - Mentre una cartella live cerca nuove pagine, il badge sulla sua icona mostra un anello che gira, come Mail mostra una casella mentre la controlla, e si ferma appena il controllo finisce.
 - Le finestre Nuova cartella live e Modifica cartella live mostrano l’icona della cartella, come la barra laterale: quella di GitHub per un elenco GitHub, quella del sito per un feed o quella che hai scelto. Fai clic per cambiare l’icona, come con Cambia icona…, e una nuova cartella mantiene l’icona scelta.
 - «Sincronizza con iCloud», in Impostazioni › Generali: i tuoi spazi, profili, pannelli fissati, cartelle, preferiti, cartelle live e impostazioni restano uguali su ogni Mac in cui hai effettuato l’accesso a iCloud, conservati nel tuo database privato di iCloud. Pannelli aperti, cronologia, dati dei siti web ed estensioni restano su ciascun Mac, e le password continuano a sincronizzarsi con il Portachiavi di iCloud. Attivandola, la libreria del Mac viene unita a quella di iCloud: dove un elemento è in entrambe, vince la modifica più recente, niente viene rimosso senza chiedere e prima viene salvato un backup. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- La barra laterale dal bordo dello schermo mostra le anteprime delle pagine: tieni il puntatore fermo su un pannello e la sua pagina esce accanto alla barra laterale, sopra l’app in cui ti trovi. Un pannello sospeso mostra il suo nome e resta sospeso, e un clic ti porta al pannello in Zigzag. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
 
 ### Modifiche
 - Gli scorrimenti a due dita indietro e avanti sono più fluidi, partono con una distanza più breve o un gesto più leggero, non fanno slittare la pagina in su e in giù e non lasciano mai la freccia visibile o la pagina spostata, nei pannelli, nella vista divisa e in Zigzag Mini.
 - La modalità compatibilità è ora la prima riga di Questo sito nei Controlli del sito, sopra le righe che disattiva. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- «Sincronizza con iCloud», in Impostazioni › Generali, indica quando è avvenuta l’ultima sincronizzazione, come «Ultima sincronizzazione 5 minuti fa», e mostra «Sincronizzazione…» solo per la prima sincronizzazione o per una che richiede tempo, non a ogni controllo veloce. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- «La tua carta Zigzag», in Informazioni su Zigzag, è ridisegnata come una vera carta: il tuo nome più grande, «Da» con mese e anno, la Z impressa nell’angolo e finiture in vetro satinato, lamina perlata, grafite anodizzata e carta di lino, ognuna con il nome accanto al campione. «Salva come immagine» e «Condividi» creano un’immagine di 2400 × 1500 con la carta su uno sfondo coordinato.
 
 ### Correzioni
 - Con Zigzag Mini aperto sopra una pagina, scorrere sulla pagina oscurata non muove più la pagina dietro. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -56,4 +48,6 @@ Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, frances
 - Con Preferiti per riga su Automatico, i preferiti si distribuiscono in modo uniforme sulle righe: sei dove ne starebbero quattro diventano due righe da tre, non quattro e due.
 - Approvare l’aggiornamento di un’estensione che richiede di più non toglie più in seguito ciò che avevi consentito, come la connessione di Bitwarden alla sua app per «Sblocca con i dati biometrici». Grazie a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - Rimuovere un profilo mentre le sue estensioni si stanno ancora avviando non fa più chiudere Zigzag.
+- Password di iCloud si configura nelle pagine di accesso anche con pannelli sospesi: richiedere i frame di un pannello sospeso non fallisce più, come in Chrome.
+- The Marvellous Suspender e altre estensioni che impostano sveglie tornano a funzionare: impostare una sveglia ora restituisce loro una promise, come in Chrome.
 

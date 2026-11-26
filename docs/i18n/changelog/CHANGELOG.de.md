@@ -4,17 +4,6 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 
 ## [Unreleased]
 
-### Neu
-- Die Seitenleiste vom Bildschirmrand zeigt Seiten als Vorschau: Bleib mit dem Zeiger auf einem Tab stehen, und seine Seite erscheint neben der Seitenleiste, über der App, in der du gerade bist. Ein ruhender Tab zeigt seinen Namen und bleibt in Ruhe, und ein Klick bringt dich in Zigzag zum Tab. Danke an [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-
-### Geändert
-- „Mit iCloud synchronisieren“ in „Einstellungen“ › „Allgemein“ sagt, wann zuletzt synchronisiert wurde, etwa „Zuletzt synchronisiert vor 5 Minuten“, und zeigt „Wird synchronisiert …“ nur bei der ersten Synchronisierung oder bei einer, die länger dauert, nicht bei jeder kurzen Prüfung. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- „Deine Zigzag-Karte“ unter „Über Zigzag“ ist als echte Karte neu gezeichnet: dein Name größer, „Seit“ mit Monat und Jahr, das Z in die Ecke geprägt und Oberflächen aus mattiertem Glas, Perlmuttfolie, eloxiertem Graphit und Leinenpapier, jeweils mit Namen neben der Farbprobe. „Als Bild sichern“ und „Teilen“ erzeugen ein Bild mit 2400 × 1500 Pixeln, auf dem die Karte vor einem passenden Hintergrund liegt.
-
-### Behoben
-- iCloud-Passwörter lässt sich auf Anmeldeseiten auch bei ruhenden Tabs einrichten: Die Abfrage der Frames eines ruhenden Tabs schlägt nicht mehr fehl, wie in Chrome.
-- The Marvellous Suspender und andere Erweiterungen, die Wecker setzen, funktionieren wieder: Wer einen Wecker setzt, bekommt jetzt ein Promise zurück, wie in Chrome.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, Französisch, Spanisch und Russisch; Downloadregeln, die die gesicherte Datei übergeben; Live-Ordner, die zeigen, wann sie zuletzt aktualisiert wurden; und chinesisches Pinyin tippen und dann zu Englisch wechseln, ohne dass Leerzeichen übrig bleiben.
@@ -35,10 +24,13 @@ Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, 
 - Während ein Live-Ordner nach neuen Seiten sucht, zeigt der Chip an seinem Symbol einen drehenden Ring, so wie Mail ein Postfach beim Abrufen zeigt, und hört auf, sobald die Suche fertig ist.
 - Das Fenster „Neuer Live-Ordner“ bzw. „Live-Ordner bearbeiten“ zeigt das Symbol des Ordners wie die Seitenleiste: das von GitHub für eine GitHub-Liste, das der Website für einen Feed oder das, das du gewählt hast. Klicke darauf, um das Symbol wie mit „Symbol ändern …“ zu ändern, und ein neuer Ordner behält das gewählte Symbol.
 - „Mit iCloud synchronisieren“ in „Einstellungen“ › „Allgemein“: Deine Spaces, Profile, fixierten Tabs, Ordner, Favoriten, Live-Ordner und Einstellungen bleiben auf jedem Mac, auf dem du bei iCloud angemeldet bist, gleich und liegen in deiner eigenen privaten iCloud-Datenbank. Offene Tabs, Verlauf, Websitedaten und Erweiterungen bleiben auf dem jeweiligen Mac, und Passwörter werden weiterhin über den iCloud-Schlüsselbund synchronisiert. Beim Einschalten wird die Bibliothek des Mac mit der in iCloud zusammengeführt: Was in beiden vorkommt, übernimmt die neuere Änderung, ohne Rückfrage wird nichts entfernt, und vorher wird ein Backup gesichert. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- Die Seitenleiste vom Bildschirmrand zeigt Seiten als Vorschau: Bleib mit dem Zeiger auf einem Tab stehen, und seine Seite erscheint neben der Seitenleiste, über der App, in der du gerade bist. Ein ruhender Tab zeigt seinen Namen und bleibt in Ruhe, und ein Klick bringt dich in Zigzag zum Tab. Danke an [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
 
 ### Geändert
 - Das Wischen mit zwei Fingern zurück und vorwärts ist flüssiger, funktioniert schon bei kürzerer Strecke oder leichterem Wischen, lässt die Seite nicht auf und ab wandern und lässt weder den Pfeil stehen noch die Seite verschoben, in Tabs, in der Split View und in Zigzag Mini.
 - Der Kompatibilitätsmodus ist jetzt die erste Zeile unter „Diese Website“ in den „Website-Einstellungen“, über den Zeilen, die er deaktiviert. Danke an [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- „Mit iCloud synchronisieren“ in „Einstellungen“ › „Allgemein“ sagt, wann zuletzt synchronisiert wurde, etwa „Zuletzt synchronisiert vor 5 Minuten“, und zeigt „Wird synchronisiert …“ nur bei der ersten Synchronisierung oder bei einer, die länger dauert, nicht bei jeder kurzen Prüfung. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- „Deine Zigzag-Karte“ unter „Über Zigzag“ ist als echte Karte neu gezeichnet: dein Name größer, „Seit“ mit Monat und Jahr, das Z in die Ecke geprägt und Oberflächen aus mattiertem Glas, Perlmuttfolie, eloxiertem Graphit und Leinenpapier, jeweils mit Namen neben der Farbprobe. „Als Bild sichern“ und „Teilen“ erzeugen ein Bild mit 2400 × 1500 Pixeln, auf dem die Karte vor einem passenden Hintergrund liegt.
 
 ### Behoben
 - Ist Zigzag Mini über einer Seite geöffnet, bewegt Scrollen über der abgedunkelten Seite nicht mehr die Seite dahinter. Danke an [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -56,4 +48,6 @@ Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, 
 - Steht „Favoriten pro Reihe“ auf „Automatisch“, verteilen sich die Favoriten gleichmäßig auf ihre Reihen: Sechs, wo vier passen würden, werden zwei Reihen mit je drei, nicht vier und zwei.
 - Wenn du ein Erweiterungs-Update genehmigst, das mehr verlangt, wird dir später nicht mehr entzogen, was du erlaubt hattest, etwa Bitwardens Verbindung zur App für „Mit Biometrie entsperren“. Danke an [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - Wenn du ein Profil entfernst, während seine Erweiterungen noch starten, wird Zigzag nicht mehr beendet.
+- iCloud-Passwörter lässt sich auf Anmeldeseiten auch bei ruhenden Tabs einrichten: Die Abfrage der Frames eines ruhenden Tabs schlägt nicht mehr fehl, wie in Chrome.
+- The Marvellous Suspender und andere Erweiterungen, die Wecker setzen, funktionieren wieder: Wer einen Wecker setzt, bekommt jetzt ein Promise zurück, wie in Chrome.
 

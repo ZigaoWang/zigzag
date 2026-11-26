@@ -4,17 +4,6 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ## [Unreleased]
 
-### Novo
-- A barra lateral a partir da borda da tela mostra prévias das páginas: deixe o ponteiro sobre uma aba e a página dela aparece ao lado da barra lateral, sobre o app em que você está. Uma aba suspensa mostra o nome e continua suspensa, e um clique leva você até a aba no Zigzag. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-
-### Alterado
-- “Sincronizar com o iCloud”, em Ajustes › Geral, informa quando foi a última sincronização, como “Última sincronização há 5 minutos”, e mostra “Sincronizando…” só na primeira sincronização ou em uma que demora, não a cada verificação rápida. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- “Seu Cartão Zigzag”, em Sobre o Zigzag, foi redesenhado como um cartão de verdade: seu nome maior, “Desde” com mês e ano, o Z gravado no canto e acabamentos de vidro fosco, folha perolada, grafite anodizado e papel linho, cada um com o nome ao lado da amostra. “Salvar como imagem” e “Compartilhar” criam uma imagem de 2400 × 1500 com o cartão sobre um fundo combinando.
-
-### Corrigido
-- Senhas do iCloud é configurado nas páginas de login mesmo com abas suspensas: pedir os frames de uma aba suspensa não falha mais, como no Chrome.
-- The Marvellous Suspender e outras extensões que definem alarmes voltam a funcionar: definir um alarme agora devolve uma promessa a elas, como no Chrome.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanhol e russo; regras de download que entregam o arquivo salvo; pastas dinâmicas que mostram quando foram atualizadas pela última vez; e digitar em pinyin chinês e mudar para o inglês sem espaços sobrando.
@@ -35,10 +24,13 @@ Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanh
 - Enquanto uma pasta dinâmica procura páginas novas, o selo no ícone dela mostra um anel girando, como o Mail mostra uma caixa sendo verificada, e para assim que a verificação termina.
 - As janelas Nova pasta dinâmica e Editar pasta dinâmica mostram o ícone da pasta, como a barra lateral: o do GitHub para uma lista do GitHub, o do site para um feed ou o que você escolheu. Clique nele para mudar o ícone, como em Alterar ícone…, e uma pasta nova fica com o ícone escolhido.
 - “Sincronizar com o iCloud”, em Ajustes › Geral: seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes ficam iguais em todos os Macs conectados ao seu iCloud, guardados no seu próprio banco de dados privado do iCloud. Abas abertas, histórico, dados de sites e extensões ficam em cada Mac, e as senhas continuam sincronizando pelas Chaves do iCloud. Ao ativar, a biblioteca do Mac é reunida com a do iCloud: o que está nos dois fica com a edição mais recente, nada é removido sem perguntar e um backup é salvo antes. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- A barra lateral a partir da borda da tela mostra prévias das páginas: deixe o ponteiro sobre uma aba e a página dela aparece ao lado da barra lateral, sobre o app em que você está. Uma aba suspensa mostra o nome e continua suspensa, e um clique leva você até a aba no Zigzag. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
 
 ### Alterado
 - Os deslizes de dois dedos para voltar e avançar ficam mais suaves, funcionam com uma distância menor ou um toque mais leve, impedem que a página se mova para cima e para baixo e nunca deixam a seta visível nem a página deslocada, em abas, na Split View e no Zigzag Mini.
 - O modo de compatibilidade agora é a primeira linha de Este site nos Ajustes do site, acima das linhas que ele desativa. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- “Sincronizar com o iCloud”, em Ajustes › Geral, informa quando foi a última sincronização, como “Última sincronização há 5 minutos”, e mostra “Sincronizando…” só na primeira sincronização ou em uma que demora, não a cada verificação rápida. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- “Seu Cartão Zigzag”, em Sobre o Zigzag, foi redesenhado como um cartão de verdade: seu nome maior, “Desde” com mês e ano, o Z gravado no canto e acabamentos de vidro fosco, folha perolada, grafite anodizado e papel linho, cada um com o nome ao lado da amostra. “Salvar como imagem” e “Compartilhar” criam uma imagem de 2400 × 1500 com o cartão sobre um fundo combinando.
 
 ### Corrigido
 - Com o Zigzag Mini aberto sobre uma página, rolar sobre a página escurecida não move mais a página atrás dele. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -56,4 +48,6 @@ Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanh
 - Com Favoritos por linha em Automático, os favoritos se distribuem igualmente pelas linhas: seis onde caberiam quatro viram duas linhas de três, e não quatro e duas.
 - Aprovar a atualização de uma extensão que pede mais não tira mais depois o que você permitiu, como a conexão do Bitwarden com o app para “Desbloquear com biometria”. Agradecimentos a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - Remover um perfil enquanto suas extensões ainda estão iniciando não fecha mais o Zigzag.
+- Senhas do iCloud é configurado nas páginas de login mesmo com abas suspensas: pedir os frames de uma aba suspensa não falha mais, como no Chrome.
+- The Marvellous Suspender e outras extensões que definem alarmes voltam a funcionar: definir um alarme agora devolve uma promessa a elas, como no Chrome.
 

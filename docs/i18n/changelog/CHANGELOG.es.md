@@ -4,17 +4,6 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
-### Nuevo
-- La barra lateral desde el borde de la pantalla muestra vistas previas de las páginas: deja el puntero sobre una pestaña y su página aparece junto a la barra lateral, encima de la app en la que estás. Una pestaña suspendida muestra su nombre y sigue suspendida, y un clic te lleva a la pestaña en Zigzag. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
-
-### Cambios
-- «Sincronizar con iCloud», en Ajustes › General, indica cuándo se sincronizó por última vez, como «Última sincronización hace 5 minutos», y muestra «Sincronizando…» solo en la primera sincronización o en una que tarda, no en cada comprobación rápida. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- «Tu tarjeta de Zigzag», en Acerca de Zigzag, se ha redibujado como una tarjeta de verdad: tu nombre más grande, «Desde» con el mes y el año, la Z grabada en la esquina y acabados de cristal esmerilado, lámina nacarada, grafito anodizado y papel de lino, cada uno con su nombre junto a la muestra. «Guardar como imagen» y «Compartir» crean una imagen de 2400 × 1500 con la tarjeta sobre un fondo a juego.
-
-### Correcciones
-- Contraseñas de iCloud se configura en las páginas de inicio de sesión aunque haya pestañas suspendidas: pedir los marcos de una pestaña suspendida ya no falla, como en Chrome.
-- The Marvellous Suspender y otras extensiones que crean alarmas vuelven a funcionar: crear una alarma ahora les devuelve una promesa, como en Chrome.
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés, el español y el ruso; reglas de descarga que envían el archivo guardado; carpetas dinámicas que dicen cuándo se actualizaron por última vez, y escribir en pinyin chino y pasar al inglés sin espacios de más.
@@ -35,10 +24,13 @@ Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés,
 - Mientras una carpeta dinámica busca páginas nuevas, la insignia de su icono muestra un anillo que gira, como Mail muestra un buzón mientras lo comprueba, y se detiene en cuanto termina.
 - Las ventanas Nueva carpeta dinámica y Editar carpeta dinámica muestran el icono de la carpeta, como la barra lateral: el de GitHub para una lista de GitHub, el del sitio para un feed o el que elegiste. Haz clic en él para cambiar el icono, como con Cambiar icono…, y una carpeta nueva conserva el icono que elijas.
 - «Sincronizar con iCloud», en Ajustes › General: tus espacios, perfiles, pestañas fijadas, carpetas, favoritos, carpetas dinámicas y ajustes se mantienen iguales en cada Mac con la sesión iniciada en tu iCloud, guardados en tu propia base de datos privada de iCloud. Las pestañas abiertas, el historial, los datos de sitios web y las extensiones se quedan en cada Mac, y las contraseñas siguen sincronizándose con el llavero de iCloud. Al activarla, la biblioteca de este Mac se une a la de iCloud: lo que está en las dos se queda con la edición más reciente, no se quita nada sin preguntar y antes se guarda una copia de seguridad. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- La barra lateral desde el borde de la pantalla muestra vistas previas de las páginas: deja el puntero sobre una pestaña y su página aparece junto a la barra lateral, encima de la app en la que estás. Una pestaña suspendida muestra su nombre y sigue suspendida, y un clic te lleva a la pestaña en Zigzag. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
 
 ### Cambios
 - Los deslizamientos con dos dedos hacia atrás y hacia adelante son más fluidos, se activan con menos recorrido o un gesto más ligero, evitan que la página se desplace arriba y abajo, y nunca dejan la flecha a la vista ni la página movida, en pestañas, en Split View y en Zigzag Mini.
 - El modo de compatibilidad es ahora la primera fila de Este sitio en los Ajustes del sitio, encima de las filas que desactiva. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- «Sincronizar con iCloud», en Ajustes › General, indica cuándo se sincronizó por última vez, como «Última sincronización hace 5 minutos», y muestra «Sincronizando…» solo en la primera sincronización o en una que tarda, no en cada comprobación rápida. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- «Tu tarjeta de Zigzag», en Acerca de Zigzag, se ha redibujado como una tarjeta de verdad: tu nombre más grande, «Desde» con el mes y el año, la Z grabada en la esquina y acabados de cristal esmerilado, lámina nacarada, grafito anodizado y papel de lino, cada uno con su nombre junto a la muestra. «Guardar como imagen» y «Compartir» crean una imagen de 2400 × 1500 con la tarjeta sobre un fondo a juego.
 
 ### Correcciones
 - Con Zigzag Mini abierto sobre una página, desplazarte sobre la página atenuada ya no mueve la página de detrás. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -56,4 +48,6 @@ Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés,
 - Con Favoritos por fila en Automático, los favoritos se reparten por igual entre sus filas: seis donde cabrían cuatro son dos filas de tres, no cuatro y dos.
 - Aprobar la actualización de una extensión que pide más permisos ya no te quita después lo que habías permitido, como la conexión de Bitwarden con su app para «Desbloquear con biometría». Gracias a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
 - Eliminar un perfil mientras sus extensiones aún se están iniciando ya no cierra Zigzag.
+- Contraseñas de iCloud se configura en las páginas de inicio de sesión aunque haya pestañas suspendidas: pedir los marcos de una pestaña suspendida ya no falla, como en Chrome.
+- The Marvellous Suspender y otras extensiones que crean alarmas vuelven a funcionar: crear una alarma ahora les devuelve una promesa, como en Chrome.
 
