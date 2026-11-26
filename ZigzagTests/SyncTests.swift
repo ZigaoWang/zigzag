@@ -92,7 +92,11 @@ import Testing
     var pushed = false
     /// The zone isn't in iCloud.
     var zoneMissing = false
-    private var token = 0
+    /// How far it has read, kept in the state as Zigzag keeps its own zone token.
+    private var token: Int {
+        get { session.state.zoneToken.flatMap { Int(String(decoding: $0, as: UTF8.self)) } ?? 0 }
+        set { session.updateState { $0.zoneToken = Data(String(newValue).utf8) } }
+    }
     private(set) var saves: [String] = []
     private(set) var deletes: [String] = []
     private(set) var sent = 0
@@ -422,7 +426,7 @@ extension SyncLibrary {
             #expect(mac.library.spaceNames == ["Personal"], "\(n) \(mac.library.contents.spaces.map { "\($0.id) \($0.bookmarks.map(\.url.lastPathComponent))" }) \(mac.session.state.base.keys.sorted()) \(mac.session.state.copies) \(mac.session.state.aliases.toServer) cloud \(cloud.records.keys.sorted())")
             #expect(mac.library.urls(in: "Personal").sorted() == ["x", "y", "z"])
             #expect(mac.library.contents.favorites.count == 1)
-            #expect(mac.library.contents.directory.all.filter { $0.name == "Work" }.count == 1)
+            #expect(mac.library.contents.directory.all.filter { $0.name == "Work" }.count == 1, "\(n)")
         }
         #expect(cloud.records.keys.filter { $0.hasPrefix("space.") }.count == 1)
         #expect(cloud.records.keys.filter { $0.hasPrefix("page.") }.count == 3)
@@ -1668,5 +1672,44 @@ extension SyncTests {
         a.sync(); b.sync()
         #expect(b.library.contents.directory.profile(work.id) != nil)
         #expect(b.library.contents.favorites.map(\.id) == [mail.id])
+    }
+
+    @Test func twoFirstSyncsAtOnceAgreeHoweverLateOneReads() {
+        var diverged = 0
+        for _ in 0..<12 {
+            let cloud = FakeCloud()
+            let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x")])]))
+            let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("y")])]))
+            a.fetch(); b.fetch()
+            a.send(); b.send()
+            a.sync()
+            // B reads A's copies only hours later.
+            b.clock += 7200
+            b.sync(); a.sync(); b.sync(); a.sync()
+            b.edit { $0.contents.spaces[$0.contents.spaces.count - 1].bookmarks.append(Sample.page("later")) }
+            b.sync(); a.sync()
+            let aURLs = a.library.contents.spaces.flatMap(\.bookmarks).map(\.url.lastPathComponent).sorted()
+            let bURLs = b.library.contents.spaces.flatMap(\.bookmarks).map(\.url.lastPathComponent).sorted()
+            if aURLs != bURLs || a.library.spaceNames != b.library.spaceNames || a.library.spaceNames != ["Personal"] || aURLs != ["later", "x", "y"] {
+                diverged += 1
+            }
+        }
+        #expect(diverged == 0, "\(diverged) of 12 diverged")
+    }
+
+    @Test func aSecondMacJoiningNormallyKeepsItsOwnDuplicatePins() {
+        var bad = 0
+        for _ in 0..<12 {
+            let cloud = FakeCloud()
+            let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x", "mine")])]))
+            a.sync()
+            // B joins minutes later with two pins of one address (two accounts on one site).
+            let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x", "account 1"), Sample.page("x", "account 2")])]), clock: a.clock + 300)
+            b.sync()
+            a.clock += 300
+            a.sync(); b.sync(); a.sync(); b.sync()
+            if a.library.titles(in: "Personal").count != 2 || b.library.titles(in: "Personal").count != 2 { bad += 1 }
+        }
+        #expect(bad == 0, "\(bad) of 12 lost a pin or diverged")
     }
 }

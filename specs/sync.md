@@ -40,8 +40,10 @@
   Test: SyncTests.aSecondMacsFirstSpaceIsMatchedByNameNotCopied
 - Two pinned pages or favorites whose addresses differ only after the # (a web app's views) → stay two.
   Test: SyncTests.pinsThatDifferOnlyAfterTheHashStayTwo
-- Sync turned on on two Macs at the same moment, both finding iCloud empty → for an hour after, their profiles, spaces, folders, pages and favorites are matched by name and address as they arrive, and each pair becomes one on both Macs. A space of the same name made on purpose on the other Mac in that hour is taken for the same one too.
+- Sync turned on on two Macs at the same moment, both finding iCloud empty → each leaves a record of what it sent, and from those records alone every Mac matches the two copies of each profile, space, folder, pinned page and favorite by name and address, one to one, the same way, keeping one of each, however late each reads. What either Mac adds afterwards, and anything on a Mac that joined when iCloud already had a library, is never matched this way.
   Test: SyncTests.twoMacsTurningSyncOnAtOnceMakeNoCopies
+  Test: SyncTests.twoFirstSyncsAtOnceAgreeHoweverLateOneReads
+  Test: SyncTests.aSecondMacJoiningNormallyKeepsItsOwnDuplicatePins
 - Something iCloud doesn't have → added to iCloud, never removed from this Mac.
   Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
 - iCloud's copy reset, or sync turned on again after it was removed from iCloud → merged again, and nothing is added twice. A Mac that was offline during a reset matches its items as before the reset, even renamed ones, and nothing is copied; but as in any first sync, iCloud's version of what matched wins, so what that Mac changed offline is lost, and what it removed offline comes back from the Mac that sent first.
