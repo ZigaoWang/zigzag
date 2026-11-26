@@ -32,11 +32,15 @@ Settings › Appearance › Sidebar from the screen edge (#363).
 - Rest the pointer on a tab's row → its page comes out beside the sidebar, in the same Zigzag Mini that opens over a page, as tall as the sidebar and a third of the screen wide. The sidebar keeps its width and place, and the page is laid out once, at that size.
   Test: EdgeSidebarTests.aPreviewWidensThePanelBesideTheSidebar
   Test: EdgeSidebarTests.aTileGroupPreviewStartsAtThePagePillSize
+- Change space in the panel while a page is out → a handover with no arrival: the page folds away, the panel stays out, and the empty page folds into its place, drawn as the window draws one, from the side the new space's list slid in on. No page of the new space is borrowed or shown by changing space; resting on a row there brings one out.
+  Test: EdgeHoverRoutingTests.theFoldFollowsTheSpaceList
 - It is the row's own page, still in the browser's list: closing the preview gives the page back to its tab, and the preview has no space chip to move it with.
   Test: InPageMiniHostTests.theEdgePreviewBorrowsTheRowsLivePage
   Test: InPageMiniHostTests.aBorrowedPreviewKeepsTheSpaceChipHidden
 - Move across a split's or tile group's parts → each part's page comes out as the pointer reaches it.
   Test: EdgeSidebarTests.aMultiPageRowReportsThePartUnderThePointer
+- Cross from one row to the next → the nil a row's tracking area sends on the way out does not close the page: the pointer still being among the rows is a crossing, not leaving.
+  Test: EdgeHoverRoutingTests.aCrossingBetweenRowsDoesNotCloseThePage
 - A row whose page is asleep or not loaded yet → a card with its name and why it isn't running, in the page's place. Resting on it never wakes the page.
   Test: EdgeSidebarTests.anAsleepRowShowsItsCardAndStaysAsleep
 - A row of Zigzag's own pages, like History or Settings → nothing comes out beside the sidebar; a click opens it in the browser window.

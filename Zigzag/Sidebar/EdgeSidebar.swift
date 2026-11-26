@@ -365,6 +365,8 @@ final class EdgeSidebar {
     private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
         guard isShowing, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
               preview?.tab !== tab else { return }
+        // A real page takes the blank pill's place.
+        host.showBlankSlate(false)
         let live = EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
         let previous = preview
         // The panel takes its full width first, so the page is laid out once at its final size.
@@ -395,6 +397,22 @@ final class EdgeSidebar {
         }
     }
 
+    /// Whether the pointer is over the panel's list, rows included.
+    private func pointerIsOverRows() -> Bool {
+        guard let panel, let host, panel.frame.contains(NSEvent.mouseLocation) else { return false }
+        let inHost = host.convert(panel.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        return host.cardFrame.contains(inHost)
+    }
+
+    /// Whether the pointer is over the page the panel is showing.
+    private func pointerIsOverPreview() -> Bool {
+        let mouse = NSEvent.mouseLocation
+        if preview?.window?.frame.contains(mouse) == true { return true }
+        guard let panel, let host, panel.frame.contains(mouse) else { return false }
+        let inHost = host.convert(panel.convertPoint(fromScreen: mouse), from: nil)
+        return host.pageFrame.contains(inHost)
+    }
+
     private func schedulePreviewClose() {
         closeWork?.cancel()
         closeWork = nil
@@ -403,7 +421,12 @@ final class EdgeSidebar {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 let mouse = NSEvent.mouseLocation
-                if self.preview?.window?.frame.contains(mouse) == true { return }
+                // A row's tracking area reports nothing while the pointer crosses from one row to the next, and the
+                // next row's report cancels this close — but only if it arrives in time. Move slowly, or stop between
+                // two rows, and the page closed and came back. The pointer still being among the rows means the nil
+                // was a crossing, not leaving.
+                guard EdgeHoverRouting.closesAfterNilHover(pointerOverRows: self.pointerIsOverRows(),
+                                                           pointerOverPreview: self.pointerIsOverPreview()) else { return }
                 self.closePreview()
             }
         }
@@ -449,9 +472,43 @@ final class EdgeSidebar {
         hide(animated: false)
     }
 
+    /// A space switch with the box out: the page folds away and the blank pill takes its place, in the same wide frame.
+    /// Nothing is lent and nothing is shown that wasn't asked for; resting on a row in the new space brings a page in.
+    private func handOverToBlank(from before: UUID?, to after: UUID?) {
+        guard isShowing, let panel, let host else {
+            closePreview(animated: false)
+            return
+        }
+        if preview == nil {
+            narrowPanel()
+            return
+        }
+        previewWork?.cancel()
+        previewWork = nil
+        closeWork?.cancel()
+        closeWork = nil
+        let previous = preview
+        preview = nil
+        previewTab = nil
+        // The wide frame stays while the box is out: this is a fold, not the panel narrowing.
+        host.pageShowing = true
+        panel.setFrame(previewPanelFrame == .zero ? panel.frame : previewPanelFrame, display: true)
+        host.placeCard()
+        host.showBlankSlate(true)
+        host.layoutSubtreeIfNeeded()
+        if let previous {
+            previous.onInPageMiniClosed = nil
+            previous.onInPageMiniDetached = nil
+            previous.closeInPage(focusBack: false, animated: true)
+        }
+        let slide = EdgePreviewRouting.spaceSlide(from: before, to: after, order: target?.tabManager.listedSpaces.map(\.id) ?? [])
+        host.showBlankSlateAnimatingIn(foldFromRight: slide == 0 ? shownOnRight : slide > 0)
+    }
+
     private func narrowPanel() {
         previewPanelFrame = .zero
         guard isShowing, let host, let panel else { return }
+        host.showBlankSlate(false)
         host.pageShowing = false
         if let target { host.cardWidth = target.edgeSidebarWidth }
         panel.setFrame(cardPanelFrame, display: true)
@@ -461,8 +518,9 @@ final class EdgeSidebar {
         guard preview != nil else { return }
         switch change {
         case .space:
-            // The row it came from is no longer on screen.
-            closePreview(animated: false)
+            // The row it came from is no longer on screen, so the page can't stay. The panel does: the box folds and
+            // the empty page lands in it, and no page of the new space is shown unasked (#545).
+            handOverToBlank(from: previewTab?.spaceID, to: target?.tabManager.currentSpaceID)
         case .structure:
             if previewTab?.isClosed == true { closePreview(animated: false) }
         case .selection, .content:
@@ -616,7 +674,10 @@ final class EdgeSidebarHost: NSView {
     var onRight = false { didSet { placeCard() } }
     var cardWidth: CGFloat = 0 { didSet { placeCard() } }
     /// A page is out beside the card.
-    var pageShowing = false
+    var pageShowing = false { didSet { placeCard() } }
+    /// The pill with no page in it: what a space switch hands the panel, drawn as the window draws an empty page, so
+    /// the handover arrives somewhere rather than on the previous space's page (#545).
+    private(set) lazy var blankSlate: NSView = makeBlankSlate()
 
     override var isFlipped: Bool { true }
 
@@ -643,6 +704,51 @@ final class EdgeSidebarHost: NSView {
 
     func placeCard() {
         container?.frame = cardFrame
+        if blankSlate.superview != nil { blankSlate.frame = pageFrame }
+    }
+
+    /// The empty page as the window draws it: the wordmark on the pill's ground, the same drawing Settings, History and
+    /// the error page use. Not a page, so nothing is borrowed and nothing has to be given back.
+    private func makeBlankSlate() -> NSView {
+        let pill = NSView()
+        pill.wantsLayer = true
+        pill.layer?.backgroundColor = cgColor(Tokens.Color.cardBackground)
+        pill.layer?.cornerRadius = Tokens.Radius.large
+        pill.layer?.cornerCurve = .continuous
+        pill.layer?.masksToBounds = true
+        let mark = WordmarkView()
+        mark.translatesAutoresizingMaskIntoConstraints = false
+        pill.addSubview(mark)
+        NSLayoutConstraint.activate([
+            mark.centerXAnchor.constraint(equalTo: pill.centerXAnchor),
+            mark.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            mark.widthAnchor.constraint(equalTo: pill.widthAnchor, multiplier: 0.46),
+            mark.heightAnchor.constraint(equalTo: mark.widthAnchor, multiplier: 1 / WordmarkView.aspect),
+        ])
+        return pill
+    }
+
+    /// Shows the blank pill in the page's room, or takes it away.
+    func showBlankSlate(_ showing: Bool) {
+        if showing {
+            if blankSlate.superview !== self { addSubview(blankSlate) }
+            blankSlate.frame = pageFrame
+        } else {
+            blankSlate.removeFromSuperview()
+        }
+    }
+
+    /// The blank pill arrives as a page does: it unfolds from the sidebar's side, over the page it replaces.
+    func showBlankSlateAnimatingIn(foldFromRight: Bool) {
+        guard blankSlate.superview != nil else { return }
+        let full = pageFrame
+        // Growing from the sidebar's side: the page's right edge when the sidebar is on the right.
+        blankSlate.frame = NSRect(x: foldFromRight ? full.maxX : full.minX, y: full.minY, width: 0, height: full.height)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Tokens.Motion.Role.drawer.duration(entering: true)
+            context.timingFunction = Tokens.Motion.Role.drawer.timing
+            self.blankSlate.animator().frame = full
+        }
     }
 
     override func layout() {

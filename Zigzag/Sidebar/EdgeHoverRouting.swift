@@ -1,0 +1,25 @@
+import Foundation
+
+/// When a row reports that no tab is hovered, the edge panel closes the preview after a moment (#534). A row's
+/// tracking area reports nothing while the pointer crosses from one row to the next, and the next row's report cancels
+/// the close — but only if it arrives inside that moment. Move slowly, or stop between two rows, and the page closed
+/// and came back: a flicker that reads as the preview fighting the list.
+enum EdgeHoverRouting {
+    /// Whether the delayed close should go ahead. The pointer being in the list, or on the page itself, means the nil
+    /// was a crossing or a departure over the page, not leaving the rows.
+    static func closesAfterNilHover(pointerOverRows: Bool, pointerOverPreview: Bool) -> Bool {
+        !pointerOverRows && !pointerOverPreview
+    }
+}
+
+/// Where a space switch's fold comes from: the list slides in from the side of the space that was picked, and the box
+/// folds from the same side (#545).
+enum EdgePreviewRouting {
+    /// 1 for a space later in the list (its list slides in from the right), -1 for one before it, 0 when the order
+    /// can't say (the same space, or one not listed).
+    static func spaceSlide(from before: UUID?, to after: UUID?, order: [UUID]) -> Int {
+        guard let before, let after, before != after,
+              let from = order.firstIndex(of: before), let to = order.firstIndex(of: after) else { return 0 }
+        return to > from ? 1 : -1
+    }
+}
