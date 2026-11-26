@@ -143,14 +143,22 @@ final class SyncSettingsRows {
         case .syncing:
             return (String(localized: "Syncing…", comment: "Status under Sync with iCloud in Settings › General."), "", remove)
         case .synced(let date):
-            guard let date, now.timeIntervalSince(date) >= 60 else {
-                return (String(localized: "Up to date", comment: "Status under Sync with iCloud in Settings › General: everything has synced."), "", remove)
+            let date = date ?? now
+            let age = now.timeIntervalSince(date)
+            guard age >= 60 else {
+                return (String(localized: "Last synced just now", comment: "Status under Sync with iCloud in Settings › General: the last sync was less than a minute ago."), "", remove)
             }
-            let formatter = RelativeDateTimeFormatter()
-            formatter.locale = Words.locale
-            formatter.unitsStyle = .full
-            let ago = formatter.localizedString(for: date, relativeTo: now)
-            return (String(localized: "Last synced \(ago)", comment: "Status under Sync with iCloud in Settings › General. The placeholder says how long ago, like “2 minutes ago”."), "", remove)
+            let when: String
+            if age < 24 * 60 * 60 {
+                let formatter = RelativeDateTimeFormatter()
+                formatter.locale = Words.locale
+                formatter.dateTimeStyle = .named
+                formatter.unitsStyle = .full
+                when = formatter.localizedString(for: date, relativeTo: now)
+            } else {
+                when = date.formatted(Date.FormatStyle(locale: Words.locale).month(.abbreviated).day().hour().minute())
+            }
+            return (String(localized: "Last synced \(when)", comment: "Status under Sync with iCloud in Settings › General. The placeholder says when: how long ago, like “2 minutes ago”, or for more than a day, a date and time, like “Nov 24 at 6:53 AM”."), "", remove)
         case .notSignedIn:
             return (String(localized: "Not signed in to iCloud", comment: "Status under Sync with iCloud in Settings › General."), "",
                     String(localized: "Open System Settings", comment: "Button beside “Not signed in to iCloud” in Settings › General: opens Apple Account in System Settings."))
@@ -201,7 +209,8 @@ final class SyncSettingsRows {
     /// Every status the line can show, for the layout tests and pictures.
     static let everyStatus: [(name: String, status: ICloudSync.Status, isOn: Bool, hasCopy: Bool)] = [
         ("off", .off, false, false), ("off with a copy", .off, false, true), ("syncing", .syncing, true, true),
-        ("up to date", .synced(Date()), true, true), ("last synced", .synced(Date().addingTimeInterval(-120)), true, true),
+        ("just synced", .synced(Date()), true, true), ("last synced", .synced(Date().addingTimeInterval(-120)), true, true),
+        ("last synced days ago", .synced(Date().addingTimeInterval(-3 * 86400)), true, true),
         ("not signed in", .notSignedIn, true, true), ("other account", .otherAccount, true, true), ("restricted", .restricted, true, true),
         ("full", .full, true, true), ("offline", .offline, true, true), ("removed elsewhere", .removedElsewhere, false, false),
         ("not entitled", .notEntitled, true, false), ("backup failed", .backupFailed, false, false), ("failed", .failed("The request timed out."), true, true),

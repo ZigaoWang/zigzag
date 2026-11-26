@@ -35,10 +35,25 @@ final class ICloudSync {
     }
 
     var status: Status {
-        guard let held = session?.state.heldNames, !held.isEmpty else { return shown }
-        return .removalsHeld(SyncKind.count(held), shown)
+        let current = Self.status(line.status, lastSynced: session?.state.lastSynced)
+        guard let held = session?.state.heldNames, !held.isEmpty else { return current }
+        return .removalsHeld(SyncKind.count(held), current)
     }
-    private var shown: Status = .off { didSet { if oldValue != shown { changed.send() } } }
+    /// What sync is doing; the line shows it through `line`, which keeps quick catch-ups quiet.
+    private var shown: Status = .off { didSet { if oldValue != shown { line.update(shown, lastSynced: quietSince) } } }
+    private let line = SyncStatusLine()
+    /// The last sync, once the first has completed here: work after it is background work.
+    private var quietSince: Date? {
+        guard let state = session?.state, state.merged, !state.resumed else { return nil }
+        return state.lastSynced
+    }
+    private var lastSyncedSeen: Date?
+
+    /// Synced, as of the last contact with iCloud the state knows of.
+    static func status(_ shown: Status, lastSynced: Date?) -> Status {
+        guard case .synced(let date) = shown, let lastSynced, lastSynced > date ?? .distantPast else { return shown }
+        return .synced(lastSynced)
+    }
     /// Fires when the status changes.
     let changed = Signal<Void>()
 
@@ -75,6 +90,14 @@ final class ICloudSync {
 
     private init() {
         retry.onRetry = { [weak self] in self?.tryAgain() }
+        line.onChange = { [weak self] in self?.changed.send() }
+    }
+
+    /// Last synced moved: the line says so.
+    private func noteLastSynced() {
+        guard let date = session?.state.lastSynced, date != lastSyncedSeen else { return }
+        lastSyncedSeen = date
+        if case .synced = line.status { changed.send() }
     }
 
     // MARK: Starting and stopping
@@ -276,7 +299,10 @@ final class ICloudSync {
 
     private func start(state: SyncState) {
         let session = SyncSession(host: host, state: state)
-        session.onChange = { [weak self] in self?.saveSoon() }
+        session.onChange = { [weak self] in
+            self?.saveSoon()
+            self?.noteLastSynced()
+        }
         session.onTookICloud = { [weak self] in self?.tellTookICloud() }
         session.onHeld = { [weak self] in
             self?.changed.send()
@@ -383,6 +409,8 @@ final class ICloudSync {
                 if session.state.resumed { session.updateState { $0.resumed = false } }
                 retry.succeeded()
             }
+            guard self.session === session else { return }
+            if case .synced = shown { shown = .synced(session.state.lastSynced) }
         } catch {
             Self.log.error("syncing failed: \(error.localizedDescription, privacy: .public)")
             guard self.session === session else { return }
@@ -620,6 +648,50 @@ final class ICloudSync {
         case .managedAccountRestricted: return .restricted
         default: return nil
         }
+    }
+}
+
+// MARK: - The status line
+
+/// The status the line under the switch shows. Once the first sync has completed, a fetch or send keeps the line as
+/// it was and says Syncing… only when it's still going after `delay`; everything else shows at once.
+final class SyncStatusLine {
+    static let delay: TimeInterval = 1.5
+
+    /// Runs the work after the delay and returns what cancels it; tests run it by hand.
+    var schedule: (TimeInterval, @escaping @MainActor () -> Void) -> () -> Void = { delay, work in
+        let item = DispatchWorkItem { MainActor.assumeIsolated { work() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+        return { item.cancel() }
+    }
+    var onChange: (() -> Void)?
+    private(set) var status: ICloudSync.Status = .off
+    private var cancelPending: (() -> Void)?
+
+    /// `lastSynced`: nil before the first sync has completed, or turned on again, which shows Syncing… at once.
+    func update(_ new: ICloudSync.Status, lastSynced: Date?) {
+        guard new == .syncing, let lastSynced else {
+            cancel()
+            set(new)
+            return
+        }
+        if status == .off { set(.synced(lastSynced)) }
+        guard status != .syncing, cancelPending == nil else { return }
+        cancelPending = schedule(Self.delay) { [weak self] in
+            self?.cancelPending = nil
+            self?.set(.syncing)
+        }
+    }
+
+    private func set(_ new: ICloudSync.Status) {
+        guard new != status else { return }
+        status = new
+        onChange?()
+    }
+
+    private func cancel() {
+        cancelPending?()
+        cancelPending = nil
     }
 }
 

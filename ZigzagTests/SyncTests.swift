@@ -956,8 +956,11 @@ extension SyncLibrary {
         #expect(SyncSettingsRows.describe(.off, hasCopy: false, now: now).text.isEmpty)
         #expect(SyncSettingsRows.describe(.off, hasCopy: true, now: now).action != nil)
         #expect(SyncSettingsRows.describe(.synced(now.addingTimeInterval(-10)), hasCopy: true, now: now).text
-                == String(localized: "Up to date", comment: "Status under Sync with iCloud in Settings › General: everything has synced."))
+                == String(localized: "Last synced just now", comment: "Status under Sync with iCloud in Settings › General: the last sync was less than a minute ago."))
         #expect(SyncSettingsRows.describe(.synced(now.addingTimeInterval(-120)), hasCopy: true, now: now).text.contains("2"))
+        // Older than a day: the date and time it last synced.
+        let old = now.addingTimeInterval(-3 * 86400)
+        #expect(SyncSettingsRows.describe(.synced(old), hasCopy: true, now: now).text.contains(old.formatted(Date.FormatStyle(locale: Words.locale).day())))
         let signedOut = SyncSettingsRows.describe(.notSignedIn, hasCopy: true, now: now)
         #expect(signedOut.action == String(localized: "Open System Settings", comment: "Button beside “Not signed in to iCloud” in Settings › General: opens Apple Account in System Settings."))
         #expect(!SyncSettingsRows.describe(.full, hasCopy: true, now: now).text.isEmpty)
@@ -965,6 +968,79 @@ extension SyncLibrary {
         let settings = SettingsView(pane: .general)
         #expect(!settings.syncRows.toggle.isOn)
         #expect(!settings.syncRows.statusRow.isAvailable)
+    }
+
+    private func makeLine(_ waits: Waits) -> SyncStatusLine {
+        let line = SyncStatusLine()
+        line.schedule = { [waits] delay, work in
+            waits.delays.append(delay)
+            waits.pending = work
+            return { [weak waits] in waits?.pending = nil }
+        }
+        return line
+    }
+
+    @Test func aQuickCatchUpDoesntSaySyncing() {
+        let waits = Waits()
+        let line = makeLine(waits)
+        var changes = 0
+        let before = Date(timeIntervalSince1970: 1_800_000_000), after = before + 30
+        line.update(.synced(before), lastSynced: before)
+        line.onChange = { changes += 1 }
+        line.update(.syncing, lastSynced: before)
+        #expect(line.status == .synced(before))
+        line.update(.synced(after), lastSynced: after)
+        #expect(line.status == .synced(after))
+        #expect(waits.pending == nil && changes == 1)
+        // At launch, the last sync shows while the first catch-up runs.
+        let launched = makeLine(Waits())
+        launched.update(.syncing, lastSynced: before)
+        #expect(launched.status == .synced(before))
+    }
+
+    @Test func aSlowCatchUpAndTheFirstSyncSaySyncing() {
+        let waits = Waits()
+        let line = makeLine(waits)
+        let before = Date(timeIntervalSince1970: 1_800_000_000)
+        line.update(.synced(before), lastSynced: before)
+        line.update(.syncing, lastSynced: before)
+        #expect(waits.delays == [SyncStatusLine.delay] && SyncStatusLine.delay == 1.5)
+        waits.runAll()
+        #expect(line.status == .syncing)
+        // The first sync, or turned on again: Syncing… at once.
+        let first = makeLine(Waits())
+        first.update(.syncing, lastSynced: nil)
+        #expect(first.status == .syncing)
+    }
+
+    @Test func lastSyncedMovesAfterAnEmptyFetch() async throws {
+        let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let before = try #require(a.session.state.lastSynced)
+        a.clock += 300
+        try await ICloudSync.catchUp(a.session, through: a)
+        #expect(a.saves.isEmpty && a.deletes.isEmpty)
+        #expect(a.session.state.lastSynced == a.clock)
+        #expect(ICloudSync.status(.synced(before), lastSynced: a.session.state.lastSynced) == .synced(a.clock))
+        // Kept in the state, so it's there after a relaunch.
+        let relaunched = try JSONDecoder().decode(SyncState.self, from: JSONEncoder().encode(a.session.state))
+        #expect(relaunched.lastSynced == a.clock)
+    }
+
+    @Test func errorsWinOverLastSynced() {
+        let waits = Waits()
+        let line = makeLine(waits)
+        let before = Date(timeIntervalSince1970: 1_800_000_000)
+        line.update(.synced(before), lastSynced: before)
+        line.update(.offline, lastSynced: before)
+        #expect(line.status == .offline)
+        // A quick retry keeps saying so.
+        line.update(.syncing, lastSynced: before)
+        #expect(line.status == .offline)
+        #expect(ICloudSync.status(.offline, lastSynced: before + 60) == .offline)
+        let lastSynced = SyncSettingsRows.describe(.synced(before), hasCopy: true).text
+        for status: ICloudSync.Status in [.offline, .notSignedIn, .otherAccount, .full, .failed("x"), .removalsHeld([.page: 2], .synced(before))] {
+            #expect(SyncSettingsRows.describe(status, hasCopy: true).text != lastSynced)
+        }
     }
 
     @Test func anUnrelatedDefaultsChangeSendsNothing() throws {
@@ -2049,7 +2125,7 @@ extension SyncTests {
         #expect(again.session.state.removed[SyncName.page(x.id)] == nil)
     }
 
-    @Test func afterASendTheLineSaysUpToDateWhateverIsHeld() {
+    @Test func afterASendTheLineSaysLastSyncedWhateverIsHeld() {
         let date = Date(timeIntervalSince1970: 1_800_000_000)
         #expect(ICloudSync.status(afterSending: .syncing, merged: true, lastSynced: date) == .synced(date))
         #expect(ICloudSync.status(afterSending: .offline, merged: true, lastSynced: date) == .offline)

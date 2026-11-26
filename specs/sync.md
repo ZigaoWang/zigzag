@@ -121,8 +121,17 @@
   Test: SyncTests.aKindOnlyANewerZigzagKnowsIsLeftAlone
 
 ## iCloud's state
-- Under the switch → Syncing…, Up to date, or Last synced and how long ago, with Remove from iCloud….
+- Under the switch, once synced → Last synced and when: just now, how long ago (5 minutes ago), or for more than a day the date and time, kept current while Settings is open, with Remove from iCloud…. Never before the first sync has completed.
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
+- Last synced → the last time a fetch or send went through, even when nothing changed; kept across relaunches.
+  Test: SyncTests.lastSyncedMovesAfterAnEmptyFetch
+- Syncing… → only for the first sync, after turning sync on, or a fetch or send still going after 1.5 seconds. A quick catch-up (coming back to Zigzag, a wake, the timer, a retry, a push) leaves the line as it was.
+  Test: SyncTests.aQuickCatchUpDoesntSaySyncing
+  Test: SyncTests.aSlowCatchUpAndTheFirstSyncSaySyncing
+- A defaults change sync doesn't carry (a window's frame) → nothing is sent and the line doesn't change.
+  Test: SyncTests.anUnrelatedDefaultsChangeSendsNothing
+- Offline and trying again, not signed in, another account, iCloud full, removals held or a failure → shown instead of Last synced.
+  Test: SyncTests.errorsWinOverLastSynced
 - Not signed in to iCloud → says so, with Open System Settings; nothing on this Mac changes.
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
 - Signed in to a different iCloud account → sync stops and says so; this Mac's library is never sent to that account until sync is turned off and on again, even when its sync state couldn't be read.
@@ -196,9 +205,9 @@
   Test: SyncTests.anEditFoundAtLaunchCountsFromWhenItWasMade
 - Zigzag ended (a crash, a power cut) after sync saved its state but before Library.json was saved → at the next launch what had just arrived is laid out again from iCloud, never sent as removed. Library.json is saved before sync's state.
   Test: SyncTests.endingBeforeLibraryJsonIsSavedDoesntRemoveWhatJustArrived
-- Removals held → Settings says how many of what, that they're hidden here and stay in iCloud until you choose, and what else sync is doing (offline, signed out, iCloud full). Remove Everywhere asks first, naming how many of what. Library.json laid out from iCloud at launch because it was older → a toast says so. After Restore or Remove Everywhere, the line says Up to date as soon as nothing is left to send.
+- Removals held → Settings says how many of what, that they're hidden here and stay in iCloud until you choose, and what else sync is doing (offline, signed out, iCloud full). Remove Everywhere asks first, naming how many of what. Library.json laid out from iCloud at launch because it was older → a toast says so. After Restore or Remove Everywhere, the line says Last synced as soon as nothing is left to send.
   Test: SyncTests.aLibraryPutBackFromAnOldCopyIsntSentAsRemovals
   Test: SyncTests.aLibraryOlderThanTheOneLastSyncedSendsNothing
-  Test: SyncTests.afterASendTheLineSaysUpToDateWhateverIsHeld
+  Test: SyncTests.afterASendTheLineSaysLastSyncedWhateverIsHeld
 - A preference changed while sync was off → counts from when it changed (noted while off), or from when sync was turned on, never from the library file's date, so a later change on another Mac wins and an earlier one doesn't.
   Test: SyncTests.aPreferenceChangedWhileOffCountsFromWhenItChanged
