@@ -303,7 +303,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                                                           name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
         // Plugged in or on battery, Low Power Mode on or off: clear glass comes and goes with it.
         PowerSaving.start()
-        NotificationCenter.default.addObserver(self, selector: #selector(displayOptionsChanged), name: PowerSaving.changed, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(powerChanged), name: PowerSaving.changed, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(placeAddress), name: BrowserRootView.addressPlaceChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(placeSidebarSide), name: BrowserRootView.sidebarSideChanged, object: nil)
         placeAddress()
@@ -709,6 +709,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func displayOptionsChanged() { applySpaceColor(animated: false) }
+
+    /// The power source reports often (a battery's level); only a change in power saving repaints the glass.
+    @objc private func powerChanged() {
+        guard PowerSaving.isOn != paintedPowerSaving else { return }
+        paintedPowerSaving = PowerSaving.isOn
+        applySpaceColor(animated: false)
+    }
+    private var paintedPowerSaving = PowerSaving.isOn
 
     /// Settings › Appearance › Address bar above the page: the sidebar's own back, forward, reload and address move
     /// to the bar above the page, or back. The same views, so everything that hangs from them follows; what was open
