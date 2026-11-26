@@ -33,6 +33,8 @@
   Test: CRXPackageTests.checkForUpdatesSaysWhatHappened
 - An update that asks for nothing new → replaces the running version; one that asks for more, or changes the search engine, Zigzag's pages or outside messaging → waits for your approval.
   Test: ExtensionSecurityTests.updatesThatTakeOverMoreWait
+- An update or a reinstall over an install → keeps what you allowed it later, like native messaging or an optional site, while the new version still asks for it, through a relaunch too; what the new version no longer asks for is dropped, and removing the extension forgets it all.
+  Test: ExtensionUpdateGrantsTests.aHeldBackUpdateKeepsGrantedOptionalPermissions
 - A folder extension whose manifest now asks for more → gets only what you allowed before.
   Test: ExtensionSecurityTests.aFolderThatNowAsksForMoreWaitsForThePerson
 

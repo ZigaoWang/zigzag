@@ -11,6 +11,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Changed
 - Compatibility mode is now the first row of This Site in Site Controls, above the rows it turns off. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### Fixed
+- Approving an extension update that asks for more no longer takes back what you allowed it later, like Bitwarden's connection to its app for Unlock with biometrics. Thanks to [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
