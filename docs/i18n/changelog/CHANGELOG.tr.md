@@ -4,6 +4,10 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ## [Unreleased]
 
+### Düzeltmeler
+- ⌘T ile az önce açtığınız bir sekmeyi kapatmak, Safari ve Chrome’daki gibi, alttaki sekmeye değil bulunduğunuz sekmeye geri götürür.
+- Ekranın kenarından açılan kenar çubuğunun sayfa önizlemesi, bir sekmeden diğerine geçerken artık kapanıp geri gelmez, imleç sekmelerden ve sayfadan kenar çubuğunun boş kısmına geçtiğinde kapanır ve eklentilere artık ayrı bir pencere olarak görünmez. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
 ## [0.10.0] - 2026-11-25
 
 Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç yeni dilde Zigzag; kaydedilen dosyayı devreden indirme kuralları; en son ne zaman güncellendiğini gösteren canlı klasörler; ve Çince Pinyin yazarken İngilizceye geçince fazladan boşluk kalmaması.

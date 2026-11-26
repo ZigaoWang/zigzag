@@ -4,6 +4,10 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
+### Correzioni
+- Chiudendo un pannello appena aperto con ⌘T si torna al pannello in cui eri, come in Safari e Chrome, invece che al pannello sotto.
+- L’anteprima della pagina della barra laterale dal bordo dello schermo non si chiude più per poi tornare mentre passi da un pannello al successivo, si ripiega quando il puntatore lascia i pannelli e la pagina per la parte vuota della barra laterale, e non compare più alle estensioni come una finestra a sé. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, francese, spagnolo e russo; regole di download che trasferiscono il file salvato; cartelle live che dicono quando si sono aggiornate l’ultima volta; e niente più spazi di troppo quando scrivi in pinyin cinese e passi all’inglese.

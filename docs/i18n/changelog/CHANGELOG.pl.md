@@ -4,6 +4,10 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
+### Naprawiono
+- Zamknięcie karty, którą właśnie otwarto skrótem ⌘T, wraca do karty, na której byłeś, tak jak w Safari i Chrome, a nie do karty poniżej.
+- Podgląd strony w pasku bocznym wysuwanym od krawędzi ekranu nie zamyka się już i nie wraca, gdy przesuwasz wskaźnik z jednej karty na następną, zwija się, gdy wskaźnik opuści karty i stronę i trafi na puste miejsce paska bocznego, i nie jest już widoczny dla rozszerzeń jako osobne okno. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.

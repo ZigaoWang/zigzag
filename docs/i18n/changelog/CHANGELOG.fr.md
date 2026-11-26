@@ -4,6 +4,10 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Corrections
+- Fermer un onglet que vous venez d’ouvrir avec ⌘T vous ramène à l’onglet où vous étiez, comme dans Safari et Chrome, au lieu de l’onglet situé en dessous.
+- L’aperçu de page de la barre latérale depuis le bord de l’écran ne se ferme plus pour revenir quand vous passez d’un onglet au suivant, se replie quand le pointeur quitte les onglets et la page pour la partie vide de la barre latérale, et n’apparaît plus aux extensions comme une fenêtre à part. Merci à [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, au français, à l’espagnol et au russe ; des règles de téléchargement qui transfèrent le fichier enregistré ; des dossiers dynamiques qui indiquent leur dernière mise à jour ; et la saisie en pinyin chinois suivie d’un passage à l’anglais sans espaces parasites.

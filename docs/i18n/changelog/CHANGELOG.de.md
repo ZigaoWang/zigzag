@@ -4,6 +4,10 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 
 ## [Unreleased]
 
+### Behoben
+- Wenn du einen Tab schließt, den du gerade mit ⌘T geöffnet hast, kommst du zurück zum vorherigen Tab, wie in Safari und Chrome, statt zum Tab darunter.
+- Die Seitenvorschau der Seitenleiste vom Bildschirmrand schließt sich nicht mehr und kommt wieder, wenn du von einem Tab zum nächsten fährst, klappt wieder ein, wenn der Zeiger die Tabs und die Seite verlässt und in den leeren Teil der Seitenleiste wandert, und erscheint für Erweiterungen nicht mehr als eigenes Fenster. Danke an [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, Französisch, Spanisch und Russisch; Downloadregeln, die die gesicherte Datei übergeben; Live-Ordner, die zeigen, wann sie zuletzt aktualisiert wurden; und chinesisches Pinyin tippen und dann zu Englisch wechseln, ohne dass Leerzeichen übrig bleiben.
