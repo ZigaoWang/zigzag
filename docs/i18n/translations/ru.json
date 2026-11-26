@@ -15652,10 +15652,10 @@
         "value": "Не удалось сначала сохранить резервную копию, поэтому синхронизация по-прежнему выключена."
       }
     },
-    "Many things were removed on this Mac, so sync is paused": {
+    "Many things were removed on this Mac at once. They’re still in iCloud.": {
       "stringUnit": {
         "state": "translated",
-        "value": "На этом Mac удалено много объектов, поэтому синхронизация приостановлена"
+        "value": "На этом Mac сразу удалено много объектов. В iCloud они пока остались."
       }
     },
     "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {

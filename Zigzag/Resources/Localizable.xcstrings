@@ -1246,85 +1246,85 @@
         }
       }
     },
-    "Many things were removed on this Mac, so sync is paused" : {
-      "comment" : "Status under Sync with iCloud in Settings › General, when many spaces, pinned tabs or favorites went at once (an old copy of the library put back, say).",
+    "Many things were removed on this Mac at once. They’re still in iCloud." : {
+      "comment" : "Status under Sync with iCloud in Settings › General, and a toast, when many spaces, pinned tabs or favorites went missing at once at launch or when sync was turned on (an old copy of the library put back, say). The rest keeps syncing.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auf diesem Mac wurde vieles entfernt, daher ist die Synchronisierung angehalten"
+            "value" : "Auf diesem Mac wurde auf einmal vieles entfernt. In iCloud ist noch alles da."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se eliminaron muchas cosas en este Mac, así que la sincronización está en pausa"
+            "value" : "Se eliminaron muchas cosas a la vez en este Mac. Siguen en iCloud."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beaucoup d’éléments ont été supprimés sur ce Mac, la synchronisation est donc en pause"
+            "value" : "Beaucoup d’éléments ont été supprimés d’un coup sur ce Mac. Ils sont toujours dans iCloud."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Molti elementi sono stati rimossi su questo Mac, quindi la sincronizzazione è in pausa"
+            "value" : "Molti elementi sono stati rimossi tutti insieme su questo Mac. Sono ancora in iCloud."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacで多くの項目が削除されたため、同期を一時停止しています"
+            "value" : "このMacで多くの項目が一度に削除されました。iCloudにはまだ残っています。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 Mac에서 많은 항목이 제거되어 동기화가 일시 정지되었습니다"
+            "value" : "이 Mac에서 많은 항목이 한꺼번에 제거되었습니다. iCloud에는 아직 남아 있습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er is veel verwijderd op deze Mac, dus synchronisatie is gepauzeerd"
+            "value" : "Er is op deze Mac in één keer veel verwijderd. Het staat nog in iCloud."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Na tym Macu usunięto wiele elementów, więc synchronizacja jest wstrzymana"
+            "value" : "Na tym Macu usunięto naraz wiele elementów. Wciąż są w iCloud."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muitos itens foram removidos neste Mac, então a sincronização está pausada"
+            "value" : "Muitos itens foram removidos de uma vez neste Mac. Eles ainda estão no iCloud."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "На этом Mac удалено много объектов, поэтому синхронизация приостановлена"
+            "value" : "На этом Mac сразу удалено много объектов. В iCloud они пока остались."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu Mac’te çok sayıda öge kaldırıldı, bu yüzden eşzamanlama duraklatıldı"
+            "value" : "Bu Mac’te çok sayıda öge aynı anda kaldırıldı. Hâlâ iCloud’dalar."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 上一次性移除了许多内容，因此同步已暂停"
+            "value" : "这台 Mac 上一次移除了许多内容。它们仍在 iCloud 中。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台 Mac 上一次性移除了許多內容，因此同步已暫停"
+            "value" : "這台 Mac 上一次移除了許多內容。它們仍在 iCloud 中。"
           }
         }
       }
@@ -2326,7 +2326,7 @@
       }
     },
     "Remove Everywhere" : {
-      "comment" : "Button beside “Many things were removed on this Mac, so sync is paused” in Settings › General: removes them from iCloud and the other Macs too.",
+      "comment" : "Button beside “Many things were removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2409,7 +2409,7 @@
       }
     },
     "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too." : {
-      "comment" : "Explanation under “Many things were removed on this Mac, so sync is paused” in Settings › General. Restore and Remove Everywhere are the two buttons beside it.",
+      "comment" : "Explanation under “Many things were removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -137210,7 +137210,7 @@
       }
     },
     "Restore" : {
-      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nButton in the Import window's question when a Zigzag backup is opened from Finder.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.\nButton beside “Many things were removed on this Mac, so sync is paused” in Settings › General: brings them back from iCloud.",
+      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nButton in the Import window's question when a Zigzag backup is opened from Finder.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.\nButton beside “Many things were removed on this Mac at once” in Settings › General: brings them back from iCloud.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -146512,7 +146512,7 @@
       }
     },
     "Settings…" : {
-      "comment" : "Zigzag menu item, and a command in the command bar.",
+      "comment" : "Zigzag menu item, and a command in the command bar.\nButton in the toast saying many things were removed on this Mac at once: opens Settings › General.",
       "localizations" : {
         "de" : {
           "stringUnit" : {

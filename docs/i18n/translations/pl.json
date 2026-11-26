@@ -15603,10 +15603,10 @@
         "value": "Nie udało się najpierw zapisać kopii zapasowej, więc synchronizacja jest nadal wyłączona."
       }
     },
-    "Many things were removed on this Mac, so sync is paused": {
+    "Many things were removed on this Mac at once. They’re still in iCloud.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Na tym Macu usunięto wiele elementów, więc synchronizacja jest wstrzymana"
+        "value": "Na tym Macu usunięto naraz wiele elementów. Wciąż są w iCloud."
       }
     },
     "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {

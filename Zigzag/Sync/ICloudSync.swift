@@ -97,6 +97,18 @@ final class ICloudSync {
         }
     }
 
+    /// Removals held: said in a toast too, not only in Settings, once the windows are up.
+    private func tellHeld() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self, self.status == .removalsHeld,
+                  let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            let text = SyncSettingsRows.describe(.removalsHeld, hasCopy: true).text
+            let settings = String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar.")
+            controller.promptToast(text, symbol: "exclamationmark.icloud", duration: 12,
+                                   action: (title: settings, run: { SettingsPage.open(.general, in: controller) }))
+        }
+    }
+
     /// Removals held: the library here as it was before them, from iCloud, with what else changed here kept.
     func bringBackRemovals() {
         session?.bringBackHeld()
@@ -182,11 +194,15 @@ final class ICloudSync {
     private func start(state: SyncState) {
         let session = SyncSession(host: host, state: state)
         session.onChange = { [weak self] in self?.saveSoon() }
-        session.onHeld = { [weak self] in self?.changed.send() }
+        session.onHeld = { [weak self] in
+            self?.changed.send()
+            if self?.session?.state.heldRemovals != nil { self?.tellHeld() }
+        }
         session.onRemovedElsewhere = { [weak self] in self?.zoneDeleted(reset: false) }
         session.onNeedsFetch = { [weak self] in self?.pushDebouncer.call { self?.fetchSoon(after: 0) } }
         self.session = session
         watchLibrary()
+        session.checkAfterLaunch()
         // CKSyncEngine listens for pushes too, but its own fetch on one goes through a scheduler that can refuse it.
         NSApplication.shared.registerForRemoteNotifications()
         shown = .syncing
@@ -571,6 +587,10 @@ final class SyncRetry {
 final class AppSyncHost: SyncHost {
     /// While it writes, the library's change signal isn't one made here.
     private(set) var isWriting = false
+
+    var libraryStamp: Date? {
+        (try? FileManager.default.attributesOfItem(atPath: Paths.library.path))?[.modificationDate] as? Date
+    }
 
     func read() -> SyncLibrary {
         let library = Library.shared

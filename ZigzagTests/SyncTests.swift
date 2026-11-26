@@ -64,6 +64,7 @@ import Testing
 /// A library in memory, as a Mac's.
 @MainActor final class MemoryHost: SyncHost {
     var library: SyncLibrary
+    var libraryStamp: Date?
     init(_ library: SyncLibrary) { self.library = library }
     func read() -> SyncLibrary { library }
     func write(_ library: SyncLibrary) {
@@ -1043,34 +1044,112 @@ extension SyncLibrary {
         twoMacs(Sample.library([Sample.space("Personal", (0..<40).map { Sample.page("p\($0)") })]))
     }
 
+    /// Zigzag launched with `library` in Library.json.
+    private func relaunch(_ mac: FakeMac, with library: SyncLibrary) {
+        mac.library = library
+        mac.session.checkAfterLaunch()
+    }
+
     @Test func aLibraryPutBackFromAnOldCopyIsntSentAsRemovals() {
         let (cloud, a, b) = manyPages()
         let records = cloud.records.count
-        // An old Library.json put back: 35 of 40 pages gone at once, and a page pinned since.
-        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeLast(35) } }
+        // An old Library.json put back: 35 of 40 pages gone at once.
+        var old = a.library
+        old.editSpace("Personal") { $0.bookmarks.removeLast(35) }
+        relaunch(a, with: old)
         #expect(a.session.state.heldRemovals == 35)
         #expect(a.saves.isEmpty && a.deletes.isEmpty)
-        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("new")) } }
-        a.sync()
-        #expect(cloud.records.count == records)
         #expect(SyncSettingsRows.describe(.removalsHeld, hasCopy: true).second != nil)
-        // Restore: iCloud's pages come back, and the page pinned since stays and goes up.
+        // A page pinned since goes up at once; the removals don't.
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("new")) } }
+        a.sync(); b.sync()
+        #expect(cloud.records.count == records + 1)
+        #expect(b.library.urls(in: "Personal").count == 41)
+        // Restore: iCloud's pages come back.
         a.session.bringBackHeld()
         a.sync(); b.sync()
         #expect(a.session.state.heldRemovals == nil)
         #expect(a.library.urls(in: "Personal").count == 41 && a.library.urls(in: "Personal").contains("new"))
         #expect(b.library.urls(in: "Personal").count == 41)
-        // A few removed by hand go up as usual.
-        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeLast(3) } }
-        #expect(a.session.state.heldRemovals == nil)
     }
 
     @Test func manyRemovalsSentWhenAsked() {
         let (_, a, b) = manyPages()
-        a.edit { $0.editSpace("Personal") { $0.bookmarks.removeLast(35) } }
+        var old = a.library
+        old.editSpace("Personal") { $0.bookmarks.removeLast(35) }
+        relaunch(a, with: old)
         a.session.sendHeld()
         a.sync(); b.sync()
         #expect(b.library.urls(in: "Personal").count == 5)
+        #expect(a.library.urls(in: "Personal").count == 5)
+    }
+
+    @Test func restoringAnOldCopyTakesICloudsVersionOfEverythingElse() {
+        let (_, a, b) = manyPages()
+        let old = a.library
+        // Since then: p1 renamed and p2 removed by hand, on B.
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[1].title = "Renamed"; $0.bookmarks.remove(at: 2) } }
+        b.sync(); a.sync()
+        // A's Library.json put back from the old copy, with 35 of its pages lost too.
+        var rolled = old
+        rolled.editSpace("Personal") { $0.bookmarks.removeLast(35) }
+        a.clock += 100
+        relaunch(a, with: rolled)
+        #expect(a.session.state.heldRemovals != nil)
+        a.session.bringBackHeld()
+        a.sync(); b.sync(); a.sync()
+        for mac in [a, b] {
+            #expect(mac.library.titles(in: "Personal")[1] == "Renamed", "stale title sent")
+            #expect(!mac.library.urls(in: "Personal").contains("p2"), "deleted pin resurrected")
+            #expect(mac.library.urls(in: "Personal").count == 39)
+        }
+    }
+
+    @Test func removingASpaceAndItsPinsByHandIsSentAtOnce() {
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", (0..<20).map { Sample.page("p\($0)") }),
+                                                Sample.space("Work", (0..<15).map { Sample.page("w\($0)") })]))
+        a.edit { $0.contents.spaces.removeAll { $0.name == "Work" } }
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "edited later" } }
+        a.sync(); b.sync()
+        #expect(a.session.state.heldRemovals == nil)
+        #expect(b.library.spaceNames == ["Personal"])
+        #expect(b.library.titles(in: "Personal").first == "edited later")
+    }
+
+    @Test func anEditWhileRemovalsAreHeldKeepsItsOwnTime() {
+        let (_, a, b) = manyPages()
+        var old = a.library
+        old.editSpace("Personal") { $0.bookmarks.removeLast(35) }
+        relaunch(a, with: old)
+        #expect(a.session.state.heldRemovals != nil)
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "older, from A" } }
+        b.clock = a.clock + 60
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "newer, from B" } }
+        b.sync()
+        a.clock = b.clock + 3600
+        a.sync()
+        a.session.sendHeld()
+        a.sync(); b.sync()
+        #expect(b.library.titles(in: "Personal").first == "newer, from B")
+        #expect(a.library.titles(in: "Personal").first == "newer, from B")
+    }
+
+    @Test func aLibraryOlderThanTheOneLastSyncedSendsNothing() {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let old = a.library
+        a.host.libraryStamp = Date(timeIntervalSince1970: 1_000)
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "Since" } }
+        a.host.libraryStamp = Date(timeIntervalSince1970: 2_000)
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("c")) } }
+        a.sync(); b.sync()
+        let records = cloud.records
+        // Library.json put back from a copy saved before the last sync: one pin fewer, an old title.
+        a.host.libraryStamp = Date(timeIntervalSince1970: 1_500)
+        relaunch(a, with: old)
+        #expect(a.saves.isEmpty && a.deletes.isEmpty)
+        a.sync(); b.sync()
+        #expect(cloud.records.mapValues(\.tag) == records.mapValues(\.tag))
+        #expect(a.library.titles(in: "Personal") == ["Since", "b", "c"])
     }
 
     @Test func aMissingProfilesFileIsUnreadableNotEveryProfileRemoved() {

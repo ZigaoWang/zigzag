@@ -14685,10 +14685,10 @@
         "value": "먼저 백업을 저장할 수 없어서 동기화가 아직 꺼져 있습니다."
       }
     },
-    "Many things were removed on this Mac, so sync is paused": {
+    "Many things were removed on this Mac at once. They’re still in iCloud.": {
       "stringUnit": {
         "state": "translated",
-        "value": "이 Mac에서 많은 항목이 제거되어 동기화가 일시 정지되었습니다"
+        "value": "이 Mac에서 많은 항목이 한꺼번에 제거되었습니다. iCloud에는 아직 남아 있습니다."
       }
     },
     "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {

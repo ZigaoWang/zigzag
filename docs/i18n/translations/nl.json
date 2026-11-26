@@ -14991,10 +14991,10 @@
         "value": "Er kon eerst geen reservekopie worden bewaard, dus synchronisatie staat nog uit."
       }
     },
-    "Many things were removed on this Mac, so sync is paused": {
+    "Many things were removed on this Mac at once. They’re still in iCloud.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Er is veel verwijderd op deze Mac, dus synchronisatie is gepauzeerd"
+        "value": "Er is op deze Mac in één keer veel verwijderd. Het staat nog in iCloud."
       }
     },
     "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {

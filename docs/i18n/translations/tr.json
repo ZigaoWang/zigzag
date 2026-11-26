@@ -14991,10 +14991,10 @@
         "value": "Önce bir yedek kaydedilemedi, bu yüzden eşzamanlama hâlâ kapalı."
       }
     },
-    "Many things were removed on this Mac, so sync is paused": {
+    "Many things were removed on this Mac at once. They’re still in iCloud.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Bu Mac’te çok sayıda öge kaldırıldı, bu yüzden eşzamanlama duraklatıldı"
+        "value": "Bu Mac’te çok sayıda öge aynı anda kaldırıldı. Hâlâ iCloud’dalar."
       }
     },
     "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {

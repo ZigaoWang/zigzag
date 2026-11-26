@@ -4,6 +4,12 @@ import Foundation
 protocol SyncHost: AnyObject {
     func read() -> SyncLibrary
     func write(_ library: SyncLibrary)
+    /// When the library's file was last written, if it has one.
+    var libraryStamp: Date? { get }
+}
+
+extension SyncHost {
+    var libraryStamp: Date? { nil }
 }
 
 /// The server's side: CKSyncEngine, or a test's stand-in for iCloud.
@@ -112,8 +118,11 @@ struct SyncState: Codable {
     var leftovers: [String: SyncLeftover] = [:]
     /// Fetches settled so far.
     var fetches = 0
-    /// How many removals made here at once wait to be confirmed or brought back; nil while nothing waits.
-    var heldRemovals: Int?
+    /// Removals found at launch, many at once, that wait to be confirmed or brought back: not shown, not sent.
+    var heldNames: Set<String> = []
+    var heldRemovals: Int? { heldNames.isEmpty ? nil : heldNames.count }
+    /// Library.json's own date when sync last read it, so one put back from an older copy is told apart.
+    var libraryStamp: Date?
     /// When this Mac's first sync found iCloud empty: another Mac turning on at the same time may have sent copies of
     /// the same spaces, matched as they arrive for a while (`SyncSession.copyWindow`).
     var mergedAlone: Date?
@@ -124,7 +133,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldRemovals, mergedAlone, copies, savedSeen, fetches
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldNames, libraryStamp, mergedAlone, copies, savedSeen, fetches
     }
 
     init() {}
@@ -147,7 +156,8 @@ struct SyncState: Codable {
         serverDates = try c.decodeIfPresent([String: Date].self, forKey: .serverDates) ?? [:]
         zoneToken = try c.decodeIfPresent(Data.self, forKey: .zoneToken)
         leftovers = try c.decodeIfPresent([String: SyncLeftover].self, forKey: .leftovers) ?? [:]
-        heldRemovals = try c.decodeIfPresent(Int.self, forKey: .heldRemovals)
+        heldNames = try c.decodeIfPresent(Set<String>.self, forKey: .heldNames) ?? []
+        libraryStamp = try c.decodeIfPresent(Date.self, forKey: .libraryStamp)
         mergedAlone = try c.decodeIfPresent(Date.self, forKey: .mergedAlone)
         copies = try c.decodeIfPresent(Set<String>.self, forKey: .copies) ?? []
         savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
@@ -215,54 +225,75 @@ final class SyncSession {
 
     // MARK: Changes here
 
-    /// Reads the library and queues what changed since.
-    func localChanged(allowingManyRemovals: Bool = false) {
-        guard !isClosed, state.merged, !isApplying, state.heldRemovals == nil else { return }
-        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
+    /// Reads the library and queues what changed since. What's changed here by hand is always sent: only the first
+    /// look after launch (`checkAfterLaunch`) can tell a library put back from a copy.
+    func localChanged() {
+        guard !isClosed, state.merged, !isApplying else { return }
+        let library = host.read()
+        let export = SyncMapping.export(library, previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: now())
-        if !allowingManyRemovals, let count = Self.manyRemovals(from: state.base, to: export.items) {
-            state.heldRemovals = count
-            onChange?()
-            onHeld?()
-            return
-        }
         state.emptyFolders = export.emptyFolders
         queue(diff(export.items, deletes: true))
+        if let stamp = host.libraryStamp { state.libraryStamp = max(state.libraryStamp ?? stamp, stamp) }
         onChange?()
         if export.needsLayout { layOut() }
     }
 
-    /// More than 10 of one kind, and more than a quarter of them, gone at once: a library file replaced or rolled
-    /// back (Time Machine, an old copy) rather than things removed by hand. Returns how many.
-    static func manyRemovals(from base: [String: SyncItem], to items: [String: SyncItem]) -> Int? {
-        var total: [Substring: Int] = [:], gone: [Substring: Int] = [:]
-        for name in base.keys where SyncName.id(name) != nil {
-            let kind = name.prefix { $0 != "." }
-            total[kind, default: 0] += 1
-            if items[name] == nil { gone[kind, default: 0] += 1 }
+    /// At launch and when sync is turned on, before anything here is sent: a Library.json older than the one last
+    /// synced (put back from Time Machine or a copy) takes iCloud's version of everything, and nothing is sent. Many
+    /// things gone at once are held: everything else takes iCloud's version, and the removals wait to be confirmed
+    /// (Remove Everywhere) or brought back (Restore). Edits made after it go up as usual.
+    func checkAfterLaunch() {
+        guard !isClosed, state.merged, !isApplying else { return }
+        if let synced = state.libraryStamp, let stamp = host.libraryStamp, stamp < synced.addingTimeInterval(-1) {
+            layOut()
+            return
         }
-        let many = gone.filter { kind, count in count > 10 && Double(count) > Double(total[kind] ?? 0) * 0.25 }
-        return many.isEmpty ? nil : gone.values.reduce(0, +)
-    }
-
-    /// Held removals brought back: what iCloud has is laid out here again, and what else changed here meanwhile goes up.
-    func bringBackHeld() {
-        guard state.heldRemovals != nil else { return }
-        state.heldRemovals = nil
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: now())
-        queue(diff(export.items, deletes: false))
+        if let gone = Self.manyRemovals(from: state.base, to: export.items, unsent: state.unsent) {
+            state.heldNames.formUnion(gone)
+            layOut()
+            onHeld?()
+            return
+        }
+        localChanged()
+    }
+
+    /// More than 10 of one kind, and more than a quarter of them, gone at once: a library file replaced or rolled
+    /// back rather than things removed by hand. Returns everything gone.
+    static func manyRemovals(from base: [String: SyncItem], to items: [String: SyncItem], unsent: Set<String> = []) -> Set<String>? {
+        var total: [Substring: Int] = [:], gone: [Substring: Int] = [:]
+        var names: Set<String> = []
+        for (name, item) in base where SyncName.id(name) != nil {
+            if case .unknown = item.body { continue }
+            let kind = name.prefix { $0 != "." }
+            total[kind, default: 0] += 1
+            if items[name] == nil, !unsent.contains(name) { gone[kind, default: 0] += 1; names.insert(name) }
+        }
+        let many = gone.filter { kind, count in count > 10 && Double(count) > Double(total[kind] ?? 0) * 0.25 }
+        return many.isEmpty ? nil : names
+    }
+
+    /// Held removals brought back, as iCloud has them.
+    func bringBackHeld() {
+        guard !isClosed, !state.heldNames.isEmpty else { return }
+        state.heldNames = []
         layOut()
-        fetchFinished()
         onHeld?()
     }
 
     /// Held removals sent: removed from iCloud, and so from every Mac.
     func sendHeld() {
-        guard state.heldRemovals != nil else { return }
-        state.heldRemovals = nil
-        localChanged(allowingManyRemovals: true)
-        fetchFinished()
+        guard !isClosed, !state.heldNames.isEmpty else { return }
+        let names = state.heldNames.filter { state.base[$0] != nil }
+        state.heldNames = []
+        for name in names {
+            state.base[name] = nil
+            state.unsent.remove(name)
+        }
+        queue(([], Array(names)))
+        layOut()
         onHeld?()
     }
 
@@ -291,7 +322,7 @@ final class SyncSession {
             saves.append(name)
         }
         if allowDeletes {
-            for (name, item) in state.base where items[name] == nil {
+            for (name, item) in state.base where items[name] == nil && !state.heldNames.contains(name) {
                 // A kind only a newer Zigzag reads is left as it is.
                 if case .unknown = item.body { continue }
                 state.base[name] = nil
@@ -306,7 +337,8 @@ final class SyncSession {
     /// at the top of its space) goes up too.
     private func layOut() {
         isApplying = true
-        host.write(SyncMapping.apply(state.base, onto: host.read(), aliases: state.aliases, kept: state.keptProfiles, unsent: state.unsent).library)
+        host.write(SyncMapping.apply(state.base.filter { !state.heldNames.contains($0.key) }, onto: host.read(), aliases: state.aliases,
+                                     kept: state.keptProfiles, unsent: state.unsent).library)
         isApplying = false
         localChanged()
     }
@@ -329,8 +361,6 @@ final class SyncSession {
     /// A fetch is done: the first sync merges, later ones settle what came.
     func fetchFinished() {
         guard !isClosed else { return }
-        // While removals are held, what comes waits too: laying it out would bring them back unasked.
-        if state.heldRemovals != nil { onChange?(); return }
         if !state.merged { mergeFirst() } else { settle() }
         state.lastSynced = now()
         onChange?()
@@ -340,7 +370,6 @@ final class SyncSession {
         guard !state.incoming.isEmpty || !state.incomingRemoved.isEmpty else { return }
         // What changed here first, so it isn't taken for something the server undid.
         localChanged()
-        guard state.heldRemovals == nil else { return }
         var arrived = incoming
         clearIncoming()
         if let alone = state.mergedAlone {
@@ -375,6 +404,7 @@ final class SyncSession {
                 state.serverDates[name] = nil
                 // Changed here since: it comes back rather than vanish.
                 if state.unsent.contains(name) { resend.append(name); continue }
+                state.heldNames.remove(name)
                 if let item = state.base.removeValue(forKey: name) {
                     // A profile removed elsewhere stays here, never its data erased: it's this Mac's own from now on.
                     if name.hasPrefix("profile."), let id = SyncName.id(name).map(state.aliases.local), id != Profile.defaultID {

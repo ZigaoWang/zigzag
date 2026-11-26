@@ -100,7 +100,7 @@ final class SyncSettingsRows {
         let shown: (text: String, detail: String, action: String?) = describeOne(status, hasCopy: hasCopy, now: now)
         guard status == .removalsHeld else { return (shown.text, shown.detail, shown.action, nil) }
         return (shown.text, shown.detail, shown.action,
-                String(localized: "Remove Everywhere", comment: "Button beside “Many things were removed on this Mac, so sync is paused” in Settings › General: removes them from iCloud and the other Macs too."))
+                String(localized: "Remove Everywhere", comment: "Button beside “Many things were removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too."))
     }
 
     private static func describeOne(_ status: ICloudSync.Status, hasCopy: Bool, now: Date) -> (text: String, detail: String, action: String?) {
@@ -142,9 +142,9 @@ final class SyncSettingsRows {
         case .failed(let message):
             return (String(localized: "iCloud couldn’t sync: \(message)", comment: "Status under Sync with iCloud in Settings › General. The placeholder is iCloud's own explanation."), "", remove)
         case .removalsHeld:
-            return (String(localized: "Many things were removed on this Mac, so sync is paused", comment: "Status under Sync with iCloud in Settings › General, when many spaces, pinned tabs or favorites went at once (an old copy of the library put back, say)."),
-                    String(localized: "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.", comment: "Explanation under “Many things were removed on this Mac, so sync is paused” in Settings › General. Restore and Remove Everywhere are the two buttons beside it."),
-                    String(localized: "Restore", comment: "Button beside “Many things were removed on this Mac, so sync is paused” in Settings › General: brings them back from iCloud."))
+            return (String(localized: "Many things were removed on this Mac at once. They’re still in iCloud.", comment: "Status under Sync with iCloud in Settings › General, and a toast, when many spaces, pinned tabs or favorites went missing at once at launch or when sync was turned on (an old copy of the library put back, say). The rest keeps syncing."),
+                    String(localized: "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.", comment: "Explanation under “Many things were removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it."),
+                    String(localized: "Restore", comment: "Button beside “Many things were removed on this Mac at once” in Settings › General: brings them back from iCloud."))
         }
     }
 
