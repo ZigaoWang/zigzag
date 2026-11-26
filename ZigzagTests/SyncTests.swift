@@ -1764,4 +1764,48 @@ extension SyncTests {
         #expect(again.library.titles(in: "Personal") == ["B, Tuesday"])
         #expect(b.library.titles(in: "Personal") == ["B, Tuesday"])
     }
+
+    @Test func turningOnAfterTidyingUpWhileOffKeepsNewPinsAndRenames() throws {
+        let (cloud, a, b) = manyPages()
+        let off = try saved(ICloudSync.stateTurningOff(b.session.state))
+        // While off: 15 of 40 pins removed, one renamed, two new ones pinned.
+        var library = b.library
+        library.editSpace("Personal") { s in
+            s.bookmarks.removeLast(15)
+            s.bookmarks[0].title = "renamed while off"
+            s.bookmarks.append(contentsOf: [Sample.page("new 1"), Sample.page("new 2")])
+        }
+        let again = FakeMac(cloud, library, clock: b.clock + 86400, state: ICloudSync.stateTurningOn(saved: off))
+        again.session.checkAfterLaunch()
+        #expect(again.session.state.heldRemovals == 15)
+        again.sync(); a.sync()
+        let urls = again.library.urls(in: "Personal")
+        #expect(urls.contains("new 1") && urls.contains("new 2"))
+        #expect(again.library.titles(in: "Personal").first == "renamed while off")
+        #expect(a.library.urls(in: "Personal").contains("new 1"))
+        #expect(a.library.urls(in: "Personal").count == 42)
+    }
+
+    @Test func aHeldLaunchKeepsAPinPinnedJustBeforeQuit() throws {
+        let (cloud, a, b) = manyPages()
+        // A pin removed elsewhere since, still in an old copy.
+        let gone = a.library.space(named: "Personal")!.bookmarks[3]
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 3) } }
+        b.sync(); a.sync()
+        a.clock += 1
+        a.library.editSpace("Personal") { s in
+            s.bookmarks.removeLast(15)
+            s.bookmarks.append(Sample.page("pinned last"))
+            s.bookmarks.insert(gone, at: 3)
+        }
+        let again = FakeMac(cloud, a.library, clock: a.clock + 60, state: try saved(a.session.state))
+        again.session.checkAfterLaunch()
+        #expect(again.session.state.heldRemovals == 15)
+        let urls = again.library.urls(in: "Personal")
+        #expect(urls.contains("pinned last"))
+        #expect(!urls.contains(gone.url.lastPathComponent))
+        again.sync(); b.sync()
+        #expect(b.library.urls(in: "Personal").contains("pinned last"))
+        #expect(!b.library.urls(in: "Personal").contains(gone.url.lastPathComponent))
+    }
 }

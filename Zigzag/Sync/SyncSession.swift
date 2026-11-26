@@ -118,6 +118,8 @@ struct SyncState: Codable {
     var leftovers: [String: SyncLeftover] = [:]
     /// Fetches settled so far.
     var fetches = 0
+    /// Records removed, here or elsewhere, and when this Mac learned it: an old copy's pin is told from a new one.
+    var removed: [String: Date] = [:]
     /// Removals found at launch, many at once, that wait to be confirmed or brought back: not shown, not sent.
     var heldNames: Set<String> = []
     var heldRemovals: Int? { heldNames.isEmpty ? nil : heldNames.count }
@@ -136,7 +138,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldNames, libraryStamp, resumeAccount, resumed, ownFirstSync, copies, savedSeen, fetches
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, resumeAccount, resumed, ownFirstSync, copies, savedSeen, fetches
     }
 
     init() {}
@@ -160,6 +162,7 @@ struct SyncState: Codable {
         zoneToken = try c.decodeIfPresent(Data.self, forKey: .zoneToken)
         leftovers = try c.decodeIfPresent([String: SyncLeftover].self, forKey: .leftovers) ?? [:]
         heldNames = try c.decodeIfPresent(Set<String>.self, forKey: .heldNames) ?? []
+        removed = try c.decodeIfPresent([String: Date].self, forKey: .removed) ?? [:]
         libraryStamp = try c.decodeIfPresent(Date.self, forKey: .libraryStamp)
         resumeAccount = try c.decodeIfPresent(String.self, forKey: .resumeAccount)
         resumed = try c.decodeIfPresent(Bool.self, forKey: .resumed) ?? false
@@ -256,18 +259,30 @@ final class SyncSession {
         let changedAt = host.libraryStamp.map { min($0, now()) }
         if let synced = state.libraryStamp, synced <= now().addingTimeInterval(60), let stamp = host.libraryStamp,
            stamp < synced.addingTimeInterval(-1) {
-            layOut()
+            takeICloudKeepingNew(stamp: changedAt)
             return
         }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: changedAt ?? now())
         if let gone = Self.manyRemovals(from: state.base, to: export.items, unsent: state.unsent) {
             state.heldNames.formUnion(gone)
-            layOut()
+            // Turned on after tidying up while off, the rest is this Mac's own: sent. At a launch, it may be an old
+            // copy's: iCloud's version, but what's new here stays.
+            if state.resumed { localChanged(stamp: changedAt) } else { takeICloudKeepingNew(stamp: changedAt) }
             onHeld?()
             return
         }
         localChanged(stamp: changedAt)
+    }
+
+    /// iCloud's version of everything this Mac and iCloud both have, laid out here; what's only here is sent, unless
+    /// it's something removed since (an old copy's), which goes.
+    private func takeICloudKeepingNew(stamp: Date?) {
+        let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
+                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now())
+        let new = export.items.filter { state.base[$0.key] == nil && state.removed[$0.key] == nil && SyncName.id($0.key) != nil }
+        queue(diff(new, deletes: false, stamp: stamp))
+        layOut()
     }
 
     /// More than 10 of one kind, and more than a quarter of them, gone at once: a library file replaced or rolled
@@ -301,6 +316,7 @@ final class SyncSession {
         for name in names {
             state.base[name] = nil
             state.unsent.remove(name)
+            state.removed[name] = now()
         }
         queue(([], Array(names)))
         layOut()
@@ -338,6 +354,7 @@ final class SyncSession {
                 state.base[name] = nil
                 state.unsent.remove(name)
                 deletes.append(name)
+                state.removed[name] = stamp
             }
         }
         return (saves, deletes)
@@ -410,6 +427,7 @@ final class SyncSession {
         let fetch = state.fetches
         state.leftovers = state.leftovers.filter { $0.value.fetch >= fetch - 1 }
         state.savedSeen = state.savedSeen.filter { stamp.timeIntervalSince($0.value) < 24 * 3600 }
+        state.removed = state.removed.filter { stamp.timeIntervalSince($0.value) < 180 * 24 * 3600 }
         // Records first, then copies dropped, then removals, so a copy's removal is read as one.
         for case let (name, record?) in arrived {
             // A space moved off another profile to the first one: that profile's removal may be next.
@@ -433,6 +451,7 @@ final class SyncSession {
             // Changed here since: it comes back rather than vanish.
             if state.unsent.contains(name) { resend.append(name); continue }
             state.heldNames.remove(name)
+            if state.base[name] != nil { state.removed[name] = stamp }
             if let item = state.base.removeValue(forKey: name) {
                 // A profile removed elsewhere stays here, never its data erased: it's this Mac's own from now on.
                 if name.hasPrefix("profile."), let id = SyncName.id(name).map(state.aliases.local), id != Profile.defaultID {

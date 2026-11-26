@@ -151,6 +151,9 @@
   Test: SyncTests.manyRemovalsSentWhenAsked
   Test: SyncTests.restoringAnOldCopyTakesICloudsVersionOfEverythingElse
   Test: SyncTests.anEditWhileRemovalsAreHeldKeepsItsOwnTime
+- Removals held at launch, with something pinned just before → what's new here stays and is sent; a pin an old copy has that was removed since doesn't come back. Held when sync is turned on again, everything else changed while off is this Mac's own and is sent.
+  Test: SyncTests.aHeldLaunchKeepsAPinPinnedJustBeforeQuit
+  Test: SyncTests.turningOnAfterTidyingUpWhileOffKeepsNewPinsAndRenames
 - Zigzag opened with a Library.json older than the one sync last read (put back from a copy) → iCloud's version of everything, and nothing is sent.
   Test: SyncTests.aLibraryOlderThanTheOneLastSyncedSendsNothing
   Test: SyncTests.aClockOnceAheadDoesntMakeLaterLaunchesRollbacks
