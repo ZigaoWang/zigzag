@@ -933,6 +933,9 @@ extension SyncLibrary {
         #expect(url.deletingLastPathComponent().lastPathComponent == "Backups")
         guard case .success(let backup) = ZigzagBackup.read(url) else { Issue.record("the backup doesn't read"); return }
         #expect(backup.spaces.map(\.id) == Library.shared.spaces.map(\.id))
+        // Every preference sync carries is in it.
+        #expect(SyncPreferences.keys.isSubset(of: ZigzagBackup.settingKeys), "\(SyncPreferences.keys.subtracting(ZigzagBackup.settingKeys).sorted())")
+        #expect(Set(SyncPreferences.profileKeys).isSubset(of: ZigzagBackup.profileSettingKeys))
     }
 
     @Test func withoutABackupSyncStaysOff() {

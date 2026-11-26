@@ -381,7 +381,8 @@ final class ICloudSync {
 
     // MARK: Before the first sync
 
-    /// A Zigzag backup of what's here now, in Backups, so a merge that wasn't wanted can be undone (File › Import).
+    /// A Zigzag backup of what's here now, in Backups, with every preference sync carries. Restoring it (File › Import)
+    /// adds back what's missing; it doesn't undo renames or remove what the merge added.
     @discardableResult
     func backUp() -> URL? {
         let folder = Paths.directory("Backups")

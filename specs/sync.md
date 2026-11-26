@@ -5,7 +5,7 @@
   Test: SyncTests.theStatusLineSaysWhatSyncIsDoing
 - Turn on Sync with iCloud → a sheet says what syncs, what stays on this Mac, and that it merges; Continue turns it on, Cancel leaves it off.
   No test yet.
-- Continue → a Zigzag backup of this Mac's library is saved in Backups first, then the first sync merges this Mac with iCloud.
+- Continue → a Zigzag backup of this Mac's library, with every preference sync carries, is saved in Backups first, then the first sync merges this Mac with iCloud. Restoring it adds back whatever is missing; it doesn't undo renames or remove what the merge added.
   Test: SyncTests.aBackupIsSavedBeforeTheFirstSync
 - The backup can't be saved (a full disk) → sync stays off and says so; nothing goes to iCloud.
   Test: SyncTests.withoutABackupSyncStaysOff

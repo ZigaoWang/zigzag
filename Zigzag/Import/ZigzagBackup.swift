@@ -174,12 +174,13 @@ struct ZigzagBackup: Codable {
         "AskBeforeQuitting", "LaunchChoice", "DownloadsAskWhere", "BetaUpdates", "SUAutomaticallyUpdate", "FormsAutofill",
         "NewSpacesGetOwnProfile", "OpensExternalLinksInMini", "CaptureMode", "CardFinish",
         // Look
-        "borderlessPage", "addressAbovePage", "sidebarOnRight", "sidebarDoubleClickNewTab", "SidebarSize", "SidebarSizePercent",
-        "LargeSpaceNames", "FavoritesPerRow", "DefaultZoom", "ReduceMotion", "DarkPages", "DarkPagesPureBlack",
+        "borderlessPage", "addressBarPlace", "addressAbovePage", "sidebarOnRight", "sidebarDoubleClickNewTab", "SidebarSize", "SidebarSizePercent",
+        "LargeSpaceNames", "FavoritesPerRow", "PinnedTabsAsTiles", "ShortFloatingSidebar", "ShowLinkAddressOnHover", "DefaultZoom", "ReduceMotion",
+        "DarkPages", "DarkPagesPureBlack", "EdgeSidebar",
         // Tabs and windows
         "ControlTabOrder", "NestsOpenedLinks", "WindowsShareTabs", "ArchiveTabsAfter", "SleepsBusyTabs", "NewTabPlace", "NewTabPlaceOtherwise",
         "PictureInPictureFollowsTabs", "PictureInPictureWhenLeaving", "FullScreenFills", "SwipeBetweenPages", "OffersToPinWanderedPage",
-        "CommandBarPosition", "ShortcutOverrides", "SearchSuggestions", "CustomSearchTemplate", "pdfTwoPages",
+        "CommandBarPosition", "InPageMini", "ShortcutOverrides", "SearchSuggestions", "CustomSearchTemplate", "pdfTwoPages",
         // Privacy
         "BlockAdsAndTrackers", "AdsAllowedSites", "ProtectsIPFromWebRTC", "JavaScriptAllowed", "JavaScriptOnSites", "JavaScriptOffSites",
         "CookieBanners", "CookieBannersHandledSites", "CookieBannersLeftSites", "SiteAsksBeforeDownloads",
@@ -190,7 +191,7 @@ struct ZigzagBackup: Codable {
         "SiteBoosts", "ZoomLevels", "DarkPagesOnSites", "DarkPagesOffSites", "DarkPagesForcedSites", "SitePermissions", "SitePermissionActions",
         "UserAgentSites", "KeepAwakeSites", "FullScreenPageSites", "FullScreenScreenSites", "SiteIcons",
         // Developer
-        "DeveloperTools", "DeveloperToolsInBar", "DeveloperPageSizes",
+        "DeveloperTools", "DeveloperToolsInBar", "DeveloperPageSizes", "DevelopmentSites",
     ]
 
     /// Per-profile choices a backup carries.
