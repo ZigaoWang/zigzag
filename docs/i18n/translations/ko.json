@@ -14601,16 +14601,16 @@
         "value": "동기화 중…"
       }
     },
-    "Up to date": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "최신 상태"
-      }
-    },
     "Last synced %@": {
       "stringUnit": {
         "state": "translated",
         "value": "마지막 동기화: %@"
+      }
+    },
+    "Last synced just now": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "마지막 동기화: 방금"
       }
     },
     "Not signed in to iCloud": {

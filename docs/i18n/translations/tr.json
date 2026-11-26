@@ -14907,16 +14907,16 @@
         "value": "Eşzamanlanıyor…"
       }
     },
-    "Up to date": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Güncel"
-      }
-    },
     "Last synced %@": {
       "stringUnit": {
         "state": "translated",
         "value": "Son eşzamanlama: %@"
+      }
+    },
+    "Last synced just now": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Son eşzamanlama: az önce"
       }
     },
     "Not signed in to iCloud": {

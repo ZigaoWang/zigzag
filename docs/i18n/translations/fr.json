@@ -14956,16 +14956,16 @@
         "value": "Synchronisation…"
       }
     },
-    "Up to date": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "À jour"
-      }
-    },
     "Last synced %@": {
       "stringUnit": {
         "state": "translated",
         "value": "Dernière synchronisation %@"
+      }
+    },
+    "Last synced just now": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Synchronisé à l’instant"
       }
     },
     "Not signed in to iCloud": {

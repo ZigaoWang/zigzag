@@ -15568,16 +15568,16 @@
         "value": "Синхронизация…"
       }
     },
-    "Up to date": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Всё синхронизировано"
-      }
-    },
     "Last synced %@": {
       "stringUnit": {
         "state": "translated",
         "value": "Синхронизировано %@"
+      }
+    },
+    "Last synced just now": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Синхронизировано только что"
       }
     },
     "Not signed in to iCloud": {
