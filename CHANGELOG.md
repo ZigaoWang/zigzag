@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.

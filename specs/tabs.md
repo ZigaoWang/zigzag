@@ -3,7 +3,9 @@
 ## Closing
 - ⌘W on a tab opened from another tab, before you switched tabs yourself → the next tab that opener opened, else the opener.
   Test: TabCloseSelectionTests.aLinkOpenedInFrontClosesBackToItsPage
-- ⌘W on any other tab → the tab below, else the one above; never the one you used last.
+- ⌘W on a tab you opened yourself (⌘T, New Tab), before you switched tabs → the tab you were on.
+  Test: TabCloseSelectionTests.aNewTabClosesBackToTheTabYouWereOn
+- ⌘W on any other tab you switched to → the tab below, else the one above; never the one you used last.
   Test: TabCloseSelectionTests.closingGoesToTheTabBelowNotTheOneYouWereOnBefore
 - ⌘W on a pinned tab or favorite → it unloads and stays; next time it opens fresh at its saved address.
   Test: TabCloseSelectionTests.closingAPinnedPageOrFavoriteUnloadsItAndKeepsIt
