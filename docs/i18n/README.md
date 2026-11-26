@@ -163,7 +163,10 @@ scripts/site-languages.py           # writes site/<lang>/index.html and site/sit
 scripts/site-languages.py --check   # fails if a page is out of date or the English changed under a translation
 ```
 
-Never edit `site/<lang>/index.html` by hand. When an English line changes, change it in `en.json` and every
+`scripts/changelog-page.py` writes the release notes at `/<lang>/release-notes/` from `changelog/CHANGELOG.<lang>.md`,
+only versions with a stable tag, and takes the page's words from the `release-notes` part of the same strings files.
+
+Never edit `site/<lang>/index.html` or `site/<lang>/release-notes/` by hand. When an English line changes, change it in `en.json` and every
 language file too.
 
 ## The release gate
