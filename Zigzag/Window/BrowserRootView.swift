@@ -1709,6 +1709,9 @@ final class BrowserRootView: SpaceFrameView {
 
     private var paintsTopBar: Bool { chromeBarShown && barColor != nil && tiles == nil && !isEmpty }
 
+    /// The bar lies on the page's card in a solid color, so no frame shows behind it.
+    private var barCoversFrame: Bool { paintsTopBar && (barColor?.alphaComponent ?? 0) > 0.99 }
+
     /// Framed in split view under the bar, each pane whose strip is up in the bar's row is one card with it, as a page
     /// alone is with the bar: its card reaches up to the bar's top, its own ground (its page's color, or the card's)
     /// behind its strip, so no strip floats on the glass over a card. Between the panes the glass shows down to the
@@ -2097,8 +2100,8 @@ final class BrowserRootView: SpaceFrameView {
     override var glassFrame: NSRect {
         // Edge to edge under the bar above the page, only the bar shows the frame, as in Zigzag Mini.
         if chromeBarShown, isEdgeToEdge, !card.isHidden { return topBarFrame }
-        // Beside the sidebar too, the frame shows along the top and the side: glass under all of it.
-        if chromeBarShown { return bounds }
+        // Beside the sidebar, a bar on the page's card covers its row too; a bar on the frame needs glass under it.
+        if chromeBarShown, !barCoversFrame { return bounds }
         // A split view's seam between its two pages shows the frame: glass under all of it then.
         guard chromeSidebarShown, card.isAttached, !card.isHidden,
               extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
