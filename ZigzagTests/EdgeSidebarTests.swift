@@ -120,8 +120,9 @@ struct EdgeSidebarTests {
         manager.select(tabs[0])
         let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
         controller.window?.layoutIfNeeded()
-        // The pointer isn't on the panel in a test: keep it out.
+        // The pointer isn't on the panel in a test: keep it out, and keep the real mouse's moves out of it.
         EdgeSidebar.debugHoldsOpen = true
+        EdgeSidebar.debugPointer = offScreen
         EdgeSidebar.shared.show(on: visible, for: controller)
         return (controller, manager, tabs, {
             EdgeSidebar.debugHoldsOpen = false
@@ -132,6 +133,9 @@ struct EdgeSidebarTests {
             Library.shared.restore(before)
         })
     }
+
+    /// Where a test's pointer is when it isn't anywhere in particular: off every screen.
+    private let offScreen = NSPoint(x: -100_000, y: -100_000)
 
     private func panelParts() throws -> (NSWindow, EdgeSidebarHost) {
         let panel = try #require(NSApp.windows.first { $0.contentView is EdgeSidebarHost })
@@ -260,10 +264,11 @@ struct EdgeSidebarTests {
         defer { controller.window?.close() }
         controller.window?.layoutIfNeeded()
 
+        EdgeSidebar.debugHoldsOpen = true
+        EdgeSidebar.debugPointer = offScreen
+        defer { EdgeSidebar.debugHoldsOpen = false; EdgeSidebar.debugPointer = nil }
         EdgeSidebar.shared.show(on: visible, for: controller)
         defer { EdgeSidebar.shared.hide(animated: false) }
-        EdgeSidebar.debugHoldsOpen = true
-        defer { EdgeSidebar.debugHoldsOpen = false }
         let (panel, host) = try panelParts()
         var seen: [NSSize] = []
         let watch = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: pages[2].webView,
@@ -332,7 +337,11 @@ struct EdgeSidebarTests {
         let row = try #require(controller.edgeSidebar?.list.row(for: tab))
         let window = try #require(row.window)
         #expect(EdgeSidebar.shared.isPanel(window))
-        return window.convertToScreen(row.convert(row.bounds, to: nil))
+        // The list places its rows in its own layout pass: measured before it, a row is where it was made.
+        window.contentView?.layoutSubtreeIfNeeded()
+        let frame = window.convertToScreen(row.convert(row.bounds, to: nil))
+        try #require(frame.width > 0)
+        return frame
     }
 
     /// Crossing from one row to the next, the row left says so before the next one speaks, and the pointer can rest on
@@ -341,8 +350,8 @@ struct EdgeSidebarTests {
         let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b",
                                                          "https://example.test/c"])
         defer { done() }
-        let b = try rowOnScreen(tabs[1], in: controller), c = try rowOnScreen(tabs[2], in: controller)
         EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let b = try rowOnScreen(tabs[1], in: controller), c = try rowOnScreen(tabs[2], in: controller)
         // Between the two rows, no row under the pointer.
         EdgeSidebar.debugPointer = NSPoint(x: b.midX, y: (max(b.minY, c.minY) + min(b.maxY, c.maxY)) / 2)
         EdgeSidebar.shared.hover(nil, in: controller)
