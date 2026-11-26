@@ -385,6 +385,18 @@ struct EdgeSidebarTests {
         #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
     }
 
+    /// Extensions hear nothing of the preview: its Mini is no window of theirs, as a Zigzag Mini of its own is.
+    @Test func thePreviewIsNoWindowForExtensions() throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a"])
+        defer { done() }
+        EdgeSidebar.shared.previewNow(tabs[0], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(!mini.isExtensionWindow)
+        mini.promoteFromPage()
+        #expect(mini.isExtensionWindow)
+        mini.window?.close()
+    }
+
     private func until(_ seconds: Double = 8, _ condition: () -> Bool) async -> Bool {
         let end = Date().addingTimeInterval(seconds)
         while Date() < end {

@@ -58,4 +58,4 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   Test: InPageMiniHostTests.openInZigzagGivesTheBorrowedPageBackToItsTab
   Test: EdgeSidebarTests.expandingTheEdgePreviewLeavesAnIndependentMini
 - Extensions hear nothing of the preview: it is a tab the browser already has.
-  No test yet.
+  Test: EdgeSidebarTests.thePreviewIsNoWindowForExtensions

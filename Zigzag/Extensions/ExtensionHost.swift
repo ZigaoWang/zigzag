@@ -1663,7 +1663,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
         if let popup = PopupWindowController.key { return isOurs(popup) ? popup : nil }
-        if let mini = MiniWindowController.key { return isOurs(mini) ? mini : nil }
+        if let mini = MiniWindowController.key, mini.isExtensionWindow { return isOurs(mini) ? mini : nil }
         return WindowManager.shared.keyController.flatMap { PrivateAccess.sees(isPrivate: $0.tabManager.isPrivate, allowed: extensionContext.hasAccessToPrivateData) ? $0 : nil }
     }
 
@@ -1671,7 +1671,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         !popup.isPrivate && popup.webView.configuration.websiteDataStore === profile.store
     }
 
-    private func isOurs(_ mini: MiniWindowController) -> Bool { mini.tab.extensionHost === self }
+    /// A Mini of this profile's. The edge preview's page is a browser tab already, so its Mini is no window of theirs.
+    private func isOurs(_ mini: MiniWindowController) -> Bool { mini.isExtensionWindow && mini.tab.extensionHost === self }
 
     /// Whether the side panel a window shows is this profile's copy of an extension's, not another profile's copy
     /// of the same one.
