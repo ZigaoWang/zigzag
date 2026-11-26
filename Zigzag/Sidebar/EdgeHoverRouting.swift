@@ -23,3 +23,10 @@ enum EdgePreviewRouting {
         return to > from ? 1 : -1
     }
 }
+
+/// Whether a hover that reports nothing should close the panel's preview (#546).
+enum EdgeHoverKeep {
+    /// The panel is holding the empty page after a space switch: there is no page to close, and closing here would
+    /// narrow the panel and take away what the switch just put in place.
+    static func closesOnNilHover(blankSlateShown: Bool) -> Bool { !blankSlateShown }
+}

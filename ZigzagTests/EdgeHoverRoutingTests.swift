@@ -22,6 +22,14 @@ struct EdgeHoverRoutingTests {
         #expect(EdgeHoverRouting.closesAfterNilHover(pointerOverRows: false, pointerOverPreview: false))
     }
 
+    @Test func aBlankSlateIsNotClosedByANilHover() {
+        // After a space switch the panel holds the empty page: there is no page to close, and closing would narrow
+        // the panel and take away what the switch just put in place.
+        #expect(!EdgeHoverKeep.closesOnNilHover(blankSlateShown: true))
+        // With a page out, leaving the rows closes it as before.
+        #expect(EdgeHoverKeep.closesOnNilHover(blankSlateShown: false))
+    }
+
     @Test func theFoldFollowsTheSpaceList() {
         let first = UUID(), second = UUID(), third = UUID()
         let order = [first, second, third]
