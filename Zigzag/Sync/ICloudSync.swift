@@ -220,7 +220,9 @@ final class ICloudSync {
             if self?.session?.state.heldRemovals != nil { self?.tellHeld() }
         }
         session.onRemovedElsewhere = { [weak self] in self?.zoneDeleted(reset: false) }
-        session.onNeedsFetch = { [weak self] in self?.pushDebouncer.call { self?.fetchSoon(after: 0) } }
+        session.onNeedsFetch = { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self?.pushDebouncer.call { self?.fetchSoon(after: 0) } }
+        }
         self.session = session
         watchLibrary()
         session.checkAfterLaunch()
@@ -334,6 +336,8 @@ final class ICloudSync {
         guard isCurrent() else { return }
         let first = !session.state.merged
         if first { session.fetchFinished() }
+        // Still not merged: another Mac's first sync is going up, and this one reads again shortly.
+        guard session.state.merged else { return }
         fetched(first)
         session.requeue()
         try await server.sendChanges()

@@ -44,6 +44,9 @@
   Test: SyncTests.twoMacsTurningSyncOnAtOnceMakeNoCopies
   Test: SyncTests.twoFirstSyncsAtOnceAgreeHoweverLateOneReads
   Test: SyncTests.aSecondMacJoiningNormallyKeepsItsOwnDuplicatePins
+- A second Mac turning sync on while another's first sync is still going up → it reads again until the rest has arrived, then merges; the first-sync record goes up first, so this is known. After 10 minutes without the rest, it merges and leaves its own record, and the two are matched as two first syncs at once.
+  Test: SyncTests.aSecondMacReadingAHalfSentFirstSyncWaitsForTheRest
+  Test: SyncTests.aFirstSyncThatNeverFinishesGoingUpIsMatchedAsTwoAtOnce
 - Something iCloud doesn't have → added to iCloud, never removed from this Mac.
   Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
 - iCloud's copy reset, or sync turned on again after it was removed from iCloud → merged again, and nothing is added twice. A Mac that was offline during a reset matches its items as before the reset, even renamed ones, and nothing is copied; but as in any first sync, iCloud's version of what matched wins, so what that Mac changed offline is lost, and what it removed offline comes back from the Mac that sent first.

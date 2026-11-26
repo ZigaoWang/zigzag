@@ -133,6 +133,8 @@ struct SyncState: Codable {
     var resumed = false
     /// The record this Mac's first sync into an empty iCloud left (`SyncSession.firstSyncType`).
     var ownFirstSync: String?
+    /// Since when the first sync has waited for another Mac's still going up.
+    var firstSyncWait: Date?
     /// Copies dropped here (two first syncs at once), not taken again if read before their removal is.
     var copies: Set<String> = []
     /// How far Zigzag's own fetch of the zone has read, beside CKSyncEngine's.
@@ -140,7 +142,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, ownFirstSync, copies, savedSeen, fetches
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, ownFirstSync, firstSyncWait, copies, savedSeen, fetches
     }
 
     init() {}
@@ -170,6 +172,7 @@ struct SyncState: Codable {
         resumeAccount = try c.decodeIfPresent(String.self, forKey: .resumeAccount)
         resumed = try c.decodeIfPresent(Bool.self, forKey: .resumed) ?? false
         ownFirstSync = try c.decodeIfPresent(String.self, forKey: .ownFirstSync)
+        firstSyncWait = try c.decodeIfPresent(Date.self, forKey: .firstSyncWait)
         copies = try c.decodeIfPresent(Set<String>.self, forKey: .copies) ?? []
         savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
         fetches = try c.decodeIfPresent(Int.self, forKey: .fetches) ?? 0
@@ -429,7 +432,23 @@ final class SyncSession {
     /// A fetch is done: the first sync merges, later ones settle what came.
     func fetchFinished() {
         guard !isClosed else { return }
-        if !state.merged { mergeFirst() } else { settle() }
+        if !state.merged {
+            // Another Mac's first sync still going up: read again before merging, for a while.
+            if halfSentFirstSync() {
+                let since = state.firstSyncWait ?? now()
+                state.firstSyncWait = since
+                if now().timeIntervalSince(since) < Self.firstSyncWait {
+                    onChange?()
+                    onNeedsFetch?()
+                    return
+                }
+                mergeFirst(leavingRecord: true)
+            } else {
+                mergeFirst()
+            }
+        } else {
+            settle()
+        }
         state.lastSynced = now()
         onChange?()
     }
@@ -658,7 +677,22 @@ final class SyncSession {
     }
 
     /// The first sync on this Mac: iCloud's records and the library here merged, never replaced.
-    private func mergeFirst() {
+    /// How long a first sync waits for another Mac's that's still going up.
+    static let firstSyncWait: TimeInterval = 10 * 60
+
+    /// A first-sync record read whose items haven't all arrived yet.
+    private func halfSentFirstSync() -> Bool {
+        let records = state.incoming.filter { $0.value.type == Self.firstSyncType }
+        return records.values.contains { record in
+            guard let sync = try? SyncBody.decoder().decode(FirstSync.self, from: record.payload) else { return false }
+            return sync.items.contains { state.incoming[$0.n] == nil && !state.incomingRemoved.contains($0.n) }
+        }
+    }
+
+    /// `leavingRecord`: another Mac's first sync didn't finish going up in time, so this one leaves its own record
+    /// too, and the two are matched as two first syncs at once.
+    private func mergeFirst(leavingRecord: Bool = false) {
+        state.firstSyncWait = nil
         var server: [String: SyncItem] = [:]
         for case let (name, record?) in incoming {
             if let date = record.serverModified { state.serverDates[name] = date }
@@ -668,7 +702,7 @@ final class SyncSession {
         }
         clearIncoming()
         let merge = SyncMerge.merge(local: host.read(), server: server, previous: state.aliases, now: now())
-        let alone = !server.keys.contains { SyncName.id($0) != nil }
+        let alone = leavingRecord || !server.keys.contains { SyncName.id($0) != nil }
         state.aliases = merge.aliases
         state.base = server
         state.merged = true
@@ -676,14 +710,16 @@ final class SyncSession {
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, now: now())
         state.emptyFolders = export.emptyFolders
         // Nothing in iCloud is removed because this Mac lacks it.
-        queue(diff(export.items, deletes: false))
+        let changes = diff(export.items, deletes: false)
         if alone {
+            // Its record goes up first, so another Mac reading part of this send knows to wait for the rest.
             let name = Self.firstSyncPrefix + UUID().uuidString
-            state.base[name] = Self.firstSync(of: state.base)
+            state.base[name] = Self.firstSync(of: state.base.filter { server[$0.key] == nil })
             state.unsent.insert(name)
             state.ownFirstSync = name
             queue(([name], []))
         }
+        queue(changes)
     }
 
     // MARK: Two first syncs at once

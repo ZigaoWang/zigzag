@@ -1848,4 +1848,43 @@ extension SyncTests {
         #expect(restored.library.urls(in: "Personal") == ["a"])
         #expect(b.library.urls(in: "Personal") == ["a"])
     }
+
+    @Test func aSecondMacReadingAHalfSentFirstSyncWaitsForTheRest() throws {
+        let cloud = FakeCloud()
+        let pages = (0..<20).map { "p\($0)" }
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", pages.map { Sample.page($0) })]))
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", pages.map { Sample.page($0) })]))
+        a.fetch()
+        // A's first batch: its first-sync record, which goes first, the space and five pages.
+        let record = try #require(a.session.state.ownFirstSync)
+        #expect(a.saves.first == record)
+        let first = [record] + a.session.state.base.keys.filter { $0.hasPrefix("space.") } + a.session.state.base.keys.filter { $0.hasPrefix("page.") }.sorted().prefix(5)
+        for name in first { if let up = a.session.upload(name) { cloud.save(up) } }
+        b.sync()
+        #expect(!b.session.state.merged)
+        for _ in 0..<4 { a.sync(); b.sync() }
+        #expect(a.library.urls(in: "Personal").count == 20)
+        #expect(b.library.urls(in: "Personal").count == 20)
+        #expect(cloud.records.keys.filter { $0.hasPrefix("page.") }.count == 20)
+    }
+
+    @Test func aFirstSyncThatNeverFinishesGoingUpIsMatchedAsTwoAtOnce() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])]))
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("z")])]))
+        a.fetch()
+        // A sends only its record and its space, then goes offline for a long while.
+        let record = try #require(a.session.state.ownFirstSync)
+        for name in [record] + a.session.state.base.keys.filter({ $0.hasPrefix("space.") }) { if let up = a.session.upload(name) { cloud.save(up) } }
+        b.sync()
+        #expect(!b.session.state.merged)
+        b.clock += SyncSession.firstSyncWait + 1
+        b.sync()
+        #expect(b.session.state.merged && b.session.state.ownFirstSync != nil)
+        for _ in 0..<3 { a.sync(); b.sync() }
+        for mac in [a, b] {
+            #expect(mac.library.spaceNames == ["Personal"])
+            #expect(mac.library.urls(in: "Personal").sorted() == ["x", "y", "z"])
+        }
+    }
 }
