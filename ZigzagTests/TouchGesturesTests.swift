@@ -1731,6 +1731,259 @@ struct TouchMovesTests {
         #expect(!TouchPinch.opensCard(magnification: -0.3))
     }
 
+    // MARK: Touch-sized menus
+
+    @Test func aMenuAFingerOpensHasTouchSizedRows() throws {
+        let saved = (TouchPress.landedAt, TouchPress.fingerDown)
+        defer { TouchPress.landedAt = saved.0; TouchPress.fingerDown = saved.1 }
+        TouchPress.landedAt = nil
+        TouchPress.fingerDown = false
+        let window = window()
+        var chosen: [String] = []
+        let view = control(in: window) { chosen.append($0) }
+        // Opened by the mouse: as it always was.
+        #expect(view.showContextMenu())
+        let mouseMenu = try #require(MenuPanel.current)
+        #expect(!mouseMenu.isTouchSized && mouseMenu.rowHeight == Tokens.Page.controlHeight)
+        let titles = mouseMenu.itemTitles, mouseSize = mouseMenu.frame.size
+        mouseMenu.close(animated: false)
+        // Held by a finger: the same items and width, each row 44 points tall.
+        let hold = try #require(view.beginTouchHold(at: middle(of: view)))
+        hold.showMenu()
+        let menu = try #require(MenuPanel.current)
+        #expect(menu.isTouchSized && menu.rowHeight == 44)
+        #expect(menu.itemTitles == titles && menu.frame.width == mouseSize.width)
+        #expect(menu.frame.height == mouseSize.height + CGFloat(titles.count) * (44 - Tokens.Page.controlHeight))
+        // Sliding onto an item and lifting runs it, as before.
+        hold.moved(to: menu.debugItemPoint(1))
+        #expect(menu.highlightedIndex == 1)
+        hold.lifted(at: menu.debugItemPoint(1))
+        #expect(chosen == ["Two"])
+        #expect(MenuPanel.current == nil)
+    }
+
+    @Test func aTappedDropdownOpensItsMenuTouchSized() throws {
+        let saved = (TouchPress.landedAt, TouchPress.fingerDown)
+        defer { TouchPress.landedAt = saved.0; TouchPress.fingerDown = saved.1 }
+        TouchPress.fingerDown = false
+        let window = window()
+        let dropdown = DropdownButton(frame: NSRect(x: 20, y: 600, width: 160, height: Tokens.Page.controlHeight))
+        dropdown.options = ["One", "Two"].map { DropdownButton.Option(title: $0) }
+        window.contentView?.addSubview(dropdown)
+        let point = middle(of: dropdown)
+        // A mouse click: as it always was.
+        TouchPress.landedAt = nil
+        dropdown.mouseDown(with: mouse(.leftMouseDown, at: point, window: window))
+        dropdown.mouseUp(with: mouse(.leftMouseUp, at: point, window: window))
+        #expect(MenuPanel.current?.isTouchSized == false)
+        MenuPanel.current?.close(animated: false)
+        // AppKit's click from a tap: touch-sized.
+        TouchPress.landedAt = ProcessInfo.processInfo.systemUptime
+        dropdown.mouseDown(with: mouse(.leftMouseDown, at: point, window: window))
+        dropdown.mouseUp(with: mouse(.leftMouseUp, at: point, window: window))
+        #expect(MenuPanel.current?.isTouchSized == true)
+        MenuPanel.current?.close(animated: false)
+        // A submenu opens the same size as the menu it's from.
+        MenuPanel.openingForTouch = true
+        let more = MenuPanel.Item(title: "More", submenu: [.item(MenuPanel.Item(title: "Inside") {})]) {}
+        let menu = try #require(MenuPanel.show([.item(more)], from: dropdown))
+        MenuPanel.openingForTouch = false
+        menu.debugOpenSubmenu("More")
+        #expect(menu.isTouchSized && menu.openSubmenu?.isTouchSized == true)
+        menu.close(animated: false)
+        // A hold, or a click from a finger that just landed; never the keyboard, nor the mouse long after a finger.
+        #expect(MenuPanel.opensForTouch(holding: true, eventType: nil, eventTime: 0, landedAt: nil, fingerDown: false))
+        #expect(MenuPanel.opensForTouch(holding: false, eventType: .leftMouseDown, eventTime: 10.2, landedAt: 10, fingerDown: false))
+        #expect(!MenuPanel.opensForTouch(holding: false, eventType: .keyDown, eventTime: 10.2, landedAt: 10, fingerDown: true))
+        #expect(!MenuPanel.opensForTouch(holding: false, eventType: .leftMouseDown, eventTime: 12, landedAt: 10, fingerDown: false))
+        #expect(!MenuPanel.opensForTouch(holding: false, eventType: .rightMouseDown, eventTime: 12, landedAt: nil, fingerDown: false))
+    }
+
+    // MARK: Touch targets
+
+    /// Back and Forward, 28 points and 4 apart on a plain strip, over a control filling the window under it.
+    private func buttonStrip(in window: NSWindow) throws -> (back: IconButton, forward: IconButton) {
+        let content = try #require(window.contentView)
+        let page = InteractiveView(frame: NSRect(x: 0, y: 0, width: 500, height: 200))
+        page.onClick = { _ in }
+        let strip = NSView(frame: NSRect(x: 0, y: 200, width: 500, height: 36))
+        let back = IconButton(symbol: "chevron.left"), forward = IconButton(symbol: "chevron.right")
+        back.frame = NSRect(x: 20, y: 4, width: 28, height: 28)
+        forward.frame = NSRect(x: 52, y: 4, width: 28, height: 28)
+        for button in [back, forward] {
+            button.onClick = { _ in }
+            strip.addSubview(button)
+        }
+        content.addSubview(page)
+        content.addSubview(strip)
+        return (back, forward)
+    }
+
+    @Test func aFingerBesideASmallControlTakesIt() throws {
+        let window = window(height: 300)
+        let (back, forward) = try buttonStrip(in: window)
+        func taker(_ x: CGFloat, _ y: CGFloat) -> NSView? {
+            TouchTargets.point(for: NSPoint(x: x, y: y), in: window).flatMap { TouchTargets.hit(at: $0, in: window) }
+        }
+        // Back spans 20 to 48 and 204 to 232; a finger takes it 44 points across.
+        #expect(taker(13, 218) === back)
+        #expect(taker(34, 239) === back)
+        #expect(taker(11, 218) == nil)
+        // Between the two, the nearer one.
+        #expect(taker(49, 218) === back)
+        #expect(taker(51, 218) === forward)
+        // On a control, it's that control's own.
+        #expect(TouchTargets.point(for: NSPoint(x: 34, y: 218), in: window) == nil)
+        // On the control under the strip, though in Back's box: that control's.
+        #expect(TouchTargets.point(for: NSPoint(x: 34, y: 198), in: window) == nil)
+        // Hidden or dimmed: none.
+        back.isHidden = true
+        #expect(taker(13, 218) == nil)
+        back.isHidden = false
+        back.isEnabled = false
+        #expect(taker(13, 218) == nil)
+        // A big control's room is its own.
+        #expect(TouchTargets.isSmall(width: 28, height: 28) && !TouchTargets.isSmall(width: 240, height: 34))
+    }
+
+    @Test func aFingersClickMovesOntoTheControlAndTheMousesDoesnt() throws {
+        let saved = (TouchPress.landedAt, TouchPress.landedPoint)
+        defer { TouchPress.landedAt = saved.0; TouchPress.landedPoint = saved.1 }
+        let window = window(height: 300)
+        let (back, _) = try buttonStrip(in: window)
+        var clicks = 0
+        back.onClick = { _ in clicks += 1 }
+        let beside = NSPoint(x: 13, y: 218), retarget = TouchRetarget()
+        // The mouse's click stays where it is.
+        TouchPress.landedAt = nil
+        #expect(retarget.adjust(mouse(.leftMouseDown, at: beside, window: window), in: window).locationInWindow == beside)
+        #expect(retarget.adjust(mouse(.leftMouseUp, at: beside, window: window), in: window).locationInWindow == beside)
+        // A finger's: its press and lift land in Back, which is clicked.
+        TouchPress.landedAt = ProcessInfo.processInfo.systemUptime
+        TouchPress.landedPoint = (beside, window.windowNumber)
+        let down = retarget.adjust(mouse(.leftMouseDown, at: beside, window: window), in: window)
+        let up = retarget.adjust(mouse(.leftMouseUp, at: NSPoint(x: beside.x + 2, y: beside.y), window: window), in: window)
+        let frame = back.convert(back.bounds, to: nil)
+        #expect(frame.contains(down.locationInWindow) && frame.contains(up.locationInWindow))
+        back.mouseDown(with: down)
+        back.mouseUp(with: up)
+        #expect(clicks == 1)
+        // After its lift, nothing more moves.
+        #expect(retarget.adjust(mouse(.leftMouseUp, at: beside, window: window), in: window).locationInWindow == beside)
+        // A click far from where the finger landed isn't the finger's.
+        TouchPress.landedPoint = (NSPoint(x: 400, y: 100), window.windowNumber)
+        #expect(retarget.adjust(mouse(.leftMouseDown, at: beside, window: window), in: window).locationInWindow == beside)
+    }
+
+    @Test func aRowsCloseTakesAFingerAcrossATouchTarget() {
+        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 240, height: 34))
+        row.isSelected = true
+        row.layoutSubtreeIfNeeded()
+        var clicks = 0, closes = 0
+        row.onClick = { _ in clicks += 1 }
+        row.onClose = { closes += 1 }
+        let close = row.closeButton.frame
+        #expect(row.closeTouchBox.width >= 44 || row.closeTouchBox.maxX == row.bounds.maxX)
+        // Ten points before the ×: the finger's tap closes, the mouse's click there is the row's.
+        let near = NSPoint(x: close.minX - 10, y: close.midY)
+        #expect(row.closeTouchBox.contains(near))
+        row.touchDown(at: near)
+        row.mouseDown(with: mouse(.leftMouseDown, at: near))
+        row.mouseUp(with: mouse(.leftMouseUp, at: near))
+        row.touchTapped(at: near)
+        #expect(closes == 1 && clicks == 0)
+        row.mouseDown(with: mouse(.leftMouseDown, at: near))
+        row.mouseUp(with: mouse(.leftMouseUp, at: near))
+        #expect(clicks == 1 && closes == 1)
+        TouchReveal.finish()
+    }
+
+    // MARK: Picked rows
+
+    @Test func holdingAPickedRowLiftsAndCarriesThemAll() throws {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        let tabs = (0..<3).map { _ in manager.newTab(url: nil, spaceID: space, select: false) }
+        defer { tabs.forEach { $0.close() }; manager.invalidate() }
+        let host = TouchListHost(manager)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 400), styleMask: [.borderless], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let list = SidebarListView(frame: NSRect(x: 0, y: 0, width: 240, height: 400))
+        window.contentView?.addSubview(list)
+        list.delegate = host
+        list.reload(animated: false)
+        list.mark(pages: [tabs[0], tabs[2]])
+        #expect(list.marked.count == 2)
+        let held = try #require(list.tabRow(tabs[0].id) as? InteractiveView)
+        let other = try #require(list.tabRow(tabs[2].id) as? InteractiveView)
+        let unpicked = try #require(list.tabRow(tabs[1].id) as? InteractiveView)
+        let start = held.convert(NSPoint(x: held.bounds.midX, y: held.bounds.midY), to: nil)
+        let hold = try #require(held.beginTouchHold(at: start))
+        // Both picked rows rise together; the other row stays.
+        #expect(held.isTouchLifted && other.isTouchLifted && !unpicked.isTouchLifted)
+        // Moved off: picked up together, as the mouse drags them, the carried copy taking over.
+        hold.moved(to: NSPoint(x: start.x, y: start.y - 30))
+        #expect(list.isDragging && hold.carry != nil)
+        #expect(held.alphaValue == CarriedCopy.faint && other.alphaValue == CarriedCopy.faint && unpicked.alphaValue == 1)
+        #expect(!held.isTouchLifted && !other.isTouchLifted)
+        hold.cancelled()
+        #expect(TouchHold.current == nil && !other.isTouchLifted)
+        // Not picked: a held row rises alone.
+        let lone = try #require(unpicked.beginTouchHold(at: unpicked.convert(NSPoint(x: unpicked.bounds.midX, y: unpicked.bounds.midY), to: nil)))
+        #expect(unpicked.isTouchLifted && !held.isTouchLifted && !other.isTouchLifted)
+        lone.cancelled()
+        #expect(!unpicked.isTouchLifted)
+    }
+
+    // MARK: The sidebar's edge
+
+    @Test func aFingerResizesTheSidebarByItsEdge() {
+        let root = BrowserRootView(sidebar: SidebarView())
+        root.frame = NSRect(x: 0, y: 0, width: 1000, height: 700)
+        root.layoutSubtreeIfNeeded()
+        let edge = root.sidebarWidth
+        // 22 points either side of the edge, its full height.
+        #expect(root.resizeHandle(atTouch: NSPoint(x: edge - 21, y: 350)) === root.resizeHandle)
+        #expect(root.resizeHandle(atTouch: NSPoint(x: edge + 21, y: 350)) === root.resizeHandle)
+        #expect(root.resizeHandle(atTouch: NSPoint(x: edge, y: 3)) === root.resizeHandle)
+        #expect(root.resizeHandle(atTouch: NSPoint(x: edge - 23, y: 350)) == nil)
+        #expect(root.resizeHandle(atTouch: NSPoint(x: edge + 23, y: 350)) == nil)
+        // On the right, the same about its edge there.
+        root.setSidebarOnRight(true, animated: false)
+        defer { root.setSidebarOnRight(false, animated: false) }
+        root.layoutSubtreeIfNeeded()
+        #expect(root.resizeHandle(atTouch: NSPoint(x: 1000 - edge - 21, y: 350)) === root.resizeHandle)
+        #expect(root.resizeHandle(atTouch: NSPoint(x: 1000 - edge + 21, y: 350)) === root.resizeHandle)
+        #expect(root.resizeHandle(atTouch: NSPoint(x: 1000 - edge + 23, y: 350)) == nil)
+        // Sideways it drags; up and down it scrolls past.
+        #expect(BrowserRootView.edgePanBegins(NSPoint(x: 12, y: 3), vertical: false, bothWays: false, holding: false))
+        #expect(!BrowserRootView.edgePanBegins(NSPoint(x: 3, y: 12), vertical: false, bothWays: false, holding: false))
+    }
+
+    @Test func theSidebarsEdgeTakesAFingerFirst() {
+        let root = BrowserRootView(sidebar: SidebarView())
+        root.frame = NSRect(x: 0, y: 0, width: 1000, height: 700)
+        root.layoutSubtreeIfNeeded()
+        let sidebar = root.sidebarContainer.sidebar, edge = root.sidebarWidth
+        func switchesSpaces(_ x: CGFloat) -> Bool { sidebar.touchSwipeTakes(at: sidebar.convert(NSPoint(x: x, y: 350), from: root)) }
+        // At the edge a finger resizes; further in, sideways switches spaces.
+        #expect(!switchesSpaces(edge - 10))
+        #expect(switchesSpaces(edge - 30))
+        #expect(switchesSpaces(80))
+        // A row held there until it lifted drags as a row.
+        #expect(!BrowserRootView.edgePanBegins(NSPoint(x: 12, y: 3), vertical: false, bothWays: false, holding: true))
+        // The window's outer 12 points stay macOS's, to resize the window.
+        let bounds = NSRect(x: 0, y: 0, width: 1000, height: 700)
+        #expect(BrowserRootView.sidebarEdgeTouchBox(line: 20, frame: NSRect(x: 10, y: 0, width: 14, height: 700), in: bounds).minX == 12)
+        #expect(BrowserRootView.sidebarEdgeTouchBox(line: 980, frame: NSRect(x: 976, y: 0, width: 14, height: 700), in: bounds).maxX == 988)
+        // Hidden, the edge takes nothing: a finger in from the page's edge pulls the sidebar out.
+        root.setSidebarVisible(false, animated: false)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.resizeHandle(atTouch: NSPoint(x: 20, y: 350)) == nil)
+        #expect(TouchSidebarPull.take(atX: 20, pageEdge: 0, revealed: false, held: false, onCard: false) == .pull)
+    }
+
     @Test func aPinchOutsideABrowserWindowDoesNothing() {
         let page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         let holder = PageHolder(holding: page)
@@ -1740,6 +1993,58 @@ struct TouchMovesTests {
         holder.touchPinchedIn()
         #expect(window.windowController == nil)
     }
+}
+
+/// A list's delegate that does nothing, for driving its rows by touch.
+@MainActor
+final class TouchListHost: SidebarListDelegate {
+    let tabManager: TabManager
+    init(_ manager: TabManager) { tabManager = manager }
+    func listSelect(_ tab: Tab) {}
+    func listOpenBookmark(_ bookmark: Bookmark) {}
+    func listRenameBookmark(_ id: UUID, to name: String) {}
+    func listClose(_ tab: Tab) {}
+    func listClose(_ tabs: [Tab]) {}
+    func listRemove(_ items: [SidebarItem]) {}
+    func listNewTab() {}
+    func listClearTabs() {}
+    func listSetFolderOpen(_ id: UUID, _ open: Bool) {}
+    func listSetGroupOpen(_ id: UUID, _ open: Bool) {}
+    func listRenameGroup(_ id: UUID, to name: String) {}
+    func listMoveGroup(_ id: UUID, to index: Int, in spaceID: UUID) {}
+    func listPinGroup(_ id: UUID, at index: Int, in spaceID: UUID, folder: UUID?) {}
+    func listAddToGroup(_ tabs: [Tab], group: UUID) {}
+    func listRenameFolder(_ id: UUID, to name: String) {}
+    func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {}
+    func listAsOne(_ name: String, _ body: @escaping () -> Void) { body() }
+    func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID, folder: UUID?) {}
+    func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?) {}
+    func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {}
+    func listMenu(for item: SidebarItem) -> NSMenu? { nil }
+    func listMenu(forMarked items: [SidebarItem]) -> NSMenu? { nil }
+    func listDragHoverSpace(at windowPoint: NSPoint) -> UUID? { nil }
+    func listDragEnded() {}
+    func listDropFinished() {}
+    func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting, grouping: TabManager.Grouping) {}
+    func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {}
+    func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?, group: UUID?) {}
+    func listSetNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool) {}
+    func listSwitchSpaceDuringDrag(_ spaceID: UUID) {}
+    func listDropOutside(_ tabs: [Tab], at screenPoint: NSPoint) -> Bool { false }
+    func listMoveToWindow(_ tabs: [Tab], controller: BrowserWindowController, index: Int) -> Bool { false }
+    func listMovePinnedToWindow(_ bookmarkID: UUID, controller: BrowserWindowController, at screenPoint: NSPoint) -> NSView? { nil }
+    func listMoveBookmark(_ id: UUID, to index: Int, in spaceID: UUID) {}
+    func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool { false }
+    func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) {}
+    func listJoinSplit(_ page: TabManager.RowPage, onto target: TabManager.RowPage, onRight: Bool) {}
+    func listZoomPane(_ tab: Tab) {}
+    func listPinSplit(_ tab: Tab, onto bookmarkID: UUID, tabOnRight: Bool) {}
+    func listUnpinSplit(_ bookmarkID: UUID, onto tab: Tab, pinnedOnRight: Bool) {}
+    func listJoinPinned(_ bookmarkID: UUID, onto targetID: UUID, onRight: Bool) {}
+    func listDropOnFavorites(_ items: [SidebarItem], dragged: SidebarItem) -> Bool { false }
+    func listFavoriteTile(for bookmarkID: UUID) -> NSView? { nil }
+    func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {}
+    func listDropOnPage(_ item: SidebarItem) -> Bool { false }
 }
 
 extension BrowserRootView {

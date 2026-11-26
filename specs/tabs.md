@@ -186,6 +186,11 @@
   Test: TouchGesturesTests.aTapShowsARowsButtonsUntilThePointerOrAFingerElsewhere
 - Tap just beside a row's showing × → the tab closes; a mouse click there is still the row's.
   Test: TouchGesturesTests.aFingerNearTheCloseButtonCloses
+- A row's showing × takes a finger anywhere in 44 points around it, within the row.
+  Test: TouchMovesTests.aRowsCloseTakesAFingerAcrossATouchTarget
+- A finger's tap beside a small control (an icon button such as Back or Forward, a space's dot, a swatch), on what the control sits on → that control's, anywhere in 44 points around it; where two overlap, the nearer one's; on another control, a page or text, that one's own. The mouse clicks where it always did.
+  Test: TouchMovesTests.aFingerBesideASmallControlTakesIt
+  Test: TouchMovesTests.aFingersClickMovesOntoTheControlAndTheMousesDoesnt
 - Tap an open favorite → its × shows, as hovering shows it, until a finger lands outside the sidebar, something else is tapped, or the pointer moves over it.
   Test: TouchGesturesTests.aTapShowsAnOpenFavoritesClose
 - Tap the Tabs label above today's tabs → Clear shows, as hovering the list shows it, until a finger lands outside the sidebar or the pointer comes over the list.
@@ -200,6 +205,9 @@
   Test: TouchGesturesTests.aFingerLandingRunsTheMouseDownHooks
 - Touch and hold a row, slide onto its menu without lifting → the item under the finger lights; lift on it → it runs.
   Test: TouchMovesTests.slidingOntoTheMenuAndLiftingChooses
+- A menu a finger opens, by touch and hold or by a tap on a control with a menu → rows 44 points tall, the same items, width and look, and its submenus the same; opened by the mouse or the keys, as before.
+  Test: TouchMovesTests.aMenuAFingerOpensHasTouchSizedRows
+  Test: TouchMovesTests.aTappedDropdownOpensItsMenuTouchSized
 - Touch and hold a row, lift off its menu → the menu stays open, to be tapped.
   Test: TouchMovesTests.liftingOffTheMenuLeavesItOpen
 - Touch and hold a row, then move away from its menu, or before it shows → the row is picked up and drags as with the mouse.
@@ -214,6 +222,12 @@
   Test: TouchMovesTests.theListScrollsNearItsEdgesFasterNearer
 - A finger and the mouse drag a row the same way: reorder, into a folder, a split, another space.
   Test: TouchMovesTests.theMouseAndAFingerDriveTheSameDrag
+- Touch and hold one of several picked rows → they all lift; move, and they're carried together, as dragging them with the mouse does.
+  Test: TouchMovesTests.holdingAPickedRowLiftsAndCarriesThemAll
+- Drag the sidebar's edge with a finger → it resizes as with the mouse; a finger takes the edge anywhere 22 points either side of it, its full height.
+  Test: TouchMovesTests.aFingerResizesTheSidebarByItsEdge
+- At the sidebar's edge, first: the window's outer 12 points are macOS's, to resize the window; then a row held until it lifted drags as a row; then a finger moving sideways resizes the sidebar, not switching spaces; up and down scrolls. Further in, one finger sideways switches spaces. With the sidebar hidden there's no edge to take: a finger in from the page's edge pulls it out.
+  Test: TouchMovesTests.theSidebarsEdgeTakesAFingerFirst
 - A row carried by a finger out over the page → it keeps following the finger there until it lifts.
   Test: SplitDragTests.theWindowFollowsTheFingerOverThePage
 - One finger sideways across the sidebar → the previous or next space, as two fingers on the trackpad; up and down scrolls.
