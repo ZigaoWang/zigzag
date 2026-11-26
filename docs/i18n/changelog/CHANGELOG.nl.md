@@ -4,6 +4,17 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
+### Nieuw
+- De navigatiekolom vanaf de schermrand toont voorbeelden van pagina’s: laat de aanwijzer op een tabblad staan en de pagina komt naast de navigatiekolom te staan, boven de app waarin je zit. Een tabblad in de slaapstand toont zijn naam en blijft in de slaapstand, en met een klik ga je in Zigzag naar het tabblad. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+
+### Gewijzigd
+- “Synchroniseer met iCloud” in Instellingen › Algemeen laat zien wanneer er voor het laatst is gesynchroniseerd, zoals “Laatst gesynchroniseerd 5 minuten geleden”, en toont “Bezig met synchroniseren…” alleen bij de eerste synchronisatie of een die lang duurt, niet bij elke snelle controle. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- “Je Zigzag-kaart” in Over Zigzag is opnieuw getekend als een echte kaart: je naam groter, “Sinds” met maand en jaar, de Z in de hoek geperst en afwerkingen van matglas, parelfolie, geanodiseerd grafiet en linnenpapier, elk met zijn naam naast het staal. “Bewaar als afbeelding” en “Deel” maken een afbeelding van 2400 × 1500 met de kaart op een bijpassende achtergrond.
+
+### Opgelost
+- iCloud-wachtwoorden wordt ook ingesteld op inlogpagina’s als er tabbladen in de slaapstand staan: de frames van een tabblad in de slaapstand opvragen mislukt niet meer, zoals in Chrome.
+- The Marvellous Suspender en andere extensies die alarmen instellen werken weer: een alarm instellen geeft nu een promise terug, zoals in Chrome.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans en Russisch; downloadregels die het bewaarde bestand doorgeven; livemappen die laten zien wanneer ze voor het laatst zijn bijgewerkt; en na Chinees Pinyin overschakelen naar Engels zonder losse spaties.

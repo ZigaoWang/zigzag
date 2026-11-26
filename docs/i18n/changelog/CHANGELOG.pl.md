@@ -4,6 +4,17 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
+### Nowe
+- Pasek boczny wysuwany od krawędzi ekranu pokazuje podgląd stron: zatrzymaj wskaźnik na karcie, a jej strona pojawi się obok paska bocznego, nad aplikacją, w której jesteś. Uśpiona karta pokazuje swoją nazwę i zostaje uśpiona, a kliknięcie przenosi cię do karty w Zigzag. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+
+### Zmieniono
+- „Synchronizuj z iCloud” w „Ustawienia” › „Ogólne” pokazuje, kiedy ostatnio synchronizowano, na przykład „Zsynchronizowano 5 minut temu”, a „Synchronizowanie…” pojawia się tylko przy pierwszej synchronizacji albo takiej, która trwa dłużej, nie przy każdym szybkim sprawdzeniu. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- „Twoja karta Zigzag” w „O Zigzag” jest narysowana na nowo jak prawdziwa karta: większe imię, „Od” z miesiącem i rokiem, litera Z wytłoczona w rogu oraz wykończenia z matowego szkła, perłowej folii, anodowanego grafitu i lnianego papieru, każde z nazwą obok próbki. „Zachowaj jako obraz” i „Udostępnij” tworzą obraz 2400 × 1500 z kartą na pasującym tle.
+
+### Naprawiono
+- Hasła iCloud konfigurują się na stronach logowania także przy uśpionych kartach: pobieranie ramek uśpionej karty już się nie kończy się błędem, tak jak w Chrome.
+- The Marvellous Suspender i inne rozszerzenia, które ustawiają alarmy, znów działają: ustawienie alarmu zwraca im teraz obietnicę, tak jak w Chrome.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.

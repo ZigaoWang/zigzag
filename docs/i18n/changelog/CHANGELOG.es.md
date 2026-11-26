@@ -4,6 +4,17 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
+### Nuevo
+- La barra lateral desde el borde de la pantalla muestra vistas previas de las páginas: deja el puntero sobre una pestaña y su página aparece junto a la barra lateral, encima de la app en la que estás. Una pestaña suspendida muestra su nombre y sigue suspendida, y un clic te lleva a la pestaña en Zigzag. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+
+### Cambios
+- «Sincronizar con iCloud», en Ajustes › General, indica cuándo se sincronizó por última vez, como «Última sincronización hace 5 minutos», y muestra «Sincronizando…» solo en la primera sincronización o en una que tarda, no en cada comprobación rápida. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- «Tu tarjeta de Zigzag», en Acerca de Zigzag, se ha redibujado como una tarjeta de verdad: tu nombre más grande, «Desde» con el mes y el año, la Z grabada en la esquina y acabados de cristal esmerilado, lámina nacarada, grafito anodizado y papel de lino, cada uno con su nombre junto a la muestra. «Guardar como imagen» y «Compartir» crean una imagen de 2400 × 1500 con la tarjeta sobre un fondo a juego.
+
+### Correcciones
+- Contraseñas de iCloud se configura en las páginas de inicio de sesión aunque haya pestañas suspendidas: pedir los marcos de una pestaña suspendida ya no falla, como en Chrome.
+- The Marvellous Suspender y otras extensiones que crean alarmas vuelven a funcionar: crear una alarma ahora les devuelve una promesa, como en Chrome.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés, el español y el ruso; reglas de descarga que envían el archivo guardado; carpetas dinámicas que dicen cuándo se actualizaron por última vez, y escribir en pinyin chino y pasar al inglés sin espacios de más.

@@ -4,6 +4,17 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Nouveautés
+- La barre latérale depuis le bord de l’écran affiche un aperçu des pages : laissez le pointeur sur un onglet et sa page apparaît à côté de la barre latérale, par-dessus l’app où vous êtes. Un onglet en veille montre son nom et reste en veille, et un clic vous amène à l’onglet dans Zigzag. Merci à [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+
+### Modifications
+- « Synchroniser avec iCloud », dans Réglages › Général, indique la date de la dernière synchronisation, comme « Dernière synchronisation il y a 5 minutes », et n’affiche « Synchronisation… » que pour la première synchronisation ou une synchronisation un peu longue, pas à chaque vérification rapide. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- « Votre carte Zigzag », dans À propos de Zigzag, est redessinée comme une vraie carte : votre nom plus grand, « Depuis » avec le mois et l’année, le Z embossé dans le coin, et des finitions en verre dépoli, feuille nacrée, graphite anodisé et papier de lin, chacune nommée à côté de son échantillon. « Enregistrer en tant qu’image » et « Partager » créent une image de 2400 × 1500 avec la carte sur un fond assorti.
+
+### Corrections
+- Mots de passe iCloud s’installe sur les pages de connexion même quand des onglets sont en veille : demander les cadres d’un onglet en veille n’échoue plus, comme dans Chrome.
+- The Marvellous Suspender et d’autres extensions qui programment des alarmes fonctionnent de nouveau : programmer une alarme leur renvoie maintenant une promesse, comme dans Chrome.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, au français, à l’espagnol et au russe ; des règles de téléchargement qui transfèrent le fichier enregistré ; des dossiers dynamiques qui indiquent leur dernière mise à jour ; et la saisie en pinyin chinois suivie d’un passage à l’anglais sans espaces parasites.

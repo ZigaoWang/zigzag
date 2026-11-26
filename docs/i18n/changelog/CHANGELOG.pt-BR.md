@@ -4,6 +4,17 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ## [Unreleased]
 
+### Novo
+- A barra lateral a partir da borda da tela mostra prévias das páginas: deixe o ponteiro sobre uma aba e a página dela aparece ao lado da barra lateral, sobre o app em que você está. Uma aba suspensa mostra o nome e continua suspensa, e um clique leva você até a aba no Zigzag. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+
+### Alterado
+- “Sincronizar com o iCloud”, em Ajustes › Geral, informa quando foi a última sincronização, como “Última sincronização há 5 minutos”, e mostra “Sincronizando…” só na primeira sincronização ou em uma que demora, não a cada verificação rápida. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- “Seu Cartão Zigzag”, em Sobre o Zigzag, foi redesenhado como um cartão de verdade: seu nome maior, “Desde” com mês e ano, o Z gravado no canto e acabamentos de vidro fosco, folha perolada, grafite anodizado e papel linho, cada um com o nome ao lado da amostra. “Salvar como imagem” e “Compartilhar” criam uma imagem de 2400 × 1500 com o cartão sobre um fundo combinando.
+
+### Corrigido
+- Senhas do iCloud é configurado nas páginas de login mesmo com abas suspensas: pedir os frames de uma aba suspensa não falha mais, como no Chrome.
+- The Marvellous Suspender e outras extensões que definem alarmes voltam a funcionar: definir um alarme agora devolve uma promessa a elas, como no Chrome.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanhol e russo; regras de download que entregam o arquivo salvo; pastas dinâmicas que mostram quando foram atualizadas pela última vez; e digitar em pinyin chinês e mudar para o inglês sem espaços sobrando.

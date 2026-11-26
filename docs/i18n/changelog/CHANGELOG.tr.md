@@ -4,6 +4,17 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ## [Unreleased]
 
+### Yeni Özellikler
+- Ekranın kenarından açılan kenar çubuğu sayfaları önizler: imleci bir sekmenin üzerinde bekletin, sayfası içinde bulunduğunuz uygulamanın üstünde, kenar çubuğunun yanında açılır. Uykuya alınmış bir sekme adını gösterir ve uykuda kalır, bir tıklama da sizi Zigzag’de o sekmeye götürür. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#365](https://github.com/ZigaoWang/zigzag/issues/365), [#534](https://github.com/ZigaoWang/zigzag/pull/534))
+
+### Değişiklikler
+- Ayarlar › Genel’deki “iCloud ile eşzamanla”, en son ne zaman eşzamanlandığını “Son eşzamanlama: 5 dakika önce” gibi gösterir; “Eşzamanlanıyor…” yalnızca ilk eşzamanlamada ya da uzun süren bir eşzamanlamada görünür, her hızlı denetimde görünmez. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+- “Zigzag Kartınız”, Zigzag Hakkında bölümünde gerçek bir kart gibi yeniden çizildi: adınız daha büyük, ay ve yılın yazdığı “… tarihinden beri” satırı, köşeye bastırılmış Z ve buzlu cam, sedefli folyo, eloksallı grafit ve keten kâğıt kaplamalar; her birinin adı örneğinin yanında yazıyor. “Resim Olarak Kaydet” ve “Paylaş”, kartı uyumlu bir arka planın üzerine koyan 2400 × 1500 boyutunda bir resim oluşturur.
+
+### Düzeltmeler
+- iCloud Parolaları, sekmeler uykudayken bile giriş sayfalarında kurulur: uykudaki bir sekmenin çerçevelerini istemek artık başarısız olmaz, tıpkı Chrome’daki gibi.
+- Alarm kuran The Marvellous Suspender ve diğer genişletmeler yeniden çalışıyor: alarm kurmak artık onlara bir Promise döndürür, tıpkı Chrome’daki gibi.
+
 ## [0.10.0] - 2026-11-25
 
 Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç yeni dilde Zigzag; kaydedilen dosyayı devreden indirme kuralları; en son ne zaman güncellendiğini gösteren canlı klasörler; ve Çince Pinyin yazarken İngilizceye geçince fazladan boşluk kalmaması.
