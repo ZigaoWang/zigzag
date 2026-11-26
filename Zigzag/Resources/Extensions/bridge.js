@@ -449,6 +449,13 @@
     result.then((value) => callback(value), (error) => { console.warn(`chrome.${ns}.${fn}:`, error.message); callback(undefined); });
   };
 
+  // A fixed answer, as a promise or to the callback.
+  const given = (value, callback) => {
+    if (typeof callback !== 'function') return Promise.resolve(value);
+    setTimeout(() => callback(value), 0);
+    return undefined;
+  };
+
   // Events: one port for all of them, opened the first time anything listens, reopened if it drops.
   const listeners = new Map();
   let port = null;
@@ -591,7 +598,7 @@
     cancel: method('downloads', 'cancel'),
     erase: method('downloads', 'erase'),
     removeFile: method('downloads', 'removeFile'),
-    open: (id) => { send('downloads', 'open', [id]).catch((e) => console.warn('chrome.downloads.open:', e.message)); },
+    open: method('downloads', 'open'),
     show: (id) => { send('downloads', 'show', [id]).catch(() => {}); },
     showDefaultFolder: () => { send('downloads', 'showDefaultFolder', []).catch(() => {}); },
     getFileIcon: method('downloads', 'getFileIcon'),
@@ -678,14 +685,14 @@
       return Promise.reject(error);
     },
     removeCachedAuthToken: method('identity', 'getRedirectURL', { after: () => undefined }),
-    clearAllCachedAuthTokens: () => Promise.resolve(),
+    clearAllCachedAuthTokens: (callback) => given(undefined, callback),
     getProfileUserInfo: (...args) => {
       const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
       const info = { email: '', id: '' };
       if (callback) { setTimeout(() => callback(info), 0); return; }
       return Promise.resolve(info);
     },
-    getAccounts: () => Promise.resolve([]),
+    getAccounts: (callback) => given([], callback),
     onSignInChanged: event('identity.onSignInChanged'),
   });
 

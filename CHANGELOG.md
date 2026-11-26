@@ -11,6 +11,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Changed
 - Sync with iCloud in Settings › General says when it last synced, like Last synced 5 minutes ago, and shows Syncing… only for the first sync or one that takes a while, not every quick check. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
+### Fixed
+- The Marvellous Suspender and other extensions that set alarms work again: setting an alarm now gives them back a promise, as in Chrome.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.

@@ -1141,6 +1141,28 @@
       } catch (e) {}
     }
 
+    // alarms: in Chrome MV3 each call returns a promise when no callback is given. WebKit's alarms.create returns
+    // undefined and takes no callback, so The Marvellous Suspender's `alarms.create(...).catch` threw and it never
+    // suspended a tab. Whatever WebKit returns that isn't a promise becomes one; the callback hears the same answer.
+    const alarms = api.alarms;
+    if (alarms) {
+      for (const name of ['create', 'clear', 'clearAll', 'get', 'getAll']) {
+        if (typeof alarms[name] !== 'function') continue;
+        const native = alarms[name].bind(alarms);
+        setMember(['alarms'], name, (...args) => {
+          const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+          const result = native(...args);
+          const answer = result && typeof result.then === 'function' ? result : Promise.resolve(result);
+          if (!callback) return answer;
+          answer.then((value) => callback(value), (error) => {
+            if (typeof globalThis.__zigzagWithLastError === 'function') globalThis.__zigzagWithLastError(callback, error);
+            else callback();
+          });
+          return undefined;
+        });
+      }
+    }
+
     // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
     // keeps no such cache, so there's nothing to do; refused, it left an unhandled error in Tampermonkey's start.
     if (webRequest && typeof webRequest.handlerBehaviorChanged !== 'function') {

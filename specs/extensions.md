@@ -117,6 +117,9 @@
   Test: ExtensionScriptTests.aTabMessageNothingHearsFails
 - A content script's or page's message that none of the extension's pages listens for → fails the same way.
   Test: ExtensionScriptTests.aRuntimeMessageNothingHearsFails
+- An `alarms` call, `downloads.open` or `identity.getAccounts` without a callback → returns a promise, as in Chrome MV3; with one → the callback gets the answer.
+  Test: ExtensionScriptTests.alarmCallsReturnPromisesAsInChrome
+  Test: ExtensionScriptTests.bridgedCallsChromeAnswersWithAPromiseReturnOne
 
 ## Windows
 - An extension's `windows.create` with `state: 'minimized'` → the window goes straight to the Dock, never shown in front or focused, as in Chrome.

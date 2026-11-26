@@ -289,6 +289,22 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__warned.length").toInt32() == 1)
     }
 
+    @Test func bridgedCallsChromeAnswersWithAPromiseReturnOne() {
+        // In Chrome MV3 these return a promise without a callback, and call the callback when given one.
+        let context = Self.bridgeWorld(permissions: ["downloads", "downloads.open", "identity"])
+        context.evaluateScript("""
+        var __seen = [];
+        var __open = chrome.downloads.open(1);
+        __open.then(() => __seen.push('opened'), (e) => __seen.push('open refused'));
+        chrome.identity.clearAllCachedAuthTokens(() => __seen.push('cleared'));
+        chrome.identity.getAccounts((accounts) => __seen.push('accounts ' + accounts.length));
+        chrome.identity.getAccounts().then((accounts) => __seen.push('promised ' + accounts.length));
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__open instanceof Promise").toBool())
+        #expect(context.evaluateScript("__seen.sort().join()").toString() == "accounts 0,cleared,open refused,promised 0")
+    }
+
     @Test func aCompatibilityLayerFailureKeepsMainsCallbackShape() {
         let context = Self.compatibilityWorld(permissions: ["debugger"])
         context.evaluateScript("""
@@ -1290,6 +1306,30 @@ struct ExtensionScriptTests {
         let popup = Self.workerWorld(worker: false, setup: setup + "__registration = {};")
         popup.evaluateScript("navigator.serviceWorker.ready.then((r) => { globalThis.__ready = r; })")
         #expect(popup.evaluateScript("__ready").toString() == "webkit")
+    }
+
+    @Test func alarmCallsReturnPromisesAsInChrome() {
+        // WebKit's alarms.create returns undefined; The Marvellous Suspender calls .catch on it.
+        let background = Self.workerWorld(worker: true, setup: """
+        var __made = [];
+        chrome.alarms = { create: (...args) => { __made.push(args.length); }, clear: () => undefined, clearAll: () => undefined,
+                          get: () => Promise.resolve({ name: 'a' }), getAll: () => Promise.resolve([]), onAlarm: event() };
+        """)
+        background.evaluateScript("""
+        var __seen = [];
+        var __made1 = chrome.alarms.create('7', { when: 5 });
+        __made1.then(() => __seen.push('created'));
+        chrome.alarms.create({ when: 5 }).catch(() => {});
+        chrome.alarms.create('8', { when: 5 }, () => __seen.push('callback'));
+        chrome.alarms.clear('7').then(() => __seen.push('cleared'));
+        chrome.alarms.clearAll().then(() => __seen.push('all cleared'));
+        chrome.alarms.get('a').then((alarm) => __seen.push(alarm.name));
+        """)
+        background.evaluateScript("__flush()")
+        #expect(background.evaluateScript("__made1 instanceof Promise").toBool())
+        // The callback isn't handed to WebKit, which takes none.
+        #expect(background.evaluateScript("__made.join()").toString() == "2,1,2")
+        #expect(background.evaluateScript("__seen.sort().join()").toString() == "a,all cleared,callback,cleared,created")
     }
 
     @Test func cookiesAsChromeDescribesThemAreSet() {
