@@ -45,8 +45,15 @@
   Test: SyncTests.twoMacsTurningSyncOnAtOnceMakeNoCopies
   Test: SyncTests.twoFirstSyncsAtOnceAgreeHoweverLateOneReads
   Test: SyncTests.aSecondMacWaitsForTheFirstMacsClaimToBeComplete
-- The first Mac quits or goes offline halfway through sending its library → after the claim has been incomplete for 30 minutes (by iCloud's own date), the other merges with what's there. What the first sends later arrives as usual; this rare case can leave a page there twice, one from each Mac, but never loses one.
+- The first Mac renews its claim before each part of its library goes up. One that stalls (asleep, offline, quit) and doesn't renew it for 30 minutes, counted from the later of iCloud's last save of the claim and when the waiting Mac first saw it (so a clock set wrong can't cut it short), has its claim taken over by a waiting Mac, which then sends as the first; of two waiting, only one takes it. When the stalled Mac comes back, its next renewal is refused: what it hadn't sent isn't sent, and it merges with what's there as a Mac joining does. What it sent before stalling stays, so only what it sent in its last part before stalling, and that the other Mac also has, can be there twice. Nothing is lost. An old claim left incomplete (a Mac that claimed and was turned off) is taken over the same way. A first Mac turned off and on, or quit just after its claim was saved, carries on and marks its claim complete.
   Test: SyncTests.aFirstMacQuittingHalfwayLosesNothing
+  Test: SyncTests.aStalledFirstMacsClaimIsTakenOverWithoutCopies
+  Test: SyncTests.anOldIncompleteClaimStillKeepsTwoAtOnceApart
+  Test: SyncTests.aFirstMacTurnedOffAndOnHalfwayCompletesItsClaim
+  Test: SyncTests.aClaimSavedJustBeforeAQuitIsCarriedOn
+  Test: SyncTests.aFirstMacThatLostItsStateConverges
+  Test: SyncTests.threeMacsAtOnceMakeNoCopies
+  Test: SyncTests.aWaitingMacWhoseClockRunsAheadStillWaits
 - A Mac joining later, when the claim is complete → merges at once, by name and full address, and keeps its own duplicate pins; what was moved or removed since the first sync isn't matched where it was.
   Test: SyncTests.aSecondMacJoiningNormallyKeepsItsOwnDuplicatePins
   Test: SyncTests.aLaterJoinerAfterARemovalMergesAtOnce

@@ -138,6 +138,8 @@ struct SyncState: Codable {
     var device: UUID?
     /// This Mac's claim was saved: once its library has all gone up, the claim is marked complete.
     var claimed = false
+    /// When this Mac first saw another Mac's incomplete claim.
+    var claimSeen: Date?
     /// Saves that found their record gone, waiting for a fetch of iCloud's removals before they're decided.
     var goneAsked: Set<String> = []
     var goneRead: Set<String> = []
@@ -146,7 +148,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, device, claimed, goneAsked, savedSeen, fetches
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, device, claimed, claimSeen, goneAsked, savedSeen, fetches
     }
 
     init() {}
@@ -177,6 +179,7 @@ struct SyncState: Codable {
         resumed = try c.decodeIfPresent(Bool.self, forKey: .resumed) ?? false
         device = try c.decodeIfPresent(UUID.self, forKey: .device)
         claimed = try c.decodeIfPresent(Bool.self, forKey: .claimed) ?? false
+        claimSeen = try c.decodeIfPresent(Date.self, forKey: .claimSeen)
         goneAsked = try c.decodeIfPresent(Set<String>.self, forKey: .goneAsked) ?? []
         savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
         fetches = try c.decodeIfPresent(Int.self, forKey: .fetches) ?? 0
@@ -203,6 +206,8 @@ final class SyncSession {
     var onNeedsFetch: (() -> Void)?
     /// Called while the first sync waits for another Mac's to finish going up: read again on the retry schedule.
     var onWaiting: (() -> Void)?
+    /// Called when sync starts over here as a first sync (this Mac's claim was taken over).
+    var onStartedOver: (() -> Void)?
     /// True while it writes into the library, so the change that causes isn't read as one made here.
     private(set) var isApplying = false
     /// Sync turned off or started again: a fetch still on its way changes nothing.
@@ -693,14 +698,25 @@ final class SyncSession {
         let device = state.device ?? UUID()
         state.device = device
         if let record = state.incoming[SyncName.claim], let claim = try? SyncBody.decoder().decode(SyncClaim.self, from: record.payload) {
-            let saved = record.serverModified ?? now()
-            if claim.device == device || claim.complete || now().timeIntervalSince(saved) >= Self.claimTimeout {
+            if claim.device == device || claim.complete {
                 mergeFirst()
+                return
+            }
+            // Another Mac's first sync is going up. Its claim is renewed as each part goes up; one not renewed for
+            // `claimTimeout`, counted from when iCloud last saved it or this Mac first saw it, whichever is later (a
+            // clock set wrong can't cut it short), is taken over: this Mac sends as the first, if no other took it.
+            let seen = state.claimSeen ?? now()
+            state.claimSeen = seen
+            let renewed = max(record.serverModified ?? seen, seen)
+            if now().timeIntervalSince(renewed) >= Self.claimTimeout {
+                state.systemFields[SyncName.claim] = record.systemFields
+                state.base[SyncName.claim] = Self.claimItem(SyncClaim(device: device, complete: false))
+                state.unsent.insert(SyncName.claim)
+                queue(([SyncName.claim], []))
             } else {
-                // Another Mac's first sync is going up: read again later.
-                onChange?()
                 onWaiting?()
             }
+            onChange?()
             return
         }
         // iCloud has a library (and no claim): merged as usual.
@@ -712,13 +728,26 @@ final class SyncSession {
         onChange?()
     }
 
-    /// This Mac's library has all gone up after its claim: the claim says so.
-    private func completeClaim() {
-        guard state.claimed, state.unsent.subtracting([SyncName.claim]).isEmpty, let device = state.device else { return }
-        state.claimed = false
-        state.base[SyncName.claim] = Self.claimItem(SyncClaim(device: device, complete: true))
+    /// After a part of this Mac's first sync went up: the claim is renewed before the next part, or, all gone up,
+    /// marked complete.
+    private func renewClaim() {
+        guard state.claimed, state.merged, let device = state.device else { return }
+        let done = state.unsent.subtracting([SyncName.claim]).isEmpty
+        if done { state.claimed = false }
+        state.base[SyncName.claim] = Self.claimItem(SyncClaim(device: device, complete: done))
         state.unsent.insert(SyncName.claim)
         queue(([SyncName.claim], []))
+    }
+
+    /// Whether the next part of what goes up is the claim alone: while this Mac's first sync goes up, each part waits
+    /// for the claim to be renewed, so one taken over by another Mac stops it before more goes up.
+    var claimFirst: Bool { state.claimed && state.unsent.contains(SyncName.claim) }
+
+    /// Another Mac took the claim over while this one's first sync was stalled: what hasn't gone up isn't sent, and
+    /// this Mac merges with what's there as a Mac joining does, once that Mac's first sync is done. What went up stays.
+    private func lostClaim() {
+        startOver()
+        onStartedOver?()
     }
 
     /// The first sync on this Mac: iCloud's records and the library here put together, nothing removed.
@@ -736,6 +765,12 @@ final class SyncSession {
         state.aliases = merge.aliases
         state.base = server
         if server[SyncName.claim] == nil, let claim { state.base[SyncName.claim] = claim }
+        // This Mac's own claim, saved before it could note that (a quit): its first sync carries on.
+        if let record = server[SyncName.claim], let own = try? SyncBody.decoder().decode(SyncClaim.self, from: record.payload),
+           own.device == state.device, !own.complete {
+            state.claimed = true
+        }
+        state.claimSeen = nil
         state.merged = true
         write(SyncMapping.apply(merge.items, onto: host.read(), aliases: state.aliases).library)
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, now: now())
@@ -769,12 +804,18 @@ final class SyncSession {
         }
         state.lastSynced = now()
         onChange?()
-        // This Mac's claim saved: it's the first; its library goes up, then the claim says it's complete.
+        // This Mac's claim saved: it's the first; its library goes up, renewing the claim between parts, then the claim
+        // says it's complete.
         if !state.merged, records.contains(where: { $0.name == SyncName.claim }) {
             state.claimed = true
+            // Renewed before the first part goes up, so it's queued first.
+            state.unsent.insert(SyncName.claim)
+            queue(([SyncName.claim], []))
             mergeFirst()
+            if state.unsent.subtracting([SyncName.claim]).isEmpty { renewClaim() }
+            return
         }
-        completeClaim()
+        if records.contains(where: { $0.name != SyncName.claim }) { renewClaim() }
     }
 
     func deleteFailed(_ name: String, _ failure: SyncDeleteFailure) {
@@ -818,6 +859,10 @@ final class SyncSession {
         guard !isClosed else { return }
         switch failure {
         case .conflict(let record):
+            if name == SyncName.claim, state.merged, state.claimed {
+                lostClaim()
+                return
+            }
             arrive(name, record)
             if state.merged {
                 settle()
@@ -851,11 +896,12 @@ final class SyncSession {
 
     /// Everything here goes up again from scratch (iCloud's copy was reset): merged again on the next fetch.
     func startOver() {
-        let account = state.account, aliases = state.aliases, device = state.device
+        let account = state.account, aliases = state.aliases, device = state.device, seen = state.claimSeen
         state = SyncState()
         state.account = account
         state.aliases = aliases
         state.device = device
+        state.claimSeen = seen
         clearIncoming()
         onChange?()
     }

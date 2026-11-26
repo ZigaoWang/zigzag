@@ -2082,3 +2082,126 @@ extension SyncTests {
         #expect(b.library.titles(in: "Personal").contains("edited after"))
     }
 }
+
+// MARK: - The claim, stalled or taken over
+
+extension SyncTests {
+    private func claim(_ cloud: FakeCloud) -> SyncSession.SyncClaim? {
+        cloud.records[SyncName.claim].flatMap { try? SyncBody.decoder().decode(SyncSession.SyncClaim.self, from: $0.payload) }
+    }
+    private func describe(_ n: String, _ m: FakeMac) -> String {
+        "\(n): spaces \(m.library.spaceNames) personal \(m.library.contents.spaces.filter { $0.name == "Personal" }.map { $0.bookmarks.map(\.url.lastPathComponent) }) work \(m.library.contents.directory.all.filter { $0.name == "Work" }.count) favs \(m.library.contents.favorites.count) merged \(m.session.state.merged)"
+    }
+
+    /// The first Mac claims, then sleeps over 30 minutes before sending its library; the other takes the claim over.
+    @Test func aStalledFirstMacsClaimIsTakenOverWithoutCopies() {
+        let cloud = FakeCloud()
+        var one = ProfileDirectory(), two = ProfileDirectory()
+        _ = one.add(name: "Work"); _ = two.add(name: "Work")
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])], favorites: [Sample.page("mail")], directory: one))
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("z")])], favorites: [Sample.page("mail")], directory: two))
+        a.fetch(); b.fetch()
+        // Only A's claim goes up; A's library stays queued (lid closed).
+        if let up = a.session.upload(SyncName.claim) { if case .saved(let r) = cloud.save(up) { a.session.saved([r]) } }
+        b.send()
+        b.clock += SyncSession.claimTimeout + 1
+        b.sync()
+        a.clock = b.clock
+        for _ in 0..<4 { a.sync(); b.sync() }
+        #expect(a.library.spaceNames == ["Personal"], "\(describe("a", a))")
+        #expect(cloud.records.keys.filter { $0.hasPrefix("space.") }.count == 1)
+        #expect(b.library.spaceNames == ["Personal"] && Set(a.library.urls(in: "Personal")) == ["x", "y", "z"])
+        #expect(a.library.urls(in: "Personal").sorted() == b.library.urls(in: "Personal").sorted())
+        #expect(claim(cloud)?.complete == true)
+    }
+
+    /// An old incomplete claim (a Mac that claimed and turned off), then two Macs at once.
+    @Test func anOldIncompleteClaimStillKeepsTwoAtOnceApart() {
+        let cloud = FakeCloud()
+        let z = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x")])]))
+        z.fetch()
+        if let up = z.session.upload(SyncName.claim) { cloud.save(up) }
+        let later = z.clock + 3600
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])]), clock: later)
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("y"), Sample.page("z")])]), clock: later)
+        a.fetch(); b.fetch()
+        a.send(); b.send()
+        for _ in 0..<3 { a.sync(); b.sync() }
+        #expect(a.library.spaceNames == ["Personal"], "\(describe("a", a))")
+    }
+
+    /// The first Mac turned off and on halfway through its first sync.
+    @Test func aFirstMacTurnedOffAndOnHalfwayCompletesItsClaim() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", (0..<10).map { Sample.page("p\($0)") })]))
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("p0"), Sample.page("b")])]))
+        a.fetch(); b.fetch(); a.send(); b.send()
+        #expect(a.session.state.merged && a.session.state.claimed)
+        for name in a.saves.filter({ $0.hasPrefix("space.") }) { if let up = a.session.upload(name) { cloud.save(up) } }
+        let off = try saved(ICloudSync.stateTurningOff(a.session.state))
+        let again = FakeMac(cloud, a.library, clock: a.clock + 60, state: ICloudSync.stateTurningOn(saved: off))
+        again.session.checkAfterLaunch(); again.session.requeue()
+        for _ in 0..<4 { again.sync() }
+        b.clock = again.clock
+        b.sync()
+        #expect(claim(cloud)?.complete == true)
+        #expect(b.session.state.merged)
+    }
+
+    /// The claim saved, and Zigzag quit before noting it.
+    @Test func aClaimSavedJustBeforeAQuitIsCarriedOn() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", (0..<5).map { Sample.page("p\($0)") })]))
+        a.fetch()
+        if let up = a.session.upload(SyncName.claim) { cloud.save(up) }
+        let state = ICloudSync.stateAtLaunch(saved: try saved(a.session.state), libraryWasRead: true)
+        let again = FakeMac(cloud, a.library, clock: a.clock + 10, state: state)
+        again.session.requeue()
+        for _ in 0..<4 { again.sync() }
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("b")])]), clock: again.clock + 60)
+        b.sync()
+        #expect(claim(cloud)?.complete == true)
+        #expect(b.session.state.merged)
+    }
+
+    /// The first Mac's State.json lost halfway through its first sync.
+    @Test func aFirstMacThatLostItsStateConverges() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", (0..<5).map { Sample.page("p\($0)") })]))
+        a.fetch(); a.send()
+        for name in a.saves.filter({ $0.hasPrefix("space.") }) + a.saves.filter({ $0.hasPrefix("page.") }).prefix(2) { if let up = a.session.upload(name) { cloud.save(up) } }
+        let again = FakeMac(cloud, a.library, clock: a.clock + 10)
+        again.sync()
+        let waited = !again.session.state.merged
+        again.clock += SyncSession.claimTimeout + 1
+        for _ in 0..<3 { again.sync() }
+        #expect(again.library.urls(in: "Personal").count == 5)
+        #expect(cloud.records.keys.filter { $0.hasPrefix("page.") }.count == 5)
+        #expect(claim(cloud)?.complete == true)
+    }
+
+    /// Three Macs at once.
+    @Test func threeMacsAtOnceMakeNoCopies() {
+        let cloud = FakeCloud()
+        let macs = ["a", "b", "c"].map { n in FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page(n)])])) }
+        for m in macs { m.fetch() }
+        for m in macs { m.send() }
+        for _ in 0..<3 { for m in macs { m.sync() } }
+        for m in macs { m.clock += 60 }
+        for _ in 0..<3 { for m in macs { m.sync() } }
+        for m in macs { #expect(m.library.urls(in: "Personal").sorted() == ["a", "b", "c", "x"]) }
+    }
+
+    /// A waiting Mac whose clock runs 31 minutes ahead, while the first Mac's library is still going up.
+    @Test func aWaitingMacWhoseClockRunsAheadStillWaits() {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])]))
+        let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("z")])]), clock: Date(timeIntervalSince1970: 1_800_000_000 + SyncSession.claimTimeout + 60))
+        a.fetch(); b.fetch()
+        if let up = a.session.upload(SyncName.claim) { if case .saved(let r) = cloud.save(up) { a.session.saved([r]) } }
+        b.send()
+        b.sync()
+        for _ in 0..<3 { a.sync(); b.sync() }
+        #expect(a.library.spaceNames == ["Personal"])
+    }
+}

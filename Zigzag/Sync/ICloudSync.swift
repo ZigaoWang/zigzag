@@ -214,8 +214,11 @@ final class ICloudSync {
         kept.aliases = state?.aliases ?? SyncAliases()
         // This Mac's ID in a first-sync claim, so a claim it made is still known as its own.
         kept.device = state?.device
+        kept.claimSeen = state?.claimSeen
         guard keepingLibrary, let state, state.merged else { return kept }
         kept.merged = true
+        // A first sync still going up when it was turned off carries on, and marks its claim complete.
+        kept.claimed = state.claimed
         kept.base = state.base
         kept.serverPayloads = state.serverPayloads
         kept.serverDates = state.serverDates
@@ -281,6 +284,11 @@ final class ICloudSync {
         }
         session.onRemovedElsewhere = { [weak self] in self?.zoneDeleted(reset: false) }
         session.onWaiting = { [weak self] in self?.retry.failed(nil) }
+        session.onStartedOver = { [weak self] in
+            self?.engine?.stop()
+            self?.engine = nil
+            Task { await self?.connect() }
+        }
         session.onNeedsFetch = { [weak self] in
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self?.pushDebouncer.call { self?.fetchSoon(after: 0) } }
         }
@@ -943,6 +951,10 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             return key(a) < key(b)
         }
         guard !pending.isEmpty else { return nil }
+        // While this Mac's first sync goes up, the renewed claim goes alone before each part.
+        if let claim = pending.first, case .saveRecord(let id) = claim, id.recordName == SyncName.claim, session?.claimFirst == true {
+            return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: [claim]) { [weak self] id in await self?.record(for: id) }
+        }
         return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [weak self] id in
             guard let record = await self?.record(for: id) else {
                 // Nothing to send (removed here since, or too big for iCloud): dropped, so it isn't asked for again.
