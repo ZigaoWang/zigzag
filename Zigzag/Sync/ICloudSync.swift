@@ -798,7 +798,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             func key(_ change: CKSyncEngine.PendingRecordZoneChange) -> (Int, Int, String) {
                 switch change {
                 case .saveRecord(let id): (0, SyncName.rank(id.recordName), id.recordName)
-                case .deleteRecord(let id): (1, SyncName.rank(id.recordName), id.recordName)
+                // A profile's removal first, so another Mac knows it before its spaces move off it.
+                case .deleteRecord(let id): (SyncName.rank(id.recordName) == 0 ? -1 : 1, SyncName.rank(id.recordName), id.recordName)
                 @unknown default: (2, 0, "")
                 }
             }

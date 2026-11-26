@@ -60,13 +60,15 @@ enum SyncSaveFailure {
     case zoneMissing
 }
 
-/// A favorite or a preference of a profile, removed on another Mac before the profile itself was.
+/// A favorite or a preference of a profile removed on another Mac, or a space moved off it, read just before the
+/// profile's own removal: kept for that fetch and the next only, so one removed on purpose never comes back later.
 struct SyncLeftover: Codable {
-    var at: Date
+    /// The fetch it came in (`SyncState.fetches`).
+    var fetch: Int
     var favorite: SyncItem?
     var value: SettingValue?
-    /// How long one waits for its profile's removal.
-    static let kept: TimeInterval = 30 * 24 * 3600
+    /// The profile a space was on, by its iCloud ID.
+    var profile: UUID?
 }
 
 /// Why the server didn't take a removal.
@@ -108,6 +110,8 @@ struct SyncState: Codable {
     /// Favorites (by record name) and preferences (by key) of another profile removed elsewhere lately: when the
     /// profile's own removal follows, they come back with it.
     var leftovers: [String: SyncLeftover] = [:]
+    /// Fetches settled so far.
+    var fetches = 0
     /// How many removals made here at once wait to be confirmed or brought back; nil while nothing waits.
     var heldRemovals: Int?
     /// When this Mac's first sync found iCloud empty: another Mac turning on at the same time may have sent copies of
@@ -120,7 +124,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldRemovals, mergedAlone, copies, savedSeen
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldRemovals, mergedAlone, copies, savedSeen, fetches
     }
 
     init() {}
@@ -147,6 +151,8 @@ struct SyncState: Codable {
         mergedAlone = try c.decodeIfPresent(Date.self, forKey: .mergedAlone)
         copies = try c.decodeIfPresent(Set<String>.self, forKey: .copies) ?? []
         savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
+        fetches = try c.decodeIfPresent(Int.self, forKey: .fetches) ?? 0
+        leftovers = leftovers.filter { $0.value.fetch >= fetches - 1 }
     }
 }
 
@@ -349,10 +355,17 @@ final class SyncSession {
         var resend: [String] = []
         var profilesGone: Set<UUID> = []
         let stamp = now()
-        state.leftovers = state.leftovers.filter { stamp.timeIntervalSince($0.value.at) < SyncLeftover.kept }
+        state.fetches += 1
+        let fetch = state.fetches
+        state.leftovers = state.leftovers.filter { $0.value.fetch >= fetch - 1 }
         state.savedSeen = state.savedSeen.filter { stamp.timeIntervalSince($0.value) < 24 * 3600 }
         for (name, record) in arrived {
             if let record {
+                // A space moved off another profile to the first one: that profile's removal may be next.
+                if case .space(let old)? = state.base[name]?.body, old.profile != Profile.defaultID,
+                   case .space(let new) = SyncBody.decode(type: record.type, payload: record.payload), new.profile == Profile.defaultID {
+                    state.leftovers["space:" + name] = SyncLeftover(fetch: fetch, profile: old.profile)
+                }
                 let outcome = take(record)
                 changed = changed || outcome.changed
                 if outcome.resend { resend.append(name) }
@@ -370,7 +383,7 @@ final class SyncSession {
                     }
                     // Another profile's favorite: kept a while, in case its profile's removal comes next.
                     if case .favorite(let favorite) = item.body, favorite.profile != Profile.defaultID {
-                        state.leftovers[name] = SyncLeftover(at: stamp, favorite: item)
+                        state.leftovers[name] = SyncLeftover(fetch: fetch, favorite: item)
                     }
                     changed = true
                 }
@@ -384,7 +397,7 @@ final class SyncSession {
         let after = host.read().settings
         for (key, value) in before where after[key] == nil {
             if let profile = SyncPreferences.owner(key).profile, profile != Profile.defaultID {
-                state.leftovers["setting:" + key] = SyncLeftover(at: stamp, value: value)
+                state.leftovers["setting:" + key] = SyncLeftover(fetch: fetch, value: value)
             }
         }
         if !profilesGone.isEmpty { bringBack(profilesGone) }
@@ -400,6 +413,10 @@ final class SyncSession {
                let id = SyncName.id(name).map(state.aliases.local), !library.contents.favorites.contains(where: { $0.id == id }) {
                 library.contents.favorites.append(Bookmark(id: id, url: favorite.url, title: favorite.title, icon: favorite.icon))
                 directory.assign(favorite: id, to: state.aliases.local(favorite.profile))
+            } else if name.hasPrefix("space:"), let profile = leftover.profile.map(state.aliases.local), profiles.contains(profile),
+                      let id = SyncName.id(String(name.dropFirst("space:".count))).map(state.aliases.local),
+                      library.contents.spaces.contains(where: { $0.id == id }) {
+                directory.assign(space: id, to: profile)
             } else if name.hasPrefix("setting:"), let value = leftover.value {
                 let key = String(name.dropFirst("setting:".count))
                 guard let profile = SyncPreferences.owner(key).profile, profiles.contains(profile), library.settings[key] == nil else { continue }

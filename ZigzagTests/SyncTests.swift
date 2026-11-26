@@ -1512,4 +1512,48 @@ extension SyncTests {
         #expect(a.library.space(named: "Personal")?.pinnedSplits?.count == 1, "split lost on A")
         #expect(b.library.space(named: "Personal")?.pinnedSplits?.count == 1, "split lost on B")
     }
+
+    @Test func aProfileRemovedElsewhereAndReadInPartsKeepsItsSpace() throws {
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work")
+        let office = Sample.space("Office", [Sample.page("jira")])
+        directory.assign(space: office.id, to: work.id)
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal"), office], directory: directory))
+        let before = cloud.changes(since: 0).token
+        a.edit { lib in var d = lib.contents.directory; d.remove(work.id); lib.contents.directory = d }
+        a.sync()
+        let changes = cloud.changes(since: before)
+        // B reads the space's move to the first profile, then the profile's removal.
+        b.session.fetched(changes.records, deleted: [])
+        b.session.fetchFinished()
+        b.session.fetched([], deleted: changes.deleted)
+        b.session.fetchFinished()
+        b.sync()
+        let dir = b.library.contents.directory
+        #expect(dir.profile(work.id) != nil)
+        #expect(b.library.space(named: "Office").map { dir.profileID(ofSpace: $0.id) } == work.id)
+    }
+
+    @Test func aFavoriteRemovedOnPurposeDoesntComeBackWithItsProfileLater() {
+        var directory = ProfileDirectory()
+        let work = directory.add(name: "Work")
+        let chat = Sample.page("chat"), mail = Sample.page("mail")
+        directory.assign(favorite: chat.id, to: work.id)
+        directory.assign(favorite: mail.id, to: work.id)
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal")], favorites: [chat, mail], directory: directory))
+        // The favorite removed on purpose, and synced; days later the profile.
+        a.edit { $0.contents.favorites.removeAll { $0.id == chat.id } }
+        a.sync(); b.sync()
+        a.edit { $0.editSpace("Personal") { $0.name = "Home" } }
+        a.sync(); b.sync()
+        a.edit { lib in
+            var d = lib.contents.directory
+            d.remove(work.id)
+            lib.contents.directory = d
+            lib.contents.favorites.removeAll { $0.id == mail.id }
+        }
+        a.sync(); b.sync()
+        #expect(b.library.contents.directory.profile(work.id) != nil)
+        #expect(b.library.contents.favorites.map(\.id) == [mail.id])
+    }
 }

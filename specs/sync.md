@@ -80,6 +80,9 @@
 - A profile removed on one Mac → stays on the others with its spaces, favorites, settings, sign-ins and website data, and from then on it's that Mac's own and no longer syncs. Its spaces keep syncing.
   Test: SyncTests.aProfileRemovedOnAnotherMacStaysHereWithItsSpaces
   Test: SyncTests.aProfilesFavoritesRemovedBeforeItStayWithItHere
+  Test: SyncTests.aProfileRemovedElsewhereAndReadInPartsKeepsItsSpace
+- A favorite removed on purpose from a profile that's removed later → stays removed; only what was removed with the profile, in the same fetch or the one just before, comes back with it.
+  Test: SyncTests.aFavoriteRemovedOnPurposeDoesntComeBackWithItsProfileLater
 - A preference too big for iCloud (long styles for many sites) → stays on this Mac and isn't replaced by another Mac's; the rest still sync.
   Test: SyncTests.aPreferenceTooBigForICloudStaysOnThisMac
 - A pinned page too big for iCloud (a long data: address) → stays on this Mac and isn't sent, without asking iCloud again and again.
