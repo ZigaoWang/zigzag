@@ -219,13 +219,26 @@ enum SyncMapping {
             return result
         }
         var export = Export(items: [:], emptyFolders: [])
+        let held = waiting(previous, unsent: unsent, kept: Set(kept.map { SyncName.profile(aliases.server($0)) }))
+        /// Splits iCloud has whose pages (or favorites) haven't arrived here yet, or wait: kept as they are.
+        func pendingSplits(_ earlier: [PinnedSplit]?, here: Set<UUID>, name: (UUID) -> String) -> [PinnedSplit] {
+            (earlier ?? []).filter { split in
+                split.ids.contains { id in
+                    guard !here.contains(id) else { return false }
+                    let record = name(id)
+                    return previous[record] == nil || held.contains(record)
+                }
+            }
+        }
 
         // Profiles
         let profiles = directory.all.filter { !$0.isHeadless && !kept.contains($0.id) }
         let profileKeys = SyncOrder.keys(for: profiles.map(\.id), existing: existing(profiles.map(\.id), SyncName.profile))
         let favoriteSplits = contents.favoriteSplits
         for profile in profiles {
-            let splits = favoriteSplits.filter { directory.profileID(ofFavorite: $0.left) == profile.id }.compactMap { mapped($0, aliases.server) }
+            var splits = favoriteSplits.filter { directory.profileID(ofFavorite: $0.left) == profile.id }.compactMap { mapped($0, aliases.server) }
+            let earlierSplits: [PinnedSplit]? = if case .profile(let v)? = previous[SyncName.profile(aliases.server(profile.id))]?.body { v.favoriteSplits } else { nil }
+            splits += pendingSplits(earlierSplits, here: Set(contents.favorites.map { aliases.server($0.id) }), name: SyncName.favorite)
             put(SyncName.profile(aliases.server(profile.id)),
                 .profile(SyncProfile(name: profile.name, color: profile.color, position: profileKeys[profile.id] ?? "", favoriteSplits: splits)))
         }
@@ -294,7 +307,9 @@ enum SyncMapping {
                     }
                 }
             }
-            let splits = (space.pinnedSplits ?? []).filter { !$0.ids.contains(where: livePages.contains) }.compactMap { mapped($0, aliases.server) }
+            var splits = (space.pinnedSplits ?? []).filter { !$0.ids.contains(where: livePages.contains) }.compactMap { mapped($0, aliases.server) }
+            let earlierSplits: [PinnedSplit]? = if case .space(let v)? = previous[SyncName.space(serverSpace)]?.body { v.splits } else { nil }
+            splits += pendingSplits(earlierSplits, here: Set(space.bookmarks.map { aliases.server($0.id) }), name: SyncName.page)
             var look = space
             look.id = serverSpace
             look.icon = sentIcon(space.icon)
@@ -311,7 +326,6 @@ enum SyncMapping {
         var routes = contents.siteRoutes.filter { synced.contains($0.spaceID) }
         for i in routes.indices { routes[i].spaceID = aliases.server(routes[i].spaceID) }
         // Waiting records, and the rules for spaces not here yet, stay as they are.
-        let held = waiting(previous, unsent: unsent, kept: Set(kept.map { SyncName.profile(aliases.server($0)) }))
         if case .rules(let earlier)? = previous[SyncName.rules]?.body {
             let here = Set(spaces.map { aliases.server($0.id) })
             for (i, route) in earlier.routes.rules.enumerated() where !here.contains(route.spaceID) && !routes.contains(where: { $0.id == route.id }) {

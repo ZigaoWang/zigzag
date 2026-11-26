@@ -133,6 +133,8 @@
   Test: SyncTests.aPageArrivingBeforeItsSpaceWaitsForIt
 - A folder moved to another space, read before its pages → the pages wait until they've moved too; nothing is left behind or sent back.
   Test: SyncTests.aFolderMovedToAnotherSpaceAndReadInPartsKeepsItsPages
+- A split (or favorites side by side) read before its pages → the split shows once they arrive, and isn't sent back without them meanwhile.
+  Test: SyncTests.aSplitReadBeforeItsPagesIsKept
 - Something inside a space, folder or profile only a newer Zigzag can read → left as it is, never moved or rewritten here.
   Test: SyncTests.whatsInsideARecordANewerZigzagWroteIsLeftAlone
 - A preference only a newer Zigzag knows, or one of a profile this Mac doesn't have → kept in iCloud as it is, never sent back as unset.

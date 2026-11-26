@@ -1494,4 +1494,22 @@ extension SyncTests {
             #expect(mac.library.space(named: "Two")?.folders?.first?.bookmarkIDs.count == 2, "\(n)")
         }
     }
+
+    @Test func aSplitReadBeforeItsPagesIsKept() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let before = cloud.changes(since: 0).token
+        let left = Sample.page("left"), right = Sample.page("right")
+        a.edit { $0.editSpace("Personal") { $0.bookmarks += [left, right]; $0.pinnedSplits = [PinnedSplit(left: left.id, right: right.id)] } }
+        a.sync()
+        let changes = cloud.changes(since: before)
+        // B reads the space, with its new split, before the split's two pages.
+        b.clock = a.clock + 5
+        b.session.fetched(changes.records.filter { $0.name.hasPrefix("space.") }, deleted: [])
+        b.session.fetchFinished()
+        b.session.fetched(changes.records.filter { !$0.name.hasPrefix("space.") }, deleted: [])
+        b.session.fetchFinished()
+        b.sync(); a.sync(); b.sync()
+        #expect(a.library.space(named: "Personal")?.pinnedSplits?.count == 1, "split lost on A")
+        #expect(b.library.space(named: "Personal")?.pinnedSplits?.count == 1, "split lost on B")
+    }
 }
