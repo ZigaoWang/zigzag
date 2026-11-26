@@ -355,8 +355,10 @@ final class SyncSession {
         guard !isClosed else { return }
         let started = startedAt ?? now()
         for record in records {
+            // Only a save newer than the one known here: this Mac's own, read back, isn't one.
+            let newer = record.serverModified.map { date in state.serverDates[record.name].map { date > $0 } ?? true } ?? true
+            if newer { state.savedSeen[record.name] = max(state.savedSeen[record.name] ?? .distantPast, started) }
             arrive(record.name, record)
-            state.savedSeen[record.name] = max(state.savedSeen[record.name] ?? .distantPast, started)
         }
         // A removal from a fetch that started before one that brought a newer save is stale.
         for name in deleted where !(state.savedSeen[name].map { $0 > started } ?? false) { arrive(name, nil) }
@@ -821,7 +823,6 @@ final class SyncSession {
             state.systemFields[record.name] = record.systemFields
             state.serverPayloads[record.name] = record.payload
             if let date = record.serverModified { state.serverDates[record.name] = date }
-            state.savedSeen[record.name] = now()
             if let item = state.base[record.name], item.modified == record.modified { state.unsent.remove(record.name) }
         }
         state.lastSynced = now()

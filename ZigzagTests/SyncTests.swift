@@ -1712,4 +1712,22 @@ extension SyncTests {
         }
         #expect(bad == 0, "\(bad) of 12 lost a pin or diverged")
     }
+
+    @Test func aRemovalAfterThisMacsOwnSaveIsntTakenForStale() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let staleStart = a.clock
+        a.clock += 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[1].title = "edited on A" } }
+        a.sync(); b.sync()
+        let before = cloud.changes(since: 0).token
+        b.clock = a.clock + 3600
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 1) } }
+        b.sync()
+        let removal = cloud.changes(since: before)
+        // A fetch that started before A's own save brings B's later removal.
+        a.clock = b.clock + 10
+        a.session.fetched([], deleted: removal.deleted, startedAt: staleStart)
+        a.session.fetchFinished()
+        #expect(a.library.urls(in: "Personal") == ["a"])
+    }
 }

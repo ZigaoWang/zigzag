@@ -835,6 +835,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         case .willSendChanges:
             owner?.engineEvent(.syncing)
         case .didFetchChanges:
+            fetchStarted = nil
             guard session.state.merged else { break }
             session.fetchFinished()
             owner?.retry.succeeded()
