@@ -359,6 +359,27 @@ struct InPageMiniHostTests {
         }
     }
 
+    @Test func aBorrowedPageSelectedWhileOutComesBackToTheCard() throws {
+        try inWindow(pageAt: "https://example.test/one", and: "https://example.test/two") { browser, _, second in
+            // A row that wasn't selected: its page is in no card when the preview borrows it.
+            second.ensureWebView()
+            let mini = try #require(MiniWindowController.openPreview(of: second, from: browser, dockedIn: browser))
+            let holder = try #require(second.pageHolder)
+            #expect(holder.window === mini.window)
+            // Its tab is selected while the preview has it; the card counts it as its own and leaves it there.
+            browser.tabManager.select(second)
+            browser.window?.layoutIfNeeded()
+            #expect(browser.root.card.webView === second.webView)
+            #expect(holder.window === mini.window)
+            mini.closeInPage(focusBack: false, animated: false)
+            // Given back, the page is in the card that shows its tab, not left out with nowhere to be.
+            #expect(second.host === browser)
+            #expect(browser.root.card.webView === second.webView)
+            #expect(holder.window === browser.window)
+            #expect(holder.isDescendant(of: browser.root.card))
+        }
+    }
+
     @Test func openInZigzagGivesTheBorrowedPageBackToItsTab() throws {
         try inWindow(pageAt: "https://example.test/open") { browser, tab in
             let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: browser))

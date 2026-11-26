@@ -456,37 +456,23 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
-    /// Gives the borrowed page back to its tab. It goes back to the card it came from only while that still shows it;
-    /// a card that moved on takes it again when its tab is shown.
+    /// Gives the borrowed page back to its tab, in the card showing it now: the one it came from, or one that
+    /// selected its tab while the preview had it.
     private func giveBackBorrowedPage() {
         guard let borrowed else { return }
         let page = tab
         self.borrowed = nil
         tabToken?.cancel()
         tabToken = nil
-        if !page.isClosed, let holder = page.pageHolder {
-            // A deferred preview (a sleeping row, or Zigzag's own page) never took the page in: it is still in the
-            // browser's card, and stays there.
-            let wasOurs = holder.isDescendant(of: root) || holder.window === window
-            if wasOurs { holder.removeFromSuperview() }
-            // A page the browser's card replaced meanwhile stays out, so it never paints over the page there now.
-            // A card that cleared its page while the Mini had it — its “shown in another window” state, or no page —
-            // takes it back through show(), which clears that state; re-adding the holder alone would leave the page
-            // dead there until another tab and back.
-            if wasOurs, let card = borrowed.card, card.webView == nil || card.webView === page.webView {
-                if card.webView === page.webView, let origin = borrowed.origin {
-                    holder.frame = borrowed.originFrame
-                    // The card lays the page out again when the Web Inspector takes room beside it.
-                    holder.onDockedRoomChange = { [weak card] in card?.needsLayout = true }
-                    origin.addSubview(holder)
-                    origin.needsLayout = true
-                    card.needsLayout = true
-                } else if card.shownElsewhere == nil || card.shownElsewhere === page {
-                    card.show(page.webView)
-                }
-            } else if wasOurs, borrowed.card == nil, let origin = borrowed.origin {
-                // No card was showing it when the preview took it (a parked window, say): it goes back to the place
-                // it came from rather than being left with no home.
+        // A card preview never took the page in: it is wherever it was.
+        if !page.isClosed, let holder = page.pageHolder, holder.isDescendant(of: root) || holder.window === window {
+            holder.removeFromSuperview()
+            let came = borrowed.card.flatMap { $0.webView == nil || $0.webView === page.webView ? $0 : nil }
+            if let card = came ?? borrowed.browser?.root.paneCards.first(where: { $0.webView === page.webView }) {
+                // The card still counts the page as its own, but the holder left with the borrow: show it again.
+                if card.webView === page.webView { card.show(nil) }
+                if card.shownElsewhere == nil || card.shownElsewhere === page { card.show(page.webView) }
+            } else if let origin = borrowed.origin {
                 holder.frame = borrowed.originFrame
                 holder.onDockedRoomChange = nil
                 origin.addSubview(holder)
