@@ -118,12 +118,17 @@ struct CardFace: Equatable {
     }
 
     var sinceLine: String {
+        let date = Self.monthAndYear(start, locale: Words.dates)
+        return String(localized: "Since \(date)", comment: "On Your Zigzag Card, under the name: the month and year Zigzag was first used on this Mac, as in Since November 2026.")
+    }
+
+    /// "November 2026", the month in the form a date uses ("ноября 2026 г.", not "ноябрь"), so it reads after "Since".
+    static func monthAndYear(_ date: Date, locale: Locale) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Words.dates
-        formatter.dateStyle = .long
-        formatter.timeStyle = .none
-        let date = formatter.string(from: start)
-        return String(localized: "Since \(date)", comment: "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac.")
+        formatter.locale = locale
+        formatter.setLocalizedDateFormatFromTemplate("MMMMy")
+        formatter.dateFormat = formatter.dateFormat.replacingOccurrences(of: "LLLL", with: "MMMM")
+        return formatter.string(from: date)
     }
 
     /// Everything on it, for VoiceOver.

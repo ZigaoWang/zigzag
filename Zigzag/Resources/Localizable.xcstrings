@@ -10962,7 +10962,7 @@
       }
     },
     "Since %@" : {
-      "comment" : "On Your Zigzag Card, under the name: the day Zigzag was first used on this Mac. The placeholder is the date, like November 8, 2026.",
+      "comment" : "On Your Zigzag Card, under the name: the month and year Zigzag was first used on this Mac, as in Since November 2026.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10973,19 +10973,19 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Desde el %@"
+            "value" : "Desde %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Depuis le %@"
+            "value" : "Depuis %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dal %@"
+            "value" : "Da %@"
           }
         },
         "ja" : {

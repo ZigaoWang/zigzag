@@ -1471,6 +1471,17 @@ struct ZigzagCardTests {
         }
     }
 
+    /// "Since" gives the month and year, the month in the form a date uses in languages that change it.
+    @Test func sinceGivesTheMonthAndYear() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let date = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 8, hour: 12)))
+        #expect(CardFace.monthAndYear(date, locale: Locale(identifier: "en_US")) == "November 2026")
+        #expect(CardFace.monthAndYear(date, locale: Locale(identifier: "ru")).hasPrefix("ноября 2026"))
+        #expect(CardFace.monthAndYear(date, locale: Locale(identifier: "pl")) == "listopada 2026")
+        #expect(CardFace.monthAndYear(date, locale: Locale(identifier: "zh_Hans")) == "2026年11月")
+    }
+
     /// "Since" reads at AA and the name well above it on every finish, by day and at night, wherever the light is.
     @Test func theWordsReadOnEveryFinish() throws {
         let face = CardFace(name: "Ada Lovelace", start: now, version: "0.9.4", isExact: true, day: 14)
