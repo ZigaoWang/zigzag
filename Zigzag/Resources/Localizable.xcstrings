@@ -68392,6 +68392,29 @@
         }
       }
     },
+    "Data from %lld profiles that are no longer listed" : {
+      "comment" : "Heads the folded list in Settings › Profiles of data left on this Mac by profiles in no list, there when more than three are listed: how many.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Data from %lld profile that’s no longer listed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Data from %lld profiles that are no longer listed"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Default" : {
       "comment" : "The name of the first profile, which holds what Zigzag kept before there were profiles, until it's renamed.",
       "localizations" : {

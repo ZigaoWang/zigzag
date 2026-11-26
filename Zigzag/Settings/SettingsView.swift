@@ -3255,37 +3255,56 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             orphans.end()
             // The same data as is listed: its rows stay as they are.
             guard let self, self.unlistedListing.shown != found else { return }
-            self.unlistedListing.show(found)
-            self.unlistedGroup.removeAllRows()
-            for id in found {
-                let restore = PillButton(title: String(localized: "Restore", comment: "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again."))
-                restore.onClick = { [weak self] _ in
-                    Library.shared.restoreProfile(id, name: String(localized: "Restored Profile", comment: "Name a profile gets when it's made again from data left on this Mac. People can rename it."))
-                    self?.reloadProfiles()
-                }
-                let delete = IconButton(symbol: "trash", size: .compact,
-                                        toolTip: String(localized: "Delete", comment: "Tooltip of the trash button in Settings › Profiles, on data left by a profile that's no longer listed."))
-                delete.onClick = { [weak self] _ in
-                    self?.confirm(title: String(localized: "Delete this profile’s data?", comment: "Title of the sheet that asks before deleting data left by a profile that's no longer listed."),
-                                  message: String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins and history. Make sure you have your recovery phrases. This can’t be undone.", comment: "Message of the sheet that asks before deleting data left by a profile that's no longer listed."),
-                                  action: String(localized: "Delete", comment: "Button of the sheet that deletes data left by a profile that's no longer listed.")) {
-                        Task { @MainActor in
-                            await Profiles.shared.eraseOrphan(id)
-                            self?.reloadUnlisted()
-                        }
-                    }
-                }
-                let stack = NSStackView(views: [delete, restore])
-                stack.spacing = Tokens.Space.x2
-                let row = FormRow(title: String(localized: "Data from a profile that’s no longer listed", comment: "Title of a row in Settings › Profiles, for data left on this Mac by a profile that's in no list."),
-                                  detail: String(localized: "Extensions, sign-ins and history kept on this Mac", comment: "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list."),
-                                  icon: NSImage(systemSymbolName: "questionmark.folder", accessibilityDescription: nil), control: stack)
-                row.revealsOnHover(delete)
-                self.unlistedGroup.add(row)
-            }
-            self.layoutSubtreeIfNeeded()
-            if self.pane == .profiles || self.isSearching { self.layoutDocument() }
+            self.showUnlisted(found)
         }
+    }
+
+    /// Past three, one folded box headed by how many, its rows made when it opens.
+    private func showUnlisted(_ found: [UUID]) {
+        unlistedListing.show(found)
+        unlistedGroup.removeAllRows()
+        if found.count > FoldStyle.openUpTo {
+            let header = FormRow(title: String(localized: "Data from \(found.count) profiles that are no longer listed", comment: "Heads the folded list in Settings › Profiles of data left on this Mac by profiles in no list, there when more than three are listed: how many."),
+                                 control: NSView())
+            let words = [Self.unlistedRowTitle, Self.unlistedRowDetail].joined(separator: " ")
+            unlistedGroup.add(fold("unlisted profiles", header: header, contents: words, in: found.count) { [weak self] in
+                found.compactMap { self?.unlistedRow($0) }
+            })
+        } else {
+            found.forEach { unlistedGroup.add(unlistedRow($0)) }
+        }
+        layoutSubtreeIfNeeded()
+        if pane == .profiles || isSearching { layoutDocument() }
+    }
+
+    private static var unlistedRowTitle: String { String(localized: "Data from a profile that’s no longer listed", comment: "Title of a row in Settings › Profiles, for data left on this Mac by a profile that's in no list.") }
+    private static var unlistedRowDetail: String { String(localized: "Extensions, sign-ins and history kept on this Mac", comment: "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list.") }
+
+    /// One profile's data in no list, with Restore and its trash.
+    private func unlistedRow(_ id: UUID) -> FormRow {
+        let restore = PillButton(title: String(localized: "Restore", comment: "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again."))
+        restore.onClick = { [weak self] _ in
+            Library.shared.restoreProfile(id, name: String(localized: "Restored Profile", comment: "Name a profile gets when it's made again from data left on this Mac. People can rename it."))
+            self?.reloadProfiles()
+        }
+        let delete = IconButton(symbol: "trash", size: .compact,
+                                toolTip: String(localized: "Delete", comment: "Tooltip of the trash button in Settings › Profiles, on data left by a profile that's no longer listed."))
+        delete.onClick = { [weak self] _ in
+            self?.confirm(title: String(localized: "Delete this profile’s data?", comment: "Title of the sheet that asks before deleting data left by a profile that's no longer listed."),
+                          message: String(localized: "Its extensions and everything they hold, including any wallets, are deleted, along with its sign-ins and history. Make sure you have your recovery phrases. This can’t be undone.", comment: "Message of the sheet that asks before deleting data left by a profile that's no longer listed."),
+                          action: String(localized: "Delete", comment: "Button of the sheet that deletes data left by a profile that's no longer listed.")) {
+                Task { @MainActor in
+                    await Profiles.shared.eraseOrphan(id)
+                    self?.reloadUnlisted()
+                }
+            }
+        }
+        let stack = NSStackView(views: [delete, restore])
+        stack.spacing = Tokens.Space.x2
+        let row = FormRow(title: Self.unlistedRowTitle, detail: Self.unlistedRowDetail,
+                          icon: NSImage(systemSymbolName: "questionmark.folder", accessibilityDescription: nil), control: stack)
+        row.revealsOnHover(delete)
+        return row
     }
 
     private func addRoute() {
@@ -3975,6 +3994,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Reads the sections waiting for the page to draw, as the next frame would.
     func debugReadNow() { readWaitingSections() }
+    /// Settings › Profiles listing this data from profiles in no list, as if just read from disk.
+    func debugShowUnlisted(_ ids: [UUID]) { showUnlisted(ids) }
+    var debugUnlistedRows: [NSView] { unlistedGroup.rows }
 
     /// flags find <text> | all | top: Settings › Developer › Feature Flags searched, Show All opened, or scrolled to.
     func debugFlags(_ arg: String) {

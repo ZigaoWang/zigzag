@@ -828,3 +828,43 @@ struct SettingsLazyBuildTests {
     }
 }
 
+/// Settings › Profiles with data on this Mac from many profiles in no list.
+@MainActor
+struct SettingsUnlistedTests {
+    private func settings() -> (SettingsView, NSWindow) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+        let settings = SettingsView(pane: .profiles)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        window.contentView?.addSubview(settings)
+        settings.layoutSubtreeIfNeeded()
+        settings.debugReadNow()
+        return (settings, window)
+    }
+
+    /// Thousands of rows froze Settings for over a minute in Auto Layout as the group joined the page.
+    @Test func manyUnlistedProfilesFoldIntoOneBoxAndShowAtOnce() throws {
+        let (settings, window) = settings()
+        let start = Date()
+        settings.debugShowUnlisted((0..<2000).map { _ in UUID() })
+        settings.layoutSubtreeIfNeeded()
+        let ms = Int(Date().timeIntervalSince(start) * 1000)
+        #expect(ms < 300, "\(ms) ms")
+        let box = try #require(settings.debugUnlistedRows.first as? FoldBox)
+        #expect(settings.debugUnlistedRows.count == 1)
+        #expect(!box.isOpen && !box.isBuilt)
+        #expect(box.headerRow.debugTitle.contains(2000.formatted()))
+        _ = window
+    }
+
+    @Test func upToThreeAreRowsAndMoreAreABoxThatOpensToThem() throws {
+        let (settings, window) = settings()
+        settings.debugShowUnlisted([UUID(), UUID(), UUID()])
+        #expect(settings.debugUnlistedRows.count == 3)
+        #expect(settings.debugUnlistedRows.allSatisfy { $0 is FormRow })
+        settings.debugShowUnlisted((0..<5).map { _ in UUID() })
+        let box = try #require(settings.debugUnlistedRows.first as? FoldBox)
+        settings.debugFold("open \(box.headerRow.debugTitle)")
+        #expect(box.isOpen && box.rows.count == 5)
+        _ = window
+    }
+}
