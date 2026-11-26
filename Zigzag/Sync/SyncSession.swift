@@ -325,7 +325,8 @@ final class SyncSession {
             state.unsent.remove(name)
             state.removed[name] = now()
         }
-        queue(([], Array(names)))
+        let noted = noteRemovals(Array(names), at: now())
+        queue((noted.map { [$0] } ?? [], Array(names)))
         layOut()
         onHeld?()
     }
@@ -344,9 +345,11 @@ final class SyncSession {
     }
 
     private func diff(_ exported: [String: SyncItem], deletes allowDeletes: Bool, stamp: Date? = nil) -> (saves: [String], deletes: [String]) {
-        let items = exported
+        var items = exported
         var saves: [String] = [], deletes: [String] = []
         let stamp = stamp ?? now()
+        // The removals record isn't the library's: kept as it is, and added to below.
+        if let removals = state.base[SyncName.removals] { items[SyncName.removals] = removals }
         for (name, var item) in items {
             if let old = state.base[name], old.sameContent(as: item) { continue }
             if item.type != SyncBody.settingsType { item.modified = stamp }
@@ -363,8 +366,25 @@ final class SyncSession {
                 deletes.append(name)
                 state.removed[name] = stamp
             }
+            if !deletes.isEmpty, let name = noteRemovals(deletes, at: stamp) { saves.append(name) }
         }
         return (saves, deletes)
+    }
+
+    /// Removals sent from here go in the removals record too, with when. Returns its name when it changed.
+    private func noteRemovals(_ names: [String], at date: Date) -> String? {
+        var removals: [String: Date] = if case .removals(let r)? = state.base[SyncName.removals]?.body { r.names } else { [:] }
+        for name in names where SyncName.id(name) != nil { removals[name] = max(removals[name] ?? date, date) }
+        removals = removals.filter { now().timeIntervalSince($0.value) < SyncRemovals.kept }
+        state.base[SyncName.removals] = SyncItem(.removals(SyncRemovals(names: removals)), modified: now())
+        state.unsent.insert(SyncName.removals)
+        return SyncName.removals
+    }
+
+    /// When `name` was removed on some Mac, as the removals record has it.
+    private func removedAt(_ name: String) -> Date? {
+        if case .removals(let r)? = state.base[SyncName.removals]?.body { return r.names[name] }
+        return nil
     }
 
     /// Into the library, noting when, so a Library.json that didn't get it (Zigzag ended before saving) is told apart.
@@ -461,8 +481,16 @@ final class SyncSession {
             state.systemFields[name] = nil
             state.serverPayloads[name] = nil
             state.serverDates[name] = nil
-            // Changed here since: it comes back rather than vanish.
-            if state.unsent.contains(name) { resend.append(name); continue }
+            // Changed here since: it comes back rather than vanish, unless the removal came after the change (an
+            // edit from a Mac restored from a backup).
+            if state.unsent.contains(name) {
+                if let at = removedAt(name), let edit = state.base[name]?.modified, at > edit {
+                    state.unsent.remove(name)
+                } else {
+                    resend.append(name)
+                    continue
+                }
+            }
             state.heldNames.remove(name)
             if state.base[name] != nil { state.removed[name] = stamp }
             if let item = state.base.removeValue(forKey: name) {
@@ -570,6 +598,8 @@ final class SyncSession {
         switch (mine.body, theirs.body, ancestor?.body) {
         case (.settings(let a), .settings(let b), _):
             return SyncItem(.settings(SyncSettings(values: SyncSettings.merged(b.values, a.values))), modified: modified)
+        case (.removals(let a), .removals(let b), _):
+            return SyncItem(.removals(SyncRemovals(names: a.names.merging(b.names) { max($0, $1) })), modified: modified)
         case (.rules(let m), .rules(let t), let base):
             let a: [SiteRoutes.Route] = if case .rules(let r)? = base { r.routes.rules } else { [] }
             var routes = t.routes
@@ -888,6 +918,15 @@ final class SyncSession {
             if state.base[name] != nil { state.unsent.insert(name) }
             onNeedsFetch?()
         case .gone:
+            // Removed elsewhere after it changed here (a Mac restored from a backup): the removal wins.
+            if let at = removedAt(name), let edit = state.base[name]?.modified, at > edit {
+                state.base[name] = nil
+                state.unsent.remove(name)
+                state.systemFields[name] = nil
+                state.serverPayloads[name] = nil
+                layOut()
+                break
+            }
             // Removed elsewhere while it changed here: the change wins and it comes back.
             state.systemFields[name] = nil
             state.serverPayloads[name] = nil

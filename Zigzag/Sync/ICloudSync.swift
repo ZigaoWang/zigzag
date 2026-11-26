@@ -275,7 +275,7 @@ final class ICloudSync {
             self.engine = engine
             session.server = engine
             engine.start()
-            session.requeue()
+            // What's unsent is queued again by the catch-up, after its fetch has read what was removed meanwhile.
             await catchUp()
         } catch {
             Self.log.error("connecting failed: \(error.localizedDescription, privacy: .public)")

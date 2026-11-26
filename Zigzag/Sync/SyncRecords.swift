@@ -30,11 +30,11 @@ struct SyncItem: Codable, Equatable {
 /// What a record is about. A kind this version doesn't know is kept as it came and never changed.
 enum SyncBody {
     case space(SyncSpace), profile(SyncProfile), page(SyncPage), folder(SyncFolder), favorite(SyncFavorite)
-    case rules(SyncRules), settings(SyncSettings)
+    case rules(SyncRules), settings(SyncSettings), removals(SyncRemovals)
     case unknown(type: String, payload: Data)
 
     static let spaceType = "Space", profileType = "Profile", pageType = "Page", folderType = "Folder"
-    static let favoriteType = "Favorite", rulesType = "Rules", settingsType = "Settings"
+    static let favoriteType = "Favorite", rulesType = "Rules", settingsType = "Settings", removalsType = "Removals"
 
     var recordType: String {
         switch self {
@@ -45,6 +45,7 @@ enum SyncBody {
         case .favorite: Self.favoriteType
         case .rules: Self.rulesType
         case .settings: Self.settingsType
+        case .removals: Self.removalsType
         case .unknown(let type, _): type
         }
     }
@@ -59,6 +60,7 @@ enum SyncBody {
         case favoriteType: SyncFavorite.knownKeys
         case rulesType: SyncRules.knownKeys
         case settingsType: SyncSettings.knownKeys
+        case removalsType: SyncRemovals.knownKeys
         default: []
         }
     }
@@ -87,6 +89,7 @@ enum SyncBody {
         case .favorite(let v): data = try? encoder.encode(v)
         case .rules(let v): data = try? encoder.encode(v)
         case .settings(let v): data = try? encoder.encode(v)
+        case .removals(let v): data = try? encoder.encode(v)
         case .unknown(_, let payload): data = payload
         }
         return data ?? Data("{}".utf8)
@@ -103,6 +106,7 @@ enum SyncBody {
         case favoriteType: if let v = try? decoder.decode(SyncFavorite.self, from: payload) { return .favorite(v) }
         case rulesType: if let v = try? decoder.decode(SyncRules.self, from: payload) { return .rules(v) }
         case settingsType: if let v = try? decoder.decode(SyncSettings.self, from: payload) { return .settings(v) }
+        case removalsType: if let v = try? decoder.decode(SyncRemovals.self, from: payload) { return .removals(v) }
         default: break
         }
         return .unknown(type: type, payload: payload)
@@ -125,6 +129,7 @@ enum SyncBody {
 enum SyncName {
     static let rules = "rules"
     static let settings = "settings"
+    static let removals = "removals"
 
     static func space(_ id: UUID) -> String { "space.\(id.uuidString)" }
     static func profile(_ id: UUID) -> String { "profile.\(id.uuidString)" }
@@ -394,6 +399,24 @@ struct SyncSettings: Codable {
     /// Each key's newer value.
     static func merged(_ a: [String: Entry], _ b: [String: Entry]) -> [String: Entry] {
         a.merging(b) { x, y in y.modified > x.modified ? y : x }
+    }
+}
+
+/// What was removed lately, by record name, and when: an edit made before a removal, sent late (a Mac restored
+/// from a backup), doesn't bring it back.
+struct SyncRemovals: Codable {
+    var names: [String: Date]
+
+    private enum CodingKeys: String, CodingKey { case names }
+    static let knownKeys: Set<String> = ["names"]
+    /// How long a removal is remembered.
+    static let kept: TimeInterval = 30 * 24 * 3600
+
+    init(names: [String: Date]) { self.names = names }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        names = (try? c.decodeIfPresent([String: Date].self, forKey: .names)) ?? [:]
     }
 }
 

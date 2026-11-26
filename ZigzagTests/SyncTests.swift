@@ -1826,4 +1826,26 @@ extension SyncTests {
         #expect(b.library.urls(in: "Personal").count == 4)
         #expect(again.library.urls(in: "Personal").count == 4)
     }
+
+    @Test func aMacRestoredFromABackupDoesntBringBackAPinRemovedSince() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        // A backup made while A was offline with an edit not yet sent.
+        a.online = false
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[1].title = "edited offline" } }
+        let backupState = try saved(a.session.state), backupLibrary = a.library
+        a.online = true
+        a.sync(); b.sync()
+        // The page removed by hand a day later.
+        a.clock += 86400
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 1) } }
+        a.sync(); b.sync()
+        #expect(b.library.urls(in: "Personal") == ["a"])
+        // The disk died; A comes back from the backup.
+        let restored = FakeMac(cloud, backupLibrary, clock: a.clock + 86400, state: backupState)
+        restored.session.checkAfterLaunch()
+        restored.session.requeue()
+        restored.sync(); b.sync()
+        #expect(restored.library.urls(in: "Personal") == ["a"])
+        #expect(b.library.urls(in: "Personal") == ["a"])
+    }
 }

@@ -208,7 +208,7 @@ enum SyncMapping {
             case .page(let v): positions[name] = v.position
             case .folder(let v): positions[name] = v.position
             case .favorite(let v): positions[name] = v.position
-            case .unknown: items[name] = item
+            case .unknown, .removals: items[name] = item
             default: break
             }
         }
@@ -397,7 +397,7 @@ enum SyncMapping {
             case .favorite(let v): if let id { favorites.append((id, v)) }
             case .rules(let v): rules = v
             case .settings(let v): settings = v
-            case .unknown: break
+            case .unknown, .removals: break
             }
         }
         let old = library.contents
