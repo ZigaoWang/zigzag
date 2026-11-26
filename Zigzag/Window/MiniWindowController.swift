@@ -1233,12 +1233,16 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// Puts the card over the previewed page; the page is never loaded for it. `note` and `hint` replace what the tab
     /// would say, for a page the panel can't show at all.
     func showAsleepCard(note: String? = nil, hint: String? = nil) {
-        let card = asleepCard ?? EdgeAsleepPageView(frame: root.overlay.bounds)
+        let card = asleepCard ?? EdgeAsleepPageView(frame: root.bounds)
         card.autoresizingMask = [.width, .height]
-        card.frame = root.overlay.bounds
+        card.frame = root.bounds
         card.show(tab: tab, note: note, hint: hint)
         card.onClick = { [weak self] in self?.onAsleepCardClicked?() }
-        if card.superview !== root.overlay { root.overlay.addSubview(card) }
+        // Over the page's card, not in the overlay under it: the overlay sits below the page, so a card there is under
+        // the page it covers and no click on it arrives.
+        if card.superview !== root {
+            root.addSubview(card, positioned: .above, relativeTo: root.card)
+        }
         asleepCard = card
     }
 
@@ -2158,6 +2162,10 @@ final class MiniRootView: SpaceFrameView {
     private func orderChrome() {
         if chromeOverlay {
             addSubview(card, positioned: .below, relativeTo: bar)
+            // The waking card stays over the page it covers, whichever order the chrome is put in.
+            for asleep in subviews.compactMap({ $0 as? EdgeAsleepPageView }) {
+                addSubview(asleep, positioned: .above, relativeTo: card)
+            }
         } else {
             addSubview(bar, positioned: .below, relativeTo: card)
             addSubview(strip, positioned: .below, relativeTo: card)

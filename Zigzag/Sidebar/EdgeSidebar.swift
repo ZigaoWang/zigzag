@@ -468,8 +468,11 @@ final class EdgeSidebar {
                 // next row's report cancels this close — but only if it arrives in time. Move slowly, or stop between
                 // two rows, and the page closed and came back. The pointer still being among the rows means the nil
                 // was a crossing, not leaving.
+                // The sidebar's own leave rule decides whether the panel stays; a page doesn't go before the panel does.
+                let kept = self.panel.map { EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: $0.frame) } ?? false
                 guard EdgeHoverRouting.closesAfterNilHover(pointerOverRows: self.pointerIsOverRows(),
-                                                           pointerOverPreview: self.pointerIsOverPreview()) else { return }
+                                                           pointerOverPreview: self.pointerIsOverPreview(),
+                                                           panelKept: kept) else { return }
                 // After a space switch the panel holds the empty page: there is nothing to close, and closing would
                 // narrow the panel and undo the handover.
                 guard EdgeHoverKeep.closesOnNilHover(blankSlateShown: self.host?.blankSlate.superview != nil) else { return }
@@ -481,7 +484,7 @@ final class EdgeSidebar {
     }
 
     /// Puts the page away; the panel narrows to the sidebar and stays out. `animated`: the page folds back first.
-    private func closePreview(animated: Bool = true) {
+    private func closePreview(animated: Bool = true, focusBack: Bool = true) {
         previewWork?.cancel()
         previewWork = nil
         closeWork?.cancel()
@@ -490,11 +493,11 @@ final class EdgeSidebar {
         preview = nil
         previewTab = nil
         if animated {
-            mini.closeInPage(focusBack: true, animated: true)
+            mini.closeInPage(focusBack: focusBack, animated: true)
         } else {
             mini.onInPageMiniClosed = nil
             mini.onInPageMiniDetached = nil
-            mini.closeInPage(focusBack: true, animated: false)
+            mini.closeInPage(focusBack: focusBack, animated: false)
             narrowPanel()
         }
     }
@@ -563,6 +566,12 @@ final class EdgeSidebar {
     }
 
     private func managerChanged(_ change: TabManager.Change) {
+        // A space switch made in the panel (a swipe over its rows) is the same event as picking another space, whether
+        // or not a page is out: the box shows the blank either way, so it never stands for a space you've left.
+        if case .space = change, isShowing, host?.blankSlate.superview == nil {
+            handOverToBlank(from: previewTab?.spaceID, to: target?.tabManager.currentSpaceID)
+            return
+        }
         guard preview != nil else { return }
         switch change {
         case .space:
@@ -624,7 +633,9 @@ final class EdgeSidebar {
         activationWork = nil
         managerToken?.cancel()
         managerToken = nil
-        closePreview(animated: false)
+        // Not focusBack: the panel is about to go, so making it key hands the keyboard to the browser window behind
+        // it as it leaves, and the window comes forward.
+        closePreview(animated: false, focusBack: false)
         guard isShowing, let panel else { return }
         isShowing = false
         generation += 1
@@ -858,6 +869,9 @@ extension EdgeSidebar: MiniDockHosting {
 
 /// Over the preview's room while the row's page isn't running: its name and why, on the card's own ground.
 final class EdgeAsleepPageView: NSView {
+    /// Waking is the whole point of the card: the first click counts, key window or not, as a row's does.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     private let ground = ColorView(color: Tokens.Color.cardBackground)
     private let icon = NSImageView()
     private let title = Label("", font: Tokens.Font.title(), color: Tokens.Color.textPrimary)
