@@ -156,12 +156,8 @@ protocol CommandBarHost: AnyObject {
     func commandBarWillShow()
     /// Typing goes back to the page.
     func commandBarRestoreFocus()
-    /// The field takes typing where the bar actually is (a popup of its own in the edge panel).
-    func commandBarFocus(_ field: NSTextField)
     /// Opens a chosen result itself; false leaves it to the bar, which opens it in the browser window's tabs.
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool
-    /// A result was chosen in the bar: the panel is done and the browser comes forward on it.
-    func commandBarChoseResult()
     /// The bar is gone from the screen, its exit finished.
     func commandBarDidHide()
 }
@@ -172,8 +168,6 @@ extension CommandBarHost {
     var commandBarAppearance: NSAppearance? { nil }
     var commandBarIsMovable: Bool { false }
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool { false }
-    func commandBarChoseResult() {}
-    func commandBarFocus(_ field: NSTextField) { window?.makeFirstResponder(field) }
     func commandBarDidHide() {}
 }
 
@@ -378,7 +372,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // most) it's simply there; clicked open, it grows out of the page's top, or fades in place over the address
         // it stands in for.
         if opening { panel.present(arrival: Tokens.Motion.isFromKey ? .instant : isAnchored ? .fade : .pop) }
-        host.commandBarFocus(field)
+        host.window?.makeFirstResponder(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)
     }
@@ -1212,7 +1206,6 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private func activate(_ result: CommandResult, modifiers: NSEvent.ModifierFlags) {
         guard let host, result.isActionable else { return }
-        host.commandBarChoseResult()
         let editing = mode == .editCurrent && host.commandBarTab != nil
         // An extension's keyword: the extension decides what happens, told where to open it.
         if case .omnibox(_, let content, _) = result.kind {

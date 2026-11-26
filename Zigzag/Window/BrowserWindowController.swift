@@ -24,8 +24,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SidebarView()
     /// The sidebar the screen's edge brings out over other apps (#363), made the first time it comes out.
     private(set) var edgeSidebar: SidebarView?
-    /// The command bar is open over the screen in the edge panel, not in this window.
-    private(set) var edgeCommandBarInPlace = false
     private var edgeContainer: SidebarContainer?
     let root: BrowserRootView
     let inPageMini = InPageMiniHost()
@@ -696,13 +694,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens the space panel beside the sidebar (or closes it, if it's already showing that space).
     func openSpaceEditor(_ spaceID: UUID, anchor: NSView? = nil) {
-        // Over the edge panel while it is out: its editor is a sheet on the panel, not an errand in the window
-        // behind it.
-        if EdgeSidebar.shared.isShowing {
-            previews.hide()
-            SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor ?? edgeSidebar?.list.headerView, in: self)
-            return
-        }
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         if !root.chromeSidebarShown && !root.isSidebarFloatingVisible { root.reveal(true) }
         previews.hide()
         SpaceEditorPanel.toggle(spaceID: spaceID, anchor: anchor, in: self)
@@ -833,7 +825,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Back, Forward, Reload, the address and its star for the page you're on, in the sidebar or the bar above the
     /// page: the one place every path refreshes them, so none shows another's state.
     func refreshAddress(for tab: Tab?) {
-        bothSidebars { $0.update(tab: tab) }
+        sidebar.update(tab: tab)
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         root.topBar.showPin(sidebar.address.canSave)
     }
@@ -2176,46 +2168,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// The address bar's translate button: on pages in another language, and pressed while translated.
     private func updateTranslateButton() {
-        guard let tab = tabManager.selectedTab else {
-            sidebar.address.setTranslation(available: false, translated: false)
-            edgeSidebar?.address.setTranslation(available: false, translated: false)
-            return
-        }
-        let state = translationState(for: tab)
-        sidebar.address.setTranslation(available: state.available, translated: state.translated, translating: state.translating)
-        // The panel's address row offers the same button for the page it shows.
-        edgeSidebar?.address.setTranslation(available: state.available, translated: state.translated, translating: state.translating)
-    }
-
-    /// What the Translate button says for `tab`: whether to offer it, whether the page is translated, and whether
-    /// the translation is under way.
-    private func translationState(for tab: Tab) -> (available: Bool, translated: Bool, translating: Bool) {
+        guard let tab = tabManager.selectedTab else { sidebar.address.setTranslation(available: false, translated: false); return }
         let foreign = tab.foreignLanguage != nil && PageTranslator.readsLanguage(of: tab.url, errorPage: tab.showsErrorPage)
         let choices = PageTranslator.Choices()
         let site = ContentBlocker.site(of: tab.url)
         let never = (tab.foreignLanguage.map { choices.neverLanguages.contains(PageTranslator.code(of: $0)) } ?? false)
             || site.map { choices.neverSites.contains($0) || neverTranslatedHere.contains($0) } ?? false
         let key = ObjectIdentifier(tab)
-        return (PageTranslator.offersButton(foreign: foreign, translated: tab.isTranslated, never: never),
-                tab.isTranslated,
-                translations.run(for: key) != nil || planningTranslation.contains(key))
-    }
-
-    /// The panel's address row for the page it shows: a previewed tab may not be the one selected behind the panel,
-    /// so Reader and Translate follow the preview rather than the window's selection.
-    func updateEdgeAddressButtons(for tab: Tab?) {
-        guard let mirror = edgeSidebar else { return }
-        mirror.address.setReader(available: tab?.isArticle ?? false, active: isShowingReader)
-        guard let tab else {
-            mirror.address.setTranslation(available: false, translated: false)
-            return
-        }
-        let state = translationState(for: tab)
-        mirror.address.setTranslation(available: state.available, translated: state.translated, translating: state.translating)
+        sidebar.address.setTranslation(available: PageTranslator.offersButton(foreign: foreign, translated: tab.isTranslated, never: never),
+                                       translated: tab.isTranslated,
+                                       translating: translations.run(for: key) != nil || planningTranslation.contains(key))
     }
 
     /// The translate button's menu: Translate or Show Original, then the Always and Never choices.
-    func showTranslateMenu(from anchor: NSView? = nil) {
+    func showTranslateMenu() {
         guard let tab = tabManager.selectedTab else { return }
         let language = tab.foreignLanguage ?? ContentBlocker.site(of: tab.url).flatMap { translatedSites[$0] }
         var entries: [MenuPanel.Entry] = [.item(MenuPanel.Item(title: PageTranslator.menuTitle(translated: tab.isTranslated)) { [weak self, weak tab] in
@@ -2223,7 +2189,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         })]
         let choices = translateChoices(tab, language: language)
         if !choices.isEmpty { entries += [.separator] + choices }
-        MenuPanel.show(entries, from: anchor ?? sidebar.address.translateButton, placement: .below)
+        MenuPanel.show(entries, from: sidebar.address.translateButton, placement: .below)
     }
 
     /// Always Translate and Never Translate for the page's language and site, and the way to Settings.
@@ -2595,29 +2561,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         readerTab = tab
         tab.readerWebView = view.webView
         readerURL = url
-        // In the edge panel the article takes the previewed page's card, so Reader opens there rather than in the
-        // window behind.
-        let card: PageCardView
-        if let preview = EdgeSidebar.shared.pagePreview, preview.tab === tab {
-            card = preview.root.card
-        } else {
-            let index = tabManager.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0
-            card = root.paneCards[min(index, root.paneCards.count - 1)]
-        }
+        let index = tabManager.split(for: tab)?.ids.firstIndex(of: tab.id) ?? 0
+        let card = root.paneCards[min(index, root.paneCards.count - 1)]
         readerCard = card
         card.setOverlay(view)
         // Visible from the start (WebKit doesn't paint into a hidden view); the article is local and draws
         // within a few frames, well inside the fade.
         Self.readerTransition(view, entering: true)
-        card.window?.makeFirstResponder(view.webView)
+        window?.makeFirstResponder(view.webView)
         // Opened again quickly: one listener, never two.
         if let old = readerKeyMonitor { NSEvent.removeMonitor(old) }
         readerKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             // The command bar or a panel over it, and mid-word in an input method, Esc belongs to that.
-            guard let self, event.keyCode == 53, self.reader != nil,
-                  event.window === self.window || event.window === EdgeSidebar.shared.sheetHost?.window
-                    || event.window === self.readerCard?.window,
-                  !self.hasFloatingPanel, (event.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
+            guard let self, event.keyCode == 53, event.window === self.window, self.reader != nil,
+                  !self.hasFloatingPanel, (self.window?.firstResponder as? NSTextInputClient)?.hasMarkedText() != true else { return event }
             self.closeReader()
             return nil
         }
@@ -2634,23 +2591,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// the button's and always whole inside the page.
     func toggleReaderOptions() {
         guard let reader = readerHere else { return }
-        // Over the card the article is on: the panel's page while Reader is there, the window's otherwise.
-        let previewCard = EdgeSidebar.shared.pagePreview?.root.card
-        let inPanel = previewCard.map { readerCard === $0 } ?? false
-        let overlay = inPanel ? (EdgeSidebar.shared.sheetHost ?? root.overlay) : root.overlay
-        if !ReaderOptions.isOpen(in: overlay.window) { closeFloatingPanels() }
+        let overlay = root.overlay
+        if !ReaderOptions.isOpen(in: window) { closeFloatingPanels() }
         ReaderOptions.toggle(for: reader, in: overlay) { [weak reader, weak overlay] size in
             guard let reader, let overlay else { return .zero }
             let b = reader.optionsButton.convert(reader.optionsButton.bounds, to: overlay)
             let page = reader.convert(reader.bounds, to: overlay)
             return NSPoint(x: max(page.minX + Tokens.Space.x3, b.maxX - size.width), y: b.maxY + Tokens.Space.x1)
         }
-    }
-
-    /// The panel's page is going: Reader open on it goes too, rather than leaving the article over the next page.
-    func closeReaderForEdgePreview(_ preview: MiniWindowController) {
-        guard let card = readerCard, card === preview.root.card else { return }
-        closeReader()
     }
 
     private func closeReader() {
@@ -2668,7 +2616,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard card.overlay === view else { view.removeFromSuperview(); return }
             card.setOverlay(nil)
         }
-        if let webView = tabManager.selectedTab?.webView { card.window?.makeFirstResponder(webView) }
+        if let webView = tabManager.selectedTab?.webView { window?.makeFirstResponder(webView) }
         updateReaderButton()
         paintTopBar()
         findBar.pageChanged()
@@ -2689,9 +2637,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func updateReaderButton() {
         // Pressed while Reader is up in this split, as the menu and Site Controls say: a press then closes it.
         sidebar.address.setReader(available: tabManager.selectedTab?.isArticle ?? false, active: isShowingReader)
-        if EdgeSidebar.shared.isShowing, let mirror = edgeSidebar {
-            mirror.address.setReader(available: EdgeSidebar.shared.displayedTab?.isArticle ?? false, active: isShowingReader)
-        }
     }
 
     private func updateWindowTitle() {
@@ -3429,18 +3374,6 @@ extension BrowserWindowController: TabHost {
         isOutOfSight && tab.isAsleep ? nil : tab.ensureWebView()
     }
 
-    /// The card showing a page, whichever pane of the window it is in. The edge preview asks before it borrows a
-    /// page it woke, so closing the preview puts the page back in the card it came from.
-    func pageCard(showing tab: Tab) -> PageCardView? {
-        root.paneCards.first { $0.webView != nil && $0.webView === tab.webView }
-    }
-
-    /// A preview borrowed a page born while it was out: the window shows its pages again so the page lands back in
-    /// the card it belongs in, rather than being left in a closing Mini.
-    func showPagesAfterPreview() {
-        showPages()
-    }
-
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
         // A result opened from a search page keeps the search one Back away.
@@ -3583,28 +3516,12 @@ extension BrowserWindowController: TabHost {
 extension BrowserWindowController: SidebarDelegate {
     // Picking one sends a sidebar held out by touch back, as the pointer leaving sends back a hovered one.
     func listSelect(_ tab: Tab) {
-        // In the edge panel a click marks the tab active in this window without bringing Zigzag forward: the panel
-        // stays out, and the picked page is the one a later hover comes back to. The preview takes the page first,
-        // so the browser's card never lays it out at the window's size on the way to the pill.
-        if EdgeSidebar.shared.isShowing {
-            EdgeSidebar.shared.markActive(tab, in: self)
-            tabManager.select(tab)
-            root.endTouchHold()
-            return
-        }
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         tabManager.select(tab)
         root.endTouchHold()
     }
     func listOpenBookmark(_ bookmark: Bookmark) {
-        // The edge panel's pinned links mark their tab active without bringing the browser forward, as its rows do.
-        if EdgeSidebar.shared.isShowing {
-            tabManager.openBookmark(bookmark)
-            if let selected = tabManager.selectedTab {
-                EdgeSidebar.shared.markActive(selected, in: self)
-            }
-            root.endTouchHold()
-            return
-        }
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         tabManager.openBookmark(bookmark)
         root.endTouchHold()
     }
@@ -3767,11 +3684,7 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
     func listNewTab() {
-        // In the edge panel the new tab's bar opens over the screen, in the panel: no errand in the window behind.
-        if EdgeSidebar.shared.isShowing {
-            EdgeSidebar.shared.newTabInPlace()
-            return
-        }
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         commandBar.show(mode: .newTab)
     }
 
@@ -3791,8 +3704,7 @@ extension BrowserWindowController: SidebarDelegate {
         }), duration: Toast.undoDuration, in: self)
     }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
-        // The edge panel's rows bring the page in beside the sidebar as the same docked Mini; the window's floating
-        // preview would sit behind another app.
+        // The edge panel's rows preview the page beside the panel; the window's card would show behind another app.
         if let row, EdgeSidebar.shared.isPanel(row.window) {
             EdgeSidebar.shared.hover(tab, in: self)
             return
@@ -3939,15 +3851,9 @@ extension BrowserWindowController: SidebarDelegate {
         revealNewFolder(made.id)
     }
 
-    /// A folder just made shows, with its name ready to type. From the edge panel it shows in the panel's list, not
-    /// the window behind it.
+    /// A folder just made shows, with its name ready to type.
     func revealNewFolder(_ id: UUID) {
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { SidebarListView.setCollapsed(tabManager.currentSpaceID, false) }
-        if EdgeSidebar.shared.isShowing, let mirror = edgeSidebar {
-            mirror.list.reload(animated: true)
-            DispatchQueue.main.async { [weak mirror] in mirror?.list.renameFolder(id) }
-            return
-        }
         sidebar.list.reload(animated: true)
         DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(id) }
     }
@@ -4433,10 +4339,7 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func sidebarOpenCommandBar() {
-        if EdgeSidebar.shared.isShowing {
-            EdgeSidebar.shared.editAddressInPlace()
-            return
-        }
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         commandBar.show(mode: .editCurrent)
     }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
@@ -4444,25 +4347,16 @@ extension BrowserWindowController: SidebarDelegate {
     func sidebarBlankMenu() -> [MenuPanel.Entry] { SidebarMenus.blankPanel(controller: self) }
     /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
     func sidebarDoubleClickedBlank() {
-        if EdgeSidebar.shared.isShowing {
-            EdgeSidebar.shared.newTabInPlace()
-            return
-        }
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) }
     }
     func sidebarShowDownloads(from view: NSView) {
-        if EdgeSidebar.shared.isShowing {
-            EdgeSidebar.shared.showDownloads(from: view, in: self)
-            return
-        }
-        DownloadsPanel.show(from: view, in: self)
+        guard EdgeSidebar.shared.isShowing else { return DownloadsPanel.show(from: view, in: self) }
+        bringForwardForEdge()
+        showDownloads(nil)
     }
-    /// A space dot's menu: Edit Space… opens at the dot. The edge panel's own dot is the one on screen while it is
-    /// out, so the editor opens there rather than in the window behind.
-    func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
-        let anchor = EdgeSidebar.shared.isShowing ? edgeSidebar?.dot(for: id) : sidebar.dot(for: id)
-        return sidebarSpaceMenu(for: id, anchor: anchor)
-    }
+    /// A space dot's menu: Edit Space… opens at the dot.
+    func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }
 
     private func sidebarSpaceMenu(for id: UUID, anchor: NSView?) -> NSMenu? {
         let menu = SidebarMenus.spaceMenu(for: id, controller: self, anchor: anchor)
@@ -4517,14 +4411,6 @@ extension BrowserWindowController {
     var edgeSidebarOnRight: Bool { root.sidebarOnRight }
 
     /// The edge's sidebar, up to date with this window's, ready to show.
-    /// Opens the browser's own bar in the panel, over the screen: the same bar and results, its overlay and keyboard
-    /// in the edge popup while it is open (`CommandBarHost` in this file).
-    func showEdgeCommandBar(mode: CommandBarController.Mode) {
-        guard !commandBar.isVisible else { return }
-        edgeCommandBarInPlace = true
-        commandBar.show(mode: mode)
-    }
-
     func prepareEdgeSidebar() -> SidebarContainer {
         let (mirror, container) = edgeSidebarViews()
         mirror.isPrivate = tabManager.isPrivate
@@ -4532,7 +4418,6 @@ extension BrowserWindowController {
         mirror.currentSpaceID = tabManager.currentSpaceID
         mirror.reloadSpaces(current: tabManager.currentSpaceID)
         mirror.list.reload(animated: false)
-        mirror.update(tab: tabManager.selectedTab)
         mirror.setUpdateCard(Updater.shared.cardState)
         reloadFavorites()
         downloadsChanged()
@@ -4565,83 +4450,11 @@ extension BrowserWindowController {
         if let edgeSidebar, let edgeContainer { return (edgeSidebar, edgeContainer) }
         let mirror = SidebarView(frame: .zero)
         mirror.delegate = self
-        // The panel is over another app, with no top bar to hold the address: its own row keeps the URL, the site
-        // controls and the sidebar button, as the window's sidebar does when the address is not above the page.
-        mirror.showsAddressRow = true
-        mirror.showsSidebarButton = false
+        // A list to pick from: the address row stays in the window, and rows don't drag out of the panel.
+        mirror.showsAddressRow = false
         mirror.list.allowsDragging = false
-        // The row's controls act on this window, as the list's do; the ones that open something in the page bring
-        // the window forward, since there is nowhere over the panel for their UI to open.
-        // The address row follows the page beside the panel, not the selection behind it: a previewed row's back,
-        // forward, reload, site controls and star answer for that page while it is out.
-        mirror.backButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            if let page = EdgeSidebar.shared.pagePreview { page.goBack(nil) } else { self.goBack(nil) }
-        }
-        mirror.forwardButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            if let page = EdgeSidebar.shared.pagePreview { page.goForward(nil) } else { self.goForward(nil) }
-        }
-        mirror.reloadButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            if let page = EdgeSidebar.shared.pagePreview {
-                if page.tab.isLoading { page.stopLoading(nil) } else { page.reloadPage(nil) }
-            } else if self.tabManager.selectedTab?.isLoading == true {
-                self.stopLoading(nil)
-            } else {
-                self.reloadPage(nil)
-            }
-        }
-        mirror.address.readerButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            let displayed = EdgeSidebar.shared.displayedTab
-            if let displayed, self.tabManager.selectedTab !== displayed {
-                self.tabManager.select(displayed)
-            }
-            // The article opens in the panel's page when that page is the one beside it; without a page there is
-            // nowhere over the panel to read it, so the window comes forward as before.
-            if let displayed, EdgeSidebar.shared.pagePreview?.tab === displayed {
-                self.toggleReader()
-            } else {
-                self.bringForwardForEdge()
-                self.toggleReader()
-            }
-        }
-        mirror.address.translateButton.onClick = { [weak self, weak mirror] _ in
-            guard let self else { return }
-            let displayed = EdgeSidebar.shared.displayedTab
-            if let displayed, self.tabManager.selectedTab !== displayed {
-                self.tabManager.select(displayed)
-            }
-            // With a page beside the panel the menu opens there, at its own Translate button; without one there is
-            // nothing over the panel to translate, so the window comes forward as before.
-            if let displayed, EdgeSidebar.shared.pagePreview?.tab === displayed {
-                self.showTranslateMenu(from: mirror?.address.translateButton)
-            } else {
-                self.bringForwardForEdge()
-                self.showTranslateMenu()
-            }
-        }
-        mirror.address.siteControlsButton.onClick = { [weak self, weak mirror] _ in
-            guard let self, let mirror, let tab = EdgeSidebar.shared.displayedTab ?? self.tabManager.selectedTab else { return }
-            EdgeSidebar.shared.showSiteControls(for: tab, from: mirror.address.siteControlsButton, in: self)
-        }
-        mirror.address.siteControlsButton.onRightClick = { [weak self, weak mirror] _ in
-            guard let self, let mirror, let tab = EdgeSidebar.shared.displayedTab ?? self.tabManager.selectedTab else { return nil }
-            EdgeSidebar.shared.showSiteControls(for: tab, from: mirror.address.siteControlsButton, in: self)
-            return nil
-        }
-        mirror.address.saveButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            if let tab = EdgeSidebar.shared.displayedTab {
-                self.save(tab, request: SavePath.request(for: .star, shiftHeld: Self.shiftHeld))
-            } else {
-                self.saveFromStar()
-            }
-        }
-        mirror.list.refusesSystemPages = true
         mirror.hoversWhileInactive = true
-        mirror.onEditSpace = { [weak self, weak mirror] id in self?.openSpaceEditor(id, anchor: mirror?.dot(for: id)) }
+        mirror.onEditSpace = { [weak self] id in self?.openSpaceEditor(id, anchor: self?.sidebar.dot(for: id)) }
         mirror.onSwipeSpace = { [weak self] offset in
             guard let self else { return false }
             let before = self.tabManager.currentSpaceID
@@ -4650,12 +4463,8 @@ extension BrowserWindowController {
         }
         mirror.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
         mirror.favorites.onOpen = { [weak self] favorite in
-            guard let self else { return }
-            // A pinned link in the panel marks its tab active like a tab row does: the browser stays where it is.
-            self.tabManager.openBookmark(favorite)
-            if let selected = self.tabManager.selectedTab {
-                EdgeSidebar.shared.markActive(selected, in: self)
-            }
+            self?.bringForwardForEdge()
+            self?.tabManager.openBookmark(favorite)
         }
         mirror.favorites.onMenu = { [weak self] favorite in
             guard let self else { return nil }
@@ -4684,8 +4493,7 @@ extension BrowserWindowController {
 
     /// Something picked in the edge's panel: the panel goes and this window comes forward, as from the Dock.
     func bringForwardForEdge() {
-        // The panel tucks toward its edge as every other dismissal does; the window then comes forward on the page.
-        EdgeSidebar.shared.hide(animated: true)
+        EdgeSidebar.shared.hide(animated: false)
         guard let window else { return }
         if NSApp.isHidden { NSApp.unhide(nil) }
         if window.isMiniaturized { window.deminiaturize(nil) }
@@ -4708,17 +4516,11 @@ extension BrowserWindowController {
 // MARK: - The command bar in a browser window
 
 extension BrowserWindowController: CommandBarHost {
-    var commandBarOverlay: NSView {
-        edgeCommandBarInPlace ? (EdgeSidebar.shared.commandBarOverlay ?? root.overlay) : root.overlay
-    }
-    var commandBarPageFrame: NSRect {
-        edgeCommandBarInPlace ? (EdgeSidebar.shared.commandBarPageFrame ?? root.cardFrame) : root.cardFrame
-    }
+    var commandBarOverlay: NSView { root.overlay }
+    var commandBarPageFrame: NSRect { root.cardFrame }
     /// A split pane's address when asked for; else the address above the page, or the sidebar's while the sidebar
     /// shows docked.
     func commandBarAnchor(asked: NSView?) -> NSView? {
-        // The panel's bar opens over its own address row, as the window's sidebar address does.
-        if edgeCommandBarInPlace { return EdgeSidebar.shared.commandBarAnchorView }
         if let asked { return asked }
         // In split view under the bar, the bar's address steps aside: the address of the pane you're in, as ⌘L edits
         // that pane's page.
@@ -4729,7 +4531,7 @@ extension BrowserWindowController: CommandBarHost {
         return root.chromeSidebarShown && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }
     var commandBarTabs: TabManager? { tabManager }
-    var commandBarIsMovable: Bool { !edgeCommandBarInPlace }
+    var commandBarIsMovable: Bool { true }
     var commandBarProfile: Profile { tabManager.profile }
     var commandBarTab: Tab? { tabManager.selectedTab }
     var commandBarSpace: SpaceInfo? { tabManager.currentSpace }
@@ -4753,27 +4555,7 @@ extension BrowserWindowController: CommandBarHost {
     }
 
     func commandBarRestoreFocus() {
-        // In the panel the popup hands the keyboard back when it goes (`commandBarDidHide`).
-        guard !edgeCommandBarInPlace else { return }
         if let selectedWebView { window?.makeFirstResponder(selectedWebView) }
-    }
-
-    /// A result chosen in the panel is the panel's: the page it opens becomes the panel's page, and the sidebar
-    /// stays out. Bringing the window forward here was what made opening a tab or editing an address jump away.
-    func commandBarChoseResult() {
-        EdgeSidebar.shared.commandBarChoseResult()
-    }
-
-    /// The same bar, keyboard and all, in the panel's popup.
-    func commandBarFocus(_ field: NSTextField) {
-        if edgeCommandBarInPlace { EdgeSidebar.shared.focusCommandBar(field) }
-        else { window?.makeFirstResponder(field) }
-    }
-
-    func commandBarDidHide() {
-        guard edgeCommandBarInPlace else { return }
-        edgeCommandBarInPlace = false
-        EdgeSidebar.shared.commandBarDidHide()
     }
 }
 

@@ -17,14 +17,6 @@ class SidebarRowView: InteractiveView {
     var holdsCardBack = false { didSet { if oldValue != holdsCardBack { stateDidChange(animated: false) } } }
     /// Picked with ⌘ or ⇧ along with others, to drag or act on together.
     var isMarked = false { didSet { if oldValue != isMarked { stateDidChange(animated: true) } } }
-    /// A page the surface showing this list can't take (the edge panel and Zigzag's own pages): its title and icon
-    /// stay greyed, whatever the pointer does. The row still takes hover, so its wash says where the pointer is.
-    var isUnusable = false {
-        didSet {
-            guard oldValue != isUnusable else { return }
-            applyFreshness()
-        }
-    }
     /// A pinned page that's open: a fine edge, as on a favorite's tile, so you can tell which are loaded.
     var showsOpenEdge = false { didSet { if oldValue != showsOpenEdge { stateDidChange(animated: false) } } }
 
@@ -128,9 +120,7 @@ class SidebarRowView: InteractiveView {
     var fadingViews: [NSView] { [icon, title] }
 
     func applyFreshness(animated: Bool = false) {
-        let visible = isAboutToClear ? 0.18
-            : isUnusable ? 0.45
-            : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
+        let visible = isAboutToClear ? 0.18 : isSelected || isHovered || isLifted || isMarked ? 1 : freshness
         for view in fadingViews { (animated ? view.animator() : view).alphaValue = visible }
     }
 }
@@ -432,8 +422,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The row's other pages in the group's order: a split's other half, or a tile group's other two or three.
     private(set) var parts: [Part] = [] {
         didSet {
-            // A row that stops being a split has no parts to point at. A part left over would keep the edge preview
-            // on a page the row no longer shows, and the next move would report the same part again.
+            // A row that stops being a split has no part left to point at.
             if parts.isEmpty {
                 pointedPart = nil
                 reportedPart = nil
@@ -581,17 +570,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     #if DEBUG
     /// The debug bridge's pointer over one part of the row (`half(at:)`'s numbering).
     func debugPoint(atPart part: Int?) { pointedPart = part }
-    /// The part the pointer is on, as the row would draw it.
-    var debugPointedPart: Int? { pointedPart }
     /// The chevron of a tab with tabs under it, while it shows.
     var debugNestedButton: IconButton? { madeNestedButton?.isHidden == false ? madeNestedButton : nil }
     #endif
     private var moveTracking: NSTrackingArea?
-    /// The page under the pointer, when it moves from one part of a split or tile group to another: the edge panel
-    /// previews the part being pointed at, not only the row's first page.
+    /// The part of a split or tile group the pointer moved onto, for the edge sidebar's preview.
     var onHoverPart: ((Tab?) -> Void)?
     private var reportedPart: Int?
-    /// The page under the pointer now, in a multi-page row; the row's own page when there is only one.
+    /// The page under the pointer: the part of a split or tile group, or the row's own page.
     var pageUnderPointer: Tab? {
         guard let window else { return tab }
         let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
@@ -601,8 +587,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let moveTracking { removeTrackingArea(moveTracking) }
-        // The edge panel floats over another app while Zigzag is inactive: like the list's and the row's own hover
-        // areas, the part tracker must stay live there, or moving from one tile to another only refreshes on re-entry.
+        // The edge panel answers hover with another app in front, so its parts must too.
         let active: NSTrackingArea.Options = tracksHoverWhileInactive ? .activeAlways : .activeInActiveApp
         let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, active, .inVisibleRect], owner: self)
         addTrackingArea(area)
@@ -648,11 +633,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func trackPointer(_ event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        let inside = bounds.contains(point)
-        let part = isSplit && inside ? half(at: point) : nil
-        if closesPart, isSplit { pointedPart = part }
-        // A split's or a tile group's parts are pages of their own: the preview follows the pointer from one to the
-        // next, as a click already does.
+        let part = isSplit && bounds.contains(point) ? half(at: point) : nil
+        pointedPart = closesPart ? part : nil
         guard part != reportedPart else { return }
         reportedPart = part
         onHoverPart?(part == nil ? nil : page(at: point))

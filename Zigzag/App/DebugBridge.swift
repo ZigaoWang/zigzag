@@ -728,98 +728,30 @@ enum DebugBridge {
     }
 
     #if DEBUG
-    /// Drives the screen-edge sidebar for a harness: `edge show|hide|hold on|off|hover <url>|click <url>|space <n>` and
-    /// `edge frames|watch <seconds>|shot <path>|test <hover-url> <click-url>`, all against the front browser window.
+    /// Drives the screen-edge sidebar: `edge show|hide|hold on|off|hover <url>|preview <url>|click <url>|frames`, against
+    /// the front browser window.
     private static func runEdge(_ arg: String, in controller: BrowserWindowController) {
         let f = arg.split(separator: " ").map(String.init)
         let edge = EdgeSidebar.shared
         func tab(_ part: String) -> Tab? {
             controller.tabManager.allTabs.first { $0.url?.absoluteString.contains(part) == true }
         }
-        var visible: NSRect {
-            controller.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
-                ?? NSRect(x: 0, y: 0, width: 1440, height: 875)
-        }
+        let visible = controller.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         switch f.first ?? "" {
         case "show": edge.show(on: visible, for: controller)
         case "hide": edge.hide(animated: false)
         case "hold": EdgeSidebar.debugHoldsOpen = f.dropFirst().first != "off"
         case "hover": if f.count > 1, let t = tab(f[1]) { edge.hover(t, in: controller) }
         case "preview": if f.count > 1, let t = tab(f[1]) { edge.previewNow(t, in: controller) }
-        case "address": edge.editAddressInPlace()
-        case "site":
-            if let t = controller.tabManager.selectedTab, let button = controller.edgeSidebar?.address.siteControlsButton {
-                edge.showSiteControls(for: t, from: button, in: controller)
-            }
         case "click": if f.count > 1, let t = tab(f[1]) { controller.listSelect(t) }
-        case "space": if f.count > 1, let n = Int(f[1]) { controller.tabManager.switchSpace(by: n) }
-        case "frames": debugLog(edgeFrames(in: controller))
-        case "inner":
-            if let mini = MiniWindowController.all.last(where: { $0.isDockedInPage }), let page = mini.tab.webView {
-                page.evaluateJavaScript("innerWidth+'x'+innerHeight+' client='+document.documentElement.clientWidth+' scale='+devicePixelRatio") { result, error in
-                    debugLog("edge inner => \(String(describing: result)) \(String(describing: error))")
-                }
-            }
-        case "watch": watchEdge(seconds: Double(f.dropFirst().first ?? "") ?? 1, in: controller)
-        case "shot": if f.count > 1 { shotEdge(to: f[1]) }
-        case "test":
-            guard f.count > 2 else { return }
-            edge.show(on: visible, for: controller)
-            if let hovered = tab(f[1]) { edge.hover(hovered, in: controller) }
-            let clicked = tab(f[2])
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                MainActor.assumeIsolated {
-                    debugLog("edge hover \(edgeFrames(in: controller))")
-                    if let clicked { controller.listSelect(clicked) }
-                    debugLog("edge click \(edgeFrames(in: controller))")
-                }
-            }
+        case "frames":
+            let mini = edge.pagePreview
+            debugLog("edge showing=\(edge.isShowing) mini=\(mini?.window.map { NSStringFromRect($0.frame) } ?? "-")"
+                + " url=\(mini?.tab.url?.absoluteString ?? "-") card=\(mini?.asleepCardTitle ?? "-")"
+                + " selected=\(controller.tabManager.selectedTab?.url?.lastPathComponent ?? "-")"
+                + " shown=\(controller.root.card.webView.map { $0.window === controller.window } ?? false)")
         default: break
         }
-    }
-
-    /// Whatever the edge panel, its host and its preview Mini are doing, in one line.
-    private static func edgeFrames(in controller: BrowserWindowController) -> String {
-        let panel = NSApp.windows.first { $0.contentView is EdgeSidebarHost }
-        let host = panel?.contentView as? EdgeSidebarHost
-        let mini = MiniWindowController.all.last { $0.isDockedInPage }
-        let web = mini?.tab.webView.map { NSStringFromRect($0.frame) } ?? "-"
-        let webBounds = mini?.tab.webView.map { NSStringFromRect($0.bounds) } ?? "-"
-        let holder = mini?.tab.pageHolder.map { NSStringFromRect($0.frame) } ?? "-"
-        let miniRoot = mini?.window?.contentView.map { NSStringFromRect($0.bounds) } ?? "-"
-        let miniCard = mini.map { NSStringFromRect($0.root.card.frame) } ?? "-"
-        let overlayIndex = host?.subviews.firstIndex(of: host?.overlay ?? NSView()) ?? -1
-        let cardIndex = host?.container.flatMap { c in host?.subviews.firstIndex(of: c) } ?? -1
-        let bar = controller.commandBar.isVisible ? NSStringFromRect(controller.commandBar.panelView.frame) : "-"
-        return "edge panel=\(panel.map { NSStringFromRect($0.frame) } ?? "-")"
-            + " host=\(host.map { NSStringFromRect($0.bounds) } ?? "-")"
-            + " card=\(host.map { NSStringFromRect($0.cardFrame) } ?? "-")"
-            + " page=\(host.map { NSStringFromRect($0.pageFrame) } ?? "-")"
-            + " showing=\(host?.pageShowing ?? false) sleep=\(mini?.asleepCardTitle != nil)"
-            + " mini=\(mini?.window.map { NSStringFromRect($0.frame) } ?? "-")"
-            + " url=\(mini?.tab.url?.absoluteString ?? "-")"
-            + " overlayOnTop=\(overlayIndex > cardIndex) bar=\(bar)"
-            + " site=\(SitePanel.isOpen(in: panel) ? "open" : "-")"
-            + " web=\(web) webBounds=\(webBounds) holder=\(holder) miniRoot=\(miniRoot) miniCard=\(miniCard)"
-            + " docking=\(mini?.isDockedInPage ?? false) covered=\(mini?.isCoveredInDock ?? false)"
-    }
-
-    private static func watchEdge(seconds: Double, in controller: BrowserWindowController) {
-        let end = Date().addingTimeInterval(seconds)
-        var tick: (() -> Void)!
-        tick = {
-            debugLog(edgeFrames(in: controller))
-            if Date() < end { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: tick) }
-        }
-        tick()
-    }
-
-    private static func shotEdge(to path: String) {
-        guard let view = (NSApp.windows.first { $0.contentView is EdgeSidebarHost })?.contentView else { return }
-        view.layoutSubtreeIfNeeded()
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
     }
     #endif
 

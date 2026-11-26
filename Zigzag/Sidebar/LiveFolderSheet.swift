@@ -69,10 +69,9 @@ enum LiveFolderSheet {
         String(localized: "\(note) \(scheduleNote)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
     }
 
-    /// `editing`: the live folder to change; nil makes one, inside `parent` when given. `host`: where the sheet opens,
-    /// when that isn't the browser window (the edge panel over another app).
-    static func show(in controller: BrowserWindowController, editing: UUID? = nil, parent: UUID? = nil, host: NSView? = nil) {
-        guard !controller.tabManager.isPrivate, let host = host ?? controller.window?.contentView else { return }
+    /// `editing`: the live folder to change; nil makes one, inside `parent` when given.
+    static func show(in controller: BrowserWindowController, editing: UUID? = nil, parent: UUID? = nil) {
+        guard !controller.tabManager.isPrivate, let host = controller.window?.contentView else { return }
         let form = Form(editing: editing.flatMap(Library.shared.folder))
         let sheet = FormSheet.show(in: host, title: form.existing == nil ? String(localized: "New Live Folder", comment: "Title of the sheet that makes a live folder.")
                                                                           : String(localized: "Edit Live Folder", comment: "Title of the sheet that changes a live folder."),
@@ -309,26 +308,16 @@ enum LiveFolderSheet {
             }
             guard let made else { return }
             if SidebarListView.isCollapsed(spaceID) { SidebarListView.setCollapsed(spaceID, false) }
-            controller.reloadFolderList()
+            controller.sidebar.list.reload(animated: true)
             LiveFolders.shared.refreshNow(made.id)
         }
     }
 }
 
 extension BrowserWindowController {
-    /// The list that shows a folder just made or changed: the edge panel's when it is out, and the window's.
-    func reloadFolderList() {
-        sidebar.list.reload(animated: true)
-        if EdgeSidebar.shared.isShowing { edgeSidebar?.list.reload(animated: true) }
-    }
+    func newLiveFolder(inside parent: UUID? = nil) { LiveFolderSheet.show(in: self, parent: parent) }
 
-    func newLiveFolder(inside parent: UUID? = nil) {
-        LiveFolderSheet.show(in: self, parent: parent, host: EdgeSidebar.shared.sheetHost)
-    }
-
-    func editLiveFolder(_ id: UUID) {
-        LiveFolderSheet.show(in: self, editing: id, host: EdgeSidebar.shared.sheetHost)
-    }
+    func editLiveFolder(_ id: UUID) { LiveFolderSheet.show(in: self, editing: id) }
 
     /// The folder and its pages go; ⌘Z brings them back.
     func deleteLiveFolderWithUndo(_ id: UUID) {

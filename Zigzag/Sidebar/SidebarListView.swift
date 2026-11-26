@@ -161,9 +161,6 @@ final class SidebarListView: NSView {
     var spaceOverride: UUID?
     /// Off in the screen edge's sidebar: a drag would leave its panel.
     var allowsDragging = true
-    /// On in the screen edge's sidebar: rows for Zigzag's own pages stay greyed and take no pick; the panel's notice
-    /// says where they work instead.
-    var refusesSystemPages = false
     /// In a private window, the header says "Private" instead of the space name.
     var privateLabel = false
     private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
@@ -963,14 +960,6 @@ final class SidebarListView: NSView {
     #endif
     override func mouseExited(with event: NSEvent) { isPointerInside = false }
 
-    /// Puts every row's hover away, for a list whose window goes out from under the pointer: the exit never arrives,
-    /// and a row left lit reads as a selection that can't be cleared.
-    func clearHover() {
-        isPointerInside = false
-        for case let row as InteractiveView in rows.values { row.isHovered = false }
-        (rows[.separator] as? SeparatorRowView)?.showsClear = false
-    }
-
     // MARK: Rows
 
     private func makeView(for item: SidebarItem) -> NSView {
@@ -1062,10 +1051,8 @@ final class SidebarListView: NSView {
                 // Anywhere else ⇧ picks rows, as always.
                 if self.zoomsPart(of: row, with: event) { return }
                 if self.mark(item, with: event) { return }
-                let page = row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab
-                guard !self.refusesSystemPages || EdgeLensPolicy.takesPage(url: page.url) else { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
-                self.delegate?.listSelect(page)
+                self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
                 _ = id
             }
             // In a row of several pages, the part double-clicked is the page renamed.
@@ -1193,7 +1180,6 @@ final class SidebarListView: NSView {
 
         case .tab(let id):
             guard let row = view as? TabRowView, let tab = manager.tab(with: id) else { return }
-            row.isUnusable = refusesSystemPages && !EdgeLensPolicy.takesPage(url: tab.url)
             row.configure(tab: tab)
             // Both halves of a split show as open, and every page of a tile group.
             let partners = manager.partners(of: tab)
@@ -1223,7 +1209,6 @@ final class SidebarListView: NSView {
         case .bookmark(let id):
             guard let row = view as? TabRowView, let bookmark = Library.shared.bookmark(id) else { return }
             let tab = manager.bookmarkTab(for: id)
-            row.isUnusable = refusesSystemPages && !EdgeLensPolicy.takesPage(url: tab?.url ?? bookmark.url)
             row.bookmarkIcon = bookmark.displayIcon
             if row.bookmarkIcon == nil { FaviconStore.shared.prefetch(for: bookmark.url) }
             // Moved on from its pinned page: the row shows where it is now, and its button goes back.
@@ -1740,19 +1725,16 @@ final class SidebarListView: NSView {
             if hovering {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
-                // Only the edge panel previews the part under the pointer; the window's own hover card stays on the
-                // row's page, whichever half the pointer came in on.
+                // The edge panel previews the part under the pointer; the window's hover card stays on the row's page.
                 let pointed = EdgeSidebar.shared.isPanel(row.window) ? row.pageUnderPointer : nil
                 self.delegate?.listHover(pointed ?? row.tab, row: row, bookmark: bookmark)
             } else {
                 self.delegate?.listHover(nil, row: nil, bookmark: nil)
             }
         }
-        // A split's or a tile group's parts are pages of their own: moving across the row previews each as it comes
-        // under the pointer. Only the edge panel follows the parts; the window's own preview stays on its row.
+        // Moving across a split's or tile group's parts in the edge panel previews each part.
         row.onHoverPart = { [weak self, weak row] page in
-            guard let self, let row, self.drag == nil, let page,
-                  EdgeSidebar.shared.isPanel(row.window) else { return }
+            guard let self, let row, self.drag == nil, let page, EdgeSidebar.shared.isPanel(row.window) else { return }
             self.delegate?.listHover(page, row: row, bookmark: nil)
         }
     }

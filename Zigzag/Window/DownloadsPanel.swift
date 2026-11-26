@@ -274,20 +274,6 @@ enum DownloadsPanel {
         current = panel
         panel.show(from: anchor, arrival: arrival)
     }
-
-    /// The same panel over the edge sidebar's lane, in the panel's own window, not the browser window behind it.
-    static func show(from anchor: NSView, in controller: BrowserWindowController, host: NSView, lane: NSRect,
-                     receding: [NSView]) {
-        if let current {
-            let here = current.window === host.window
-            current.close()
-            if here { return }
-        }
-        controller.closeFloatingPanels()
-        let panel = DownloadsPanelView(controller: controller)
-        current = panel
-        panel.show(from: anchor, in: host, lane: lane, receding: receding)
-    }
 }
 
 final class DownloadsPanelView: FloatingPanelView {
@@ -319,9 +305,6 @@ final class DownloadsPanelView: FloatingPanelView {
     private var token: SignalToken?
     private var monitor: Any?
     private weak var anchor: NSView?
-    /// In the edge panel: the view it sits in and the lane it takes there.
-    private weak var host: NSView?
-    private var hostLane: NSRect?
     private let rowHeight = Tokens.Space.x12 + Tokens.Space.x2
     private let rowGap = Tokens.Metric.rowGap
     /// The title's strip, the rows inset `Space.x1` from the panel's sides so their corners run with its corners.
@@ -429,22 +412,14 @@ final class DownloadsPanelView: FloatingPanelView {
         ], from: more)
     }
 
-    func show(from anchor: NSView, in host: NSView? = nil, lane: NSRect = .zero, receding: [NSView] = [],
-              arrival: Arrival = .pop) {
+    func show(from anchor: NSView, arrival: Arrival = .pop) {
         guard let controller else { return }
         self.anchor = anchor
-        if let host {
-            self.host = host
-            hostLane = lane
-            self.recedes = receding
-            host.addSubview(self)
-        } else {
-            // A glass panel over the sidebar's lane, with the tabs under it faded back so nothing shows around it.
-            if controller.root.chromeSidebarShown, !controller.root.isSidebarFloatingVisible {
-                recedes = [controller.sidebar.list]
-            }
-            controller.root.overlay.addSubview(self)
+        // A glass panel over the sidebar's lane, with the tabs under it faded back so nothing shows around it.
+        if controller.root.chromeSidebarShown, !controller.root.isSidebarFloatingVisible {
+            recedes = [controller.sidebar.list]
         }
+        controller.root.overlay.addSubview(self)
         reload()
         // Out of its button: at the panel's bottom right from the stand-in in a right sidebar's corner.
         let standIn = !(controller.root.chromeSidebarShown || controller.root.isSidebarFloatingVisible)
@@ -557,13 +532,6 @@ final class DownloadsPanelView: FloatingPanelView {
         guard let controller, let anchor else { return }
         let body = rows.isEmpty ? emptyHeight : CGFloat(rows.count) * (rowHeight + rowGap) - rowGap
         let height = header + body + footer
-        // In the edge panel: the mirror's lane, above the button that opened it.
-        if let host, let hostLane {
-            let button = anchor.convert(anchor.bounds, to: host)
-            let width = width(lane: hostLane.width, room: host.bounds.width)
-            frame = NSRect(x: hostLane.minX, y: button.minY - Tokens.Space.x2 - height, width: width, height: height)
-            return
-        }
         // Sidebar hidden: above the stand-in Downloads button in the same corner, at the sidebar's usual width.
         guard controller.root.chromeSidebarShown || controller.root.isSidebarFloatingVisible else {
             let button = anchor.convert(anchor.bounds, to: controller.root.overlay)
