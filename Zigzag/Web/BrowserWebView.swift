@@ -85,6 +85,61 @@ final class BrowserWebView: WKWebView {
         }
     }
 
+    // WKWebView's text input methods aren't public, so these take their selectors; WebKit's hasMarkedText reads false.
+    private var markedLetters: String?
+    private var composingSource: IMECommit.Source?
+
+    @objc(setMarkedText:selectedRange:replacementRange:)
+    func imeSetMarkedText(_ string: AnyObject, selectedRange: NSRange, replacementRange: NSRange) {
+        let text = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
+        markedLetters = text.isEmpty ? nil : text
+        composingSource = text.isEmpty ? nil : composingSource ?? IMECommit.currentSource()
+        typealias Call = @convention(c) (AnyObject, Selector, AnyObject, NSRange, NSRange) -> Void
+        let selector = #selector(imeSetMarkedText(_:selectedRange:replacementRange:))
+        Self.webKit(selector, as: Call.self)(self, selector, string, selectedRange, replacementRange)
+    }
+
+    @objc(insertText:replacementRange:)
+    func imeInsertText(_ string: AnyObject, replacementRange: NSRange) {
+        let composing = markedLetters != nil
+        let source = composing ? composingSource ?? IMECommit.currentSource() : nil
+        markedLetters = nil
+        composingSource = nil
+        superInsertText(IMECommit.cleaned(string as Any, composing: composing, source: source) as AnyObject, replacementRange)
+    }
+
+    /// Switching to English mid-word commits the marked text this way.
+    @objc(unmarkText)
+    func imeUnmarkText() {
+        let marked = markedLetters
+        let source = composingSource ?? IMECommit.currentSource()
+        markedLetters = nil
+        composingSource = nil
+        if let marked {
+            let text = IMECommit.cleaned(marked, composing: true, source: source)
+            if text != marked { superInsertText(text as NSString, NSRange(location: NSNotFound, length: 0)); return }
+        }
+        typealias Call = @convention(c) (AnyObject, Selector) -> Void
+        let selector = #selector(imeUnmarkText)
+        Self.webKit(selector, as: Call.self)(self, selector)
+    }
+
+    private func superInsertText(_ string: AnyObject, _ replacementRange: NSRange) {
+        typealias Call = @convention(c) (AnyObject, Selector, AnyObject, NSRange) -> Void
+        let selector = #selector(imeInsertText(_:replacementRange:))
+        Self.webKit(selector, as: Call.self)(self, selector, string, replacementRange)
+    }
+
+    override func resignFirstResponder() -> Bool {
+        markedLetters = nil
+        composingSource = nil
+        return super.resignFirstResponder()
+    }
+
+    private static func webKit<Call>(_ selector: Selector, as: Call.Type) -> Call {
+        unsafeBitCast(class_getMethodImplementation(WKWebView.self, selector), to: Call.self)
+    }
+
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
         if TouchSwipeRecognizer.claims(event) || swipe.handle(event) { return }

@@ -12,6 +12,8 @@ class PlainTextField: NSTextField {
     var centersText = false
     /// Items to offer right after Paste in the field's right-click menu (the address's Paste and Go).
     var pasteMenuItems: (() -> [NSMenuItem])?
+    /// Its own field editor, which commits pinyin letters without the input method's spaces.
+    fileprivate lazy var imeFieldEditor = IMEFieldEditor.make()
 
     /// The field editor asks its delegate, this field, for the menu it shows on a right-click.
     @objc(textView:menu:forEvent:atIndex:)
@@ -75,6 +77,9 @@ private final class PaddedTextFieldCell: NSTextFieldCell {
         super.select(withFrame: textRect(in: rect), in: controlView, editor: editor, delegate: delegate, start: start, length: length)
     }
 
+    override func fieldEditor(for controlView: NSView) -> NSTextView? {
+        (controlView as? PlainTextField)?.imeFieldEditor ?? super.fieldEditor(for: controlView)
+    }
 }
 
 /// A window the find bar can search: a browser window or Zigzag Mini (#246).
