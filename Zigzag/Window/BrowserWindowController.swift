@@ -659,7 +659,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func libraryChanged() {
         // The list and favorites reload once already: the tab manager hears the same change first and sends
         // `.structure` (`tabManagerChanged`).
-        applySpaceColor(animated: true)
+        // A change elsewhere in the library leaves the window as it is: repainting it fades the whole window.
+        if tabManager.currentSpace != renderedSpace { applySpaceColor(animated: true) }
         bothSidebars { $0.reloadSpaces(current: tabManager.currentSpaceID) }
     }
 
@@ -790,6 +791,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.showEmptyPage(of: space, toward: next, share: share)
     }
 
+    /// The space the window was last painted for.
+    private var renderedSpace: SpaceInfo?
+
     private func applySpaceColor(animated: Bool, crossFadesMode: Bool = true) {
         Freezes.mark("space color")
         showsSwipeLook = false
@@ -799,6 +803,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Draws the window for a space: its mode, color, gradient, how see-through it is, and grain.
     private func render(_ space: SpaceInfo, animated: Bool, crossFadesMode: Bool = true) {
+        renderedSpace = space
         let (color, end) = root.paint(space, isPrivate: tabManager.isPrivate, animated: animated, crossFadesMode: crossFadesMode)
         root.sidebarContainer.tint = color
         root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
