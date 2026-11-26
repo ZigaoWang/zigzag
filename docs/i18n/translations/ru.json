@@ -15535,7 +15535,7 @@
     "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s here and what’s in iCloud are put together: where something is in both, the newer edit wins, and nothing is removed without asking. A backup is saved first.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Ваши пространства, профили, закреплённые вкладки, папки, избранное, живые папки и настройки синхронизируются через ваш собственный iCloud. Открытые вкладки, история, пароли, данные сайтов, расширения и загрузки остаются на этом Mac. Данные здесь и в iCloud объединяются: если что-то есть и там, и там, остаётся более позднее изменение, и ничего не удаляется без вопроса. Сначала сохраняется резервная копия."
+        "value": "Ваши пространства, профили, закреплённые вкладки, папки, избранное, живые папки и настройки синхронизируются через ваш собственный iCloud. Открытые вкладки, история, пароли, данные сайтов, расширения и загрузки остаются на этом Mac. Данные здесь и в iCloud объединяются: если что-то есть и там, и там, остаётся более позднее изменение, и ничего не удаляется без спроса. Сначала сохраняется резервная копия."
       }
     },
     "Remove your library from iCloud?": {

@@ -14856,7 +14856,7 @@
     "Your spaces, pinned tabs, favorites and settings on every Mac signed in to your iCloud.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Je spaces, vastgezette tabbladen, favorieten en instellingen op elke Mac waarop je bent ingelogd bij iCloud."
+        "value": "Je spaces, vastgezette tabbladen, favorieten en instellingen op elke Mac waarop je bent aangemeld bij iCloud."
       }
     },
     "icloud sync cloud macs devices mac computers": {
@@ -14874,7 +14874,7 @@
     "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s here and what’s in iCloud are put together: where something is in both, the newer edit wins, and nothing is removed without asking. A backup is saved first.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen worden gesynchroniseerd via je eigen iCloud. Open tabbladen, geschiedenis, wachtwoorden, websitegegevens, extensies en downloads blijven op deze Mac. Wat hier staat en wat in iCloud staat, wordt samengevoegd: staat iets op beide plekken, dan geldt de nieuwste wijziging, en niets wordt verwijderd zonder dat je het wordt gevraagd. Eerst wordt er een reservekopie bewaard."
+        "value": "Je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen worden gesynchroniseerd via je eigen iCloud. Open tabbladen, geschiedenis, wachtwoorden, websitegegevens, extensies en downloads blijven op deze Mac. Wat hier staat en wat in iCloud staat, wordt samengevoegd: staat iets op beide plekken, dan geldt de nieuwste wijziging, en niets wordt verwijderd zonder dat het je gevraagd wordt. Eerst wordt er een reservekopie bewaard."
       }
     },
     "Remove your library from iCloud?": {
@@ -14922,13 +14922,13 @@
     "Not signed in to iCloud": {
       "stringUnit": {
         "state": "translated",
-        "value": "Niet ingelogd bij iCloud"
+        "value": "Niet aangemeld bij iCloud"
       }
     },
     "Signed in to a different iCloud account": {
       "stringUnit": {
         "state": "translated",
-        "value": "Ingelogd met een ander iCloud-account"
+        "value": "Aangemeld met een ander iCloud-account"
       }
     },
     "Turn sync off and on again to merge with this account. Nothing on this Mac has changed.": {

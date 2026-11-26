@@ -15229,7 +15229,7 @@
     "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s here and what’s in iCloud are put together: where something is in both, the newer edit wins, and nothing is removed without asking. A backup is saved first.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes são sincronizados pelo seu próprio iCloud. As abas abertas, o histórico, as senhas, os dados de sites, as extensões e os downloads ficam neste Mac. O que está aqui e o que está no iCloud é reunido: quando algo está nos dois, vale a alteração mais recente, e nada é removido sem perguntar. Um backup é salvo antes."
+        "value": "Seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes são sincronizados pelo seu próprio iCloud. As abas abertas, o histórico, as senhas, os dados de sites, as extensões e os downloads ficam neste Mac. O que está aqui e o que está no iCloud é reunido: quando algo está nos dois, vale a alteração mais recente, e nada é removido sem perguntar a você. Um backup é salvo antes."
       }
     },
     "Remove your library from iCloud?": {
@@ -15277,13 +15277,13 @@
     "Not signed in to iCloud": {
       "stringUnit": {
         "state": "translated",
-        "value": "Você não iniciou sessão no iCloud"
+        "value": "Você não fez login no iCloud"
       }
     },
     "Signed in to a different iCloud account": {
       "stringUnit": {
         "state": "translated",
-        "value": "Sessão iniciada em outra conta do iCloud"
+        "value": "Login feito em outra conta do iCloud"
       }
     },
     "Turn sync off and on again to merge with this account. Nothing on this Mac has changed.": {
@@ -15349,13 +15349,13 @@
     "Removed on this Mac at once: %@": {
       "stringUnit": {
         "state": "translated",
-        "value": "Removido de uma vez neste Mac: %@"
+        "value": "Removidos de uma vez neste Mac: %@"
       }
     },
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Eles ficam ocultos aqui e continuam no iCloud até você escolher. Restaurar os traz de volta aqui; Remover em todos os remove também do iCloud e dos seus outros Macs."
+        "value": "Eles ficam ocultos aqui e continuam no iCloud até você escolher. Restaurar os traz de volta aqui; Remover de todos os Macs os remove também do iCloud e dos seus outros Macs."
       }
     },
     "Remove Everywhere": {
@@ -15367,13 +15367,13 @@
     "Remove %@ from iCloud and every Mac?": {
       "stringUnit": {
         "state": "translated",
-        "value": "Remover do iCloud e de todos os Macs: %@?"
+        "value": "Remover %@ do iCloud e de todos os Macs?"
       }
     },
     "This can’t be undone.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Esta ação não pode ser desfeita."
+        "value": "Isto não pode ser desfeito."
       }
     },
     "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {

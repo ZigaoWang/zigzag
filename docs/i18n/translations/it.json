@@ -14994,7 +14994,7 @@
     "Removed on this Mac at once: %@": {
       "stringUnit": {
         "state": "translated",
-        "value": "Rimosso tutto insieme su questo Mac: %@"
+        "value": "Rimossi tutti insieme su questo Mac: %@"
       }
     },
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too.": {
@@ -15018,7 +15018,7 @@
     "This can’t be undone.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Questa azione non può essere annullata."
+        "value": "L’operazione non può essere annullata."
       }
     },
     "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {

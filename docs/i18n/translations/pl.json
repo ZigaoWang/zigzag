@@ -15600,7 +15600,7 @@
     "Couldn’t save a backup first, so sync is still off.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Nie udało się najpierw zapisać kopii zapasowej, więc synchronizacja jest nadal wyłączona."
+        "value": "Nie udało się najpierw zachować kopii zapasowej, więc synchronizacja jest nadal wyłączona."
       }
     },
     "Removed on this Mac at once: %@": {
@@ -15612,7 +15612,7 @@
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Są tu ukryte i zostają w iCloud, dopóki nie wybierzesz. Przywróć przywraca je tutaj; Usuń wszędzie usuwa je także z iCloud i z innych Maców."
+        "value": "Są tu ukryte i zostają w iCloud, dopóki nie wybierzesz. „Przywróć” przywraca je tutaj; „Usuń wszędzie” usuwa je także z iCloud i z innych Maców."
       }
     },
     "Remove Everywhere": {

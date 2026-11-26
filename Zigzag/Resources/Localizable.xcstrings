@@ -2065,7 +2065,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Eliminar %@ de iCloud y de todos los Mac?"
+            "value" : "¿Quitar %@ de iCloud y de todos los Mac?"
           }
         },
         "fr" : {
@@ -2107,7 +2107,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remover do iCloud e de todos os Macs: %@?"
+            "value" : "Remover %@ do iCloud e de todos os Macs?"
           }
         },
         "ru" : {
@@ -2125,13 +2125,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要从 iCloud 和所有 Mac 上移除%@吗？"
+            "value" : "要从 iCloud 和所有 Mac 上移除 %@吗？"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要從 iCloud 和所有 Mac 上移除%@嗎？"
+            "value" : "要從 iCloud 和所有 Mac 上移除 %@嗎？"
           }
         }
       }
@@ -2148,19 +2148,19 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminado de una vez en este Mac: %@"
+            "value" : "Se quitaron de una vez en este Mac: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Supprimé d’un coup sur ce Mac : %@"
+            "value" : "Supprimés d’un coup sur ce Mac : %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rimosso tutto insieme su questo Mac: %@"
+            "value" : "Rimossi tutti insieme su questo Mac: %@"
           }
         },
         "ja" : {
@@ -2190,7 +2190,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Removido de uma vez neste Mac: %@"
+            "value" : "Removidos de uma vez neste Mac: %@"
           }
         },
         "ru" : {
@@ -2208,13 +2208,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 上一次性移除了：%@"
+            "value" : "已在这台 Mac 上同时移除：%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台 Mac 上一次性移除了：%@"
+            "value" : "已在這台 Mac 上同時移除：%@"
           }
         }
       }
@@ -3227,7 +3227,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar en todas partes"
+            "value" : "Quitar de todas partes"
           }
         },
         "fr" : {
@@ -3310,13 +3310,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Están ocultos aquí y siguen en iCloud hasta que decidas. Restaurar los recupera aquí; Eliminar en todas partes los elimina también de iCloud y de tus otros Mac."
+            "value" : "Están ocultos aquí y siguen en iCloud hasta que decidas. Restaurar los devuelve aquí; Quitar de todas partes los quita también de iCloud y de tus otros Mac."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ils sont masqués ici et restent dans iCloud jusqu’à votre choix. « Restaurer » les récupère ici ; « Supprimer partout » les supprime aussi d’iCloud et de vos autres Mac."
+            "value" : "Ils sont masqués ici et restent dans iCloud jusqu’à votre choix. Restaurer les ramène ici ; Supprimer partout les supprime aussi d’iCloud et de vos autres Mac."
           }
         },
         "it" : {
@@ -3328,13 +3328,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選ぶまでこのMacでは非表示になり、iCloudには残ります。「復元」を選ぶとこのMacに戻し、「すべてのMacで削除」を選ぶとiCloudとほかのMacからも削除します。"
+            "value" : "選ぶまでこのMacでは非表示になり、iCloudには残ります。「復元」を選ぶとこのMacに戻り、「すべてのMacで削除」を選ぶとiCloudとほかのMacからも削除されます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "선택할 때까지 이 Mac에서는 가려지고 iCloud에는 그대로 남습니다. 복원을 누르면 이 Mac으로 되돌리고, 모든 Mac에서 제거를 누르면 iCloud와 다른 Mac에서도 제거됩니다."
+            "value" : "선택할 때까지 이 Mac에서는 가려지고 iCloud에는 그대로 남습니다. ‘복원’을 누르면 이 Mac으로 되돌리고, ‘모든 Mac에서 제거’를 누르면 iCloud와 다른 Mac에서도 제거됩니다."
           }
         },
         "nl" : {
@@ -3346,13 +3346,13 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Są tu ukryte i zostają w iCloud, dopóki nie wybierzesz. Przywróć przywraca je tutaj; Usuń wszędzie usuwa je także z iCloud i z innych Maców."
+            "value" : "Są tu ukryte i zostają w iCloud, dopóki nie wybierzesz. „Przywróć” przywraca je tutaj; „Usuń wszędzie” usuwa je także z iCloud i z innych Maców."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eles ficam ocultos aqui e continuam no iCloud até você escolher. Restaurar os traz de volta aqui; Remover em todos os remove também do iCloud e dos seus outros Macs."
+            "value" : "Eles ficam ocultos aqui e continuam no iCloud até você escolher. Restaurar os traz de volta aqui; Remover de todos os Macs os remove também do iCloud e dos seus outros Macs."
           }
         },
         "ru" : {
@@ -3364,19 +3364,19 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siz seçene kadar burada gizlenir ve iCloud’da kalırlar. Geri Yükle bunları buraya geri getirir; Her Yerden Kaldır bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
+            "value" : "Siz seçene kadar burada gizlenir ve iCloud’da kalırlar. “Geri Yükle” bunları buraya geri getirir; “Her Yerden Kaldır” bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在你选择之前，它们在这台 Mac 上隐藏，并保留在 iCloud 中。“恢复”会把它们找回到这里；“在所有 Mac 上移除”会把它们也从 iCloud 和你的其他 Mac 上移除。"
+            "value" : "它们在这台 Mac 上先隐藏，并保留在 iCloud 中，直到你做出选择。“恢复”会把它们放回这里；“在所有 Mac 上移除”会把它们也从 iCloud 和你的其他 Mac 上移除。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在你選擇之前，它們在這台 Mac 上隱藏，並保留在 iCloud 中。「還原」會把它們找回到這裡；「在所有 Mac 上移除」會把它們也從 iCloud 和你的其他 Mac 上移除。"
+            "value" : "它們在這台 Mac 上先隱藏，並保留在 iCloud 中，直到你做出選擇。「還原」會把它們放回這裡；「在所有 Mac 上移除」會把它們也從 iCloud 和你的其他 Mac 上移除。"
           }
         }
       }
@@ -3719,7 +3719,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das kann nicht widerrufen werden."
+            "value" : "Dies kann nicht widerrufen werden."
           }
         },
         "es" : {
@@ -3737,7 +3737,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa azione non può essere annullata."
+            "value" : "L’operazione non può essere annullata."
           }
         },
         "ja" : {
@@ -3749,7 +3749,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 작업은 실행 취소할 수 없습니다."
+            "value" : "이 동작은 실행 취소할 수 없습니다."
           }
         },
         "nl" : {
@@ -3767,7 +3767,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta ação não pode ser desfeita."
+            "value" : "Isto não pode ser desfeito."
           }
         },
         "ru" : {
@@ -3791,7 +3791,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此動作無法還原。"
+            "value" : "此操作無法復原。"
           }
         }
       }
@@ -3808,13 +3808,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La biblioteca de este Mac era más antigua que la última que sincronizó, así que se repuso la versión de iCloud."
+            "value" : "La biblioteca de este Mac era más antigua que la última que sincronizó, así que se restauró la versión de iCloud."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La bibliothèque de ce Mac était plus ancienne que lors de sa dernière synchronisation : la version d’iCloud a été remise."
+            "value" : "La bibliothèque de ce Mac était plus ancienne que lors de sa dernière synchronisation : la version d’iCloud a été restaurée."
           }
         },
         "it" : {
@@ -208973,7 +208973,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Je spaces, vastgezette tabbladen, favorieten en instellingen op elke Mac waarop je bent ingelogd bij iCloud."
+            "value" : "Je spaces, vastgezette tabbladen, favorieten en instellingen op elke Mac waarop je bent aangemeld bij iCloud."
           }
         },
         "pl" : {
@@ -209192,13 +209192,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tus espacios, perfiles, pestañas fijadas, carpetas, favoritos, carpetas dinámicas y ajustes se sincronizan a través de tu propia cuenta de iCloud. Las pestañas abiertas, el historial, las contraseñas, los datos de sitios web, las extensiones y las descargas se quedan en este Mac. Lo que hay aquí y lo que hay en iCloud se combina: si algo está en los dos, gana el cambio más reciente, y no se elimina nada sin preguntarte. Antes se guarda una copia de seguridad."
+            "value" : "Tus espacios, perfiles, pestañas fijadas, carpetas, favoritos, carpetas dinámicas y ajustes se sincronizan a través de tu propia cuenta de iCloud. Las pestañas abiertas, el historial, las contraseñas, los datos de sitios web, las extensiones y las descargas se quedan en este Mac. Lo que hay aquí y lo que hay en iCloud se combina: si algo está en los dos, gana el cambio más reciente, y no se quita nada sin preguntarte. Antes se guarda una copia de seguridad."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages se synchronisent via votre propre compte iCloud. Les onglets ouverts, l’historique, les mots de passe, les données des sites web, les extensions et les téléchargements restent sur ce Mac. Le contenu de ce Mac et celui d’iCloud sont réunis : quand un élément est des deux côtés, la modification la plus récente l’emporte, et rien n’est supprimé sans vous le demander. Une sauvegarde est enregistrée avant."
+            "value" : "Vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages se synchronisent via votre propre compte iCloud. Les onglets ouverts, l’historique, les mots de passe, les données des sites web, les extensions et les téléchargements restent sur ce Mac. Le contenu de ce Mac et celui d’iCloud sont réunis : quand un élément est des deux côtés, la modification la plus récente l’emporte, et rien n’est supprimé sans vous le demander. Une sauvegarde est d’abord enregistrée."
           }
         },
         "it" : {
@@ -209210,7 +209210,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スペース、プロファイル、固定タブ、フォルダ、お気に入り、ライブフォルダ、設定は、自分のiCloudを通じて同期されます。開いているタブ、履歴、パスワード、Webサイトデータ、機能拡張、ダウンロードはこのMacに残ります。このMacとiCloudの内容はまとめられ、両方にあるものは新しい変更が優先されます。確認なしに削除されることはありません。先にバックアップも保存されます。"
+            "value" : "スペース、プロファイル、固定タブ、フォルダ、お気に入り、ライブフォルダ、設定は、自分のiCloudを通じて同期されます。開いているタブ、履歴、パスワード、Webサイトデータ、機能拡張、ダウンロードはこのMacに残ります。このMacとiCloudの内容は統合され、両方にあるものは新しい変更が優先されます。確認なしに削除されることはありません。先にバックアップも保存されます。"
           }
         },
         "ko" : {
@@ -209222,7 +209222,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen worden gesynchroniseerd via je eigen iCloud. Open tabbladen, geschiedenis, wachtwoorden, websitegegevens, extensies en downloads blijven op deze Mac. Wat hier staat en wat in iCloud staat, wordt samengevoegd: staat iets op beide plekken, dan geldt de nieuwste wijziging, en niets wordt verwijderd zonder dat je het wordt gevraagd. Eerst wordt er een reservekopie bewaard."
+            "value" : "Je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen worden gesynchroniseerd via je eigen iCloud. Open tabbladen, geschiedenis, wachtwoorden, websitegegevens, extensies en downloads blijven op deze Mac. Wat hier staat en wat in iCloud staat, wordt samengevoegd: staat iets op beide plekken, dan geldt de nieuwste wijziging, en niets wordt verwijderd zonder dat het je gevraagd wordt. Eerst wordt er een reservekopie bewaard."
           }
         },
         "pl" : {
@@ -209234,13 +209234,13 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes são sincronizados pelo seu próprio iCloud. As abas abertas, o histórico, as senhas, os dados de sites, as extensões e os downloads ficam neste Mac. O que está aqui e o que está no iCloud é reunido: quando algo está nos dois, vale a alteração mais recente, e nada é removido sem perguntar. Um backup é salvo antes."
+            "value" : "Seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes são sincronizados pelo seu próprio iCloud. As abas abertas, o histórico, as senhas, os dados de sites, as extensões e os downloads ficam neste Mac. O que está aqui e o que está no iCloud é reunido: quando algo está nos dois, vale a alteração mais recente, e nada é removido sem perguntar a você. Um backup é salvo antes."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ваши пространства, профили, закреплённые вкладки, папки, избранное, живые папки и настройки синхронизируются через ваш собственный iCloud. Открытые вкладки, история, пароли, данные сайтов, расширения и загрузки остаются на этом Mac. Данные здесь и в iCloud объединяются: если что-то есть и там, и там, остаётся более позднее изменение, и ничего не удаляется без вопроса. Сначала сохраняется резервная копия."
+            "value" : "Ваши пространства, профили, закреплённые вкладки, папки, избранное, живые папки и настройки синхронизируются через ваш собственный iCloud. Открытые вкладки, история, пароли, данные сайтов, расширения и загрузки остаются на этом Mac. Данные здесь и в iCloud объединяются: если что-то есть и там, и там, остаётся более позднее изменение, и ничего не удаляется без спроса. Сначала сохраняется резервная копия."
           }
         },
         "tr" : {
@@ -209252,13 +209252,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的空间、个人资料、已固定标签页、文件夹、收藏、实时文件夹和设置会通过你自己的 iCloud 同步。打开的标签页、历史记录、密码、网站数据、扩展和下载只保留在这台 Mac 上。这台 Mac 和 iCloud 中的内容会合在一起：两边都有的内容以较新的修改为准，不经询问不会移除任何内容。会先存储一份备份。"
+            "value" : "你的空间、个人资料、已固定标签页、文件夹、收藏、实时文件夹和设置会通过你自己的 iCloud 同步。打开的标签页、历史记录、密码、网站数据、扩展和下载只保留在这台 Mac 上。这台 Mac 和 iCloud 中的内容会合并：两边都有的内容以较新的修改为准，不经询问不会移除任何内容。会先存储一份备份。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的空間、個人資料、已固定分頁、資料夾、收藏、即時資料夾和設定會透過你自己的 iCloud 同步。開啟的分頁、瀏覽記錄、密碼、網站資料、延伸功能和下載項目只保留在這台 Mac 上。這台 Mac 和 iCloud 中的內容會合在一起：兩邊都有的內容以較新的修改為準，不經詢問不會移除任何內容。會先儲存一份備份。"
+            "value" : "你的空間、個人資料、已固定分頁、資料夾、收藏、即時資料夾和設定會透過你自己的 iCloud 同步。開啟的分頁、瀏覽記錄、密碼、網站資料、延伸功能和下載項目只保留在這台 Mac 上。這台 Mac 和 iCloud 中的內容會合併：兩邊都有的內容以較新的修改為準，不經詢問不會移除任何內容。會先儲存一份備份。"
           }
         }
       }
@@ -209275,7 +209275,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Eliminar tu biblioteca de iCloud?"
+            "value" : "¿Quitar tu biblioteca de iCloud?"
           }
         },
         "fr" : {
@@ -209358,7 +209358,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tus espacios, pestañas fijadas, favoritos y ajustes se eliminan de iCloud y dejan de sincronizarse en todos tus Mac. Todo lo que hay en este Mac se queda como está."
+            "value" : "Tus espacios, pestañas fijadas, favoritos y ajustes se quitan de iCloud y dejan de sincronizarse en todos tus Mac. Todo lo que hay en este Mac se queda como está."
           }
         },
         "fr" : {
@@ -209441,7 +209441,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar de iCloud…"
+            "value" : "Quitar de iCloud…"
           }
         },
         "fr" : {
@@ -209584,13 +209584,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未在同步"
+            "value" : "未同步"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未在同步"
+            "value" : "未同步"
           }
         }
       }
@@ -209886,7 +209886,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niet ingelogd bij iCloud"
+            "value" : "Niet aangemeld bij iCloud"
           }
         },
         "pl" : {
@@ -209898,7 +209898,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Você não iniciou sessão no iCloud"
+            "value" : "Você não fez login no iCloud"
           }
         },
         "ru" : {
@@ -209969,7 +209969,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ingelogd met een ander iCloud-account"
+            "value" : "Aangemeld met een ander iCloud-account"
           }
         },
         "pl" : {
@@ -209981,7 +209981,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sessão iniciada em outra conta do iCloud"
+            "value" : "Login feito em outra conta do iCloud"
           }
         },
         "ru" : {
@@ -210040,7 +210040,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同期をオフにしてからもう一度オンにすると、このアカウントと結合されます。このMac上のものは何も変更されていません。"
+            "value" : "同期をオフにしてからもう一度オンにすると、このアカウントと統合されます。このMac上のものは何も変更されていません。"
           }
         },
         "ko" : {
@@ -210437,7 +210437,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se eliminó de iCloud en otro Mac"
+            "value" : "Se quitó de iCloud en otro Mac"
           }
         },
         "fr" : {
@@ -210704,13 +210704,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloudで同期できませんでした：%@"
+            "value" : "iCloudと同期できませんでした：%@"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud에서 동기화할 수 없음: %@"
+            "value" : "iCloud와 동기화할 수 없음: %@"
           }
         },
         "nl" : {
@@ -210775,7 +210775,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossible d’enregistrer d’abord une sauvegarde : la synchronisation reste désactivée."
+            "value" : "Impossible d’enregistrer d’abord une sauvegarde : la synchronisation reste désactivée."
           }
         },
         "it" : {
@@ -210799,7 +210799,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nie udało się najpierw zapisać kopii zapasowej, więc synchronizacja jest nadal wyłączona."
+            "value" : "Nie udało się najpierw zachować kopii zapasowej, więc synchronizacja jest nadal wyłączona."
           }
         },
         "pt-BR" : {
@@ -210829,7 +210829,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未能先存一份备份，所以同步仍是关闭的。"
+            "value" : "未能先存储备份，所以同步仍是关闭的。"
           }
         },
         "zh-Hant" : {

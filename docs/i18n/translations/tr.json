@@ -15000,7 +15000,7 @@
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Siz seçene kadar burada gizlenir ve iCloud’da kalırlar. Geri Yükle bunları buraya geri getirir; Her Yerden Kaldır bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
+        "value": "Siz seçene kadar burada gizlenir ve iCloud’da kalırlar. “Geri Yükle” bunları buraya geri getirir; “Her Yerden Kaldır” bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
       }
     },
     "Remove Everywhere": {

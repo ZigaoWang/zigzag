@@ -14676,7 +14676,7 @@
     "iCloud couldn’t sync: %@": {
       "stringUnit": {
         "state": "translated",
-        "value": "iCloud에서 동기화할 수 없음: %@"
+        "value": "iCloud와 동기화할 수 없음: %@"
       }
     },
     "Couldn’t save a backup first, so sync is still off.": {
@@ -14694,7 +14694,7 @@
     "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too.": {
       "stringUnit": {
         "state": "translated",
-        "value": "선택할 때까지 이 Mac에서는 가려지고 iCloud에는 그대로 남습니다. 복원을 누르면 이 Mac으로 되돌리고, 모든 Mac에서 제거를 누르면 iCloud와 다른 Mac에서도 제거됩니다."
+        "value": "선택할 때까지 이 Mac에서는 가려지고 iCloud에는 그대로 남습니다. ‘복원’을 누르면 이 Mac으로 되돌리고, ‘모든 Mac에서 제거’를 누르면 iCloud와 다른 Mac에서도 제거됩니다."
       }
     },
     "Remove Everywhere": {
@@ -14712,7 +14712,7 @@
     "This can’t be undone.": {
       "stringUnit": {
         "state": "translated",
-        "value": "이 작업은 실행 취소할 수 없습니다."
+        "value": "이 동작은 실행 취소할 수 없습니다."
       }
     },
     "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
