@@ -2033,4 +2033,11 @@ extension SyncTests {
         // Read as a re-add, it leaves the removed list.
         #expect(again.session.state.removed[SyncName.page(x.id)] == nil)
     }
+
+    @Test func afterASendTheLineSaysUpToDateWhateverIsHeld() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(ICloudSync.status(afterSending: .syncing, merged: true, lastSynced: date) == .synced(date))
+        #expect(ICloudSync.status(afterSending: .offline, merged: true, lastSynced: date) == .offline)
+        #expect(ICloudSync.status(afterSending: .syncing, merged: false, lastSynced: date) == .syncing)
+    }
 }

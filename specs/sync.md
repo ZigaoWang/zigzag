@@ -185,8 +185,9 @@
   Test: SyncTests.anEditFoundAtLaunchCountsFromWhenItWasMade
 - Zigzag ended (a crash, a power cut) after sync saved its state but before Library.json was saved → at the next launch what had just arrived is laid out again from iCloud, never sent as removed. Library.json is saved before sync's state.
   Test: SyncTests.endingBeforeLibraryJsonIsSavedDoesntRemoveWhatJustArrived
-- Removals held → Settings says how many of what, that they're hidden here and stay in iCloud until you choose, and what else sync is doing (offline, signed out, iCloud full). Remove Everywhere asks first, naming how many of what. Library.json laid out from iCloud at launch because it was older → a toast says so.
+- Removals held → Settings says how many of what, that they're hidden here and stay in iCloud until you choose, and what else sync is doing (offline, signed out, iCloud full). Remove Everywhere asks first, naming how many of what. Library.json laid out from iCloud at launch because it was older → a toast says so. After Restore or Remove Everywhere, the line says Up to date as soon as nothing is left to send.
   Test: SyncTests.aLibraryPutBackFromAnOldCopyIsntSentAsRemovals
   Test: SyncTests.aLibraryOlderThanTheOneLastSyncedSendsNothing
+  Test: SyncTests.afterASendTheLineSaysUpToDateWhateverIsHeld
 - A preference changed while sync was off → counts from when it changed (noted while off), or from when sync was turned on, never from the library file's date, so a later change on another Mac wins and an earlier one doesn't.
   Test: SyncTests.aPreferenceChangedWhileOffCountsFromWhenItChanged

@@ -126,13 +126,25 @@ final class ICloudSync {
     /// Removals held: the library here as it was before them, from iCloud, with what else changed here kept.
     func bringBackRemovals() {
         session?.bringBackHeld()
+        sent()
         changed.send()
     }
 
     /// Removals held: removed from iCloud and every Mac too.
     func sendRemovals() {
         session?.sendHeld()
+        sent()
         changed.send()
+    }
+
+    /// What was waiting has gone up (or nothing waits): the line under the switch says so, held removals or not.
+    fileprivate func sent() {
+        guard let session else { return }
+        shown = Self.status(afterSending: shown, merged: session.state.merged, lastSynced: session.state.lastSynced)
+    }
+
+    static func status(afterSending shown: Status, merged: Bool, lastSynced: Date?) -> Status {
+        merged && shown == .syncing ? .synced(lastSynced) : shown
     }
 
     /// What sync starts from at launch. A library that couldn't be read (and started afresh) is merged with iCloud as
@@ -904,7 +916,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             owner?.retry.succeeded()
             owner?.engineEvent(.synced(session.state.lastSynced))
         case .didSendChanges:
-            if session.state.merged, owner?.status == .syncing { owner?.engineEvent(.synced(session.state.lastSynced)) }
+            owner?.sent()
         default:
             break
         }
