@@ -210839,57 +210839,6 @@
           }
         }
       }
-    },
-    "Click the tab to load it." : {
-      "comment" : "At the foot of the edge sidebar's card for a tab whose page hasn't loaded since Zigzag reopened: hovering only shows its snapshot, and a click loads the page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "点按标签页即可载入。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按一下標籤頁即可載入。"
-          }
-        }
-      }
-    },
-    "Click the tab to wake it." : {
-      "comment" : "At the foot of the edge sidebar's card for a sleeping tab: hovering only shows its snapshot, and a click loads the page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "点按标签页即可唤醒。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按一下標籤頁即可喚醒。"
-          }
-        }
-      }
-    },
-    "This page is asleep." : {
-      "comment" : "In the edge sidebar's card for a tab whose page isn't running, when the app has no more specific reason to give.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此页面已休眠。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此頁面已休眠。"
-          }
-        }
-      }
     }
   },
   "version" : "1.0"
