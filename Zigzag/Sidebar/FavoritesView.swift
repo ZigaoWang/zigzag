@@ -192,6 +192,11 @@ final class FavoritesView: NSView {
         func fitting(_ tile: CGFloat) -> Int { min(max(Int((width + gap) / (tile + gap)), 2), Tokens.Sidebar.favoriteMaxColumns) }
         let roomy = fitting(Tokens.Sidebar.favoriteMinWidth), tight = max(roomy, fitting(Tokens.Sidebar.favoriteTightWidth))
         guard count > roomy else { return roomy }
+        // As few rows as the width allows, then the fewest columns that keep that many rows, so rows come out even:
+        // six where four fit are 3 and 3, not 4 and 2.
+        let rows = (count + tight - 1) / tight
+        let even = max(2, (count + rows - 1) / rows)
+        if count % even != 1 { return even }
         if let whole = (roomy...tight).first(where: { count % $0 == 0 }) { return whole }
         // Then fewer, larger columns; when every count leaves one over (13 does), the roomy one.
         return (roomy...tight).first { count % $0 != 1 } ?? (2..<roomy).reversed().first { count % $0 != 1 } ?? roomy
