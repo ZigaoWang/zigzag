@@ -82,6 +82,8 @@ extension NSView {
 extension CALayer {
     /// Sets a property with a short fade, or instantly.
     func set(backgroundColor color: CGColor?, animated: Bool, duration: TimeInterval = Tokens.Motion.quick) {
+        // The same color again: a fade to it would redraw the layer every frame for nothing.
+        guard !Self.sameColor(color, backgroundColor) else { return }
         if animated {
             let animation = CABasicAnimation(keyPath: "backgroundColor")
             animation.fromValue = presentation()?.backgroundColor ?? backgroundColor
@@ -92,6 +94,19 @@ extension CALayer {
             add(animation, forKey: "backgroundColor")
         }
         Tokens.Motion.withoutAnimation { backgroundColor = color }
+    }
+
+    /// Whether two colors look the same, whatever their color spaces; no color is clear.
+    nonisolated static func sameColor(_ a: CGColor?, _ b: CGColor?) -> Bool {
+        if a === b { return true }
+        guard let space = CGColorSpace(name: CGColorSpace.extendedSRGB) else { return false }
+        func components(_ color: CGColor?) -> [CGFloat]? {
+            guard let color else { return [0, 0, 0, 0] }
+            guard let c = color.converted(to: space, intent: .defaultIntent, options: nil)?.components, c.count == 4 else { return nil }
+            return c[3] == 0 ? [0, 0, 0, 0] : c
+        }
+        guard let x = components(a), let y = components(b) else { return false }
+        return zip(x, y).allSatisfy { abs($0 - $1) < 0.0005 }
     }
 
     /// Rounds the corners for a shape of `size`: never more than half its short side, and a capsule's ends true

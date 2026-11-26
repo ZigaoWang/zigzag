@@ -246,10 +246,13 @@ class SpaceFrameView: ColorView {
         CATransaction.setAnimationTimingFunction(Tokens.Motion.easeOut)
         if let (start, end) = gradientColors {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                gradientLayer.colors = [start.cgColor, end.cgColor]
+                let colors = [start.cgColor, end.cgColor]
+                // The same colors again would fade the whole window from them to them.
+                let shown = (gradientLayer.colors as? [CGColor]) ?? []
+                if shown.count != 2 || !zip(shown, colors).allSatisfy({ CALayer.sameColor($0, $1) }) { gradientLayer.colors = colors }
             }
-            gradientLayer.opacity = 1
-        } else {
+            if gradientLayer.opacity != 1 { gradientLayer.opacity = 1 }
+        } else if gradientLayer.opacity != 0 {
             gradientLayer.opacity = 0
         }
         CATransaction.commit()
