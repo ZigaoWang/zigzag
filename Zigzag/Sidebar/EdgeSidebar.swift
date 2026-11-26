@@ -524,8 +524,13 @@ final class EdgeSidebar {
             closePreview(animated: false)
             return
         }
-        if preview == nil {
-            narrowPanel()
+        // No page to fold away: the blank the last switch put there slides in from this switch's side instead, so the
+        // box still says which way the space moved.
+        guard preview != nil else {
+            let slide = EdgePreviewRouting.spaceSlide(from: before, to: after, order: target?.tabManager.listedSpaces.map(\.id) ?? [])
+            host.showBlankSlate(true)
+            host.layoutSubtreeIfNeeded()
+            host.showBlankSlateAnimatingIn(foldFromRight: slide == 0 ? shownOnRight : slide > 0)
             return
         }
         previewWork?.cancel()
@@ -562,9 +567,11 @@ final class EdgeSidebar {
     }
 
     private func managerChanged(_ change: TabManager.Change) {
-        // A space switch made in the panel (a swipe over its rows) is the same event as picking another space, whether
-        // or not a page is out: the box shows the blank either way, so it never stands for a space you've left.
-        if case .space = change, isShowing, host?.blankSlate.superview == nil {
+        // A space switch is the same event whether a page is out, the blank is showing, or the panel is just the rows:
+        // the box always ends on the new space's blank, so it never stands for a space you've left. It is not gated on
+        // a preview existing — after the first handover there is none, and gating on that left the old space's blank
+        // in place for every switch after it.
+        if case .space = change, isShowing {
             handOverToBlank(from: previewTab?.spaceID, to: target?.tabManager.currentSpaceID)
             return
         }
