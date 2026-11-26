@@ -1464,4 +1464,34 @@ extension SyncTests {
         #expect(a.library.urls(in: "Personal") == ["a", "b"])
         #expect(cloud.records[name] != nil)
     }
+
+    @Test func aFolderMovedToAnotherSpaceAndReadInPartsKeepsItsPages() throws {
+        var folder = BookmarkFolder(name: "F")
+        let f1 = Sample.page("f1"), f2 = Sample.page("f2")
+        folder.bookmarkIDs = [f1.id, f2.id]
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("One", [Sample.page("o"), f1, f2], folders: [folder]), Sample.space("Two", [Sample.page("t")])]))
+        #expect(b.library.space(named: "One")?.folders?.count == 1)
+        let before = cloud.changes(since: 0).token
+        a.edit { lib in
+            var moved = lib.space(named: "One")!.folders![0]
+            let pages = lib.space(named: "One")!.bookmarks.filter { moved.bookmarkIDs.contains($0.id) }
+            lib.editSpace("One") { $0.folders = []; $0.bookmarks.removeAll { moved.bookmarkIDs.contains($0.id) } }
+            moved.parentID = nil
+            lib.editSpace("Two") { $0.folders = [moved]; $0.bookmarks.append(contentsOf: pages) }
+        }
+        a.sync()
+        let changes = cloud.changes(since: before)
+        // B reads the folder first, its pages in a later fetch.
+        b.clock = a.clock + 5
+        b.session.fetched(changes.records.filter { $0.name.hasPrefix("folder.") }, deleted: [])
+        b.session.fetchFinished()
+        b.clock += 1
+        b.session.fetched(changes.records.filter { !$0.name.hasPrefix("folder.") }, deleted: changes.deleted)
+        b.session.fetchFinished()
+        b.sync(); a.sync(); b.sync()
+        for (n, mac) in [("a", a), ("b", b)] {
+            #expect(mac.library.urls(in: "One") == ["o"], "\(n): pages left behind in the old space")
+            #expect(mac.library.space(named: "Two")?.folders?.first?.bookmarkIDs.count == 2, "\(n)")
+        }
+    }
 }

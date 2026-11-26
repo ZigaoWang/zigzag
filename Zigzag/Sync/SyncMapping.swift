@@ -170,12 +170,20 @@ enum SyncMapping {
             // A loop reads as placed; apply untangles it.
             memo[name] = false
             var result = false
+            let space: UUID? = switch item.body {
+            case .page(let p): p.space
+            case .folder(let f): f.space
+            default: nil
+            }
             for parent in parents(item.body) where !kept.contains(parent) {
                 guard let record = items[parent] else {
                     if !unsent.contains(name) { result = true }
                     continue
                 }
-                if case .unknown = record.body { result = true } else if waits(parent), !unsent.contains(name) { result = true }
+                if case .unknown = record.body { result = true; continue }
+                // Its folder there, but in another space: one of the two moved, and the other hasn't arrived yet.
+                if case .folder(let folder) = record.body, let space, folder.space != space, !unsent.contains(name) { result = true; continue }
+                if waits(parent), !unsent.contains(name) { result = true }
             }
             memo[name] = result
             return result

@@ -131,6 +131,8 @@
   Test: SyncTests.editsMadeBeforeConnectingAreSentOnceConnected
 - A page, folder or favorite read before its space, folder or profile (a send read halfway) → waits on this Mac until its parent arrives, and nothing is moved or sent back meanwhile. Each Mac sends spaces before folders before pages.
   Test: SyncTests.aPageArrivingBeforeItsSpaceWaitsForIt
+- A folder moved to another space, read before its pages → the pages wait until they've moved too; nothing is left behind or sent back.
+  Test: SyncTests.aFolderMovedToAnotherSpaceAndReadInPartsKeepsItsPages
 - Something inside a space, folder or profile only a newer Zigzag can read → left as it is, never moved or rewritten here.
   Test: SyncTests.whatsInsideARecordANewerZigzagWroteIsLeftAlone
 - A preference only a newer Zigzag knows, or one of a profile this Mac doesn't have → kept in iCloud as it is, never sent back as unset.
