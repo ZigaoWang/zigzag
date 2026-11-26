@@ -40,11 +40,15 @@
   Test: SyncTests.aSecondMacsFirstSpaceIsMatchedByNameNotCopied
 - Two pinned pages or favorites whose addresses differ only after the # (a web app's views) → stay two.
   Test: SyncTests.pinsThatDifferOnlyAfterTheHashStayTwo
-- Sync turned on on two Macs at the same moment, both finding iCloud empty → each leaves a record of what it sent, and from those records alone every Mac matches the two copies of each profile, space, folder, pinned page and favorite by name and address, one to one, the same way, keeping one of each, however late each reads. What either Mac adds afterwards, and anything on a Mac that joined when iCloud already had a library, is never matched this way.
+- Sync turned on on two Macs at the same moment, both finding iCloud empty → each leaves a record listing what it sent. Two such records saved within 20 minutes of each other are two first syncs at once: every Mac matches the two copies of each listed profile, space, folder, pinned page and favorite by name and address as they are now, one to one, the same way, keeping one of each, however late each reads. Anything moved or removed since is matched where it is now, or not at all; what either Mac adds afterwards, and anything on a Mac that joined when iCloud already had a library, is never matched this way. Each Mac removes its own record a day after its first sync has gone up.
   Test: SyncTests.twoMacsTurningSyncOnAtOnceMakeNoCopies
   Test: SyncTests.twoFirstSyncsAtOnceAgreeHoweverLateOneReads
   Test: SyncTests.aSecondMacJoiningNormallyKeepsItsOwnDuplicatePins
-- A second Mac turning sync on while another's first sync is still going up → it reads again until the rest has arrived, then merges; the first-sync record goes up first, so this is known. After 10 minutes without the rest, it merges and leaves its own record, and the two are matched as two first syncs at once.
+- A second Mac turning sync on while another's first sync is still going up (its record saved in the last 10 minutes) → it reads again until the rest has arrived, then merges; the first-sync record goes up first, so this is known. After 10 minutes without the rest, it merges and leaves its own record, and the two are matched as two first syncs at once; turning sync off and on doesn't start the wait over. A Mac joining later, when iCloud has a library and no first sync going up, merges at once, leaves no record, and keeps its own duplicate pins.
+  Test: SyncTests.aLaterJoinerAfterARemovalMergesAtOnce
+  Test: SyncTests.aLaterJoinerKeepsItsOwnDuplicatePin
+  Test: SyncTests.aLaterJoinerWithoutARemovalKeepsItsDuplicatePin
+  Test: SyncTests.aPinMovedSinceTheFirstSyncIsntMatchedWhereItWas
   Test: SyncTests.aSecondMacReadingAHalfSentFirstSyncWaitsForTheRest
   Test: SyncTests.aFirstSyncThatNeverFinishesGoingUpIsMatchedAsTwoAtOnce
 - Something iCloud doesn't have → added to iCloud, never removed from this Mac.

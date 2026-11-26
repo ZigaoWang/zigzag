@@ -169,6 +169,8 @@ final class ICloudSync {
     static func stateTurningOff(_ state: SyncState?, keepingLibrary: Bool = true) -> SyncState {
         var kept = SyncState()
         kept.aliases = state?.aliases ?? SyncAliases()
+        // A first sync waiting for another Mac's doesn't start its wait over.
+        kept.firstSyncWait = state?.firstSyncWait
         guard keepingLibrary, let state, state.merged else { return kept }
         kept.merged = true
         kept.base = state.base

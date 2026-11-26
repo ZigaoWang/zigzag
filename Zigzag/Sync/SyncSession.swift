@@ -441,7 +441,8 @@ final class SyncSession {
     func fetchFinished() {
         guard !isClosed else { return }
         if !state.merged {
-            // Another Mac's first sync still going up: read again before merging, for a while.
+            // Another Mac's first sync still going up: read again before merging, for a while. iCloud with a library
+            // and no first sync going up: merged at once, the usual way.
             if halfSentFirstSync() {
                 let since = state.firstSyncWait ?? now()
                 state.firstSyncWait = since
@@ -456,6 +457,7 @@ final class SyncSession {
             }
         } else {
             settle()
+            removeOwnFirstSync()
         }
         state.lastSynced = now()
         onChange?()
@@ -477,10 +479,12 @@ final class SyncSession {
         var profilesGone: Set<UUID> = []
         // Copies from two first syncs at once that the other Mac already removed: not kept as removed elsewhere.
         var markers = state.base.filter { $0.value.type == Self.firstSyncType }
+        var markerDates = state.serverDates
         for case let (name, record?) in arrived where record.type == Self.firstSyncType {
             markers[name] = SyncItem(type: record.type, payload: record.payload, modified: record.modified)
+            markerDates[name] = record.serverModified ?? markerDates[name]
         }
-        let copyPairs = Self.copies(in: markers)
+        let copyPairs = Self.copies(in: markers, dates: markerDates, now: now(), asSent: true)
         var copiesGone: [UUID] = []
         let stamp = now()
         state.fetches += 1
@@ -685,12 +689,25 @@ final class SyncSession {
     }
 
     /// The first sync on this Mac: iCloud's records and the library here merged, never replaced.
+    /// This Mac's first-sync record, a day after iCloud saved it with nothing left to send: removed, so it doesn't stay.
+    private func removeOwnFirstSync() {
+        guard let own = state.ownFirstSync, state.base[own] != nil, state.unsent.isEmpty,
+              let saved = state.serverDates[own], now().timeIntervalSince(saved) > Self.firstSyncKept else { return }
+        state.base[own] = nil
+        state.ownFirstSync = nil
+        queue(([], [own]))
+    }
+
+    static let firstSyncKept: TimeInterval = 24 * 3600
+
     /// How long a first sync waits for another Mac's that's still going up.
     static let firstSyncWait: TimeInterval = 10 * 60
 
-    /// A first-sync record read whose items haven't all arrived yet.
+    /// A first-sync record iCloud saved lately (or since this Mac began waiting) whose items haven't all arrived yet.
+    /// An older one is no first sync still going up: what it lists that's missing was removed since.
     private func halfSentFirstSync() -> Bool {
-        let records = state.incoming.filter { $0.value.type == Self.firstSyncType }
+        let since = (state.firstSyncWait ?? now()).addingTimeInterval(-Self.firstSyncWait)
+        let records = state.incoming.filter { $0.value.type == Self.firstSyncType && ($0.value.serverModified ?? now()) >= since }
         return records.values.contains { record in
             guard let sync = try? SyncBody.decoder().decode(FirstSync.self, from: record.payload) else { return false }
             return sync.items.contains { state.incoming[$0.n] == nil && !state.incomingRemoved.contains($0.n) }
@@ -750,37 +767,49 @@ final class SyncSession {
         var items: [FirstSyncItem]
     }
 
+    /// What an item is matched by: its kind, its space, folder or profile, and its name or address.
+    private static func matchItem(_ name: String, _ body: SyncBody) -> FirstSyncItem? {
+        func text(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        switch body {
+        case .profile(let p) where SyncName.id(name) != Profile.defaultID && !text(p.name ?? "").isEmpty:
+            return .init(n: name, p: [], k: text(p.name ?? ""))
+        case .space(let s):
+            return .init(n: name, p: [SyncName.profile(s.profile)], k: text(s.look.name))
+        case .folder(let f):
+            return .init(n: name, p: [SyncName.space(f.space), f.parent.map(SyncName.folder) ?? ""], k: "\(text(f.name)) \(f.live == nil)")
+        case .page(let p):
+            return .init(n: name, p: [SyncName.space(p.space), p.parent.map(SyncName.folder) ?? ""], k: TabManager.pinnedKey(p.url))
+        case .favorite(let f):
+            return .init(n: name, p: [SyncName.profile(f.profile)], k: TabManager.pinnedKey(f.url))
+        default:
+            return nil
+        }
+    }
+
     /// The record of a first sync into an empty iCloud: what's in `items`, as it was sent.
     private static func firstSync(of items: [String: SyncItem]) -> SyncItem {
-        func text(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-        var list: [FirstSyncItem] = []
-        for (name, item) in items {
-            switch item.body {
-            case .profile(let p) where SyncName.id(name) != Profile.defaultID && !text(p.name ?? "").isEmpty:
-                list.append(.init(n: name, p: [], k: text(p.name ?? "")))
-            case .space(let s):
-                list.append(.init(n: name, p: [SyncName.profile(s.profile)], k: text(s.look.name)))
-            case .folder(let f):
-                list.append(.init(n: name, p: [SyncName.space(f.space), f.parent.map(SyncName.folder) ?? ""], k: "\(text(f.name)) \(f.live == nil)"))
-            case .page(let p):
-                list.append(.init(n: name, p: [SyncName.space(p.space), p.parent.map(SyncName.folder) ?? ""], k: TabManager.pinnedKey(p.url)))
-            case .favorite(let f):
-                list.append(.init(n: name, p: [SyncName.profile(f.profile)], k: TabManager.pinnedKey(f.url)))
-            default:
-                break
-            }
-        }
         // iCloud takes a record up to 1 MB: past that, the rest isn't matched.
-        list = Array(list.sorted { $0.n < $1.n }.prefix(15_000))
+        let list = Array(items.compactMap { matchItem($0.key, $0.value.body) }.sorted { $0.n < $1.n }.prefix(15_000))
         let payload = (try? SyncBody.encoder().encode(FirstSync(items: list))) ?? Data("{}".utf8)
         return SyncItem(type: firstSyncType, payload: payload, modified: Date())
     }
 
-    /// Each copy that isn't kept, to the one kept, from every first-sync record: the same on every Mac.
-    static func copies(in records: [String: SyncItem]) -> [String: String] {
+    /// Two first-sync records whose server dates are this close were two first syncs at once.
+    static let firstSyncsAtOnce: TimeInterval = 2 * firstSyncWait
+
+    /// Each copy that isn't kept, to the one kept, from first-sync records saved close together (`dates`: when iCloud
+    /// saved each; one not yet saved counts as `now`): the same on every Mac. Items are matched as they are now in
+    /// `records`; one that's gone isn't matched, unless `asSent` (to tell a copy's removal from another).
+    static func copies(in records: [String: SyncItem], dates: [String: Date] = [:], now: Date = Date(), asSent: Bool = false) -> [String: String] {
         let syncs = records.filter { $0.value.type == firstSyncType }.sorted { $0.key < $1.key }
-            .compactMap { try? SyncBody.decoder().decode(FirstSync.self, from: $0.value.payload) }
+            .compactMap { name, item in
+                (try? SyncBody.decoder().decode(FirstSync.self, from: item.payload)).map { (dates[name] ?? now, $0) }
+            }
         guard syncs.count > 1 else { return [:] }
+        func current(_ item: FirstSyncItem) -> FirstSyncItem? {
+            if let record = records[item.n] { return matchItem(item.n, record.body) }
+            return asSent ? item : nil
+        }
         var kept: [String: String] = [:]
         func canonical(_ name: String) -> String {
             var name = name, seen: Set<String> = []
@@ -789,16 +818,17 @@ final class SyncSession {
         }
         func id(_ name: String) -> String { SyncName.id(name)?.uuidString ?? name }
         for i in syncs.indices {
-            for j in syncs.indices where j > i {
+            for j in syncs.indices where j > i && abs(syncs[i].0.timeIntervalSince(syncs[j].0)) <= firstSyncsAtOnce {
                 for kind in ["profile", "space", "folder", "folder", "folder", "folder", "page", "favorite"] {
                     func groups(_ sync: FirstSync) -> [String: [String]] {
                         var result: [String: [String]] = [:]
-                        for item in sync.items where item.n.hasPrefix(kind + ".") && kept[item.n] == nil {
+                        for listed in sync.items where listed.n.hasPrefix(kind + ".") && kept[listed.n] == nil {
+                            guard let item = current(listed) else { continue }
                             result["\(item.p.map(canonical)) \(item.k)", default: []].append(item.n)
                         }
                         return result.mapValues { $0.sorted { id($0) < id($1) } }
                     }
-                    let a = groups(syncs[i]), b = groups(syncs[j])
+                    let a = groups(syncs[i].1), b = groups(syncs[j].1)
                     for (key, mine) in a {
                         guard let theirs = b[key] else { continue }
                         for (x, y) in zip(mine, theirs) where x != y {
@@ -815,7 +845,7 @@ final class SyncSession {
     /// Copies from two first syncs at once dropped here, what was in them moved to the one kept. Each pair waits only
     /// until the one kept has arrived.
     private func dropCopies() {
-        let pairs = Self.copies(in: state.base)
+        let pairs = Self.copies(in: state.base, dates: state.serverDates, now: now())
         guard !pairs.isEmpty else { return }
         let own = state.ownFirstSync.flatMap { name in
             state.base[name].flatMap { try? SyncBody.decoder().decode(FirstSync.self, from: $0.payload) }.map { Set($0.items.map(\.n)) }
@@ -987,10 +1017,11 @@ final class SyncSession {
 
     /// Everything here goes up again from scratch (iCloud's copy was reset): merged again on the next fetch.
     func startOver() {
-        let account = state.account, aliases = state.aliases
+        let account = state.account, aliases = state.aliases, wait = state.firstSyncWait
         state = SyncState()
         state.account = account
         state.aliases = aliases
+        state.firstSyncWait = wait
         clearIncoming()
         onChange?()
     }

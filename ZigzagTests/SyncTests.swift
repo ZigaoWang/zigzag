@@ -16,7 +16,7 @@ import Testing
 
     func remote(_ name: String) -> SyncRemote? {
         records[name].map { SyncRemote(name: name, type: $0.type, payload: $0.payload, modified: $0.modified, systemFields: Data(String($0.tag).utf8),
-                                       serverModified: Date(timeIntervalSince1970: Double($0.tag))) }
+                                       serverModified: Date(timeIntervalSince1970: 1_800_000_000 + Double($0.tag) / 1000)) }
     }
 
     enum Saved { case saved(SyncRemote), failed(SyncSaveFailure) }
@@ -1911,5 +1911,69 @@ extension SyncTests {
         again.sync(); a.sync()
         #expect(again.library.urls(in: "Personal") == ["a", "pinned while off"])
         #expect(a.library.urls(in: "Personal") == ["a", "pinned while off"])
+    }
+
+    @Test func aLaterJoinerAfterARemovalMergesAtOnce() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", (0..<20).map { Sample.page("p\($0)") })]))
+        a.sync()
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 3) } }
+        a.sync()
+        let c = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("c-only")])]), clock: a.clock + 86400 * 14)
+        c.sync()
+        #expect(c.session.state.merged)
+        #expect(c.session.state.ownFirstSync == nil)
+        #expect(c.library.urls(in: "Personal").count == 20)
+        // A's own first-sync record goes a day after it was sent.
+        a.clock = c.clock
+        a.sync()
+        #expect(a.session.state.ownFirstSync == nil)
+        #expect(!cloud.records.keys.contains { $0.hasPrefix(SyncSession.firstSyncPrefix) })
+    }
+
+    @Test func aLaterJoinerKeepsItsOwnDuplicatePin() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", (0..<5).map { Sample.page("p\($0)") })]))
+        a.sync()
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 3) } }
+        a.sync()
+        let c = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("p0"), Sample.page("p0"), Sample.page("c-only")])]), clock: a.clock + 86400)
+        c.sync()
+        #expect(c.session.state.merged && c.session.state.ownFirstSync == nil)
+        c.clock += SyncSession.firstSyncWait + 1
+        c.sync()
+        for _ in 0..<3 { a.sync(); c.sync() }
+        #expect(c.library.urls(in: "Personal").filter { $0 == "p0" }.count == 2)
+        #expect(a.library.urls(in: "Personal").filter { $0 == "p0" }.count == 2)
+    }
+
+    @Test func aLaterJoinerWithoutARemovalKeepsItsDuplicatePin() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", (0..<5).map { Sample.page("p\($0)") })]))
+        a.sync()
+        let c = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("p0"), Sample.page("p0"), Sample.page("c-only")])]), clock: a.clock + 86400)
+        c.sync()
+        for _ in 0..<3 { a.sync(); c.sync() }
+        #expect(c.session.state.merged && c.library.urls(in: "Personal").filter { $0 == "p0" }.count == 2)
+    }
+
+    @Test func aPinMovedSinceTheFirstSyncIsntMatchedWhereItWas() throws {
+        let cloud = FakeCloud()
+        let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("news"), Sample.page("gone")]), Sample.space("Work")]))
+        a.sync()
+        a.edit { lib in
+            let news = lib.space(named: "Personal")!.bookmarks[0]
+            lib.editSpace("Personal") { $0.bookmarks = [] }
+            lib.editSpace("Work") { $0.bookmarks = [news] }
+        }
+        a.sync()
+        let c = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("news")]), Sample.space("Work")]), clock: a.clock + 86400)
+        c.sync()
+        c.clock += SyncSession.firstSyncWait + 1
+        c.sync()
+        for _ in 0..<3 { a.sync(); c.sync() }
+        for mac in [a, c] {
+            #expect(mac.library.urls(in: "Work") == ["news"] && mac.library.urls(in: "Personal") == ["news"])
+        }
     }
 }
