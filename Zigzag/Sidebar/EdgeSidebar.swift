@@ -2,17 +2,27 @@ import AppKit
 
 /// What the edge preview shows for a row.
 enum EdgeLensPolicy {
-    /// Web pages and local files are previewed. Zigzag's own pages (Settings, History) belong to the window, so the
-    /// panel can't show them — but it says so on a card rather than doing nothing.
+    /// Pages the panel previews: the web, local files, and Zigzag's own pages, which are served by a scheme handler
+    /// and so are pages like any other. A page that doesn't work in the panel's little window is listed as blocked
+    /// rather than by refusing its scheme, so each one can be judged on its own.
     static func previews(url: URL?) -> Bool {
-        ["http", "https", "file"].contains(url?.scheme?.lowercased() ?? "")
+        guard let url, let scheme = url.scheme?.lowercased() else { return false }
+        if internalSchemes.contains(scheme) { return !blockedInternalPages.contains(url.host() ?? "") }
+        return ["http", "https", "file"].contains(scheme)
     }
 
-    /// The card a Zigzag page gets in the preview's room: its name and why it can't be shown there.
-    static let systemPageNote = String(localized: "Zigzag's own page.",
-                                       comment: "In the edge sidebar's card over a row of Zigzag's own pages, like Settings or History.")
-    static let systemPageHint = String(localized: "Open it from the sidebar in Zigzag's window.",
-                                       comment: "At the foot of the edge sidebar's card over a row of Zigzag's own pages, like Settings or History.")
+    /// Schemes Zigzag serves itself.
+    static let internalSchemes: Set<String> = ["zigzag"]
+    /// Zigzag's own pages the panel's window doesn't show well. Empty until one is found: Settings and History are
+    /// ordinary pages, so they're previewed with everything else.
+    static let blockedInternalPages: Set<String> = []
+
+    /// The card a Zigzag page gets in the preview's room: it says the page is the window's own and can't be shown
+    /// beside the sidebar, and the card itself is the way back to it.
+    static let systemPageNote = String(localized: "This Zigzag page can only be opened in the browser window.",
+                                       comment: "In the edge sidebar's place, over a row of one of Zigzag's own pages that the panel doesn't preview.")
+    static let systemPageHint = String(localized: "Click to go back to Zigzag.",
+                                       comment: "At the foot of the edge sidebar's card over a row of Zigzag's own pages: clicking it opens the page in the browser window.")
 
     /// A running page is lent to the preview; one asleep or not loaded yet shows a card, so a hover never wakes it.
     static func showsLivePage(isLoaded: Bool, isAsleep: Bool) -> Bool { isLoaded && !isAsleep }
@@ -133,6 +143,8 @@ final class EdgeSidebar {
     private var activationWork: DispatchWorkItem?
     /// The page beside the sidebar: a docked Mini borrowing the row's page, or showing its card.
     private var preview: MiniWindowController?
+    /// Zigzag's own page, standing in for one the panel can't show.
+    private var systemCard: EdgeAsleepPageView?
     private var previewTab: Tab?
     private var previewWork: DispatchWorkItem?
     private var closeWork: DispatchWorkItem?
@@ -352,6 +364,40 @@ final class EdgeSidebar {
     }
     #endif
 
+    /// Zigzag's own page, in the panel's page room: its name, why the panel can't show it, and a button that goes
+    /// back to the browser on that page. Not a page, so nothing is borrowed and nothing has to be given back.
+    private func showSystemPageCard(_ tab: Tab) {
+        guard let host else { return }
+        let card = systemCard ?? EdgeAsleepPageView(frame: .zero)
+        systemCard = card
+        card.show(tab: tab, note: EdgeLensPolicy.systemPageNote, hint: EdgeLensPolicy.systemPageHint)
+        card.onClick = { [weak self, weak tab] in
+            guard let self, let tab else { return }
+            self.returnToZigzag(tab)
+        }
+        card.frame = host.pageFrame
+        card.autoresizingMask = []
+        if card.superview !== host { host.addSubview(card) }
+        if let panel = panel {
+            let wide = EdgeSidebarLayout.width(sidebar: host.cardWidth, page: true, inset: host.inset, in: shownVisible)
+            previewPanelFrame = EdgeSidebarLayout.frame(in: shownVisible, width: wide, onRight: shownOnRight)
+            host.pageShowing = true
+            panel.setFrame(previewPanelFrame, display: true)
+        }
+        host.layoutSubtreeIfNeeded()
+        card.frame = host.pageFrame
+        host.showBlankSlateAnimatingIn(foldFromRight: shownOnRight)
+    }
+
+    /// Takes the panel away and puts the page in front, in the browser window it belongs to.
+    private func returnToZigzag(_ tab: Tab) {
+        let controller = target
+        hide(animated: false)
+        controller?.tabManager.select(tab)
+        controller?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
     /// A pointer crossing rows previews nothing; one that stops on a row does after a short rest.
     private func scheduleHoverCheck(tab: Tab, in controller: BrowserWindowController, pointer: NSPoint,
                                     since: TimeInterval, token: Int) {
@@ -382,7 +428,15 @@ final class EdgeSidebar {
         guard isShowing, let panel, let host, !tab.isPrivate, tab.url != nil, preview?.tab !== tab else { return }
         // A real page, or the card standing in for one, takes the blank pill's place.
         host.showBlankSlate(false)
+        systemCard?.removeFromSuperview()
+        systemCard = nil
         let system = !EdgeLensPolicy.previews(url: tab.url)
+        if system {
+            // A page the panel deliberately doesn't preview (`EdgeLensPolicy.blockedInternalPages`). A card says so
+            // and offers the way back, rather than an empty pill.
+            showSystemPageCard(tab)
+            return
+        }
         let live = !system && EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
         let previous = preview
         // The panel takes its full width first, so the page is laid out once at its final size.
@@ -519,44 +573,6 @@ final class EdgeSidebar {
 
     /// A space switch with the box out: the page folds away and the blank pill takes its place, in the same wide frame.
     /// Nothing is lent and nothing is shown that wasn't asked for; resting on a row in the new space brings a page in.
-    private func handOverToBlank(from before: UUID?, to after: UUID?) {
-        guard isShowing, let panel, let host else {
-            closePreview(animated: false)
-            return
-        }
-        // No page to fold away: the blank the last switch put there slides in from this switch's side instead, so the
-        // box still says which way the space moved.
-        guard preview != nil else {
-            let slide = EdgePreviewRouting.spaceSlide(from: before, to: after, order: target?.tabManager.listedSpaces.map(\.id) ?? [])
-            host.showBlankSlate(true)
-            host.layoutSubtreeIfNeeded()
-            host.showBlankSlateAnimatingIn(foldFromRight: slide == 0 ? shownOnRight : slide > 0)
-            return
-        }
-        previewWork?.cancel()
-        previewWork = nil
-        closeWork?.cancel()
-        closeWork = nil
-        let previous = preview
-        preview = nil
-        previewTab = nil
-        // The wide frame stays while the box is out: this is a fold, not the panel narrowing.
-        host.pageShowing = true
-        panel.setFrame(previewPanelFrame == .zero ? panel.frame : previewPanelFrame, display: true)
-        host.placeCard()
-        host.showBlankSlate(true)
-        host.layoutSubtreeIfNeeded()
-        if let previous {
-            previous.onInPageMiniClosed = nil
-            previous.onInPageMiniDetached = nil
-            // No animation: a closing Mini stays on screen until its own slide ends, drawing the old page over the
-            // blank the handover just put in place.
-            previous.closeInPage(focusBack: false, animated: false)
-        }
-        let slide = EdgePreviewRouting.spaceSlide(from: before, to: after, order: target?.tabManager.listedSpaces.map(\.id) ?? [])
-        host.showBlankSlateAnimatingIn(foldFromRight: slide == 0 ? shownOnRight : slide > 0)
-    }
-
     private func narrowPanel() {
         previewPanelFrame = .zero
         guard isShowing, let host, let panel else { return }
@@ -567,10 +583,8 @@ final class EdgeSidebar {
     }
 
     private func managerChanged(_ change: TabManager.Change) {
-        // A space switch is the same event whether a page is out, the blank is showing, or the panel is just the rows:
-        // the box always ends on the new space's blank, so it never stands for a space you've left. It is not gated on
-        // a preview existing — after the first handover there is none, and gating on that left the old space's blank
-        // in place for every switch after it.
+        // A space switch always lands on the empty page, whether a page was out or the box was already holding the
+        // blank. Gating this on a preview existing is what made every switch after the first do nothing.
         if case .space = change, isShowing {
             handOverToBlank(from: previewTab?.spaceID, to: target?.tabManager.currentSpaceID)
             return
@@ -578,14 +592,44 @@ final class EdgeSidebar {
         guard preview != nil else { return }
         switch change {
         case .space:
-            // The row it came from is no longer on screen, so the page can't stay. The panel does: the box folds and
-            // the empty page lands in it, and no page of the new space is shown unasked (#545).
-            handOverToBlank(from: previewTab?.spaceID, to: target?.tabManager.currentSpaceID)
+            break
         case .structure:
             if previewTab?.isClosed == true { closePreview(animated: false) }
         case .selection, .content:
             break
         }
+    }
+
+    /// A space switch with the panel out: the page belongs to the space that was left, so it goes, and the box keeps
+    /// its width and fills with the empty page, folding in from the side the space list moved.
+    ///
+    /// One path for both cases — a page to fold away, or the blank already there — so a second switch behaves like the
+    /// first instead of falling back to a narrow panel.
+    private func handOverToBlank(from before: UUID?, to after: UUID?) {
+        guard isShowing, let panel, let host else { return }
+        previewWork?.cancel()
+        previewWork = nil
+        closeWork?.cancel()
+        closeWork = nil
+        host.showBlankSlate(true)
+        host.pageShowing = true
+        if let mini = preview {
+            preview = nil
+            previewTab = nil
+            // Its own close would narrow the panel and undo the handover, so the handlers go first.
+            mini.onInPageMiniClosed = nil
+            mini.onInPageMiniDetached = nil
+            mini.closeInPage(focusBack: false, animated: false)
+        }
+        let sidebar = host.cardWidth
+        let wide = EdgeSidebarLayout.width(sidebar: sidebar, page: true, inset: host.inset, in: shownVisible)
+        previewPanelFrame = EdgeSidebarLayout.frame(in: shownVisible, width: wide, onRight: shownOnRight)
+        panel.setFrame(previewPanelFrame, display: true)
+        host.placeCard()
+        host.layoutSubtreeIfNeeded()
+        let slide = EdgePreviewRouting.spaceSlide(from: before, to: after,
+                                                  order: target?.tabManager.listedSpaces.map(\.id) ?? [])
+        host.showBlankSlateAnimatingIn(foldFromRight: slide == 0 ? shownOnRight : slide > 0)
     }
 
     // MARK: The panel
@@ -638,6 +682,8 @@ final class EdgeSidebar {
         managerToken = nil
         // Not focusBack: the panel is about to go, so making it key hands the keyboard to the browser window behind
         // it as it leaves, and the window comes forward.
+        systemCard?.removeFromSuperview()
+        systemCard = nil
         closePreview(animated: false, focusBack: false)
         guard isShowing, let panel else { return }
         isShowing = false

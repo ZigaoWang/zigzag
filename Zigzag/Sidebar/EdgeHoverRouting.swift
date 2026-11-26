@@ -13,11 +13,9 @@ enum EdgeHoverRouting {
     }
 }
 
-/// Where a space switch's fold comes from: the list slides in from the side of the space that was picked, and the box
-/// folds from the same side (#545).
+/// Where a space switch's fold comes from: the list slides in from the side of the space that was picked. Kept for
+/// the system-page card, which arrives from the sidebar's side.
 enum EdgePreviewRouting {
-    /// 1 for a space later in the list (its list slides in from the right), -1 for one before it, 0 when the order
-    /// can't say (the same space, or one not listed).
     static func spaceSlide(from before: UUID?, to after: UUID?, order: [UUID]) -> Int {
         guard let before, let after, before != after,
               let from = order.firstIndex(of: before), let to = order.firstIndex(of: after) else { return 0 }

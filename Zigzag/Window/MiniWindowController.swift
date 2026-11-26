@@ -423,8 +423,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     static func openPreview(of tab: Tab, from browser: BrowserWindowController,
                             dockedIn edge: any MiniDockHosting, reveal: Bool = true,
                             deferPage: Bool = false) -> MiniWindowController? {
+        // Zigzag's own pages are pages too: the scheme handler serves them into a web view like any other, so a Mini
+        // can hold one. Which ones preview well is `EdgeLensPolicy`'s call, not this guard's.
         guard let url = tab.url, !tab.isPrivate,
-              ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+              ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "")
+                || EdgeLensPolicy.previews(url: url) else { return nil }
         // In a browser's page card the page is the card's; a Mini has borrowed it. The preview's page must go home
         // before it is borrowed again, even if this Mini is still folding away.
         if let old = tab.host as? MiniWindowController { old.endBorrowingNow() }
