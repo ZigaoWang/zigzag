@@ -697,7 +697,7 @@ enum DebugBridge {
 
     /// A sidebar menu as a right-click at `point` in `view` shows it.
     private static func showDrawn(_ menu: NSMenu, from view: NSView, at point: NSPoint) {
-        MenuPanel.show(MenuPanel.entries(from: menu), from: view, placement: .at(view.convert(point, to: nil)))
+        MenuPanel.show(menu: menu, from: view, placement: .at(view.convert(point, to: nil)))
     }
     private static var trackedMenu: NSMenu?
 
@@ -891,6 +891,7 @@ enum DebugBridge {
         if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
         if name == "fpsbench" { FrameRateBench.run(arg, in: controller); return }
         if name == "perfsuite" { PerfBench.run(arg); return }
+        if name == "idle" { IdleWorkCommand.run(arg); return }
         // glassvariant <name>: draws clear glass another way (`GlassVariant`), until relaunch.
         if name == "glassvariant" { if let variant = GlassVariant(rawValue: arg) { DebugMenu.apply(variant) }; return }
         // card [tilt <x> <y>|tilt off|finish <name>|flip|hover <n>|save <path>|shot <path>|close]: About with Your Zigzag Card, opened behind, leaning as if
@@ -1326,6 +1327,10 @@ enum DebugBridge {
             let energy = arg.hasPrefix("energy ")
             let prefix = energy ? String(arg.dropFirst(7)) : arg
             controller.tabManager.allTabs.first { $0.url?.absoluteString.hasPrefix(prefix) == true }?.suspend(because: energy ? EnergyWatch.sleepReason : "debug")
+        // networkprocess: the process id of WebKit's network process for the shown tab's store, in the debug log.
+        case "networkprocess":
+            let store = controller.tabManager.selectedTab?.webView?.configuration.websiteDataStore
+            debugLog("networkprocess \(store.map(NetworkProcessCookies.process) ?? 0)")
         // iconpicker <index>: the Change Icon… grid beside the tab at that sidebar position, as its menu item opens it.
         case "iconpicker":
             let list = controller.tabManager.navigableTabs
@@ -2907,9 +2912,8 @@ enum DebugBridge {
         // getextensions: Settings › Extensions' Get Extensions menu, open.
         case "getextensions": controller.tabManager.selectedTab?.settingsView?.debugShowGetExtensionsMenu()
         case "shortcutrecord":
-            // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts.
-            func rows(in view: NSView) -> [ShortcutRow] { view.subviews.flatMap { ($0 as? ShortcutRow).map { [$0] } ?? rows(in: $0) } }
-            if let content = controller.window?.contentView { rows(in: content).first { $0.debugTitle == arg }?.debugRecord() }
+            // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts, its menu's box opened.
+            controller.tabManager.selectedTab?.settingsView?.debugRecordShortcut(arg)
         case "engine": if let engine = SearchEngine(rawValue: arg) { Library.shared.searchEngine = engine }
         case "engineinfo":
             // The engine searched with, its address for "zigzag test", and the engines extensions give.
@@ -2967,6 +2971,8 @@ enum DebugBridge {
         case "webrtcoffer": if let tab = controller.tabManager.selectedTab { Task { let allowed = await WebRTCProtection.offer(in: tab); debugLog("webrtcoffer => \(allowed)") } }
         // sitedark <automatic|on|off|force>: the Dark page row's dropdown.
         case "sitedark": SitePanel.shown?.debugDark(arg)
+        // sitecompat <on|off>: the Compatibility mode switch.
+        case "sitecompat": SitePanel.shown?.debugCompatibility(arg)
         // sitejs <allowed|blocked>: the JavaScript row. javascript <on|off>: Settings › Privacy › JavaScript.
         case "sitejs": SitePanel.shown?.debugJavaScript(arg)
         case "javascript": if arg == "on" || arg == "off" { SiteJavaScript.isAllowed = arg == "on" }
@@ -4801,6 +4807,44 @@ enum PerfBench {
         overlay?.removeFromSuperview()
         overlay = nil
         return result
+    }
+}
+#endif
+
+#if DEBUG
+/// idle audit <path> | idle back | idle stopanims | idle clearbg [class]: what keeps the window server drawing windows
+/// that sit still; `back` orders them behind every other app's, `clearbg` makes shadowed see-through windows wholly clear again.
+@MainActor
+enum IdleWorkCommand {
+    static func run(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        let windows = NSApp.windows.filter(\.isVisible)
+        switch f.first {
+        case "audit":
+            let rows: [[String: Any]] = windows.map { window in
+                ["class": "\(type(of: window))", "frame": NSStringFromRect(window.frame), "opaque": window.isOpaque,
+                 "background": window.backgroundColor.description, "shadow": window.hasShadow,
+                 "occlusionVisible": window.occlusionState.contains(.visible), "key": window.isKeyWindow,
+                 "animations": IdleWork.animations(in: window, longerThan: 1), "blurs": IdleWork.liveBlurs(in: window),
+                 "hdr": IdleWork.extendedRangeLayers(in: window), "glass": (window.contentView as? SpaceFrameView)?.debugGlass ?? [:]]
+            }
+            if let path = f.dropFirst().first, let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: URL(fileURLWithPath: path))
+            }
+        case "back": windows.forEach { $0.orderBack(nil) }
+        case "clearbg":
+            let only = f.dropFirst().first
+            windows.filter { !$0.isOpaque && $0.hasShadow && (only == nil || "\(type(of: $0))" == only) }.forEach { $0.backgroundColor = .clear }
+        case "stopanims":
+            func walk(_ layer: CALayer) {
+                for key in layer.animationKeys() ?? [] where layer.animation(forKey: key).map(IdleWork.isEndless) == true {
+                    layer.removeAnimation(forKey: key)
+                }
+                (layer.sublayers ?? []).forEach(walk)
+            }
+            windows.compactMap { $0.contentView?.superview?.layer }.forEach(walk)
+        default: break
+        }
     }
 }
 #endif

@@ -70,6 +70,14 @@
   // The icons of open tabs, by address, for the favIconUrl WebKit's tabs leave out (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagFavicons', { value: (urls) => send('favicons', 'forPages', [urls]), configurable: true });
 
+  // Native messaging the manifest lists as optional, held only as the person allowed it (webkit-differences.js).
+  if ((manifest.optional_permissions || []).includes('nativeMessaging')) {
+    Object.defineProperty(globalThis, '__zigzagNativeHosts', {
+      value: { held: () => send('nativeHosts', 'held', []), request: () => send('nativeHosts', 'request', []), remove: () => send('nativeHosts', 'remove', []) },
+      configurable: true,
+    });
+  }
+
   // Context menu items persisted across relaunches, like Chrome (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagContextMenus', {
     value: { change: (op, args) => send('contextMenusKept', 'change', [op, ...args]), restore: () => send('contextMenusKept', 'restore', []) },

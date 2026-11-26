@@ -1871,8 +1871,9 @@ extension Tab: WKNavigationDelegate {
     nonisolated static func skipsDownloadQuestion(kept: Bool?) -> Bool { kept != false }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
-        // The last session's session cookies go back in before its first request.
+        // The last session's session cookies go back in before its first request, and those an ended network process took.
         let dataStore = webView.configuration.websiteDataStore
+        NetworkProcessCookies.check(dataStore)
         if SessionCookies.isRestoring(dataStore) { await SessionCookies.ready(dataStore) }
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
@@ -2315,6 +2316,7 @@ extension Tab: WKNavigationDelegate {
             if SitePermissions.pageWithoutSiteMayDownload(isFile: (webView.url ?? url).isFileURL) { return true }
             refusedDownload(in: webView, text: DownloadPolicy.blockedText,
                             note: "A page with no site of its own tried to save a file")
+            DownloadManager.shared.dropFileHandoff(for: url, from: webView)
             return false
         }
         let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self,
@@ -2322,6 +2324,7 @@ extension Tab: WKNavigationDelegate {
         if !allowed {
             refusedDownload(in: webView, text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
                             action: askAgain(origin: origin, request: retry, in: webView))
+            DownloadManager.shared.dropFileHandoff(for: url, from: webView)
         }
         return allowed
     }
@@ -2391,6 +2394,12 @@ extension Tab: WKNavigationDelegate {
         }
         switch decision.gate {
         case .handOff:
+            // A File rule needs the download first: let WebKit make it, and the download manager runs the rule on the
+            // saved file when it finishes.
+            if DownloadHandoff.defersToSavedFile(rule, forDownload: !appliesToLinks) {
+                DownloadManager.shared.expectFileHandoff(rule, request: handoff, from: webView)
+                return false
+            }
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
             // A matched rule that didn't take it (declined Open URL) acts as no match; the download manager must not

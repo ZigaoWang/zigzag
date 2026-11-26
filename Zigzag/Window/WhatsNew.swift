@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// After an update: a note that Zigzag updated, and this version's notes on a sheet. The notes are this version's
-/// section of CHANGELOG.md, or of the matching localized changelog when the app speaks Chinese.
+/// section of CHANGELOG.md, or of the app language's changelog from docs/i18n/changelog.
 enum WhatsNew {
     /// A GitHub issue or pull request a note is about: "#32" at its end, linked.
     struct Issue: Equatable {
@@ -38,18 +38,25 @@ enum WhatsNew {
         }
         let file = notesFile(for: Bundle.main.preferredLocalizations.first ?? "en")
         return pick(english: text("CHANGELOG") ?? "", localized: file.flatMap(text), version: notesVersion,
-                    requireCompleteTranslation: file == "CHANGELOG.zh-Hant")
+                    requireCompleteTranslation: file != "CHANGELOG.zh-Hans")
     }()
+
+    /// The languages with a changelog of their own, by language code: Chinese by script, Portuguese is Brazil's.
+    private static let notesLanguages = ["ja", "ko", "de", "fr", "it", "es", "ru", "nl", "pl", "tr"]
 
     /// The changelog in the app's language, next to CHANGELOG.md in the app: none for English, and none for a
     /// language without one.
     static func notesFile(for language: String) -> String? {
         let localeLanguage = Locale.Language(identifier: language)
-        guard localeLanguage.languageCode?.identifier == "zh" else { return nil }
-        return localeLanguage.script?.identifier == "Hant" ? "CHANGELOG.zh-Hant" : "CHANGELOG.zh-Hans"
+        switch localeLanguage.languageCode?.identifier {
+        case "zh": return localeLanguage.script?.identifier == "Hant" ? "CHANGELOG.zh-Hant" : "CHANGELOG.zh-Hans"
+        case "pt": return "CHANGELOG.pt-BR"
+        case let code? where notesLanguages.contains(code): return "CHANGELOG.\(code)"
+        default: return nil
+        }
     }
 
-    /// Traditional Chinese can lag behind the English notes. Fall back for the whole release: without IDs on
+    /// A translation can lag behind the English notes. Fall back for the whole release: without IDs on
     /// the bullets, there is no reliable way to tell which English bullet a partial translation is missing.
     static func pick(english: String, localized: String?, version: String, requireCompleteTranslation: Bool = false) -> Release {
         let source = parse(english, version: version)
@@ -63,12 +70,16 @@ enum WhatsNew {
         return translation
     }
 
-    private static func sectionKind(_ title: String) -> String {
-        switch title {
-        case "新功能": "New"
-        case "修复", "修正": "Fixed"
-        default: title
-        }
+    /// New and Fixed as each changelog writes them: the app's own What's New headings in that language.
+    static let newHeadings: Set = ["新功能", "新機能", "새로운 기능", "Neu", "Nouveautés", "Novità", "Nuevo", "Novo", "Новое", "Nieuw",
+                                   "Nowe", "Yeni Özellikler"]
+    static let fixedHeadings: Set = ["修复", "修正", "수정 사항", "Behoben", "Corrections", "Correzioni", "Correcciones", "Corrigido",
+                                     "Исправлено", "Opgelost", "Naprawiono", "Düzeltmeler"]
+
+    static func sectionKind(_ title: String) -> String {
+        if newHeadings.contains(title) { return "New" }
+        if fixedHeadings.contains(title) { return "Fixed" }
+        return title
     }
 
     /// A section's heading as the sheet shows it: New and Fixed in the app's language, whichever changelog they came

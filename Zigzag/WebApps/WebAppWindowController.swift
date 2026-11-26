@@ -116,10 +116,22 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         refreshStrip()
         refreshBar(animated: false)
         strip.trafficLightsWidth = window.trafficLightsWidth
+        window.onTrafficLightsOnScreenChange = { [weak self] in self?.refreshTrafficLightsRoom() }
         applyToolbar()
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// The lights' room in the toolbar, none while full screen's title bar is up (#542).
+    private func refreshTrafficLightsRoom() {
+        guard let window = window as? BrowserWindow else { return }
+        let width = window.trafficLightsOnScreen ? window.trafficLightsWidth : 0
+        guard width != strip.trafficLightsWidth else { return }
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, moves: true) {
+            self.strip.trafficLightsWidth = width
+            self.strip.layoutSubtreeIfNeeded()
+        }
+    }
 
     var space: SpaceInfo { Library.shared.space(tab.spaceID) ?? Library.shared.spaces[0] }
 

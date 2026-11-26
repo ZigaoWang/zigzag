@@ -13,14 +13,23 @@ final class PageTitleView: NSView {
     private static let size = Tokens.Sidebar.scaled(26, for: .medium)
     private let label = Label("", font: Tokens.Font.voice(size), color: Tokens.Color.textPrimary)
     private var written = ""
+    /// The width the title needs at its full size, and the size it's drawn at.
+    private var naturalWidth: CGFloat = 0
+    private var shownSize = PageTitleView.size
 
     var title: String {
         get { written }
         set {
             written = newValue
-            label.attributedStringValue = Tokens.Font.voiceText(newValue, size: Self.size)
+            show(at: Self.size)
+            naturalWidth = label.textWidth
             setAccessibilityLabel(newValue); needsLayout = true
         }
+    }
+
+    private func show(at size: CGFloat) {
+        shownSize = size
+        label.attributedStringValue = Tokens.Font.voiceText(written, size: size)
     }
 
     init(_ title: String) {
@@ -36,10 +45,13 @@ final class PageTitleView: NSView {
     override var isFlipped: Bool { true }
 
     /// The width it needs.
-    var fittingWidth: CGFloat { label.textWidth }
+    var fittingWidth: CGFloat { naturalWidth }
 
     override func layout() {
         super.layout()
+        // A title longer than the room, as in a longer language, steps down in size, to 70% at most, rather than being cut.
+        if shownSize != Self.size { show(at: Self.size) }
+        while bounds.width > 0, shownSize > Self.size * 0.7, label.inkWidth > bounds.width - Label.inset { show(at: shownSize - 1) }
         label.frame = NSRect(x: -Label.inset, y: label.centeredY(in: bounds.height),
                              width: max(0, bounds.width + Label.inset), height: label.lineHeight)
     }
@@ -90,7 +102,8 @@ final class PageHeader: NSView {
         for view in trailing.reversed() where !view.isHidden {
             var wanted = Self.width(of: view)
             if view is FilledField {
-                let spare = contentFrame.maxX - contentFrame.minX - others - titleNeeds - Tokens.Space.x2
+                // Less the gap after the search and the one before the title.
+                let spare = contentFrame.maxX - contentFrame.minX - others - titleNeeds - Tokens.Space.x2 * 2
                 wanted = max(min(wanted, spare), Self.minimumSearchWidth)
             }
             let width = min(wanted, max(0, right - contentFrame.minX))

@@ -277,6 +277,7 @@ struct PermissionPromptTests {
         open = true
         button.openMenu()
         let menu = try #require(MenuPanel.current)
+        defer { menu.close(animated: false) }
         open = false
         #expect(menu.handleKey(key(36, "\r", in: window)))
         #expect(chosen.isEmpty)

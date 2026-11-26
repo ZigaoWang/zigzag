@@ -2,6 +2,8 @@ import AppKit
 
 #if DEBUG
 DevDefaults.isolate()
+// -ZigzagPseudoLocalize YES: every string accented, bracketed and longer (docs/i18n/README.md).
+PseudoLocale.startIfAsked()
 // Debug builds only: a gesture recognizer stuck or missing an override crashes with a stack trace instead of being
 // cancelled (TN3212). Off with ZIGZAG_GESTURE_CRASH=0, and while hosting tests. In memory, never saved.
 if ProcessInfo.processInfo.environment["ZIGZAG_GESTURE_CRASH"] != "0", ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {

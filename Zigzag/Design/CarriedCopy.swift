@@ -48,9 +48,7 @@ final class CarriedCopy {
         let height = anchor.y + max(size.height - grab.y, alternateSize.height - alternateGrab.y) + m
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.setSeeThrough(shadow: false)
         panel.level = .floating
         panel.ignoresMouseEvents = true
         panel.appearance = appearance

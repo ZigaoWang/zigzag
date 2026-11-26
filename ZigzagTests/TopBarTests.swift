@@ -314,6 +314,32 @@ struct TopBarTests {
         #expect(root.card.band == 0 && root.topBar.pageColor == nil)
     }
 
+    @Test func underABarOnThePagesCardTheGlassStaysBesideTheSidebar() {
+        let sidebar = SidebarView()
+        let root = BrowserRootView(sidebar: sidebar)
+        root.frame = window
+        sidebar.holdsAddress = false
+        root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+        root.layoutSubtreeIfNeeded()
+        let withoutBar = root.glassFrame
+        #expect(withoutBar.width < window.width / 2)
+
+        // The bar in the page's color is the card's top: no glass behind the page or the bar.
+        root.showsTopBar = true
+        root.paintTopBar(.black)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.glassFrame == withoutBar)
+        #expect(!root.glassFrame.contains(NSPoint(x: root.card.frame.midX, y: root.topBar.frame.midY)))
+
+        // A bar on the frame, or a see-through color, still has glass under it.
+        root.paintTopBar(nil)
+        root.layoutSubtreeIfNeeded()
+        #expect(root.glassFrame.contains(root.topBar.frame))
+        root.paintTopBar(NSColor.black.withAlphaComponent(0.5))
+        root.layoutSubtreeIfNeeded()
+        #expect(root.glassFrame.contains(root.topBar.frame))
+    }
+
     @Test func offTheLayoutIsUnchanged() {
         #expect(BrowserRootView.pageArea(in: window, sidebarVisible: true, sidebarWidth: 240, edgeToEdge: false, borderless: true, topBar: false)
                 == NSRect(x: 240, y: 0, width: 1040, height: 800))

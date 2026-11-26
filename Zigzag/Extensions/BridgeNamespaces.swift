@@ -8,6 +8,29 @@ import UserNotifications
 // The smaller Chrome namespaces the bridge answers (ExtensionBridge). Each is the Chrome API's shape over what
 // Zigzag or macOS already has; anything left out says so by name rather than doing nothing.
 
+// MARK: - nativeHosts
+
+/// Native messaging a manifest lists as optional, which WebKit grants every extension for Zigzag's bridge: held only
+/// as the person allowed it, for permissions.contains, request, remove and getAll (webkit-differences.js).
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeNativeHosts: BridgeNamespace {
+    static let name = "nativeHosts"
+    static let permission = ""
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    init(host: ExtensionHost) { self.host = host }
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        switch fn {
+        case "held": return host.allowsNativeHosts(extensionID)
+        case "request": return await host.askForNativeHosts(extensionID)
+        case "remove": return host.forgetNativeHosts(extensionID)
+        default: throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+}
+
 // MARK: - history
 
 /// `chrome.history`, over Zigzag's own history. Private windows never record history, so none shows here.
@@ -1086,9 +1109,7 @@ final class BridgeOffscreen: BridgeNamespace {
             // Never seen, wherever macOS puts it: a video going full screen brings windows onto its space, and this
             // one would show there as a white box. Clear, it still counts as shown, so the page's sound keeps playing.
             window.alphaValue = 0
-            window.isOpaque = false
-            window.backgroundColor = .clear
-            window.hasShadow = false
+            window.setSeeThrough(shadow: false)
             window.collectionBehavior = [.transient, .ignoresCycle, .fullScreenNone, .stationary]
             window.orderBack(nil)
             self.window = window
@@ -2369,7 +2390,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         guard let context = host.context(for: extensionID),
               PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate || tab.isPrivate, allowed: context.hasAccessToPrivateData),
               let webView = tab.webView, let url = webView.url ?? tab.url else { throw BridgeError("Cannot capture a tab here") }
-        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites(in: host.profile),
+        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSitesInEffect(in: host.profile),
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: host.profile.installs.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
         }

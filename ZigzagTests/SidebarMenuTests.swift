@@ -701,15 +701,15 @@ struct SidebarRowMenuTests {
                                               validators: .init()), to: folder.id)
             let shown = try #require(Library.shared.folder(folder.id))
             #expect(titles(SidebarMenus.folderMenu(for: shown, controller: controller))
-                    == ["Open All in Tabs", "-", "Close Folder", "-", "Mark All as Read", "Refresh Now", "-", "Edit…", SidebarMenus.changeIconTitle, "-", "Delete Live Folder"])
+                    == ["Updated Just Now", "-", "Open All in Tabs", "-", "Close Folder", "-", "Mark All as Read", "Refresh Now", "-", "Edit…", SidebarMenus.changeIconTitle, "-", "Delete Live Folder"])
             let page = try #require(shown.bookmarkIDs.first.flatMap(Library.shared.bookmark))
             let pageMenu = titles(SidebarMenus.bookmarkMenu(for: page, controller: controller))
             #expect(pageMenu.contains("Mark as Read"))
             for title in ["Rename", "Unpin Tab", "Add to Folder", "Add to New Folder", "Move to Space", SidebarMenus.removePinsTitle(1)] { #expect(!pageMenu.contains(title), "\(title)") }
-            // Couldn't refresh: why, and Try Again in Refresh Now's place.
+            // Couldn't refresh: when it last could, why not, and Try Again in Refresh Now's place.
             LiveFolders.shared.apply(.failed(.status(500), retryAfter: nil), to: folder.id)
             let failed = titles(SidebarMenus.folderMenu(for: shown, controller: controller))
-            #expect(Array(failed.prefix(3)) == ["Couldn’t Refresh", LiveProblem.status(500).message, "Try Again"])
+            #expect(Array(failed.prefix(5)) == ["Updated Just Now", "-", "Couldn’t Refresh", LiveProblem.status(500).message, "Try Again"])
             #expect(!failed.contains("Refresh Now"))
             // Deleted with its pages, and back with ⌘Z.
             controller.deleteLiveFolderWithUndo(folder.id)
@@ -717,6 +717,217 @@ struct SidebarRowMenuTests {
             #expect(Library.shared.bookmark(page.id) == nil)
             controller.sidebarUndo.undo()
             #expect(Library.shared.folder(folder.id)?.bookmarkIDs == shown.bookmarkIDs)
+        }
+    }
+
+    /// A live folder's menu opens with when it was last updated, or Updating… while it fetches, and Refresh Now
+    /// fetches it.
+    @Test func aLiveFoldersMenuSaysWhenItWasUpdated() async throws {
+        let live = LiveFolders.shared
+        let (clock, fetcher) = (live.now, live.fetcher)
+        defer { live.now = clock; live.fetcher = fetcher; LiveFoldersTests.Server.reset() }
+        let config = LiveFetcher.configuration(userAgent: "Zigzag tests")
+        config.protocolClasses = [LiveFoldersTests.Server.self]
+        live.fetcher = LiveFetcher(configuration: config)
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/menu/0")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let folder = try #require(Library.shared.addLiveFolder(named: "News", source: .feed(URL(string: "https://example.com/menu/updated")!), limit: 25,
+                                                               namedByFeed: false, in: space))
+        // Never fetched: no line.
+        #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first != "Updating…")
+        #expect(!titles(SidebarMenus.folderMenu(for: folder, controller: controller)).contains { $0.hasPrefix("Updated") })
+        let fetched = Date()
+        live.now = { fetched }
+        live.apply(.unchanged, to: folder.id)
+        live.now = { fetched.addingTimeInterval(5 * 60) }
+        let menu = SidebarMenus.folderMenu(for: folder, controller: controller)
+        #expect(Array(titles(menu).prefix(2)) == ["Updated 5 Minutes Ago", "-"])
+        #expect(menu.items.first?.isEnabled == false)
+        // Refresh Now fetches, and the menu says so while it does.
+        try run(menu.items.first { $0.title == "Refresh Now" })
+        for _ in 0..<1000 where !live.isRefreshing(folder.id) { await Task.yield() }
+        #expect(titles(SidebarMenus.folderMenu(for: folder, controller: controller)).first == "Updating…")
+        for _ in 0..<500 where live.isRefreshing(folder.id) { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(LiveFoldersTests.Server.requests.last?.url?.absoluteString == "https://example.com/menu/updated")
+    }
+
+    /// A live folder in a window of its own, fetched from the test server, which holds each request until `gate`
+    /// lets it through.
+    private func withLiveFolder(_ address: String, _ body: (BrowserWindowController, BookmarkFolder, DispatchSemaphore) async throws -> Void) async throws {
+        let live = LiveFolders.shared
+        let (clock, fetcher) = (live.now, live.fetcher)
+        defer { live.now = clock; live.fetcher = fetcher; LiveFoldersTests.Server.reset() }
+        let config = LiveFetcher.configuration(userAgent: "Zigzag tests")
+        config.protocolClasses = [LiveFoldersTests.Server.self]
+        live.fetcher = LiveFetcher(configuration: config)
+        let gate = DispatchSemaphore(value: 0)
+        LiveFoldersTests.Server.gate = gate
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/menu/0")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let folder = try #require(Library.shared.addLiveFolder(named: "News", source: .feed(URL(string: address)!), limit: 25, namedByFeed: false, in: space))
+        controller.sidebar.list.reload(animated: false)
+        try await body(controller, folder, gate)
+    }
+
+    private func waitForFetch(_ id: UUID, running: Bool) async throws {
+        for _ in 0..<500 where LiveFolders.shared.isRefreshing(id) != running { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(LiveFolders.shared.isRefreshing(id) == running)
+    }
+
+    /// The open menu's first line follows the fetch: Updating…, then Updated Just Now, or Couldn’t Refresh, without
+    /// closing, and the item the keys were on stays lit.
+    @Test func anOpenLiveFoldersMenuFollowsItsFetch() async throws {
+        try await withLiveFolder("https://example.com/menu/open") { controller, folder, gate in
+            let rss = Data("<rss version=\"2.0\"><channel><title>T</title><item><title>N</title><link>https://example.com/menu/n</link><guid>n</guid></item></channel></rss>".utf8)
+            LiveFoldersTests.Server.answer("https://example.com/menu/open", .init(body: rss))
+            let row = try #require(controller.sidebar.list.folderRow(folder.id))
+            LiveFolders.shared.refreshNow(folder.id)
+            try await waitForFetch(folder.id, running: true)
+            let panel = try #require(MenuPanel.show(menu: SidebarMenus.folderMenu(for: folder, controller: controller), from: row))
+            defer { panel.close(animated: false) }
+            #expect(panel.itemTitles.first == "Updating…")
+            #expect(panel.debugIsEnabled("Mark All as Read") == false)
+            panel.debugKey(125)
+            let lit = try #require(panel.highlightedIndex.map { panel.itemTitles[$0] })
+            gate.signal()
+            try await waitForFetch(folder.id, running: false)
+            #expect(MenuPanel.current === panel)
+            #expect(panel.itemTitles.first == "Updated Just Now")
+            #expect(panel.highlightedIndex.map { panel.itemTitles[$0] } == lit)
+            // Its new page: Mark All as Read can be chosen now.
+            #expect(panel.debugIsEnabled("Mark All as Read") == true)
+            // A failure shows in place: why, and Try Again.
+            LiveFoldersTests.Server.answer("https://example.com/menu/open", .init(status: 500))
+            LiveFolders.shared.refreshNow(folder.id)
+            try await waitForFetch(folder.id, running: true)
+            #expect(panel.itemTitles.first == "Updating…")
+            gate.signal()
+            try await waitForFetch(folder.id, running: false)
+            #expect(MenuPanel.current === panel)
+            #expect(Array(panel.itemTitles.prefix(3)) == ["Updated Just Now", LiveProblem.status(500).message, "Try Again"])
+            #expect(panel.highlightedIndex.map { panel.itemTitles[$0] } == lit)
+        }
+    }
+
+    /// The row's chip turns only while its folder fetches, and nothing is left animating after; with Reduce Motion it
+    /// shows the updating mark standing still.
+    @Test func aLiveFoldersRowSpinsOnlyWhileItFetches() async throws {
+        try await withLiveFolder("https://example.com/menu/spin") { controller, folder, gate in
+            let row = try #require(controller.sidebar.list.folderRow(folder.id) as? FolderRowView)
+            #expect(!row.isUpdating && !row.isChipSpinning)
+            LiveFolders.shared.refreshNow(folder.id)
+            try await waitForFetch(folder.id, running: true)
+            #expect(row.isUpdating && row.isChipSpinning)
+            gate.signal()
+            try await waitForFetch(folder.id, running: false)
+            #expect(!row.isUpdating && !row.isChipSpinning)
+            func animating(_ layer: CALayer?) -> Bool {
+                guard let layer else { return false }
+                return !(layer.animationKeys() ?? []).isEmpty || (layer.sublayers ?? []).contains(where: animating)
+            }
+            #expect(!animating(row.layer))
+            Tokens.Motion.debugReduceMotion = true
+            defer { Tokens.Motion.debugReduceMotion = false }
+            LiveFolders.shared.refreshNow(folder.id)
+            try await waitForFetch(folder.id, running: true)
+            #expect(row.isUpdating && !row.isChipSpinning)
+            gate.signal()
+            try await waitForFetch(folder.id, running: false)
+            #expect(!row.isUpdating)
+        }
+    }
+
+    /// The sheet's heading wears the folder's icon as its row does, and clicking it opens the folder's icon grid;
+    /// what's picked there is kept on Save, and a new folder takes it when it's added.
+    @Test func theLiveFolderSheetsIconIsTheFoldersAndChangesIt() throws {
+        try inWindow(["A"]) { controller, _, space in
+            let site = try #require(URL(string: "https://github.com/"))
+            FaviconStore.shared.remember(NSImage(size: NSSize(width: 16, height: 16)), for: site)
+            let mark = try #require(FaviconStore.shared.cachedIcon(for: site))
+            let folder = try #require(Library.shared.addLiveFolder(named: "Mine", source: .gitHub(.issues, user: "octocat"), limit: 10,
+                                                                   namedByFeed: false, in: space))
+            controller.sidebar.list.reload(animated: false)
+            let row = try #require(controller.sidebar.list.folderRow(folder.id) as? FolderRowView)
+            controller.editLiveFolder(folder.id)
+            let sheet = try #require(LiveFolderSheet.current)
+            sheet.layoutSubtreeIfNeeded()
+            #expect(sheet.header.pictureImage === mark)
+            #expect(row.icon.image === mark)
+            let button = try #require(sheet.header.pictureButton)
+            #expect(button.toolTip == SidebarMenus.changeIconTitle)
+            #expect(button.accessibilityPerformPress())
+            let picker = try #require(IconPickerPanel.current)
+            #expect(picker.isDescendant(of: sheet))
+            picker.grid.pick("star")
+            #expect(sheet.header.pictureImage !== mark)
+            sheet.debugAnswer(true)
+            #expect(Library.shared.folder(folder.id)?.icon == "star")
+            // A new one: the feed mark until there's a source, then the picked icon once added.
+            controller.newLiveFolder()
+            let fresh = try #require(LiveFolderSheet.current)
+            defer { fresh.close() }
+            #expect(fresh.header.pictureImage != nil)
+            #expect(try #require(fresh.header.pictureButton).accessibilityPerformPress())
+            try #require(IconPickerPanel.current).grid.pick("flame")
+            func fields(_ view: NSView) -> [FilledField] { view.subviews.flatMap { (($0 as? FilledField).map { [$0] } ?? []) + fields($0) } }
+            let field = try #require(fields(fresh).first)
+            field.stringValue = "example.com/menu/new.xml"
+            fresh.revalidate()
+            fresh.debugAnswer(true)
+            let made = try #require(Library.shared.liveFolders.first { $0.live?.source.address?.absoluteString == "https://example.com/menu/new.xml" })
+            #expect(made.icon == "flame")
+        }
+    }
+
+    /// The live folder sheet: the source first, then what to show; dropdowns as wide as the fields; a note that says
+    /// what the list shows and how often it checks; the name it will use when left empty; a username GitHub can't
+    /// have keeps Save off.
+    @Test func theLiveFolderSheetSaysWhatItShowsAndHowOften() throws {
+        try inWindow(["A"]) { controller, _, space in
+            let folder = try #require(Library.shared.addLiveFolder(named: "Mine", source: .gitHub(.repositoryIssues, user: "octocat"), limit: 10,
+                                                                   namedByFeed: false, in: space))
+            controller.editLiveFolder(folder.id)
+            let sheet = try #require(LiveFolderSheet.current)
+            defer { sheet.close() }
+            sheet.layoutSubtreeIfNeeded()
+            func all<T: NSView>(_ kind: T.Type, in view: NSView) -> [T] { view.subviews.flatMap { (($0 as? T).map { [$0] } ?? []) + all(kind, in: $0) } }
+            func note() -> String? { all(NSTextField.self, in: sheet).map { $0.stringValue }.first { $0.contains("Checks every") } }
+            #expect(note() == "Open issues in public repositories octocat owns, newest activity first. Checks every 30 minutes, or hourly in Low Power Mode.")
+            let fields = all(FilledField.self, in: sheet)
+            let user = try #require(fields.first { $0.stringValue == "octocat" })
+            let name = try #require(fields.first { $0.stringValue == "Mine" })
+            let dropdowns = all(DropdownButton.self, in: sheet).filter { !$0.isHidden }
+            #expect(dropdowns.count == 2)
+            // Username above List, every control the width of the fields.
+            for dropdown in dropdowns {
+                #expect(dropdown.frame.width == user.frame.width)
+                #expect(dropdown.frame.minY > user.frame.minY)
+            }
+            name.stringValue = ""
+            sheet.revalidate()
+            #expect(name.placeholder == LiveFolderSheet.listTitle(.repositoryIssues))
+            user.stringValue = "not a user!"
+            sheet.revalidate()
+            #expect(user.isInvalid)
+            #expect(note()?.hasPrefix("Open issues in public repositories this user owns") == true)
+            sheet.debugAnswer(true)
+            #expect(Library.shared.folder(folder.id)?.live?.source == .gitHub(.repositoryIssues, user: "octocat"))
         }
     }
 
@@ -986,14 +1197,22 @@ struct BackHoldEventTests {
         let tab = Tab(url: urls[0], title: "0", spaceID: space)
         manager.adopt([tab], in: space)
         manager.select(tab)
-        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        // Off screen, out of the pointer's way, and in front of this process's other windows only.
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 1000, height: 700))
         defer { controller.window?.close() }
-        controller.window?.orderBack(nil)
+        let window = try #require(controller.window)
+        if let top = NSApp.orderedWindows.first(where: { $0 !== window }) {
+            window.order(.above, relativeTo: top.windowNumber)
+        } else {
+            window.orderBack(nil)
+        }
+        window.setFrameOrigin(NSPoint(x: -6000, y: 200))
+        #expect(MenuPanel.current == nil, "a menu left open by an earlier test")
         for url in urls {
             if url != urls[0] { tab.load(url) }
             #expect(await until { tab.webView?.url == url && tab.webView?.isLoading == false })
         }
-        controller.window?.layoutIfNeeded()
+        window.layoutIfNeeded()
         try await body(controller, tab)
     }
 
@@ -1003,7 +1222,7 @@ struct BackHoldEventTests {
         var leftDown = false
     }
 
-    /// Through the app's event queue; `delivered` false drops the drags and release, as the window server can.
+    /// Straight to the window, as AppKit hands it a click; `delivered` false drops the drags and release, as the window server can.
     private func send(_ type: NSEvent.EventType, at point: NSPoint, to window: NSWindow, pointer: Pointer, delivered: Bool = true) {
         pointer.location = window.convertPoint(toScreen: point)
         pointer.leftDown = type != .leftMouseUp
@@ -1011,7 +1230,11 @@ struct BackHoldEventTests {
               let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                              windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
         else { return }
-        NSApp.postEvent(event, atStart: false)
+        if type == .leftMouseDown, let frame = window.contentView?.superview {
+            let hit = frame.hitTest(frame.convert(point, from: nil))
+            #expect(hit is InteractiveView, "the press lands on \(hit.map { "\(Swift.type(of: $0))" } ?? "nothing")")
+        }
+        window.sendEvent(event)
     }
 
     private func middle(of view: NSView) -> NSPoint { view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil) }

@@ -171,6 +171,13 @@ final class HistoryStore {
         return HistoryRemoval(visits: visits, archive: TabArchive.shared.take(urls, where: isOurs), pdfPlaces: [:], icons: nil, profile: profile)
     }
 
+    /// Takes every page on one site out of History, with or without "www.".
+    func remove(host: String) -> HistoryRemoval {
+        let site = host.lowercased().withoutWWW
+        let urls = database.sync { db in HistoryDatabase.select(db, "host = ?1") { HistoryDatabase.bind($0, 1, site) } }.map(\.url)
+        return remove(urls)
+    }
+
     /// Puts back what a removal took, as it was.
     func restore(_ removal: HistoryRemoval) {
         importVisits(removal.visits.map { ($0.url, $0.title, $0.visitCount, $0.lastVisit) })
@@ -242,6 +249,15 @@ final class HistoryStore {
         // What was recorded just before is in by then.
         await database.written()
         return await reader.search(Self.words(query), limit: limit, asker: asker, ticket: ticket, then: then)
+    }
+
+    /// The History page's search (`HistorySearch`), off the main thread. Nil when a newer one from `asker` took over.
+    func pageSearch<T: Sendable>(_ query: String, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
+        let words = HistorySearch.words(query)
+        guard let reader else { return then(database.sync { HistorySearch.find(words, in: HistorySearch.rows(in: $0)) }) }
+        let ticket = reader.claim(asker)
+        await database.written()
+        return await reader.pageSearch(words, asker: asker, ticket: ticket, then: then)
     }
 
     nonisolated fileprivate static func runSearch(_ words: [String], limit: Int, in db: OpaquePointer?) -> [HistoryEntry] {
@@ -562,6 +578,22 @@ nonisolated final class HistoryReader: @unchecked Sendable {
 
     func search<T: Sendable>(_ words: [String], limit: Int, asker: Int, ticket: Int? = nil, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
         await read(asker: asker, ticket: ticket, { HistoryStore.runSearch(words, limit: limit, in: $0) }, then: then)
+    }
+
+    /// Every page, folded for the History page's search, kept while the file is unchanged. Only touched on `queue`.
+    private var searchRows: (version: Int64, rows: [HistorySearch.Row])?
+
+    func pageSearch<T: Sendable>(_ words: [[UInt8]], asker: Int, ticket: Int? = nil, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
+        await read(asker: asker, ticket: ticket, { db in HistorySearch.find(words, in: self.rows(db)) }, then: then)
+    }
+
+    /// Read again only after another connection changed the file; never kept when a newer search cut it short.
+    private func rows(_ db: OpaquePointer?) -> [HistorySearch.Row] {
+        let version = HistorySearch.version(of: db)
+        if let searchRows, searchRows.version == version, version >= 0 { return searchRows.rows }
+        let rows = HistorySearch.rows(in: db)
+        searchRows = sqlite3_errcode(db) == SQLITE_INTERRUPT ? nil : (version, rows)
+        return rows
     }
 
     /// Claims the newest ticket for `asker` and cancels its previous read, whose answer would be dropped anyway.

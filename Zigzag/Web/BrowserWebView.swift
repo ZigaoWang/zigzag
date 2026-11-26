@@ -85,11 +85,106 @@ final class BrowserWebView: WKWebView {
         }
     }
 
+    // WKWebView's text input methods aren't public, so these take their selectors; WebKit's hasMarkedText reads false.
+    private var markedLetters: String?
+    private var composingSource: IMECommit.Source?
+    private var urlObservation: NSKeyValueObservation?
+
+    override init(frame: NSRect, configuration: WKWebViewConfiguration) {
+        _ = Self.interposed
+        super.init(frame: frame, configuration: configuration)
+        // A composition doesn't outlive its page.
+        urlObservation = observe(\.url) { webView, _ in MainActor.assumeIsolated { webView.forgetComposition() } }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// The page took the composition away (a click, a new page): what was marked is no longer coming.
+    private func forgetComposition() {
+        markedLetters = nil
+        composingSource = nil
+    }
+
+    #if DEBUG
+    var debugMarkedLetters: String? { markedLetters }
+    #endif
+
+    /// WebKit's text input selectors and the ones here that stand in for them.
+    static let imeSelectors: [(webKit: Selector, ours: Selector)] = [
+        (NSSelectorFromString("setMarkedText:selectedRange:replacementRange:"), #selector(imeSetMarkedText(_:selectedRange:replacementRange:))),
+        (NSSelectorFromString("insertText:replacementRange:"), #selector(imeInsertText(_:replacementRange:))),
+        (NSSelectorFromString("unmarkText"), #selector(imeUnmarkText)),
+    ]
+
+    static let interposed: [Selector] = interpose(into: BrowserWebView.self, over: WKWebView.self)
+
+    /// Adds the stand-ins to `cls` for each selector `base` implements; the others are left to `base`. Returns the
+    /// selectors it took.
+    static func interpose(into cls: AnyClass, over base: AnyClass) -> [Selector] {
+        imeSelectors.compactMap { webKit, ours in
+            guard class_getInstanceMethod(base, webKit) != nil, let method = class_getInstanceMethod(BrowserWebView.self, ours) else { return nil }
+            return class_addMethod(cls, webKit, method_getImplementation(method), method_getTypeEncoding(method)) ? webKit : nil
+        }
+    }
+
+    @objc(zigzagSetMarkedText:selectedRange:replacementRange:)
+    func imeSetMarkedText(_ string: AnyObject, selectedRange: NSRange, replacementRange: NSRange) {
+        let text = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
+        if text.isEmpty { forgetComposition() } else {
+            composingSource = markedLetters == nil ? IMECommit.currentSource() : composingSource
+            markedLetters = text
+        }
+        typealias Call = @convention(c) (AnyObject, Selector, AnyObject, NSRange, NSRange) -> Void
+        let selector = Self.imeSelectors[0].webKit
+        Self.webKit(selector, as: Call.self)(self, selector, string, selectedRange, replacementRange)
+    }
+
+    @objc(zigzagInsertText:replacementRange:)
+    func imeInsertText(_ string: AnyObject, replacementRange: NSRange) {
+        let plain = (string as? String) ?? (string as? NSAttributedString)?.string
+        // Only the marked letters themselves, committed: never dictation or a text replacement.
+        let composing = markedLetters != nil && plain == markedLetters
+        let source = composing ? composingSource ?? IMECommit.currentSource() : nil
+        forgetComposition()
+        superInsertText(IMECommit.cleaned(string as Any, composing: composing, source: source) as AnyObject, replacementRange)
+    }
+
+    /// Switching to English mid-word commits the marked text this way.
+    @objc(zigzagUnmarkText)
+    func imeUnmarkText() {
+        let marked = markedLetters
+        let source = composingSource ?? IMECommit.currentSource()
+        forgetComposition()
+        if let marked {
+            let text = IMECommit.cleaned(marked, composing: true, source: source)
+            if text != marked { superInsertText(text as NSString, NSRange(location: NSNotFound, length: 0)); return }
+        }
+        typealias Call = @convention(c) (AnyObject, Selector) -> Void
+        let selector = Self.imeSelectors[2].webKit
+        Self.webKit(selector, as: Call.self)(self, selector)
+    }
+
+    private func superInsertText(_ string: AnyObject, _ replacementRange: NSRange) {
+        typealias Call = @convention(c) (AnyObject, Selector, AnyObject, NSRange) -> Void
+        let selector = Self.imeSelectors[1].webKit
+        Self.webKit(selector, as: Call.self)(self, selector, string, replacementRange)
+    }
+
+    override func resignFirstResponder() -> Bool {
+        forgetComposition()
+        return super.resignFirstResponder()
+    }
+
+    /// WebKit's own implementation; only called for selectors `interpose` found it has.
+    private static func webKit<Call>(_ selector: Selector, as: Call.Type) -> Call {
+        unsafeBitCast(class_getMethodImplementation(WKWebView.self, selector), to: Call.self)
+    }
+
     override func scrollWheel(with event: NSEvent) {
         // A sideways swipe to go back or forward is taken here; everything else scrolls the page.
         if TouchSwipeRecognizer.claims(event) || swipe.handle(event) { return }
         owner?.scrolledSinceSave = true
-        super.scrollWheel(with: event)
+        super.scrollWheel(with: swipe.forPage(event))
     }
 
     // Keys (space, arrows, Page Down) and clicks (the scroll bar, a link to a heading) move the page too: the next
@@ -101,6 +196,7 @@ final class BrowserWebView: WKWebView {
 
     override func mouseDown(with event: NSEvent) {
         owner?.scrolledSinceSave = true
+        forgetComposition()
         if event.modifierFlags.contains(.control) { readSelectionForMenu() }
         super.mouseDown(with: event)
     }
@@ -204,6 +300,7 @@ final class BrowserWebView: WKWebView {
         // In a browser window's page or Zigzag Mini's, which a browser window translates; not a web app's.
         if let owner, WindowManager.shared.controller(for: window) != nil || MiniWindowController.showing(window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
+        if HistoryPage.isHistory(url) { HistoryPage.addMenuItems(to: menu, in: self) }
         Self.placeInspectElementLast(in: menu)
         #if DEBUG
         // What the page's menu holds, with submenus and actions (AutoFill › Passwords… in a field), for scripts.

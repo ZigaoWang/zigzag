@@ -1,17 +1,20 @@
 import Foundation
 
-/// History the way people remember it: in sittings, and within a sitting by the site they were on. A break with
-/// nothing visited (lunch, a meeting) ends a session; pages visited one after another on the same site fold into
-/// one cluster, so an afternoon of reading docs is one row, not forty.
+/// History the way people remember it: by the part of the day (this morning, yesterday evening), and within it by the
+/// site you were on. Pages visited one after another on one site fold into a stack, so an afternoon of reading docs is
+/// one row, not forty; a long break (lunch, a meeting) ends a stack, and a run of one or two pages stays as rows.
 nonisolated enum HistoryClusters {
-    /// How long nothing is visited before the next page starts a new session.
+    /// How long nothing is visited before the next page starts a new stack.
     static let sessionGap: TimeInterval = 40 * 60
+    /// The fewest pages that fold into a stack: folding two would hide a row to save one.
+    static let fewestStacked = 3
 
     struct Cluster {
         let host: String
         var entries: [HistoryEntry]
     }
 
+    /// One part of one day: its heading names it, so no two follow each other with the same name.
     struct Session {
         var clusters: [Cluster]
         var entries: [HistoryEntry] { clusters.flatMap(\.entries) }
@@ -20,17 +23,16 @@ nonisolated enum HistoryClusters {
         var end: Date { clusters[0].entries[0].lastVisit }
     }
 
-    /// Groups entries into sessions, newest first, and each session into runs of the same site. Order comes from the
-    /// entries' last visit, so search results (ranked by how often they're visited) group the same way as browsing.
-    /// A session never runs past midnight, so its title can name one day.
-    static func group(_ entries: [HistoryEntry], calendar: Calendar = .current) -> [Session] {
+    /// Groups entries into parts of days, newest first, and each into stacks of one site. Order comes from the entries'
+    /// last visit. `stacks` off (a search) leaves every page a row of its own, so nothing found is folded away.
+    static func group(_ entries: [HistoryEntry], stacks: Bool = true, calendar: Calendar = .current) -> [Session] {
         var sessions: [Session] = []
         var previous: HistoryEntry?
         for entry in entries.sorted(by: { $0.lastVisit > $1.lastVisit }) {
             let host = HistoryStore.normalizedHost(entry.url)
             if let previous, continues(previous, with: entry, calendar: calendar) {
                 let s = sessions.count - 1
-                if sessions[s].clusters.last!.host == host {
+                if stacks, sessions[s].clusters.last!.host == host, previous.lastVisit.timeIntervalSince(entry.lastVisit) <= sessionGap {
                     sessions[s].clusters[sessions[s].clusters.count - 1].entries.append(entry)
                 } else {
                     sessions[s].clusters.append(Cluster(host: host, entries: [entry]))
@@ -40,13 +42,18 @@ nonisolated enum HistoryClusters {
             }
             previous = entry
         }
+        // A run too short to stack is its rows.
+        for s in sessions.indices {
+            sessions[s].clusters = sessions[s].clusters.flatMap { cluster in
+                cluster.entries.count >= fewestStacked ? [cluster] : cluster.entries.map { Cluster(host: cluster.host, entries: [$0]) }
+            }
+        }
         return sessions
     }
 
-    /// Same session: same day and time of day (morning, afternoon, evening, night) with no long break. Sessions are
-    /// named by when they began, so splitting at time-of-day boundaries keeps every heading accurate.
+    /// Same heading: the same day and time of day (morning, afternoon, evening, night), however long the break.
     static func continues(_ last: HistoryEntry, with entry: HistoryEntry, calendar: Calendar = .current) -> Bool {
-        last.lastVisit.timeIntervalSince(entry.lastVisit) <= sessionGap && calendar.isDate(last.lastVisit, inSameDayAs: entry.lastVisit)
+        calendar.isDate(last.lastVisit, inSameDayAs: entry.lastVisit)
             && part(of: last.lastVisit, calendar: calendar) == part(of: entry.lastVisit, calendar: calendar)
     }
 

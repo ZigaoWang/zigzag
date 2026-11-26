@@ -499,6 +499,39 @@ struct FoldBoxTests {
         #expect(window.firstResponder === first.header)
     }
 
+    @Test func aFoldedBoxMakesNothingUntilOpenedOrSearched() {
+        var made = 0
+        let header = FormRow(title: "View", detail: "2 shortcuts", control: NSView())
+        let box = FoldBox(key: "shortcuts View", header: header, contents: "Reload Page Zoom In", isOpen: false) {
+            made += 1
+            return [self.row("Reload Page"), self.row("Zoom In")]
+        }
+        box.frame = NSRect(x: 0, y: 0, width: 600, height: box.height(for: 600))
+        box.layoutSubtreeIfNeeded()
+        #expect(made == 0 && !box.isBuilt)
+        // Words none of its rows have: passed over, still unmade.
+        #expect(!box.find(["camera"]))
+        #expect(made == 0)
+        // Words one has: made, and open to it.
+        #expect(box.find(["zoom"]))
+        #expect(made == 1 && box.isBuilt)
+        #expect(box.shownRows.map(\.debugTitle) == ["Zoom In"])
+        // Opened, another box makes its rows once.
+        var other = 0
+        let second = FoldBox(key: "shortcuts Edit", header: FormRow(title: "Edit", control: NSView()), contents: nil, isOpen: false) {
+            other += 1
+            return [self.row("Copy")]
+        }
+        #expect(other == 0)
+        second.isOpen = true
+        second.isOpen = false
+        second.isOpen = true
+        #expect(other == 1 && second.shownRows.map(\.debugTitle) == ["Copy"])
+        // Nothing inside: a card with no chevron, which isn't a disclosure triangle.
+        let card = FoldBox(key: "type pdf", header: FormRow(title: "pdf", control: NSView()), contents: nil, isOpen: false, build: nil)
+        #expect(card.header.isLeaf && !card.header.isAccessibilityElement())
+    }
+
     @Test func boxesKeepAGapWhereRowsHaveAHairline() {
         let group = FormGroup(frame: NSRect(x: 0, y: 0, width: 600, height: 0))
         let plain = row("Ask before a site downloads files")
@@ -651,4 +684,147 @@ struct SettingsFoldingTests {
         group.filter([])
         #expect(box.isHidden && !other.isHidden)
     }
+
+    /// The sites shown by the list's own search, each with the titles of the rows open in it.
+    private func found(_ settings: SettingsView, _ text: String) -> [String: [String]] {
+        settings.debugSearchSites(text)
+        return Dictionary(uniqueKeysWithValues: settings.debugSiteBoxes.filter { !$0.isHidden }.map { ($0.headerRow.debugTitle, $0.shownRows.map(\.debugTitle)) })
+    }
+
+    @Test func aPermissionsNameFindsItsSites() throws {
+        try withSites(FoldStyle.searchFrom) { sites in
+            let settings = privacy()
+            // Every site with a camera choice, each under its own name, opened to that row alone.
+            let camera = found(settings, "camera")
+            #expect(camera.count == sites.count && camera.values.allSatisfy { $0 == ["Camera"] })
+            // A choice finds the permissions that have it.
+            #expect(found(settings, "notifications") == [sites[0]: ["Notifications"]])
+            #expect(found(settings, "block") == [sites[0]: ["Notifications"]])
+            #expect(found(settings, "blocked") == [sites[0]: ["Notifications"]])
+            #expect(found(settings, "camera allow").count == sites.count)
+            #expect(found(settings, "camera block").isEmpty)
+            // A site's name still finds its whole box, folded as it was.
+            #expect(found(settings, sites[3]) == [sites[3]: []])
+        }
+    }
+
+    @Test func aPermissionsNameFindsItsSitesInItsLanguage() throws {
+        PseudoLocale.install()
+        try PseudoLocale.$speaking.withValue("de") {
+            try withSites(FoldStyle.searchFrom) { sites in
+                let settings = privacy()
+                let camera = SitePermission.camera.title, notifications = SitePermission.notifications.title
+                #expect(camera == "Kamera")
+                let byName = found(settings, camera)
+                #expect(byName.count == sites.count && byName.values.allSatisfy { $0 == [camera] })
+                #expect(found(settings, PermissionChoice.block.title) == [sites[0]: [notifications]])
+                // The English name isn't what the rows say.
+                #expect(found(settings, "camera").isEmpty)
+            }
+        }
+    }
+
+    @Test func findASettingReachesAFoldedRowAndOpensItsBox() throws {
+        let name = "SettingsFoldingTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        let before = DeveloperTools.defaults
+        DeveloperTools.defaults = defaults
+        defer {
+            DeveloperTools.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let sites = (0..<5).map { "fold-dev-\($0).example" }
+        DevelopmentSites.sites = sites
+        let settings = SettingsView(pane: .general)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        settings.show(.developer)
+        // More than three: one box headed by how many, folded, its rows not made.
+        let box = try #require(settings.debugDeveloperSitesBox)
+        #expect(box.headerRow.debugTitle == "5 sites")
+        #expect(!box.isOpen && !box.isBuilt)
+        settings.debugFind("fold-dev-3")
+        #expect(box.isBuilt && box.showsOpen && !box.isOpen)
+        #expect(box.shownRows.map(\.debugTitle) == ["fold-dev-3.example"])
+        #expect(settings.debugFound.contains("fold-dev-3.example"))
+        settings.debugFind("")
+        #expect(!box.showsOpen)
+    }
 }
+
+/// Settings makes a pane's rows the first time it's shown or searched, and a box's when it opens (#536).
+@MainActor
+struct SettingsLazyBuildTests {
+    private func settings(_ pane: SettingsPane) -> SettingsView {
+        let settings = SettingsView(pane: pane)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        settings.layoutSubtreeIfNeeded()
+        settings.debugReadNow()
+        return settings
+    }
+
+    @Test func openingOnGeneralMakesNoRowsForTheOtherPanes() {
+        let settings = settings(.general)
+        #expect(settings.debugBuiltPanes == [.general])
+        #expect(settings.debugRowCount(.general) > 0)
+        for pane in SettingsPane.allCases where pane != .general {
+            #expect(settings.debugRowCount(pane) == 0, "\(pane)")
+        }
+        // Shown, a pane is made; a deep link to one is made the same way.
+        settings.show(.downloads)
+        #expect(settings.debugRowCount(.downloads) > 0)
+        #expect(self.settings(.developer).debugRowCount(.developer) > 0)
+        #expect(settings.debugRowCount(.shortcuts) == 0)
+    }
+
+    @Test func eachDownloadRuleIsABoxWithItsAnswersInside() throws {
+        let name = "SettingsLazyBuildTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        let store = DownloadRulesStore.shared
+        let kept = store.rules
+        defer {
+            store.replace(kept)
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let answered = DownloadRule(name: "Answered", pattern: "answered.example", action: DownloadRuleAction(kind: .openURL))
+        let plain = DownloadRule(name: "Plain", pattern: "plain.example", action: DownloadRuleAction(kind: .openURL))
+        store.replace([answered, plain])
+        SitePermissions.remember("handOff", subject: PermissionSubject.handoff(answered.id), origin: "https://answered.example")
+        let boxes = settings(.downloads).debugRuleBoxes
+        #expect(boxes.map(\.headerRow.debugTitle) == ["Answered", "Plain"])
+        // Its saved answer inside, under the rule's own row.
+        let answer = try #require(boxes.first?.rows.first)
+        #expect(answer.debugDetail.stringValue.contains("answered.example"))
+        // Nothing saved: a card with no chevron.
+        #expect(boxes.last?.header.isLeaf == true)
+        // Each is dragged by its header to change the order.
+        #expect(boxes.allSatisfy { $0.header.onDragStart != nil })
+    }
+
+    @Test func shortcutsAreABoxForEachMenu() throws {
+        let settings = settings(.shortcuts)
+        let boxes = settings.debugShortcutBoxes
+        let menus = (NSApp.mainMenu?.items ?? []).filter { top in top.submenu?.items.contains(where: Shortcuts.isListed) == true }
+        #expect(boxes.count >= menus.count && boxes.count > FoldStyle.openUpTo)
+        // A long list starts folded, and nothing in it is made.
+        #expect(boxes.allSatisfy { !$0.isOpen && !$0.isBuilt })
+        let first = try #require(boxes.first)
+        #expect(first.headerRow.debugDetail.stringValue == SettingsView.shortcutsSummary(first.content.count))
+    }
+
+    @Test func findASettingOpensTheMenuAShortcutIsIn() throws {
+        let settings = settings(.general)
+        // The longest name of a shortcut straight in a menu, so few other menus have every word of it.
+        let items = (NSApp.mainMenu?.items ?? []).compactMap(\.submenu).flatMap(\.items).filter(Shortcuts.isListed)
+        let item = try #require(items.max { $0.title.count < $1.title.count })
+        let title = item.title.hasSuffix("…") ? String(item.title.dropLast()) : item.title
+        settings.debugFind(title)
+        let box = try #require(settings.debugShortcutBoxes.first { $0.isBuilt && $0.shownContent.contains { ($0 as? ShortcutRow)?.debugTitle == title } })
+        #expect(!box.isHidden && box.showsOpen && !box.isOpen)
+        // Menus without those words stay unmade.
+        #expect(settings.debugShortcutBoxes.contains { !$0.isBuilt })
+    }
+}
+

@@ -852,7 +852,7 @@ final class ExtensionHost: NSObject {
         let approved = (state?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
         let requested = (state?.requestedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
         Self.applySiteAccess(state?.siteAccess, approved: approved, sites: profile.installs.accessSites(id), requested: requested,
-                             offSites: ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)),
+                             offSites: ExtensionStore.extensionsOffSitesInEffect(in: profile).union(profile.installs.offSites(id)),
                              approvesActiveTab: state?.grantedPermissions?.contains(WKWebExtension.Permission.activeTab.rawValue) ?? false,
                              to: context)
     }
@@ -950,6 +950,69 @@ final class ExtensionHost: NSObject {
     /// it to every extension for its own bridge, so WebKit's grant can't tell; what was recorded can.
     private func mayUseNativeHosts(_ context: WKWebExtensionContext) -> Bool {
         profile.installs.approves(WKWebExtension.Permission.nativeMessaging.rawValue, for: context.uniqueIdentifier)
+    }
+
+    /// Whether the person allowed the extension's native messaging: what its permissions.contains reads when the
+    /// manifest lists it as optional (BridgeNativeHosts), since WebKit's grant is for Zigzag's bridge.
+    func allowsNativeHosts(_ id: String) -> Bool {
+        profile.installs.approves(WKWebExtension.Permission.nativeMessaging.rawValue, for: id)
+    }
+
+    /// permissions.request for native messaging listed as optional (Bitwarden, before Touch ID unlock): the
+    /// more-access sheet asks, only right after you used the extension, as Chrome requires. Allowed is kept.
+    func askForNativeHosts(_ id: String) async -> Bool {
+        let permission = WKWebExtension.Permission.nativeMessaging.rawValue
+        guard let context = context(for: id) else { return false }
+        if let answer = Self.nativeHostsAnswer(optional: ExtensionStore.declaredPermissions(id).optional.contains(permission),
+                                               allowed: allowsNativeHosts(id), recentGesture: hasRecentGesture(id)) {
+            if !answer { ExtensionLog.write("\(context.webExtension.displayName ?? id) asked for native messaging; not granted") }
+            return answer
+        }
+        guard !ExtensionSheet.isShowing,
+              let window = WindowManager.shared.keyController.flatMap({ $0.tabManager.isPrivate ? nil : $0 }) ?? openWindows.first else {
+            ExtensionLog.write("\(context.webExtension.displayName ?? id) asked for native messaging with no window to ask in; not granted")
+            return false
+        }
+        return await withCheckedContinuation { continuation in
+            var answered = false
+            let answer = { (allowed: Bool) in
+                guard !answered else { return }
+                answered = true
+                continuation.resume(returning: allowed)
+            }
+            let report = ExtensionReport(requesting: [permission], id: id)
+            ExtensionSheet.present(Self.moreAccessSheet(for: context, report: report), in: window, onConfirm: { [weak self, weak context] in
+                guard let self, let context, self.context(for: id) === context else { answer(false); return }
+                self.use.touched(id)
+                self.approveNativeHosts(of: context)
+                answer(true)
+            }, onCancel: { answer(false) })
+        }
+    }
+
+    /// A request for native messaging answered without asking: held already, or not listed as optional or with no
+    /// recent use (refused). Nil means the sheet asks.
+    static func nativeHostsAnswer(optional: Bool, allowed: Bool, recentGesture: Bool) -> Bool? {
+        guard optional else { return false }
+        if allowed { return true }
+        return recentGesture ? nil : false
+    }
+
+    /// Records native messaging as the person's approval.
+    private func approveNativeHosts(of context: WKWebExtensionContext) {
+        saveGrants(of: context, approving: [WKWebExtension.Permission.nativeMessaging.rawValue])
+    }
+
+    /// permissions.remove for native messaging listed as optional: no longer allowed, and its helpers end. One the
+    /// manifest requires can't be removed, as in Chrome.
+    func forgetNativeHosts(_ id: String) -> Bool {
+        let permission = WKWebExtension.Permission.nativeMessaging.rawValue
+        let declared = ExtensionStore.declaredPermissions(id)
+        guard declared.optional.contains(permission), !declared.required.contains(permission) else { return false }
+        let held = allowsNativeHosts(id)
+        profile.installs.update(id) { $0.grantedPermissions?.removeAll { $0 == permission } }
+        NativeMessagingHost.terminateAll(for: id, of: self)
+        return held
     }
 
     private func announceExistingWindows(to context: WKWebExtensionContext) {
@@ -1313,8 +1376,10 @@ final class ExtensionHost: NSObject {
 
     /// A companion app isn't installed. Logged only: as in Chrome, the extension handles it. Often optional (Bitwarden,
     /// Better Passwords, #248).
-    fileprivate func companionAppMissing(for context: WKWebExtensionContext) {
-        ExtensionLog.write("\(context.webExtension.displayName ?? context.uniqueIdentifier) asked for a companion app that isn't installed")
+    fileprivate func companionAppMissing(for context: WKWebExtensionContext, allowed: Bool) {
+        let name = context.webExtension.displayName ?? context.uniqueIdentifier
+        ExtensionLog.write(allowed ? "\(name) asked for a companion app that isn't installed"
+                                   : "\(name) asked for a companion app without being allowed native messaging")
     }
 
     // MARK: Event fan-out from our model
@@ -1883,7 +1948,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // for Zigzag's bridge alone.
         guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext, owner: self) else {
-            companionAppMissing(for: extensionContext)
+            companionAppMissing(for: extensionContext, allowed: mayUseNativeHosts(extensionContext))
             replyHandler(nil, NativeMessagingHost.notFound)
             return
         }
@@ -1925,7 +1990,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         }
         guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext, owner: self) else {
-            companionAppMissing(for: extensionContext)
+            companionAppMissing(for: extensionContext, allowed: mayUseNativeHosts(extensionContext))
             completionHandler(NativeMessagingHost.notFound)
             return
         }
@@ -2128,10 +2193,17 @@ final class NativeMessagingHost {
     init?(name: String?, context: WKWebExtensionContext, owner: ExtensionHost) {
         self.owner = owner
         let id = context.uniqueIdentifier
-        guard let name, let manifest = Self.manifest(named: name), let host = Self.host(in: manifest, for: id) else { return nil }
+        guard let name, let host = Self.host(named: name, for: id) else { return nil }
         executable = host.executable
         origin = host.origin
         extensionID = id
+    }
+
+    /// A helper found already, with no profile's extensions behind it (tests).
+    init(executable: URL, origin: String, extensionID: String) {
+        self.executable = executable
+        self.origin = origin
+        self.extensionID = extensionID
     }
 
     /// Chrome's error for a missing host. Extensions match it to tell "not installed" from a failure (Better Passwords, #248).
@@ -2154,6 +2226,29 @@ final class NativeMessagingHost {
         guard FileManager.default.fileExists(atPath: executable.path, isDirectory: &isDirectory), !isDirectory.boolValue,
               FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }
         return (executable, origin)
+    }
+
+    /// The helper for this extension from the first manifest that has one for it: an app can leave a stale manifest
+    /// in one browser's folder and a current one in another's.
+    static func host(named name: String, for id: String) -> (executable: URL, origin: String)? {
+        guard isValidName(name) else { return nil }
+        #if DEBUG
+        // A test copy keeps to its own data folder's hosts (below).
+        let env = ProcessInfo.processInfo.environment
+        if env["ZIGZAG_BLOCK_NATIVE_MESSAGING"] == "1" || !(env["ZIGZAG_DATA_DIR"] ?? "").isEmpty {
+            return manifest(named: name).flatMap { host(in: $0, for: id) }
+        }
+        #endif
+        return host(named: name, for: id, in: searchFolders(home: FileManager.default.homeDirectoryForCurrentUser))
+    }
+
+    static func host(named name: String, for id: String, in dirs: [URL]) -> (executable: URL, origin: String)? {
+        guard isValidName(name) else { return nil }
+        for dir in dirs {
+            guard let manifest = manifest(named: name, in: [dir]), let host = host(in: manifest, for: id) else { continue }
+            return host
+        }
+        return nil
     }
 
     static func manifest(named name: String) -> [String: Any]? {
@@ -2179,7 +2274,8 @@ final class NativeMessagingHost {
         [
             "Google/Chrome", "Google/Chrome Beta", "Google/Chrome Dev", "Google/Chrome Canary", "Chromium",
             "Microsoft Edge", "Microsoft Edge Beta", "Microsoft Edge Dev", "Microsoft Edge Canary",
-            "BraveSoftware/Brave-Browser", "Vivaldi", "Vivaldi Snapshot", "Arc/User Data",
+            "BraveSoftware/Brave-Browser", "BraveSoftware/Brave-Browser-Beta", "BraveSoftware/Brave-Browser-Nightly",
+            "Vivaldi", "Vivaldi Snapshot", "Arc/User Data",
         ].map { home.appendingPathComponent("Library/Application Support/\($0)/NativeMessagingHosts", isDirectory: true) }
             + [URL(fileURLWithPath: "/Library/Google/Chrome/NativeMessagingHosts", isDirectory: true)]
     }
@@ -2201,6 +2297,8 @@ final class NativeMessagingHost {
         let process = Process()
         process.executableURL = executable
         process.arguments = [origin]
+        // Chrome starts a host in its own folder.
+        process.currentDirectoryURL = executable.deletingLastPathComponent()
         let stdin = Pipe(), stdout = Pipe()
         process.standardInput = stdin
         process.standardOutput = stdout

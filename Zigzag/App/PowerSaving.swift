@@ -7,7 +7,12 @@ import IOKit.ps
 enum PowerSaving {
     nonisolated static let changed = Notification.Name("PowerSavingChanged")
 
+    #if DEBUG
+    /// A test copy started with `ZIGZAG_IGNORE_POWER=1` keeps clear glass on battery.
+    static var isOn: Bool { ProcessInfo.processInfo.environment["ZIGZAG_IGNORE_POWER"] == "1" ? false : lowPowerMode || onBattery }
+    #else
     static var isOn: Bool { lowPowerMode || onBattery }
+    #endif
 
     /// Whether Low Power Mode is on.
     static var lowPowerMode: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled }

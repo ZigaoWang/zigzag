@@ -130,6 +130,8 @@
   Test: UnloadedTabTests.aWokenTabKeepsItsSessionStorage
 - A sleeping tab's sessionStorage with an item too big to carry → the rest of it is still kept.
   Test: UnloadedTabTests.aBigItemDoesntCostTheRestOfTheSession
+- WebKit's network process ends while a tab sleeps (macOS ends it when memory is short) → woken, its page still has its session cookies and its sessionStorage, so it's still signed in.
+  Test: UnloadedTabTests.aWokenTabStaysSignedInAfterWebKitsNetworkProcessEnds
 - A sleeping tab woken, or one restored after a relaunch → its page plays nothing with sound until you use it.
   Test: UnloadedTabTests.aWokenOrRestoredPageStartsNoSoundOnItsOwn
 - A sleeping tab woken, or one restored after a relaunch → its page is the site's page now, not a copy kept from before.
@@ -288,3 +290,32 @@
   Test: SwipeExitTests.callingItOffStillSpringsBack
 - Reduce Motion → the page stays put through a swipe; the arrow alone shows it.
   Test: SwipeExitTests.reduceMotionLeavesThePageWhereItIs
+- Let go of a trackpad swipe a third of the page's width along, at most 180 scrolled points, or with a flick a third of that way → back or forward. Fingers on the screen: 100 points, or a third of a narrower pane.
+  Test: SwipeGestureTests.swipeGoesAtAThirdCappedOrAFlick
+  Test: SwipeGestureTests.aPlainPageGoesBackAndEndsClean
+  Test: SwipeGestureTests.aFlickGoesShortOfTheDistance
+  Test: SwipeGestureTests.aShortSwipeSpringsBackAndEndsClean
+- A sideways gesture that starts where the page can scroll that way, or on a page that cancels its wheel events (a canvas, a map) → the page's for the whole gesture, even once it reaches its edge; only a new gesture there goes back. Mostly up and down, or turning sideways after starting up and down, is a scroll.
+  Test: SwipeGestureTests.aSidewaysScrollerKeepsTheGestureUntilANewOneAtItsEdge
+  Test: SwipeGestureTests.aPageThatCancelsWheelsNeverSwipes
+  Test: SwipeGestureTests.upAndDownAndTurningSidewaysLaterScroll
+- While the arrow leans in, the page gets only the sideways part of the scroll: it doesn't move up or down under the swipe.
+  Test: SwipeGestureTests.whileTheArrowLeansInThePageOnlyGetsTheSidewaysPart
+- A swipe whose end never arrives → it ends as the next gesture starts or its glide comes, when the pointer moves, a click, a key, the window or app going to the back, or after 3 seconds still; no arrow, shifted page or page listener is left. The same in a tab, a split pane, Zigzag Mini and a web app.
+  Test: SwipeGestureTests.aLostEndIsClearedByTheNextGesture
+  Test: SwipeGestureTests.momentumWithNoEndIsTheRelease
+  Test: SwipeGestureTests.aRestHoldsUntilTheWindowGoesOrItRunsOut
+  Test: SwipeGestureTests.aRestEndsWhenThePointerMovesInAWindowThatDoesntTrackIt
+  Test: SwipeGestureTests.leavingTheWindowMidSwipeEndsClean
+  Test: SwipeGestureTests.aPageInACardSwipesTheSameWay
+- A new swipe straight after one called off or one that went → it tracks from its first step.
+  Test: SwipeGestureTests.aNewSwipeTracksAtOnceAfterOneCalledOff
+- Each step of a swipe only moves layers: the backdrop and the page's shadow are set up once as it starts.
+  Test: SwipeGestureTests.eachStepOfASwipeIsCheap
+
+## Typing
+- Switch a Chinese input method like Pinyin to English mid-word → the letters land without the spaces it showed between syllables ("ni hao" → "nihao"), on a page and in Zigzag's fields, as in Chrome; other input methods, Chinese characters and typing without one are left as they are.
+  Test: IMECommitTests.aPageGetsTheLettersCommitted
+  Test: IMECommitTests.aCancelledCompositionLeavesLaterTextAlone
+  Test: IMECommitTests.aClickOrANewPageForgetsTheComposition
+  Test: IMECommitTests.aFieldLeavesOtherTextOverMarkedLettersAlone

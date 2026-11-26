@@ -39,22 +39,40 @@ struct HistoryClustersTests {
         #expect(sessions[0].end == date(30, 10, 5))
     }
 
-    /// Lunch ends a session; a short pause doesn't. Neither does a session run past midnight.
-    @Test func breaksAndMidnightSplitSessions() {
+    /// Lunch ends a stack but not the heading, so "This afternoon" is never shown twice in a row; a new part of the
+    /// day or midnight starts a new heading.
+    @Test func aBreakEndsAStackAndEachPartOfTheDayHasOneHeading() {
         #expect(HistoryClusters.sessionGap == 40 * 60)
         let sessions = HistoryClusters.group([
             visit("https://github.com/a", 30, 14, 0),
-            visit("https://github.com/b", 30, 13, 25),  // 35 minutes before: same session
-            visit("https://github.com/c", 30, 12, 0),   // 85 minutes before: a new one
-            visit("https://github.com/d", 30, 0, 10),
-            visit("https://github.com/e", 29, 23, 50),  // 20 minutes, but the day before
+            visit("https://github.com/b", 30, 13, 25),  // 35 minutes before: the same stack
+            visit("https://github.com/c", 30, 13, 20),
+            visit("https://github.com/d", 30, 12, 0),   // 80 minutes before: a new stack, the same heading
+            visit("https://github.com/e", 30, 0, 10),
+            visit("https://github.com/f", 29, 23, 50),  // 20 minutes, but the day before
         ], calendar: calendar)
-        #expect(shape(sessions) == [["github.com 2"], ["github.com 1"], ["github.com 1"], ["github.com 1"]])
-        #expect(HistoryClusters.continues(visit("https://a.com", 30, 12, 40), with: visit("https://b.com", 30, 12, 0), calendar: calendar))
-        #expect(!HistoryClusters.continues(visit("https://a.com", 30, 12, 41), with: visit("https://b.com", 30, 12, 0), calendar: calendar))
-        // Continuous browsing from afternoon into evening starts a new session, so the heading is right.
+        #expect(shape(sessions) == [["github.com 3", "github.com 1"], ["github.com 1"], ["github.com 1"]])
+        #expect(HistoryClusters.continues(visit("https://a.com", 30, 16, 59), with: visit("https://b.com", 30, 12, 0), calendar: calendar))
+        // Continuous browsing from afternoon into evening starts a new heading, so each heading is right.
         #expect(!HistoryClusters.continues(visit("https://a.com", 30, 17, 5), with: visit("https://b.com", 30, 16, 55), calendar: calendar))
-        #expect(HistoryClusters.continues(visit("https://a.com", 30, 16, 59), with: visit("https://b.com", 30, 16, 30), calendar: calendar))
+    }
+
+    /// Two pages in a row on one site stay two rows: folding them would hide a row to save one.
+    @Test func runsOfTwoStayRows() {
+        #expect(HistoryClusters.fewestStacked == 3)
+        let sessions = HistoryClusters.group([
+            visit("https://github.com/a", 30, 10, 5),
+            visit("https://github.com/b", 30, 10, 4),
+            visit("https://news.example.com/", 30, 10, 3),
+        ], calendar: calendar)
+        #expect(shape(sessions) == [["github.com 1", "github.com 1", "news.example.com 1"]])
+    }
+
+    /// A search's matches are never stacked, so none is folded out of sight.
+    @Test func searchResultsAreNeverStacked() {
+        let entries = (0..<5).map { visit("https://github.com/\($0)", 30, 10, $0) }
+        #expect(shape(HistoryClusters.group(entries, calendar: calendar)) == [["github.com 5"]])
+        #expect(shape(HistoryClusters.group(entries, stacks: false, calendar: calendar)) == [Array(repeating: "github.com 1", count: 5)])
     }
 
     /// Search hands back matches by rank; History still shows them newest first.
@@ -64,7 +82,8 @@ struct HistoryClustersTests {
             visit("https://b.com/1", 30, 9, 20),
             visit("https://a.com/2", 30, 9, 10),
         ], calendar: calendar)
-        #expect(shape(sessions) == [["b.com 1", "a.com 2"]])
+        #expect(shape(sessions) == [["b.com 1", "a.com 1", "a.com 1"]])
+        #expect(sessions[0].entries.map(\.url.absoluteString) == ["https://b.com/1", "https://a.com/2", "https://a.com/1"])
         #expect(HistoryClusters.group([], calendar: calendar).isEmpty)
     }
 

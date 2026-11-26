@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""The release notes for the update window and the GitHub release, from CHANGELOG.md and CHANGELOG.zh-Hans.md.
+"""The release notes for the update window and the GitHub release, from CHANGELOG.md and its translations in
+docs/i18n/changelog.
 
 Usage: scripts/release-notes.py VERSION PLANNED OUT
 
 Writes, for the version being released (a beta uses the section of the version it leads up to, PLANNED):
 - OUT/updates/Zigzag-VERSION.html: the English notes, which generate_appcast embeds in the feed.
-- OUT/updates/Zigzag-VERSION.en.html and .zh.html, when CHANGELOG.zh-Hans.md has the version: generate_appcast
-  links each with xml:lang, and Sparkle shows the one in the app's language (English for any other).
+- OUT/updates/Zigzag-VERSION.<code>.html for each translation that has the version, and .en.html beside them:
+  generate_appcast links each with xml:lang, and Sparkle shows the one in the app's language (English for any other).
+  The code is the ISO 639 one generate_appcast knows: zh for zh-Hans, pt for pt-BR. Traditional Chinese has no code
+  of its own there, so it gets the Simplified Chinese notes, as macOS matches zh-Hant to zh.
 - OUT/notes.md: the English notes as Markdown, for `gh release create --notes-file`.
 
 Run by scripts/release.sh; it reads nothing else and touches nothing outside OUT, so it can be run on its own.
@@ -53,21 +56,28 @@ def write(version, planned, out, root=ROOT):
     if not sections: sys.exit(f"CHANGELOG.md has no notes for {planned}")
     # A fragment, without <body>: generate_appcast embeds it as the update's description.
     (out / "updates" / f"Zigzag-{version}.html").write_text(STYLE + body(summary, sections), encoding="utf-8")
-    zh = root / "CHANGELOG.zh-Hans.md"
-    zh_summary, zh_sections = section(zh.read_text(encoding="utf-8"), planned) if zh.exists() else ([], [])
-    if zh_sections:
-        # generate_appcast takes the language from the name's ISO 639 code: "zh", which macOS matches to zh-Hans.
-        # English gets a link of its own too, or Sparkle would show the only link, the Chinese one, to everyone.
+    translated = []
+    for file in sorted((root / "docs" / "i18n" / "changelog").glob("CHANGELOG.*.md")):
+        language = file.name[len("CHANGELOG."):-len(".md")]
+        # One file per code: zh-Hans has zh, so zh-Hant has none.
+        if language == "zh-Hant":
+            continue
+        code = language.split("-")[0]
+        t_summary, t_sections = section(file.read_text(encoding="utf-8"), planned)
+        if not t_sections:
+            print(f"Warning: {file.relative_to(root)} has no notes for {planned}; the update window shows English in {language}.",
+                  file=sys.stderr)
+            continue
+        (out / "updates" / f"Zigzag-{version}.{code}.html").write_text(page(language, t_summary, t_sections), encoding="utf-8")
+        translated.append((code, language))
+    if translated:
+        # English gets a link of its own too, or Sparkle would show a translation to everyone else.
         (out / "updates" / f"Zigzag-{version}.en.html").write_text(page("en", summary, sections), encoding="utf-8")
-        (out / "updates" / f"Zigzag-{version}.zh.html").write_text(page("zh-Hans", zh_summary, zh_sections), encoding="utf-8")
-    else:
-        print(f"Warning: CHANGELOG.zh-Hans.md has no notes for {planned}; the update window shows English to everyone.",
-              file=sys.stderr)
     md = "".join(f"{s}\n\n" for s in summary) + "\n\n".join(f"## {t}\n" + "\n".join(f"- {i}" for i in items) for t, items in sections)
     md += ("\n\nDownload the DMG, open it, and drag Zigzag to Applications. Requires macOS 15.4 or later. Updates install automatically."
            "\n\nEvery version's notes: https://zigzagbrowser.com/release-notes\n")
     (out / "notes.md").write_text(md, encoding="utf-8")
-    return bool(zh_sections)
+    return [language for _, language in translated]
 
 
 if __name__ == "__main__":

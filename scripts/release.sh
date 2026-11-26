@@ -12,7 +12,8 @@
 #                                      General › Beta updates), tag the commit vX.Y.Z-beta.N and make it a
 #                                      GitHub pre-release; no DMG, website or Homebrew
 # Before releasing: add the version's section to CHANGELOG.md (New and Fixed); every place notes appear reads it.
-# Add Simplified Chinese for What's New and the update feed. Traditional Chinese is optional for What's New.
+# Translate it into every shipped language's docs/i18n/changelog/CHANGELOG.<language>.md, and every string too:
+# scripts/check-strings.py lists what's left. See docs/i18n/README.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -35,8 +36,10 @@ TEAM=$(/usr/libexec/PlistBuddy -c "Print :teamID" scripts/ExportOptions.plist)
 # The notes come first: CHANGELOG.md needs a section for the version being released, or nothing is built.
 PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
 grep -q "^## \[$PLANNED\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $PLANNED. Add one, then release."; exit 1; }
-# The Simplified Chinese notes should come with them. Traditional Chinese can follow later without a warning.
-grep -q "^## \[$PLANNED\]" CHANGELOG.zh-Hans.md || echo "Warning: CHANGELOG.zh-Hans.md has no section for $PLANNED. Simplified Chinese readers get the English notes."
+
+# Every language Zigzag ships has every string translated and reviewed, and this version's notes with the English
+# points and issues, or nothing is built. See docs/i18n/README.md.
+python3 scripts/check-strings.py --notes "$PLANNED" || { echo "Some strings or notes above aren't translated or still need review. Finish them, then release."; exit 1; }
 
 # The ad blocking scriptlets a release accepts are pinned by hash in the app: one older than Ghostery's newest keeps
 # working, but misses its fixes. Pinning is a code change, so it's for before the release, not here.
@@ -150,9 +153,9 @@ xcrun stapler staple "$APP"
 rm "$ZIP" && ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 spctl --assess --type execute --verbose "$APP"
 
-# The release notes for the update window: this version's section of CHANGELOG.md as HTML, with
-# CHANGELOG.zh-Hans.md's beside it for a Mac in Chinese, and for a GitHub release as Markdown (build/release/notes.md,
-# for --notes-file). A beta uses the section of the version it leads up to. See scripts/release-notes.py.
+# The release notes for the update window: this version's section of CHANGELOG.md as HTML, with each translation's
+# in docs/i18n/changelog beside it for a Mac in that language, and for a GitHub release as Markdown
+# (build/release/notes.md, for --notes-file). A beta uses the section of the version it leads up to. See scripts/release-notes.py.
 write_notes() { python3 scripts/release-notes.py "$VERSION" "$PLANNED" "$OUT"; }
 # The notes in each language are files of their own that the feed links to, so they go up before it.
 upload_notes() {

@@ -75,7 +75,8 @@ happens when a tab closes should work the way those users expect, unless an issu
 
 ## Localization
 
-Zigzag speaks English, Simplified Chinese, and Traditional Chinese. Every word people read goes through
+Zigzag speaks English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Italian, Spanish,
+Brazilian Portuguese, Russian, Dutch, Polish, and Turkish. Every word people read goes through
 `String(localized: "…", comment: "…")`, with a comment that says where it appears. After adding or changing
 strings, build, bring the catalog in step and add Simplified Chinese in `Zigzag/Resources/Localizable.xcstrings`:
 
@@ -84,17 +85,24 @@ xcodebuild -project Zigzag.xcodeproj -scheme Zigzag -derivedDataPath build/dev b
 scripts/sync-strings.sh build/dev
 ```
 
-`LocalizationTests` requires Simplified Chinese and checks the formatting of both translations where present.
-Traditional Chinese is welcome but optional: leave untranslated entries out so they use the English source.
-See the [Simplified Chinese](docs/i18n/glossary.md) and [Traditional Chinese](docs/i18n/glossary.zh-Hant.md)
-glossaries for wording and typography. If you can't write the Simplified Chinese, say so in the pull request.
+Write new strings in English only, each with a comment that says where it shows. You don't need to translate:
+Zigzag ships in 14 languages, and the maintainers fill in every language before a release (`scripts/check-strings.py`
+lists what's missing, and `scripts/release.sh` won't build until it's complete). Until then a new string reads in
+English. If you speak one of the languages and want to translate your own strings too, follow that language's
+glossary in [docs/i18n/glossaries](docs/i18n/glossaries). `LocalizationTests` checks whatever translations are there for formatting, names
+and plurals.
 
-Add each release's section to [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
-[CHANGELOG.zh-Hant.md](CHANGELOG.zh-Hant.md) can follow later. Keep the same version, date, order, issue links
-and credited names. Use `### 新功能` for New, `### 修复` for Fixed in Simplified Chinese, and `### 修正` in Traditional Chinese.
-`WhatsNewTests` compares shipped Simplified Chinese notes with English and skips Unreleased. If the Traditional
-Chinese notes for a version are incomplete or missing, the in-app What's New sheet shows its English notes.
-Sparkle's pre-install notes still use Simplified Chinese for its single Chinese release-notes link.
+[docs/i18n/README.md](docs/i18n/README.md) has the whole workflow: one sentence per string, plurals, dates and
+numbers, the pseudo-locale for finding cut-off text, adding a language, and the release gate.
+
+A change to README.md is in English too. The maintainers bring its translations in
+[docs/i18n/readme](docs/i18n/readme) in step. Every README starts with the same small language line.
+
+[docs/releasing.md](docs/releasing.md) explains version numbers, what each kind of release needs, and the bug labels.
+
+Add each release's section to [CHANGELOG.md](CHANGELOG.md) in English. The maintainers translate it into every
+language in [docs/i18n/changelog](docs/i18n/changelog) before the release, and the release gate checks each has the
+same points and issue links. [docs/i18n/README.md](docs/i18n/README.md) says where every translated file lives.
 
 ## Commits and pull requests
 
@@ -109,9 +117,8 @@ Sparkle's pre-install notes still use Simplified Chinese for its single Chinese 
 - Don't add CI workflows or other files under `.github/workflows`.
 - Write `Fixes #N` in the pull request so the issue closes with it.
 - Every change people will notice gets a line under `## [Unreleased]`, in `### New` or `### Fixed`, in
-  [CHANGELOG.md](CHANGELOG.md) and under the matching heading in [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md).
-  Add a Traditional Chinese line if you can. Write the Chinese as a person would say it, not word for word.
-  End the line with the issue link, and separate several with ", ": `([#311](…), [#312](…))`.
+  [CHANGELOG.md](CHANGELOG.md), in English. End the line with the issue link, and separate several with ", ":
+  `([#311](…), [#312](…))`.
 - Make sure the app builds and the tests pass, and say in the pull request how you checked your change. For UI,
   add before and after screenshots in light and dark.
 - Draft pull requests aren't reviewed for merge. Mark yours ready when it is.

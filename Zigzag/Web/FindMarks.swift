@@ -64,7 +64,8 @@ enum FindMarks {
         let all: String, current: String, allDark: String, currentDark: String
 
         static func random() -> Names {
-            let letters = Array("abcdefghijklmnopqrstuvwxyz")
+            // No "i", so a name can never spell "find" or "zigzag" by chance.
+            let letters = Array("abcdefghjklmnopqrstuvwxyz")
             let stem = "h" + String((0..<12).map { _ in letters.randomElement()! })
             return Names(all: stem + "a", current: stem + "c", allDark: stem + "ad", currentDark: stem + "cd")
         }

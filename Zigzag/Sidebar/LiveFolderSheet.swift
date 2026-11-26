@@ -11,6 +11,14 @@ enum LiveFolderSheet {
     /// The live folder's mark on its menu items and sheet.
     static let symbol = "dot.radiowaves.up.forward"
 
+    /// The site's icon a live folder wears (GitHub's for a GitHub list), fetched when it isn't kept yet.
+    static func siteIcon(for source: LiveSource) -> NSImage? {
+        guard let site = source.iconSite else { return nil }
+        let icon = FaviconStore.shared.cachedIcon(for: site)
+        if icon == nil { FaviconStore.shared.prefetch(for: site) }
+        return icon
+    }
+
     /// What's typed, as a web address: "example.com" is https, a feed: address is its https one.
     nonisolated static func address(from text: String) -> URL? {
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -39,6 +47,27 @@ enum LiveFolderSheet {
         String(localized: "Latest \(count)", comment: "Choice of how many pages a live folder shows, in its sheet: the newest 10, 25 or 50.")
     }
 
+    /// What a GitHub list shows, for the sheet's note.
+    static func listNote(_ list: GitHubList, user: String?) -> String {
+        let user = user ?? String(localized: "this user", comment: "Stands in for a GitHub username in the New Live Folder sheet's note until one is typed, as in “Open issues assigned to this user…”.")
+        return switch list {
+        case .pullRequests: String(localized: "Open pull requests \(user) opened in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Pull Requests Opened list. The placeholder is a GitHub username.")
+        case .issues: String(localized: "Open issues assigned to \(user) in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Issues Assigned list. The placeholder is a GitHub username.")
+        case .reviewRequests: String(localized: "Open pull requests \(user) is asked to review in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Review Requests list. The placeholder is a GitHub username.")
+        case .repositoryIssues: String(localized: "Open issues in public repositories \(user) owns, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Issues in Owned Repositories list. The placeholder is a GitHub username.")
+        case .repositoryPullRequests: String(localized: "Open pull requests in public repositories \(user) owns, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for the Pull Requests in Owned Repositories list. The placeholder is a GitHub username.")
+        }
+    }
+
+    /// How often it checks, from `LiveSchedule`.
+    static var scheduleNote: String {
+        String(localized: "Checks every \(Int(LiveSchedule.interval / 60)) minutes, or hourly in Low Power Mode.", comment: "Under the fields of the New Live Folder sheet: how often a live folder fetches its feed or list. The number is minutes (30).")
+    }
+
+    /// What it shows, then how often it checks.
+    static func withSchedule(_ note: String) -> String {
+        String(localized: "\(note) \(scheduleNote)", comment: "Joins two sentences, one after the other. Leave out the space if your language doesn't put one between sentences.")
+    }
 
     /// `editing`: the live folder to change; nil makes one, inside `parent` when given. `host`: where the sheet opens,
     /// when that isn't the browser window (the edge panel over another app).
@@ -55,6 +84,9 @@ enum LiveFolderSheet {
             form.commit(in: controller, parent: parent)
         }
         form.sheet = sheet
+        sheet.header.makePictureClickable(toolTip: SidebarMenus.changeIconTitle) { [weak form] in form?.chooseIcon() }
+        form.showIcon()
+        sheet.heldUpNote = { [weak form] in form?.usernameProblem }
         #if DEBUG
         current = sheet
         #endif
@@ -75,6 +107,10 @@ enum LiveFolderSheet {
         let count = DropdownButton()
         let note = NSTextField.dialogText("", font: Tokens.Font.detail())
         weak var sheet: FormSheet?
+        /// The icon chosen in the sheet, kept on Save or Add.
+        private(set) var icon: String?
+        private var iconToken: SignalToken?
+        private var shownIcon: String?
         private let lists = GitHubList.allCases
         /// What looking up an address found, for the address it was for (nil while it looks).
         private var lookup: (url: URL, result: LiveFolders.Lookup?)?
@@ -82,6 +118,7 @@ enum LiveFolderSheet {
 
         init(editing folder: BookmarkFolder?) {
             existing = folder
+            icon = folder?.icon
             let live = folder?.live
             kind.selectedIndex = live?.source.gitHub == nil ? 0 : 1
             kind.setAccessibilityLabel(String(localized: "Source", comment: "Accessibility label of the Feed or GitHub switch in the New Live Folder sheet."))
@@ -101,10 +138,10 @@ enum LiveFolderSheet {
         var rows: [FormSheet.Row] {
             [.init(label: nil, view: kind),
              .init(label: String(localized: "Address", comment: "Label of the address field in the New Live Folder sheet."), view: address, isHidden: isGitHub),
-             .init(label: String(localized: "List", comment: "Label of the GitHub list menu in the New Live Folder sheet."), view: list, isHidden: !isGitHub),
              .init(label: String(localized: "Username", comment: "Label of the GitHub username field in the New Live Folder sheet."), view: user, isHidden: !isGitHub),
+             .init(label: String(localized: "List", comment: "Label of the GitHub list menu in the New Live Folder sheet."), view: list, isHidden: !isGitHub, fills: true),
              .init(label: String(localized: "Name", comment: "Label of the name field in the New Live Folder sheet."), view: name),
-             .init(label: String(localized: "Show", comment: "Label of the menu in the New Live Folder sheet that picks how many pages it shows."), view: count),
+             .init(label: String(localized: "Show", comment: "Label of the menu in the New Live Folder sheet that picks how many pages it shows."), view: count, fills: true),
              .init(label: nil, view: note, height: 0)]
         }
 
@@ -118,11 +155,11 @@ enum LiveFolderSheet {
 
         private var typedAddress: URL? { LiveFolderSheet.address(from: address.stringValue) }
 
+        /// The username as typed, without spaces or an @.
+        private var login: String { user.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "@", with: "") }
+
         var source: LiveSource? {
-            if isGitHub {
-                let login = user.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "@", with: "")
-                return GitHubList.isUsername(login) ? .gitHub(lists[list.selectedIndex], user: login) : nil
-            }
+            if isGitHub { return GitHubList.isUsername(login) ? .gitHub(lists[list.selectedIndex], user: login) : nil }
             guard let url = typedAddress else { return nil }
             if let lookup, lookup.url == url, case .found(let feed, _)? = lookup.result { return .feed(url, found: feed) }
             return .feed(url)
@@ -139,9 +176,72 @@ enum LiveFolderSheet {
                 ?? String(localized: "Live Folder", comment: "Name of a new live folder whose feed has no name.")
         }
 
+        /// The name an empty Name field gives, as Save names it.
+        var emptyName: String {
+            if let existing, !isGitHub, existing.live?.namedByFeed == true, existing.live?.source == source { return existing.name }
+            return defaultName
+        }
+
+        /// Why what's typed can't be a GitHub username; nil while it can, or while it's empty.
+        var usernameProblem: String? {
+            guard isGitHub, !login.isEmpty, !GitHubList.isUsername(login) else { return nil }
+            return String(localized: "GitHub usernames have only letters, numbers and single hyphens.", comment: "Tooltip on the username field of the New Live Folder sheet when what's typed can't be a GitHub username, so its button can't be pressed.")
+        }
+
+        /// The source the header's icon is for: a feed once it's found, a GitHub list once the username can be one.
+        private var iconSource: LiveSource? {
+            if isGitHub { return source }
+            guard let lookup, lookup.url == typedAddress, case .found? = lookup.result else { return existing?.live?.source }
+            return source
+        }
+
+        /// The heading's icon, as the folder's sidebar row shows it: its own icon in a folder, else its site's icon,
+        /// else the folder; the feed mark while a new folder has no source yet.
+        func showIcon() {
+            guard let header = sheet?.header else { return }
+            let source = icon == nil ? iconSource : nil
+            let site = source.flatMap(LiveFolderSheet.siteIcon(for:))
+            let key = [icon ?? "", source?.iconSite?.absoluteString ?? "", site.map { "\(ObjectIdentifier($0).hashValue)" } ?? ""].joined(separator: "|")
+            guard key != shownIcon else { return }
+            shownIcon = key
+            let side = Tokens.TypeSize.heading
+            if let icon {
+                let image = IconChoice.folder(icon, open: false, size: side)
+                if IconChoice.isEmoji(icon) || PageImageIcon.isImage(icon) { header.setImage(image) } else { header.setTemplate(image, tint: Tokens.Color.icon) }
+                return
+            }
+            guard let source else {
+                header.setSymbol(existing == nil ? LiveFolderSheet.symbol : "folder", tint: Tokens.Color.icon)
+                return
+            }
+            if let site {
+                header.setImage(site)
+            } else {
+                header.setSymbol("folder", tint: Tokens.Color.icon)
+                let key = FaviconStore.shared.iconKey(for: source.iconSite)
+                iconToken = FaviconStore.shared.updated.observe { [weak self] site in if site == key { self?.showIcon() } }
+            }
+        }
+
+        /// The same grid as the folder's Change Icon…, under the heading's icon.
+        func chooseIcon() {
+            guard let sheet, let button = sheet.header.pictureButton else { return }
+            if let open = IconPickerPanel.current, open.isDescendant(of: sheet) { open.close(); return }
+            let panel = IconPickerPanel.forFolder(selected: icon) { [weak self] picked in
+                self?.icon = picked
+                self?.showIcon()
+            }
+            let corner = button.convert(NSPoint(x: button.bounds.minX, y: button.bounds.maxY + Tokens.Space.x1), to: sheet)
+            panel.show(at: corner, in: sheet, growsFrom: CGPoint(x: 0, y: 1))
+        }
+
         func canConfirm() -> Bool {
             lookUp()
             showNote()
+            showIcon()
+            if name.placeholder != emptyName { name.placeholder = emptyName }
+            user.isInvalid = usernameProblem != nil
+            user.toolTip = usernameProblem
             guard source != nil else { return false }
             if !isGitHub, let lookup, lookup.url == typedAddress, case .problem? = lookup.result { return false }
             return true
@@ -165,14 +265,18 @@ enum LiveFolderSheet {
         private func showNote() {
             var text = ""
             var problem = false
+            let fromFeed = String(localized: "New pages from the feed, newest first.", comment: "Under the fields of the New Live Folder sheet, for a feed.")
             if isGitHub {
-                text = String(localized: "Open ones in public repositories, newest activity first.", comment: "Under the fields of the New Live Folder sheet, for a GitHub list.")
+                text = LiveFolderSheet.withSchedule(LiveFolderSheet.listNote(lists[list.selectedIndex], user: GitHubList.isUsername(login) ? login : nil))
             } else if let lookup, lookup.url == typedAddress {
                 switch lookup.result {
-                case .found(_, let title)?: text = title.map { String(localized: "Found “\($0)”.", comment: "Under the address in the New Live Folder sheet: the feed found there, by its name.") } ?? ""
+                case .found(_, let title)?:
+                    text = LiveFolderSheet.withSchedule(title.map { String(localized: "New pages from “\($0)”, newest first.", comment: "Under the address in the New Live Folder sheet: the feed found there, by its name.") } ?? fromFeed)
                 case .problem(let reason)?: text = reason.message; problem = true
                 case nil: text = String(localized: "Looking for a feed…", comment: "Under the address in the New Live Folder sheet, while Zigzag looks for the feed.")
                 }
+            } else {
+                text = LiveFolderSheet.withSchedule(fromFeed)
             }
             note.textColor = problem ? Tokens.Color.destructive : Tokens.Color.textSecondary
             guard note.stringValue != text else { return }
@@ -190,6 +294,7 @@ enum LiveFolderSheet {
                 let title = typed.isEmpty ? (changed || !followsFeed ? defaultName : existing.name) : typed
                 controller.libraryChange(String(localized: "Edit Live Folder", comment: "Undo action name, shown in Edit › Undo.")) {
                     Library.shared.updateLiveFolder(existing.id, name: title, namedByFeed: followsFeed, source: chosen, limit: limit)
+                    if icon != existing.icon { Library.shared.setIcon(icon, forFolder: existing.id) }
                 }
                 if changed { LiveFolders.shared.reset(existing.id) }
                 LiveFolders.shared.refreshNow(existing.id)
@@ -200,6 +305,7 @@ enum LiveFolderSheet {
             controller.libraryChange(String(localized: "New Live Folder", comment: "Undo action name, shown in Edit › Undo.")) {
                 made = Library.shared.addLiveFolder(named: typed.isEmpty ? defaultName : typed, source: chosen, limit: limit,
                                                     namedByFeed: followsFeed, in: spaceID, parent: parent)
+                if let made, let icon { Library.shared.setIcon(icon, forFolder: made.id) }
             }
             guard let made else { return }
             if SidebarListView.isCollapsed(spaceID) { SidebarListView.setCollapsed(spaceID, false) }
@@ -231,9 +337,31 @@ extension BrowserWindowController {
 }
 
 extension SidebarMenus {
-    /// A live folder's menu: its state when it couldn't refresh, then reading, folding, its source and deleting it.
+    /// "Updated 5 Minutes Ago", "Updated Just Now" under a minute, in the app's language; title case in English.
+    static func updatedTitle(_ date: Date, now: Date = Date(), locale: Locale = Words.locale) -> String {
+        guard now.timeIntervalSince(date) >= 60 else {
+            return String(localized: "Updated Just Now", comment: "Line at the top of a live folder's menu in the sidebar: it was fetched less than a minute ago.")
+        }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = locale
+        formatter.unitsStyle = .full
+        formatter.dateTimeStyle = .numeric
+        formatter.formattingContext = .middleOfSentence
+        var ago = formatter.localizedString(for: min(date, now), relativeTo: now)
+        if locale.language.languageCode == .english { ago = ago.capitalized(with: locale) }
+        return String(localized: "Updated \(ago)", comment: "Line at the top of a live folder's menu in the sidebar: when it was last fetched. The placeholder is a relative time, like “5 Minutes Ago”.")
+    }
+
+    /// A live folder's menu: when it was updated, its state when it couldn't refresh, then reading, folding, its source
+    /// and deleting it.
     static func liveFolderMenu(for folder: BookmarkFolder, controller: BrowserWindowController) -> NSMenu {
         let live = LiveFolders.shared
+        var updated: [NSMenuItem] = []
+        if live.isRefreshing(folder.id) {
+            updated.append(Item(String(localized: "Updating…", comment: "Line at the top of a live folder's menu in the sidebar, while it's being fetched."), symbol: "clock", enabled: false) {})
+        } else if let checked = live.state(folder.id).checked {
+            updated.append(Item(updatedTitle(checked, now: live.now()), symbol: "clock", enabled: false) {})
+        }
         var problem: [NSMenuItem] = []
         if let reason = live.state(folder.id).problem {
             problem.append(.sectionHeader(title: String(localized: "Couldn’t Refresh", comment: "Heading in a live folder's menu in the sidebar, over why its feed couldn't be fetched.")))
@@ -252,7 +380,12 @@ extension SidebarMenus {
             Item(changeIconTitle, symbol: Symbol.changeIcon) { controller.chooseFolderIcon(folder.id) },
         ]
         let close = [Item(String(localized: "Delete Live Folder", comment: "Item in a live folder's menu in the sidebar: the folder and its pages go."), symbol: Symbol.remove, destructive: true) { controller.deleteLiveFolderWithUndo(folder.id) }]
-        return menu([problem, open, view, reading, edit, close])
+        let result = menu([updated, problem, open, view, reading, edit, close])
+        result.updates = MenuUpdates(changes: live.changed) { [weak controller] in
+            guard let controller, let now = Library.shared.folder(folder.id), now.live != nil else { return nil }
+            return liveFolderMenu(for: now, controller: controller)
+        }
+        return result
     }
 
     /// A live folder's page belongs to its feed: no renaming, filing or removing, but read or unread, and copies

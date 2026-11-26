@@ -10,23 +10,35 @@ nonisolated struct SiteBoost: Codable, Equatable, Sendable {
     var names: [String: String] = [:]
     /// Custom CSS from Edit Style…; empty is off.
     var style = ""
+    /// Compatibility mode (#497): extensions, blockers, zaps and the style are set aside on the site, not forgotten.
+    var compatible = false
 
     var hasStyle: Bool { !style.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    var isEmpty: Bool { zaps.isEmpty && !hasStyle }
+    var isEmpty: Bool { zaps.isEmpty && !hasStyle && !compatible }
 
     /// The name kept for `selector`, else one made from the selector.
     func name(forZap selector: String) -> String { names[selector] ?? SiteBoosts.label(forZap: selector) }
 }
 
 nonisolated extension SiteBoost {
-    private enum Keys: String, CodingKey { case zaps, names, style }
+    private enum Keys: String, CodingKey { case zaps, names, style, compatible }
 
-    /// Any may be missing (boosts saved before styles or names existed).
+    /// Any may be missing (boosts saved before styles, names or compatibility mode existed).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         zaps = try c.decodeIfPresent([String].self, forKey: .zaps) ?? []
         names = (try? c.decodeIfPresent([String: String].self, forKey: .names)) ?? [:]
         style = try c.decodeIfPresent(String.self, forKey: .style) ?? ""
+        compatible = (try? c.decodeIfPresent(Bool.self, forKey: .compatible)) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        try c.encode(zaps, forKey: .zaps)
+        try c.encode(names, forKey: .names)
+        try c.encode(style, forKey: .style)
+        // Left out while off, so files stay as they were for sites without it.
+        if compatible { try c.encode(true, forKey: .compatible) }
     }
 }
 
@@ -48,7 +60,7 @@ nonisolated enum StyleProblem: Equatable, Sendable {
 enum SiteBoosts {
     /// Tests use their own.
     static var defaults: UserDefaults = .standard
-    private static let key = "SiteBoosts"
+    static let key = "SiteBoosts"
     static let maxZaps = 200
 
     static var all: [String: SiteBoost] {
@@ -242,12 +254,18 @@ enum SiteBoosts {
     /// Forget in Settings › Privacy › Sites.
     static func forget(site: String) {
         var all = all
+        let compatible = all[site]?.compatible == true
         all[site] = nil
         self.all = all
+        if compatible { SiteCompatibility.apply() }
     }
 
     /// Settings › Privacy › Sites › Reset All.
-    static func forgetAll() { all = [:] }
+    static func forgetAll() {
+        let compatible = !SiteCompatibility.sites.isEmpty
+        all = [:]
+        if compatible { SiteCompatibility.apply() }
+    }
 
     /// Rejects anything that could close the rule, start another or comment out later ones. Backslashes are allowed
     /// since `CSS.escape` writes them.
@@ -332,6 +350,65 @@ enum SiteBoosts {
     }
 }
 
+/// Compatibility mode (#497), for a site that breaks: extensions, ad blocking, cookie banners, zapped elements and
+/// custom style are all set aside there, and every one of those choices is kept for when it's turned off. Kept in the
+/// site's boost, for every profile; a site covers its subdomains. Private windows follow it and never change it.
+enum SiteCompatibility {
+    /// Turned on or off for a site.
+    static let changed = Signal<Void>()
+
+    /// The sites it's on for, read again only when the boosts change.
+    private static var read: (data: Data?, sites: Set<String>)?
+
+    static var sites: Set<String> {
+        let data = SiteBoosts.defaults.data(forKey: SiteBoosts.key)
+        if let read, read.data == data { return read.sites }
+        let sites = Set(SiteBoosts.all.filter(\.value.compatible).keys)
+        read = (data, sites)
+        return sites
+    }
+
+    static func isOn(site: String) -> Bool {
+        sites.contains { site == $0 || site.hasSuffix("." + $0) }
+    }
+
+    /// Web pages only.
+    static func isOn(for url: URL?) -> Bool { SiteBoosts.site(of: url).map(isOn(site:)) ?? false }
+
+    /// Off also takes it from a parent site that covered this one, as allowing ads does.
+    static func set(_ on: Bool, for url: URL?) {
+        guard let site = SiteBoosts.site(of: url) else { return }
+        var all = SiteBoosts.all
+        if on {
+            all[site, default: SiteBoost()].compatible = true
+        } else {
+            for key in all.keys where site == key || site.hasSuffix("." + key) { all[key]?.compatible = false }
+        }
+        SiteBoosts.all = all
+        apply()
+    }
+
+    /// Only this site's own, for Settings › Privacy › Sites.
+    static func set(_ on: Bool, forSite site: String) {
+        var all = SiteBoosts.all
+        all[site, default: SiteBoost()].compatible = on
+        SiteBoosts.all = all
+        apply()
+    }
+
+    /// Open pages pick it up on their next load; extensions are told now.
+    static func apply() {
+        changed.send()
+        ContentBlocker.changed.send()
+        if #available(macOS 15.4, *) {
+            for profile in Profiles.shared.all {
+                guard let host = profile.startedExtensions else { continue }
+                for id in profile.installs.installedIDs { host.applySiteAccess(id) }
+            }
+        }
+    }
+}
+
 /// Injects boosts as a style sheet at document start, main frame only, like the ad blocker's cosmetic rules
 /// (`PageFilters.styleSource`). Edits apply in place.
 enum PageBoosts {
@@ -347,9 +424,14 @@ enum PageBoosts {
         let controller = webView.configuration.userContentController
         OwnScripts.remove(from: controller, where: isOurs)
         guard !errorPage, let site = SiteBoosts.site(of: url) else { return }
-        let css = SiteBoosts.css(for: SiteBoosts.boost(forSite: site, privateStore: privateStore))
+        let css = applied(site: site, privateStore: privateStore)
         guard !css.isEmpty else { return }
         controller.addUserScript(WKUserScript(source: source(css: css, site: site), injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
+    }
+
+    /// The CSS a site's pages get: none in compatibility mode.
+    static func applied(site: String, privateStore: WKWebsiteDataStore?) -> String {
+        SiteCompatibility.isOn(site: site) ? "" : SiteBoosts.css(for: SiteBoosts.boost(forSite: site, privateStore: privateStore))
     }
 
     /// Previews `boost` without saving (Edit Style while typing).
@@ -364,7 +446,7 @@ enum PageBoosts {
         let url = webView.url ?? tab.url
         prepare(webView, for: url, privateStore: tab.privateStore, errorPage: ErrorPage.pending.contains(webView))
         guard let site = SiteBoosts.site(of: url), !ErrorPage.pending.contains(webView) else { return }
-        let css = SiteBoosts.css(for: SiteBoosts.boost(forSite: site, privateStore: tab.privateStore))
+        let css = applied(site: site, privateStore: tab.privateStore)
         webView.runOwnScript(source(css: css, site: site), world: world)
     }
 

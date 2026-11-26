@@ -2,6 +2,8 @@
   <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Feels great. Weighs nothing. The lightweight browser for Mac, free and open source. A Zigzag window in split view, Fonts In Use beside Grilli Type, with the sidebar of spaces and pinned tabs."></a>
 </p>
 
+<p align="center"><sub>English | <a href="docs/i18n/readme/README.zh-Hans.md">简体中文</a> | <a href="docs/i18n/readme/README.zh-Hant.md">繁體中文</a> | <a href="docs/i18n/readme/README.ja.md">日本語</a> | <a href="docs/i18n/readme/README.ko.md">한국어</a> | <a href="docs/i18n/readme/README.de.md">Deutsch</a> | <a href="docs/i18n/readme/README.fr.md">Français</a> | <a href="docs/i18n/readme/README.it.md">Italiano</a> | <a href="docs/i18n/readme/README.es.md">Español</a> | <a href="docs/i18n/readme/README.pt-BR.md">Português (Brasil)</a> | <a href="docs/i18n/readme/README.ru.md">Русский</a> | <a href="docs/i18n/readme/README.nl.md">Nederlands</a> | <a href="docs/i18n/readme/README.pl.md">Polski</a> | <a href="docs/i18n/readme/README.tr.md">Türkçe</a></sub></p>
+
 <p align="center">
   <a href="https://zigzagbrowser.com/download"><b>Download for Mac</b></a><br>
   <sub>or <code>brew install --cask zigaowang/tap/zigzag</code></sub><br>
@@ -95,7 +97,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
 | **Your data** | File › Export Your Data… saves your bookmarks as a standard HTML file any browser imports, and a full Zigzag backup you can restore on another Mac. |
-| **Languages** | English, Simplified Chinese, and Traditional Chinese. |
+| **Languages** | English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Italian, Spanish, Brazilian Portuguese, Russian, Dutch, Polish, and Turkish. |
 | **And** | Reader, PDF viewer, Handoff to your iPhone, iPad or other Mac, Capture of an area, a part of the page or the whole page (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
 
 ## What's missing

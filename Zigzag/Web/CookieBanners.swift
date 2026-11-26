@@ -95,6 +95,9 @@ enum CookieBanners {
         return scheme == "https" || scheme == "http"
     }
 
+    /// Whether Autoconsent runs on a page at all: never on a site in compatibility mode (#497).
+    static func runs(on url: URL?) -> Bool { applies(to: url) && !SiteCompatibility.isOn(for: url) }
+
     // MARK: What was found on a page
 
     /// What Autoconsent found and did on the page in a web view, in any of its frames.
@@ -286,7 +289,7 @@ enum CookieBanners {
             }
             let frame = message.frameInfo
             let top = CookieBanners.topURL(frameURL: body["url"] as? String, isMainFrame: frame.isMainFrame, webViewURL: webView.url)
-            guard CookieBanners.applies(to: top), let site = CookieBanners.site(of: top) else { replyHandler(nil, nil); return }
+            guard CookieBanners.runs(on: top), let site = CookieBanners.site(of: top) else { replyHandler(nil, nil); return }
             switch type {
             case "init":
                 let config = CookieBanners.json(CookieBanners.config(handles: CookieBanners.handles(top)))

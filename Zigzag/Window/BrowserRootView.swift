@@ -829,6 +829,7 @@ final class BrowserRootView: SpaceFrameView {
 
     private var trackingArea: NSTrackingArea?
     private var borderlessToken: NSObjectProtocol?
+    private var shortFloatingToken: NSObjectProtocol?
     /// Keeps the floating sidebar open, e.g. while a menu from it is showing.
     var holdReveal = false
     /// Also keeps it open: a panel that came out of it (the site panel, downloads) is still showing.
@@ -904,6 +905,9 @@ final class BrowserRootView: SpaceFrameView {
                     self.layoutSubtreeIfNeeded()
                 }
             }
+        }
+        shortFloatingToken = NotificationCenter.default.addObserver(forName: Self.shortFloatingChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.needsLayout = true }
         }
         // Questions arriving or answered toggle the glow.
         attentionToken = PendingQuestions.changed.observe { [weak self] _ in self?.needsLayout = true }
@@ -1709,6 +1713,9 @@ final class BrowserRootView: SpaceFrameView {
 
     private var paintsTopBar: Bool { chromeBarShown && barColor != nil && tiles == nil && !isEmpty }
 
+    /// The bar lies on the page's card in a solid color, so no frame shows behind it.
+    private var barCoversFrame: Bool { paintsTopBar && (barColor?.alphaComponent ?? 0) > 0.99 }
+
     /// Framed in split view under the bar, each pane whose strip is up in the bar's row is one card with it, as a page
     /// alone is with the bar: its card reaches up to the bar's top, its own ground (its page's color, or the card's)
     /// behind its strip, so no strip floats on the glass over a card. Between the panes the glass shows down to the
@@ -2046,13 +2053,27 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// The sidebar's frame: docked along the window's edge, floating a frame's inset in from it while slid out, or
-    /// out of sight past that edge.
-    static func sidebarFrame(in bounds: NSRect, width: CGFloat, visible: Bool, revealed: Bool, onRight: Bool) -> NSRect {
+    /// out of sight past that edge. `short`: floating at two thirds of the window's height (#538).
+    static func sidebarFrame(in bounds: NSRect, width: CGFloat, visible: Bool, revealed: Bool, onRight: Bool,
+                             short: Bool = shortFloatingSidebar) -> NSRect {
         let inset = Tokens.Metric.cardInset
         if visible { return mirrored(NSRect(x: bounds.minX, y: bounds.minY, width: width, height: bounds.height), in: bounds, if: onRight) }
         let x = bounds.minX + (revealed ? inset : -width - inset * 4)
-        return mirrored(NSRect(x: x, y: bounds.minY + inset, width: width, height: bounds.height - inset * 2), in: bounds, if: onRight)
+        let y = short ? bounds.minY + round(bounds.height / 6) : bounds.minY + inset
+        let height = short ? bounds.height - round(bounds.height / 6) * 2 : bounds.height - inset * 2
+        return mirrored(NSRect(x: x, y: y, width: width, height: height), in: bounds, if: onRight)
     }
+
+    /// Settings › Appearance › Shorter floating sidebar (#538). Off by default.
+    static var shortFloatingSidebar: Bool {
+        get { UserDefaults.standard.bool(forKey: shortFloatingKey) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: shortFloatingKey)
+            NotificationCenter.default.post(name: shortFloatingChanged, object: nil)
+        }
+    }
+    static let shortFloatingKey = "ShortFloatingSidebar"
+    static let shortFloatingChanged = Notification.Name("ShortFloatingSidebarChanged")
 
     /// Where a panel `width` wide goes beside the sidebar, a little way out over the page: right of it, or left of it
     /// when it's on the right (tab previews, the space editor, the icon picker).
@@ -2097,8 +2118,8 @@ final class BrowserRootView: SpaceFrameView {
     override var glassFrame: NSRect {
         // Edge to edge under the bar above the page, only the bar shows the frame, as in Zigzag Mini.
         if chromeBarShown, isEdgeToEdge, !card.isHidden { return topBarFrame }
-        // Beside the sidebar too, the frame shows along the top and the side: glass under all of it.
-        if chromeBarShown { return bounds }
+        // Beside the sidebar, a bar on the page's card covers its row too; a bar on the frame needs glass under it.
+        if chromeBarShown, !barCoversFrame { return bounds }
         // A split view's seam between its two pages shows the frame: glass under all of it then.
         guard chromeSidebarShown, card.isAttached, !card.isHidden,
               extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
@@ -2446,6 +2467,8 @@ final class BrowserRootView: SpaceFrameView {
             pageCard.isAttached = visible && Self.isBorderless
             pageCard.setEdgeToEdge(isEdgeToEdge, duration: duration)
         }
+        // Coming back, the glass leaves the bar's row it had edge to edge before the sidebar slides in.
+        if visible { refreshGlassFrame() }
         refreshGlassOcclusion()
         // The bar's controls and the page move as one: nothing in the bar jumps to its new place.
         if topBarSlideFrame != nil { topBar.slideControls(from: oldControls, curve: curve) }
@@ -2683,6 +2706,7 @@ final class BrowserRootView: SpaceFrameView {
         edgeTimer?.invalidate()
         pointerObservers.forEach(NotificationCenter.default.removeObserver)
         if let borderlessToken { NotificationCenter.default.removeObserver(borderlessToken) }
+        if let shortFloatingToken { NotificationCenter.default.removeObserver(shortFloatingToken) }
         if let touchListener { TouchPress.stopListening(touchListener) }
         grabberHideWork?.cancel()
         grabberRevealWork?.cancel()

@@ -324,10 +324,9 @@ class InteractiveView: NSView {
         holdTimer = nil
         guard isEnabled, isPressed, !dragging, let press = mouseDownEvent, let onRightClick, window != nil,
               MenuPanel.current == nil, let menu = onRightClick(press) else { return }
-        let entries = MenuPanel.entries(from: menu)
-        guard !entries.isEmpty else { return }
+        guard !MenuPanel.entries(from: menu).isEmpty else { return }
         isPressed = false
-        heldMenu = MenuPanel.show(entries, from: self, placement: .below)
+        heldMenu = MenuPanel.show(menu: menu, from: self, placement: .below)
         if heldMenu != nil { startHeldFollow() }
     }
 
@@ -547,9 +546,7 @@ class InteractiveView: NSView {
     }
 
     private func showDrawnMenu(_ menu: NSMenu, at windowPoint: NSPoint) {
-        let entries = MenuPanel.entries(from: menu)
-        guard !entries.isEmpty else { return }
-        MenuPanel.show(entries, from: self, placement: .at(windowPoint))
+        MenuPanel.show(menu: menu, from: self, placement: .at(windowPoint))
     }
 
     override func accessibilityPerformShowMenu() -> Bool { showContextMenu() }
@@ -1078,7 +1075,49 @@ final class Label: NSTextField {
     static let inset: CGFloat = 2
 
     /// Height of one line in this label's font.
-    var lineHeight: CGFloat { ceil(intrinsicContentSize.height) }
+    var lineHeight: CGFloat {
+        guard wrapsWhenLong else { return ceil(intrinsicContentSize.height) }
+        return ceil(Self.oneLineProbe(font ?? Tokens.Font.body()).intrinsicContentSize.height)
+    }
+
+    /// Text longer than the label's width runs onto more lines instead of being cut short, as a longer language
+    /// needs. The owner sizes it with `height(forWidth:)` and calls `fitLines(_:)` with its width before placing it.
+    private(set) var wrapsWhenLong = false
+
+    func wrapWhenLong() { wrapsWhenLong = true }
+
+    /// Whether the text fits on one line at `width` (the label's frame width).
+    func fitsOneLine(_ width: CGFloat) -> Bool { inkWidth <= width - Label.inset * 2 + 0.5 }
+
+    /// The height its text needs at `width` (its frame width): one line when it fits, else every line it wraps to.
+    func height(forWidth width: CGFloat) -> CGFloat {
+        guard wrapsWhenLong, !fitsOneLine(width) else { return lineHeight }
+        let probe = NSTextField(wrappingLabelWithString: "")
+        probe.font = font
+        probe.attributedStringValue = attributedStringValue
+        return ceil(probe.sizeThatFits(NSSize(width: width, height: 10_000)).height)
+    }
+
+    /// One line, cut at its end, while the text fits `width`; wrapping once it doesn't.
+    func fitLines(_ width: CGFloat) {
+        guard wrapsWhenLong else { return }
+        let wraps = !fitsOneLine(width)
+        guard (cell?.wraps ?? false) != wraps else { return }
+        usesSingleLineMode = !wraps
+        maximumNumberOfLines = wraps ? 0 : 1
+        lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
+        cell?.wraps = wraps
+        cell?.truncatesLastVisibleLine = !wraps
+    }
+
+    /// A single-line label in `font`, to read one line's height from.
+    private static func oneLineProbe(_ font: NSFont) -> Label {
+        if let probe = probes[font] { return probe }
+        let probe = Label("Hg", font: font)
+        probes[font] = probe
+        return probe
+    }
+    private static var probes: [NSFont: Label] = [:]
 
     private struct CapsKey: Hashable {
         var fontName: String
@@ -1942,6 +1981,22 @@ protocol MenuItemStyle: AnyObject {
     var isDestructive: Bool { get }
 }
 
+/// What keeps a drawn menu up to date while it's open: each time `changes` fires, `rebuild` makes its AppKit menu again.
+final class MenuUpdates {
+    let changes: Signal<Void>
+    let rebuild: () -> NSMenu?
+    init(changes: Signal<Void>, rebuild: @escaping () -> NSMenu?) { self.changes = changes; self.rebuild = rebuild }
+}
+
+extension NSMenu {
+    private static var updatesKey: UInt8 = 0
+    /// Set on a menu shown as a drawn one (`MenuPanel.show(menu:)`), it changes in place while open.
+    var updates: MenuUpdates? {
+        get { objc_getAssociatedObject(self, &Self.updatesKey) as? MenuUpdates }
+        set { objc_setAssociatedObject(self, &Self.updatesKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+}
+
 /// Zigzag's own menu, drawn rather than the system's, for choosing from a list (a dropdown's options) or acting on
 /// something (a button's few actions): a solid panel with a hairline edge and the panel shadow, 15pt items, a soft gray
 /// row under the pointer or the arrow keys, a check at the trailing end of the chosen one. It arrives in a quick fade
@@ -2016,8 +2071,9 @@ final class MenuPanel: FloatingPanelView {
     static weak var current: MenuPanel?
     private(set) weak var anchor: NSView?
 
-    private let entries: [Entry]
+    private var entries: [Entry]
     private var rows: [Row] = []
+    private var followToken: SignalToken?
     private var notes: [NSTextField] = []
     /// The width notes wrap to, set once the menu's width is known.
     private var noteWidth: CGFloat = 0
@@ -2073,6 +2129,14 @@ final class MenuPanel: FloatingPanelView {
         scroll.documentView = list
         addSubview(scroll)
         list.addSubview(pill)
+        buildContent()
+        setAccessibilityElement(true)
+        // Only words to read: a popover, not a menu to choose from.
+        setAccessibilityRole(rows.isEmpty && !notes.isEmpty ? .popover : .menu)
+    }
+
+    /// A row, heading, line or note for each entry.
+    private func buildContent() {
         let hasImages = entries.contains { if case .item(let item) = $0 { return item.image != nil || item.symbol != nil }; return false }
         for entry in entries {
             switch entry {
@@ -2105,9 +2169,6 @@ final class MenuPanel: FloatingPanelView {
                 list.addSubview(note)
             }
         }
-        setAccessibilityElement(true)
-        // Only words to read: a popover, not a menu to choose from.
-        setAccessibilityRole(rows.isEmpty && !notes.isEmpty ? .popover : .menu)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -2287,6 +2348,78 @@ final class MenuPanel: FloatingPanelView {
     /// Pressed, the highlight darkens a step.
     fileprivate func showPressed(_ pressed: Bool) { pill.showPressed(pressed) }
 
+    // MARK: Keeping up
+
+    /// Opens an AppKit menu as a drawn one; with `updates`, it keeps up while it's open.
+    @discardableResult
+    static func show(menu: NSMenu, from anchor: NSView, placement: Placement = .below) -> MenuPanel? {
+        let entries = Self.entries(from: menu)
+        guard !entries.isEmpty, let panel = show(entries, from: anchor, placement: placement) else { return nil }
+        if let updates = menu.updates {
+            panel.followToken = updates.changes.observe { [weak panel] in
+                guard let panel, let fresh = updates.rebuild() else { return }
+                panel.update(Self.entries(from: fresh))
+            }
+        }
+        return panel
+    }
+
+    /// New entries in the open menu, as a system menu changes while open: items that only changed their title,
+    /// state or action change in place; otherwise the rows are made again in the same panel. The lit item stays lit.
+    func update(_ fresh: [Entry]) {
+        let lit = highlighted.map { rows[$0].item.title }
+        if Self.sameShape(entries, fresh) {
+            entries = fresh
+            var index = 0
+            for entry in fresh {
+                guard case .item(let item) = entry else { continue }
+                rows[index].apply(item)
+                index += 1
+            }
+            if let highlighted, !rows[highlighted].item.isEnabled { self.highlighted = nil }
+            if fittingWidth > bounds.width { resizeToFit() }
+            return
+        }
+        closeChild(animated: false)
+        entries = fresh
+        list.subviews.filter { $0 !== pill }.forEach { $0.removeFromSuperview() }
+        rows = []
+        notes = []
+        buildContent()
+        highlighted = lit.flatMap { title in rows.firstIndex { $0.item.title == title && $0.item.isEnabled } }
+        resizeToFit()
+    }
+
+    /// The same rows in the same places, each item with the same picture and kind.
+    private static func sameShape(_ a: [Entry], _ b: [Entry]) -> Bool {
+        guard a.count == b.count else { return false }
+        return zip(a, b).allSatisfy { pair in
+            switch pair {
+            case (.item(let x), .item(let y)):
+                x.symbol == y.symbol && (x.image == nil) == (y.image == nil) && x.isDestructive == y.isDestructive
+                    && (x.submenu == nil) == (y.submenu == nil) && x.shortcut == y.shortcut
+            case (.header(let x), .header(let y)): x == y
+            case (.separator, .separator): true
+            default: false
+            }
+        }
+    }
+
+    /// Its top edge stays where it is; it grows wider when an item needs it, and as tall as its items, inside the window.
+    private func resizeToFit() {
+        guard let host = superview, window != nil else { return }
+        let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
+        var rect = convert(bounds, to: nil)
+        let width = ceil(max(rect.width, fittingWidth))
+        if width != rect.width { noteWidth = width - (Self.pad + Self.rowInset) * 2 }
+        let height = min(contentHeight, area.height)
+        rect = NSRect(x: min(rect.minX, max(area.minX, area.maxX - width)), y: rect.maxY - height, width: width, height: height)
+        if rect.minY < area.minY { rect.origin.y = area.minY }
+        frame = host.convert(rect, from: nil)
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
     // MARK: Closing
 
     private func watch(_ window: NSWindow) {
@@ -2315,6 +2448,7 @@ final class MenuPanel: FloatingPanelView {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
         if Self.current === self { Self.current = nil }
+        followToken = nil
         let closed = onClose
         onClose = nil
         if animated { leave() } else { removeFromSuperview() }
@@ -2539,6 +2673,9 @@ final class MenuPanel: FloatingPanelView {
         return row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
     }
 
+    /// Whether the item with this title can be chosen; nil when there's none.
+    func debugIsEnabled(_ title: String) -> Bool? { rows.first { $0.item.title == title }?.item.isEnabled }
+
     /// Opens the submenu of the item with this title, as hovering it does.
     func debugOpenSubmenu(_ title: String) {
         if let index = rows.firstIndex(where: { $0.item.title == title }) { highlighted = index; openChild(index, fromKey: false) }
@@ -2622,7 +2759,7 @@ final class MenuPanel: FloatingPanelView {
     // MARK: Rows
 
     fileprivate final class Row: InteractiveView {
-        let item: Item
+        private(set) var item: Item
         let reservesIcon: Bool
         private let icon = NSImageView()
         private let label: Label
@@ -2672,6 +2809,17 @@ final class MenuPanel: FloatingPanelView {
 
         required init?(coder: NSCoder) { fatalError() }
 
+        /// The same kind of item with a new title, check, state or action.
+        func apply(_ new: Item) {
+            item = new
+            label.stringValue = new.title
+            check.isHidden = !new.isChecked && new.submenu == nil
+            isEnabled = new.isEnabled
+            setAccessibilityLabel(new.title)
+            setAccessibilityValue(new.isChecked ? String(localized: "selected", comment: "What VoiceOver says after a checked item in one of Zigzag's menus.") : nil)
+            stateDidChange(animated: false)
+        }
+
         override func layout() {
             super.layout()
             var x = MenuPanel.rowInset
@@ -2705,12 +2853,13 @@ final class MenuPanel: FloatingPanelView {
 }
 
 /// A state, said calmly: a check in its window's accent and a few words ("Zigzag is your default browser").
-final class StatusLabel: NSView {
+final class StatusLabel: NSView, FormSheetSizing {
     private let check = NSImageView()
     private let label: Label
     init(_ text: String, symbol: String = "checkmark.circle.fill") {
         label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
+        label.wrapWhenLong()
         check.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
         [check, label].forEach { addSubview($0) }
     }
@@ -2724,10 +2873,23 @@ final class StatusLabel: NSView {
 
     override var intrinsicContentSize: NSSize { NSSize(width: 16 + Tokens.Space.x2 + label.inkWidth + Label.inset, height: Tokens.Space.x7Height) }
 
+    /// Where its words start, past the icon.
+    private static let textX = 16 + Tokens.Space.x2 - Label.inset
+
+    /// One line beside its icon, or more for words longer than the row.
+    func height(for width: CGFloat) -> CGFloat {
+        let room = width - Self.textX
+        return label.fitsOneLine(room) ? Tokens.Metric.controlHeight : label.height(forWidth: room)
+    }
+
     override func layout() {
         super.layout()
-        check.frame = NSRect(x: 0, y: (bounds.height - 16) / 2, width: 16, height: 16)
-        label.frame = NSRect(x: 16 + Tokens.Space.x2 - Label.inset, y: label.centeredY(in: bounds.height), width: label.inkWidth + Label.inset * 2, height: label.lineHeight)
+        let room = min(label.inkWidth + Label.inset * 2, bounds.width - Self.textX)
+        label.fitLines(room)
+        let height = label.height(forWidth: room)
+        let y = height == label.lineHeight ? label.centeredY(in: bounds.height) : round((bounds.height - height) / 2)
+        label.frame = NSRect(x: Self.textX, y: y, width: max(0, room), height: height)
+        check.frame = NSRect(x: 0, y: height == label.lineHeight ? (bounds.height - 16) / 2 : y + (label.lineHeight - 16) / 2, width: 16, height: 16)
     }
 }
 

@@ -1,6 +1,6 @@
 <!--
 繁體中文版版本說明。版本、日期、條目順序、問題連結和致謝名單請與 CHANGELOG.md 保持一致。
-用語請參考 docs/i18n/glossary.zh-Hant.md。翻譯不完整或尚未翻譯的版本，App 會顯示英文版說明。
+用語請參考 docs/i18n/glossaries/zh-Hant.md。翻譯不完整或尚未翻譯的版本，App 會顯示英文版說明。
 -->
 # 版本記錄
 
@@ -20,6 +20,44 @@
 - 從螢幕邊緣側邊欄預覽網頁時，網頁一開始就按頁面這一欄的尺寸排版，平鋪群組裡的網頁也一樣，不會再先按 Mini 記住的視窗尺寸或它在平鋪群組裡的尺寸排版再調整；折疊動畫會等網頁按新尺寸畫好第一格再開始，所以開啟預覽或在平鋪群組各部分之間移動時，網頁內容不會再跟著重排或移動。
 - 從螢幕邊緣側邊欄新增分頁時，命令列和在別處一樣開在螢幕正中的聚光列裡，不再是擠在側邊欄寬度裡的一條。在那裡選取結果後，面板不會收起，後面的視窗也不會被帶到前面。
 
+## [0.10.0] - 2026-11-25
+
+Zigzag 新增十三種語言，包括日文、韓文、德文、法文、西班牙文和俄文；下載規則可以轉交下載好的檔案；即時資料夾會顯示上次更新的時間；用中文拼音輸入中途切換到英文，不會再多出空格。
+
+### 新功能
+- Zigzag 現在支援日文，用詞和 Apple 的日文 macOS、Safari 一致。它會跟隨 Mac 的語言，也可以在「設定 › 一般 › 語言」裡選擇。
+- Zigzag 現在支援韓文、德文、法文、義大利文、西班牙文、巴西葡萄牙文、俄文、荷蘭文、波蘭文和土耳其文，用詞和 Apple 在各語言中的一致。它會跟隨 Mac 的語言，也可以在「設定 › 一般 › 語言」裡選擇。
+- 下載規則可以轉交檔案，而不只是網址：把「轉交」設為「檔案」，Zigzag 會先用網頁的登入狀態下載，再把儲存好的檔案交給 App、指令碼或服務。連結仍然轉交網址；轉交檔案時，範本可以用 {file} 或 {file_url} 取得儲存的檔案。感謝 [Lakeland97](https://github.com/Lakeland97)。([#529](https://github.com/ZigaoWang/zigzag/issues/529))
+- 即時資料夾的選單頂端現在會顯示上次更新的時間，例如「5分鐘前更新」；正在取得時顯示「正在更新…」。
+- 「新增即時資料夾」和「編輯即時資料夾」會先詢問來源，下拉式選單與輸入欄位對齊，下方會說明資料夾會顯示什麼，以及每 30 分鐘檢查一次（低耗電模式下每小時一次）。名稱留空時會顯示將使用的名稱，不可能是 GitHub 使用者名稱的輸入會被標出。
+- 「網站設定」新增「相容模式」，給無法正常使用的網站用：一個開關就能在這個網站上關閉延伸功能、廣告阻擋、Cookie 彈出式視窗和已隱藏的元素，關閉相容模式後，你之前對它們的選擇都會恢復。開啟時「網站設定」按鈕會變成強調色，「設定 › 隱私 › 網站」也會列出它。感謝 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+- 「設定 › 外觀 › 指向連結時顯示連結網址」：關閉後，指向連結時網頁角落不會再顯示連結網址，瀏覽器視窗、Zigzag Mini、Web App 和分頁概覽都一樣。預設仍然開啟。感謝 [sarekhamri](https://github.com/sarekhamri)。([#537](https://github.com/ZigaoWang/zigzag/issues/537))
+- 「設定 › 外觀 › 較短的浮動側邊欄」：側邊欄隱藏時，浮現在網頁上的側邊欄高度是視窗的三分之二，上下各留出六分之一。固定的側邊欄不變。預設關閉。感謝 [sarekhamri](https://github.com/sarekhamri)。([#538](https://github.com/ZigaoWang/zigzag/issues/538))
+- 「設定 › 外觀 › 已固定分頁顯示為方塊」：不在資料夾裡的已固定分頁會以方塊顯示在收藏下方，和收藏在同一個格狀排列裡，中間隔一條細線；打開、卸載、右鍵選單和拖移都和原本的列一樣。資料夾和裡面的網頁仍然是列。預設關閉。感謝 [sarekhamri](https://github.com/sarekhamri)。([#539](https://github.com/ZigaoWang/zigzag/issues/539))
+- 「設定」裡的長列表現在像「網站權限」一樣收合成方框：「鍵盤快速鍵」的每個選單、每條下載規則（儲存的回答在裡面）、每類功能旗標，以及超過三項時的「開發者模式中的網站」「受信任的憑證」和「網頁尺寸」。「搜尋設定」仍會展開符合項目所在的方框。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- 「網站權限」本身的搜尋和「搜尋設定」現在也能依權限和選擇找網站：輸入「相機」「通知」或「阻擋」，就能看到做了這個選擇的每個網站，各自在網站名稱下面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#532](https://github.com/ZigaoWang/zigzag/issues/532))
+- 「瀏覽記錄」的搜尋不分重音和大小寫，能依任意順序找到每個詞並標出來，也不會把符合的結果藏在疊起來的一組裡；一天的每個時段只有一個標題，同一網站的兩個頁面仍是兩列，列表還能回應方向鍵、Delete、⌘Return、⌘F，以及能移除整個網站的右鍵操作。
+- 即時資料夾檢查新頁面時，圖示角落的標記會顯示一個轉動的圓環，就像「郵件」檢查信箱時那樣，檢查一結束就停下。
+- 「新增即時資料夾」和「編輯即時資料夾」會顯示資料夾自己的圖示，和側邊欄裡一樣：GitHub 列表是 GitHub 的圖示，訂閱來源是網站的圖示，選過圖示就是選的那個。按一下就能像「變更圖示…」一樣更換圖示，新增的資料夾會使用你選的圖示。
+
+### 變更
+- 雙指向上一頁、下一頁輕掃更順暢了，滑動距離更短或輕輕一撥就能觸發，頁面不會上下漂移，也不會留下箭頭或讓頁面錯位，在分頁、分割顯示和 Zigzag Mini 中都一樣。
+
+### 修正
+- 網頁上開啟 Zigzag Mini 時，在變暗的網頁上捲動不會再把後面的網頁捲走。感謝 [Lakeland97](https://github.com/Lakeland97)。([#531](https://github.com/ZigaoWang/zigzag/pull/531))
+- 允許網站存取這台 Mac 上的 App 之前的說明，現在按順序寫清楚了：先開啟這個設定，再在網站設定裡開啟每個網站，關閉這個設定會停止所有網站。感謝 [Lakeland97](https://github.com/Lakeland97)。([#533](https://github.com/ZigaoWang/zigzag/issues/533))
+- 在「設定」中，標題旁有按鈕或搜尋欄位的清單，例如「網站儲存的資料」或「轉交下載和連結」，不會再緊貼在這些控制項下方，與其他標題下方保留相同的間距。感謝 [Lakeland97](https://github.com/Lakeland97)。([#527](https://github.com/ZigaoWang/zigzag/issues/527))
+- 拼音輸入到一半切換到英文時，字母之間不再留下空格，網頁和網址列裡都是，與 Chrome 一致。
+- 玻璃選為「透明」的空間，在 Zigzag 什麼都沒做時（即使是空白頁或「設定」）不會再讓 Mac 的圖形處理器一直忙碌。之前 macOS 每一格畫面都要重畫整個視窗和它的陰影，現在只在有變化時才重畫。更新卡片的進度列在隱藏時也不會再繼續滑動。
+- 「設定」開啟得更快了。每個部分在第一次開啟時才產生，收合的方框在展開或被搜尋時才產生，所以在「一般」開啟「設定」時不會再產生「下載項目」「鍵盤快速鍵」或「開發者」。感謝 [Lakeland97](https://github.com/Lakeland97)。([#536](https://github.com/ZigaoWang/zigzag/issues/536))
+- Bitwarden 的「使用生物辨識解鎖」現在能連上 Bitwarden App 了。之前 Zigzag 告訴 Bitwarden 它已經能和 App 溝通，所以 Bitwarden 從不申請，Zigzag 卻又不讓它連上 App。現在 Bitwarden 會申請，Zigzag 會詢問你是否允許。如果之前開啟過生物辨識，請在 Bitwarden 的設定裡把「使用生物辨識解鎖」關閉再開啟。感謝 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- 網址列放在頁面上方、空間設為透明時，播放影片不再讓 Mac 的圖形處理比關閉網址列時忙得多。視窗的玻璃現在只留在側邊欄後面，而不是整個視窗。
+- 在 Mac 記憶體不足時休眠了好幾個小時的分頁，醒來後不再登出 Azure DevOps、Microsoft 365 等網站：如果 WebKit 中儲存登入 Cookie 的部分停止了（記憶體吃緊時 macOS 可能會讓它停止），Zigzag 會在頁面載入前把它們放回去。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- 全螢幕播放的影片不再被網站自己的頂部列或側欄蓋住，例如 Bilibili。([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- 在不顯示視窗按鈕的地方，上一頁、下一頁和重新載入按鈕前不再留出放視窗按鈕的空位，例如選單列落下之前的全螢幕；較短的浮動側邊欄展開時，視窗按鈕也會留在工具列裡。感謝 [Lakeland97](https://github.com/Lakeland97)。([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- 更新時一直開著的即時資料夾選單，現在不用關掉就會從「正在更新…」變成「剛剛更新」，或顯示無法更新的原因。
+- 「每行收藏數」設為「自動」時，收藏會平均分布在各列：六個本來能排四個的，會排成兩列各三個，而不是四個加兩個。
+
 ## [0.9.5] - 2026-11-25
 
 可以匯出你的資料，隨時帶走一切；即時資料夾；拖動就能巢狀放置分頁；繁體中文介面；影片全螢幕留在瀏覽器裡；網址列可以自動隱藏；從螢幕邊緣拉出側邊欄；Zigzag 在每個網頁裡做的事更少，捲動更順暢；網頁以螢幕完整的 120 Hz 繪製；觸控操作更順手；從 Dia 匯入時會一併帶入已固定分頁；按住上一頁或下一頁按鈕就能瀏覽記錄；重新啟動後會保留登入狀態和 YouTube 的劇院模式；設定裡可以選取密碼管理器延伸功能。
@@ -28,10 +66,10 @@
 - 從 Dia 匯入時，和 Arc 一樣也會帶入側邊欄。每個 Dia 個人資料的已固定分頁會固定在放書籤的空間中，分割顯示仍會並排，收藏也會保留。若選取「開啟的分頁」，這些分頁也會一併匯入，並在點選時才載入。再次匯入只會加入新的項目。([#511](https://github.com/ZigaoWang/zigzag/issues/511))
 - 和 Safari、Chrome 一樣，按住上一頁或下一頁按鈕就能直接選取該方向的瀏覽記錄。可以滑到要開啟的網頁再放開，也可以先放開再點選。側邊欄、網頁上方的工具列、分割顯示、Zigzag Mini 和網頁 App 都支援。在觸控式螢幕上按住按鈕，或按一下滑鼠右鍵，也會開啟同一個 Zigzag 選單。([#509](https://github.com/ZigaoWang/zigzag/issues/509))
 - 「設定 › 分頁 › 全螢幕影片填滿」選取「整個螢幕」時，影片的全螢幕現在會留在瀏覽器視窗裡。視窗會進入自己的全螢幕空間，和「顯示 › 進入全螢幕」一樣，側邊欄和網址列會讓開；把指標移到最上方就能叫出網址列。在分割畫面中，影片只會填滿自己的窗格。按 Esc 會讓視窗回到原本的樣子，原本就在全螢幕的視窗會留在全螢幕。影片右上角的按鈕仍然可以讓它單獨全螢幕，和以前一樣。Web App、Zigzag Mini 和迷你播放器維持原本的全螢幕方式。感謝 [Lakeland97](https://github.com/Lakeland97)。([#462](https://github.com/ZigaoWang/zigzag/issues/462))
-- 儲存網頁的延伸功能（`chrome.pageCapture`）現在可以用了：可以像在 Chrome 裡一樣，把分頁儲存為一個 MHTML 檔案，連同它的樣式、圖片和框架，Chrome 等瀏覽器能把它當作網頁開啟。只適用於延伸功能可存取的網站上的網頁；網頁載入的內容中，只有圖片、樣式表和字型會存進去，和 Chrome 一樣。感謝 [OnurrUgur](https://github.com/OnurrUgur)。([#488](https://github.com/ZigaoWang/zigzag/issues/488))
 - 新增繁體中文介面。在「設定 › 一般 › 語言」選取「繁體中文」後，重新啟動 Zigzag 即可套用。感謝 [aliceric27](https://github.com/aliceric27)。([#505](https://github.com/ZigaoWang/zigzag/issues/505))
 - 開啟「設定 › 外觀」中的「從螢幕邊緣拉出側邊欄」後，側邊欄可以在你正在使用的 App 上方拉出來，就像隱藏的 Dock 一樣。把指標推到側邊欄那一側的螢幕邊緣停一下，空間、收藏、分頁和正在播放的內容就會出現在那個 App 上方。點一下分頁、收藏或新增分頁，Zigzag 會像從 Dock 打開一樣來到前面並顯示它；把指標移開，側邊欄就會收回，原本的 App 仍在前面。螢幕角落、Dock 或幕前調度所在的那一側，以及通往另一台顯示器的邊緣都不會拉出側邊欄。預設關閉。感謝 [Lakeland97](https://github.com/Lakeland97)。([#363](https://github.com/ZigaoWang/zigzag/issues/363))
 - AI App 可以在背景工作，螢幕上什麼都不顯示：開啟「設定 › 自動化 › 讓 AI App 在背景執行」（預設關閉，且需要同時開啟「允許 AI App 使用 Zigzag」）。它們會在自己的「AI App」個人資料中獲得一個隱藏視窗，看不到你的視窗和分頁；這個空間不會出現在你的側邊欄和空間列表中，你可以在「設定 › 個人資料」中刪除這個個人資料。兩個開關都開啟時，用 `--headless` 開啟 Zigzag 會只為它們執行，在你自己開啟之前不顯示 Dock 圖像和視窗，用完後會自行結束。這個個人資料拿不到你的任何東西：沒有儲存的密碼、登入資訊、憑證或通行密鑰，沒有你給網站的權限，不會套用你的下載規則，你設為在某個空間中開啟的網站也不會從這裡被送走，也連不到這台 Mac 上的 App，它的分頁不會進入你的封存。它們的網頁一開始就是靜音的，不能全螢幕蓋住你的螢幕，也不能寫入你的剪貼簿；下載的檔案放在它們自己的資料夾裡，不會出現在你的下載項目和 Dock 中。背景沒有人能回應網頁，所以網頁的對話框會被直接關閉，並告知 App。選單列中會有一個項目表明它們正在工作，並提供「顯示 AI App 視窗」（觀看它們工作）和「停止 AI App」。AI App 正在使用的分頁也不會再在使用時被休眠、封存或清除。感謝 [vandenbulckjean](https://github.com/vandenbulckjean)。([#214](https://github.com/ZigaoWang/zigzag/issues/214))
+- 儲存網頁的延伸功能（`chrome.pageCapture`）現在可以用了：可以像在 Chrome 裡一樣，把分頁儲存為一個 MHTML 檔案，連同它的樣式、圖片和框架，Chrome 等瀏覽器能把它當作網頁開啟。只適用於延伸功能可存取的網站上的網頁；網頁載入的內容中，只有圖片、樣式表和字型會存進去，和 Chrome 一樣。感謝 [OnurrUgur](https://github.com/OnurrUgur)。([#488](https://github.com/ZigaoWang/zigzag/issues/488))
 - 「檔案 › 匯出你的資料…」可以把你的空間、已固定分頁和收藏儲存成書籤檔案，Chrome、Safari、Firefox 等瀏覽器都能匯入，每個空間是一個資料夾，裡面的資料夾和網頁依側邊欄的順序排列。也可以儲存一份 Zigzag 備份，包括空間、資料夾、分割顯示、收藏、個人資料、網站設定和設定，需要的話還有開啟的分頁和瀏覽記錄；在這台或另一台 Mac 上按兩下備份檔案，或在匯入視窗中選取它，Zigzag 會先詢問再還原，已有的內容不會重複。密碼仍在「密碼」視窗中另外匯出。「設定 › 一般」和指令列中也找得到它。([#518](https://github.com/ZigaoWang/zigzag/issues/518))
 - 網頁上方的網址列可以自動隱藏了。「設定 › 外觀 › 在網頁上方顯示網址列」現在有「關閉」、「自動隱藏」和「一律」三個選項，原本開啟的會維持「一律」。選擇「自動隱藏」時，向下捲動網址列會跟著網頁往上收起，網頁會使用它的空間；重新向上滑動、捲動到網頁最上方、將指標移到視窗頂端、按下 ⌘L，或在觸控螢幕上輕點它原本的位置，它就會回來。在網頁中輸入文字或網頁自行捲動時，它會保持不動，視窗按鈕也會跟著它一起收起和出現。分割顯示時，每個網頁的網址列會跟著各自的捲動。感謝 [Lakeland97](https://github.com/Lakeland97)。([#359](https://github.com/ZigaoWang/zigzag/issues/359))
 - 即時資料夾，和 Arc 一樣。在側邊欄的 +、空間選單或資料夾選單中選取「新增即時資料夾…」，貼上訂閱來源的網址，或直接貼上網站網址，也可以選取一個 GitHub 列表（你開啟的提取要求、指派給你的議題或請你審查的提取要求）並輸入使用者名稱。資料夾會自動填入最新的網頁，每半小時在背景檢查一次，新網頁會帶一個圓點，開啟後就會消失。它的選單中有「全部標示為已讀」、「立即更新」和「編輯…」，無法取得訂閱來源時也會說明原因。把網頁拖出來，就會固定在你放下的位置。GitHub 列表只會顯示公開儲存庫，因為 Zigzag 不會為此登入 GitHub。
@@ -59,11 +97,11 @@
 - 登入欄位下方的已儲存登入選單，在你縮放網頁、調整視窗或分割畫面大小，或網頁自行移動欄位時，會一直跟在欄位下方；在用雙指放大的網頁上也會出現在正確的位置。以前它會停在剛打開的地方蓋住欄位，本來要點欄位卻可能填入一組登入資料。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 從 Dia 匯入時，每個 Dia 個人資料都會變成一個空間，名稱和 Dia 裡一樣，沒有書籤或固定分頁的也會建立；Dia 沒標明側邊欄分頁屬於哪個個人資料時，會放進你在 Dia 裡最後使用的那個。([#511](https://github.com/ZigaoWang/zigzag/issues/511))
 - 捲動 X、GitHub 和 linux.do 這類一直在變的長網頁更順暢了，因為 Zigzag 在這段時間自己做的事更少了：Cookie 彈出視窗的檢查會等你停止捲動，捲過每則貼文都會改網址的論壇不再每次重畫側邊欄的網址，網頁的語言判斷也移到不會卡住視窗繪製的地方。「說明 › 回報問題」也會列出 Zigzag 停頓超過二十分之一秒的時刻，以及當時在做什麼。網頁在你捲動時也少做 Zigzag 的工作：只在可能開始滑動前往上一頁或下一頁時才監聽滑動，只在網頁載入後或你操作之後才尋找新的登入欄位。
+- 對 120 Hz 來說太重的網站，重新開啟 Zigzag 後第一個網頁就以 60 開始，不會再卡頓到 Zigzag 重新發現為止；網站會記住一個月，清除瀏覽記錄或網站資料時一併忘記。被限制在 60 附近的網頁會等你停止捲動再切換更新率，不會在捲動途中切換。開啟低耗電模式或 Mac 發熱時，網頁從 60 附近開始。([#519](https://github.com/ZigaoWang/zigzag/issues/519))
 - 你在「設定 › 開發者」中改過的功能旗標，開關旁邊會有「重設」按鈕，取代原本只顯示的「已更改」；Zigzag 預設值與 WebKit 不同的旗標（例如 Prefer Page Rendering Updates near 60fps）會在名稱下方註明。
 - 滑動前往上一頁或下一頁放開時，網頁不會再先彈回原位才離開，而是順著滑動方向再移動一點並稍微變暗，接著下一個網頁直接出現在原處，不用看箭頭也知道滑動已生效。沒滑到底時網頁仍會彈回；開啟「減少動態效果」時網頁不會移動。([#508](https://github.com/ZigaoWang/zigzag/issues/508))
 - 你在「設定 › 密碼 › 密碼管理器」中選取的密碼管理器延伸功能，即使 Zigzag 不認得它的名稱（例如 Litewarden），現在也會生效：Zigzag 不再提示儲存和填寫密碼，登入欄位中不顯示鑰匙圖示，通行密鑰也交給它處理。會關閉瀏覽器內建密碼儲存功能的延伸功能（例如在 Chrome 中的 Bitwarden 和 1Password）也會列在那裡並同樣生效，直到它把設定改回來，或你停用或移除它。([#513](https://github.com/ZigaoWang/zigzag/issues/513))
 - 你允許使用位置的網站現在能取得你的位置。以前 macOS 從不詢問 Zigzag 能否使用你的位置，「系統設定 › 隱私權與安全性 › 定位服務」中也沒有 Zigzag，所以你允許的網站（例如 Google 地圖）始終找不到你的位置。現在你第一次允許網站時，macOS 會詢問一次。如果整台 Mac 的定位服務已關閉，或你拒絕了 Zigzag，網站會立刻收到拒絕，而不會一直等待。
-- 對 120 Hz 來說太重的網站，重新開啟 Zigzag 後第一個網頁就以 60 開始，不會再卡頓到 Zigzag 重新發現為止；網站會記住一個月，清除瀏覽記錄或網站資料時一併忘記。被限制在 60 附近的網頁會等你停止捲動再切換更新率，不會在捲動途中切換。開啟低耗電模式或 Mac 發熱時，網頁從 60 附近開始。([#519](https://github.com/ZigaoWang/zigzag/issues/519))
 - 按住 ⇧ 點按由網站自行開啟的連結（例如 YouTube 和部分 Google 頁面）時，也會和其他按住 ⇧ 點按的連結一樣在 Zigzag Mini 裡開啟，不再變成彈出的分頁。感謝 [Lakeland97](https://github.com/Lakeland97)。([#522](https://github.com/ZigaoWang/zigzag/pull/522))
 - 像 Property Mate 這樣在背景開啟一個縮到最小的視窗來載入網頁的延伸功能，不會再把視窗帶到最前面。和 Chrome 一樣，視窗會直接進入 Dock；不要求聚焦的視窗會在你的視窗後面開啟，你的視窗仍在前面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#521](https://github.com/ZigaoWang/zigzag/issues/521))
 - 把登入狀態存在分頁工作階段儲存空間（sessionStorage）中的網站，例如 Microsoft 365，在 Zigzag 結束後重新開啟上次的工作階段，或為了更新而重新啟動後，你仍會保持登入。休眠中的分頁，或結束時開著的分頁，會在網頁載入前拿回它的工作階段儲存空間，和 Chrome 一樣。它儲存在你的個人資料資料夾中，只有你能讀取，私密視窗從不儲存；清除這個網站的資料或關閉分頁時，它也會一起刪除。「啟動時」設為「開啟新視窗」時會直接捨棄。([#502](https://github.com/ZigaoWang/zigzag/issues/502))
@@ -119,7 +157,7 @@
 - 來自 Chrome 線上應用程式商店或 Firefox 附加元件的主題，以及用「從資料夾安裝」選的主題資料夾，不會再被安裝。Zigzag 不使用瀏覽器主題，所以會直接說明，並提示可以改空間的顏色；以前會把主題當成延伸功能裝上，裝好後什麼也不做。在應用店的主題網頁上點提示欄的「新增」，也只顯示這一行說明，不再出現「重試」按鈕，因為重試也只會得到同樣的結果。感謝 [Lakeland97](https://github.com/Lakeland97)。([#454](https://github.com/ZigaoWang/zigzag/issues/454))
 - 翻譯很長的網頁不會再在 45 秒後放棄了。螢幕上看得到的部分先翻，翻好一段就換上一段，提示裡會顯示翻到多少了；只有連續 45 秒什麼都沒翻出來才會報錯。感謝 [orisred](https://github.com/orisred)。([#465](https://github.com/ZigaoWang/zigzag/issues/465))
 - 紅黃綠按鈕和旁邊的按鈕現在正好在視窗頂部和網址列中間，上下留白一樣，不再偏下。
-- 為了修好 macOS 26 上 Mac 的密碼清單，Zigzag 會在你的 Mac 上記一份很小的步驟日誌，絕不記你的登入資訊，放在 ~/Library/Logs/Zigzag/passwords.log。「幫助 › 報告問題」會附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+- 為了修好 macOS 26 上 Mac 的密碼清單，Zigzag 會在你的 Mac 上記一份很小的步驟日誌，絕不記你的登入資訊，放在 ~/Library/Logs/Zigzag/passwords.log。「輔助說明 › 報告問題」會附上它。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 輕掃後退或前進時，箭頭不會再掃到一半就變成實心，手指一停又變回空心。現在只有掃得夠遠箭頭才會變實心，手指停住不動時箭頭保持原樣。手指還在移動時快速一掃鬆手，照樣會後退或前進。感謝 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - 空間編輯器裡的色塊，滑鼠移上去不再放大，只顯示一圈淡淡的邊，和閱讀器裡一樣。([#455](https://github.com/ZigaoWang/zigzag/issues/455))
 - 在「顯示所有分頁」裡，卡片滾到搜尋框下面時會出現一條細線，不會再像被硬切掉一樣。([#458](https://github.com/ZigaoWang/zigzag/issues/458))
@@ -602,7 +640,7 @@
 - 給空間、資料夾或分頁選圖示時，可以在圖示網格下面的輸入欄位裡輸入「cat」或「rocket」這樣的名稱，找到對應的表情符號。點一下一個或按 Return 選中，按 Esc 回到圖示。以前輸入的字母會消失。感謝 [thekevinbrown](https://github.com/thekevinbrown)。([#163](https://github.com/ZigaoWang/zigzag/issues/163))
 - 用滑鼠中鍵點一下地址可以關閉目前分頁，和中鍵點一下側邊欄裡它那一行一樣。感謝 [Lakeland97](https://github.com/Lakeland97)。([#171](https://github.com/ZigaoWang/zigzag/issues/171))
 - 休眠分頁的預覽會說明它為什麼休眠、大約釋放了多少記憶體，例如「為省記憶體已休眠，釋放了約 180 MB。」。它的圖示外面換成了一圈均勻的細虛線，不再是粗點。([#140](https://github.com/ZigaoWang/zigzag/issues/140))
-- 「Zigzag 已更新」的提示 15 秒後會自己消失，和通知一樣，滑鼠指標停在上面時不會消失。「新功能」仍然在「幫助」選單裡。
+- 「Zigzag 已更新」的提示 15 秒後會自己消失，和通知一樣，滑鼠指標停在上面時不會消失。「新功能」仍然在「輔助說明」選單裡。
 - 「變更圖示」裡的第一個選項顯示網站自己的圖示，一看就知道它是用來恢復網站圖示的。
 
 ### 修正
@@ -721,7 +759,7 @@
 - 「密碼…」會在網頁的輸入欄旁直接開啟 Mac 的自動填寫面板，由 macOS 填寫登入資訊。它也在輸入欄右鍵選單的「自動填寫」下，以及登入欄的鑰匙圖示上。([#132](https://github.com/ZigaoWang/zigzag/issues/132))
 - Zigzag 會阻擋 YouTube 廣告，而且不會影響 YouTube 自己的對話方塊和捲動。如果你用了 uBlock Origin Lite 或 AdGuard 這類廣告阻擋延伸功能，在 YouTube 上會交給它處理。([#129](https://github.com/ZigaoWang/zigzag/issues/129))
 - 從有多份個人資料的 Chrome 或其他瀏覽器匯入時，每份個人資料都會變成一個以它命名的空間。再次匯入會加到同樣的空間裡。([#131](https://github.com/ZigaoWang/zigzag/issues/131))
-- 「幫助 › 鍵盤鍵盤快速鍵」會開啟鍵盤快速鍵清單。([#122](https://github.com/ZigaoWang/zigzag/issues/122))
+- 「輔助說明 › 鍵盤快速鍵」會開啟鍵盤快速鍵清單。([#122](https://github.com/ZigaoWang/zigzag/issues/122))
 - 設定搜尋可以用你習慣的說法找到啟動、主頁、深色模式和預設瀏覽器的設定。([#121](https://github.com/ZigaoWang/zigzag/issues/121))
 - 被 Zigzag 休眠的分頁，圖示外面會有一圈虛線，和 Chrome 一樣，指標指向時會說明原因。([#140](https://github.com/ZigaoWang/zigzag/issues/140))
 
@@ -764,4 +802,4 @@
 - 「密碼…」會一直開著，直到你選了一個登入資訊或去做別的事，不會一開啟就關上。([#96](https://github.com/ZigaoWang/zigzag/issues/96))
 - 你開啟過的固定網頁，即使所在的資料夾合上了，也會顯示在資料夾下面，和 Arc 一樣。([#94](https://github.com/ZigaoWang/zigzag/issues/94))
 - 按住 ⌥⌘ 拖移可以從視窗的任何地方移動視窗，設定和空視窗也一樣。([#95](https://github.com/ZigaoWang/zigzag/issues/95))
-- Zigzag 啟動快了一點，「幫助 › 報告問題」產生的卡頓報告會說明當時在執行什麼。([#89](https://github.com/ZigaoWang/zigzag/issues/89))
+- Zigzag 啟動快了一點，「輔助說明 › 報告問題」產生的卡頓報告會說明當時在執行什麼。([#89](https://github.com/ZigaoWang/zigzag/issues/89))

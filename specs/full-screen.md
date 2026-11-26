@@ -62,6 +62,9 @@ page is the one hand-off to WebKit's own full screen.
   Test: PageFullScreenTests.escLeavesAndSoDoesZigzag
 - A video's own full screen button → it fills the same way.
   Test: PageFullScreenTests.aVideosOwnFullScreenFillsThePageToo
+- While a page fills → nothing else on the page draws over the element (a fixed bar, a side column), as in WebKit's
+  own full screen.
+  Test: PageFullScreenTests.nothingOnThePageDrawsOverTheElement
 - A frame with allowfullscreen asks → the page around it fills with the frame.
   Test: PageFullScreenTests.aFrameFillsThePageWithItself
 - A request without a click, or from a frame without allowfullscreen → nothing fills.

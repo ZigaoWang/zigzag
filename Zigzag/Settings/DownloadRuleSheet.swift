@@ -41,6 +41,11 @@ enum DownloadRuleSheet {
         let applies = DropdownButton()
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
         applies.selectedIndex = DownloadRule.Applies.allCases.firstIndex(of: source.applies) ?? 0
+        /// URL hands over the address as before; File downloads in Zigzag first, then hands over the saved file.
+        let handoff = DropdownButton()
+        handoff.options = DownloadRule.HandoffType.allCases.map { DropdownButton.Option(title: $0.title) }
+        handoff.selectedIndex = DownloadRule.HandoffType.allCases.firstIndex(of: source.handoffType) ?? 0
+        handoff.setAccessibilityLabel(String(localized: "Hand off", comment: "Label of the choice between handing off a download rule's URL or its saved file."))
         // A destination is only a file type. Any other rule matches an address, or a download's own type whatever its
         // address says, so a tracker's download.php address can still reach the downloader.
         let matchChoices = Self.matchChoices(isDestination: isDestination)
@@ -169,13 +174,13 @@ enum DownloadRuleSheet {
             argumentView = args
             actionRows.append(FormSheet.Row(label: String(localized: "Arguments", comment: "Label of the arguments field in a download rule's sheet: one argument a line."),
                                             view: args, height: 96))
-            actionRows.append(.note(String(localized: "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES.",
-                                           comment: "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.")))
+            actionRows.append(.note(String(localized: "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES; a File handoff also sets ZIGZAG_FILE.",
+                                           comment: "Under the arguments of a Run Script download rule: one argument a line, and the names the link, the cookies and a File handoff's saved file arrive under.")))
             actionRows.append(FormSheet.Row(label: nil,
                                             view: StatusLabel(String(localized: "Run directly, never through a shell",
                                                                      comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line, since the script is run directly."),
                                                               symbol: "checkmark.shield.fill"),
-                                            height: Tokens.Metric.controlHeight))
+                                            height: 0))
         case .jsonRPC:
             let endpoint = FilledField(placeholder: "http://127.0.0.1:6800/jsonrpc")
             endpoint.stringValue = action.rpcEndpoint
@@ -237,8 +242,10 @@ enum DownloadRuleSheet {
                                             view: stack(folder, chooseFolder)))
         }
 
-        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
-                                             comment: "The tokens a download rule's fields may use, listed in its sheet."))
+        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}, {file}, {file_url}. {file} and {file_url} need File handoff.",
+                                             comment: "The tokens a download rule's fields may use, listed in its sheet. File and file_url are only filled in when the rule hands off a saved file."))
+        let handoffNote = FormSheet.Row.note(String(localized: "File saves the download in Zigzag first, using the page’s session, then hands off the saved file; links still hand off their address.",
+                                                    comment: "Under the Hand off choice in a download rule's sheet: what File does, and that links are unaffected."))
         // Destinations only ask for file types; they drop the address rule rows (applies to, match, case, page
         // continues). A rule that matches a file's own type shows the same field as "File Extensions", not "Address".
         let addressLabel = String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet.")
@@ -257,23 +264,30 @@ enum DownloadRuleSheet {
             matchRows = [
                 FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
                 FormSheet.Row(label: String(localized: "Applies to", comment: "Label of the choice of what a download rule catches, in its sheet."), view: applies),
+                FormSheet.Row(label: String(localized: "Hand off", comment: "Label of the choice between handing off a download rule's URL or its saved file, in its sheet."), view: handoff),
                 FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
                 FormSheet.Row(label: source.match == .fileType ? extensionsLabel : addressLabel, view: pattern),
                 FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
                 FormSheet.Row(label: String(localized: "Allow in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
             ]
-            patternRow = 3
+            patternRow = 4
         }
         // Destinations add their action; address rules list tokens unless the path is literal (Open App).
-        let rows = matchRows + actionRows + (isDestination ? [
-            FormSheet.Row.note(String(localized: "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins.",
-                                                 comment: "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.")),
-            FormSheet.Row.note(String(localized: "Allow in private windows affects only Open, not Save.",
-                                      comment: "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.")),
-            FormSheet.Row.note(String(localized: "Apps, scripts, installers, archives and .mobileconfig files are always saved, never opened.",
-                                      comment: "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.")),
-            tokens,
-        ] : (action.kind == .openApp ? [] : [tokens]))
+        let trailingRows: [FormSheet.Row]
+        if isDestination {
+            trailingRows = [
+                FormSheet.Row.note(String(localized: "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins.",
+                                                     comment: "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.")),
+                FormSheet.Row.note(String(localized: "Allow in private windows affects only Open, not Save.",
+                                          comment: "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.")),
+                FormSheet.Row.note(String(localized: "Apps, scripts, installers, archives and .mobileconfig files are always saved, never opened.",
+                                          comment: "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.")),
+                tokens,
+            ]
+        } else {
+            trailingRows = action.kind == .openApp ? [] : [tokens]
+        }
+        let rows = matchRows + (isDestination ? [] : [handoffNote]) + actionRows + trailingRows
 
         func ruleFromFields() -> DownloadRule? {
             var action = action
@@ -301,6 +315,9 @@ enum DownloadRuleSheet {
             var rule = existing ?? source
             rule.name = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.applies = DownloadRule.Applies.allCases[applies.selectedIndex]
+            rule.handoffType = DownloadRule.HandoffType.allCases.indices.contains(handoff.selectedIndex)
+                ? DownloadRule.HandoffType.allCases[handoff.selectedIndex]
+                : source.handoffType
             rule.match = matchChoices.indices.contains(match.selectedIndex) ? matchChoices[match.selectedIndex] : source.match
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.isCaseSensitive = matchCase.isOn

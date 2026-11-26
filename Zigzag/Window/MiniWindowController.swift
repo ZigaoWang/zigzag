@@ -878,7 +878,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         window.animationBehavior = .documentWindow
         window.isMovableByWindowBackground = true
         window.isExcludedFromWindowsMenu = false
-        strip.trafficLightsWidth = (window as? BrowserWindow)?.trafficLightsWidth ?? 52
+        refreshTrafficLightsRoom(animated: false)
         // The root was kept clear for the child; now the window is a window again and the space paints it as one.
         root.paint(space, isPrivate: isPrivate, animated: false)
         refreshStrip()
@@ -1118,9 +1118,22 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         refreshBar(animated: false)
         window.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - window.trafficLightHeight) / 2))
         strip.trafficLightsWidth = window.trafficLightsWidth
+        window.onTrafficLightsOnScreenChange = { [weak self] in self?.refreshTrafficLightsRoom(animated: true) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// The lights' room in the strip, none while full screen's title bar is up (#542).
+    private func refreshTrafficLightsRoom(animated: Bool) {
+        guard !isDockedInPage, let window = window as? BrowserWindow else { return }
+        let width = window.trafficLightsOnScreen ? window.trafficLightsWidth : 0
+        guard width != strip.trafficLightsWidth else { return }
+        guard animated else { strip.trafficLightsWidth = width; return }
+        Tokens.Motion.animate(Tokens.Motion.gentle, evenFromKeyboard: true, moves: true) {
+            self.strip.trafficLightsWidth = width
+            self.strip.layoutSubtreeIfNeeded()
+        }
+    }
 
     /// Where a new one goes: its size, cut to fit, centered on the screen's usable area, or on `middle` (the middle
     /// of the browser window its page came from) as far as the area allows. One already at that spot moves it a step
@@ -2201,8 +2214,7 @@ final class MiniRootView: SpaceFrameView {
             return
         }
         wantsLayer = true
-        window?.isOpaque = false
-        window?.backgroundColor = .clear
+        window?.setSeeThrough(shadow: false)
         if let ground = pageOverlayColor ?? paintedSpaceGround {
             layer?.backgroundColor = cgColor(ground)
         }

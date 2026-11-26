@@ -49,6 +49,14 @@ final class BrowserWindow: NSWindow {
     /// is never the window you are "in" for the Window menu or ⌘`, and never a main window of its own.
     var isOverlayChild = false
 
+    #if DEBUG
+    /// A test copy started with `ZIGZAG_ORDER_BACK=1` puts its windows behind every other app's, never in front.
+    static let ordersBack = ProcessInfo.processInfo.environment["ZIGZAG_ORDER_BACK"] == "1"
+    override func makeKeyAndOrderFront(_ sender: Any?) { Self.ordersBack ? orderBack(sender) : super.makeKeyAndOrderFront(sender) }
+    override func orderFront(_ sender: Any?) { Self.ordersBack ? orderBack(sender) : super.orderFront(sender) }
+    override func orderFrontRegardless() { Self.ordersBack ? orderBack(nil) : super.orderFrontRegardless() }
+    #endif
+
     override var canBecomeKey: Bool { !isParked }
     override var canBecomeMain: Bool { !isParked && !isOverlayChild }
 
@@ -590,9 +598,58 @@ final class BrowserWindow: NSWindow {
         // controls rather than over them.
         guard !styleMask.contains(.fullScreen) else {
             buttons.forEach { if $0.isHidden { $0.isHidden = false } }
+            watchFullScreenTitlebar()
             return
         }
+        watchFullScreenTitlebar()
         buttonSpacing = placeTrafficLights(at: origin, spacing: buttonSpacing)
+    }
+
+    /// Whether the buttons are on screen: always windowed, in full screen only with the menu bar down (#542).
+    var trafficLightsOnScreen: Bool { !styleMask.contains(.fullScreen) || fullScreenTitlebarShown }
+    /// Called as full screen's title bar comes down with the menu bar or goes back up.
+    var onTrafficLightsOnScreenChange: (() -> Void)?
+    private var fullScreenTitlebarShown = false
+    private var titlebarWatch: [NSObjectProtocol] = []
+    private weak var watchedTitlebar: NSView?
+
+    /// Watches full screen's title bar, which AppKit slides down with the menu bar.
+    private func watchFullScreenTitlebar() {
+        let fullScreen = styleMask.contains(.fullScreen)
+        let container = fullScreen ? standardWindowButton(.closeButton)?.superview?.superview : nil
+        if container !== watchedTitlebar {
+            titlebarWatch.forEach(NotificationCenter.default.removeObserver)
+            titlebarWatch = []
+            watchedTitlebar = container
+            if let container, let titlebarWindow = container.window {
+                container.postsFrameChangedNotifications = true
+                let center = NotificationCenter.default
+                let changed: @Sendable (Notification) -> Void = { [weak self] _ in
+                    MainActor.assumeIsolated { self?.refreshFullScreenTitlebar() }
+                }
+                titlebarWatch = [center.addObserver(forName: NSView.frameDidChangeNotification, object: container, queue: .main, using: changed),
+                                 center.addObserver(forName: NSWindow.didMoveNotification, object: titlebarWindow, queue: .main, using: changed),
+                                 center.addObserver(forName: NSWindow.didResizeNotification, object: titlebarWindow, queue: .main, using: changed),
+                                 center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: titlebarWindow, queue: .main, using: changed)]
+            }
+        }
+        refreshFullScreenTitlebar()
+    }
+
+    private func refreshFullScreenTitlebar() {
+        let shown = watchedTitlebar != nil && Self.isShown(standardWindowButton(.closeButton))
+        guard shown != fullScreenTitlebarShown else { return }
+        fullScreenTitlebarShown = shown
+        onTrafficLightsOnScreenChange?()
+    }
+
+    /// Whether any of the button is inside its window and on its screen.
+    private static func isShown(_ button: NSButton?) -> Bool {
+        guard let button, let window = button.window, window.isVisible, !button.isHidden else { return false }
+        let inWindow = button.convert(button.bounds, to: nil)
+        let onScreen = window.convertToScreen(inWindow)
+        return inWindow.maxY > 0 && inWindow.minY < (window.contentView?.bounds.height ?? window.frame.height)
+            && (window.screen?.frame.intersects(onScreen) ?? true)
     }
 
     /// A picture of the three buttons, so they can travel with the sidebar while it slides.
@@ -700,6 +757,16 @@ final class TrafficLightKeeper: NSView {
 }
 
 extension NSWindow {
+    /// Clear to the eye; a wholly clear window with a shadow is redrawn by the window server every frame.
+    static let seeThroughBackground = NSColor(white: 0, alpha: 1.0 / 255)
+
+    /// See-through around what it draws; without a shadow it stays wholly clear, so clicks there pass through.
+    func setSeeThrough(shadow: Bool) {
+        isOpaque = false
+        hasShadow = shadow
+        backgroundColor = shadow ? Self.seeThroughBackground : .clear
+    }
+
     /// Places the system buttons with the close button's top left at `origin` (window coordinates from the top left).
     /// `spacing` is measured once from AppKit's layout and kept by the caller: read mid-move it can be wrong. Moving
     /// can re-enter, so it's not inout.

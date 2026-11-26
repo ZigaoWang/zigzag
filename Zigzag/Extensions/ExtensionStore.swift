@@ -236,6 +236,11 @@ enum ExtensionStore {
         Set(UserDefaults.standard.stringArray(forKey: ProfileKey.extensionsOffSites.name(in: profile.id)) ?? [])
     }
 
+    /// Where extensions don't run now: those, and sites in compatibility mode (#497).
+    static func extensionsOffSitesInEffect(in profile: Profile) -> Set<String> {
+        extensionsOffSites(in: profile).union(SiteCompatibility.sites)
+    }
+
     static func setExtensionsOffSites(_ sites: Set<String>, in profile: Profile) {
         UserDefaults.standard.set(Array(sites).sorted(), forKey: ProfileKey.extensionsOffSites.name(in: profile.id))
         guard #available(macOS 15.4, *), let host = profile.startedExtensions else { return }

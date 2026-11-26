@@ -15,10 +15,10 @@ settings:
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
     MACOSX_DEPLOYMENT_TARGET: "15.4"
-    MARKETING_VERSION: "0.9.5"
+    MARKETING_VERSION: "0.10.0"
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     SPARKLE_PUBLIC_KEY: ""
-    CURRENT_PROJECT_VERSION: "164"
+    CURRENT_PROJECT_VERSION: "167"
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
     CODE_SIGN_STYLE: Manual
@@ -64,9 +64,7 @@ targets:
       # The release notes the app shows after an update: this version's section of the changelog in the app's language.
       - path: CHANGELOG.md
         buildPhase: resources
-      - path: CHANGELOG.zh-Hans.md
-        buildPhase: resources
-      - path: CHANGELOG.zh-Hant.md
+      - path: docs/i18n/changelog
         buildPhase: resources
       # The licenses About Zigzag › Acknowledgments shows: the same files as the repository's, never a copy.
       - path: LICENSE
@@ -102,7 +100,7 @@ targets:
       properties:
         # The languages Zigzag speaks, so macOS offers them in Language & Region and the frameworks' own words
         # (Sparkle's update windows) follow. XcodeGen adds known regions from the catalogs themselves.
-        CFBundleLocalizations: [en, zh-Hans, zh-Hant]
+        CFBundleLocalizations: [en, de, es, fr, it, ja, ko, nl, pl, pt-BR, ru, tr, zh-Hans, zh-Hant]
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
         CFBundleIconName: AppIcon
         CFBundleName: $(APP_DISPLAY_NAME)

@@ -28,7 +28,7 @@ class SpaceFrameView: ColorView {
         // Only clear glass needs a see-through window, which macOS shows at 80 Hz on a 120 Hz display (#394).
         let (seeThroughWindow, liquid) = Self.glassKind(clear: clear, space)
         window?.isOpaque = !seeThroughWindow
-        window?.backgroundColor = seeThroughWindow ? .clear : .windowBackgroundColor
+        window?.backgroundColor = seeThroughWindow ? NSWindow.seeThroughBackground : .windowBackgroundColor
         setGlass(clear, clear: liquid, tint: space.frameColor)
         // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
         // sits under it and would be hidden); a single color washes as a gradient of itself.
@@ -100,6 +100,9 @@ class SpaceFrameView: ColorView {
     /// `clear`: Liquid Glass, really transparent and still blurred, tinted with `tint` (it draws over the frame's own
     /// wash, so the color goes in the glass). Before macOS 26 the frosted glass stands in.
     func setGlass(_ on: Bool, clear: Bool = false, tint: NSColor? = nil) {
+        #if DEBUG
+        let on = on && GlassVariant.now != .noGlass && GlassVariant.now != .seeThroughNoGlass
+        #endif
         glassWanted = on
         let liquid = clear && SpaceInfo.hasClearGlass
         windowGlass = on ? WindowGlass(isClear: liquid, tint: liquid ? tint : nil) : nil
@@ -194,7 +197,7 @@ class SpaceFrameView: ColorView {
     var debugGlass: [String: Any] {
         ["opaque": window?.isOpaque ?? false, "wanted": glassWanted, "frosted": !glassView.isHidden, "frostedAlpha": glassView.alphaValue,
          "clear": clearGlass.map { !$0.isHidden } ?? false, "clearAlpha": clearGlass?.alphaValue ?? -1,
-         "clearFrame": NSStringFromRect(clearGlass?.frame ?? .zero), "occlusionVisible": window?.occlusionState.contains(.visible) ?? false,
+         "clearFrame": NSStringFromRect(clearGlass?.frame ?? .zero), "frostedFrame": NSStringFromRect(glassView.frame), "occlusionVisible": window?.occlusionState.contains(.visible) ?? false,
          "background": window?.backgroundColor.description ?? ""]
     }
     #endif
@@ -326,6 +329,10 @@ enum GlassVariant: String, CaseIterable {
     case frostedSeeThrough
     /// Opaque window, `NSVisualEffectView` behind the window (`-ZZGlassMaterial`, under-window background by default).
     case visualEffect
+    /// Opaque window, no glass: the space's color solid.
+    case noGlass
+    /// See-through window, no glass: the desktop shows through sharp.
+    case seeThroughNoGlass
 
     static var now: GlassVariant = {
         let args = ProcessInfo.processInfo.arguments
@@ -338,7 +345,8 @@ enum GlassVariant: String, CaseIterable {
         switch self {
         case .opaqueGlass: (false, true)
         case .frostedSeeThrough: (true, false)
-        case .visualEffect: (false, false)
+        case .visualEffect, .noGlass: (false, false)
+        case .seeThroughNoGlass: (true, true)
         default: (true, true)
         }
     }
@@ -358,6 +366,65 @@ enum GlassVariant: String, CaseIterable {
             "contentBackground": .contentBackground, "sheet": .sheet, "toolTip": .toolTip, "underPageBackground": .underPageBackground,
         ]
         return name.flatMap { materials[$0] } ?? .underWindowBackground
+    }
+}
+
+/// What keeps the window server drawing a window that sits still (`idle audit`, and the tests' guard).
+@MainActor
+enum IdleWork {
+    static func isEndless(_ animation: CAAnimation) -> Bool {
+        animation.repeatCount == .infinity || animation.repeatDuration == .infinity || animation.repeatCount > 10_000
+    }
+
+    /// Every animation in the window, hidden layers and effect views' own layers included, that never ends or runs
+    /// longer than `seconds` from now, as "path key repeat duration", with "hidden" when it doesn't show.
+    static func animations(in window: NSWindow, longerThan seconds: CFTimeInterval = 0) -> [String] {
+        guard let top = window.contentView?.superview?.layer ?? window.contentView?.layer else { return [] }
+        var found: [String] = []
+        let now = CACurrentMediaTime()
+        func walk(_ layer: CALayer, path: String, hidden: Bool) {
+            let hidden = hidden || layer.isHidden || layer.opacity <= 0
+            let here = path + "/" + (layer.delegate.map { "\(type(of: $0))" } ?? "\(type(of: layer))")
+            for key in layer.animationKeys() ?? [] {
+                guard let animation = layer.animation(forKey: key) else { continue }
+                let start = animation.beginTime > 0 ? layer.convertTime(animation.beginTime, to: nil) : now
+                let left = start + animation.duration * Double(max(animation.repeatCount, 1)) - now
+                guard isEndless(animation) || left > seconds else { continue }
+                found.append("\(here) \(key) repeat \(animation.repeatCount) duration \(animation.duration)\(hidden ? " hidden" : "")")
+            }
+            (layer.sublayers ?? []).forEach { walk($0, path: here, hidden: hidden) }
+        }
+        walk(top, path: "", hidden: false)
+        return found
+    }
+
+    /// Layers asking for HDR or float compositing, which an HDR display then composites the whole window in.
+    static func extendedRangeLayers(in window: NSWindow) -> [String] {
+        guard let top = window.contentView?.superview?.layer ?? window.contentView?.layer else { return [] }
+        var found: [String] = []
+        func walk(_ layer: CALayer) {
+            if layer.wantsExtendedDynamicRangeContent || layer.contentsFormat == .RGBA16Float || layer is CAMetalLayer {
+                found.append(layer.delegate.map { "\(type(of: $0))" } ?? "\(type(of: layer))")
+            }
+            (layer.sublayers ?? []).forEach(walk)
+        }
+        walk(top)
+        return found
+    }
+
+    /// Shown blurs of what's behind the window (and Liquid Glass), as "class size".
+    static func liveBlurs(in window: NSWindow) -> [String] {
+        guard let top = window.contentView?.superview ?? window.contentView else { return [] }
+        var found: [String] = []
+        func walk(_ view: NSView) {
+            guard !view.isHidden, view.alphaValue > 0 else { return }
+            let size = "\(Int(view.frame.width))x\(Int(view.frame.height))"
+            if let effect = view as? NSVisualEffectView, effect.blendingMode == .behindWindow { found.append("\(type(of: view)) \(size)") }
+            if #available(macOS 26.0, *), view is NSGlassEffectView { found.append("\(type(of: view)) \(size)") }
+            view.subviews.forEach(walk)
+        }
+        walk(top)
+        return found
     }
 }
 #endif

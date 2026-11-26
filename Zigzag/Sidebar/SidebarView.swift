@@ -889,6 +889,10 @@ final class SidebarView: NSView {
     let sidebarButton = SidebarView.chromeButton(SidebarView.toggleSymbol(onRight: false), toolTip: String(localized: "Hide Sidebar", comment: "Tooltip of the sidebar button while the sidebar shows."))
     let address = AddressView()
     let favorites = FavoritesView()
+    /// The space's pinned pages in no folder, as tiles under the favorites (#539); empty while that's off.
+    let pinnedTiles = FavoritesView()
+    /// The fine line between the favorites and the pinned tiles.
+    private let pinnedLine = ColorView(color: Tokens.Color.separator)
     /// Holds the grid; past its cap the grid scrolls inside it, so the list and footer keep their room.
     let favoritesScroll = NSScrollView()
     /// Tiles running on below the grid's cap fade out there, as tabs do at the list's foot.
@@ -1052,6 +1056,15 @@ final class SidebarView: NSView {
         addSubview(favoritesScroll)
         NotificationCenter.default.addObserver(self, selector: #selector(favoritesScrolled), name: NSView.boundsDidChangeNotification, object: favoritesScroll.contentView)
         favorites.onHeightChange = { [weak self] in self?.needsLayout = true }
+        // Inside the favorites' grid, so the two scroll as one.
+        pinnedTiles.kind = .pinned
+        pinnedTiles.isHidden = true
+        pinnedTiles.onHeightChange = { [weak self] in self?.needsLayout = true }
+        pinnedLine.isHidden = true
+        favorites.addSubview(pinnedLine)
+        favorites.addSubview(pinnedTiles)
+        favorites.below = pinnedTiles
+        list.pinnedTile = { [weak self] id in self?.pinnedTiles.tile(for: id) }
         // Settings › Appearance › Sidebar size: the address and favorites take their new heights, the list moves.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -1155,6 +1168,29 @@ final class SidebarView: NSView {
         window?.titleBarMouseDown(event, clicks: clicks)
     }
 
+    /// Settings › Appearance › Pinned tabs as tiles (#539). Off by default.
+    static var pinnedTabsAsTiles: Bool {
+        get { UserDefaults.standard.bool(forKey: pinnedTilesKey) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: pinnedTilesKey)
+            NotificationCenter.default.post(name: pinnedTilesChanged, object: nil)
+        }
+    }
+    static let pinnedTilesKey = "PinnedTabsAsTiles"
+    static let pinnedTilesChanged = Notification.Name("PinnedTabsAsTilesChanged")
+
+    /// A favorite's or pinned page's tile.
+    func tile(for bookmarkID: UUID) -> NSView? { favorites.tile(for: bookmarkID) ?? pinnedTiles.tile(for: bookmarkID) }
+
+    /// The gap above and below the line between the favorites and the pinned tiles.
+    static let pinnedLineGap = Tokens.Space.x2
+
+    /// Columns both grids use while each has tiles: as for all of them, no more than the larger group fills.
+    static func sharedColumns(width: CGFloat, favorites: Int, pinned: Int) -> Int? {
+        guard favorites > 0, pinned > 0 else { return nil }
+        return max(2, min(FavoritesView.columns(for: width, count: favorites + pinned), max(favorites, pinned)))
+    }
+
     /// Settings › Appearance › Double-click the sidebar for a new tab. On by default.
     static var doubleClickOpensNewTab: Bool {
         get { UserDefaults.standard.object(forKey: "sidebarDoubleClickNewTab") as? Bool ?? true }
@@ -1246,14 +1282,24 @@ final class SidebarView: NSView {
         let buttonInset = (bottomHeight - Tokens.Sidebar.button) / 2
         bottomBar.frame = NSRect(x: 0, y: bounds.height - bottomHeight + buttonInset - pad, width: width, height: bottomHeight)
         let frames = bottomFrames()
-        let gridHeight = favorites.preferredHeight(for: width - pad * 2)
+        let gridWidth = width - pad * 2
+        let columns = Self.sharedColumns(width: gridWidth, favorites: favorites.tileIDs.count, pinned: pinnedTiles.tileIDs.count)
+        favorites.columnsOverride = columns
+        pinnedTiles.columnsOverride = columns
+        let ownHeight = favorites.preferredHeight(for: gridWidth), pinnedHeight = pinnedTiles.preferredHeight(for: gridWidth)
+        let lineRoom = ownHeight > 0 && pinnedHeight > 0 ? Self.pinnedLineGap * 2 + Tokens.Metric.hairline : 0
+        let gridHeight = ownHeight + lineRoom + pinnedHeight
         let favoritesHeight = min(gridHeight, Self.favoritesCap(room: frames.listBottom - topEdge))
         favorites.isHidden = gridHeight == 0
         favoritesScroll.isHidden = gridHeight == 0
         let out = FavoriteTile.badgeOverhang
         favoritesScroll.frame = NSRect(x: pad, y: topEdge - out, width: width - pad * 2 + out, height: favoritesHeight + out)
         favoritesScroll.verticalScrollElasticity = gridHeight > favoritesHeight ? .allowed : .none
-        favorites.frame = NSRect(x: 0, y: 0, width: width - pad * 2, height: gridHeight)
+        favorites.frame = NSRect(x: 0, y: 0, width: gridWidth, height: gridHeight)
+        pinnedTiles.isHidden = pinnedHeight == 0
+        pinnedTiles.frame = NSRect(x: 0, y: ownHeight + lineRoom, width: gridWidth, height: pinnedHeight)
+        pinnedLine.isHidden = lineRoom == 0
+        pinnedLine.frame = NSRect(x: 0, y: ownHeight + Self.pinnedLineGap, width: gridWidth, height: Tokens.Metric.hairline)
         updateFavoritesFade()
         let listTop = favoritesHeight > 0 ? favoritesScroll.frame.maxY + Tokens.Sidebar.sectionGap
             : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
@@ -1362,6 +1408,7 @@ final class SidebarView: NSView {
         }
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: AddressView.canSave(for: tab))
+        SitePanel.markCompatibility(address.siteControlsButton, url: tab?.url)
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

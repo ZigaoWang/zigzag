@@ -62,7 +62,7 @@ nonisolated enum WebAppBundle {
     /// Where the app goes in `folder`: its name, or "Name 2" and on when another app has that name. `own` is where
     /// this app already is, which it may take again.
     static func destination(for spec: Spec, in folder: URL, own: URL?) -> URL {
-        let base = WebApps.fileName(for: spec.name, fallback: spec.url.host() ?? "Web App")
+        let base = WebApps.fileName(for: spec.name, fallback: spec.url.host() ?? String(localized: "Web App", comment: "Name of a site installed as an app, in the Applications folder, when the site has neither a name nor an address to name it by."))
         var n = 1
         while true {
             let name = n == 1 ? base : "\(base) \(n)"

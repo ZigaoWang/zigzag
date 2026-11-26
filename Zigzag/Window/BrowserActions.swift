@@ -212,7 +212,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         Toast.show(String(localized: "Markdown link copied", comment: "Toast after the page's title and address are copied as a Markdown link."), symbol: "link", in: self)
     }
 
-    @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
+    @objc func showFindBar(_ sender: Any?) {
+        if let webView = selectedWebView, HistoryPage.isHistory(webView.url) { HistoryPage.focusSearch(in: webView); return }
+        findBar.toggle()
+    }
     @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
     @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
     @objc func useSelectionForFind(_ sender: Any?) {
@@ -775,7 +778,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         let favorites = Library.shared.favoriteTiles(in: tabManager.profile.id).filter { tile in
             ([tile.0] + tile.partners).contains { tabManager.bookmarkTab(for: $0.id) != nil }
         }
-        return favorites.map { SidebarItem.bookmark($0.0.id) } + sidebar.list.pageRows
+        return favorites.map { SidebarItem.bookmark($0.0.id) } + sidebar.pinnedTiles.tileIDs.map(SidebarItem.bookmark) + sidebar.list.pageRows
     }
 
     /// The pages a stop stands for: a split's are all of them.
@@ -810,7 +813,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func selectTabByNumber(_ sender: NSMenuItem) {
         // In the tab overview, the number picks the card in that place, as you see them.
         if desk.isVisible { desk.openCard(number: sender.tag); return }
-        let rows = Library.shared.favoriteTiles(in: tabManager.profile.id).map { SidebarItem.bookmark($0.0.id) } + sidebar.list.pageRows
+        let rows = Library.shared.favoriteTiles(in: tabManager.profile.id).map { SidebarItem.bookmark($0.0.id) }
+            + sidebar.pinnedTiles.tileIDs.map(SidebarItem.bookmark) + sidebar.list.pageRows
         // Cmd+9 always means the last tab, like every browser. An index past the end means the last too.
         guard let index = TabNumbers.index(for: sender.tag, count: rows.count) else { return }
         switch rows[index] {

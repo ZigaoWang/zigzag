@@ -108,7 +108,7 @@ line around them; the tab you're on is a light card of the color (`Chrome.card`,
 with an edge only just there and a shadow-sm, seen at a glance on any color. Hover is a gentler wash (`Chrome.hover`).
 No bevels, no puffy shadows, no boxes.
 
-No glass gimmicks: in the browser, see-through spaces frost the desktop under the frame, and the sidebar that slides out over the page is glass, the page blurred under the space's color at 88% by day and 90% at night (`Frame.floatingCover`), see-through spaces too, so it's the same color slid out as shown; Liquid Glass where the Mac has it, tinted as the window's own glass is, or the frosting when the space chose it. Those are the only blurs (brand moments keep their `GlassSurface`, under Materials). With Reduce Transparency, or Low Power Mode, the sliding sidebar is the space's solid color.
+No glass gimmicks: in the browser, see-through spaces frost the desktop under the frame, and the sidebar that slides out over the page is glass, the page blurred under the space's color at 88% by day and 90% at night (`Frame.floatingCover`), see-through spaces too, so it's the same color slid out as shown; Liquid Glass where the Mac has it, tinted as the window's own glass is, or the frosting when the space chose it. Those are the only blurs (brand moments keep their `GlassSurface`, under Materials). With Reduce Transparency, or Low Power Mode, the sliding sidebar is the space's solid color. With Shorter floating sidebar (#538) the card is two thirds of the window's height in its middle, and the traffic lights stay out of it.
 
 ## Size scale
 
@@ -347,7 +347,7 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   The address: a soft field of the space's color (`Chrome.field`, the host in `textPrimary`, its own small buttons, any pinned extensions by Site Controls at its right,
   the accent ring from the keyboard). A link, an address or words dragged over any address field (the sidebar's, the
   bar above the page's, a pane strip's, Zigzag Mini's) get the accent drop ring around the field, and let go they
-  load in that field's page, or search for the words (`AddressDrop`, #182). Favorites: small soft tiles four to a row in the same look. The space's name
+  load in that field's page, or search for the words (`AddressDrop`, #182). Favorites: small soft tiles four to a row in the same look; with Pinned tabs as tiles (#539) the pinned pages in no folder follow in the same grid and columns, under a `Color.separator` hairline with `Space.x2` above and below it. The space's name
   over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row (two pages, or a tile group's three or four) is one row: a part
   of one width for each page in reading order (`TabRowView.splitParts`), a `Color.separator` hairline between them 8pt
   short of the row's top and bottom, and in each part a tab's row in small: the icon 6pt in from the part's start, the

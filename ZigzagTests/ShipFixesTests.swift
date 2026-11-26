@@ -575,16 +575,16 @@ struct BookmarkFolderTests {
     }
 
     @Test func swipeNeedsAThirdOfThePage() {
-        // A third of a narrow page, at most 220 points however wide the window (#377).
-        #expect(SwipeDecision.distance(forWidth: 600) == 200)
-        #expect(SwipeDecision.distance(forWidth: 900) == 220)
-        #expect(SwipeDecision.distance(forWidth: 300) == 160)
-        #expect(SwipeDecision.distance(forWidth: 2000) == 220)
-        // All the way, or a quick flick well started.
+        // A third of a narrow page, at most 180 points however wide the window (#377).
+        #expect(SwipeDecision.distance(forWidth: 450) == 150)
+        #expect(SwipeDecision.distance(forWidth: 900) == 180)
+        #expect(SwipeDecision.distance(forWidth: 300) == 120)
+        #expect(SwipeDecision.distance(forWidth: 2000) == 180)
+        // All the way, or a flick that got started.
         #expect(SwipeDecision.commits(progress: 1, speed: 0))
         #expect(SwipeDecision.commits(progress: 0.5, speed: 1000))
         // Short, slow, or pulled back before letting go: no.
-        #expect(!SwipeDecision.commits(progress: 0.3, speed: 2000))
+        #expect(!SwipeDecision.commits(progress: 0.2, speed: 2000))
         #expect(!SwipeDecision.commits(progress: 0.9, speed: 0))
         #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }
@@ -1624,6 +1624,358 @@ struct SwipeExitTests {
         page.swipeNavigator.touchEnded(at: 1.05, cancelled: false)
         #expect(!page.swipeNavigator.isCarryingOn)
         #expect(offset(page) == 0 && page.layer?.opacity == 1)
+        _ = host
+    }
+}
+
+/// A trackpad swipe driven through its phases in-process: it goes back past its distance or with a flick, leaves pages
+/// that scroll or pan sideways alone, and every path, lost ends included, finishes with nothing left over.
+@MainActor
+@Suite(.serialized)
+struct SwipeGestureTests {
+    private final class Host: NSWindowController, SwipeArrowHost {
+        let swipeArrowLayer = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        var tab: Tab?
+    }
+
+    /// A page 800 points wide in a window that shows the arrow, with somewhere to go back to; a tab's, in a card, if `card`.
+    private func page(card: Bool = false) throws -> (BrowserWebView, Host) {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.borderless],
+                              backing: .buffered, defer: true)
+        let host = Host(window: window)
+        var page = BrowserWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        if card {
+            let tab = Tab(url: URL(string: "about:blank"), spaceID: UUID())
+            page = try #require(tab.ensureWebView() as? BrowserWebView)
+            host.tab = tab
+            let holder = PageCardView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+            window.contentView?.addSubview(holder)
+            holder.show(page)
+            holder.layoutSubtreeIfNeeded()
+        } else {
+            page.wantsLayer = true
+            window.contentView?.addSubview(page)
+        }
+        window.contentView?.addSubview(host.swipeArrowLayer)
+        page.swipeNavigator.debugCanGo = (true, false)
+        return (page, host)
+    }
+
+    private var now: TimeInterval = ProcessInfo.processInfo.systemUptime
+
+    /// A two-finger scroll at CGEvent's `phase` (128 may begin, 1 began, 2 changed, 4 ended, 8 cancelled) or
+    /// `momentum` (1 began, 2 going, 3 ended), `dx` and `dy` points, `after` seconds past the last one.
+    private mutating func scroll(phase: Int64 = 0, momentum: Int64 = 0, dx: Int32 = 0, dy: Int32 = 0, after: TimeInterval = 0.008) throws -> NSEvent {
+        now += after
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: dx, wheel3: 0))
+        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+        cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentum)
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(dx))
+        cg.timestamp = CGEventTimestamp(now * 1_000_000_000)
+        return try #require(NSEvent(cgEvent: cg))
+    }
+
+    /// Fingers down and `steps` moves of `dx` (positive goes back) and `dy`, the page having said what it can scroll.
+    private mutating func drag(_ page: BrowserWebView, steps: Int, dx: Int32, dy: Int32 = 0,
+                                room: (left: Bool, right: Bool) = (false, false)) throws {
+        let swipe = page.swipeNavigator
+        _ = swipe.handle(try scroll(phase: 1, dx: dx, dy: dy))
+        swipe.debugHeard(left: room.left, right: room.right)
+        for _ in 0..<steps { _ = swipe.handle(try scroll(phase: 2, dx: dx, dy: dy)) }
+    }
+
+    private var on: Bool { NSEvent.isSwipeTrackingFromScrollEventsEnabled && SwipeNavigator.isOn }
+
+    @Test func swipeGoesAtAThirdCappedOrAFlick() {
+        // A third of the page, between 120 and 180 scrolled points.
+        #expect(SwipeDecision.distance(forWidth: 300) == 120)
+        #expect(SwipeDecision.distance(forWidth: 450) == 150)
+        #expect(SwipeDecision.distance(forWidth: 1600) == 180)
+        // A flick a third of the way at a moderate speed goes; a slow or short one doesn't.
+        #expect(SwipeDecision.commits(progress: 0.3, speed: 500))
+        #expect(!SwipeDecision.commits(progress: 0.3, speed: 300))
+        #expect(!SwipeDecision.commits(progress: 0.2, speed: 2000))
+        // Fingers on the screen: their 100 points, or a third of a narrow pane.
+        #expect(SwipeDecision.touchDistance(forWidth: 1200) == 100)
+        #expect(SwipeDecision.touchDistance(forWidth: 240) == 80)
+        #expect(SwipeDecision.commits(progress: 0.3, touchSpeed: 320))
+    }
+
+    @Test mutating func aPlainPageGoesBackAndEndsClean() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        // 200 points, past the 180 an 800 point page needs, slowly enough to stop before letting go.
+        try drag(page, steps: 20, dx: 10)
+        #expect(swipe.isTracking)
+        _ = swipe.handle(try scroll(phase: 4, after: 0.2))
+        #expect(swipe.isCarryingOn)
+        swipe.pageArrived()
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aShortSwipeSpringsBackAndEndsClean() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 8, dx: 8)
+        #expect(swipe.isShowing)
+        _ = swipe.handle(try scroll(phase: 4, after: 0.2))
+        #expect(!swipe.isCarryingOn)
+        #expect(swipe.isClean)
+        #expect(page.layer?.animation(forKey: "swipe.settle") != nil)
+        _ = host
+    }
+
+    @Test mutating func aFlickGoesShortOfTheDistance() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        // 66 points, over a third of the way, at 1500 points a second as the fingers lift.
+        try drag(page, steps: 10, dx: 6)
+        _ = swipe.handle(try scroll(phase: 2, dx: 12))
+        _ = swipe.handle(try scroll(phase: 4, after: 0.004))
+        #expect(swipe.isCarryingOn)
+        swipe.pageArrived()
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aSidewaysScrollerKeepsTheGestureUntilANewOneAtItsEdge() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        // Room to scroll back: the page has the gesture, all of it, even once it reaches its edge.
+        _ = swipe.handle(try scroll(phase: 1, dx: 10))
+        swipe.debugHeard(left: true, right: true)
+        for _ in 0..<10 { #expect(!swipe.handle(try scroll(phase: 2, dx: 10))) }
+        swipe.debugHeard(left: false, right: true)
+        for _ in 0..<20 { #expect(!swipe.handle(try scroll(phase: 2, dx: 10))) }
+        #expect(!swipe.isShowing)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        // A new gesture at the edge goes back.
+        try drag(page, steps: 20, dx: 10, room: (false, true))
+        #expect(swipe.isTracking)
+        _ = swipe.handle(try scroll(phase: 4, after: 0.2))
+        swipe.pageArrived()
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aPageThatCancelsWheelsNeverSwipes() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        // A canvas: nothing scrolls, but it calls preventDefault on the first scroll.
+        _ = swipe.handle(try scroll(phase: 1, dx: 10))
+        swipe.debugHeard(left: false, right: false)
+        swipe.pageAnswered(kept: true, at: 1e15)
+        for _ in 0..<30 { #expect(!swipe.handle(try scroll(phase: 2, dx: 10))) }
+        #expect(!swipe.isShowing)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        // Answering late, mid-swipe: the arrow goes and the page has the rest.
+        try drag(page, steps: 12, dx: 10)
+        #expect(swipe.isShowing)
+        swipe.pageAnswered(kept: true, at: 1e15)
+        #expect(!swipe.isShowing)
+        for _ in 0..<5 { #expect(!swipe.handle(try scroll(phase: 2, dx: 10))) }
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func upAndDownAndTurningSidewaysLaterScroll() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 10, dx: 0, dy: -12)
+        #expect(!swipe.isShowing)
+        // Turning sideways in the same gesture stays a scroll.
+        for _ in 0..<30 { #expect(!swipe.handle(try scroll(phase: 2, dx: 12))) }
+        #expect(!swipe.isShowing)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        // Mostly up and down with a little sideways: a scroll too.
+        try drag(page, steps: 20, dx: 6, dy: 10)
+        #expect(!swipe.isShowing)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func whileTheArrowLeansInThePageOnlyGetsTheSidewaysPart() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 1, dx: 12, dy: 3)
+        #expect(swipe.isShowing && !swipe.isTracking)
+        let step = try scroll(phase: 2, dx: 12, dy: 3)
+        #expect(!swipe.handle(step))
+        let level = swipe.forPage(step)
+        #expect(level.scrollingDeltaY == 0 && level.scrollingDeltaX == step.scrollingDeltaX && level.phase == step.phase)
+        // Up and down is the page's as ever.
+        _ = swipe.handle(try scroll(phase: 4))
+        _ = swipe.handle(try scroll(phase: 1, dy: -12))
+        let down = try scroll(phase: 2, dy: -12)
+        _ = swipe.handle(down)
+        #expect(swipe.forPage(down) === down)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aLostEndIsClearedByTheNextGesture() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 10, dx: 10)
+        #expect(page.layer?.affineTransform() != .identity)
+        // No end; the next gesture is up and down: the page doesn't stay shifted.
+        _ = swipe.handle(try scroll(phase: 128, after: 0.05))
+        _ = swipe.handle(try scroll(phase: 1, dy: -12))
+        #expect(page.layer?.affineTransform() == .identity)
+        _ = swipe.handle(try scroll(phase: 2, dy: -12))
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func momentumWithNoEndIsTheRelease() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 20, dx: 10)
+        // The end was lost; the glide after it says the fingers lifted.
+        #expect(swipe.handle(try scroll(momentum: 1, dx: 20)))
+        #expect(swipe.isCarryingOn)
+        #expect(swipe.handle(try scroll(momentum: 2, dx: 10)))
+        _ = swipe.handle(try scroll(momentum: 3))
+        swipe.pageArrived()
+        #expect(swipe.isClean)
+        // The next scroll is the page's again.
+        _ = swipe.handle(try scroll(phase: 1, dy: -10))
+        #expect(!swipe.handle(try scroll(phase: 2, dy: -10)))
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aRestHoldsUntilTheWindowGoesOrItRunsOut() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 10, dx: 10)
+        // Resting: the swipe holds and watches for the hand doing something else.
+        swipe.debugRest()
+        #expect(swipe.isShowing)
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: page.window)
+        #expect(!swipe.isShowing)
+        #expect(swipe.isClean)
+        // Resting with nothing else happening: it runs out.
+        try drag(page, steps: 10, dx: 10)
+        swipe.debugRest()
+        swipe.debugRest()
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aRestEndsWhenThePointerMovesInAWindowThatDoesntTrackIt() async throws {
+        guard on else { return }
+        // A standalone Zigzag Mini that isn't key gets no pointer moves as events.
+        let (page, host) = try page()
+        page.window?.acceptsMouseMovedEvents = false
+        let swipe = page.swipeNavigator
+        var at = NSPoint(x: 400, y: 300)
+        swipe.pointer = { at }
+        try drag(page, steps: 10, dx: 10)
+        swipe.debugRest()
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(swipe.isShowing)
+        at.x += 30
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aNewSwipeTracksAtOnceAfterOneCalledOff() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 8, dx: 8)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(page.layer?.animation(forKey: "swipe.settle") != nil)
+        // The spring back still running doesn't hide the next swipe's movement.
+        try drag(page, steps: 8, dx: 8, room: (false, false))
+        #expect(swipe.isShowing)
+        #expect(page.layer?.animation(forKey: "swipe.settle") == nil)
+        #expect(page.layer?.affineTransform() != .identity)
+        _ = swipe.handle(try scroll(phase: 8))
+        #expect(swipe.isClean)
+        // And straight after one that went.
+        try drag(page, steps: 20, dx: 10)
+        _ = swipe.handle(try scroll(phase: 4, after: 0.2))
+        #expect(swipe.isCarryingOn)
+        _ = swipe.handle(try scroll(phase: 1, dx: 10))
+        #expect(!swipe.isCarryingOn)
+        _ = swipe.handle(try scroll(phase: 4))
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func leavingTheWindowMidSwipeEndsClean() throws {
+        guard on else { return }
+        let (page, host) = try page()
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 12, dx: 10)
+        #expect(swipe.isShowing)
+        page.removeFromSuperview()
+        #expect(swipe.isClean)
+        _ = host
+    }
+
+    @Test mutating func aPageInACardSwipesTheSameWay() throws {
+        guard on else { return }
+        let (page, host) = try page(card: true)
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 8, dx: 8)
+        #expect(swipe.isShowing)
+        let moved = try #require(page.superview?.layer)
+        #expect(moved.affineTransform() != .identity)
+        _ = swipe.handle(try scroll(phase: 4, after: 0.2))
+        #expect(swipe.isClean)
+        #expect(moved.affineTransform() == .identity)
+        try drag(page, steps: 20, dx: 10)
+        _ = swipe.handle(try scroll(phase: 4, after: 0.2))
+        #expect(swipe.isCarryingOn)
+        swipe.pageArrived()
+        #expect(swipe.isClean)
+        #expect(moved.affineTransform() == .identity)
+        _ = host
+    }
+
+    @Test mutating func eachStepOfASwipeIsCheap() throws {
+        guard on else { return }
+        let (page, host) = try page(card: true)
+        let swipe = page.swipeNavigator
+        try drag(page, steps: 10, dx: 2)
+        var times: [Double] = []
+        for _ in 0..<240 {
+            let event = try scroll(phase: 2, dx: 1)
+            let start = DispatchTime.now().uptimeNanoseconds
+            _ = swipe.handle(event)
+            CATransaction.flush()
+            times.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1000)
+        }
+        let sorted = times.sorted()
+        print("swipe step µs: median \(Int(sorted[sorted.count / 2])) p95 \(Int(sorted[sorted.count * 95 / 100])) max \(Int(sorted.last ?? 0))")
+        // Well inside one 120 Hz frame.
+        #expect(sorted[sorted.count / 2] < 1000)
+        _ = swipe.handle(try scroll(phase: 8))
         _ = host
     }
 }

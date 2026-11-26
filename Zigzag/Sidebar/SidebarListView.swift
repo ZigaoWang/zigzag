@@ -281,7 +281,9 @@ final class SidebarListView: NSView {
         // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
         // open without opening every folder on the way to it. The page you're on is always open.
         let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil }
-        let pinned = Self.pinnedRows(bookmarks: bookmarks.map(\.id).filter { !riders.contains($0) }, folders: folders,
+        // Shown as tiles under the favorites instead (#539): the pages in no folder.
+        let tiled: Set<UUID> = SidebarView.pinnedTabsAsTiles ? Set(Library.shared.pinnedTiles(in: spaceID).flatMap { [$0.0.id] + $0.partners.map(\.id) }) : []
+        let pinned = Self.pinnedRows(bookmarks: bookmarks.map(\.id).filter { !riders.contains($0) && !tiled.contains($0) }, folders: folders,
                                      current: current, folded: collapsed, isOpen: isOpen)
         result += pinned.rows
         rowDepth = pinned.depth
@@ -1208,11 +1210,10 @@ final class SidebarListView: NSView {
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
             let count = folderPageCounts[id] ?? Library.shared.allBookmarkIDs(inFolder: id).count
             let folded = shownSpaceID.map(Self.isCollapsed) ?? false
-            let site = folder.icon == nil ? folder.live?.source.iconSite : nil
-            let siteIcon = site.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
-            if let site, siteIcon == nil { FaviconStore.shared.prefetch(for: site) }
+            let siteIcon = folder.icon == nil ? folder.live.flatMap { LiveFolderSheet.siteIcon(for: $0.source) } : nil
             row.configure(name: folder.name, open: folder.isOpen && !folded, count: count, icon: folder.icon,
-                          live: folder.live != nil, siteIcon: siteIcon, unread: folder.live == nil ? 0 : LiveFolders.shared.unreadCount(id))
+                          live: folder.live != nil, siteIcon: siteIcon, unread: folder.live == nil ? 0 : LiveFolders.shared.unreadCount(id),
+                          updating: folder.live != nil && LiveFolders.shared.isRefreshing(id))
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
         case .tabGroup(let id):
             guard let row = view as? FolderRowView, let group = manager.group(id) else { return }
@@ -1587,7 +1588,7 @@ final class SidebarListView: NSView {
         guard let item = rows.first(where: { ($0.value as? TabRowView)?.pages.contains { $0.id == id } == true })?.key else { return nil }
         return shownRow(item)
     }
-    func bookmarkRow(_ id: UUID) -> NSView? { shownRow(.bookmark(id)) }
+    func bookmarkRow(_ id: UUID) -> NSView? { shownRow(.bookmark(id)) ?? pinnedTile?(id) }
     /// Where a tab's own row sits in the list as last laid out, whether it has a view or not; nil inside a closed folder.
     func layoutFrame(ofTab id: UUID) -> NSRect? { shownFrames[.tab(id)] }
 
@@ -1703,15 +1704,22 @@ final class SidebarListView: NSView {
         if collapsed { collapsedSpaces.insert(spaceID.uuidString) } else { collapsedSpaces.remove(spaceID.uuidString) }
     }
 
+    /// The pinned section folded or opened from its header.
+    var onFold: (() -> Void)?
+
     private func toggleCollapsed() {
         guard let manager, !Library.shared.bookmarks(in: manager.currentSpaceID).isEmpty else { return }
         Self.setCollapsed(manager.currentSpaceID, !Self.isCollapsed(manager.currentSpaceID))
         reload(animated: true)
+        onFold?()
     }
+
+    /// A pinned page's tile, while pinned pages show as tiles (#539).
+    var pinnedTile: ((UUID) -> NSView?)?
 
     /// The row showing a tab: its own, its pinned page's, or for the right half of a split, the row of the pair.
     func row(for tab: Tab) -> NSView? {
-        if let bookmarkID = tab.bookmarkID { return madeRow(.bookmark(Self.rowID(bookmarkID))) }
+        if let bookmarkID = tab.bookmarkID { return madeRow(.bookmark(Self.rowID(bookmarkID))) ?? pinnedTile?(bookmarkID) }
         if let row = madeRow(.tab(tab.id)) { return row }
         if let partner = manager?.partner(of: tab) {
             return partner.bookmarkID.map { madeRow(.bookmark(Self.rowID($0))) } ?? madeRow(.tab(partner.id))
@@ -1721,7 +1729,7 @@ final class SidebarListView: NSView {
     }
 
     /// The row showing a pinned page (a pinned split's row for either of its pages).
-    func row(forBookmark id: UUID) -> NSView? { madeRow(.bookmark(Self.rowID(id))) }
+    func row(forBookmark id: UUID) -> NSView? { madeRow(.bookmark(Self.rowID(id))) ?? pinnedTile?(id) }
 
     /// The folder's row, if visible.
     func row(forFolder id: UUID) -> NSView? { madeRow(.folder(id)) }
@@ -1978,11 +1986,12 @@ final class SidebarListView: NSView {
     }
 
     /// Where something from outside the list lands, at a point on screen, and the folder it goes into, if any.
-    func dropTarget(at screenPoint: NSPoint, allowsPinned: Bool) -> (section: Section, index: Int, folder: UUID?) {
+    /// `carrying`: pinned pages it's carrying, which don't count where it lands.
+    func dropTarget(at screenPoint: NSPoint, allowsPinned: Bool, carrying: Set<SidebarItem> = []) -> (section: Section, index: Int, folder: UUID?) {
         guard let window else { return (.tabs, 0, nil) }
         let point = convert(window.convertPoint(fromScreen: screenPoint), from: nil)
-        let (section, index) = target(at: point.y, allowsPinned: allowsPinned, carried: [])
-        let folder = section == .bookmarks ? folderForGap(in: withPlaceholder(items, section: section, index: index, carried: []), pointX: point.x) : nil
+        let (section, index) = target(at: point.y, allowsPinned: allowsPinned, carried: carrying)
+        let folder = section == .bookmarks ? folderForGap(in: withPlaceholder(items, section: section, index: index, carried: carrying), pointX: point.x) : nil
         // Among the tabs, a position in the tab list rather than a count of rows.
         return (section, section == .tabs ? tabListIndex(forRow: index, carried: [], moving: []) : index, folder)
     }

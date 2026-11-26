@@ -741,6 +741,11 @@ final class SitePanel: FloatingPanelView {
                    "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? CGFloat(-1)]]
     }
 
+    /// sitecompat on|off: the Compatibility mode switch.
+    func debugCompatibility(_ arg: String) {
+        rows.first { $0.debugTitle.hasPrefix(Self.compatibilityTitle + ":") }?.debugChoose(arg == "on" ? 1 : 0)
+    }
+
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
     func debugDark(_ arg: String) {
         guard let index = DarkPages.SiteChoice.allCases.firstIndex(where: { $0.rawValue == arg }) else { return }
@@ -830,7 +835,7 @@ final class SitePanel: FloatingPanelView {
         let actions = host.actions(for: tab).filter { PrivateAccess.sees(isPrivate: isPrivate, allowed: $0.context.hasAccessToPrivateData) }
         if isPrivate, actions.isEmpty { return }
         let installs = tab.profile.installs
-        let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
+        let offHere = !isBlank && (ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) || compatible)
         let web = ["http", "https"].contains(url.scheme ?? "")
         let tab = tab, url = url
         var items: [SiteExtensionsSection.Item] = actions.map { action in
@@ -888,6 +893,26 @@ final class SitePanel: FloatingPanelView {
     // What the rows of This Site say they're set to.
     private static let onHere = String(localized: "On for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: on.")
     private static let offHere = String(localized: "Off for this site", comment: "Under a row's name in the site panel's This Site group, what it's set to: off.")
+
+    /// Compatibility mode (#497): its row's name, here and in Settings › Privacy › Sites.
+    static let compatibilityTitle = String(localized: "Compatibility mode", comment: "Row in the site panel's This Site group and in Settings › Privacy › Sites: for a site that doesn't work right, turns off extensions, ad blocking, cookie banners and zapped elements on it, keeping those choices for later.")
+    static let compatibilityTip = String(localized: "Turns off extensions, ad blocking, cookie banners and zapped elements on this site. Your choices for them come back when you turn it off.", comment: "Tooltip of the Compatibility mode row in the site panel.")
+    /// Under a row compatibility mode sets aside.
+    static let offInCompatibility = String(localized: "Off in compatibility mode", comment: "Under a row in the site panel (Ad blocking, Cookie banners, Extensions) while Compatibility mode is on for the site: it's off, and its own choice comes back when that's turned off.")
+    /// At the end of the zapped elements and Custom style rows while compatibility mode is on.
+    static let offShort = String(localized: "compatibility.off", defaultValue: "Off", comment: "Short, at the end of a row in the site panel (3 zapped, Custom style) while Compatibility mode is on for the site: those changes aren't applied.")
+
+    /// A Site Controls button in the accent while compatibility mode is on for its page's site, as the star is while pinned.
+    static func markCompatibility(_ button: IconButton, url: URL?) {
+        let on = SiteCompatibility.isOn(for: url)
+        button.tint = on ? Brand.Theme.for(button).accent : Tokens.Color.icon
+        button.toolTip = on ? String(localized: "Site Controls, compatibility mode on", comment: "Tooltip of the Site Controls button by the address while Compatibility mode is on for the page's site.")
+            : PaneHeaderView.siteControlsTitle
+        button.setAccessibilityValue(on ? compatibilityTitle : nil)
+    }
+
+    /// Compatibility mode is on for this page's site.
+    private var compatible: Bool { !isBlank && SiteCompatibility.isOn(for: url) }
 
     /// A choice in the Dark page row's dropdown.
     static func title(of choice: DarkPages.SiteChoice) -> String {
@@ -1003,6 +1028,7 @@ final class SitePanel: FloatingPanelView {
         rows = []
         zoomStepper = nil
         keepCookiesRow = nil
+        let compatible = self.compatible
         // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
         // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
         // Privacy › Sites. Its tabs still follow the ones made elsewhere.
@@ -1020,20 +1046,23 @@ final class SitePanel: FloatingPanelView {
                 zoomStepper = stepper
                 rows.append(.custom(String(localized: "Zoom", comment: "Row in the site panel's This Site group."), control: stepper))
             case .adBlocking:
+                let title = String(localized: "Ad blocking", comment: "Row in the site panel's This Site group.")
+                if compatible { rows.append(.overridden(title)); break }
                 let blocked = !ContentBlocker.isAllowed(on: url)
-                rows.append(.toggle(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."), on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                rows.append(.toggle(title, on: blocked, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     ContentBlocker.setAllowed(!on, on: self.url)
                     self.tab.reload()
                 })
             case .cookieBanners:
                 // Cookie banners (#175), for this site alone. What was done says so quietly, under its name.
+                let title = String(localized: "Cookie banners", comment: "Row in the site panel's This Site group: whether Zigzag answers this site's cookie consent pop-ups with no.")
+                if compatible { rows.append(.overridden(title)); break }
                 let banner = CookieBanners.outcome(in: tab.webView, site: site)
                 let rejected = String(localized: "Rejected on this site", comment: "Under Cookie banners in the site panel's This Site group: Zigzag said no to the cookies the site's consent pop-up asked for.")
                 let hidden = String(localized: "Hidden on this site", comment: "Under Cookie banners in the site panel's This Site group: the site's cookie notice was only hidden, since there was nothing to say no to.")
                 let handledNow = CookieBanners.handles(url)
-                rows.append(.toggle(String(localized: "Cookie banners", comment: "Row in the site panel's This Site group: whether Zigzag answers this site's cookie consent pop-ups with no."),
-                                    on: handledNow, status: { on in
+                rows.append(.toggle(title, on: handledNow, status: { on in
                                         guard on, on == handledNow else { return on ? Self.onHere : Self.offHere }
                                         return banner == .rejected ? rejected : banner == .hidden ? hidden : Self.onHere
                                     }) { [weak self] on in
@@ -1042,6 +1071,17 @@ final class SitePanel: FloatingPanelView {
                     if let webView = self.tab.webView { CookieBanners.forget(in: webView) }
                     self.tab.reload()
                 })
+            case .compatibility:
+                // One switch for a site that breaks (#497): the rows it sets aside say so, and keep their choices.
+                let row = PanelRow.toggle(Self.compatibilityTitle, on: compatible, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    SiteCompatibility.set(on, for: self.url)
+                    self.tab.reload()
+                    // After the switch has moved, the rows it overrides show it.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.state) { [weak self] in self?.rebuildAll() }
+                }
+                row.toolTip = Self.compatibilityTip
+                rows.append(row)
             case .darkPage:
                 // Dark pages for this site alone (#134): Automatic follows Settings, On and Off hold whatever it says,
                 // Force darkens it even where it looks dark on its own. Under the name, what that means here now.
@@ -1169,8 +1209,8 @@ final class SitePanel: FloatingPanelView {
            !(extensionsSection?.items.isEmpty ?? true) || ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) {
             let profile = tab.profile
             let enabled = !ExtensionStore.extensionsOffSites(in: profile).contains(site)
-            let row = PanelRow.toggle(String(localized: "Extensions", comment: "Row in the site panel's Permissions page: whether extensions run on this site."),
-                                      on: enabled, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+            let title = String(localized: "Extensions", comment: "Row in the site panel's Permissions page: whether extensions run on this site.")
+            let row = compatible ? PanelRow.overridden(title) : PanelRow.toggle(title, on: enabled, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                 guard let self else { return }
                 var sites = ExtensionStore.extensionsOffSites(in: profile)
                 if on { sites.remove(self.site) } else { sites.insert(self.site) }
@@ -1266,6 +1306,15 @@ final class SitePanel: FloatingPanelView {
         resize()
     }
 
+    /// Rows and extension tiles again, after a change that touches both.
+    private func rebuildAll() {
+        extensionsSection?.removeFromSuperview()
+        extensionsSection = nil
+        extensionsToken = nil
+        buildExtensions()
+        rebuildRows()
+    }
+
     // MARK: Boosts
 
     /// The site's boosts, including a private window's.
@@ -1301,12 +1350,14 @@ final class SitePanel: FloatingPanelView {
         if zapsGroup.superview == nil { zapsBox.addSubview(zapsGroup) }
         if styleRow == nil {
             let row = PanelLinkRow(String(localized: "Custom style", comment: "Row in the site panel, there while the site has CSS of your own: opens Edit Style. Its value says Edit…."),
-                                   value: String(localized: "Edit…", comment: "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.")) { [weak self] in self?.editStyle() }
+                                   value: Self.editStyleValue) { [weak self] in self?.editStyle() }
             addSubview(row)
             styleRow = row
         }
         refreshBoostRows()
     }
+
+    static let editStyleValue = String(localized: "Edit…", comment: "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.")
 
     static let restoreAllTitle = String(localized: "Restore All", comment: "Under the list of elements zapped on the site, on its page in the site panel: shows them all again.")
 
@@ -1315,6 +1366,8 @@ final class SitePanel: FloatingPanelView {
         zappedRow?.titleText = SiteBoosts.zapped(zaps.count)
         zappedRow?.isHidden = zaps.isEmpty
         styleRow?.isHidden = !boost.hasStyle
+        zappedRow?.value = compatible ? Self.offShort : ""
+        styleRow?.value = compatible ? Self.offShort : Self.editStyleValue
         if zappedRow != nil, listedZaps != zaps || listedNames != boost.names {
             let boost = boost
             listedZaps = zaps
@@ -1413,8 +1466,9 @@ final class SitePanel: FloatingPanelView {
         // A page's box covers the panel, so what's in it is placed in the panel's own terms.
         for box in [mainBox, permissionsBox, zapsBox] where !box.isHidden { place(box, NSRect(x: 0, y: 0, width: width, height: 10_000)) }
         func group(_ group: PanelGroup) {
-            place(group, NSRect(x: pad, y: y, width: inner, height: group.height))
-            y += group.height
+            let height = group.height(for: inner)
+            place(group, NSRect(x: pad, y: y, width: inner, height: height))
+            y += height
         }
 
         switch page {
@@ -1563,8 +1617,9 @@ final class SitePanel: FloatingPanelView {
         if !rows.isEmpty {
             heading(siteLabel)
             let y = top(self.group.topSlack)
-            place(self.group, NSRect(x: pad, y: y, width: inner, height: self.group.height))
-            ended(y + self.group.height - self.group.bottomSlack)
+            let height = self.group.height(for: inner)
+            place(self.group, NSRect(x: pad, y: y, width: inner, height: height))
+            ended(y + height - self.group.bottomSlack)
         }
         return finishMain()
     }
@@ -1777,17 +1832,20 @@ final class PanelGroup: NSView {
         }
     }
 
-    var height: CGFloat { CGFloat(rows.count) * PanelRow.height }
+    func height(for width: CGFloat) -> CGFloat { rows.map { $0.height(for: width) }.reduce(0, +) }
     /// The room above the first row's ink and below the last's: the panel spaces by the ink.
     var topSlack: CGFloat { rows.first?.topSlack ?? 0 }
-    var bottomSlack: CGFloat { rows.last?.bottomSlack ?? 0 }
+    var bottomSlack: CGFloat { rows.last?.bottomSlack(for: bounds.width) ?? 0 }
 
     override var isFlipped: Bool { true }
 
     override func layout() {
         super.layout()
-        for (i, row) in rows.enumerated() {
-            row.frame = NSRect(x: 0, y: CGFloat(i) * PanelRow.height, width: bounds.width, height: PanelRow.height)
+        var y: CGFloat = 0
+        for row in rows {
+            let height = row.height(for: bounds.width)
+            row.frame = NSRect(x: 0, y: y, width: bounds.width, height: height)
+            y += height
         }
     }
 }
@@ -1804,7 +1862,35 @@ final class PanelRow: NSView {
     /// From the row's top to its first ink: the caps of its name, or a control's box.
     var topSlack: CGFloat { min(textInk.top, controlSlack) }
     /// From the row's last ink to its bottom: the baseline of its words, or a control's box.
-    var bottomSlack: CGFloat { min(Self.height - textInk.bottom, controlSlack) }
+    var bottomSlack: CGFloat { bottomSlack(for: bounds.width) }
+    func bottomSlack(for width: CGFloat) -> CGFloat {
+        isStacked(width) ? textTop : min(Self.height - textInk.bottom, controlSlack)
+    }
+
+    /// Its height at `width`: one line of the panel, or more with its control under its name.
+    func height(for width: CGFloat) -> CGFloat {
+        isStacked(width) ? textTop + contentHeight + Tokens.Space.x2 + wantedSize.height + textTop : Self.height
+    }
+
+    /// Where its words start, centered in a row's height.
+    private var textTop: CGFloat { (Self.height - contentHeight) / 2 }
+
+    private var wantedSize: NSSize { control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize }
+
+    /// The width its name and the line under it need on one line.
+    private var namedWidth: CGFloat { ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0)) }
+
+    /// A name longer than the room its menu leaves it (a longer language) puts the menu under the name instead.
+    /// A short name keeps the menu beside it, squeezed as before, with its choice whole in a tooltip.
+    private func isStacked(_ width: CGFloat) -> Bool {
+        guard width > 0, control is DropdownButton else { return false }
+        return namedWidth > width - sideBySideWidth(width) - Tokens.Space.x2
+    }
+
+    /// The control's width beside the name.
+    private func sideBySideWidth(_ width: CGFloat) -> CGFloat {
+        min(wantedSize.width, max(0, width - min(namedWidth, Self.minimumTitle) - Tokens.Space.x2))
+    }
 
     private var textInk: (top: CGFloat, bottom: CGFloat) {
         guard let value, !value.isHidden else {
@@ -1848,6 +1934,16 @@ final class PanelRow: NSView {
             row?.value?.stringValue = status(on)
             changed(on)
         }
+        return row
+    }
+
+    /// A switch compatibility mode holds off (#497): dimmed, and saying so under its name.
+    static func overridden(_ title: String) -> PanelRow {
+        let toggle = Toggle(isOn: false)
+        toggle.isEnabled = false
+        toggle.setAccessibilityLabel(title)
+        let row = PanelRow(title, control: toggle, value: SitePanel.offInCompatibility)
+        row.title.textColor = Tokens.Color.textDisabled
         return row
     }
 
@@ -1901,7 +1997,7 @@ final class PanelRow: NSView {
         if let dropdown = control as? DropdownButton {
             return "\(title.stringValue): \(dropdown.accessibilityValue() as? String ?? "")" + (value.flatMap { $0.isHidden ? nil : " (\($0.stringValue))" } ?? "")
         }
-        if let toggle = control as? Toggle { return "\(title.stringValue): \(toggle.isOn ? "on" : "off")" }
+        if let toggle = control as? Toggle { return "\(title.stringValue): \(toggle.isOn ? "on" : "off")" + (toggle.isEnabled ? "" : ", dimmed") }
         return title.stringValue
     }
 
@@ -1936,12 +2032,23 @@ final class PanelRow: NSView {
         super.layout()
         // Not placed yet: a control sized by its frame (an icon button) would be squeezed to nothing for good.
         guard bounds.width > 0 else { return }
-        let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
-        // Shorter titles keep only their own width, so they never squeeze the control.
-        let named = ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0))
-        let size = NSSize(width: min(wanted.width, max(0, bounds.width - min(named, Self.minimumTitle) - Tokens.Space.x2)), height: wanted.height)
-        control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
+        let wanted = wantedSize
         let x = -Label.inset
+        if isStacked(bounds.width) {
+            title.usesSingleLineMode = true
+            title.maximumNumberOfLines = 1
+            title.lineBreakMode = .byTruncatingTail
+            title.cell?.wraps = false
+            title.frame = NSRect(x: x, y: textTop, width: bounds.width + Label.inset * 2, height: title.lineHeight)
+            if let value, !value.isHidden {
+                value.frame = NSRect(x: x, y: title.frame.maxY, width: bounds.width + Label.inset * 2, height: value.lineHeight)
+            }
+            control.frame = NSRect(x: 0, y: textTop + contentHeight + Tokens.Space.x2, width: min(wanted.width, bounds.width), height: wanted.height)
+            return
+        }
+        // Shorter titles keep only their own width, so they never squeeze the control.
+        let size = NSSize(width: sideBySideWidth(bounds.width), height: wanted.height)
+        control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
         let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value, !value.isHidden else {
             // A long title beside its control wraps to a second line instead of truncating; the row fits two.
@@ -2438,7 +2545,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, compatibility, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2480,6 +2587,8 @@ enum SitePanelRows {
         if c.isWeb, !c.coveredPage { rows.append(.zoom) }
         if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
+        // Kept for the site: private windows follow it, as they do allowing ads.
+        if c.isWeb, !c.isPrivate { rows.append(.compatibility) }
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)

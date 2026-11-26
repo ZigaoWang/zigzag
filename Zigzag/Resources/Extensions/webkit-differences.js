@@ -531,11 +531,60 @@
       }
     }
 
+    const permissions = api.permissions;
+    // Native messaging a manifest lists as optional: WebKit grants it to every extension for Zigzag's bridge, so it
+    // answered held, and Bitwarden never asked for it and was refused its app (#484). It's held only as the person
+    // allowed it, asked for with Zigzag's sheet (bridge.js); the rest of a question is still WebKit's.
+    const NATIVE = 'nativeMessaging';
+    const nativeHosts = () => globalThis.__zigzagNativeHosts;
+    const namesNative = (asked) => !!asked && Array.isArray(asked.permissions) && asked.permissions.includes(NATIVE);
+    const withoutNative = (asked) => Object.assign({}, asked, { permissions: asked.permissions.filter((name) => name !== NATIVE) });
+    const asksNothing = (asked) => !asked.permissions.length && !(Array.isArray(asked.origins) && asked.origins.length);
+    const answering = (answer, callback, failed = false) => {
+      if (typeof callback !== 'function') return answer;
+      answer.then((value) => callback(value), () => callback(failed));
+      return undefined;
+    };
+    if (permissions && typeof permissions.request === 'function') {
+      const request = permissions.request.bind(permissions);
+      setMember(['permissions'], 'request', (...args) => {
+        const hosts = nativeHosts();
+        if (!hosts || !namesNative(args[0])) return request(...args);
+        const rest = withoutNative(args[0]);
+        return answering((async () => {
+          if (!asksNothing(rest) && !(await request(rest))) return false;
+          return (await hosts.request()) === true;
+        })(), args[1]);
+      });
+    }
+    if (permissions && typeof permissions.remove === 'function') {
+      const remove = permissions.remove.bind(permissions);
+      setMember(['permissions'], 'remove', (...args) => {
+        const hosts = nativeHosts();
+        if (!hosts || !namesNative(args[0])) return remove(...args);
+        const rest = withoutNative(args[0]);
+        return answering((async () => {
+          const removed = (await hosts.remove()) === true;
+          return asksNothing(rest) ? removed : (await remove(rest)) && removed;
+        })(), args[1]);
+      });
+    }
+    if (permissions && typeof permissions.getAll === 'function') {
+      const getAll = permissions.getAll.bind(permissions);
+      setMember(['permissions'], 'getAll', (...args) => {
+        const hosts = nativeHosts();
+        if (!hosts) return getAll(...args);
+        return answering((async () => {
+          const all = await getAll();
+          if (!all || !Array.isArray(all.permissions) || !all.permissions.includes(NATIVE) || (await hosts.held()) === true) return all;
+          return withoutNative(all);
+        })(), args[0], null);
+      });
+    }
     // permissions.contains: WebKit refuses the whole question, and throws, when it names a permission WebKit doesn't
     // know ("downloads"), where Chrome answers. Violentmonkey asks about "downloads" on its background's first line,
     // so its background stopped there. Such a permission counts as held when the extension's manifest asks for it
     // outright (Zigzag's bridge answers for those), and not otherwise; the rest is still WebKit's to answer.
-    const permissions = api.permissions;
     if (permissions && typeof permissions.contains === 'function') {
       const contains = permissions.contains.bind(permissions);
       let required = [];
@@ -544,6 +593,12 @@
         const answer = (async () => {
           let query = Object.assign({}, asked);
           let held = true;
+          const hosts = nativeHosts();
+          if (hosts && namesNative(query)) {
+            if ((await hosts.held()) !== true) return false;
+            query = withoutNative(query);
+            if (asksNothing(query)) return true;
+          }
           for (let tries = 0; ; tries++) {
             try { return held && await contains(query); } catch (error) {
               // An origin with a port ("http://127.0.0.1:8777/*"), which Chrome reads and WebKit refuses: asked

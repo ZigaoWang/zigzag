@@ -772,21 +772,64 @@ final class DialogHeader: NSView {
         picture.contentTintColor = nil
         picture.isHidden = image == nil
         circle.isHidden = true
+        syncButton()
         needsLayout = true
+    }
+
+    /// The picture as a button, as the space editor's icon is: a hover wash on its circle, `toolTip`, and `action`.
+    private(set) var pictureButton: IconButton?
+
+    func makePictureClickable(toolTip: String, _ action: @escaping () -> Void) {
+        let side = Tokens.Dialog.iconSide
+        let button = IconButton(symbol: "circle", size: side, symbolSize: Tokens.TypeSize.heading, toolTip: toolTip)
+        button.radius = side / 2
+        button.imageSide = Tokens.Metric.favicon + Tokens.Space.x1
+        button.onClick = { _ in action() }
+        addSubview(button)
+        pictureButton = button
+        syncButton()
+    }
+
+    /// A clickable picture is drawn by its button, on the soft circle: a template tinted as a symbol, else in its own colors.
+    private func syncButton() {
+        guard let button = pictureButton else { return }
+        let image = picture.image
+        picture.isHidden = true
+        button.isHidden = image == nil
+        let tint = picture.contentTintColor ?? Tokens.Color.icon
+        if let image, image.isTemplate || picture.contentTintColor != nil {
+            button.image = nil
+            button.glyph = image
+            button.tint = tint
+        } else {
+            button.glyph = nil
+            button.image = image
+        }
+        circle.color = tint.withAlphaComponent(Tokens.Color.selectionAlpha)
+        circle.isHidden = image == nil
     }
 
     /// A symbol in the accent on a soft circle of it.
     func setSymbol(_ name: String, tint: NSColor) {
-        picture.image = Tokens.Symbol.image(name, size: Tokens.TypeSize.heading)
+        setTemplate(Tokens.Symbol.image(name, size: Tokens.TypeSize.heading), tint: tint)
+    }
+
+    /// A one-color picture drawn as a symbol is: in `tint` on a soft circle of it.
+    func setTemplate(_ image: NSImage, tint: NSColor) {
+        picture.image = image
         picture.imageScaling = .scaleNone
         picture.contentTintColor = tint
         picture.isHidden = false
         circle.color = tint.withAlphaComponent(Tokens.Color.selectionAlpha)
         circle.isHidden = false
+        syncButton()
         needsLayout = true
     }
 
-    private var hasPicture: Bool { !picture.isHidden }
+    /// The picture showing, as an image (a favicon) or a symbol.
+    var pictureImage: NSImage? { picture.image }
+
+    private var hasPicture: Bool { pictureButton.map { !$0.isHidden } ?? !picture.isHidden }
     private var textX: CGFloat { hasPicture ? Tokens.Dialog.iconSide + Tokens.Space.x3 : 0 }
 
     private func titleHeight(_ width: CGFloat) -> CGFloat {
@@ -811,6 +854,7 @@ final class DialogHeader: NSView {
         let total = height(for: bounds.width)
         circle.frame = NSRect(x: 0, y: round((total - side) / 2), width: side, height: side)
         picture.frame = circle.frame
+        pictureButton?.frame = circle.frame
         let width = max(0, bounds.width - textX - trailingRoom)
         // The title draws its text Label.inset in from its edges, as the subtitle does: both are set that much wider, so
         // their first letters line up where the text starts.

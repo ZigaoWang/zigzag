@@ -41,6 +41,11 @@ enum ContentBlocker {
         return allowed.contains { site == $0 || site.hasSuffix("." + $0) }
     }
 
+    /// Whether a page is blocked: blocking on, the site not allowed, and not in compatibility mode (#497).
+    static func blocks(on url: URL?) -> Bool {
+        isEnabled && !isAllowed(on: url) && !SiteCompatibility.isOn(for: url)
+    }
+
     static func setAllowed(_ allowed: Bool, on url: URL?) {
         guard let site = site(of: url) else { return }
         var sites = allowedSites
@@ -153,7 +158,7 @@ enum ContentBlocker {
     /// Whether pages in a web view get the community lists' site filters (AdFilters.swift): when blocking is on, the
     /// page's site isn't one you allow ads on, and no ad blocker extension runs the same lists there already.
     static func filtersWanted(in webView: WKWebView, on page: URL?) -> Bool {
-        isEnabled && !isAllowed(on: page) && extensionBlocker(for: webView) == nil
+        blocks(on: page) && extensionBlocker(for: webView) == nil
     }
 
     /// Readies a document's site filters before it starts loading: the page's, or a frame's, which follows the page it's in.
@@ -179,7 +184,7 @@ enum ContentBlocker {
     /// is allowed, otherwise the full list (or the short one until the full one is ready).
     static func apply(to webView: WKWebView, for url: URL?) {
         let controller = webView.configuration.userContentController
-        let wanted = isEnabled && !isAllowed(on: url) ? activeList : nil
+        let wanted = blocks(on: url) ? activeList : nil
         for list in [ruleList, fallbackList].compactMap({ $0 }) where list !== wanted {
             controller.remove(list)
         }
@@ -241,7 +246,7 @@ enum AdBlockers {
     static func active(in profile: Profile, inPrivate: Bool = false) -> String? {
         guard #available(macOS 15.4, *) else { return nil }
         let installs = profile.installs
-        let offSites = ExtensionStore.extensionsOffSites(in: profile)
+        let offSites = ExtensionStore.extensionsOffSitesInEffect(in: profile)
         return active(among: known.keys.filter { id in
             guard installs.isEnabled(id), installs.isInstalled(id),
                   PrivateAccess.sees(isPrivate: inPrivate, allowed: installs.allowsPrivate(id)) else { return false }

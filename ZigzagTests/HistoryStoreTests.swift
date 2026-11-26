@@ -119,6 +119,8 @@ struct HistoryStoreTests {
         let urls = await store.search("Example", limit: 10, asker: 1) { $0.map(\.url) }
         #expect(urls == store.search("Example", limit: 10).map(\.url))
         #expect(await store.search("上海", limit: 10, asker: 1) { $0.count } == 1)
+        #expect(await store.pageSearch("上海", asker: 1) { $0.count } == 1)
+        #expect(await store.pageSearch("example", asker: 1) { Set($0.map(\.url)) } == urls.map(Set.init))
 
         let reader = HistoryReader(path: file.path)
         let started = DispatchSemaphore(value: 0), proceed = DispatchSemaphore(value: 0)

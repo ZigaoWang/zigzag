@@ -35,6 +35,8 @@
 ## Download rules
 - Rules in Settings › Downloads → the first one that matches, top to bottom, takes the download.
   Test: DownloadRuleTests.firstMatchWinsTopToBottom
+- Each rule in Settings › Downloads → a box headed by its name, switch, Change and Delete, its saved answers inside; dragging the box changes the order, and a rule with no answers is a box with no chevron.
+  Test: SettingsLazyBuildTests.eachDownloadRuleIsABoxWithItsAnswersInside
 - A rule that hands downloads to an app, a script or a service → asks first: Don't Allow, Save in Zigzag or Hand Off.
   No test yet.
 - Always for the rule on that question → the answer holds on every site.
@@ -47,6 +49,16 @@
   Test: DownloadRuleTests.aDestinationIsTheFirstThatMatches
 - A handoff rule by file type → sends every download whose own name ends in one of its extensions, whatever its address says; links have no name, so they never match.
   Test: DownloadRuleTests.aFileTypeHandoffMatchesTheDownloadsNameAndNeverALink
+- A rule's Hand off set to File → Zigzag saves the download in Downloads first, then hands the saved file to the action; a link still hands off its address.
+  Test: DownloadRuleTests.onlyDownloadsHandOffASavedFile
+- A File handoff's templates → `{file}` is the saved file's path and `{file_url}` its file URL, while `{link}` stays the address.
+  Test: DownloadRuleTests.fileTokensAreTheSavedFileAndNothingWithoutOne
+- A rule saved before Hand off existed → keeps handing off its URL.
+  Test: DownloadRuleTests.aFileHandoffIsOptInAndOlderRulesKeepTheURL
+- A File handoff whose download fails or is cancelled → nothing is handed off. A download you cancel or remove says nothing; only a failure says the download didn't finish.
+  Test: DownloadRuleTests.aCancelledFileHandoffSaysNothing
+- A site that refuses the download after Hand Off → its File handoff is dropped at once.
+  Test: DownloadRuleTests.aRefusedDownloadDropsItsFileHandoff
 - Open for apps, scripts, installers, archives and web pages → never opens them; they're only saved.
   Test: DownloadRuleTests.anOpenNeverTakesAnAppScriptOrArchive
 

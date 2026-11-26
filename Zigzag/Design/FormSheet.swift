@@ -17,6 +17,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         /// Hidden rows take no room and Tab skips them. Toggle with `setHidden(_:forRow:)` when a choice makes a row
         /// pointless, rather than graying it.
         var isHidden = false
+        /// A dropdown as wide as the fields, not its own width.
+        var fills = false
 
         /// A quiet line of words, wrapped to the form's width.
         static func note(_ text: String) -> Row {
@@ -29,7 +31,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     private let scroll = NSScrollView()
     /// Scrolls rows between a fixed heading and buttons when the form is taller than the screen.
     private let content = FlippedView()
-    private let header: DialogHeader
+    let header: DialogHeader
     private let body: NSTextField?
     private var rows: [Row]
     private var labels: [Label?] = []
@@ -201,6 +203,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     private func handle(_ event: NSEvent, in window: NSWindow) -> NSEvent? {
         // A dropdown's menu, open over the form, has the keys while it's up.
         if MenuPanel.current != nil { return event }
+        // So does an icon grid opened from its heading.
+        if let picker = IconPickerPanel.current, picker.isDescendant(of: self) { return event }
         let composing = (window.firstResponder as? NSTextView)?.hasMarkedText() == true
         // Return in a MultilineField inserts a newline.
         if [36, 76].contains(event.keyCode), let text = window.firstResponder as? NSTextView, !text.isFieldEditor, text.isEditable,
@@ -315,10 +319,44 @@ final class FormSheet: NSView, NSTextFieldDelegate {
 
     /// Rows only: no heading, message or buttons.
     private func rowsHeight(width: CGFloat) -> CGFloat {
+        let above = labelsAbove(width)
         var height: CGFloat = 0
-        for row in rows where !row.isHidden { height += self.height(of: row, width: width) + rowGap }
+        for (row, label) in zip(rows, labels) where !row.isHidden {
+            height += self.height(of: row, width: width) + rowGap
+            if above, let label { height += ceil(label.intrinsicContentSize.height) + Self.labelGap }
+        }
         return max(0, height - rowGap)
     }
+
+    /// The labels' column, as wide as the widest label, so the controls after them line up.
+    private var labelColumn: CGFloat { labels.compactMap { $0?.intrinsicContentSize.width }.max().map { ceil($0) + Tokens.Space.x3 } ?? 0 }
+
+    /// A control that keeps its own width at the row's end, as in Settings; other views fill the row. Switches too,
+    /// or they'd stretch.
+    private func ownWidth(of row: Row) -> CGFloat? {
+        row.fills ? nil : (row.view as? DropdownButton)?.intrinsicContentSize.width ?? (row.view is Toggle ? row.view.intrinsicContentSize.width : nil)
+    }
+
+    /// Labels too long to sit beside their controls (a longer language) go over them instead. A dropdown may shrink,
+    /// its choice ending in "…" with the whole of it in its tooltip.
+    private func labelsAbove(_ inner: CGFloat) -> Bool {
+        let column = labelColumn
+        return zip(rows, labels).contains { row, label in
+            label != nil && !row.isHidden && column + (ownWidth(of: row).map { min($0, Self.minimumDropdown) } ?? Self.minimumFill) > inner
+        }
+    }
+
+    #if DEBUG
+    /// Whether the labels are over their controls, for tests.
+    var debugLabelsAbove: Bool { labelsAbove(width - Tokens.Dialog.padding * 2) }
+    #endif
+
+    /// The narrowest a field beside its label may get.
+    private static let minimumFill: CGFloat = 160
+    /// The narrowest a dropdown beside its label may get.
+    private static let minimumDropdown: CGFloat = 120
+    /// Between a label and the control under it.
+    private static let labelGap = Tokens.Space.x1
 
     private func height(for width: CGFloat) -> CGFloat {
         let pad = Tokens.Dialog.padding, inner = width - pad * 2
@@ -353,19 +391,21 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         scroll.frame = NSRect(x: pad, y: y, width: inner, height: viewport)
         content.frame = NSRect(x: 0, y: 0, width: inner, height: max(rowsHeight, viewport))
         // Labels share a column, so the controls after them line up.
-        let labelWidth = labels.compactMap { $0?.intrinsicContentSize.width }.max().map { ceil($0) + Tokens.Space.x3 } ?? 0
+        let labelWidth = labelColumn
+        let above = labelsAbove(inner)
         var rowY: CGFloat = 0
         for (row, label) in zip(rows, labels) {
             if row.isHidden { continue }
             let height = self.height(of: row, width: inner)
-            if let label {
+            if let label, above {
+                let lh = ceil(label.intrinsicContentSize.height)
+                label.frame = NSRect(x: 0, y: rowY, width: inner, height: lh)
+                rowY += lh + Self.labelGap
+                row.view.frame = NSRect(x: 0, y: rowY, width: min(ownWidth(of: row) ?? inner, inner), height: height)
+            } else if let label {
                 let lh = ceil(label.intrinsicContentSize.height)
                 label.frame = NSRect(x: 0, y: rowY + round((height - lh) / 2), width: labelWidth, height: lh)
-                // Controls keep their own width at the row's end, as in Settings; other views fill the row. Switches
-                // too, or they'd stretch.
-                let own = (row.view as? DropdownButton)?.intrinsicContentSize.width
-                    ?? (row.view is Toggle ? row.view.intrinsicContentSize.width : nil)
-                let width = min(own ?? inner - labelWidth, inner - labelWidth)
+                let width = min(ownWidth(of: row) ?? inner - labelWidth, inner - labelWidth)
                 row.view.frame = NSRect(x: inner - width, y: rowY, width: width, height: height)
             } else {
                 row.view.frame = NSRect(x: 0, y: rowY, width: inner, height: height)

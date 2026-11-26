@@ -1010,9 +1010,7 @@ final class EdgeSidebar {
         // Over other apps and full-screen apps, on every Space, out of Stage Manager and ⌘`.
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.setSeeThrough(shadow: false)
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.isReleasedWhenClosed = false

@@ -8,10 +8,10 @@ struct SettingsLayoutTests {
     /// Inside an animation a view still answers with the frame it had, so a layout that reads its views back is laid
     /// out for the last size. The sections and the pane are laid out for the size the page was just given.
     @Test func fitsThePageItIsGivenInsideAnAnimation() async throws {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 976), styleMask: [.borderless], backing: .buffered, defer: false)
         window.contentView?.wantsLayer = true
         let settings = SettingsView(pane: .appearance)
-        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 976)
         window.contentView?.addSubview(settings)
         settings.layoutSubtreeIfNeeded()
 
@@ -21,7 +21,7 @@ struct SettingsLayoutTests {
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.05
             context.allowsImplicitAnimation = true
-            settings.frame = NSRect(x: 0, y: 0, width: 1032, height: 760)
+            settings.frame = NSRect(x: 0, y: 0, width: 1032, height: 960)
             settings.layoutSubtreeIfNeeded()
         }, completionHandler: { MainActor.assumeIsolated { over.yes = true } })
         let deadline = Date().addingTimeInterval(5)
@@ -32,8 +32,8 @@ struct SettingsLayoutTests {
         let sections = try #require(scrolls.first?.documentView), pane = try #require(scrolls.last?.documentView)
         #expect(scrolls.count == 2)
         // Neither is taller than the page, so neither scrolls: everything in Appearance fits a page this size.
-        #expect(sections.frame.height <= 760)
-        #expect(pane.frame.height <= 760)
+        #expect(sections.frame.height <= 960)
+        #expect(pane.frame.height <= 960)
         // The pane's rows are as wide as the page leaves beside the column and its edge.
         #expect(sections.frame.width == Tokens.Page.columnWidth)
         #expect(pane.frame.width == 1032 - Tokens.Page.columnWidth - Tokens.Metric.hairline)
@@ -239,5 +239,32 @@ struct SettingsLayoutTests {
         menu?.onSelect?(1)
         #expect(Tokens.Sidebar.size == .medium)
         #expect(stepper?.isHidden == true)
+    }
+
+    /// A heading with controls beside it (Add Rule…, Find a site) keeps the heading gap below the controls, not just
+    /// below its label (#527).
+    @Test func headingControlsKeepTheGapToTheirGroup() throws {
+        let library = Library.shared
+        let info = library.addProfile(name: "Heading controls test")
+        defer {
+            _ = library.removeProfile(info.id)
+            library.finishedRemovingProfile(info.id)
+        }
+        var checked = 0
+        for pane in [SettingsPane.downloads, .spaces, .profiles, .translation, .developer, .websiteData] {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+            let settings = SettingsView(pane: pane)
+            settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+            window.contentView?.addSubview(settings)
+            settings.debugReadNow()
+            settings.layoutSubtreeIfNeeded()
+            for heading in settings.debugHeadingControls.keys.sorted() {
+                guard let gaps = settings.debugHeadingGaps(heading) else { continue }
+                checked += 1
+                // The nearer of the two is exactly the heading gap: neither the label nor the controls crowd the group.
+                #expect(min(gaps.controls, gaps.label) == Tokens.Space.x2, "\(heading)")
+            }
+        }
+        #expect(checked >= 4)
     }
 }

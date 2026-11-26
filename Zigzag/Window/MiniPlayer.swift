@@ -1112,7 +1112,7 @@ final class MiniPlayerView: NSView {
         let target = globalFrame
         let room = target.union(source)
         isGrowing = true
-        window.hasShadow = false
+        window.setSeeThrough(shadow: false)
         autoresizingMask = []
         globalFrame = room
         // The panel's view runs down as `globalFrame` does: places in it are places on screen less its corner.
@@ -1154,7 +1154,7 @@ final class MiniPlayerView: NSView {
             frame = superview.bounds
             autoresizingMask = [.width, .height]
         }
-        window.hasShadow = true
+        window.setSeeThrough(shadow: true)
         window.invalidateShadow()
     }
 
@@ -1709,9 +1709,7 @@ final class MiniPlayerPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         hidesOnDeactivate = false
         becomesKeyOnlyIfNeeded = true
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = true
+        setSeeThrough(shadow: true)
         isMovable = false
         isReleasedWhenClosed = false
         isExcludedFromWindowsMenu = true
@@ -1725,6 +1723,15 @@ final class MiniPlayerPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    #if DEBUG
+    /// A test copy started with `ZIGZAG_ORDER_BACK=1` keeps the card behind every other app's windows.
+    override func orderFrontRegardless() {
+        guard BrowserWindow.ordersBack else { return super.orderFrontRegardless() }
+        level = .normal
+        orderBack(nil)
+    }
+    #endif
 }
 
 /// The panel's view, running down as the card's places on screen do.
