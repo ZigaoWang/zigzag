@@ -983,6 +983,27 @@ enum DebugBridge {
         case "touchrecent": controller.root.debugTouchedRecently()
         // touchreveal: as if a finger had tapped where the hidden lights and sidebar toggle sit, so they show.
         case "touchreveal": controller.root.debugRevealTap()
+        // touchrowmenu <title>: a finger held on that tab's row until its menu opens, then lifted off it, so it
+        // stays open; it closes by itself after 6 s.
+        case "touchrowmenu":
+            guard let tab = controller.tabManager.currentTabs.first(where: { $0.displayTitle == arg }),
+                  let row = controller.sidebar.list.tabRow(tab.id) as? InteractiveView else { break }
+            let point = row.convert(NSPoint(x: 60, y: row.bounds.midY), to: nil)
+            guard let hold = row.beginTouchHold(at: point) else { break }
+            hold.showMenu()
+            hold.lifted(at: point)
+            closeNextMenu(after: 6)
+            debugLog("touchrowmenu \(arg) => \(MenuPanel.current?.debugState ?? [:])")
+        // touchtarget <x> <y>: where a finger's click at that window point (bottom-up) lands, in the debug log.
+        case "touchtarget":
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count == 2, let window = controller.window else { break }
+            let point = NSPoint(x: f[0], y: f[1])
+            let to = TouchTargets.point(for: point, in: window)
+            let hit = to.flatMap { TouchTargets.hit(at: $0, in: window) }
+            let under = sequence(first: TouchTargets.hit(at: point, in: window), next: { $0?.superview }).prefix(6).compactMap { $0.map { String(describing: type(of: $0)) } }
+            debugLog("touchtarget under \(Int(point.x)),\(Int(point.y)): \(under.joined(separator: " < "))")
+            debugLog("touchtarget \(Int(point.x)),\(Int(point.y)) => \(to.map { "\(Int($0.x)),\(Int($0.y)) \(hit.map { String(describing: type(of: $0)) } ?? "") \(hit?.toolTip ?? "")" } ?? "none")")
         case "edgestate": debugLog("edgestate \(controller.root.isSidebarFloatingVisible ? "out" : controller.root.sidebarVisible ? "docked" : "hidden")")
         // numbers [control|off]: the ⌘ number hints, as holding ⌘ shows them (with control, the spaces' ⌃ ones, as
         // holding ⌃ shows them), even with the window not in front. off hides both.
