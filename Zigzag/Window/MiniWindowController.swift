@@ -84,6 +84,8 @@ final class MiniPeekDimView: ColorView {
     var dockSlidesPage: Bool { get }
     /// The side it slides from: the sidebar's.
     var dockPageOnRight: Bool { get }
+    /// The child takes the parent's window level, as over the edge panel; a page card's peek stays normal.
+    var dockFollowsParentLevel: Bool { get }
     /// Host chrome over the page: the child is ordered out under it.
     var dockIsCovered: Bool { get }
     var dockIsFullScreen: Bool { get }
@@ -101,6 +103,7 @@ extension MiniDockHosting {
     var dockHasShadow: Bool { false }
     var dockSlidesPage: Bool { false }
     var dockPageOnRight: Bool { false }
+    var dockFollowsParentLevel: Bool { false }
 }
 
 extension BrowserWindowController: MiniDockHosting {
@@ -139,10 +142,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// What the feature is called wherever Zigzag names it.
     static var name: String { String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.") }
 
-    private(set) var tab: Tab
-    /// The Mini came up for a tab whose page wasn't running. The tab's page, when it wakes, is taken in from the card
-    /// it lands in, so the overlay can go without a fold, a new window or a close.
-    private var startedWithoutPage = false
+    let tab: Tab
+    /// A preview of a tab whose page isn't running: it shows the tab's card and never takes its page.
+    private let startedWithoutPage: Bool
     let root = MiniRootView()
     private var strip: MiniStripView { root.strip }
     /// The Mini is presented in a page: dimmed page, click-out and Esc, the same root and page.
@@ -167,8 +169,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The host clears its record when the docked Mini closes or is promoted.
     var onInPageMiniClosed: (() -> Void)?
     var onInPageMiniDetached: (() -> Void)?
-    /// The card standing in for a page that isn't running was clicked: wake the tab, as a click on its row does.
-    var onAsleepCardClicked: (() -> Void)?
     /// Where floating things go over the page: the link under the pointer, a site's question, a toast.
     var overlay: PassthroughView { root.overlay }
     private lazy var linkStatus = LinkStatusController(overlay: overlay)
@@ -220,7 +220,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         weak var browser: BrowserWindowController?
     }
     private var borrowed: BorrowedPage?
-    /// The row tab's own changes, replaced when the preview swaps pages. The other tokens outlive the page.
+    /// The tab's changes, kept apart so a borrowed page stops reaching this window once it is given back.
     private var tabToken: SignalToken?
     /// The preview is showing a row's live tab rather than a page of its own.
     var isBorrowingPage: Bool { borrowed != nil }
@@ -418,14 +418,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Opens a Mini for a row's page, docked in the host. The page is on loan: closing the Mini gives it back to the
-    /// browser rather than closing the tab.
-    /// `deferPage`: the row's page isn't running (a sleeping tab, or one of Zigzag's own pages): the Mini comes up with
-    /// the page's room and an overlay over it, and never makes a web view of its own. The tab wakes it.
+    /// browser rather than closing the tab. `deferPage`: the row's page isn't running; the Mini shows its card and never
+    /// loads the page.
     static func openPreview(of tab: Tab, from browser: BrowserWindowController,
                             dockedIn edge: any MiniDockHosting, reveal: Bool = true,
                             deferPage: Bool = false) -> MiniWindowController? {
         guard let url = tab.url, !tab.isPrivate,
-              deferPage || ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+              ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return nil }
         // In a browser's page card the page is the card's; a Mini has borrowed it. The preview's page must go home
         // before it is borrowed again, even if this Mini is still folding away.
         if let old = tab.host as? MiniWindowController { old.endBorrowingNow() }
@@ -455,45 +454,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         }
         // A borrowed page is the browser's tab already: extensions hear nothing for a preview that only glances at it.
         return controller
-    }
-
-    /// Swaps the previewed page without making a new Mini or resizing the card. The page it was showing goes back to
-    /// its tab first; the next comes in live, with its scroll, form and media state as it was.
-    @discardableResult
-    func loadPreview(_ tab: Tab, fromRight: Bool? = nil) -> Bool {
-        guard isDockedInPage, tab.spaceID == self.tab.spaceID, let url = tab.url, !tab.isPrivate else { return false }
-        if isBorrowingPage {
-            guard tab !== self.tab else { return true }
-            giveBackBorrowedPage()
-            adoptBorrowedPage(tab)
-            // Another page takes this one's place: unfold it from the sidebar's side, or from the side a space
-            // switch's list came from.
-            root.layoutSubtreeIfNeeded()
-            revealDockedPage(fromRight: fromRight ?? dockedHost?.dockPageOnRight ?? false)
-            return true
-        }
-        sourceTab = tab
-        if self.tab.url != url { self.tab.load(url, by: .page) }
-        return true
-    }
-
-    /// Takes the row's tab into this Mini, remembering where its page came from and how the tab was listed.
-    private func adoptBorrowedPage(_ tab: Tab) {
-        let holder = tab.pageHolder
-        borrowed = BorrowedPage(host: tab.host, wasOutsideTabList: tab.isOutsideTabList,
-                                origin: holder?.superview, originFrame: holder?.frame ?? .zero,
-                                card: Self.card(holding: holder), browser: source)
-        self.tab = tab
-        tab.host = self
-        // It is still in the browser's list: the Mini has its page, not its row.
-        tab.isOutsideTabList = borrowed?.wasOutsideTabList ?? false
-        sourceTab = tab
-        observeTab()
-        root.card.showLoading(of: tab)
-        showPage()
-        refreshStrip()
-        refreshBar(animated: false)
-        window?.title = tab.displayTitle
     }
 
     /// Gives the borrowed page back to its tab. It goes back to the card it came from only while that still shows it;
@@ -703,7 +663,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         (window as? BrowserWindow)?.isOverlayChild = true
         window.collectionBehavior = [.fullScreenAuxiliary, .transient, .ignoresCycle]
         window.minSize = .zero
-        window.level = parent.level
+        window.level = host.dockFollowsParentLevel ? parent.level : .normal
         window.hasShadow = host.dockHasShadow
         window.animationBehavior = .none
         window.isMovableByWindowBackground = false
@@ -749,13 +709,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func unembed(owner: AnyObject) {
         dockedHost?.dockHideDim(owner: owner)
         inPageMiniDim = nil
-    }
-
-    /// A row picked while the Mini is docked: the page takes the keyboard, the panel stays.
-    func focusPage() {
-        guard isDockedInPage, let window else { return }
-        window.makeKeyAndOrderFront(nil)
-        if let page = tab.webView { window.makeFirstResponder(page) }
     }
 
     /// Expands the docked Mini into its own window, with the same root, tab and web view.
@@ -994,7 +947,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// A pointer position from outside this app's event stream, as the edge sidebar's follow timer has: near the top
     /// the strip comes down; away from it, it goes back up.
     func pointerMoved(toScreen point: NSPoint) {
-        guard isDockedInPage, let window else { return }
+        // Sampled on a timer: only a move counts, so a resting pointer still lets the strip go back up.
+        guard isDockedInPage, let window, point != lastScreenPointer else { return }
+        lastScreenPointer = point
         let inWindow = window.convertFromScreen(NSRect(origin: point, size: .zero)).origin
         let inRoot = root.convert(inWindow, from: nil)
         if strip.isEditing {
@@ -1003,6 +958,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             root.pointerMoved(to: inRoot)
         }
     }
+
+    private var lastScreenPointer: NSPoint?
 
     private func removeChromePointerMonitor() {
         if let chromePointerToken { NSEvent.removeMonitor(chromePointerToken) }
@@ -1276,44 +1233,27 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func showPage() {
         root.card.show(tab.ensureWebView())
         root.card.hidePlaceholder()
-        // A sleeping row's overlay goes only once the page it was standing in for has laid out: the page replaces it
-        // in place, with no fold, no second window and nothing to close.
-        if asleepCard != nil {
-            whenPageHasLaidOut { [weak self] in self?.hideAsleepCard() }
-        }
     }
 
     // MARK: A page that isn't running
 
-    /// The card over the page's room while its tab is asleep or belongs to Zigzag itself. It is an overlay on the
-    /// previewed page, not a different surface: waking the tab only takes it away.
+    /// The card over the preview's room while the row's page isn't running.
     private var asleepCard: EdgeAsleepPageView?
 
-    /// Puts the card over the previewed page (`note` and `hint` for a tab that will never run here: Zigzag's own
-    /// pages). It is the same window, size and place the page will fill; nothing animates and nothing closes.
-    func showAsleepCard(note: String? = nil, hint: String? = nil) {
+    /// Puts the card over the previewed page; the page is never loaded for it.
+    func showAsleepCard() {
         let card = asleepCard ?? EdgeAsleepPageView(frame: root.overlay.bounds)
         card.autoresizingMask = [.width, .height]
         card.frame = root.overlay.bounds
-        card.show(tab: tab, note: note, hint: hint)
-        card.onClick = { [weak self] in self?.onAsleepCardClicked?() }
+        card.show(tab: tab)
         if card.superview !== root.overlay { root.overlay.addSubview(card) }
         asleepCard = card
     }
 
-    /// Test seam: the click the asleep card answers, without a pointer.
-    func clickAsleepCard() { onAsleepCardClicked?() }
-
-    /// The page is running: its overlay steps aside at once.
-    func hideAsleepCard() {
-        asleepCard?.removeFromSuperview()
-        asleepCard = nil
-    }
-
-    /// Test seam: the asleep card's title while it is out.
+    /// Test seam: the card's title while it is out.
     var asleepCardTitle: String? { asleepCard?.shownTitle }
 
-    /// Its page's changes. Replaced when the edge preview swaps to another row's tab; the window's other signals stay.
+    /// Its page's changes.
     private func observeTab() {
         tabToken?.cancel()
         tabToken = tab.changed.observe { [weak self] change in self?.tabChanged(change) }
@@ -1321,7 +1261,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     private func tabChanged(_ change: Tab.Change) {
         // A borrowed page whose tab closed in the browser has nowhere to be shown: the preview goes with it.
-        if tab.isClosed {
+        if isBorrowingPage, tab.isClosed {
             if isDockedInPage {
                 closeInPage(focusBack: false)
             } else {
@@ -1334,37 +1274,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             refreshStrip()
             window?.title = tab.displayTitle
             // A new web view (the page crashed and came back, or crossed into an extension's page) takes the old one's place.
-            if change == .webView, tab.webView != nil, !movedOut {
-                if startedWithoutPage {
-                    // The row was asleep or Zigzag's own page when the Mini came up. Its page, just woken by the
-                    // click or the space switch, is let into the browser's card this turn and borrowed from there
-                    // next, so it has a card to go home to and the overlay has a page to give way to.
-                    DispatchQueue.main.async { [weak self] in
-                        MainActor.assumeIsolated { self?.adoptWokenPage() }
-                    }
-                } else {
-                    showPage()
-                }
-            }
+            // A card preview stays a card: the page, if it wakes, is the browser window's.
+            if change == .webView, tab.webView != nil, !movedOut, !startedWithoutPage { showPage() }
             if change == .webView || change == .loading { refreshBar(animated: false) }
         case .themeColor, .darkPage:
             refreshBar(animated: true)
         default: break
         }
-    }
-
-    /// The page of a tab the Mini came up asleep has arrived in the browser's card: take it in from there, with the
-    /// card and the place it came from, so closing the preview puts it back. The overlay stays until the page has laid
-    /// out in the pill, then goes: waking removes it, with no fold, no new window and nothing to close.
-    private func adoptWokenPage() {
-        guard startedWithoutPage, let window, window.isVisible, tab.webView != nil else { return }
-        startedWithoutPage = false
-        if isBorrowingPage, borrowed?.card == nil, let holder = tab.pageHolder {
-            borrowed?.origin = holder.superview
-            borrowed?.originFrame = holder.frame
-            borrowed?.card = source?.pageCard(showing: tab)
-        }
-        showPage()
     }
 
     /// The strip in the page's own color (`PageBar`), its ink light or dark to read on it.
@@ -1409,27 +1325,17 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Typing an address
 
     /// ⌘T from the Mini: the new tab belongs to the browser, and a docked Mini steps aside first so the bar it opens
-    /// isn't hidden under the page it was over. In the edge panel the new tab is the panel's page: its bar opens over
-    /// the screen and the pill stays where it is.
+    /// isn't hidden under the page it was over.
     @objc func newTab(_ sender: Any?) {
-        if isDockedInPage, EdgeSidebar.shared.isShowing {
-            EdgeSidebar.shared.newTabInPlace()
-            return
-        }
         let target = browserTarget
         if isDockedInPage { closeInPage(focusBack: false, animated: false) }
         target.newTab(sender)
         Self.bringForward(target)
     }
 
-    /// ⌘L: the command bar over the page's site, the address in it to change; again, it goes. Docked in the edge
-    /// panel, the panel's own address row takes the edit, so the page and the sidebar stay put.
+    /// ⌘L: the command bar over the page's site, the address in it to change; again, it goes.
     @objc func openLocation(_ sender: Any?) {
         guard !isLeaving else { return }
-        if isDockedInPage, EdgeSidebar.shared.isShowing {
-            EdgeSidebar.shared.editAddressInPlace()
-            return
-        }
         if commandBar.isVisible { commandBar.dismiss(); return }
         commandBar.show(mode: .editCurrent)
     }
@@ -1639,15 +1545,6 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             return WindowManager.shared.controllers.last { $0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false, isPrivate: true)
         }
         return Self.browserWindow()
-    }
-
-    /// Tab and sidebar commands that aren't this window's own (⌘1–9, the next and previous tab, spaces and the rest)
-    /// reach the browser window the page belongs to, as they do from the edge panel. The Mini's own actions answer
-    /// first, so its ⌘T, ⌘W and ⌘L stay its own.
-    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        let browser = source ?? WindowManager.shared.controllers.last { $0.tabManager.isPrivate == tab.isPrivate }
-        if let browser, browser !== self, browser.responds(to: action) { return browser }
-        return super.supplementalTarget(forAction: action, sender: sender)
     }
 
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window
@@ -1892,10 +1789,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             tokens.removeAll()
             tabToken?.cancel()
             tabToken = nil
-            if !tab.isClosed {
-                if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
-                tab.close()
-            }
+            if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
+            tab.close()
         }
         if wasBorrowed { tokens.removeAll() }
         if #available(macOS 15.4, *), !wasBorrowed { ExtensionCenter.miniClosed(self) }
@@ -2317,9 +2212,8 @@ final class MiniRootView: SpaceFrameView {
     }
 
     private func scheduleChromeHide() {
-        // One hide for as long as the pointer is away. The edge sidebar follows the pointer every 0.05 s, so starting
-        // the wait again on each sample would push it back forever and leave the strip down.
-        guard chromeOverlay, chromeRevealed, chromeHideWork == nil else { return }
+        guard chromeOverlay, chromeRevealed else { return }
+        chromeHideWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.chromeOverlay, self.chromeRevealed else { return }

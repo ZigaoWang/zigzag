@@ -225,11 +225,13 @@ struct InPageMiniHostTests {
             #expect(!mini.root.chromeRevealed)
             mini.root.pointerMoved(to: NSPoint(x: 4, y: 1))
             #expect(mini.root.chromeRevealed)
-            // The edge sidebar follows the pointer every 0.05 s. Resting away from the top must not push the hide back
-            // each time, or the strip would stay down for as long as the sidebar is open.
+            // The edge sidebar samples the pointer every 0.05 s: a pointer resting away from the top still lets the
+            // strip go back up.
+            let window = try #require(mini.window)
+            let away = window.convertToScreen(NSRect(x: 4, y: 40, width: 0, height: 0)).origin
             for _ in 0..<10 {
                 try await Task.sleep(for: .milliseconds(50))
-                mini.root.pointerMoved(to: NSPoint(x: 4, y: 300))
+                mini.pointerMoved(toScreen: away)
             }
             #expect(!mini.root.chromeRevealed)
             mini.closeInPage(animated: false)
@@ -354,34 +356,6 @@ struct InPageMiniHostTests {
             #expect(browser.root.card.webView === tab.webView)
             #expect(tab.pageHolder?.superview != nil)
             #expect(!tab.isClosed)
-        }
-    }
-
-    @Test func swappingThePreviewBorrowsTheNextPageAndGivesTheFirstBack() throws {
-        try inWindow(pageAt: "https://example.test/one", and: "https://example.test/two") { browser, first, second in
-            let mini = try #require(MiniWindowController.openPreview(of: first, from: browser, dockedIn: browser))
-            let firstHolder = try #require(first.pageHolder)
-            let window = mini.window
-            #expect(mini.loadPreview(second, fromRight: true))
-            #expect(mini.window === window)
-            #expect(mini.tab === second)
-            #expect(mini.lastRevealFromRight == true)
-            #expect(second.host === mini)
-            #expect(mini.root.card.webView === second.webView)
-            // The first page is back in the card it came from, still the browser's page.
-            #expect(first.host === browser)
-            #expect(browser.root.card.webView === first.webView)
-            #expect(firstHolder.superview != nil)
-            let secondHolder = try #require(second.pageHolder)
-            mini.closeInPage(focusBack: false, animated: false)
-            #expect(!second.isClosed)
-            #expect(second.host === browser)
-            // It was never the browser's page, so its holder waits for the row to be shown rather than painting over.
-            #expect(secondHolder.superview == nil)
-            browser.tabManager.select(second)
-            browser.window?.layoutIfNeeded()
-            #expect(browser.root.card.webView === second.webView)
-            #expect(secondHolder.superview != nil)
         }
     }
 
