@@ -146,10 +146,10 @@ before using a new one.
    `Zigzag/Info.plist`, and `LocalizationTests.translated`. The code is the one Xcode and Bundle use (`pt-BR`, not
    `pt_BR`). `LocalizationTests.everyLanguageKeepsNamesSymbolsAndPlurals` then checks it keeps product names,
    keyboard symbols and addresses, ends "…" items in "…", and has CLDR's plural forms.
-7. Add `docs/i18n/changelog/CHANGELOG.<lang>.md` with the current version's notes, and add it to the `changelog`
-   group and the Zigzag target's resources in `Zigzag.xcodeproj/project.pbxproj` by hand. Add the code to
-   `WhatsNew.notesLanguages`, its New and Fixed headings to `WhatsNew.newHeadings` and `fixedHeadings`, and the code
-   to `WhatsNewTests.languages`.
+7. Add `docs/i18n/changelog/CHANGELOG.<lang>.md` with the current version's notes. `project.yml` bundles the whole
+   folder, so run `xcodegen generate` and commit only the lines that add the new file. Add the code to
+   `WhatsNew.notesLanguages`, its New, Fixed and Changed headings to `WhatsNew.newHeadings`, `fixedHeadings` and
+   `changedHeadings`, and the code to `WhatsNewTests.languages`.
 
 ## The website
 
