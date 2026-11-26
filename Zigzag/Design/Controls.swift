@@ -2125,7 +2125,28 @@ final class MenuPanel: FloatingPanelView {
     private var root: MenuPanel { parentMenu?.root ?? self }
 
     private static let pad = Tokens.Space.x1
-    private static let rowHeight = Tokens.Page.controlHeight
+    private static let standardRowHeight = Tokens.Page.controlHeight
+    /// A row's height opened by a finger, as Apple's touch guidelines have a target.
+    static let touchRowHeight = TouchTargets.size
+    /// Opened by a finger: rows `touchRowHeight` tall, the same look otherwise.
+    private(set) var isTouchSized = false
+    var rowHeight: CGFloat { isTouchSized ? Self.touchRowHeight : Self.standardRowHeight }
+    /// Set while a held finger opens a menu (`TouchHold`).
+    static var openingForTouch = false
+
+    /// Whether a menu opening on `event` is a finger's: a hold opens it, or it's AppKit's click from a tap.
+    nonisolated static func opensForTouch(holding: Bool, eventType: NSEvent.EventType?, eventTime: TimeInterval,
+                                          landedAt: TimeInterval?, fingerDown: Bool) -> Bool {
+        if holding { return true }
+        guard let eventType, [.leftMouseDown, .leftMouseUp, .rightMouseDown].contains(eventType) else { return false }
+        return TouchPress.isTouchScroll(at: eventTime, landedAt: landedAt, fingerDown: fingerDown)
+    }
+
+    private static func opensForTouch(from anchor: NSView) -> Bool {
+        let event = (anchor as? InteractiveView)?.currentPress ?? NSApp.currentEvent
+        return opensForTouch(holding: openingForTouch, eventType: event?.type, eventTime: event?.timestamp ?? 0,
+                             landedAt: TouchPress.landedAt, fingerDown: TouchPress.fingerDown)
+    }
     private static let headerHeight = Tokens.Space.x7Height
     private static let separatorHeight = Tokens.Space.x2 + 1
     /// From a row's edge to its icon or text, and from its check to the trailing edge.
@@ -2192,7 +2213,7 @@ final class MenuPanel: FloatingPanelView {
         var noteIndex = 0
         return Self.pad * 2 + entries.map { entry -> CGFloat in
             switch entry {
-            case .item: return Self.rowHeight
+            case .item: return rowHeight
             case .header: return Self.headerHeight
             case .separator: return Self.separatorHeight
             case .note:
@@ -2214,7 +2235,7 @@ final class MenuPanel: FloatingPanelView {
             case .item:
                 if seen == index { return y }
                 seen += 1
-                y += Self.rowHeight
+                y += rowHeight
             case .header: y += Self.headerHeight
             case .separator: y += Self.separatorHeight
             case .note: break
@@ -2246,6 +2267,7 @@ final class MenuPanel: FloatingPanelView {
         menu.appearance = appearance
         menu.anchor = anchor
         menu.onClose = closed
+        menu.isTouchSized = opensForTouch(from: anchor)
 
         let width = ceil(max(menu.fittingWidth, minWidth + Self.pad * 2))
         menu.noteWidth = width - (Self.pad + Self.rowInset) * 2
@@ -2261,7 +2283,7 @@ final class MenuPanel: FloatingPanelView {
         case .over(let index, let inset):
             // The chosen item's text right over the button's.
             x = a.minX + inset - Self.pad - Self.rowInset
-            let rowMid = menu.top(ofItem: index) + Self.rowHeight / 2
+            let rowMid = menu.top(ofItem: index) + menu.rowHeight / 2
             let aligned = a.midY + rowMid
             if height == full, fits(aligned) {
                 maxY = aligned
@@ -2338,8 +2360,8 @@ final class MenuPanel: FloatingPanelView {
                 note.frame = NSRect(x: Self.pad + Self.rowInset, y: y + Self.noteInset, width: width - (Self.pad + Self.rowInset) * 2, height: h - Self.noteInset * 2)
                 y += h
             } else if let row = view as? Row {
-                row.frame = NSRect(x: Self.pad, y: y, width: width - Self.pad * 2, height: Self.rowHeight)
-                y += Self.rowHeight
+                row.frame = NSRect(x: Self.pad, y: y, width: width - Self.pad * 2, height: rowHeight)
+                y += rowHeight
                 index += 1
             } else if let label = view as? Label {
                 label.frame = NSRect(x: Self.pad + Self.rowInset - Label.inset, y: y + Self.headerHeight - Tokens.Space.x1 - label.lineHeight - 2,
@@ -2547,6 +2569,7 @@ final class MenuPanel: FloatingPanelView {
         menu.appearance = appearance
         menu.anchor = anchor
         menu.parentMenu = self
+        menu.isTouchSized = isTouchSized
         let width = ceil(menu.fittingWidth)
         let area = host.convert(host.bounds, to: nil).insetBy(dx: Self.margin, dy: Self.margin)
         let height = min(menu.contentHeight, area.height)
@@ -2700,7 +2723,7 @@ final class MenuPanel: FloatingPanelView {
     /// Its items, the lit one and its open submenu's, for scripts.
     var debugState: [String: Any] {
         ["items": itemTitles, "highlighted": highlighted.map { rows[$0].item.title } ?? "", "frame": NSStringFromRect(convert(bounds, to: nil)),
-         "submenu": child?.debugState ?? [:]]
+         "touchSized": isTouchSized, "submenu": child?.debugState ?? [:]]
     }
     #endif
 

@@ -978,7 +978,10 @@ final class TouchHold {
         menuWork?.cancel()
         menuWork = nil
         guard !isFinished, carry == nil, menu == nil, let openMenu else { return }
+        // Opened by this finger: touch-sized rows.
+        MenuPanel.openingForTouch = true
         menu = openMenu()
+        MenuPanel.openingForTouch = false
         menu?.isHeldByTouch = true
         if menu != nil { TouchLog.note("menu opened \(elapsed) ms after the hold") }
         // Opened under the finger (slid up for room): the item there lights at once.
