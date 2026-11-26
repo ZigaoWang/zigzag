@@ -128,4 +128,77 @@ struct SidebarSlideTests {
         frame.setGlass(false)
         #expect(frame.windowGlass == nil)
     }
+
+    /// A browser window with one page open, laid out at 1200 × 700 with the bar above the page.
+    private func inWindow(_ body: (BrowserWindowController) throws -> Void) rethrows {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/idle-glass")!, title: "A", spaceID: space)
+        manager.adopt([tab], in: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: -6000, y: 200, width: 1200, height: 700))
+        defer { controller.window?.close() }
+        let root = controller.root
+        root.frame = NSRect(x: 0, y: 0, width: 1200, height: 700)
+        root.showsTopBar = true
+        root.setSidebarVisible(true, animated: false)
+        root.layoutSubtreeIfNeeded()
+        try body(controller)
+    }
+
+    /// A see-through window is never wholly clear: with a shadow, a wholly clear window made the window server redraw
+    /// it every frame while nothing in it moved. Its background stays too faint to see.
+    @Test func aSeeThroughWindowIsNeverWhollyClear() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        let frame = SpaceFrameView()
+        window.contentView = frame
+        var space = SpaceInfo(name: "See-through", color: .sky)
+        space.translucency = 0.6
+        let faint = SpaceFrameView.seeThroughBackground.alphaComponent
+        #expect(faint > 0 && faint <= 1.0 / 255 + 0.0001)
+        frame.paint(space, isPrivate: false, animated: false)
+        // On battery or before macOS 26 the glass is frosted and the window opaque.
+        guard !window.isOpaque else { return }
+        #expect(window.hasShadow)
+        #expect(window.backgroundColor.alphaComponent == faint)
+    }
+
+    /// A window that sits still gives the window server nothing to redraw: no animation that never ends, and no layer
+    /// asking for HDR, which an HDR display composites the whole window in.
+    @Test func anIdleWindowHasNoEndlessAnimationsAndNoHDR() throws {
+        try inWindow { controller in
+            guard let window = controller.window else { return }
+            SettingsPage.open(in: controller)
+            controller.root.layoutSubtreeIfNeeded()
+            #expect(IdleWork.animations(in: window, longerThan: 1).isEmpty, "hidden layers included")
+            #expect(IdleWork.extendedRangeLayers(in: window).isEmpty)
+        }
+    }
+
+    /// The update card's bar slides only while it shows, waiting for a size; hidden, as it is in every window until
+    /// an update downloads, it holds still.
+    @Test func theUpdateBarSlidesOnlyWhileItShows() {
+        let window = NSWindow(contentRect: NSRect(x: -6000, y: 0, width: 300, height: 40), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let bar = UpdateBar(frame: NSRect(x: 0, y: 0, width: 200, height: UpdateBar.height))
+        bar.isHidden = true
+        window.contentView?.addSubview(bar)
+        bar.share = nil
+        #expect(!bar.isSliding)
+        bar.isHidden = false
+        #expect(bar.isSliding)
+        bar.share = 0.5
+        #expect(!bar.isSliding)
+        bar.share = nil
+        #expect(bar.isSliding)
+        window.contentView?.isHidden = true
+        #expect(!bar.isSliding, "a hidden card hides its bar")
+        window.contentView?.isHidden = false
+        bar.removeFromSuperview()
+        #expect(!bar.isSliding)
+    }
 }

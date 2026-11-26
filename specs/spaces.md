@@ -21,6 +21,12 @@
   No test yet.
 - Frosted → the window stays opaque; only clear glass makes it see-through.
   Test: SidebarSlideTests.onlyClearGlassMakesTheWindowSeeThrough
+- Clear glass → the see-through window keeps its shadow and is never wholly clear, so the window server doesn't redraw it every frame; the background left is too faint to see.
+  Test: SidebarSlideTests.aSeeThroughWindowIsNeverWhollyClear
+- A window sitting still → no animation that never ends, shown or hidden, and nothing asks for HDR.
+  Test: SidebarSlideTests.anIdleWindowHasNoEndlessAnimationsAndNoHDR
+- The update card's bar → slides only while it shows and has no size to fill to.
+  Test: SidebarSlideTests.theUpdateBarSlidesOnlyWhileItShows
 - Clear on battery or in Low Power Mode → shows frosted instead, and the editor says why under Glass until you plug in or turn it off.
   Test: SidebarSlideTests.theEditorSaysWhenClearShowsAsFrosted
 - Pick a preset with a finish (Stone's linen, Smoke's or Coral's grain) → the finish comes with it; a plain preset takes it off.
