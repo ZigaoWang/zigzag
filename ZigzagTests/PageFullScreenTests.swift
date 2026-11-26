@@ -249,6 +249,40 @@ struct PageFullScreenTests {
         #expect(heard.said.last == false)
     }
 
+    /// Nothing on the page draws over the element, as in WebKit's top layer: here a bar fixed over the page and a
+    /// side column with its own stacking order, while the player sits in a sticky column, which a z-index can't undo
+    /// (#543).
+    @Test func nothingOnThePageDrawsOverTheElement() async throws {
+        let html = """
+        <html><head><style>body{margin:0;height:3000px} header{position:fixed;top:0;left:0;right:0;height:64px;z-index:1002;background:#fff}
+        #main{display:flex;margin-top:80px} #left{position:sticky;top:64px;z-index:1;width:640px}
+        #player{position:relative;width:640px;height:360px} video{width:100%;height:100%}
+        #right{position:relative;width:350px} #box{position:relative;z-index:11;height:600px;background:#eee}</style></head>
+        <body><header>Bar</header><div id="main"><div id="left"><div id="player" style="padding:4px"><video muted></video></div></div>
+        <div id="right"><div id="box">Danmaku</div></div></div></body></html>
+        """
+        let webView = await load(html)
+        let result = try await page("""
+        const player = document.getElementById('player');
+        const look = () => ['padding', 'border', 'overflow', 'color'].map(p => getComputedStyle(player).getPropertyValue(p)).join('|');
+        const was = look();
+        await player.requestFullscreen();
+        const over = (x, y) => document.elementFromPoint(x, y).closest('#player') !== null;
+        const inside = [over(500, 20), over(900, 300), over(20, 690), player.matches(':popover-open'), look() === was];
+        await document.exitFullscreen();
+        return inside.concat([player.hasAttribute('popover'), player.getBoundingClientRect().width])
+        """, in: webView) as? [Any]
+        let values = try #require(result)
+        #expect(values[0] as? Bool == true)
+        #expect(values[1] as? Bool == true)
+        #expect(values[2] as? Bool == true)
+        #expect(values[3] as? Bool == true)
+        // The top layer's popover leaves the element looking as it did.
+        #expect(values[4] as? Bool == true)
+        #expect(values[5] as? Bool == false)
+        #expect(values[6] as? Double == 648)
+    }
+
     @Test func escLeavesAndSoDoesZigzag() async throws {
         let webView = await load(Self.page)
         let viaEsc = try await page("""
