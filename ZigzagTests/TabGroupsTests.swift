@@ -377,6 +377,63 @@ struct TabGroupRulesTests {
         }
     }
 
+    /// What the sidebar lists once it has caught up: pinned rows and favorite tiles by title.
+    private func sidebarShows(_ controller: BrowserWindowController) -> [String] {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        controller.sidebar.layoutSubtreeIfNeeded()
+        let pins = controller.sidebar.list.debugItems.compactMap { item -> String? in
+            guard case .bookmark(let id) = item else { return nil }
+            return Library.shared.bookmark(id).map { "pin:" + $0.title }
+        }
+        return pins + controller.sidebar.favorites.debugTiles().map(\.0)
+    }
+
+    /// ⌘W or the row's × on a pinned page or favorite, selected or not, with other tabs or none: the sidebar keeps it.
+    @Test func aClosedPinnedPageOrFavoriteStaysInTheSidebar() throws {
+        for others in [["Tab"], []] {
+            try inWindow(others) { controller, tabs in
+                let manager = controller.tabManager
+                let pinned = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/stays/pinned")!, title: "Pinned", to: space))
+                let favorite = Library.shared.addFavorite(url: URL(string: "http://127.0.0.1:9/stays/favorite")!, title: "Favorite",
+                                                          in: Library.shared.profileID(ofSpace: space))
+                let both = ["pin:Pinned", "fav:Favorite"]
+                #expect(both.allSatisfy(sidebarShows(controller).contains))
+                for mark in [pinned, favorite] {
+                    for selected in [true, false] where selected || !tabs.isEmpty {
+                        manager.openBookmark(mark)
+                        let page = try #require(manager.bookmarkTab(for: mark.id))
+                        if selected { controller.closeTab(nil) } else { manager.select(tabs[0]); controller.listClose(page) }
+                        #expect(page.isClosed)
+                        let shown = sidebarShows(controller)
+                        #expect(both.allSatisfy(shown.contains), "\(mark.title) selected=\(selected) others=\(others.count): \(shown)")
+                    }
+                }
+            }
+        }
+    }
+
+    /// A pinned page in an open folder or in a pinned split, closed with ⌘W: its row stays.
+    @Test func aClosedPinnedPageInAFolderOrSplitStaysInTheSidebar() throws {
+        try inWindow(["Tab"]) { controller, _ in
+            let manager = controller.tabManager
+            let filed = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/stays/filed")!, title: "Filed", to: space))
+            let folder = try #require(Library.shared.addFolder(named: "Folder", with: [filed.id], in: space))
+            Library.shared.setFolderOpen(folder.id, true)
+            manager.openBookmark(filed)
+            controller.closeTab(nil)
+            #expect(sidebarShows(controller).contains("pin:Filed"))
+            let left = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/stays/left")!, title: "Left", to: space))
+            let right = try #require(Library.shared.addBookmark(url: URL(string: "http://127.0.0.1:9/stays/right")!, title: "Right", to: space))
+            controller.listJoinPinned(right.id, onto: left.id, onRight: true)
+            #expect(Library.shared.pinnedSplit(containing: left.id) != nil)
+            let page = try #require(manager.bookmarkTab(for: left.id))
+            manager.select(page)
+            controller.closeTab(nil)
+            #expect(sidebarShows(controller).contains("pin:Left"))
+            #expect(Library.shared.pinnedSplit(containing: left.id) != nil)
+        }
+    }
+
     /// ⌘W on the space's last tab goes to the page you were on before it in the space; with none, the space is empty.
     @Test func closingTheLastTabGoesToTheSpacesRecentPageElseEmpty() throws {
         try inWindow(["Last"]) { controller, tabs in
