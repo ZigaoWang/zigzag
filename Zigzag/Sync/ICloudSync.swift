@@ -244,7 +244,20 @@ final class ICloudSync {
 
     /// Every connection and every fetch: the first sync's merge, or what changed elsewhere while this Mac was away;
     /// then what's waiting here goes up.
+    private var catchingUp = false, catchUpAgain = false
+
+    /// One at a time: one asked for meanwhile runs once more after it.
     private func catchUp() async {
+        guard !catchingUp else { catchUpAgain = true; return }
+        catchingUp = true
+        defer { catchingUp = false }
+        repeat {
+            catchUpAgain = false
+            await catchUpOnce()
+        } while catchUpAgain
+    }
+
+    private func catchUpOnce() async {
         guard let engine, let session else { return }
         lastFetch = Date()
         do {
@@ -590,6 +603,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
     private weak var owner: ICloudSync?
     private var engine: CKSyncEngine?
     private(set) var serialization: Data?
+    /// When the engine's current fetch started.
+    private var fetchStarted: Date?
     private static let log = Logger(subsystem: "wang.zigao.zigzag", category: "sync")
 
     init(container: CKContainer, session: SyncSession, owner: ICloudSync) {
@@ -627,6 +642,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
     /// Each batch is saved with the token it brought; once merged, what came settles into the library.
     private func fetchZone() async throws {
         guard let session else { return }
+        let started = session.now()
         let database = container.privateCloudDatabase
         var token = session.state.zoneToken.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0) }
         var more = true
@@ -643,7 +659,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             guard self.session === session else { return }
             let records = changes.modificationResultsByID.values.compactMap { try? $0.get().record }
                 .filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(Self.remote)
-            session.fetched(records, deleted: changes.deletions.map(\.recordID.recordName))
+            session.fetched(records, deleted: changes.deletions.map(\.recordID.recordName), startedAt: started)
             token = changes.changeToken
             let archived = try? NSKeyedArchiver.archivedData(withRootObject: changes.changeToken, requiringSecureCoding: true)
             session.updateState { $0.zoneToken = archived }
@@ -716,7 +732,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             if fetched.zoneID == ICloudSync.zoneID, let error = fetched.error, ICloudSync.isZoneGone(error) { owner?.zoneMissing(error) }
         case .fetchedRecordZoneChanges(let changes):
             let records = changes.modifications.map(\.record).filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(Self.remote)
-            session.fetched(records, deleted: changes.deletions.filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(\.recordID.recordName))
+            session.fetched(records, deleted: changes.deletions.filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(\.recordID.recordName),
+                            startedAt: fetchStarted)
         case .sentRecordZoneChanges(let sent):
             session.saved(sent.savedRecords.map(Self.remote))
             session.deleted(sent.deletedRecordIDs.map(\.recordName))
@@ -759,7 +776,10 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
                     owner?.engineEvent(.failed(error.localizedDescription))
                 }
             }
-        case .willFetchChanges, .willSendChanges:
+        case .willFetchChanges:
+            fetchStarted = session.now()
+            owner?.engineEvent(.syncing)
+        case .willSendChanges:
             owner?.engineEvent(.syncing)
         case .didFetchChanges:
             guard session.state.merged else { break }

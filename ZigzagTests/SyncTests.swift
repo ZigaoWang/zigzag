@@ -1438,4 +1438,30 @@ extension SyncTests {
         #expect(a.library.urls(in: "Personal") == ["a"])
         #expect(a.saves.isEmpty && a.deletes.isEmpty)
     }
+
+    private func pageName(_ mac: FakeMac, _ path: String) -> String? {
+        mac.session.state.base.keys.first { $0.hasPrefix("page.") && mac.session.state.base[$0].map { String(decoding: $0.payload, as: UTF8.self).contains("/\(path)\"") } == true }
+    }
+
+    @Test func aLateRemovalFromAFetchThatCrossedANewerOneIsIgnored() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        let name = try #require(pageName(a, "b"))
+        let start = cloud.changes(since: 0).token
+        let kept = b.library.space(named: "Personal")!.bookmarks[1]
+        // B removes the pin and puts it back (undo).
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 1) } }
+        b.sync()
+        let deletion = cloud.changes(since: start)
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.append(kept) } }
+        b.sync()
+        // A fetch that started earlier brings the removal after A's own fetch brought the pin back.
+        let earlier = a.clock
+        a.clock += 5
+        a.fetch()
+        a.session.fetched([], deleted: deletion.deleted, startedAt: earlier)
+        a.session.fetchFinished()
+        a.sync()
+        #expect(a.library.urls(in: "Personal") == ["a", "b"])
+        #expect(cloud.records[name] != nil)
+    }
 }

@@ -146,3 +146,5 @@
   Test: SyncTests.aConflictWithoutTheServersVersionIsFetchedThenSentAgain
 - Sync turned off while a fetch is on its way → what it brings changes nothing here.
   Test: SyncTests.aFetchStillOnItsWayWhenSyncIsTurnedOffChangesNothing
+- Two fetches crossing, the older bringing a removal after the newer brought the record back → the removal is ignored. Zigzag runs one catch-up at a time.
+  Test: SyncTests.aLateRemovalFromAFetchThatCrossedANewerOneIsIgnored

@@ -102,6 +102,9 @@ struct SyncState: Codable {
     var incomingRemoved: Set<String> = []
     /// When the server last saved each record, as this Mac last had it.
     var serverDates: [String: Date] = [:]
+    /// When the fetch that brought each record's newest save started, so a removal from a fetch that started before
+    /// it (two fetches crossing) is told apart.
+    var savedSeen: [String: Date] = [:]
     /// Favorites (by record name) and preferences (by key) of another profile removed elsewhere lately: when the
     /// profile's own removal follows, they come back with it.
     var leftovers: [String: SyncLeftover] = [:]
@@ -117,7 +120,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldRemovals, mergedAlone, copies
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldRemovals, mergedAlone, copies, savedSeen
     }
 
     init() {}
@@ -143,6 +146,7 @@ struct SyncState: Codable {
         heldRemovals = try c.decodeIfPresent(Int.self, forKey: .heldRemovals)
         mergedAlone = try c.decodeIfPresent(Date.self, forKey: .mergedAlone)
         copies = try c.decodeIfPresent(Set<String>.self, forKey: .copies) ?? []
+        savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
     }
 }
 
@@ -303,10 +307,16 @@ final class SyncSession {
 
     // MARK: Changes from the server
 
-    func fetched(_ records: [SyncRemote], deleted: [String]) {
+    /// `startedAt`: when the fetch that brought these started.
+    func fetched(_ records: [SyncRemote], deleted: [String], startedAt: Date? = nil) {
         guard !isClosed else { return }
-        for record in records { arrive(record.name, record) }
-        for name in deleted { arrive(name, nil) }
+        let started = startedAt ?? now()
+        for record in records {
+            arrive(record.name, record)
+            state.savedSeen[record.name] = max(state.savedSeen[record.name] ?? .distantPast, started)
+        }
+        // A removal from a fetch that started before one that brought a newer save is stale.
+        for name in deleted where !(state.savedSeen[name].map { $0 > started } ?? false) { arrive(name, nil) }
         if !records.isEmpty || !deleted.isEmpty { onChange?() }
     }
 
@@ -340,6 +350,7 @@ final class SyncSession {
         var profilesGone: Set<UUID> = []
         let stamp = now()
         state.leftovers = state.leftovers.filter { stamp.timeIntervalSince($0.value.at) < SyncLeftover.kept }
+        state.savedSeen = state.savedSeen.filter { stamp.timeIntervalSince($0.value) < 24 * 3600 }
         for (name, record) in arrived {
             if let record {
                 let outcome = take(record)
@@ -669,6 +680,7 @@ final class SyncSession {
             state.systemFields[record.name] = record.systemFields
             state.serverPayloads[record.name] = record.payload
             if let date = record.serverModified { state.serverDates[record.name] = date }
+            state.savedSeen[record.name] = now()
             if let item = state.base[record.name], item.modified == record.modified { state.unsent.remove(record.name) }
         }
         state.lastSynced = now()
