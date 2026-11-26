@@ -57,6 +57,8 @@ final class IMEFieldEditor: NSTextView {
     static func make() -> IMEFieldEditor {
         let editor = IMEFieldEditor()
         editor.isFieldEditor = true
+        // ⌘Z in a field undoes typing, as the window's own field editor does.
+        editor.allowsUndo = true
         editor.textContainer?.widthTracksTextView = false
         editor.textContainer?.containerSize = NSSize(width: 9_000_000, height: 9_000_000)
         editor.textContainer?.lineFragmentPadding = 2
