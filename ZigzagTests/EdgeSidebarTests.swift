@@ -125,6 +125,7 @@ struct EdgeSidebarTests {
         EdgeSidebar.shared.show(on: visible, for: controller)
         return (controller, manager, tabs, {
             EdgeSidebar.debugHoldsOpen = false
+            EdgeSidebar.debugPointer = nil
             EdgeSidebar.shared.hide(animated: false)
             controller.window?.close()
             manager.invalidate()
@@ -324,6 +325,64 @@ struct EdgeSidebarTests {
         #expect(tabs[0].host === mini)
         #expect(!EdgeSidebar.shared.isShowing)
         mini.window?.close()
+    }
+
+    /// A tab's row in the panel, on screen.
+    private func rowOnScreen(_ tab: Tab, in controller: BrowserWindowController) throws -> NSRect {
+        let row = try #require(controller.edgeSidebar?.list.row(for: tab))
+        let window = try #require(row.window)
+        #expect(EdgeSidebar.shared.isPanel(window))
+        return window.convertToScreen(row.convert(row.bounds, to: nil))
+    }
+
+    /// Crossing from one row to the next, the row left says so before the next one speaks, and the pointer can rest on
+    /// the gap between them: the page stays, and the row the pointer is on is the one that counts.
+    @Test func aCrossingBetweenRowsKeepsThePage() async throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b",
+                                                         "https://example.test/c"])
+        defer { done() }
+        let b = try rowOnScreen(tabs[1], in: controller), c = try rowOnScreen(tabs[2], in: controller)
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        // Between the two rows, no row under the pointer.
+        EdgeSidebar.debugPointer = NSPoint(x: b.midX, y: (max(b.minY, c.minY) + min(b.maxY, c.maxY)) / 2)
+        EdgeSidebar.shared.hover(nil, in: controller)
+        try? await Task.sleep(for: .milliseconds(500))
+        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
+        // On the next row, its report lost to the one before: that row's page comes out after the rest.
+        EdgeSidebar.debugPointer = NSPoint(x: c.midX, y: c.midY)
+        EdgeSidebar.shared.hover(nil, in: controller)
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[2] })
+    }
+
+    /// Off the rows and the page, even with no row saying so, the page folds back and the sidebar stays out.
+    @Test func leavingTheRowsAndThePageFoldsItBack() async throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let (panel, host) = try panelParts()
+        let b = try rowOnScreen(tabs[1], in: controller)
+        let card = panel.convertToScreen(host.convert(host.cardFrame, to: nil))
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
+        // On the page it stays.
+        EdgeSidebar.debugPointer = NSPoint(x: pill.midX, y: pill.midY)
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
+        // From the page to the sidebar's empty part, below the rows.
+        EdgeSidebar.debugPointer = NSPoint(x: card.midX, y: min(b.minY - 120, card.midY))
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
+        #expect(EdgeSidebar.shared.isShowing)
+    }
+
+    /// A row of Zigzag's own pages has nothing to show beside the sidebar: resting on it puts the page away, though the
+    /// pointer is on a row.
+    @Test func anOwnPagesRowPutsThePageAway() async throws {
+        let (controller, _, tabs, done) = panelWithTabs(["https://example.test/a", "zigzag://history"])
+        defer { done() }
+        let history = try rowOnScreen(tabs[1], in: controller)
+        EdgeSidebar.shared.previewNow(tabs[0], in: controller)
+        EdgeSidebar.debugPointer = NSPoint(x: history.midX, y: history.midY)
+        EdgeSidebar.shared.hover(tabs[1], in: controller)
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
     }
 
     private func until(_ seconds: Double = 8, _ condition: () -> Bool) async -> Bool {

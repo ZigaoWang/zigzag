@@ -16,6 +16,8 @@ enum EdgePreviewHoverPolicy {
     static let dwell: TimeInterval = 0.2
     static let check: TimeInterval = 0.05
     static let movement: CGFloat = 2
+    /// Off the rows and the page this long, the page folds back.
+    static let leave: TimeInterval = 0.18
 
     static func rests(now: TimeInterval, since: TimeInterval, moved: Bool) -> Bool {
         !moved && now - since >= dwell
@@ -99,7 +101,17 @@ final class EdgeSidebar {
     #if DEBUG
     /// The debug bridge keeps the panel out with the pointer elsewhere.
     static var debugHoldsOpen = false
+    /// Where tests put the pointer, on screen.
+    static var debugPointer: NSPoint?
     #endif
+
+    /// The pointer on screen.
+    private var pointer: NSPoint {
+        #if DEBUG
+        if let point = Self.debugPointer { return point }
+        #endif
+        return NSEvent.mouseLocation
+    }
 
     /// Off until turned on in Settings › Appearance.
     static var isOn: Bool { UserDefaults.standard.bool(forKey: defaultsKey) }
@@ -281,6 +293,7 @@ final class EdgeSidebar {
         if MenuPanel.current == nil, panel.frame != frame { panel.setFrame(frame, display: true) }
         // The panel gets no mouse moves with another app in front, so the preview's strip follows from here.
         preview?.pointerMoved(toScreen: NSEvent.mouseLocation)
+        followPreviewPointer()
         if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: frame) {
             leftAt = nil
             return
@@ -303,15 +316,17 @@ final class EdgeSidebar {
         closeWork?.cancel()
         closeWork = nil
         hoverCheck += 1
-        guard let tab, tab !== previewTab || preview == nil else {
-            if tab == nil { schedulePreviewClose() }
-            return
-        }
-        guard !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url) else {
+        // Rows report leaving and arriving in either order: the row under the pointer counts.
+        guard let tab = tab ?? pageOnRow(at: pointer) else {
             schedulePreviewClose()
             return
         }
-        scheduleHoverCheck(tab: tab, in: controller, pointer: NSEvent.mouseLocation,
+        guard tab !== previewTab || preview == nil else { return }
+        guard !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url) else {
+            schedulePreviewClose(evenOnRows: true)
+            return
+        }
+        scheduleHoverCheck(tab: tab, in: controller, pointer: pointer,
                            since: ProcessInfo.processInfo.systemUptime, token: hoverCheck)
     }
 
@@ -344,7 +359,7 @@ final class EdgeSidebar {
                 guard let self, let tab, let controller, self.isShowing, self.target === controller,
                       self.hoverCheck == token else { return }
                 let now = ProcessInfo.processInfo.systemUptime
-                let point = NSEvent.mouseLocation
+                let point = self.pointer
                 let moved = abs(point.x - pointer.x) > EdgePreviewHoverPolicy.movement
                     || abs(point.y - pointer.y) > EdgePreviewHoverPolicy.movement
                 if EdgePreviewHoverPolicy.rests(now: now, since: since, moved: moved) {
@@ -395,20 +410,74 @@ final class EdgeSidebar {
         }
     }
 
-    private func schedulePreviewClose() {
+    /// The page folds back after a moment unless the pointer is on it, or still among the rows: a crossing from one row
+    /// to the next is not leaving them. `evenOnRows`: the row under the pointer has no page to show.
+    private func schedulePreviewClose(evenOnRows: Bool = false) {
         closeWork?.cancel()
         closeWork = nil
         guard preview != nil else { return }
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                let mouse = NSEvent.mouseLocation
-                if self.preview?.window?.frame.contains(mouse) == true { return }
+                self.closeWork = nil
+                let point = self.pointer
+                if self.pointerIsOnPage(point) || (!evenOnRows && self.rowNear(point) != nil) { return }
                 self.closePreview()
             }
         }
         closeWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + EdgePreviewHoverPolicy.leave, execute: work)
+    }
+
+    /// Leaving the page for the gutter or the sidebar's empty part, no row reports it: the pointer is watched.
+    private func followPreviewPointer() {
+        #if DEBUG
+        if Self.debugHoldsOpen, Self.debugPointer == nil { return }
+        #endif
+        guard preview != nil, closeWork == nil, previewWork == nil, MenuPanel.current == nil,
+              NSEvent.pressedMouseButtons == 0, let panel else { return }
+        let point = pointer
+        guard panel.frame.contains(point), !pointerIsOnPage(point), rowNear(point) == nil else { return }
+        schedulePreviewClose()
+    }
+
+    /// Whether the point is on the page beside the sidebar.
+    private func pointerIsOnPage(_ point: NSPoint) -> Bool {
+        if preview?.window?.frame.contains(point) == true { return true }
+        guard let panel, let host, host.pageShowing else { return false }
+        return panel.convertToScreen(host.convert(host.pageFrame, to: nil)).contains(point)
+    }
+
+    /// The tab row in the panel at a point on screen, or within a row's gap of it, so the gap between two rows counts.
+    private func rowNear(_ point: NSPoint) -> TabRowView? {
+        guard isShowing, let panel, let host, let container = host.container, panel.frame.contains(point) else { return nil }
+        let inWindow = panel.convertPoint(fromScreen: point)
+        guard host.cardFrame.contains(host.convert(inWindow, from: nil)) else { return nil }
+        let reach = Tokens.Sidebar.rowGap + 1
+        for dy in [0, reach, -reach] {
+            let probe = NSPoint(x: inWindow.x, y: inWindow.y + dy)
+            var view = host.hitTest(host.superview?.convert(probe, from: nil) ?? probe)
+            while let current = view, current !== container {
+                if let row = current as? TabRowView { return row }
+                view = current.superview
+            }
+        }
+        return nil
+    }
+
+    /// The page of the tab row right under a point on screen: a split's or tile group's part, or the row's own.
+    private func pageOnRow(at point: NSPoint) -> Tab? {
+        guard let panel, let host, panel.frame.contains(point) else { return nil }
+        let inWindow = panel.convertPoint(fromScreen: point)
+        var view = host.hitTest(host.superview?.convert(inWindow, from: nil) ?? inWindow)
+        while let current = view, current !== host {
+            if let row = current as? TabRowView, row.tab != nil {
+                let inRow = row.convert(inWindow, from: nil)
+                return row.isSplit ? row.page(at: inRow) : row.tab
+            }
+            view = current.superview
+        }
+        return nil
     }
 
     /// Puts the page away; the panel narrows to the sidebar and stays out. `animated`: the page folds back first.
