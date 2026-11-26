@@ -56,6 +56,7 @@
   Test: SyncTests.turningSyncOffRenamingAndOnAgainAddsNoCopy
   Test: SyncTests.turningSyncOnAgainKeepsWhatChangedOnEachSideWhileOff
   Test: SyncTests.turningSyncOnAgainAfterRemoveFromICloudMergesAfresh
+  Test: SyncTests.aPinSentDuringTheFullReadAfterTurningOnIsntTakenAsRemoved
 - This Mac's library couldn't be read and Zigzag started afresh → merged again as on a first sync, so iCloud fills it in; nothing is removed from iCloud.
   Test: SyncTests.aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto
 - Zigzag quit before the first sync finished → the next start reads all of iCloud again before merging.

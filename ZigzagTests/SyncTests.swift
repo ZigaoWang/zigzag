@@ -1893,4 +1893,23 @@ extension SyncTests {
             #expect(mac.library.urls(in: "Personal").sorted() == ["x", "y", "z"])
         }
     }
+
+    @Test func aPinSentDuringTheFullReadAfterTurningOnIsntTakenAsRemoved() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let off = try saved(ICloudSync.stateTurningOff(b.session.state))
+        var library = b.library
+        library.editSpace("Personal") { $0.bookmarks.append(Sample.page("pinned while off")) }
+        let again = FakeMac(cloud, library, clock: b.clock + 3600, state: ICloudSync.stateTurningOn(saved: off))
+        again.session.checkAfterLaunch()
+        again.session.requeue()
+        let snapshot = cloud.changes(since: 0)
+        again.session.fetched(snapshot.records, deleted: [])
+        again.session.updateState { $0.zoneToken = Data(String(snapshot.token).utf8) }
+        again.send()
+        again.session.readAll(Set(snapshot.records.map(\.name)))
+        again.session.fetchFinished()
+        again.sync(); a.sync()
+        #expect(again.library.urls(in: "Personal") == ["a", "pinned while off"])
+        #expect(a.library.urls(in: "Personal") == ["a", "pinned while off"])
+    }
 }

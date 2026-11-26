@@ -186,8 +186,9 @@ final class ICloudSync {
     }
 
     /// Turned on again: what changed only here is kept, what changed only in iCloud is taken, what changed on both
-    /// goes to the later (this Mac's edits made while off count from when its library was last saved), and what was removed here goes as any
-    /// removal at launch does, many at once held. All of iCloud is read again, so what was removed there goes too.
+    /// goes to the later (this Mac's edits made while off count from when its library was last saved), and what was
+    /// removed here goes as any removal at launch does, many at once held. All of iCloud is read again, so what was
+    /// removed there goes too.
     static func stateTurningOn(saved: SyncState?) -> SyncState {
         var state = stateTurningOff(saved)
         state.resumed = state.merged
