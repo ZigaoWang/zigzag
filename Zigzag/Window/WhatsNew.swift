@@ -70,15 +70,18 @@ enum WhatsNew {
         return translation
     }
 
-    /// New and Fixed as each changelog writes them: the app's own What's New headings in that language.
+    /// New, Fixed and Changed as each changelog writes them: the app's own What's New headings in that language.
     static let newHeadings: Set = ["新功能", "新機能", "새로운 기능", "Neu", "Nouveautés", "Novità", "Nuevo", "Novo", "Новое", "Nieuw",
                                    "Nowe", "Yeni Özellikler"]
     static let fixedHeadings: Set = ["修复", "修正", "수정 사항", "Behoben", "Corrections", "Correzioni", "Correcciones", "Corrigido",
                                      "Исправлено", "Opgelost", "Naprawiono", "Düzeltmeler"]
+    static let changedHeadings: Set = ["更改", "變更", "変更", "변경 사항", "Geändert", "Modifications", "Modifiche", "Cambios",
+                                       "Alterado", "Изменено", "Gewijzigd", "Zmieniono", "Değişiklikler"]
 
     static func sectionKind(_ title: String) -> String {
         if newHeadings.contains(title) { return "New" }
         if fixedHeadings.contains(title) { return "Fixed" }
+        if changedHeadings.contains(title) { return "Changed" }
         return title
     }
 
