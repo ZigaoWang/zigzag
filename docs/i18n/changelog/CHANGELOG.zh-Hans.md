@@ -18,6 +18,10 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 更改
 - “兼容模式”现在是“网站设置”里“此网站”的第一行，在它关掉的那些行上面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### 修复
+- 批准一个要求更多权限的扩展更新后，不会再事后收回你已允许的内容，比如 Bitwarden 为“生物识别解锁”与其 App 的连接。感谢 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- 在扩展还在启动时移除个人资料，不会再导致 Zigzag 退出。
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag 新增十三种语言，包括日语、韩语、德语、法语、西班牙语和俄语；下载规则可以转交下载好的文件；实时文件夹会显示上次更新的时间；用中文拼音输入中途切换到英文，不会再多出空格。

@@ -10,6 +10,10 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 ### Zmieniono
 - Tryb zgodności jest teraz pierwszym wierszem sekcji „Ta witryna” w „Ustawieniach witryny”, nad wierszami, które wyłącza. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### Naprawiono
+- Zatwierdzenie aktualizacji rozszerzenia, które prosi o więcej, nie odbiera już później tego, na co się zgodzono, jak połączenie Bitwardena z jego aplikacją do „Odblokuj za pomocą biometrii”. Podziękowania dla [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Usunięcie profilu, gdy jego rozszerzenia jeszcze się uruchamiają, nie zamyka już Zigzaga.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.

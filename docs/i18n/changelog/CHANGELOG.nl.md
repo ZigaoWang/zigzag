@@ -10,6 +10,10 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 ### Gewijzigd
 - De compatibiliteitsmodus is nu de eerste rij van Deze website in de Website-instellingen, boven de rijen die hij uitzet. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### Opgelost
+- Als je een extensie-update goedkeurt die meer vraagt, wordt wat je had toegestaan later niet meer ingetrokken, zoals de verbinding van Bitwarden met zijn app voor “Ontgrendelen met biometrie”. Met dank aan [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Als je een profiel verwijdert terwijl de extensies nog opstarten, sluit Zigzag niet meer af.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans en Russisch; downloadregels die het bewaarde bestand doorgeven; livemappen die laten zien wanneer ze voor het laatst zijn bijgewerkt; en na Chinees Pinyin overschakelen naar Engels zonder losse spaties.

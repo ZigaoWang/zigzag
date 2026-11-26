@@ -10,6 +10,10 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 ### Modifiche
 - La modalità compatibilità è ora la prima riga di Questo sito nei Controlli del sito, sopra le righe che disattiva. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### Correzioni
+- Approvare l’aggiornamento di un’estensione che richiede di più non toglie più in seguito ciò che avevi consentito, come la connessione di Bitwarden alla sua app per «Sblocca con i dati biometrici». Grazie a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Rimuovere un profilo mentre le sue estensioni si stanno ancora avviando non fa più chiudere Zigzag.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, francese, spagnolo e russo; regole di download che trasferiscono il file salvato; cartelle live che dicono quando si sono aggiornate l’ultima volta; e niente più spazi di troppo quando scrivi in pinyin cinese e passi all’inglese.

@@ -15,6 +15,10 @@
 ### 變更
 - 「相容模式」現在是「網站設定」裡「此網站」的第一列，在它關閉的那些列上面。感謝 [Lakeland97](https://github.com/Lakeland97)。([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### 修正
+- 核准一個要求更多權限的延伸功能更新後，不會再事後收回你已允許的內容，例如 Bitwarden 為「生物辨識解鎖」與其 App 的連線。感謝 [retorquere](https://github.com/retorquere)。([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- 在延伸功能還在啟動時移除個人資料，不會再導致 Zigzag 結束。
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag 新增十三種語言，包括日文、韓文、德文、法文、西班牙文和俄文；下載規則可以轉交下載好的檔案；即時資料夾會顯示上次更新的時間；用中文拼音輸入中途切換到英文，不會再多出空格。

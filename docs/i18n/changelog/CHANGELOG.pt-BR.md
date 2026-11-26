@@ -10,6 +10,10 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 ### Alterado
 - O modo de compatibilidade agora é a primeira linha de Este site nos Ajustes do site, acima das linhas que ele desativa. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### Corrigido
+- Aprovar a atualização de uma extensão que pede mais não tira mais depois o que você permitiu, como a conexão do Bitwarden com o app para “Desbloquear com biometria”. Agradecimentos a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Remover um perfil enquanto suas extensões ainda estão iniciando não fecha mais o Zigzag.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanhol e russo; regras de download que entregam o arquivo salvo; pastas dinâmicas que mostram quando foram atualizadas pela última vez; e digitar em pinyin chinês e mudar para o inglês sem espaços sobrando.

@@ -10,6 +10,10 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 ### Değişiklikler
 - Uyumluluk modu artık Site Ayarları’ndaki Bu Site bölümünün ilk satırı; kapattığı satırların üstünde yer alır. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### Düzeltmeler
+- Daha fazlasını isteyen bir genişletme güncellemesini onaylamak, daha sonra izin verdiklerinizi, örneğin Bitwarden’ın “Biyometri ile kilidi aç” için uygulamasına bağlantısını artık geri almıyor. Teşekkürler: [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Genişletmeleri hâlâ başlarken bir profili kaldırmak artık Zigzag’ı kapatmıyor.
+
 ## [0.10.0] - 2026-11-25
 
 Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç yeni dilde Zigzag; kaydedilen dosyayı devreden indirme kuralları; en son ne zaman güncellendiğini gösteren canlı klasörler; ve Çince Pinyin yazarken İngilizceye geçince fazladan boşluk kalmaması.

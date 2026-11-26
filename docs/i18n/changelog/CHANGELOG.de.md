@@ -10,6 +10,10 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 ### Geändert
 - Der Kompatibilitätsmodus ist jetzt die erste Zeile unter „Diese Website“ in den „Website-Einstellungen“, über den Zeilen, die er deaktiviert. Danke an [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
+### Behoben
+- Wenn du ein Erweiterungs-Update genehmigst, das mehr verlangt, wird dir später nicht mehr entzogen, was du erlaubt hattest, etwa Bitwardens Verbindung zur App für „Mit Biometrie entsperren“. Danke an [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Wenn du ein Profil entfernst, während seine Erweiterungen noch starten, wird Zigzag nicht mehr beendet.
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, Französisch, Spanisch und Russisch; Downloadregeln, die die gesicherte Datei übergeben; Live-Ordner, die zeigen, wann sie zuletzt aktualisiert wurden; und chinesisches Pinyin tippen und dann zu Englisch wechseln, ohne dass Leerzeichen übrig bleiben.
