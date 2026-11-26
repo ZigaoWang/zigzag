@@ -4,6 +4,9 @@ Queste sono le note di rilascio di Zigzag in italiano, tradotte da CHANGELOG.md.
 
 ## [Unreleased]
 
+### Novità
+- «Sincronizza con iCloud», in Impostazioni › Generali: i tuoi spazi, profili, pannelli fissati, cartelle, preferiti, cartelle live e impostazioni restano uguali su ogni Mac in cui hai effettuato l’accesso a iCloud, conservati nel tuo database privato di iCloud. Pannelli aperti, cronologia, dati dei siti web ed estensioni restano su ciascun Mac, e le password continuano a sincronizzarsi con il Portachiavi di iCloud. Attivandola, la libreria del Mac viene unita a quella di iCloud: dove un elemento è in entrambe, vince la modifica più recente, niente viene rimosso senza chiedere e prima viene salvato un backup. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, francese, spagnolo e russo; regole di download che trasferiscono il file salvato; cartelle live che dicono quando si sono aggiornate l’ultima volta; e niente più spazi di troppo quando scrivi in pinyin cinese e passi all’inglese.

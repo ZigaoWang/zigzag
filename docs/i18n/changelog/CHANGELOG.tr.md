@@ -4,6 +4,9 @@ Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. U
 
 ## [Unreleased]
 
+### Yeni Özellikler
+- “iCloud ile eşzamanla”, Ayarlar › Genel bölümünde: Space’leriniz, profilleriniz, sabitlenmiş sekmeleriniz, klasörleriniz, favorileriniz, canlı klasörleriniz ve ayarlarınız iCloud’unuzda oturum açmış her Mac’te aynı kalır ve kendi iCloud’unuzun özel veritabanında tutulur. Açık sekmeler, geçmiş, web sitesi verileri ve genişletmeler her Mac’te kalır, parolalar ise iCloud Anahtar Zinciri üzerinden eşzamanlanmaya devam eder. Açtığınızda bu Mac’in kitaplığı iCloud’dakiyle birleştirilir: ikisinde de olan öğede daha yeni düzenleme geçerli olur, sormadan hiçbir şey kaldırılmaz ve önce bir yedek kaydedilir. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+
 ## [0.10.0] - 2026-11-25
 
 Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç yeni dilde Zigzag; kaydedilen dosyayı devreden indirme kuralları; en son ne zaman güncellendiğini gösteren canlı klasörler; ve Çince Pinyin yazarken İngilizceye geçince fazladan boşluk kalmaması.

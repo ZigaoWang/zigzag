@@ -4,6 +4,9 @@ Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L�
 
 ## [Unreleased]
 
+### Nouveautés
+- « Synchroniser avec iCloud », dans Réglages › Général : vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages restent identiques sur chaque Mac connecté à votre iCloud, dans votre propre base de données privée iCloud. Les onglets ouverts, l’historique, les données de sites web et les extensions restent sur chaque Mac, et les mots de passe continuent de se synchroniser via le trousseau iCloud. L’activer réunit la bibliothèque du Mac et celle d’iCloud : quand un élément est dans les deux, la modification la plus récente l’emporte, rien n’est supprimé sans demander, et une sauvegarde est enregistrée d’abord. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, au français, à l’espagnol et au russe ; des règles de téléchargement qui transfèrent le fichier enregistré ; des dossiers dynamiques qui indiquent leur dernière mise à jour ; et la saisie en pinyin chinois suivie d’un passage à l’anglais sans espaces parasites.

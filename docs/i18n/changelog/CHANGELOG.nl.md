@@ -4,6 +4,9 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
+### Nieuw
+- “Synchroniseer met iCloud”, in Instellingen › Algemeen: je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen blijven hetzelfde op elke Mac die bij je iCloud is aangemeld en staan in je eigen privédatabase in iCloud. Open tabbladen, geschiedenis, websitegegevens en extensies blijven op elke Mac, en wachtwoorden blijven synchroniseren via de iCloud-sleutelhanger. Als je het aanzet, wordt de bibliotheek van de Mac samengevoegd met die van iCloud: staat iets in beide, dan wint de nieuwste wijziging, wordt er niets verwijderd zonder het te vragen en wordt eerst een reservekopie bewaard. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans en Russisch; downloadregels die het bewaarde bestand doorgeven; livemappen die laten zien wanneer ze voor het laatst zijn bijgewerkt; en na Chinees Pinyin overschakelen naar Engels zonder losse spaties.

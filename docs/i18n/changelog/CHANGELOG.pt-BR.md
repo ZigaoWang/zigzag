@@ -4,6 +4,9 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ## [Unreleased]
 
+### Novo
+- “Sincronizar com o iCloud”, em Ajustes › Geral: seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes ficam iguais em todos os Macs conectados ao seu iCloud, guardados no seu próprio banco de dados privado do iCloud. Abas abertas, histórico, dados de sites e extensões ficam em cada Mac, e as senhas continuam sincronizando pelas Chaves do iCloud. Ao ativar, a biblioteca do Mac é reunida com a do iCloud: o que está nos dois fica com a edição mais recente, nada é removido sem perguntar e um backup é salvo antes. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanhol e russo; regras de download que entregam o arquivo salvo; pastas dinâmicas que mostram quando foram atualizadas pela última vez; e digitar em pinyin chinês e mudar para o inglês sem espaços sobrando.

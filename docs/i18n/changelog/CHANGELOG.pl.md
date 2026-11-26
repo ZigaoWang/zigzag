@@ -4,6 +4,9 @@ To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplik
 
 ## [Unreleased]
 
+### Nowe
+- „Synchronizuj z iCloud” w „Ustawienia” › „Ogólne”: twoje przestrzenie, profile, przypięte karty, foldery, ulubione, foldery na żywo i ustawienia są takie same na każdym Macu zalogowanym do twojego iCloud i leżą w twojej prywatnej bazie danych iCloud. Otwarte karty, historia, dane witryn i rozszerzenia zostają na każdym Macu, a hasła nadal synchronizują się przez pęk kluczy iCloud. Włączenie łączy bibliotekę tego Maca z biblioteką w iCloud: gdy coś jest w obu, wygrywa nowsza zmiana, nic nie jest usuwane bez pytania, a wcześniej zapisywana jest kopia zapasowa. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemiecki, francuski, hiszpański i rosyjski; reguły pobierania, które przekazują zachowany plik; foldery na żywo, które pokazują, kiedy ostatnio się zaktualizowały; oraz przełączanie z chińskiego pinyin na angielski bez zbędnych spacji.
