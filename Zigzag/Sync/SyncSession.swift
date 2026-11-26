@@ -300,7 +300,13 @@ final class SyncSession {
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now(),
                                         settingsChanged: host.settingTimes, settingsNow: now())
-        let new = export.items.filter { state.base[$0.key] == nil && state.removed[$0.key] == nil && SyncName.id($0.key) != nil }
+        // Removed since, unless Library.json was saved after the removal (an unpin undone), so it's back on purpose.
+        let saved = host.libraryStamp
+        let new = export.items.filter { name, _ in
+            guard state.base[name] == nil, SyncName.id(name) != nil else { return false }
+            guard let removed = state.removed[name] else { return true }
+            return saved.map { $0 > removed } ?? false
+        }
         let shown = state.base.filter { !state.heldNames.contains($0.key) && SyncName.id($0.key) != nil && !$0.key.hasPrefix(Self.firstSyncPrefix) }
         let differs = export.items.contains { name, item in new[name] == nil && SyncName.id(name) != nil && shown[name].map { !$0.sameContent(as: item) } ?? true }
             || shown.keys.contains { export.items[$0] == nil }
@@ -370,6 +376,8 @@ final class SyncSession {
         for (name, var item) in items {
             if let old = state.base[name], old.sameContent(as: item) { continue }
             if item.type != SyncBody.settingsType { item.modified = stamp }
+            // Back here (an unpin undone): no longer removed.
+            state.removed[name] = nil
             state.base[name] = item
             state.unsent.insert(name)
             saves.append(name)

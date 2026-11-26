@@ -2014,4 +2014,23 @@ extension SyncTests {
         again2.sync(); c.sync()
         #expect(c.library.settings["ReaderSize"] == .int(24))
     }
+
+    @Test func anUndoneUnpinSurvivesAHeldLaunch() throws {
+        let (cloud, a, _) = manyPages()
+        let x = a.library.space(named: "Personal")!.bookmarks[0]
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 0) } }
+        a.sync()
+        // Undo puts it back (same ID), and an old copy lost 15 others, before sync read it; Library.json saved then.
+        a.clock += 1
+        a.library.editSpace("Personal") { s in s.bookmarks.insert(x, at: 0); s.bookmarks.removeLast(15) }
+        let again = FakeMac(cloud, a.library, clock: a.clock + 60, state: try saved(a.session.state))
+        again.host.libraryStamp = a.clock
+        again.session.checkAfterLaunch()
+        #expect(again.session.state.heldRemovals == 15)
+        #expect(again.library.urls(in: "Personal").contains(x.url.lastPathComponent))
+        again.sync()
+        #expect(cloud.records[SyncName.page(x.id)] != nil)
+        // Read as a re-add, it leaves the removed list.
+        #expect(again.session.state.removed[SyncName.page(x.id)] == nil)
+    }
 }
