@@ -159,6 +159,8 @@ enum SyncName {
     static let rules = "rules"
     static let settings = "settings"
     static let removals = "removals"
+    /// The first sync into an empty iCloud claims it (`SyncSession.SyncClaim`).
+    static let claim = "claim"
 
     static func space(_ id: UUID) -> String { "space.\(id.uuidString)" }
     static func profile(_ id: UUID) -> String { "profile.\(id.uuidString)" }
@@ -169,7 +171,7 @@ enum SyncName {
     /// Parents before children, so another Mac reading part of a send has a page's space before the page.
     nonisolated static func rank(_ name: String) -> Int {
         let kind = name.prefix { $0 != "." }
-        return ["firstsync": -1, "profile": 0, "space": 1, "folder": 2, "page": 3, "favorite": 4][String(kind)] ?? 5
+        return ["claim": -1, "profile": 0, "space": 1, "folder": 2, "page": 3, "favorite": 4][String(kind)] ?? 5
     }
 
     nonisolated static func ordered(_ names: [String]) -> [String] { names.sorted { (rank($0), $0) < (rank($1), $1) } }

@@ -424,7 +424,7 @@ extension SyncLibrary {
         a.send(); b.send()
         for _ in 0..<3 { a.sync(); b.sync() }
         for (n, mac) in [("a", a), ("b", b)] {
-            #expect(mac.library.spaceNames == ["Personal"], "\(n) \(mac.library.contents.spaces.map { "\($0.id) \($0.bookmarks.map(\.url.lastPathComponent))" }) \(mac.session.state.base.keys.sorted()) \(mac.session.state.copies) \(mac.session.state.aliases.toServer) cloud \(cloud.records.keys.sorted())")
+            #expect(mac.library.spaceNames == ["Personal"], "\(n)")
             #expect(mac.library.urls(in: "Personal").sorted() == ["x", "y", "z"])
             #expect(mac.library.contents.favorites.count == 1)
             #expect(mac.library.contents.directory.all.filter { $0.name == "Work" }.count == 1, "\(n)")
@@ -1856,43 +1856,48 @@ extension SyncTests {
         #expect(b.library.urls(in: "Personal") == ["a"])
     }
 
-    @Test func aSecondMacReadingAHalfSentFirstSyncWaitsForTheRest() throws {
+    @Test func aSecondMacWaitsForTheFirstMacsClaimToBeComplete() throws {
         let cloud = FakeCloud()
         let pages = (0..<20).map { "p\($0)" }
         let a = FakeMac(cloud, Sample.library([Sample.space("Personal", pages.map { Sample.page($0) })]))
         let b = FakeMac(cloud, Sample.library([Sample.space("Personal", pages.map { Sample.page($0) })]))
-        a.fetch()
-        // A's first batch: its first-sync record, which goes first, the space and five pages.
-        let record = try #require(a.session.state.ownFirstSync)
-        #expect(a.saves.first == record)
-        let first = [record] + a.session.state.base.keys.filter { $0.hasPrefix("space.") } + a.session.state.base.keys.filter { $0.hasPrefix("page.") }.sorted().prefix(5)
+        // Both find iCloud empty; A's claim is saved first, and B's refused.
+        a.fetch(); b.fetch()
+        #expect(a.saves == [SyncName.claim] && b.saves == [SyncName.claim])
+        a.send(); b.send()
+        #expect(a.session.state.merged && !b.session.state.merged)
+        // A's library goes up in parts; B reads the first part and waits.
+        let first = a.saves.filter { $0.hasPrefix("space.") } + a.saves.filter { $0.hasPrefix("page.") }.prefix(5)
         for name in first { if let up = a.session.upload(name) { cloud.save(up) } }
         b.sync()
         #expect(!b.session.state.merged)
         for _ in 0..<4 { a.sync(); b.sync() }
-        #expect(a.library.urls(in: "Personal").count == 20)
-        #expect(b.library.urls(in: "Personal").count == 20)
+        #expect(b.session.state.merged)
+        #expect(a.library.urls(in: "Personal").count == 20 && b.library.urls(in: "Personal").count == 20)
         #expect(cloud.records.keys.filter { $0.hasPrefix("page.") }.count == 20)
+        #expect(cloud.records.keys.filter { $0.hasPrefix("space.") }.count == 1)
     }
 
-    @Test func aFirstSyncThatNeverFinishesGoingUpIsMatchedAsTwoAtOnce() throws {
+    @Test func aFirstMacQuittingHalfwayLosesNothing() throws {
         let cloud = FakeCloud()
         let a = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("y")])]))
         let b = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("x"), Sample.page("z")])]))
-        a.fetch()
-        // A sends only its record and its space, then goes offline for a long while.
-        let record = try #require(a.session.state.ownFirstSync)
-        for name in [record] + a.session.state.base.keys.filter({ $0.hasPrefix("space.") }) { if let up = a.session.upload(name) { cloud.save(up) } }
+        a.fetch(); b.fetch()
+        a.send(); b.send()
+        // A sends its space, then quits for a long while.
+        for name in a.saves where name.hasPrefix("space.") { if let up = a.session.upload(name) { cloud.save(up) } }
         b.sync()
         #expect(!b.session.state.merged)
-        b.clock += SyncSession.firstSyncWait + 1
+        b.clock += SyncSession.claimTimeout + 1
         b.sync()
-        #expect(b.session.state.merged && b.session.state.ownFirstSync != nil)
+        #expect(b.session.state.merged)
         for _ in 0..<3 { a.sync(); b.sync() }
         for mac in [a, b] {
             #expect(mac.library.spaceNames == ["Personal"])
-            #expect(mac.library.urls(in: "Personal").sorted() == ["x", "y", "z"])
+            // Nothing lost; x may be there twice, as each Mac's.
+            #expect(Set(mac.library.urls(in: "Personal")) == ["x", "y", "z"])
         }
+        #expect(a.library.urls(in: "Personal").sorted() == b.library.urls(in: "Personal").sorted())
     }
 
     @Test func aPinSentDuringTheFullReadAfterTurningOnIsntTakenAsRemoved() throws {
@@ -1923,13 +1928,10 @@ extension SyncTests {
         let c = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("c-only")])]), clock: a.clock + 86400 * 14)
         c.sync()
         #expect(c.session.state.merged)
-        #expect(c.session.state.ownFirstSync == nil)
         #expect(c.library.urls(in: "Personal").count == 20)
-        // A's own first-sync record goes a day after it was sent.
-        a.clock = c.clock
-        a.sync()
-        #expect(a.session.state.ownFirstSync == nil)
-        #expect(!cloud.records.keys.contains { $0.hasPrefix(SyncSession.firstSyncPrefix) })
+        // The claim stays, complete, A's.
+        let claim = try #require(cloud.records[SyncName.claim])
+        #expect(try SyncBody.decoder().decode(SyncSession.SyncClaim.self, from: claim.payload).complete)
     }
 
     @Test func aLaterJoinerKeepsItsOwnDuplicatePin() throws {
@@ -1940,8 +1942,8 @@ extension SyncTests {
         a.sync()
         let c = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("p0"), Sample.page("p0"), Sample.page("c-only")])]), clock: a.clock + 86400)
         c.sync()
-        #expect(c.session.state.merged && c.session.state.ownFirstSync == nil)
-        c.clock += SyncSession.firstSyncWait + 1
+        #expect(c.session.state.merged)
+        c.clock += SyncSession.claimTimeout + 1
         c.sync()
         for _ in 0..<3 { a.sync(); c.sync() }
         #expect(c.library.urls(in: "Personal").filter { $0 == "p0" }.count == 2)
@@ -1970,7 +1972,7 @@ extension SyncTests {
         a.sync()
         let c = FakeMac(cloud, Sample.library([Sample.space("Personal", [Sample.page("news")]), Sample.space("Work")]), clock: a.clock + 86400)
         c.sync()
-        c.clock += SyncSession.firstSyncWait + 1
+        c.clock += SyncSession.claimTimeout + 1
         c.sync()
         for _ in 0..<3 { a.sync(); c.sync() }
         for mac in [a, c] {

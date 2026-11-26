@@ -212,8 +212,8 @@ final class ICloudSync {
     static func stateTurningOff(_ state: SyncState?, keepingLibrary: Bool = true) -> SyncState {
         var kept = SyncState()
         kept.aliases = state?.aliases ?? SyncAliases()
-        // A first sync waiting for another Mac's doesn't start its wait over.
-        kept.firstSyncWait = state?.firstSyncWait
+        // This Mac's ID in a first-sync claim, so a claim it made is still known as its own.
+        kept.device = state?.device
         guard keepingLibrary, let state, state.merged else { return kept }
         kept.merged = true
         kept.base = state.base
@@ -280,6 +280,7 @@ final class ICloudSync {
             if self?.session?.state.heldRemovals != nil { self?.tellHeld() }
         }
         session.onRemovedElsewhere = { [weak self] in self?.zoneDeleted(reset: false) }
+        session.onWaiting = { [weak self] in self?.retry.failed(nil) }
         session.onNeedsFetch = { [weak self] in
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self?.pushDebouncer.call { self?.fetchSoon(after: 0) } }
         }
@@ -397,11 +398,18 @@ final class ICloudSync {
         guard isCurrent() else { return }
         let first = !session.state.merged
         if first { session.fetchFinished() }
-        // Still not merged: another Mac's first sync is going up, and this one reads again shortly.
-        guard session.state.merged else { return }
+        if !session.state.merged {
+            // This Mac's claim on an empty iCloud goes up first; once it's saved, the library follows.
+            session.requeue()
+            try await server.sendChanges()
+            // Not merged still: another Mac's first sync is going up, and this one reads again later.
+            guard session.state.merged else { return }
+        }
         fetched(first)
         session.requeue()
         try await server.sendChanges()
+        // The first sync's library has all gone up: its claim, marked complete, goes too.
+        if session.state.unsent.contains(SyncName.claim) { try await server.sendChanges() }
     }
 
     /// The status for a failure, and the next try unless waiting won't help.
