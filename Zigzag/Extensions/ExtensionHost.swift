@@ -674,6 +674,13 @@ final class ExtensionHost: NSObject {
             profile.installs.save(known, for: id)
             state = known
         }
+        // What this version no longer declares goes, as in Chrome; what it still declares stays.
+        if let known = state, ExtensionStore.manifest(for: id) != nil,
+           let bounded = Self.boundedGrants(known, declared: declared.union(ExtensionStore.declaredPermissions(id).optional),
+                                            patterns: ext.allRequestedMatchPatterns.union(ext.optionalPermissionMatchPatterns)) {
+            profile.installs.save(bounded, for: id)
+            state = bounded
+        }
         let asked = Self.askedPermissions(requested: Set(ext.requestedPermissions.map(\.rawValue)), declared: declared)
         let permissions = Set(state?.grantedPermissions ?? Array(asked)).map(WKWebExtension.Permission.init(rawValue:))
         let patterns = state?.grantedMatchPatterns.map { Set($0.compactMap { try? WKWebExtension.MatchPattern(string: $0) }) } ?? ext.allRequestedMatchPatterns
@@ -689,6 +696,24 @@ final class ExtensionHost: NSObject {
         applySiteAccess(to: context)
         let wanted = asked.subtracting(profile.installs.state(id)?.grantedPermissions ?? [])
         if !wanted.isEmpty { askForNewAccess(wanted, for: context) }
+    }
+
+    /// A record kept to what the version declares, required or optional: Chrome bounds what an extension holds the
+    /// same way after an update. A site stays while a declared pattern covers it. Nil when nothing goes.
+    static func boundedGrants(_ state: ExtensionInstalls.State, declared: Set<String>,
+                              patterns declaredPatterns: Set<WKWebExtension.MatchPattern>) -> ExtensionInstalls.State? {
+        func covered(_ pattern: String) -> Bool {
+            guard let pattern = try? WKWebExtension.MatchPattern(string: pattern) else { return true }
+            return declaredPatterns.contains { $0 == pattern || $0.matches(pattern) }
+        }
+        var next = state
+        next.grantedPermissions = state.grantedPermissions?.filter(declared.contains)
+        next.grantedMatchPatterns = state.grantedMatchPatterns?.filter(covered)
+        let requested = (state.requestedMatchPatterns ?? []).filter(covered)
+        next.requestedMatchPatterns = requested.isEmpty ? nil : requested
+        let changed = next.grantedPermissions != state.grantedPermissions || next.grantedMatchPatterns != state.grantedMatchPatterns
+            || next.requestedMatchPatterns != state.requestedMatchPatterns
+        return changed ? next : nil
     }
 
     /// Adds webRequestBlocking to a record with webRequest when the manifest asks for it; nil when unchanged.
