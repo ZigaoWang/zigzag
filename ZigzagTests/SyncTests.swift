@@ -2040,4 +2040,32 @@ extension SyncTests {
         #expect(ICloudSync.status(afterSending: .offline, merged: true, lastSynced: date) == .offline)
         #expect(ICloudSync.status(afterSending: .syncing, merged: false, lastSynced: date) == .syncing)
     }
+
+    @Test func aRestoredMacSendingBeforeAnyFetchDoesntBringBackARemovedPin() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        a.online = false
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[1].title = "edited offline" } }
+        let backupState = try saved(a.session.state), backupLibrary = a.library
+        let page = try #require(pageName(a, "b"))
+        a.online = true
+        a.sync(); b.sync()
+        a.clock += 86400
+        a.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 1) } }
+        a.sync(); b.sync()
+        // The restored Mac's engine sends its old edit, twice, before any fetch.
+        let restored = FakeMac(cloud, backupLibrary, clock: a.clock + 86400, state: backupState)
+        var asked = false
+        restored.session.onNeedsFetch = { asked = true }
+        restored.session.checkAfterLaunch()
+        restored.session.requeue()
+        restored.send()
+        restored.session.requeue()
+        restored.send()
+        #expect(asked)
+        #expect(cloud.records[page] == nil)
+        restored.sync(); b.sync()
+        #expect(restored.library.urls(in: "Personal") == ["a"])
+        #expect(b.library.urls(in: "Personal") == ["a"])
+        #expect(cloud.records[page] == nil)
+    }
 }

@@ -136,6 +136,9 @@ struct SyncState: Codable {
     var resumed = false
     /// The record this Mac's first sync into an empty iCloud left (`SyncSession.firstSyncType`).
     var ownFirstSync: String?
+    /// Saves that found their record gone, waiting for a fetch of iCloud's removals before they're decided.
+    var goneAsked: Set<String> = []
+    var goneRead: Set<String> = []
     /// Since when the first sync has waited for another Mac's still going up.
     var firstSyncWait: Date?
     /// Copies dropped here (two first syncs at once), not taken again if read before their removal is.
@@ -145,7 +148,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, ownFirstSync, firstSyncWait, copies, savedSeen, fetches
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, removed, heldNames, libraryStamp, wroteLibrary, resumeAccount, resumed, ownFirstSync, firstSyncWait, goneAsked, copies, savedSeen, fetches
     }
 
     init() {}
@@ -176,6 +179,7 @@ struct SyncState: Codable {
         resumed = try c.decodeIfPresent(Bool.self, forKey: .resumed) ?? false
         ownFirstSync = try c.decodeIfPresent(String.self, forKey: .ownFirstSync)
         firstSyncWait = try c.decodeIfPresent(Date.self, forKey: .firstSyncWait)
+        goneAsked = try c.decodeIfPresent(Set<String>.self, forKey: .goneAsked) ?? []
         copies = try c.decodeIfPresent(Set<String>.self, forKey: .copies) ?? []
         savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
         fetches = try c.decodeIfPresent(Int.self, forKey: .fetches) ?? 0
@@ -359,7 +363,7 @@ final class SyncSession {
     func requeue() {
         guard !isClosed else { return }
         let deletes = state.serverPayloads.keys.filter { state.base[$0] == nil }
-        queue((Array(state.unsent), deletes))
+        queue((Array(state.unsent.subtracting(state.goneAsked)), deletes))
     }
 
     private func queue(_ changes: (saves: [String], deletes: [String])) {
@@ -472,6 +476,12 @@ final class SyncSession {
         } else {
             settle()
             removeOwnFirstSync()
+            // Saves that found their record gone, now that iCloud's removals are read.
+            for name in state.goneAsked where state.unsent.contains(name) {
+                state.goneRead.insert(name)
+                decideGone(name)
+            }
+            state.goneAsked = []
         }
         state.lastSynced = now()
         onChange?()
@@ -985,6 +995,24 @@ final class SyncSession {
         }
     }
 
+    /// A save that found the record gone, once iCloud's removals have been read: removed after it changed here (a Mac
+    /// restored from a backup), the removal wins; removed while it changed here, the change wins and it comes back.
+    private func decideGone(_ name: String) {
+        state.goneAsked.remove(name)
+        state.goneRead.remove(name)
+        if let at = removedAt(name), let edit = state.base[name]?.modified, at > edit {
+            state.base[name] = nil
+            state.unsent.remove(name)
+            state.systemFields[name] = nil
+            state.serverPayloads[name] = nil
+            layOut()
+            return
+        }
+        state.systemFields[name] = nil
+        state.serverPayloads[name] = nil
+        if state.base[name] != nil { state.unsent.insert(name); queue(([name], [])) }
+    }
+
     func deleted(_ names: [String]) {
         guard !isClosed else { return }
         for name in names where state.base[name] == nil {
@@ -1006,19 +1034,13 @@ final class SyncSession {
             if state.base[name] != nil { state.unsent.insert(name) }
             onNeedsFetch?()
         case .gone:
-            // Removed elsewhere after it changed here (a Mac restored from a backup): the removal wins.
-            if let at = removedAt(name), let edit = state.base[name]?.modified, at > edit {
-                state.base[name] = nil
-                state.unsent.remove(name)
-                state.systemFields[name] = nil
-                state.serverPayloads[name] = nil
-                layOut()
+            // When it was removed isn't known here yet: read iCloud's removals first, then decide.
+            guard removedAt(name) != nil || state.goneRead.contains(name) else {
+                state.goneAsked.insert(name)
+                onNeedsFetch?()
                 break
             }
-            // Removed elsewhere while it changed here: the change wins and it comes back.
-            state.systemFields[name] = nil
-            state.serverPayloads[name] = nil
-            if state.base[name] != nil { state.unsent.insert(name); queue(([name], [])) }
+            decideGone(name)
         case .zoneMissing:
             // After the first sync it was removed, never made again from here.
             if state.merged { onRemovedElsewhere?(); return }
