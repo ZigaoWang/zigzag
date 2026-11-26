@@ -87,10 +87,11 @@
   Test: SyncTests.aPageAddedToAFolderRemovedElsewhereMovesToTheTopOfItsSpace
 - A space removed on one Mac while a page is pinned in it on another → the page stays, in the first space.
   Test: SyncTests.aSpaceRemovedElsewhereKeepsAPageJustPinnedInIt
-- A page removed on one Mac while it's edited on another → the later of the two wins (the edit, when they're at the same time): an edited page comes back, but an edit made before the removal and sent only later (a Mac restored from a backup) doesn't bring it back. Each Mac notes in iCloud what it removed and when, for 30 days; a save that finds its record gone waits for those notes to be read before it decides.
+- A page removed on one Mac while it's edited on another → the later of the two wins (the edit, when they're at the same time): an edited page comes back, but an edit made before the removal and sent only later (a Mac restored from a backup) doesn't bring it back. Each Mac notes in iCloud what it removed and when, for 30 days; a save that finds its record gone waits for those notes to be read before it decides. A note dated ahead of this Mac's clock is ignored.
   Test: SyncTests.aPageEditedHereComesBackWhenRemovedElsewhere
   Test: SyncTests.aMacRestoredFromABackupDoesntBringBackAPinRemovedSince
   Test: SyncTests.aRestoredMacSendingBeforeAnyFetchDoesntBringBackARemovedPin
+  Test: SyncTests.aRemovalFromAMacWhoseClockRunsFastDoesntBeatALaterEdit
 - A profile removed on one Mac → stays on the others with its spaces, favorites, settings, sign-ins and website data, and from then on it's that Mac's own and no longer syncs. Its spaces keep syncing.
   Test: SyncTests.aProfileRemovedOnAnotherMacStaysHereWithItsSpaces
   Test: SyncTests.aProfilesFavoritesRemovedBeforeItStayWithItHere

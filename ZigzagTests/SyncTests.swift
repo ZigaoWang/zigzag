@@ -2068,4 +2068,15 @@ extension SyncTests {
         #expect(b.library.urls(in: "Personal") == ["a"])
         #expect(cloud.records[page] == nil)
     }
+
+    @Test func aRemovalFromAMacWhoseClockRunsFastDoesntBeatALaterEdit() throws {
+        let (_, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b")])]))
+        b.clock = a.clock + 86400
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.remove(at: 1) } }
+        a.clock += 60
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[1].title = "edited after" } }
+        b.sync(); a.sync(); b.sync()
+        #expect(a.library.titles(in: "Personal").contains("edited after"))
+        #expect(b.library.titles(in: "Personal").contains("edited after"))
+    }
 }

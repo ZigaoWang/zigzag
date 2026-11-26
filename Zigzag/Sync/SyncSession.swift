@@ -412,7 +412,8 @@ final class SyncSession {
 
     /// When `name` was removed on some Mac, as the removals record has it.
     private func removedAt(_ name: String) -> Date? {
-        if case .removals(let r)? = state.base[SyncName.removals]?.body { return r.names[name] }
+        // One dated ahead of this Mac's clock came from a Mac whose clock runs fast: no guide.
+        if case .removals(let r)? = state.base[SyncName.removals]?.body, let at = r.names[name], at <= now().addingTimeInterval(60) { return at }
         return nil
     }
 
