@@ -1221,23 +1221,40 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         root.card.hidePlaceholder()
     }
 
-    /// Card to card: the pill's room is already the right size and the card fills it, so there is nothing to fold.
-    func rootRevealWithinItsRoom() {
-        window?.orderFront(nil)
+    // MARK: A page that isn't running
+
+    /// The card over the preview's room while the row's page isn't running.
+    private var asleepCard: EdgeAsleepPageView?
+
+    /// What a click on the sleeping card does. The edge preview wakes the page in its own room; elsewhere the card
+    /// isn't shown.
+    var onAsleepCardClicked: (() -> Void)?
+
+    /// Puts the card over the previewed page; the page is never loaded for it. `note` and `hint` replace what the tab
+    /// would say, for a page the panel can't show at all.
+    func showAsleepCard(note: String? = nil, hint: String? = nil) {
+        let card = asleepCard ?? EdgeAsleepPageView(frame: root.overlay.bounds)
+        card.autoresizingMask = [.width, .height]
+        card.frame = root.overlay.bounds
+        card.show(tab: tab, note: note, hint: hint)
+        card.onClick = { [weak self] in self?.onAsleepCardClicked?() }
+        if card.superview !== root.overlay { root.overlay.addSubview(card) }
+        asleepCard = card
     }
 
-    /// A sleeping page woken by a click on its card: the page is built in the same pill. The card over it belongs to
-    /// the host, which takes it away, so waking never shows an empty pill and nothing closes.
+    /// Test seam: the card's title while it is out.
+    var asleepCardTitle: String? { asleepCard?.shownTitle }
+
+    /// A sleeping page woken by a click on its card: the page is built in the same pill, and the card goes once the
+    /// page is there, so waking never shows an empty pill and nothing closes.
     func wakeInPlace() {
         showPage()
+        asleepCard?.removeFromSuperview()
+        asleepCard = nil
         if isDockedInPage { layoutInDock(force: true) }
     }
 
-    // MARK: A page that isn't running
 
-    /// Test seam: the card's title while the host's card is over this page. The card belongs to the host, so this
-    /// only answers what the host's card would show for this tab.
-    var asleepCardTitle: String? { tab.displayTitle }
 
     /// Its page's changes.
     private func observeTab() {

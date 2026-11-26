@@ -402,17 +402,17 @@ final class EdgeSidebar {
             if previous == nil { narrowPanel() }
             return
         }
-        if live {
-            host.hideAsleepCard()
-        } else {
-            // The panel's one card, its contents changed: moving between sleeping rows swaps no card in and out.
-            host.showAsleepCard(for: tab, note: system ? EdgeLensPolicy.systemPageNote : nil,
-                                hint: system ? EdgeLensPolicy.systemPageHint : nil) { [weak self, weak tab, weak mini] in
-                guard let self, let tab, let mini, self.isShowing, let controller = self.target else { return }
-                // Waking the page, not choosing it: `listSelect` would bring the browser forward and take the panel
-                // away, which is the opposite of what the click asks for.
+        if !live {
+            mini.showAsleepCard(note: system ? EdgeLensPolicy.systemPageNote : nil,
+                                hint: system ? EdgeLensPolicy.systemPageHint : nil)
+            // A click on the card wakes the page in its own room: the panel stays out and the row needn't be found
+            // again in the browser window.
+            mini.onAsleepCardClicked = { [weak self, weak tab] in
+                guard let self, let tab, self.isShowing, let controller = self.target else { return }
+                // Waking the page, not choosing it: `listSelect` would bring the browser forward and hide the panel,
+                // which is the opposite of what the click asks for. The tab becomes the window's selected one so its
+                // page has somewhere to go, and the same pill keeps its place.
                 controller.tabManager.select(tab)
-                self.host?.hideAsleepCard()
                 mini.wakeInPlace()
             }
         }
@@ -421,10 +421,9 @@ final class EdgeSidebar {
         preview = mini
         previewTab = tab
         mini.layoutInDock(force: true)
-        // Card to card has nothing to uncover: both are the same still card, so the fold only made the pill jiggle.
-        // The card is the panel's and never moved; only the Mini behind it is replaced.
+        // Card to card has nothing to uncover: the card fills the pill already, so the slide only made it jiggle and
+        // showed what was behind during the gap. The new card is in place at once and the old Mini goes with it.
         if !live, previous?.tab.isLoaded != true {
-            mini.rootRevealWithinItsRoom()
             if let previous {
                 previous.onInPageMiniClosed = nil
                 previous.onInPageMiniDetached = nil
@@ -543,12 +542,11 @@ final class EdgeSidebar {
         host.placeCard()
         host.showBlankSlate(true)
         host.layoutSubtreeIfNeeded()
-        // The card belongs to the panel and goes at once; the Mini behind it goes with no animation, because a
-        // closing Mini stays on screen until its own slide finishes and would draw the old page over the blank.
-        host.hideAsleepCard()
         if let previous {
             previous.onInPageMiniClosed = nil
             previous.onInPageMiniDetached = nil
+            // No animation: a closing Mini stays on screen until its own slide ends, drawing the old page over the
+            // blank the handover just put in place.
             previous.closeInPage(focusBack: false, animated: false)
         }
         let slide = EdgePreviewRouting.spaceSlide(from: before, to: after, order: target?.tabManager.listedSpaces.map(\.id) ?? [])
@@ -559,7 +557,6 @@ final class EdgeSidebar {
         previewPanelFrame = .zero
         guard isShowing, let host, let panel else { return }
         host.showBlankSlate(false)
-        host.hideAsleepCard()
         host.pageShowing = false
         if let target { host.cardWidth = target.edgeSidebarWidth }
         panel.setFrame(cardPanelFrame, display: true)
@@ -802,25 +799,6 @@ final class EdgeSidebarHost: NSView {
             blankSlate.removeFromSuperview()
         }
     }
-
-    /// The panel's one sleeping card, shared by every row whose page isn't running: a card is the same still card
-    /// whichever row it is over, so moving between sleeping rows changes its contents and nothing else. Its own
-    /// Mini's card is handed back here rather than a second one being made.
-    private(set) lazy var asleepCard: EdgeAsleepPageView = {
-        let card = EdgeAsleepPageView(frame: .zero)
-        card.autoresizingMask = [.width, .height]
-        return card
-    }()
-
-    /// Shows the sleeping card for a row, over the page's room. One card, contents updated.
-    func showAsleepCard(for tab: Tab, note: String? = nil, hint: String? = nil, onClick: @escaping () -> Void) {
-        asleepCard.frame = pageFrame
-        asleepCard.show(tab: tab, note: note, hint: hint)
-        asleepCard.onClick = onClick
-        if asleepCard.superview !== self { addSubview(asleepCard, positioned: .above, relativeTo: blankSlate) }
-    }
-
-    func hideAsleepCard() { asleepCard.removeFromSuperview() }
 
     /// The blank pill arrives as a page does: it unfolds from the sidebar's side, over the page it replaces.
     func showBlankSlateAnimatingIn(foldFromRight: Bool) {
