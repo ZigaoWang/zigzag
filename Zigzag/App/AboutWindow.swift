@@ -125,8 +125,18 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
 private final class AboutView: NSView {
     let stage: CardStage
     let finishes: CardFinishSwatches
-    let save = PillButton(title: String(localized: "Save as Image…", comment: "Button in About Zigzag, under Your Zigzag Card: saves it as a PNG picture, asking where."))
-    let share = PillButton(title: String(localized: "Share…", comment: "Button in About Zigzag, under Your Zigzag Card: opens the Mac's share menu with its picture."))
+    /// Quiet symbols beside the finishes, named for VoiceOver and under the pointer, so the card stays the thing to look at.
+    let save = AboutView.action("square.and.arrow.down",
+                                String(localized: "Save as Image…", comment: "Button in About Zigzag, under Your Zigzag Card: saves it as a PNG picture, asking where."))
+    let share = AboutView.action("square.and.arrow.up",
+                                 String(localized: "Share…", comment: "Button in About Zigzag, under Your Zigzag Card: opens the Mac's share menu with its picture."))
+
+    private static func action(_ symbol: String, _ name: String) -> PillButton {
+        let button = PillButton(symbol: symbol, style: .quiet)
+        button.toolTip = name
+        button.setAccessibilityLabel(name)
+        return button
+    }
     private let version = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     /// Each a name, where it goes in quiet text, and an arrow that says whether it opens here or on the web.
     private let rows: [AboutRow] = [
@@ -214,12 +224,13 @@ private final class AboutView: NSView {
             stage.frame = NSRect(x: 0, y: 0, width: width, height: (k.top + k.size.height / 2) * 2)
             let swatches = finishes.fittingSize
             finishes.frame = NSRect(x: left, y: y + (height - swatches.height) / 2, width: swatches.width, height: swatches.height)
-            var x = right
+            // The last symbol's ink on the card's right edge, its hover fill past it.
+            var x = right + (height - Tokens.Space.x4) / 2
             for button in [share, save] {
                 let w = button.fittingWidth
                 x -= w
                 button.frame = NSRect(x: x, y: y, width: w, height: height)
-                x -= Tokens.Space.x2
+                x -= Tokens.Space.x1
             }
         }
         y += height + k.gap
