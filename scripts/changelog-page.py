@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """Builds zigzagbrowser.com/release-notes from CHANGELOG.md: every version, newest first, the same notes the app shows.
 
-Run by site/deploy.sh, so the page is rebuilt whenever the site goes out (and so after every release).
+Run by site/deploy.sh, so the page is rebuilt whenever the site goes out (and so after every release). The sitemap
+is scripts/site-languages.py's.
 """
-import datetime, html, pathlib, re
+import datetime, html, pathlib, re, subprocess
 
 root = pathlib.Path(__file__).resolve().parent.parent
+# Only versions released as stable (a vX.Y.Z tag): a version still in beta has its notes in CHANGELOG.md already.
+subprocess.run(["git", "-C", str(root), "fetch", "-q", "--tags", "origin"], check=False)
+released = set(subprocess.run(["git", "-C", str(root), "tag", "-l", "v*"], capture_output=True, text=True, check=True).stdout.split())
 versions = []
 current = None  # None under a heading that isn't a released version, like [Unreleased]
 for raw in (root / "CHANGELOG.md").read_text(encoding="utf-8").splitlines():
     line = raw.strip()
     if line.startswith("## "):
         m = re.match(r"## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})", line)
-        current = {"version": m[1], "date": m[2], "summary": [], "sections": []} if m else None
+        current = {"version": m[1], "date": m[2], "summary": [], "sections": []} if m and f"v{m[1]}" in released else None
         if current: versions.append(current)
     elif current and line.startswith("### "):
         current["sections"].append((line[4:], []))
@@ -110,11 +114,4 @@ old.parent.mkdir(parents=True, exist_ok=True)
 old.write_text('<!doctype html><meta charset="utf-8"><title>Zigzag Release Notes</title>'
                '<link rel="canonical" href="/release-notes"><meta http-equiv="refresh" content="0; url=/release-notes">'
                '<a href="/release-notes">Zigzag Release Notes</a>\n', encoding="utf-8")
-# The sitemap, dated by the newest release: every page changes with a release.
-newest = versions[0]["date"] if versions else datetime.date.today().isoformat()
-urls = "".join(f"  <url><loc>https://zigzagbrowser.com{path}</loc><lastmod>{newest}</lastmod></url>\n"
-               for path in ["/", "/download/", "/release-notes/"])
-(root / "site" / "sitemap.xml").write_text(
-    '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + "</urlset>\n",
-    encoding="utf-8")
 print(f"Wrote {out.relative_to(root)} with {len(versions)} versions")
