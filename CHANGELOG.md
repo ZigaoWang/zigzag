@@ -5,6 +5,11 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A translated page stays translated as it changes: posts and comments that load as you scroll, text the page updates and another page of a site that doesn't reload, like Reddit, are translated as they come, and a long page is translated all the way down instead of stopping partway.
+- Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
+- The screen edge's page preview no longer closes and comes back while you move from one tab to the next, folds back when the pointer leaves the tabs and the page for the sidebar's empty part, and no longer shows up to extensions as a window of its own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.
