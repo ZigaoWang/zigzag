@@ -31,6 +31,8 @@ final class TabManager {
     private(set) var recentTabIDs: [UUID] = []
     /// Tabs opened from another since you last switched tabs: closing one goes back toward its opener, as in Chrome.
     private var openedSinceSwitch: Set<UUID> = []
+    /// A tab you opened yourself (⌘T, New Tab), and the tab you were on: closing it before you switch goes back there.
+    private var newTabReturns: [UUID: UUID] = [:]
     /// Set while a selection is Zigzag's own (a new tab, after a close), which keeps `openedSinceSwitch`.
     private var selectingQuietly = false
     private var closedTabs: [ClosedTab] {
@@ -513,6 +515,7 @@ final class TabManager {
         watch(tab)
         tab.opener = opener
         if opener != nil { openedSinceSwitch.insert(tab.id) }
+        if opener == nil, select, configuration == nil, let before = selectedTab, before.spaceID == space { newTabReturns[tab.id] = before.id }
         // Placed once, as Settings says; the list never reorders itself after that.
         // `site`: the page a tab made empty is about to load, for Next to Tabs from the Same Site.
         let place = newTabPlacement(in: space, opener: opener, select: select, site: url ?? site)
@@ -762,7 +765,7 @@ final class TabManager {
         }
         let previous = selectedTab
         // Switching tabs yourself forgets which tabs opened which, as in Chrome.
-        if !selectingQuietly, previous !== tab { openedSinceSwitch.removeAll() }
+        if !selectingQuietly, previous !== tab { openedSinceSwitch.removeAll(); newTabReturns.removeAll() }
         previous?.captureSnapshot()
         // Where you were and what you'd typed, in case its page has to load again while you're away.
         if previous !== tab { previous?.readPageState() }
@@ -1672,8 +1675,9 @@ final class TabManager {
         return close(tabs)
     }
 
-    /// After closing the current tab, as in Chrome: opened from another tab since you last switched, the next tab
-    /// that one opened, else the opener; otherwise the tab below, else the one above. A pinned page or favorite
+    /// After closing the current tab, as in Chrome: one you opened yourself (⌘T) before switching goes back to the tab
+    /// you were on; opened from another tab since you last switched, the next tab that one opened, else the opener;
+    /// otherwise the tab below, else the one above. A pinned page or favorite
     /// goes to its opener, else the tab you were on before, else the top tab. With shared tabs (#162), prefer one no
     /// other window shows; if none, show a placeholder for it.
     private func selectAfterClosing(_ closed: Tab, index: Int) {
@@ -1681,7 +1685,11 @@ final class TabManager {
         let recent = recentTabs
         let before = { (tab: Tab) in tab !== closed && tab.spaceID == closed.spaceID && !tab.isClosed }
         let openerCounts = openedSinceSwitch.remove(closed.id) != nil
-        if closed.bookmarkID == nil, let next = heir(closing: closed, at: index, in: list, openerCounts: openerCounts) {
+        let returnTo = newTabReturns.removeValue(forKey: closed.id).flatMap { id in list.first { $0.id == id } }
+        if closed.bookmarkID == nil, let back = returnTo, !back.isClosed, !isShownElsewhere(back) {
+            // A tab you opened yourself and closed before switching: back to the tab you were on, as in Chrome and Safari.
+            selectQuietly(back, claiming: false)
+        } else if closed.bookmarkID == nil, let next = heir(closing: closed, at: index, in: list, openerCounts: openerCounts) {
             selectQuietly(next, claiming: false)
         } else if closed.bookmarkID != nil, let opener = closed.opener, list.contains(where: { $0 === opener }), !isShownElsewhere(opener) {
             selectQuietly(opener, claiming: false)

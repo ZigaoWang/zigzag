@@ -270,6 +270,24 @@ struct TabGroupRulesTests {
         }
     }
 
+    @Test func aNewTabClosesBackToTheTabYouWereOn() {
+        window { manager, t in
+            manager.select(t[1])
+            let opened = manager.newTab(url: nil, spaceID: space, select: true)
+            manager.close(opened)
+            #expect(manager.selectedTab === t[1])
+            // Switched away and back first: an ordinary close, to the tab below.
+            manager.select(t[3])
+            let again = manager.newTab(url: nil, spaceID: space, select: true)
+            manager.select(t[0])
+            manager.select(again)
+            let index = manager.tabs(in: space).firstIndex { $0 === again } ?? 0
+            manager.close(again)
+            let list = manager.tabs(in: space)
+            #expect(manager.selectedTab === list[min(index, list.count - 1)])
+        }
+    }
+
     @Test func aLinkOpenedInFrontClosesBackToItsPage() {
         window { manager, t in
             manager.select(t[1])
