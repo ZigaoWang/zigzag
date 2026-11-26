@@ -79,5 +79,12 @@
   "Privacy": "プライバシー",
   "Contact": "お問い合わせ",
   "Report a bug": "バグを報告"
+ },
+ "release-notes": {
+  "Zigzag Release Notes": "Zigzagリリースノート",
+  "What's new in each version of Zigzag, the lightweight browser for Mac.": "Mac用の軽量ブラウザ、Zigzagの各バージョンの新機能と変更点。",
+  "What changed in each version of Zigzag. Updates install by themselves, so you're always on the newest.": "Zigzagの各バージョンで変わったことです。アップデートは自動でインストールされるので、いつも最新のバージョンを使えます。",
+  "Release notes in this language start with the next version. Until then, <a href=\"/release-notes/\">read them in English</a>.": "日本語のリリースノートは次のバージョンから始まります。それまでは<a href=\"/release-notes/\">英語版</a>をご覧ください。",
+  "Notes for earlier versions are in <a href=\"/release-notes/\">English</a>.": "それより前のバージョンのノートは<a href=\"/release-notes/\">英語版</a>にあります。"
  }
 }

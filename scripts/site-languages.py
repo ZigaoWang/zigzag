@@ -3,7 +3,8 @@
 
 site/index.html stays the English source. Each strings file maps an exact piece of it to its translation, and
 site/<lang>/index.html is written from it, so the pages can't drift. Also writes the language links (hreflang in the
-head, the line of languages in the footer) into every page, English included, and site/sitemap.xml.
+head, the line of languages in the footer) into every page, English included, and site/sitemap.xml. The release notes
+in every language are scripts/changelog-page.py's; their words are in the same strings files, checked here.
 
     scripts/site-languages.py           # write the pages
     scripts/site-languages.py --check   # fail if a page is out of date or a strings file doesn't match the source
@@ -32,19 +33,24 @@ def fail(msg):
     sys.exit(f"site-languages: {msg}")
 
 
-def with_links(html, current):
-    """The page with hreflang links after its canonical, and the line of languages in its footer."""
+def with_links(html, current, page=""):
+    """The page with hreflang links after its canonical, and the line of languages in its footer. page is its path in
+    each language's folder, like "release-notes/"."""
     html = re.sub(r'<link rel="alternate" hreflang="[^"]*" href="[^"]*">\n', "", html)
-    alts = "".join(f'<link rel="alternate" hreflang="{c}" href="{url(f)}">\n' for c, _, f in LANGS)
-    alts += f'<link rel="alternate" hreflang="x-default" href="{url("")}">\n'
+    alts = "".join(f'<link rel="alternate" hreflang="{c}" href="{url(f)}{page}">\n' for c, _, f in LANGS)
+    alts += f'<link rel="alternate" hreflang="x-default" href="{url("")}{page}">\n'
     html = re.sub(r'(<link rel="canonical" href="[^"]*">\n)', lambda m: m.group(1) + alts, html, count=1)
     here = ' aria-current="page"'
-    links = "".join(f'<a href="/{f + "/" if f else ""}" hreflang="{c}" lang="{c}"{here if c == current else ""}>{name}</a>'
+    links = "".join(f'<a href="/{f + "/" if f else ""}{page}" hreflang="{c}" lang="{c}"{here if c == current else ""}>{name}</a>'
                     for c, name, f in LANGS)
-    line = f'<p class="langs">{links}</p>'
-    html = re.sub(r'\n    <p class="langs">.*?</p>', "", html)
-    html = html.replace('\n    <p class="fine">© ', f'\n    {line}\n    <p class="fine">© ', 1)
-    return html
+    html = re.sub(r'\n *<p class="langs">.*?</p>', "", html)
+    return re.sub(r'\n( *)<p class="fine">© ', lambda m: f'\n{m[1]}<p class="langs">{links}</p>\n{m[1]}<p class="fine">© ',
+                  html, count=1)
+
+
+def strings(code, section="strings"):
+    """A language's translations: "strings" for the home page, "release-notes" for the release notes."""
+    return json.loads((STRINGS / f"{code}.json").read_text())[section]
 
 
 def tags(s):
@@ -54,7 +60,8 @@ def tags(s):
 def main():
     check = "--check" in sys.argv
     source = (SITE / "index.html").read_text()
-    keys = json.loads((STRINGS / "en.json").read_text())
+    english = json.loads((STRINGS / "en.json").read_text())
+    keys = english["home"]
 
     # The statement lights up word by word, so each word is its own span. Translate it as one sentence.
     m = re.search(r'(<p class="statement">)(.*?)(</p>)', source)
@@ -72,18 +79,20 @@ def main():
         f = STRINGS / f"{code}.json"
         if not f.exists():
             fail(f"{f.relative_to(ROOT)} is missing")
-        tr = json.loads(f.read_text())["strings"]
-        if set(tr) != set(keys):
-            fail(f"{code}: missing {sorted(set(keys) - set(tr))[:3]}, extra {sorted(set(tr) - set(keys))[:3]}")
-        for k, v in tr.items():
-            if not v.strip():
-                fail(f"{code}: {k!r} is empty")
-            if tags(k) != tags(v):
-                fail(f"{code}: {k!r} has to keep the same tags")
-            if '"' in re.sub(r"<[^>]+>", "", v):
-                fail(f"{code}: {k!r} has a straight double quote; use the language's own quotes")
-            if "|" in v and k != statement:
-                fail(f"{code}: {k!r} has a |")
+        tr = strings(code)
+        for section, want in (("strings", keys), ("release-notes", english["release-notes"])):
+            got = strings(code, section)
+            if set(got) != set(want):
+                fail(f"{code} {section}: missing {sorted(set(want) - set(got))[:3]}, extra {sorted(set(got) - set(want))[:3]}")
+            for k, v in got.items():
+                if not v.strip():
+                    fail(f"{code}: {k!r} is empty")
+                if tags(k) != tags(v):
+                    fail(f"{code}: {k!r} has to keep the same tags")
+                if '"' in re.sub(r"<[^>]+>", "", v):
+                    fail(f"{code}: {k!r} has a straight double quote; use the language's own quotes")
+                if "|" in v and k != statement:
+                    fail(f"{code}: {k!r} has a |")
         html = pattern.sub(lambda m: tr[m.group(1)], plain)
         # Each word, or for languages without spaces each chunk, back in its span.
         def wrap(m):
@@ -95,6 +104,7 @@ def main():
         html = html.replace(f'<link rel="canonical" href="{BASE}/">', f'<link rel="canonical" href="{url(folder)}">', 1)
         html = html.replace(f'<meta property="og:url" content="{BASE}/">', f'<meta property="og:url" content="{url(folder)}">', 1)
         html = html.replace('href="/"', f'href="/{folder}/"')
+        html = html.replace('href="/release-notes"', f'href="/{folder}/release-notes/"')
         html = html.replace("<!doctype html>\n", "<!doctype html>\n" + GENERATED, 1)
         for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', html):
             json.loads(block)
@@ -107,7 +117,10 @@ def main():
     if check:
         today = (re.search(r"<lastmod>(.*?)</lastmod>", old) or [None, today])[1]
     rows = [f"  <url><loc>{url(f)}</loc><lastmod>{today}</lastmod>{alts}\n  </url>" for _, _, f in LANGS]
-    rows += [f"  <url><loc>{BASE}/{p}/</loc><lastmod>{today}</lastmod></url>" for p in ("download", "release-notes")]
+    rows += [f"  <url><loc>{BASE}/download/</loc><lastmod>{today}</lastmod></url>"]
+    # The release notes in every language, which scripts/changelog-page.py writes.
+    notes = alts.replace('/"/>', '/release-notes/"/>')
+    rows += [f"  <url><loc>{url(f)}release-notes/</loc><lastmod>{today}</lastmod>{notes}\n  </url>" for _, _, f in LANGS]
     out[SITE / "sitemap.xml"] = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
                                  'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' + "\n".join(rows) + "\n</urlset>\n")
 

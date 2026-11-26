@@ -79,5 +79,12 @@
   "Privacy": "Конфиденциальность",
   "Contact": "Контакты",
   "Report a bug": "Сообщить об ошибке"
+ },
+ "release-notes": {
+  "Zigzag Release Notes": "Примечания к выпуску Zigzag",
+  "What's new in each version of Zigzag, the lightweight browser for Mac.": "Что нового в каждой версии Zigzag, лёгкого браузера для Mac.",
+  "What changed in each version of Zigzag. Updates install by themselves, so you're always on the newest.": "Что изменилось в каждой версии Zigzag. Обновления устанавливаются сами, поэтому у вас всегда последняя версия.",
+  "Release notes in this language start with the next version. Until then, <a href=\"/release-notes/\">read them in English</a>.": "Примечания к выпуску на русском начнутся со следующей версии. А пока <a href=\"/release-notes/\">читайте их на английском</a>.",
+  "Notes for earlier versions are in <a href=\"/release-notes/\">English</a>.": "Примечания к более ранним версиям — <a href=\"/release-notes/\">на английском</a>."
  }
 }

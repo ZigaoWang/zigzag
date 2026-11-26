@@ -79,5 +79,12 @@
   "Privacy": "Privacidade",
   "Contact": "Contato",
   "Report a bug": "Relatar um bug"
+ },
+ "release-notes": {
+  "Zigzag Release Notes": "Notas de versão do Zigzag",
+  "What's new in each version of Zigzag, the lightweight browser for Mac.": "As novidades de cada versão do Zigzag, o navegador leve para Mac.",
+  "What changed in each version of Zigzag. Updates install by themselves, so you're always on the newest.": "O que mudou em cada versão do Zigzag. As atualizações são instaladas sozinhas, então você sempre tem a versão mais recente.",
+  "Release notes in this language start with the next version. Until then, <a href=\"/release-notes/\">read them in English</a>.": "As notas de versão em português começam na próxima versão. Até lá, <a href=\"/release-notes/\">leia em inglês</a>.",
+  "Notes for earlier versions are in <a href=\"/release-notes/\">English</a>.": "As notas de versões anteriores estão em <a href=\"/release-notes/\">inglês</a>."
  }
 }

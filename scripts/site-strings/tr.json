@@ -79,5 +79,12 @@
   "Privacy": "Gizlilik",
   "Contact": "İletişim",
   "Report a bug": "Hata bildir"
+ },
+ "release-notes": {
+  "Zigzag Release Notes": "Zigzag Sürüm Notları",
+  "What's new in each version of Zigzag, the lightweight browser for Mac.": "Mac için hafif tarayıcı Zigzag’ın her sürümündeki yenilikler.",
+  "What changed in each version of Zigzag. Updates install by themselves, so you're always on the newest.": "Zigzag’ın her sürümünde nelerin değiştiği. Güncellemeler kendiliğinden yüklenir, böylece her zaman en yeni sürümü kullanırsınız.",
+  "Release notes in this language start with the next version. Until then, <a href=\"/release-notes/\">read them in English</a>.": "Türkçe sürüm notları bir sonraki sürümle başlıyor. O zamana kadar <a href=\"/release-notes/\">İngilizcesini okuyabilirsiniz</a>.",
+  "Notes for earlier versions are in <a href=\"/release-notes/\">English</a>.": "Önceki sürümlerin notları <a href=\"/release-notes/\">İngilizce</a>."
  }
 }

@@ -79,5 +79,12 @@
   "Privacy": "隱私",
   "Contact": "聯絡",
   "Report a bug": "回報錯誤"
+ },
+ "release-notes": {
+  "Zigzag Release Notes": "Zigzag 發行說明",
+  "What's new in each version of Zigzag, the lightweight browser for Mac.": "Mac 上的輕量瀏覽器 Zigzag 每個版本的新變化。",
+  "What changed in each version of Zigzag. Updates install by themselves, so you're always on the newest.": "Zigzag 每個版本的變化。更新會自動安裝，所以你用的一定是最新版本。",
+  "Release notes in this language start with the next version. Until then, <a href=\"/release-notes/\">read them in English</a>.": "中文發行說明從下一個版本開始。在那之前，可以<a href=\"/release-notes/\">閱讀英文版</a>。",
+  "Notes for earlier versions are in <a href=\"/release-notes/\">English</a>.": "更早版本的說明請見<a href=\"/release-notes/\">英文版</a>。"
  }
 }
