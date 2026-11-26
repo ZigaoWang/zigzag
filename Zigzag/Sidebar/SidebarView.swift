@@ -2219,12 +2219,22 @@ final class SidebarView: NSView {
         swipe.decides = { swipe in
             TouchHold.current == nil && TouchSwipe.verdict(swipe.translation, forgiving: true) == .sideways
         }
+        // At its edge a finger resizes the sidebar instead.
+        swipe.touchOnly.accepts = { [weak self] point in self?.touchSwipeTakes(at: point) ?? false }
         swipe.touchOnly.outranks = { [weak self] other in
             guard let self, #available(macOS 27, *) else { return false }
             return [self.scrollView, self.panes.left.scroll, self.panes.right.scroll].contains { $0.scrollGestureForRelationships === other }
         }
         addGestureRecognizer(swipe)
         touchSwipe = swipe
+    }
+
+    /// Whether a finger landing at `point` (own coordinates) may switch spaces: not where the window's sidebar edge takes it.
+    func touchSwipeTakes(at point: NSPoint) -> Bool {
+        var view = superview
+        while let current = view, !(current is BrowserRootView) { view = current.superview }
+        guard let root = view as? BrowserRootView else { return true }
+        return !root.sidebarEdgeTakesTouch(at: root.convert(point, from: self))
     }
 
     private func touchSwipeChanged(_ swipe: TouchSwipeRecognizer) {

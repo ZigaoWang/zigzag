@@ -996,7 +996,7 @@ final class BrowserRootView: SpaceFrameView {
             let moved = pan.translation(in: self)
             let start = NSPoint(x: pan.location(in: self).x - moved.x, y: pan.location(in: self).y - moved.y)
             guard let handle = self.resizeHandle(atTouch: start) else { return false }
-            return ResizeHandle.touchDrags(moved, vertical: handle.isVertical, bothWays: handle.dragsBothWays)
+            return Self.edgePanBegins(moved, vertical: handle.isVertical, bothWays: handle.dragsBothWays, holding: TouchHold.current != nil)
         }
         addGestureRecognizer(pan)
     }
@@ -1020,7 +1020,8 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
 
-    /// The resize strip a finger at `point` (own coordinates) takes: the nearest whose touch box holds it.
+    /// The resize strip a finger at `point` (own coordinates) takes: the nearest whose touch box holds it. The
+    /// sidebar's edge takes it `sidebarEdgeReach` either side of its line, off the window's outer band.
     func resizeHandle(atTouch point: NSPoint) -> ResizeHandle? {
         var handles: [ResizeHandle] = []
         func collect(_ view: NSView) {
@@ -1029,15 +1030,46 @@ final class BrowserRootView: SpaceFrameView {
             }
         }
         collect(self)
-        let frames = handles.map { convert($0.bounds, from: $0) }
-        return Self.touchTarget(frames, at: point).map { handles[$0] }
+        let boxes = handles.map { handle -> (box: NSRect, middle: NSPoint) in
+            let frame = convert(handle.bounds, from: handle)
+            guard handle === resizeHandle else { return (TouchGestures.box(around: frame), NSPoint(x: frame.midX, y: frame.midY)) }
+            // The popout's strip sits centered on its card's edge.
+            let line = sidebarRevealed && !chromeSidebarShown ? frame.midX : frame.minX + handle.line
+            return (Self.sidebarEdgeTouchBox(line: line, frame: frame, in: bounds), NSPoint(x: line, y: frame.midY))
+        }
+        return Self.touchTarget(boxes, at: point).map { handles[$0] }
+    }
+
+    /// Whether a finger that moved by `translation` from a resize strip drags it: along its way, and not while a hold
+    /// has lifted something under it (a row held at the sidebar's edge drags as a row).
+    nonisolated static func edgePanBegins(_ translation: NSPoint, vertical: Bool, bothWays: Bool, holding: Bool) -> Bool {
+        !holding && ResizeHandle.touchDrags(translation, vertical: vertical, bothWays: bothWays)
+    }
+
+    /// How far either side of the sidebar's edge a finger takes it, for a target `TouchTargets.size` across.
+    nonisolated static let sidebarEdgeReach = TouchTargets.size / 2
+
+    /// Where a finger takes the sidebar's edge at `line`, its strip at `frame`: `sidebarEdgeReach` either side, its
+    /// full height, short of the window's outer band at either side, which macOS takes to resize the window.
+    nonisolated static func sidebarEdgeTouchBox(line: CGFloat, frame: NSRect, in bounds: NSRect) -> NSRect {
+        let band = TouchSidebarPull.resizeBand
+        let minX = max(line - sidebarEdgeReach, bounds.minX + band), maxX = min(line + sidebarEdgeReach, bounds.maxX - band)
+        return NSRect(x: minX, y: frame.minY, width: max(0, maxX - minX), height: frame.height)
     }
 
     /// Of `frames`, the one whose touch box holds `point` with its middle nearest; nil when none does.
     nonisolated static func touchTarget(_ frames: [NSRect], at point: NSPoint) -> Int? {
-        let hits = frames.indices.filter { TouchGestures.box(around: frames[$0]).contains(point) }
-        return hits.min { hypot(frames[$0].midX - point.x, frames[$0].midY - point.y) < hypot(frames[$1].midX - point.x, frames[$1].midY - point.y) }
+        touchTarget(frames.map { (TouchGestures.box(around: $0), NSPoint(x: $0.midX, y: $0.midY)) }, at: point)
     }
+
+    /// Of touch `boxes`, the one that holds `point` with its middle nearest; nil when none does.
+    nonisolated static func touchTarget(_ boxes: [(box: NSRect, middle: NSPoint)], at point: NSPoint) -> Int? {
+        let hits = boxes.indices.filter { boxes[$0].box.contains(point) }
+        return hits.min { hypot(boxes[$0].middle.x - point.x, boxes[$0].middle.y - point.y) < hypot(boxes[$1].middle.x - point.x, boxes[$1].middle.y - point.y) }
+    }
+
+    /// Whether a finger at `point` (own coordinates) is the sidebar edge's, for the sidebar's swipe to give way.
+    func sidebarEdgeTakesTouch(at point: NSPoint) -> Bool { resizeHandle(atTouch: point) === resizeHandle }
 
     // MARK: Touch: the hidden sidebar from the window's edge
 
