@@ -4587,6 +4587,18 @@
         "value": "더 이상 목록에 없는 프로필의 데이터"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "더 이상 목록에 없는 프로필 %lld개의 데이터"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",

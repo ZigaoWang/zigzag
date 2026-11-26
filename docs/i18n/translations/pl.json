@@ -5139,6 +5139,36 @@
         "value": "Dane z profilu, którego nie ma już na liście"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dane z %lld profili, których nie ma już na liście"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dane z %lld profili, których nie ma już na liście"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dane z %lld profilu, którego nie ma już na liście"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dane z %lld profilu, których nie ma już na liście"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",

@@ -4767,6 +4767,24 @@
         "value": "Artık listelenmeyen bir profilin verileri"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Artık listelenmeyen %lld profilin verileri"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Artık listelenmeyen %lld profilin verileri"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",

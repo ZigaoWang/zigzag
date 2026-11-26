@@ -9,6 +9,8 @@
   Test: FoldBoxTests.aFoldedBoxMakesNothingUntilOpenedOrSearched
 - Sites in Developer Mode, Trusted Certificates or Page Sizes with more than three → one box headed by how many, folded; Find a setting opens it to the rows that match.
   Test: SettingsFoldingTests.findASettingReachesAFoldedRowAndOpensItsBox
+- Data from more than three profiles that are no longer listed, in Settings › Profiles → one box headed by how many, folded; Settings opens on Profiles at once however many there are.
+  Test: SettingsUnlistedTests.manyUnlistedProfilesFoldIntoOneBoxAndShowAtOnce
 - Feature Flags in Settings › Developer → a box for each kind (Stable, Preview and the rest), headed by how many flags it has, folded when it has more than three; its own search opens the boxes to the flags that match.
   No test yet.
 

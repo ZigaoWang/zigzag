@@ -3904,6 +3904,24 @@
         "value": "Données d’un profil qui n’est plus répertorié"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Données de %lld profil qui n’est plus répertorié"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Données de %lld profils qui ne sont plus répertoriés"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",

@@ -4959,6 +4959,30 @@
         "value": "Datos de un perfil que ya no aparece"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Datos de %lld perfiles que ya no aparecen"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Datos de %lld perfil que ya no aparece"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Datos de %lld perfiles que ya no aparecen"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",

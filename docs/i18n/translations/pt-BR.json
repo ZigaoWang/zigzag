@@ -4090,6 +4090,30 @@
         "value": "Dados de um perfil que não está mais na lista"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dados de %lld perfis que não estão mais na lista"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dados de %lld perfil que não está mais na lista"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Dados de %lld perfis que não estão mais na lista"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",
