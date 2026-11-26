@@ -60,10 +60,13 @@ nonisolated enum DevDefaults {
         try? FileManager.default.removeItem(at: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences/\(name).plist"))
     }
 
+    /// Whether the process with this ID has ended.
+    static func isGone(_ pid: Substring) -> Bool { Int32(pid).map { kill($0, 0) != 0 && errno == ESRCH } ?? false }
+
     /// What test processes that are gone left behind: a crash or a stopped run.
     private static func removeTestLeftovers() {
         let fm = FileManager.default
-        let gone: (Substring) -> Bool = { pid in Int32(pid).map { kill($0, 0) != 0 && errno == ESRCH } ?? false }
+        let gone = isGone
         let preferences = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences", isDirectory: true)
         for file in (try? fm.contentsOfDirectory(atPath: preferences.path)) ?? [] where file.hasPrefix(testsPrefix + ".") && file.hasSuffix(".plist") {
             let domain = file.dropLast(".plist".count)

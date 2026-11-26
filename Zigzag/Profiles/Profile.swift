@@ -22,6 +22,9 @@ final class Profile {
         // Its extensions' service workers are forgotten before WebKit reads them (started at launch, off the main thread).
         ExtensionStore.waitForServiceWorkersForgotten()
         let store: WKWebsiteDataStore = isDefault ? .default() : WKWebsiteDataStore(forIdentifier: id)
+        #if DEBUG
+        if !isDefault { TestStores.note(id) }
+        #endif
         WebKitSetup.allowCrossSiteCookies(in: store)
         madeStore = store
         SessionCookies.watch(self)
@@ -240,3 +243,67 @@ final class Profiles {
         Library.shared.finishedRemovingProfile(id)
     }
 }
+
+#if DEBUG
+/// The test host's profile stores, kept by bundle ID outside its data folder, removed by a later run once it's gone.
+enum TestStores {
+    private static let prefix = "ZigzagTests-Stores-"
+
+    static func note(_ id: UUID) {
+        guard DevDefaults.testsData != nil else { return }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(prefix + "\(getpid())")
+        let line = Data((id.uuidString + "\n").utf8)
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(line)
+            try? handle.close()
+        } else {
+            try? line.write(to: file)
+        }
+    }
+
+    /// What's still to remove, by the file that lists it.
+    private static var left: [URL: Set<UUID>] = [:]
+
+    static func removeLeftovers() {
+        let fm = FileManager.default
+        let temporary = fm.temporaryDirectory
+        let names = ((try? fm.contentsOfDirectory(atPath: temporary.path)) ?? []).filter { $0.hasPrefix(prefix) && DevDefaults.isGone($0.dropFirst(prefix.count)) }
+        guard !names.isEmpty else { return }
+        // Removing a store before WebKit has started crashes in WebKit.
+        _ = WKWebsiteDataStore.nonPersistent()
+        for name in names {
+            let file = temporary.appendingPathComponent(name)
+            let ids = Set(((try? String(contentsOf: file, encoding: .utf8)) ?? "").split(separator: "\n").compactMap { UUID(uuidString: String($0)) })
+            left[file] = ids
+            if ids.isEmpty { try? fm.removeItem(at: file) }
+            // All at once, each written off as it goes: a short test run may end before they're done.
+            for id in ids {
+                Task { if await remove(id) { removed(id, from: file) } }
+            }
+        }
+    }
+
+    private static func removed(_ id: UUID, from file: URL) {
+        left[file]?.remove(id)
+        let ids = left[file] ?? []
+        if ids.isEmpty {
+            try? FileManager.default.removeItem(at: file)
+        } else {
+            try? Data(ids.map { $0.uuidString + "\n" }.joined().utf8).write(to: file)
+        }
+    }
+
+    private static func remove(_ id: UUID) async -> Bool {
+        let fm = FileManager.default
+        try? fm.removeItem(at: ExtensionStore.extensionData(ofController: id))
+        do {
+            try await WKWebsiteDataStore.remove(forIdentifier: id)
+            return true
+        } catch {
+            // Never made on disk, or another run removed it first.
+            return !fm.fileExists(atPath: ExtensionStore.websiteData(ofStore: id).deletingLastPathComponent().path)
+        }
+    }
+}
+#endif

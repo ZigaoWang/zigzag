@@ -91,6 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let isHostingTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        if Self.isHostingTests { TestStores.removeLeftovers() }
+        #endif
         guard !Self.isHostingTests else { return }
         // Every other window (Settings, a sheet's) hears fingers once it's in use.
         NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { note in
