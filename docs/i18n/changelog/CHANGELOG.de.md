@@ -7,6 +7,9 @@ Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.m
 ### Neu
 - „Mit iCloud synchronisieren“ in „Einstellungen“ › „Allgemein“: Deine Spaces, Profile, fixierten Tabs, Ordner, Favoriten, Live-Ordner und Einstellungen bleiben auf jedem Mac, auf dem du bei iCloud angemeldet bist, gleich und liegen in deiner eigenen privaten iCloud-Datenbank. Offene Tabs, Verlauf, Websitedaten und Erweiterungen bleiben auf dem jeweiligen Mac, und Passwörter werden weiterhin über den iCloud-Schlüsselbund synchronisiert. Beim Einschalten wird die Bibliothek des Mac mit der in iCloud zusammengeführt: Was in beiden vorkommt, übernimmt die neuere Änderung, ohne Rückfrage wird nichts entfernt, und vorher wird ein Backup gesichert. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
+### Geändert
+- Der Kompatibilitätsmodus ist jetzt die erste Zeile unter „Diese Website“ in den „Website-Einstellungen“, über den Zeilen, die er deaktiviert. Danke an [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, Französisch, Spanisch und Russisch; Downloadregeln, die die gesicherte Datei übergeben; Live-Ordner, die zeigen, wann sie zuletzt aktualisiert wurden; und chinesisches Pinyin tippen und dann zu Englisch wechseln, ohne dass Leerzeichen übrig bleiben.
