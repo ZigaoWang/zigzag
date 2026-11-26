@@ -27,3 +27,31 @@ Settings › Appearance › Sidebar from the screen edge (#363).
   No test yet.
 - The pointer moves off it, Esc, another app or another Space → it goes back, and the app in front keeps the keyboard unless the panel was clicked.
   Test: EdgeSidebarTests.thePanelRunsDownTheScreensEdgeAndStaysWhileThePointerIsOnIt
+
+## The preview
+- Rest the pointer on a tab's row → its page comes out beside the sidebar, in the same Zigzag Mini that opens over a page, as tall as the sidebar and a third of the screen wide. The sidebar keeps its width and place, and the page is laid out once, at that size.
+  Test: EdgeSidebarTests.aPreviewWidensThePanelBesideTheSidebar
+  Test: EdgeSidebarTests.aTileGroupPreviewStartsAtThePagePillSize
+- It is the row's own page, still in the browser's list: closing the preview gives the page back to its tab, and the preview has no space chip to move it with.
+  Test: InPageMiniHostTests.theEdgePreviewBorrowsTheRowsLivePage
+  Test: InPageMiniHostTests.aBorrowedPreviewKeepsTheSpaceChipHidden
+- Move across a split's or tile group's parts → each part's page comes out as the pointer reaches it.
+  Test: EdgeSidebarTests.aMultiPageRowReportsThePartUnderThePointer
+- A row whose page is asleep or not loaded yet → a card with its name and why it isn't running, in the page's place. Resting on it never wakes the page.
+  Test: EdgeSidebarTests.anAsleepRowShowsItsCardAndStaysAsleep
+- A row of Zigzag's own pages, like History or Settings → nothing comes out beside the sidebar; a click opens it in the browser window.
+  Test: EdgeSidebarTests.zigzagsOwnPagesOpenInTheWindow
+- Click a row while its page is out → the panel and the page go, and the browser window comes forward with that tab, its page in the window.
+  Test: EdgeSidebarTests.clickingAPreviewedRowShowsItsPageInTheWindow
+  Test: InPageMiniHostTests.aBorrowedPageSelectedWhileOutComesBackToTheCard
+- Esc, or the pointer off the rows and the page → the page folds back and the sidebar stays out.
+  Test: EdgeSidebarTests.escPutsThePageAwayFirst
+- Rest on the same row again while its page is folding away → the new preview has the page, and the tab is never left without one.
+  Test: InPageMiniHostTests.reopeningDuringTheFoldOutEndsTheOldBorrowFirst
+- Click into the page → Zigzag comes forward, and the sidebar and the page stay out until the pointer leaves them.
+  No test yet.
+- Open in Zigzag in the page's strip → the browser window comes forward on that tab. Expand → the page leaves the list for a Zigzag Mini of its own, and the panel goes.
+  Test: InPageMiniHostTests.openInZigzagGivesTheBorrowedPageBackToItsTab
+  Test: EdgeSidebarTests.expandingTheEdgePreviewLeavesAnIndependentMini
+- Extensions hear nothing of the preview: it is a tab the browser already has.
+  No test yet.

@@ -791,15 +791,21 @@ final class PageCardView: NSView {
         // A tab's page comes in the tab's own holder, with whatever is docked beside it.
         let newHolder = owner?.pageHolder
         if let newHolder {
-            let top = contentTop
-            let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            let fit = Self.pageFit(content: content, size: pageSize, docked: newHolder.dockedRoom, scales: Self.canScale(newWebView))
-            newHolder.frame = fit.frame
-            Self.apply(scale: fit.scale, to: newWebView)
-            newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
-            // The Web Inspector docking beside a page with a size of its own makes room for itself.
-            newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
-            if newHolder.superview !== clip { clip.addSubview(newHolder, positioned: .below, relativeTo: placeholder) }
+            // A page the edge preview has borrowed stays in the preview, at its size, until it is given back.
+            let lent = (newHolder.window?.windowController as? MiniWindowController)?.isBorrowingPage == true
+            if !lent {
+                let top = contentTop
+                let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
+                let fit = Self.pageFit(content: content, size: pageSize, docked: newHolder.dockedRoom, scales: Self.canScale(newWebView))
+                newHolder.frame = fit.frame
+                Self.apply(scale: fit.scale, to: newWebView)
+                newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
+                // The Web Inspector docking beside a page with a size of its own makes room for itself.
+                newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
+            }
+            if newHolder.superview !== clip, !lent {
+                clip.addSubview(newHolder, positioned: .below, relativeTo: placeholder)
+            }
         }
         webView = newWebView
         holder = newHolder

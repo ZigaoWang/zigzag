@@ -727,6 +727,34 @@ enum DebugBridge {
         }
     }
 
+    #if DEBUG
+    /// Drives the screen-edge sidebar: `edge show|hide|hold on|off|hover <url>|preview <url>|click <url>|frames`, against
+    /// the front browser window.
+    private static func runEdge(_ arg: String, in controller: BrowserWindowController) {
+        let f = arg.split(separator: " ").map(String.init)
+        let edge = EdgeSidebar.shared
+        func tab(_ part: String) -> Tab? {
+            controller.tabManager.allTabs.first { $0.url?.absoluteString.contains(part) == true }
+        }
+        let visible = controller.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        switch f.first ?? "" {
+        case "show": edge.show(on: visible, for: controller)
+        case "hide": edge.hide(animated: false)
+        case "hold": EdgeSidebar.debugHoldsOpen = f.dropFirst().first != "off"
+        case "hover": if f.count > 1, let t = tab(f[1]) { edge.hover(t, in: controller) }
+        case "preview": if f.count > 1, let t = tab(f[1]) { edge.previewNow(t, in: controller) }
+        case "click": if f.count > 1, let t = tab(f[1]) { controller.listSelect(t) }
+        case "frames":
+            let mini = edge.pagePreview
+            debugLog("edge showing=\(edge.isShowing) mini=\(mini?.window.map { NSStringFromRect($0.frame) } ?? "-")"
+                + " url=\(mini?.tab.url?.absoluteString ?? "-") card=\(mini?.asleepCardTitle ?? "-")"
+                + " selected=\(controller.tabManager.selectedTab?.url?.lastPathComponent ?? "-")"
+                + " shown=\(controller.root.card.webView.map { $0.window === controller.window } ?? false)")
+        default: break
+        }
+    }
+    #endif
+
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
@@ -768,6 +796,9 @@ enum DebugBridge {
             return
         }
         guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+        #if DEBUG
+        if name == "edge" { runEdge(arg, in: controller); return }
+        #endif
         // pindrag and pindump work on the address as it is, without bringing the window forward.
         if name == "pindrag" { controller.sidebar.address.debugPinDrag(arg); return }
         if name == "pindump" { controller.sidebar.address.debugDump(to: arg); return }

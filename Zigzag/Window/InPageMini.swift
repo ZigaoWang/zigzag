@@ -116,7 +116,7 @@ final class InPageMiniHost {
 
     func browserLayoutChanged() {
         guard let record, let browser else { return }
-        record.controller.layoutInDock(pane: browser.root.cardFrame)
+        record.controller.layoutInDock()
     }
 
     /// The browser window's full-screen transition failed: the docked Mini comes back.

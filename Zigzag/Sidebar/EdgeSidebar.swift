@@ -1,5 +1,27 @@
 import AppKit
 
+/// What the edge preview shows for a row.
+enum EdgeLensPolicy {
+    /// Web pages and local files are previewed; Zigzag's own pages stay in the window.
+    static func previews(url: URL?) -> Bool {
+        ["http", "https", "file"].contains(url?.scheme?.lowercased() ?? "")
+    }
+
+    /// A running page is lent to the preview; one asleep or not loaded yet shows a card, so a hover never wakes it.
+    static func showsLivePage(isLoaded: Bool, isAsleep: Bool) -> Bool { isLoaded && !isAsleep }
+}
+
+/// The rest on a row before its page comes out beside the panel.
+enum EdgePreviewHoverPolicy {
+    static let dwell: TimeInterval = 0.2
+    static let check: TimeInterval = 0.05
+    static let movement: CGFloat = 2
+
+    static func rests(now: TimeInterval, since: TimeInterval, moved: Bool) -> Bool {
+        !moved && now - since >= dwell
+    }
+}
+
 /// Where and when the screen's edge brings the sidebar out over other apps (#363).
 enum EdgeSidebarLayout {
     /// How close to the screen's side the pointer has to be: pushed against it.
@@ -17,6 +39,22 @@ enum EdgeSidebarLayout {
     static func frame(in visible: NSRect, width: CGFloat, onRight: Bool) -> NSRect {
         let width = min(max(width, 0), visible.width)
         return NSRect(x: onRight ? visible.maxX - width : visible.minX, y: visible.minY, width: width, height: visible.height)
+    }
+
+    /// The page's share of the screen beside the sidebar.
+    static let pageShare: CGFloat = 1.0 / 3.0
+    static func pageWidth(in visible: NSRect) -> CGFloat { floor(visible.width * pageShare) }
+
+    /// The panel's width: the sidebar and its gutter, and the page and its gutters while a page is out.
+    static func width(sidebar: CGFloat, page: Bool, inset: CGFloat, in visible: NSRect) -> CGFloat {
+        sidebar + inset + (page ? pageWidth(in: visible) + inset * 2 : 0)
+    }
+
+    /// The page beside the sidebar card, as tall as the card.
+    static func pageFrame(in bounds: NSRect, sidebar: CGFloat, inset: CGFloat, onRight: Bool) -> NSRect {
+        let width = max(0, bounds.width - sidebar - inset * 3)
+        return NSRect(x: onRight ? inset : sidebar + inset * 2, y: inset, width: width,
+                      height: max(0, bounds.height - inset * 2))
     }
 
     /// Against the screen's outer side edge, clear of the menu bar, a bottom Dock, the corners and other displays.
@@ -46,6 +84,9 @@ enum EdgeSidebarLayout {
     static func canShow(appIsActive: Bool, buttonsPressed: Bool) -> Bool {
         !appIsActive && !buttonsPressed
     }
+
+    /// How long an activation change settles before it may put the panel away.
+    static let focusGrace: TimeInterval = 0.12
 }
 
 /// The sidebar at the screen's edge (#363): the last browser window's sidebar, over other apps.
@@ -54,6 +95,11 @@ final class EdgeSidebar {
     static let shared = EdgeSidebar()
 
     static let defaultsKey = "EdgeSidebar"
+
+    #if DEBUG
+    /// The debug bridge keeps the panel out with the pointer elsewhere.
+    static var debugHoldsOpen = false
+    #endif
 
     /// Off until turned on in Settings › Appearance.
     static var isOn: Bool { UserDefaults.standard.bool(forKey: defaultsKey) }
@@ -76,6 +122,22 @@ final class EdgeSidebar {
     private var leftAt: TimeInterval?
     /// Counts shows, so a slide back only orders out the panel it hid.
     private var generation = 0
+    /// An activation change waiting to settle.
+    private var activationWork: DispatchWorkItem?
+    /// The page beside the sidebar: a docked Mini borrowing the row's page, or showing its card.
+    private var preview: MiniWindowController?
+    private var previewTab: Tab?
+    private var previewWork: DispatchWorkItem?
+    private var closeWork: DispatchWorkItem?
+    /// Counts hovers, so a rest check left from the row before can't preview it.
+    private var hoverCheck = 0
+    /// The window's list while the panel is out: a closed page or a space switch puts the preview away.
+    private var managerToken: SignalToken?
+    /// The panel's frame while a page is out.
+    private var previewPanelFrame: NSRect = .zero
+
+    /// The page beside the panel, if one is out.
+    var pagePreview: MiniWindowController? { preview }
 
     private init() {}
 
@@ -102,17 +164,36 @@ final class EdgeSidebar {
         observers.append(center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hide(animated: false) }
         })
-        // A pick brings Zigzag forward, and so does anything else: the panel has done its job.
+        // A pick brings Zigzag forward, and so does anything else: the panel has done its job. A click into the
+        // preview's page brings Zigzag forward too, and keeps the panel.
         observers.append(center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.hide(animated: false) }
+            MainActor.assumeIsolated { self?.activationChanged() }
         })
         let workspace = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification] {
-            workspaceObservers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.hide(animated: false) }
-            })
-        }
+        workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.activationChanged() }
+        })
+        workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.hide(animated: false) }
+        })
         if let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { target = key }
+    }
+
+    /// The preview's Mini takes the keyboard a moment after a click activates Zigzag, so the verdict waits.
+    private func activationChanged() {
+        guard isShowing else { return }
+        activationWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.activationWork = nil
+                guard self.isShowing else { return }
+                if NSApp.isActive, self.preview?.window?.isKeyWindow == true { return }
+                self.hide(animated: false)
+            }
+        }
+        activationWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + EdgeSidebarLayout.focusGrace, execute: work)
     }
 
     private func stop() {
@@ -190,11 +271,17 @@ final class EdgeSidebar {
         guard isShowing, let panel else { return }
         let now = ProcessInfo.processInfo.systemUptime
         // A pressed button, a menu from the panel or a sheet keeps it out.
-        let held = NSEvent.pressedMouseButtons != 0 || MenuPanel.current != nil
+        var held = NSEvent.pressedMouseButtons != 0 || MenuPanel.current != nil
             || RunLoop.current.currentMode == .eventTracking || NSApp.modalWindow != nil
-        // The menu's room goes with the menu.
-        if MenuPanel.current == nil, panel.frame != cardPanelFrame { panel.setFrame(cardPanelFrame, display: true) }
-        if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: cardPanelFrame) {
+        #if DEBUG
+        if Self.debugHoldsOpen { held = true }
+        #endif
+        // The menu's room goes with the menu; the page's room stays while a page is out.
+        let frame = preview == nil ? cardPanelFrame : previewPanelFrame
+        if MenuPanel.current == nil, panel.frame != frame { panel.setFrame(frame, display: true) }
+        // The panel gets no mouse moves with another app in front, so the preview's strip follows from here.
+        preview?.pointerMoved(toScreen: NSEvent.mouseLocation)
+        if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: frame) {
             leftAt = nil
             return
         }
@@ -202,13 +289,200 @@ final class EdgeSidebar {
         if now - leftAt > EdgeSidebarLayout.leaveDelay { hide() }
     }
 
+    // MARK: The preview
+
+    /// A row rested on in the panel: its page comes out beside the sidebar. Nil, off the rows: the page goes unless
+    /// the pointer is on it.
+    func hover(_ tab: Tab?, in controller: BrowserWindowController) {
+        previewWork?.cancel()
+        previewWork = nil
+        guard isShowing, target === controller else {
+            closePreview(animated: false)
+            return
+        }
+        closeWork?.cancel()
+        closeWork = nil
+        hoverCheck += 1
+        guard let tab, tab !== previewTab || preview == nil else {
+            if tab == nil { schedulePreviewClose() }
+            return
+        }
+        guard !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url) else {
+            schedulePreviewClose()
+            return
+        }
+        scheduleHoverCheck(tab: tab, in: controller, pointer: NSEvent.mouseLocation,
+                           since: ProcessInfo.processInfo.systemUptime, token: hoverCheck)
+    }
+
+    /// Esc in the panel puts the page away first.
+    @discardableResult
+    func dismissPreview() -> Bool {
+        guard preview != nil else { return false }
+        closePreview()
+        return true
+    }
+
+    #if DEBUG
+    /// A row's preview without the rest or the pointer, for tests and the debug bridge.
+    func previewNow(_ tab: Tab, in controller: BrowserWindowController) {
+        guard isShowing, target === controller else { return }
+        previewWork?.cancel()
+        previewWork = nil
+        closeWork?.cancel()
+        closeWork = nil
+        hoverCheck += 1
+        showPreview(tab, in: controller)
+    }
+    #endif
+
+    /// A pointer crossing rows previews nothing; one that stops on a row does after a short rest.
+    private func scheduleHoverCheck(tab: Tab, in controller: BrowserWindowController, pointer: NSPoint,
+                                    since: TimeInterval, token: Int) {
+        let work = DispatchWorkItem { [weak self, weak tab, weak controller] in
+            MainActor.assumeIsolated {
+                guard let self, let tab, let controller, self.isShowing, self.target === controller,
+                      self.hoverCheck == token else { return }
+                let now = ProcessInfo.processInfo.systemUptime
+                let point = NSEvent.mouseLocation
+                let moved = abs(point.x - pointer.x) > EdgePreviewHoverPolicy.movement
+                    || abs(point.y - pointer.y) > EdgePreviewHoverPolicy.movement
+                if EdgePreviewHoverPolicy.rests(now: now, since: since, moved: moved) {
+                    self.previewWork = nil
+                    self.showPreview(tab, in: controller)
+                } else {
+                    self.scheduleHoverCheck(tab: tab, in: controller, pointer: point, since: moved ? now : since,
+                                            token: token)
+                }
+            }
+        }
+        previewWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + EdgePreviewHoverPolicy.check, execute: work)
+    }
+
+    /// The row's page in a docked Mini beside the sidebar, folding in over the page before it. A page that isn't
+    /// running shows its card instead, and stays asleep.
+    private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
+        guard isShowing, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
+              preview?.tab !== tab else { return }
+        let live = EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
+        let previous = preview
+        // The panel takes its full width first, so the page is laid out once at its final size.
+        let sidebar = controller.edgeSidebarWidth
+        let wide = EdgeSidebarLayout.width(sidebar: sidebar, page: true, inset: host.inset, in: shownVisible)
+        previewPanelFrame = EdgeSidebarLayout.frame(in: shownVisible, width: wide, onRight: shownOnRight)
+        host.cardWidth = sidebar
+        host.pageShowing = true
+        panel.setFrame(previewPanelFrame, display: true)
+        host.layoutSubtreeIfNeeded()
+        guard let mini = MiniWindowController.openPreview(of: tab, from: controller, dockedIn: self,
+                                                           reveal: false, deferPage: !live) else {
+            if previous == nil { narrowPanel() }
+            return
+        }
+        if !live { mini.showAsleepCard() }
+        mini.onInPageMiniClosed = { [weak self, weak mini] in self?.previewClosed(mini) }
+        mini.onInPageMiniDetached = { [weak self, weak mini] in self?.previewDetached(mini) }
+        preview = mini
+        previewTab = tab
+        mini.layoutInDock(force: true)
+        mini.revealDockedPage(fromRight: shownOnRight) { [weak previous] in
+            // The page before stays under the fold until it is covered.
+            guard let previous else { return }
+            previous.onInPageMiniClosed = nil
+            previous.onInPageMiniDetached = nil
+            previous.closeInPage(focusBack: false, animated: false)
+        }
+    }
+
+    private func schedulePreviewClose() {
+        closeWork?.cancel()
+        closeWork = nil
+        guard preview != nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let mouse = NSEvent.mouseLocation
+                if self.preview?.window?.frame.contains(mouse) == true { return }
+                self.closePreview()
+            }
+        }
+        closeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+    }
+
+    /// Puts the page away; the panel narrows to the sidebar and stays out. `animated`: the page folds back first.
+    private func closePreview(animated: Bool = true) {
+        previewWork?.cancel()
+        previewWork = nil
+        closeWork?.cancel()
+        closeWork = nil
+        guard let mini = preview, !mini.isLeavingDock else { return }
+        preview = nil
+        previewTab = nil
+        if animated {
+            mini.closeInPage(focusBack: false, animated: true)
+        } else {
+            mini.onInPageMiniClosed = nil
+            mini.onInPageMiniDetached = nil
+            mini.closeInPage(focusBack: false, animated: false)
+            narrowPanel()
+        }
+    }
+
+    /// The preview closed itself (Esc, its close button, Open in Zigzag) or finished folding away.
+    private func previewClosed(_ closing: MiniWindowController?) {
+        if let closing, let preview, preview !== closing { return }
+        let movedOut = preview?.pageMovedOut == true
+        preview = nil
+        previewTab = nil
+        narrowPanel()
+        if movedOut { hide(animated: false) }
+    }
+
+    /// Expand took the page into a window of its own: the panel's job is done.
+    private func previewDetached(_ closing: MiniWindowController?) {
+        if let closing, let preview, preview !== closing { return }
+        preview = nil
+        previewTab = nil
+        narrowPanel()
+        hide(animated: false)
+    }
+
+    private func narrowPanel() {
+        previewPanelFrame = .zero
+        guard isShowing, let host, let panel else { return }
+        host.pageShowing = false
+        if let target { host.cardWidth = target.edgeSidebarWidth }
+        panel.setFrame(cardPanelFrame, display: true)
+    }
+
+    private func managerChanged(_ change: TabManager.Change) {
+        guard preview != nil else { return }
+        switch change {
+        case .space:
+            // The row it came from is no longer on screen.
+            closePreview(animated: false)
+        case .structure:
+            if previewTab?.isClosed == true { closePreview(animated: false) }
+        case .selection, .content:
+            break
+        }
+    }
+
     // MARK: The panel
 
-    private func show(on visible: NSRect, for target: BrowserWindowController) {
+    func show(on visible: NSRect, for target: BrowserWindowController) {
+        self.target = target
         let container = target.prepareEdgeSidebar()
         let onRight = target.edgeSidebarOnRight
         let panel = panel ?? makePanel()
         guard let host else { return }
+        closePreview(animated: false)
+        host.pageShowing = false
+        managerToken = target.tabManager.changed.observe { [weak self] change in
+            MainActor.assumeIsolated { self?.managerChanged(change) }
+        }
         host.onRight = onRight
         host.cardWidth = target.edgeSidebarWidth
         host.set(container)
@@ -237,6 +511,11 @@ final class EdgeSidebar {
     func hide(animated: Bool = true) {
         followTimer?.invalidate()
         followTimer = nil
+        activationWork?.cancel()
+        activationWork = nil
+        managerToken?.cancel()
+        managerToken = nil
+        closePreview(animated: false)
         guard isShowing, let panel else { return }
         isShowing = false
         generation += 1
@@ -259,7 +538,7 @@ final class EdgeSidebar {
     /// A menu is opening in the panel: it widens on the inner side, the card staying put, so the menu isn't cut off.
     func makeRoomForMenu() {
         guard isShowing, let panel else { return }
-        let width = cardPanelFrame.width + EdgeSidebarLayout.menuRoom
+        let width = max(cardPanelFrame.width + EdgeSidebarLayout.menuRoom, previewPanelFrame.width)
         panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
     }
 
@@ -311,8 +590,9 @@ final class EdgeSidebarPanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         if !isKeyWindow, event.type == .leftMouseDown || event.type == .rightMouseDown { makeKey() }
         if eventInterceptor?(event) == true { return }
-        // Esc puts it away, unless a field is being edited.
+        // Esc puts the page away, then the panel, unless a field is being edited.
         if event.type == .keyDown, event.keyCode == 53, !(firstResponder is NSTextView), MenuPanel.current == nil {
+            if EdgeSidebar.shared.dismissPreview() { return }
             EdgeSidebar.shared.hide()
             return
         }
@@ -335,8 +615,15 @@ final class EdgeSidebarHost: NSView {
     let inset = Tokens.Metric.cardInset
     var onRight = false { didSet { placeCard() } }
     var cardWidth: CGFloat = 0 { didSet { placeCard() } }
+    /// A page is out beside the card.
+    var pageShowing = false
 
     override var isFlipped: Bool { true }
+
+    /// The page's place beside the card.
+    var pageFrame: NSRect {
+        pageShowing ? EdgeSidebarLayout.pageFrame(in: bounds, sidebar: cardWidth, inset: inset, onRight: onRight) : .zero
+    }
 
     /// Against the screen's edge, whatever room beside it a menu has.
     var cardFrame: NSRect {
@@ -363,12 +650,92 @@ final class EdgeSidebarHost: NSView {
         placeCard()
     }
 
-    /// A click beside the card puts the panel away.
+    /// A click beside the card puts the panel away; the gutter by a page that is out is part of the panel.
     override func mouseDown(with event: NSEvent) {
         if container?.frame.contains(convert(event.locationInWindow, from: nil)) != true {
+            if pageShowing { return }
             EdgeSidebar.shared.hide()
             return
         }
         super.mouseDown(with: event)
+    }
+}
+
+extension EdgeSidebar: MiniDockHosting {
+    var dockParentWindow: NSWindow? { panel }
+    var dockPageView: NSView { host ?? panel?.contentView ?? NSView() }
+    var dockPageFrame: NSRect { host?.pageFrame ?? .zero }
+    /// The page is its own pill beside the sidebar, floor to ceiling.
+    func dockCardFrame(in page: NSRect) -> NSRect { page }
+    var dockCardRadius: CGFloat { Tokens.Radius.large }
+    var dockCardColor: NSColor? { Tokens.Color.cardBackground }
+    var dockHasShadow: Bool { true }
+    var dockSlidesPage: Bool { true }
+    var dockFollowsParentLevel: Bool { true }
+    var dockPageOnRight: Bool { shownOnRight }
+    var dockIsCovered: Bool { !isShowing || host?.pageShowing != true }
+    var dockIsFullScreen: Bool { false }
+
+    /// No page behind it to dim.
+    func dockShowDim(owner: AnyObject, onClick: @escaping () -> Void) -> MiniPeekDimView? { nil }
+    func dockHideDim(owner: AnyObject) {}
+    func dockFocusPage() {}
+}
+
+/// Over the preview's room while the row's page isn't running: its name and why, on the card's own ground.
+final class EdgeAsleepPageView: NSView {
+    private let ground = ColorView(color: Tokens.Color.cardBackground)
+    private let icon = NSImageView()
+    private let title = Label("", font: Tokens.Font.title(), color: Tokens.Color.textPrimary)
+    private let note = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    /// What the card says, for tests.
+    private(set) var shownTitle = ""
+    private(set) var shownNote = ""
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        icon.image = NSImage(systemSymbolName: "moon.zzz", accessibilityDescription: nil)
+        icon.contentTintColor = Tokens.Color.textTertiary
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        title.alignment = .center
+        title.lineBreakMode = .byTruncatingTail
+        note.alignment = .center
+        note.usesSingleLineMode = false
+        note.maximumNumberOfLines = 3
+        note.lineBreakMode = .byWordWrapping
+        [ground, icon, title, note].forEach(addSubview)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+
+    /// The row's name and why its page isn't running. Reads the tab only; never wakes it.
+    func show(tab: Tab) {
+        shownTitle = tab.displayTitle
+        shownNote = tab.notLoadedNote ?? ""
+        title.stringValue = shownTitle
+        note.stringValue = shownNote
+        note.isHidden = shownNote.isEmpty
+        setAccessibilityLabel([shownTitle, shownNote].filter { !$0.isEmpty }.joined(separator: ", "))
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        ground.frame = bounds
+        let width = max(0, min(Tokens.EmptyState.textWidth, bounds.width - Tokens.Space.x8))
+        let iconSide = Tokens.Space.x8
+        let titleHeight = title.lineHeight
+        let noteHeight = note.isHidden ? 0 : ceil(note.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude)).height ?? note.lineHeight)
+        let total = iconSide + Tokens.EmptyState.markGap + titleHeight + (note.isHidden ? 0 : Tokens.Space.x2 + noteHeight)
+        var y = ((bounds.height - total) / 2).rounded()
+        icon.frame = NSRect(x: (bounds.midX - iconSide / 2).rounded(), y: y, width: iconSide, height: iconSide)
+        y = icon.frame.maxY + Tokens.EmptyState.markGap
+        title.frame = NSRect(x: (bounds.midX - width / 2).rounded(), y: y, width: width, height: titleHeight)
+        y = title.frame.maxY + Tokens.Space.x2
+        note.frame = NSRect(x: (bounds.midX - width / 2).rounded(), y: y, width: width, height: noteHeight)
     }
 }

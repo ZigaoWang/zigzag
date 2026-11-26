@@ -1725,10 +1725,17 @@ final class SidebarListView: NSView {
             if hovering {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
-                self.delegate?.listHover(row.tab, row: row, bookmark: bookmark)
+                // The edge panel previews the part under the pointer; the window's hover card stays on the row's page.
+                let pointed = EdgeSidebar.shared.isPanel(row.window) ? row.pageUnderPointer : nil
+                self.delegate?.listHover(pointed ?? row.tab, row: row, bookmark: bookmark)
             } else {
                 self.delegate?.listHover(nil, row: nil, bookmark: nil)
             }
+        }
+        // Moving across a split's or tile group's parts in the edge panel previews each part.
+        row.onHoverPart = { [weak self, weak row] page in
+            guard let self, let row, self.drag == nil, let page, EdgeSidebar.shared.isPanel(row.window) else { return }
+            self.delegate?.listHover(page, row: row, bookmark: nil)
         }
     }
 

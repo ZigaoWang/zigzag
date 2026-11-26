@@ -420,7 +420,15 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         var icon: NSImage? = nil
     }
     /// The row's other pages in the group's order: a split's other half, or a tile group's other two or three.
-    private(set) var parts: [Part] = []
+    private(set) var parts: [Part] = [] {
+        didSet {
+            // A row that stops being a split has no part left to point at.
+            if parts.isEmpty {
+                pointedPart = nil
+                reportedPart = nil
+            }
+        }
+    }
     private var partTokens: [SignalToken] = []
     /// The second part's page.
     var partner: Tab? { parts.first?.page }
@@ -566,11 +574,22 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     var debugNestedButton: IconButton? { madeNestedButton?.isHidden == false ? madeNestedButton : nil }
     #endif
     private var moveTracking: NSTrackingArea?
+    /// The part of a split or tile group the pointer moved onto, for the edge sidebar's preview.
+    var onHoverPart: ((Tab?) -> Void)?
+    private var reportedPart: Int?
+    /// The page under the pointer: the part of a split or tile group, or the row's own page.
+    var pageUnderPointer: Tab? {
+        guard let window else { return tab }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        return bounds.contains(point) ? page(at: point) : tab
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let moveTracking { removeTrackingArea(moveTracking) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInActiveApp, .inVisibleRect], owner: self)
+        // The edge panel answers hover with another app in front, so its parts must too.
+        let active: NSTrackingArea.Options = tracksHoverWhileInactive ? .activeAlways : .activeInActiveApp
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, active, .inVisibleRect], owner: self)
         addTrackingArea(area)
         moveTracking = area
     }
@@ -613,9 +632,12 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     private func trackPointer(_ event: NSEvent) {
-        guard closesPart, isSplit else { pointedPart = nil; return }
         let point = convert(event.locationInWindow, from: nil)
-        pointedPart = bounds.contains(point) ? half(at: point) : nil
+        let part = isSplit && bounds.contains(point) ? half(at: point) : nil
+        pointedPart = closesPart ? part : nil
+        guard part != reportedPart else { return }
+        reportedPart = part
+        onHoverPart?(part == nil ? nil : page(at: point))
     }
 
     /// While another tab is dragged over this row's right half: where it would open.
