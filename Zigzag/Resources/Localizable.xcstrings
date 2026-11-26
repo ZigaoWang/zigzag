@@ -89933,7 +89933,7 @@
       }
     },
     "Graphite" : {
-      "comment" : "Name of a curated space color, in the space editor.\nFinish of Your Zigzag Card in About: dark brushed metal.",
+      "comment" : "Name of a curated space color, in the space editor.\nFinish of Your Zigzag Card in About: dark anodized metal.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -154789,7 +154789,7 @@
       }
     },
     "Space" : {
-      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.\nFinish of Your Zigzag Card in About: the colors of the space you're in.",
+      "comment" : "Color choice in Reader: the colors of the space you're in.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.\nFinish of Your Zigzag Card in About: frosted glass in the colors of the space you're in.",
       "localizations" : {
         "de" : {
           "stringUnit" : {

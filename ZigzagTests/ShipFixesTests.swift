@@ -1451,23 +1451,29 @@ struct ZigzagCardTests {
         #expect(CardFinish.chosen == .space)
     }
 
-    /// The saved picture is the card at eight times, clear around it for its shadow, solid in the middle and clear at
-    /// the corners, in every finish.
-    @Test func theSavedPictureIsSharpWithClearCorners() throws {
+    /// The saved picture is a 2400 × 1500 scene, solid to its edges on a ground of the card's finish, with the card
+    /// about six tenths of its width in the middle and its own round corners, in every finish, by day and at night.
+    @Test func theSavedPictureIsASixteenByTenScene() throws {
         let face = CardFace(name: "Ada Lovelace", start: now, version: "0.9.4", isExact: true, day: 14)
+        let k = Tokens.Keepsake.self
         for finish in CardFinish.allCases {
-            let data = try #require(CardArt.png(face, finish: finish, palette: CardPalette(hue: 0.6, hue2: nil), dark: finish == .graphite))
-            let rep = try #require(NSBitmapImageRep(data: data))
-            let k = Tokens.Keepsake.self
-            #expect(rep.pixelsWide >= 2700, "\(finish)")
-            #expect(rep.pixelsWide == Int((k.size.width + k.exportMargin * 2) * k.exportScale))
-            #expect(rep.pixelsHigh == Int((k.size.height + k.exportMargin * 2) * k.exportScale))
-            #expect(rep.colorAt(x: rep.pixelsWide / 2, y: rep.pixelsHigh / 2)?.alphaComponent == 1, "\(finish)")
-            #expect(rep.colorAt(x: 0, y: 0)?.alphaComponent == 0)
-            #expect(rep.colorAt(x: rep.pixelsWide - 1, y: rep.pixelsHigh - 1)?.alphaComponent == 0)
-            // The card's own corner is round: just inside its top left corner is still clear.
-            let m = Int(k.exportMargin * k.exportScale)
-            #expect(rep.colorAt(x: m + 2, y: m + 2)?.alphaComponent ?? 1 < 0.5, "\(finish)")
+            for dark in [false, true] {
+                let data = try #require(CardArt.png(face, finish: finish, palette: CardPalette(hue: 0.6, hue2: nil), dark: dark))
+                let rep = try #require(NSBitmapImageRep(data: data))
+                #expect(rep.pixelsWide == 2400 && rep.pixelsHigh == 1500, "\(finish)")
+                #expect(rep.size == k.exportScene)
+                for (x, y) in [(0, 0), (rep.pixelsWide - 1, rep.pixelsHigh - 1), (rep.pixelsWide / 2, rep.pixelsHigh / 2)] {
+                    #expect(rep.colorAt(x: x, y: y)?.alphaComponent == 1, "\(finish) \(x),\(y)")
+                }
+                let card = k.size.width * k.exportGrow / k.exportScene.width
+                #expect(card > 0.55 && card < 0.65)
+                // Just inside the card's top left corner is the ground, not the card: its corner is round.
+                let width = k.size.width * k.exportGrow * k.exportScale, height = k.size.height * k.exportGrow * k.exportScale
+                let left = Int((CGFloat(rep.pixelsWide) - width) / 2), top = Int((CGFloat(rep.pixelsHigh) - height) / 2) - Int(4 * k.exportScale)
+                let corner = try #require(rep.colorAt(x: left + 3, y: top + 3)?.usingColorSpace(.sRGB))
+                let ground = try #require(rep.colorAt(x: left - 6, y: top - 6)?.usingColorSpace(.sRGB))
+                #expect(abs(corner.redComponent - ground.redComponent) < 0.05, "\(finish) dark: \(dark)")
+            }
         }
     }
 
@@ -1480,6 +1486,24 @@ struct ZigzagCardTests {
         #expect(CardFace.monthAndYear(date, locale: Locale(identifier: "ru")).hasPrefix("ноября 2026"))
         #expect(CardFace.monthAndYear(date, locale: Locale(identifier: "pl")) == "listopada 2026")
         #expect(CardFace.monthAndYear(date, locale: Locale(identifier: "zh_Hans")) == "2026年11月")
+    }
+
+    /// A long name gets smaller to fit on one line, down to a floor; a short one keeps the full size.
+    @Test func aLongNameShrinksToFit() {
+        let k = Tokens.Keepsake.self
+        #expect(CardArt.nameSize(for: "Ada Lovelace") == k.nameSize)
+        let long = CardArt.nameSize(for: "Augusta Ada King, Countess of Lovelace")
+        #expect(long < k.nameSize && long >= k.nameSmallest)
+        #expect(CardArt.nameSize(for: String(repeating: "W", count: 80)) == k.nameSmallest)
+    }
+
+    /// The pressed Z sits inside the margins, on the bottom and right ones, clear of the wordmark.
+    @Test func theZSitsOnTheMargins() {
+        let k = Tokens.Keepsake.self
+        let ink = CardArt.emblemPath().boundingBoxOfPath
+        #expect(abs(ink.maxX - (k.size.width - k.pad)) < 0.5)
+        #expect(abs(ink.maxY - (k.size.height - k.pad)) < 0.5)
+        #expect(!ink.intersects(CardArt.markRect(.front)))
     }
 
     /// "Since" reads at AA and the name well above it on every finish, by day and at night, wherever the light is.
@@ -1540,9 +1564,14 @@ struct ZigzagCardTests {
         let swatches = CardFinishSwatches(selected: .graphite, palette: CardPalette(hue: Brand.navyHue, hue2: nil))
         swatches.frame = NSRect(origin: .zero, size: swatches.fittingSize)
         swatches.layoutSubtreeIfNeeded()
-        let tiles = swatches.subviews
+        let tiles = swatches.subviews.filter { !($0 is NSTextField) }
         #expect(tiles.count == CardFinish.allCases.count)
+        // The chosen finish is named beside the swatches, and each swatch names its own for VoiceOver and the pointer.
+        let name = try #require(swatches.subviews.compactMap { $0 as? NSTextField }.first)
+        #expect(name.stringValue == CardFinish.graphite.name)
         for (tile, finish) in zip(tiles, CardFinish.allCases) {
+            #expect(tile.accessibilityLabel() == finish.name)
+            #expect(tile.toolTip == finish.name)
             tile.layout()
             let ring = try #require(tile.layer?.sublayers?.first)
             var accent: CGColor?

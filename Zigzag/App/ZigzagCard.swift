@@ -153,6 +153,11 @@ struct CardPalette: Equatable {
     /// The name and the wordmark, then the quiet lines: at least 4.5:1 on either end of the face.
     var ink: NSColor { tone(hue, light: (0.27, 0.05), dark: (0.97, 0.012)) }
     var quiet: NSColor { tone(hue, light: (0.42, 0.06), dark: (0.84, 0.03)) }
+    /// The light inside the glass, deeper than its face, toward its top right.
+    var glow: NSColor { tone(hue2 ?? hue, light: (0.8, 0.09), dark: (0.5, 0.1)) }
+    /// The ground the saved picture puts it on.
+    var groundTop: NSColor { tone(hue, light: (0.97, 0.016), dark: (0.27, 0.028)) }
+    var groundBottom: NSColor { tone(hue2 ?? hue, light: (0.91, 0.03), dark: (0.17, 0.022)) }
 
     private func tone(_ h: Double, light: (Double, Double), dark: (Double, Double)) -> NSColor {
         Tokens.Color.dynamic(light: SpaceColor.tone(hue: h, lightness: light.0, chroma: light.1),
@@ -162,8 +167,8 @@ struct CardPalette: Equatable {
 
 // MARK: - Finishes
 
-/// What the card is made of, picked under it in About and kept: the space's color, holographic foil, brushed
-/// graphite, or linen paper.
+/// What the card is made of, picked under it in About and kept: frosted glass in the space's color, holographic foil,
+/// anodized graphite, or linen paper.
 enum CardFinish: String, CaseIterable {
     case space, holographic, graphite, paper
 
@@ -178,9 +183,9 @@ enum CardFinish: String, CaseIterable {
 
     var name: String {
         switch self {
-        case .space: String(localized: "Space", comment: "Finish of Your Zigzag Card in About: the colors of the space you're in.")
+        case .space: String(localized: "Space", comment: "Finish of Your Zigzag Card in About: frosted glass in the colors of the space you're in.")
         case .holographic: String(localized: "Holographic", comment: "Finish of Your Zigzag Card in About: iridescent foil.")
-        case .graphite: String(localized: "Graphite", comment: "Finish of Your Zigzag Card in About: dark brushed metal.")
+        case .graphite: String(localized: "Graphite", comment: "Finish of Your Zigzag Card in About: dark anodized metal.")
         case .paper: String(localized: "Paper", comment: "Finish of Your Zigzag Card in About: warm linen paper.")
         }
     }
@@ -190,8 +195,8 @@ enum CardFinish: String, CaseIterable {
 enum CardTexture {
     /// Fine, even grain, as card stock has.
     case grain
-    /// Long fine streaks running across, as brushed metal has.
-    case brushed
+    /// A fine bead-blasted tooth with a faint cloud in it, as anodized aluminum has.
+    case anodized
     /// Threads both ways, as linen paper has.
     case linen
 
@@ -217,9 +222,9 @@ enum CardTexture {
         case .grain:
             parts = [field(0.5 * pt, 0.5 * pt, seed: 1, weight: 0.5), field(1, 1, seed: 2, weight: 0.3), field(2 * pt, 2 * pt, seed: 3, weight: 0.2)]
             strength = 2.2
-        case .brushed:
-            parts = [field(70 * pt, 0.4 * pt, seed: 4, weight: 0.45), field(18 * pt, 0.2 * pt, seed: 5, weight: 0.35), field(1, 1, seed: 6, weight: 0.2)]
-            strength = 2.6
+        case .anodized:
+            parts = [field(1, 1, seed: 4, weight: 0.55), field(0.6 * pt, 0.6 * pt, seed: 5, weight: 0.3), field(40 * pt, 40 * pt, seed: 6, weight: 0.15)]
+            strength = 1.8
         case .linen:
             parts = [field(3 * pt, 0.35 * pt, seed: 7, weight: 0.36), field(0.35 * pt, 3 * pt, seed: 8, weight: 0.36),
                      field(1, 1, seed: 9, weight: 0.2), field(12 * pt, 12 * pt, seed: 10, weight: 0.08)]
@@ -240,14 +245,17 @@ enum CardTexture {
 /// One finish's colors and materials, in light or dark: settled colors, never dynamic ones.
 struct CardLook {
     var top: NSColor, bottom: NSColor
+    /// Soft light inside the material: a color, its middle (unit square, top down) and its reach as a share of the width.
+    var glows: [(color: NSColor, at: CGPoint, reach: CGFloat)] = []
     /// The name, then "Since", each at least 4.5:1 on the face.
     var ink: NSColor, quiet: NSColor
     /// The wordmark's foil, edge to shine.
     var foil: [NSColor]
     var texture: CardTexture
     var grain: CGFloat
-    /// The pressed zigzags' and the stamped wordmark's lit and shaded edges.
+    /// The pressed Z's and the stamped wordmark's lit and shaded edges, and the tone the Z is pressed in.
     var lit: CGFloat, shade: CGFloat
+    var etch: NSColor = .clear
     var rim: CGFloat
     /// The iridescence, its strength and hues.
     var holo: CGFloat = 0
@@ -257,6 +265,8 @@ struct CardLook {
     var band: CGFloat = 0
     var bandColor: NSColor = .white
     var shadow: Float
+    /// The saved picture's ground, top to bottom.
+    var ground: [NSColor]
 
     static func of(_ finish: CardFinish, palette: CardPalette, dark: Bool) -> CardLook {
         let hex = Tokens.Color.hex
@@ -264,43 +274,49 @@ struct CardLook {
         case .space:
             var c: [NSColor] = []
             NSAppearance(named: dark ? .darkAqua : .aqua)?.performAsCurrentDrawingAppearance {
-                c = [palette.top, palette.bottom, palette.ink, palette.quiet].map { $0.usingColorSpace(.sRGB) ?? $0 }
+                c = [palette.top, palette.bottom, palette.ink, palette.quiet, palette.glow, palette.groundTop, palette.groundBottom]
+                    .map { $0.usingColorSpace(.sRGB) ?? $0 }
             }
             let ink = c[2]
             let shine = ink.blended(withFraction: 0.18, of: dark ? .white : c[0]) ?? ink
-            return CardLook(top: c[0], bottom: c[1], ink: ink, quiet: dark ? c[3].blended(withFraction: 0.45, of: ink) ?? c[3] : c[3], foil: [ink, shine, ink], texture: .grain, grain: 0.07,
-                            lit: dark ? 0.07 : 0.6, shade: dark ? 0.3 : 0.08, rim: dark ? 0.16 : 0.7, sheen: dark ? 0.07 : 0.3,
-                            band: dark ? 0.03 : 0.14, shadow: dark ? 0.5 : 0.16)
+            // Frosted glass: the light gathers deeper toward the top right, and the frost is paler at the bottom left.
+            let glows: [(color: NSColor, at: CGPoint, reach: CGFloat)] = dark
+                ? [(c[4].withAlphaComponent(0.55), CGPoint(x: 0.92, y: 0.05), 0.75)]
+                : [(c[4].withAlphaComponent(0.5), CGPoint(x: 0.95, y: 0.0), 0.8), (NSColor.white.withAlphaComponent(0.45), CGPoint(x: 0.1, y: 0.95), 0.6)]
+            return CardLook(top: c[0], bottom: c[1], glows: glows, ink: ink, quiet: dark ? c[3].blended(withFraction: 0.45, of: ink) ?? c[3] : c[3],
+                            foil: [ink, shine, ink], texture: .grain, grain: dark ? 0.06 : 0.05,
+                            lit: dark ? 0.1 : 0.7, shade: dark ? 0.32 : 0.07, etch: NSColor.white.withAlphaComponent(dark ? 0.07 : 0.3),
+                            rim: dark ? 0.24 : 0.95, sheen: dark ? 0.07 : 0.3, band: dark ? 0.03 : 0.12, shadow: dark ? 0.5 : 0.16,
+                            ground: [c[5], c[6]])
         case .holographic:
-            // Soft hues three times round, so a few bands cross the card; at night only the cool half, as oil on dark
-            // metal shows it.
-            let hues: [CGFloat] = dark ? [0.48, 0.56, 0.66, 0.76, 0.86, 0.94] : [0.97, 0.07, 0.15, 0.36, 0.52, 0.64, 0.78]
-            let ring = (hues + hues + hues + [hues[0]]).map {
-                NSColor(calibratedHue: $0, saturation: dark ? 0.5 : 0.36, brightness: dark ? 0.9 : 1, alpha: 1).usingColorSpace(.sRGB)!
+            // Pearl foil: the spectrum four times round, so several bands cross the card and slide as it turns. At
+            // night the same foil, a little dimmer, as paper is.
+            let hues: [CGFloat] = [0.97, 0.07, 0.15, 0.36, 0.52, 0.64, 0.78]
+            let ring = (hues + hues + hues + hues + [hues[0]]).map {
+                NSColor(calibratedHue: $0, saturation: 0.42, brightness: 1, alpha: 1).usingColorSpace(.sRGB)!
             }
-            if dark {
-                return CardLook(top: hex(0x20232B, 1), bottom: hex(0x121419, 1), ink: hex(0xF4F6FA, 1), quiet: hex(0xD5DAE2, 1),
-                                foil: [hex(0xC9CFDA, 1), hex(0xFFFFFF, 1), hex(0xAEB6C3, 1)], texture: .grain, grain: 0.06,
-                                lit: 0.08, shade: 0.3, rim: 0.2, holo: 0.18, holoColors: ring, sheen: 0.06, band: 0.06, shadow: 0.5)
-            }
-            return CardLook(top: hex(0xF3F4F7, 1), bottom: hex(0xD9DDE5, 1), ink: hex(0x1B2130, 1), quiet: hex(0x485166, 1),
-                            foil: [hex(0x1B2130, 1), hex(0x46526A, 1), hex(0x1B2130, 1)], texture: .grain, grain: 0.05,
-                            lit: 0.7, shade: 0.08, rim: 0.8, holo: 0.55, holoColors: ring, sheen: 0.35, band: 0.4, shadow: 0.18)
+            return CardLook(top: hex(dark ? 0xE9EAF0 : 0xF5F5F8, 1), bottom: hex(dark ? 0xD3D6E0 : 0xDFE2EA, 1), ink: hex(0x1B2130, 1),
+                            quiet: hex(0x434C60, 1), foil: [hex(0x1B2130, 1), hex(0x46526A, 1), hex(0x1B2130, 1)], texture: .grain, grain: 0.05,
+                            lit: 0.75, shade: 0.1, etch: NSColor.white.withAlphaComponent(0.35), rim: 0.9, holo: dark ? 0.5 : 0.55, holoColors: ring,
+                            sheen: dark ? 0.25 : 0.35, band: dark ? 0.3 : 0.4, shadow: dark ? 0.45 : 0.18,
+                            ground: dark ? [hex(0x1E1F25, 1), hex(0x0E0F12, 1)] : [hex(0xF6F5F9, 1), hex(0xE5E4EC, 1)])
         case .graphite:
-            return CardLook(top: hex(dark ? 0x3A3D43 : 0x43474D, 1), bottom: hex(dark ? 0x1C1D20 : 0x26282C, 1),
-                            ink: hex(0xF5F6F8, 1), quiet: hex(0xD3D7DD, 1),
-                            foil: [hex(0xB4BAC4, 1), hex(0xF7F9FC, 1), hex(0x9CA3AE, 1)], texture: .brushed, grain: 0.16,
-                            lit: 0.08, shade: 0.38, rim: 0.22, sheen: 0.06, band: 0.08, bandColor: hex(0xD6E2F5, 1), shadow: dark ? 0.55 : 0.24)
+            // Anodized: a deep, even color with a fine tooth, and a bright chamfer at the edge.
+            return CardLook(top: hex(dark ? 0x34373D : 0x3A3D44, 1), bottom: hex(dark ? 0x16171A : 0x1C1E22, 1),
+                            ink: hex(0xF5F6F8, 1), quiet: hex(0xC9CED6, 1),
+                            foil: [hex(0xA9B0BB, 1), hex(0xF7F9FC, 1), hex(0x949BA6, 1)], texture: .anodized, grain: 0.12,
+                            lit: 0.1, shade: 0.5, etch: NSColor.white.withAlphaComponent(0.04), rim: 0.3, sheen: 0.08, band: 0.07,
+                            bandColor: hex(0xD6E2F5, 1), shadow: dark ? 0.55 : 0.26,
+                            ground: dark ? [hex(0x212327, 1), hex(0x0F1012, 1)] : [hex(0xEEEFF1, 1), hex(0xD8DADF, 1)])
         case .paper:
-            return CardLook(top: hex(dark ? 0xE6DFD2 : 0xF7F2E8, 1), bottom: hex(dark ? 0xD8CFBF : 0xEBE3D3, 1),
+            return CardLook(top: hex(dark ? 0xE6DFD2 : 0xF8F3EA, 1), bottom: hex(dark ? 0xD8CFBF : 0xECE4D4, 1),
                             ink: hex(0x2A2420, 1), quiet: hex(0x62584E, 1),
-                            foil: [hex(0x7A4A2C, 1), hex(0xA66F48, 1), hex(0x6A3E23, 1)], texture: .linen, grain: 0.14,
-                            lit: 0.75, shade: 0.09, rim: 0.8, sheen: 0.2, shadow: dark ? 0.45 : 0.14)
+                            foil: [hex(0x7A4A2C, 1), hex(0xA66F48, 1), hex(0x6A3E23, 1)], texture: .linen, grain: dark ? 0.1 : 0.14,
+                            lit: 0.7, shade: 0.18, etch: NSColor.black.withAlphaComponent(0.018), rim: 0.8, sheen: 0.2,
+                            shadow: dark ? 0.45 : 0.14,
+                            ground: dark ? [hex(0x2C2824, 1), hex(0x1A1714, 1)] : [hex(0xF3EDE3, 1), hex(0xE3DACB, 1)])
         }
     }
-
-    /// The swatch under the card: its face in small.
-    var swatch: [NSColor] { holo > 0 ? holoColors.map { $0.blended(withFraction: 1 - holo, of: top) ?? $0 } : [top, bottom] }
 }
 
 /// Where the light falls, from where the pointer is over the card: -1 to 1 each way from its middle, y up.
@@ -328,20 +344,22 @@ struct CardLight: Equatable {
 
 // MARK: - Drawing it
 
-/// Draws the card for the window and the saved picture: the surface (color, grain, pressed zigzags, the lit edge),
-/// the light on it (foil, sheen, the stamped wordmark) and the words. Nothing else goes on it.
+/// Draws the card for the window and the saved picture: the surface (color, the light inside it, grain, the pressed Z,
+/// the lit edge), the light on it (foil, sheen, the stamped wordmark) and the words. Nothing else goes on it.
 enum CardArt {
     enum Side { case front, back }
 
     struct Parts: OptionSet {
         let rawValue: Int
-        /// Color, grain, the pressed zigzags, the wordmark's stamped edge and the rim: what doesn't move.
+        /// Color, grain, the pressed Z, the wordmark's stamped edge and the rim: what doesn't move.
         static let surface = Parts(rawValue: 1)
-        /// The foil, the sheen, the band and the wordmark's shine, as `light` puts them.
+        /// The iridescence, the sheen and the band, as `light` puts them.
         static let light = Parts(rawValue: 2)
         /// The name and "Since".
         static let words = Parts(rawValue: 4)
-        static let all: Parts = [.surface, .light, .words]
+        /// The wordmark in foil, its shine where `light` puts it.
+        static let foil = Parts(rawValue: 8)
+        static let all: Parts = [.surface, .light, .words, .foil]
     }
 
     static var size: CGSize { Tokens.Keepsake.size }
@@ -365,17 +383,61 @@ enum CardArt {
         return WordmarkView.outline(in: rect).copy(using: &flip) ?? CGMutablePath()
     }
 
-    static var nameFont: NSFont { Tokens.Font.voice(Tokens.Keepsake.nameSize) }
+    /// The ribbon Z pressed into the front: its ink's box, top down, on the right and bottom margins.
+    static func emblemRect() -> CGRect {
+        let k = Tokens.Keepsake.self
+        let h = k.emblemHeight, s = emblemStroke(height: h)
+        let w = (h - s) / Brand.aspect + s
+        return CGRect(x: size.width - k.pad - w, y: size.height - k.pad - h, width: w, height: h)
+    }
+
+    /// The ribbon's width for a Z `h` tall: a share of its centerline's width, as the icon's is.
+    private static func emblemStroke(height h: CGFloat) -> CGFloat {
+        let weight = Tokens.Keepsake.emblemWeight
+        return (h / (Brand.aspect + weight)) * weight
+    }
+
+    /// The pressed Z's outline, top down.
+    static func emblemPath() -> CGPath {
+        let rect = emblemRect(), s = emblemStroke(height: rect.height)
+        let line = rect.insetBy(dx: s / 2, dy: s / 2)
+        let points = Brand.centerline(in: line).map { CGPoint(x: $0.x, y: line.minY + line.maxY - $0.y) }
+        return Brand.path(points).copy(strokingWithWidth: s, lineCap: .round, lineJoin: .round, miterLimit: 10).normalized()
+    }
+
+    static func nameFont(_ size: CGFloat = Tokens.Keepsake.nameSize) -> NSFont { .systemFont(ofSize: size, weight: .regular) }
     static var sinceFont: NSFont { Tokens.Font.body() }
 
-    /// Where the name and "Since" sit, top down.
-    static func wordRects() -> (name: CGRect, since: CGRect) {
+    /// The name's size: as set, or smaller until it fits on one line, down to `nameSmallest`.
+    static func nameSize(for name: String) -> CGFloat {
+        let k = Tokens.Keepsake.self, room = size.width - k.pad * 2
+        var points = k.nameSize
+        while points > k.nameSmallest, nameText(name, size: points, color: .black).size().width > room { points -= 1 }
+        return points
+    }
+
+    static func nameText(_ name: String, size: CGFloat, color: NSColor, paragraph: NSParagraphStyle? = nil) -> NSAttributedString {
+        var attributes: [NSAttributedString.Key: Any] = [.font: nameFont(size), .kern: -size * 0.012, .foregroundColor: color]
+        if let paragraph { attributes[.paragraphStyle] = paragraph }
+        return NSAttributedString(string: name, attributes: attributes)
+    }
+
+    /// Where the name and "Since" sit, top down: "Since" on the bottom margin's baseline, the name over it.
+    static func wordRects(nameSize: CGFloat = Tokens.Keepsake.nameSize) -> (name: CGRect, since: CGRect) {
         let pad = Tokens.Keepsake.pad, width = size.width - pad * 2
-        let since = sinceFont, name = nameFont
+        let since = sinceFont, name = nameFont(nameSize)
         let sinceBase = size.height - pad
-        let nameBase = sinceBase - lineHeight(since) - Tokens.Space.x2
+        let nameBase = sinceBase - ceil(since.capHeight) - Tokens.Space.x3
         return (CGRect(x: pad, y: nameBase - name.ascender, width: width, height: lineHeight(name)),
                 CGRect(x: pad, y: sinceBase - since.ascender, width: width, height: lineHeight(since)))
+    }
+
+    /// How far the first letter's ink sits in from where its line starts, so text lines up on the margin by its ink.
+    static func inkInset(_ text: NSAttributedString) -> CGFloat {
+        guard text.length > 0 else { return 0 }
+        let first = text.attributedSubstring(from: (text.string as NSString).rangeOfComposedCharacterSequence(at: 0))
+        let bounds = CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(first), .useGlyphPathBounds)
+        return bounds.isNull ? 0 : max(0, bounds.minX)
     }
 
     /// One side as a picture `scale` pixels per point, with only `parts` drawn (the rest clear).
@@ -396,7 +458,9 @@ enum CardArt {
         context.addPath(MaterialShape.rounded(rect, radius: Tokens.Keepsake.radius))
         context.clip()
         if parts.contains(.surface) { drawSurface(look, side: side, scale: scale, in: context) }
-        if parts.contains(.light) { drawLight(look, side: side, light: side == .back ? light.mirrored : light, in: context) }
+        let lit = side == .back ? light.mirrored : light
+        if parts.contains(.light) { drawLight(look, light: lit, in: context) }
+        if parts.contains(.foil) { drawFoil(look, side: side, light: lit, in: context) }
         if parts.contains(.words) {
             stampEdges(look, side: side, in: context)
             if side == .front { drawWords(face, look: look) }
@@ -405,25 +469,47 @@ enum CardArt {
         return context.makeImage()
     }
 
-    /// The saved picture: the front at `Keepsake.exportScale`, lit from the top left, on its shadow with clear room
-    /// around it, as PNG.
+    /// A finish's swatch: its back without the wordmark, `side` points square, cut from the card's middle.
+    static func swatch(_ look: CardLook, side: CGFloat, scale: CGFloat) -> CGImage? {
+        let face = CardFace(name: "", start: Date(), version: "", isExact: true, day: 1)
+        guard let card = image(face, look: look, side: .back, parts: [.surface, .light], scale: scale * side / size.height) else { return nil }
+        let px = CGFloat(card.height)
+        return card.cropping(to: CGRect(x: ((CGFloat(card.width) - px) / 2).rounded(), y: 0, width: px, height: px))
+    }
+
+    /// The saved picture: the front lit from the top left, in the middle of a 16:10 scene on a ground of its own
+    /// finish, floating on soft shadows, at `Keepsake.exportScale`, as PNG.
     static func png(_ face: CardFace, finish: CardFinish, palette: CardPalette, dark: Bool, scale: CGFloat = Tokens.Keepsake.exportScale) -> Data? {
         let look = CardLook.of(finish, palette: palette, dark: dark)
-        guard let card = image(face, look: look, scale: scale) else { return nil }
-        let k = Tokens.Keepsake.self, m = k.exportMargin
-        let width = Int(((size.width + m * 2) * scale).rounded()), height = Int(((size.height + m * 2) * scale).rounded())
+        let k = Tokens.Keepsake.self, scene = k.exportScene, grow = k.exportGrow
+        guard let card = image(face, look: look, scale: scale * grow) else { return nil }
+        let width = Int((scene.width * scale).rounded()), height = Int((scene.height * scale).rounded())
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         context.scaleBy(x: scale, y: scale)
-        let frame = CGRect(x: m, y: m, width: size.width, height: size.height)
+        // The ground: its own two tones top to bottom, and a soft light from above the card. Y up here.
+        if let ground = gradient(look.ground) {
+            context.drawLinearGradient(ground, start: CGPoint(x: 0, y: scene.height), end: .zero, options: [])
+        }
+        if let glow = gradient([NSColor.white.withAlphaComponent(dark ? 0.05 : 0.5), NSColor.white.withAlphaComponent(0)]) {
+            let center = CGPoint(x: scene.width / 2, y: scene.height * 0.72)
+            context.drawRadialGradient(glow, startCenter: center, startRadius: 0, endCenter: center, endRadius: scene.width * 0.5, options: [])
+        }
+        // A touch above the middle, so the card and its shadow sit centered together.
+        let shown = CGSize(width: size.width * grow, height: size.height * grow)
+        let frame = CGRect(x: round((scene.width - shown.width) / 2), y: round((scene.height - shown.height) / 2) + 4,
+                           width: shown.width, height: shown.height)
         // Shadows only: the shape is drawn far off the canvas and its shadow thrown back under the card.
-        let away = size.width + m * 4
-        let shape = MaterialShape.rounded(frame.offsetBy(dx: away, dy: 0), radius: k.radius)
-        for (radius, drop, opacity) in [(k.ambientRadius, k.ambientDrop, CGFloat(0.22)), (k.contactRadius, k.contactDrop, CGFloat(0.16))] {
+        let away = scene.width * 2
+        let shape = MaterialShape.rounded(frame.offsetBy(dx: away, dy: 0), radius: k.radius * grow)
+        let strength = CGFloat(look.shadow) / 0.2
+        let shadows: [(blur: CGFloat, drop: CGFloat, opacity: CGFloat)] = [(60, 34, 0.1), (k.ambientRadius, k.ambientDrop, 0.16),
+                                                                            (k.contactRadius, k.contactDrop, 0.14)]
+        for shadow in shadows {
             context.saveGState()
-            context.setShadow(offset: CGSize(width: -away * scale, height: -drop * scale), blur: radius * scale,
-                              color: NSColor.black.withAlphaComponent(opacity).cgColor)
+            context.setShadow(offset: CGSize(width: -away * scale, height: -shadow.drop * grow * scale), blur: shadow.blur * grow * scale,
+                              color: NSColor.black.withAlphaComponent(min(shadow.opacity * strength, 0.6)).cgColor)
             context.addPath(shape)
             context.fillPath()
             context.restoreGState()
@@ -432,8 +518,7 @@ enum CardArt {
         context.draw(card, in: frame)
         guard let image = context.makeImage() else { return nil }
         let rep = NSBitmapImageRep(cgImage: image)
-        // 144 dpi, so it opens at a Retina screen's size.
-        rep.size = NSSize(width: CGFloat(width) / 2, height: CGFloat(height) / 2)
+        rep.size = scene
         return rep.representation(using: .png, properties: [:])
     }
 
@@ -444,6 +529,11 @@ enum CardArt {
         if let gradient = gradient([look.top, look.bottom]) {
             context.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: rect.maxX, y: rect.maxY), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
         }
+        for glow in look.glows {
+            guard let soft = gradient([glow.color, glow.color.withAlphaComponent(0)]) else { continue }
+            let center = CGPoint(x: glow.at.x * rect.width, y: glow.at.y * rect.height)
+            context.drawRadialGradient(soft, startCenter: center, startRadius: 0, endCenter: center, endRadius: glow.reach * rect.width, options: [])
+        }
         if look.grain > 0, let texture = look.texture.image(size: size, scale: scale) {
             context.saveGState()
             context.setBlendMode(.overlay)
@@ -451,7 +541,7 @@ enum CardArt {
             context.draw(texture, in: rect)
             context.restoreGState()
         }
-        drawMotif(look, side: side, in: context)
+        if side == .front { drawEmblem(look, scale: scale, in: context) }
         // The edge catches the light, more along the top.
         context.saveGState()
         let r = Tokens.Keepsake.radius
@@ -465,37 +555,33 @@ enum CardArt {
         context.restoreGState()
     }
 
-    /// Small ribbon Zs pressed into the surface in a half-drop grid, a shaded top edge and a lit bottom one, fading
-    /// toward the words.
-    private static func drawMotif(_ look: CardLook, side: Side, in context: CGContext) {
-        let k = Tokens.Keepsake.self
-        let h = k.motifHeight, w = h * Brand.aspect
-        let one = Brand.path(Brand.centerline(in: CGRect(x: -w / 2, y: -h / 2, width: w, height: h)).map { CGPoint(x: $0.x, y: -$0.y) })
-            .copy(strokingWithWidth: h * 0.17, lineCap: .round, lineJoin: .round, miterLimit: 10).normalized()
-        let all = CGMutablePath()
-        var row = 0
-        var y = -k.motifStep.height
-        while y < size.height + k.motifStep.height {
-            var x = (row % 2 == 0 ? 0 : k.motifStep.width / 2) - k.motifStep.width
-            while x < size.width + k.motifStep.width {
-                all.addPath(one, transform: CGAffineTransform(translationX: x, y: y))
-                x += k.motifStep.width
-            }
-            y += k.motifStep.height
-            row += 1
-        }
+    /// The ribbon Z pressed into the surface: a tone of its own, shaded softly under its top edges and lit along its
+    /// bottom ones.
+    private static func drawEmblem(_ look: CardLook, scale: CGFloat, in context: CGContext) {
+        let path = emblemPath()
+        let depth = Tokens.Keepsake.emblemDepth
         context.saveGState()
-        context.beginTransparencyLayer(auxiliaryInfo: nil)
-        deboss(all, depth: k.motifDepth, look: look, in: context)
-        // Strong at the far side, faint under the words and the wordmark.
-        context.setBlendMode(.destinationIn)
-        let fade = side == .front ? [NSColor.black.withAlphaComponent(0.3), NSColor.black] : [NSColor.black.withAlphaComponent(0.7), NSColor.black]
-        if let mask = gradient(fade) {
-            context.drawLinearGradient(mask, start: CGPoint(x: size.width * 0.15, y: size.height), end: CGPoint(x: size.width, y: 0),
-                                       options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
-        }
-        context.endTransparencyLayer()
+        context.addPath(path)
+        context.setFillColor(look.etch.cgColor)
+        context.fillPath()
         context.restoreGState()
+        // The ground around it, drawn a card's width off to the side so only its shadow lands inside, with no edge.
+        let away = size.width * 2
+        let outside = CGMutablePath()
+        outside.addRect(CGRect(origin: .zero, size: size).insetBy(dx: -40, dy: -40))
+        outside.addPath(path)
+        let shifted = outside.copy(using: [CGAffineTransform(translationX: away, y: 0)]) ?? outside
+        // Shadow offsets are in pixels and y up, whatever the drawing's transform.
+        for (dy, color) in [(-depth, NSColor.black.withAlphaComponent(look.shade)), (depth, NSColor.white.withAlphaComponent(look.lit))] {
+            context.saveGState()
+            context.addPath(path)
+            context.clip()
+            context.setShadow(offset: CGSize(width: -away * scale, height: dy * scale), blur: depth * 2.5 * scale, color: color.cgColor)
+            context.addPath(shifted)
+            context.setFillColor(NSColor.black.cgColor)
+            context.fillPath(using: .evenOdd)
+            context.restoreGState()
+        }
     }
 
     /// Inside `path`, top down: a shaded edge along the top and a lit one along the bottom, as a shape pressed in.
@@ -515,7 +601,7 @@ enum CardArt {
         }
     }
 
-    private static func drawLight(_ look: CardLook, side: Side, light: CardLight, in context: CGContext) {
+    private static func drawLight(_ look: CardLook, light: CardLight, in context: CGContext) {
         let rect = CGRect(origin: .zero, size: size)
         if look.holo > 0 {
             let c = light.holoCenter, a = light.holoAngle
@@ -541,7 +627,6 @@ enum CardArt {
                 context.drawLinearGradient(band, start: .zero, end: CGPoint(x: rect.maxX, y: rect.maxY), options: [])
             }
         }
-        drawFoil(look, side: side, light: light, in: context)
     }
 
     /// Which way round the window's conic gradient runs, as seen: 1 counterclockwise, -1 clockwise.
@@ -605,14 +690,15 @@ enum CardArt {
     }
 
     private static func drawWords(_ face: CardFace, look: CardLook) {
-        let rects = wordRects()
-        let since = NSMutableParagraphStyle()
-        since.lineBreakMode = .byTruncatingTail
-        NSAttributedString(string: face.sinceLine, attributes: [.font: sinceFont, .foregroundColor: look.quiet, .paragraphStyle: since])
-            .draw(with: rects.since, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
+        let points = nameSize(for: face.name)
+        let rects = wordRects(nameSize: points)
+        let cut = NSMutableParagraphStyle()
+        cut.lineBreakMode = .byTruncatingTail
+        let since = NSAttributedString(string: face.sinceLine, attributes: [.font: sinceFont, .foregroundColor: look.quiet, .paragraphStyle: cut])
+        since.draw(with: rects.since.offsetBy(dx: -inkInset(since), dy: 0), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
         if !face.name.isEmpty {
-            Tokens.Font.voiceText(face.name, size: Tokens.Keepsake.nameSize, color: look.ink, paragraph: since)
-                .draw(with: rects.name, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
+            let name = nameText(face.name, size: points, color: look.ink, paragraph: cut)
+            name.draw(with: rects.name.offsetBy(dx: -inkInset(name), dy: 0), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
         }
     }
 
@@ -906,12 +992,18 @@ final class CardStage: NSView {
 // MARK: - Picking a finish
 
 /// The finishes as a row of round swatches under the card, as the space editor's: a faint ring under the pointer,
-/// a fine ring around the chosen one.
+/// the accent ring around the chosen one, and the name of the one under the pointer, else the chosen one, after them.
 final class CardFinishSwatches: NSView {
     var onPick: ((CardFinish) -> Void)?
-    var selected: CardFinish { didSet { tiles.forEach { $0.isSelected = $0.finish == selected } } }
+    var selected: CardFinish {
+        didSet {
+            tiles.forEach { $0.isSelected = $0.finish == selected }
+            showName()
+        }
+    }
     var palette: CardPalette { didSet { tiles.forEach { $0.palette = palette } } }
     private var tiles: [CardFinishSwatch] = []
+    private let name = Label("", font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
     private static let side: CGFloat = Tokens.Metric.controlHeight, gap = Tokens.Space.x2
 
     init(selected: CardFinish, palette: CardPalette) {
@@ -925,9 +1017,14 @@ final class CardFinishSwatches: NSView {
                 self?.selected = finish
                 self?.onPick?(finish)
             }
+            tile.onHoverChange = { [weak self] in self?.showName() }
             addSubview(tile)
             tiles.append(tile)
         }
+        addSubview(name)
+        // VoiceOver reads each swatch's own name; this one is for the eye.
+        name.setAccessibilityElement(false)
+        showName()
         setAccessibilityElement(true)
         setAccessibilityRole(.radioGroup)
         setAccessibilityLabel(String(localized: "Finish", comment: "VoiceOver name of the row of finishes under Your Zigzag Card in About Zigzag."))
@@ -940,9 +1037,19 @@ final class CardFinishSwatches: NSView {
     func debugHover(_ index: Int?) { for (i, tile) in tiles.enumerated() { tile.isHovered = i == index } }
     #endif
 
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: Self.side * CGFloat(tiles.count) + Self.gap * CGFloat(tiles.count - 1), height: Self.side)
+    private func showName() {
+        name.stringValue = (tiles.first(where: \.isHovered)?.finish ?? selected).name
     }
+
+    private var swatchesWidth: CGFloat { Self.side * CGFloat(tiles.count) + Self.gap * CGFloat(tiles.count - 1) }
+
+    /// Room for the longest name, so nothing moves as the name changes.
+    private var nameWidth: CGFloat {
+        let font = name.font ?? Tokens.Font.body()
+        return ceil(CardFinish.allCases.map { ($0.name as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0) + Tokens.Space.x1
+    }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: swatchesWidth + Tokens.Space.x3 + nameWidth, height: Self.side) }
     override var fittingSize: NSSize { intrinsicContentSize }
     override func accessibilityChildren() -> [Any]? { tiles }
 
@@ -951,15 +1058,21 @@ final class CardFinishSwatches: NSView {
         for (i, tile) in tiles.enumerated() {
             tile.frame = NSRect(x: CGFloat(i) * (Self.side + Self.gap), y: (bounds.height - Self.side) / 2, width: Self.side, height: Self.side)
         }
+        let height = ceil(name.intrinsicContentSize.height)
+        name.frame = NSRect(x: swatchesWidth + Tokens.Space.x3, y: 0, width: nameWidth, height: height)
+        name.frame.origin.y = (bounds.height - Self.side) / 2 + name.centeredY(in: Self.side)
     }
 }
 
-/// One finish, round: its surface in small.
+/// One finish, round: a piece of its material, as the card is drawn.
 private final class CardFinishSwatch: InteractiveView {
     let finish: CardFinish
-    var palette: CardPalette { didSet { stateDidChange(animated: false) } }
+    var palette: CardPalette { didSet { if palette != oldValue { drawn = nil; stateDidChange(animated: false) } } }
+    var onHoverChange: (() -> Void)?
     private let ring = CALayer()
-    private let fill = CAGradientLayer()
+    private let fill = CALayer()
+    /// What the picture was drawn for, so hovering doesn't draw it again.
+    private var drawn: (dark: Bool, scale: CGFloat)?
 
     init(finish: CardFinish, palette: CardPalette) {
         self.finish = finish
@@ -969,6 +1082,7 @@ private final class CardFinishSwatch: InteractiveView {
         layer?.addSublayer(ring)
         layer?.addSublayer(fill)
         fill.masksToBounds = true
+        fill.contentsGravity = .resizeAspectFill
         toolTip = finish.name
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(finish.name)
@@ -988,18 +1102,32 @@ private final class CardFinishSwatch: InteractiveView {
         stateDidChange(animated: false)
     }
 
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        stateDidChange(animated: false)
+    }
+
+    private var wasHovered = false
+
     override func stateDidChange(animated: Bool) {
-        let look = CardLook.of(finish, palette: palette, dark: effectiveAppearance.isDark)
+        let dark = effectiveAppearance.isDark
+        let scale = window?.backingScaleFactor ?? 2
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 // Chosen, an accent ring with a gap, as Reader's colors; under the pointer a faint ring, nothing moving.
                 SwatchRing.draw(ring: ring, fill: fill, in: bounds, selected: isSelected, hovered: isHovered, chosen: Tokens.Color.accent)
-                fill.type = look.holo > 0 ? .conic : .axial
-                fill.colors = look.swatch.map(\.cgColor)
-                fill.startPoint = look.holo > 0 ? CGPoint(x: 0.5, y: 0.5) : CGPoint(x: 0.2, y: 0.9)
-                fill.endPoint = look.holo > 0 ? CGPoint(x: 0.5, y: 1) : CGPoint(x: 0.8, y: 0.1)
+            }
+            if bounds.width > 0, drawn.map({ $0.dark != dark || $0.scale != scale }) ?? true {
+                let look = CardLook.of(finish, palette: palette, dark: dark)
+                fill.contents = CardArt.swatch(look, side: bounds.height, scale: scale)
+                fill.contentsScale = scale
+                drawn = (dark, scale)
             }
         }
         setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
+        if isHovered != wasHovered {
+            wasHovered = isHovered
+            onHoverChange?()
+        }
     }
 }

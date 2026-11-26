@@ -514,19 +514,22 @@ enum Tokens {
 
     /// Your Zigzag Card, the hero of About Zigzag: a bank card's proportions.
     enum Keepsake {
-        static let size = NSSize(width: 420, height: 264)
-        /// A bank card's corner for its width.
+        /// ISO ID-1 (85.6 × 54 mm), at 5 points a millimeter.
+        static let size = NSSize(width: 428, height: 270)
+        /// ID-1's 3.18 mm corner.
         static let radius: CGFloat = 16
-        /// From the card's edges to what's on it.
+        /// From the card's edges to what's on it, the same on every side.
         static let pad: CGFloat = Space.x6 + Space.x1
         static let wordmarkHeight: CGFloat = 18
         /// The wordmark alone in the middle of the back.
         static let backWordmarkHeight: CGFloat = 30
-        static let nameSize: CGFloat = 26
-        /// The ribbon Zs pressed into the surface: their height, the grid they sit on, and how deep they're pressed.
-        static let motifHeight: CGFloat = 9
-        static let motifStep = NSSize(width: 40, height: 32)
-        static let motifDepth: CGFloat = 0.6
+        /// The name, and the smallest it shrinks to before it's cut short.
+        static let nameSize: CGFloat = 28
+        static let nameSmallest: CGFloat = 20
+        /// The ribbon Z pressed into the front at its bottom right: its height, its ribbon as wide as the icon's, its depth.
+        static let emblemHeight: CGFloat = 150
+        static let emblemWeight: CGFloat = Brand.weight
+        static let emblemDepth: CGFloat = 1.2
         /// How deep the wordmark is stamped.
         static let stampDepth: CGFloat = 0.35
         /// The most it turns toward the pointer, in degrees, and how far the eye is from it.
@@ -537,9 +540,11 @@ enum Tokens {
         static let settle: TimeInterval = Material.follow
         static let settleBounce: CGFloat = 0.12
         static let turn: TimeInterval = Motion.large * 2
-        /// The saved picture's pixels per point, and the clear room around the card for its shadow, in points.
-        static let exportScale: CGFloat = 8
-        static let exportMargin: CGFloat = Space.x10
+        /// The saved picture: a 16:10 scene in points, at 3 pixels a point (2400 × 1500).
+        static let exportScene = NSSize(width: 800, height: 500)
+        static let exportScale: CGFloat = 3
+        /// The card in the saved picture, a little larger than in About, so it takes six tenths of the width.
+        static let exportGrow: CGFloat = 1.12
         /// Two shadows: a wide soft one it floats on, and a close one where it nearly touches.
         static let ambientRadius: CGFloat = 24
         static let ambientDrop: CGFloat = 14
