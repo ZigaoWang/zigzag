@@ -967,6 +967,19 @@ extension SyncLibrary {
         #expect(!settings.syncRows.statusRow.isAvailable)
     }
 
+    @Test func anUnrelatedDefaultsChangeSendsNothing() throws {
+        let (_, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let defaults = try #require(UserDefaults(suiteName: "SyncTests.unrelated"))
+        defer { defaults.removePersistentDomain(forName: "SyncTests.unrelated") }
+        var carried = SyncPreferences.read(from: defaults, profiles: [])
+        defaults.set("{{0, 0}, {800, 600}}", forKey: "NSWindow Frame main")
+        #expect(!ICloudSync.carriedPreferencesChanged(&carried, now: SyncPreferences.read(from: defaults, profiles: [])))
+        a.session.localChanged()
+        #expect(a.saves.isEmpty && a.deletes.isEmpty)
+        defaults.set(true, forKey: "ReduceMotion")
+        #expect(ICloudSync.carriedPreferencesChanged(&carried, now: SyncPreferences.read(from: defaults, profiles: [])))
+    }
+
     @Test func aBackupIsSavedBeforeTheFirstSync() throws {
         let url = try #require(ICloudSync.shared.backUp())
         defer { try? FileManager.default.removeItem(at: url) }

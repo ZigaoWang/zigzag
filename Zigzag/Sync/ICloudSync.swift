@@ -436,9 +436,15 @@ final class ICloudSync {
 
     private func watchLibrary() {
         tokens = [Library.shared.changed.observe { [weak self] in self?.localChangedSoon() }]
+        carried = currentPreferences()
         observers = [
             NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.localChangedSoon() }
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    // Sync's own writes of what came from iCloud aren't changes made here.
+                    if self.host.isWriting || self.session?.isApplying == true { self.carried = self.currentPreferences(); return }
+                    self.carriedDebouncer.call { [weak self] in self?.preferencesChanged() }
+                }
             },
             // Without a push, a Mac coming back to Zigzag still sees what changed.
             NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
@@ -456,6 +462,22 @@ final class ICloudSync {
         timer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.fetchSoon(after: 5 * 60) }
         }
+    }
+
+    /// The carried preferences as last read while on.
+    private var carried: [String: SettingValue] = [:]
+    private let carriedDebouncer = Debouncer(delay: 0.5, maxWait: 5)
+
+    private func preferencesChanged() {
+        guard Self.carriedPreferencesChanged(&carried, now: currentPreferences()) else { return }
+        localChangedSoon()
+    }
+
+    /// Whether a defaults change touched what sync carries; a window's frame or another Mac-only key doesn't.
+    static func carriedPreferencesChanged(_ last: inout [String: SettingValue], now: [String: SettingValue]) -> Bool {
+        guard now != last else { return false }
+        last = now
+        return true
     }
 
     private func localChangedSoon() {
@@ -811,7 +833,14 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         if let all { session.readAll(all) }
         if session.state.merged { session.fetchFinished() }
     }
-    func sendChanges() async throws { try await engine?.sendChanges() }
+    func sendChanges() async throws {
+        guard let engine, hasPending(engine) else { return }
+        try await engine.sendChanges()
+    }
+
+    private func hasPending(_ engine: CKSyncEngine) -> Bool {
+        !engine.state.pendingRecordZoneChanges.isEmpty || !engine.state.pendingDatabaseChanges.isEmpty
+    }
 
     func queue(saves: [String], deletes: [String]) {
         let changes = saves.map { CKSyncEngine.PendingRecordZoneChange.saveRecord(CKRecord.ID(recordName: $0, zoneID: ICloudSync.zoneID)) }
@@ -924,7 +953,7 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             fetchStarted = session.now()
             owner?.engineEvent(.syncing)
         case .willSendChanges:
-            owner?.engineEvent(.syncing)
+            if hasPending(syncEngine) { owner?.engineEvent(.syncing) }
         case .didFetchChanges:
             fetchStarted = nil
             guard session.state.merged else { break }
