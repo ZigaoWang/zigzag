@@ -600,12 +600,15 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
         case .rTorrent:
             var action = DownloadRuleAction(kind: .jsonRPC)
             action.rpcEndpoint = "http://127.0.0.1:8080/RPC2"
-            action.rpcMethod = "load.start"
+            // The metafile itself, not its address: a tracker passkey is a cookie, and rTorrent fetching the URL
+            // itself would be refused. Zigzag downloads it with the page's session and sends the bytes.
+            action.rpcMethod = "load.raw_start"
             action.rpcParameters = """
-            ["", "{link}"]
+            ["", "{file_raw}"]
             """
             action.rpcStyle = .xmlrpc
-            return DownloadRule(name: ruleName, applies: .downloads, match: .any, action: action)
+            return DownloadRule(name: ruleName, applies: .downloads, match: .fileType, pattern: "torrent",
+                                action: action, handoffType: .file)
         case .ytdlp:
             var action = DownloadRuleAction(kind: .runScript)
             // Via env, so it's found under either Homebrew prefix or anywhere on PATH.
@@ -627,6 +630,35 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
 // MARK: - Values a token stands for
 
 /// Token values for one handoff. Cookies are filled only when a rule needs them, since reading the store is slow.
+/// A saved file's bytes, base64, as a service that loads the metafile itself wants them. It stays a value of its own
+/// rather than text so an XML-RPC body can send it as `<base64>`: sending base64 as `<string>` is not the same thing to
+/// rTorrent, which expects the binary type there.
+nonisolated struct FileRaw: Equatable, Sendable {
+    /// The largest file this will read. A metafile is far under it; a rule that catches a video must not pull the
+    /// whole download into memory to find that out.
+    static let limit = 16 * 1024 * 1024
+
+    /// Nil when the rule didn't hand off a file, so the token expands to nothing.
+    var base64: String?
+    /// Why there are no bytes, when the rule asked for some.
+    var problem: Problem?
+
+    enum Problem: Equatable, Sendable {
+        /// No file was handed off: the rule hands off a link, or the download didn't finish.
+        case noFile
+        case tooLarge(Int)
+        case unreadable
+    }
+
+    init(_ file: URL?) {
+        guard let file else { problem = .noFile; return }
+        let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
+        if size > Self.limit { problem = .tooLarge(size); return }
+        guard let data = try? Data(contentsOf: file) else { problem = .unreadable; return }
+        base64 = data.base64EncodedString()
+    }
+}
+
 nonisolated struct HandoffValues: Equatable, Sendable {
     var link: URL
     /// The saved file, only when a File handoff has finished downloading one.
@@ -658,7 +690,7 @@ nonisolated struct HandoffValues: Equatable, Sendable {
 nonisolated enum DownloadTokens {
     /// All tokens, for the editor's note.
     static let names = ["{link}", "{encoded_link}", "{referrer}", "{cookies}", "{cookie_header}", "{filename}", "{mime}",
-                        "{space}", "{file}", "{file_url}"]
+                        "{space}", "{file}", "{file_url}", "{file_raw}"]
 
     /// Encodes `&`, `+`, `=` and `#` so they stay inside the value.
     static func queryValue(_ text: String) -> String {
@@ -700,24 +732,14 @@ nonisolated enum DownloadTokens {
         return name
     }
 
-    /// JSON string contents, without the quotes.
-    static func jsonEscaped(_ value: String) -> String {
-        guard let data = try? JSONEncoder().encode(value), let text = String(data: data, encoding: .utf8) else { return value }
-        return String(text.dropFirst().dropLast())
-    }
-
     /// Fills tokens in one pass, so a value that contains `{link}` or `{secret}` isn't expanded again. `query`
     /// encodes each value as one query value so a filename can't add parameters. `{path}`, `{query}` and
-    /// `{encoded_link}` are already encoded and aren't encoded twice. `json` escapes each value for a JSON string.
-    static func expand(_ template: String, with values: HandoffValues, secret: String = "", json: Bool = false,
+    /// `{encoded_link}` are already encoded and aren't encoded twice.
+    static func expand(_ template: String, with values: HandoffValues, secret: String = "",
                        query: Bool = false) -> String {
-        func value(_ text: String) -> String {
-            if json { return jsonEscaped(text) }
-            if query { return queryValue(text) }
-            return text
-        }
-        // Already encoded: JSON-escaped if needed, never percent-encoded again.
-        func part(_ text: String) -> String { json ? jsonEscaped(text) : text }
+        func value(_ text: String) -> String { query ? queryValue(text) : text }
+        // Already encoded: never percent-encoded again.
+        func part(_ text: String) -> String { text }
         // So aria2 or yt-dlp don't read a MIME type starting with `-` as an option.
         let mime = values.mime.hasPrefix("-") ? "_" + values.mime : values.mime
         let replacements: [String: String] = [
@@ -731,6 +753,10 @@ nonisolated enum DownloadTokens {
             // Only a File handoff has one; a URL handoff leaves both empty.
             "{file}": value(values.file?.path ?? ""),
             "{file_url}": value(values.file?.absoluteString ?? ""),
+            // The file's bytes, base64, for a service that loads a metafile itself rather than by path: rTorrent's
+            // load.raw_start. Inside a longer string it is text; on its own in a parameter it stays `FileRaw`, so an
+            // XML-RPC body can send it as <base64> (`substitute`).
+            "{file_raw}": values.file.flatMap { try? Data(contentsOf: $0) }?.base64EncodedString() ?? "",
             "{secret}": value(secret),
             // Address parts, e.g. `https://bing.com{path}` sends a google.com match to the same page on bing.com.
             // Already percent-encoded.
@@ -754,6 +780,19 @@ nonisolated enum DownloadTokens {
             index = template.index(after: index)
         }
         return result
+    }
+
+    /// One value already read out of a rule's JSON, with the token it is filled in. A string that is exactly a token
+    /// with a value of its own keeps that value, so `{file_raw}` reaches an RPC body as bytes rather than as text.
+    static func substitute(_ node: Any, with values: HandoffValues, secret: String = "") -> Any {
+        guard let text = node as? String else { return node }
+        if let typed = typedValue(of: text, with: values, secret: secret) { return typed }
+        return expand(text, with: values, secret: secret)
+    }
+
+    /// The value a string stands for, when it is exactly a token that has one of its own rather than text.
+    static func typedValue(of text: String, with values: HandoffValues, secret: String = "") -> Any? {
+        text == "{file_raw}" ? FileRaw(values.file) : nil
     }
 }
 
@@ -867,6 +906,22 @@ final class DownloadRulesStore {
     init(file: URL = Paths.downloadRules) {
         self.file = file
         rules = JSONStore.load([DownloadRule].self, from: file) ?? []
+        moveEndpointCredentialsToKeychain()
+    }
+
+    /// Endpoints used to carry `user:pass@` in the rules file. They are kept in the Keychain now, so an older rule has
+    /// its credentials taken out and the file rewritten without them.
+    private func moveEndpointCredentialsToKeychain() {
+        var moved = false
+        for index in rules.indices where rules[index].action.kind == .jsonRPC {
+            let endpoint = rules[index].action.rpcEndpoint
+            guard let (clean, user, password) = HandoffSecrets.endpointWithoutCredentials(endpoint),
+                  clean != endpoint else { continue }
+            HandoffSecrets.setEndpointCredentials((user, password), for: rules[index].id, endpoint: clean)
+            rules[index].action.rpcEndpoint = clean
+            moved = true
+        }
+        if moved { JSONStore.save(rules, to: file) }
     }
 
     /// First rule that matches. `appliesToLinks` is false for downloads; `filename` is the download's name (links
@@ -1024,11 +1079,79 @@ final class DownloadRulesStore {
 nonisolated enum HandoffSecrets {
     private static var service: String { "\(Bundle.main.bundleIdentifier ?? "app.zigzag").download-rules" }
 
-    private static func query(for rule: UUID) -> [CFString: Any] {
+    private static func query(for rule: UUID) -> [CFString: Any] { query(account: rule.uuidString) }
+
+    private static func query(account: String) -> [CFString: Any] {
         [kSecClass: kSecClassGenericPassword,
          kSecAttrService: service,
-         kSecAttrAccount: rule.uuidString]
+         kSecAttrAccount: account]
     }
+
+    /// A value kept for one account, or nil.
+    private static func value(forAccount account: String) -> String? {
+        var query = query(account: account)
+        query[kSecReturnData] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Keeps a value, or removes it when there is none.
+    private static func set(_ value: String?, account: String) {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            SecItemDelete(query(account: account) as CFDictionary)
+            return
+        }
+        let data = Data(trimmed.utf8)
+        var query = query(account: account)
+        let status = SecItemUpdate(query as CFDictionary, [kSecValueData: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            query[kSecValueData] = data
+            query[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlock
+            SecItemAdd(query as CFDictionary, nil)
+        }
+    }
+
+    /// An endpoint with any `user:pass@` taken out of it, and the credentials it carried. An address can hold them
+    /// only percent-encoded, so they are read back the same way.
+    static func endpointWithoutCredentials(_ endpoint: String) -> (endpoint: String, user: String, password: String)? {
+        guard var components = URLComponents(string: endpoint),
+              components.user != nil || components.password != nil else { return nil }
+        let user = components.user.map { $0.removingPercentEncoding ?? $0 } ?? ""
+        let password = components.password.map { $0.removingPercentEncoding ?? $0 } ?? ""
+        components.user = nil
+        components.password = nil
+        return (components.string ?? endpoint, user, password)
+    }
+
+    /// The username and password a rule's endpoint signs in with, kept apart from the rules file.
+    static func endpointCredentials(for rule: UUID, endpoint: String) -> (user: String, password: String)? {
+        guard let stored = value(forAccount: endpointAccount(for: rule)) else { return nil }
+        // Kept with the address it belongs to, so pointing a rule somewhere else can't send the old credentials there.
+        let parts = stored.components(separatedBy: "\n")
+        guard parts.count == 3, parts[0] == endpoint else { return nil }
+        return (parts[1], parts[2])
+    }
+
+    static func setEndpointCredentials(_ credentials: (user: String, password: String)?, for rule: UUID,
+                                       endpoint: String) {
+        let stored = credentials.flatMap { pair in
+            pair.user.isEmpty && pair.password.isEmpty ? nil : "\(endpoint)\n\(pair.user)\n\(pair.password)"
+        }
+        set(stored, account: endpointAccount(for: rule))
+    }
+
+    /// What the request proves who it is with: `Basic` and the credentials, never the address itself.
+    static func endpointAuthorization(for rule: UUID, endpoint: String) -> String? {
+        guard let pair = endpointCredentials(for: rule, endpoint: endpoint) else { return nil }
+        let data = Data("\(pair.user):\(pair.password)".utf8)
+        return "Basic \(data.base64EncodedString())"
+    }
+
+    private static func endpointAccount(for rule: UUID) -> String { "\(rule.uuidString)-endpoint" }
 
     static func secret(for rule: UUID) -> String? {
         var query = query(for: rule)

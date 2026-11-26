@@ -245,12 +245,99 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.expand("{filename}", with: linkish) == "{link}")
     }
 
-    @Test func jsonTokensAreQuotedForTheBody() {
+    @Test func aQuoteInANameCannotBreakTheBody() {
+        // Parameters are parsed as JSON first and filled in after, so no token is ever text in a body and nothing has
+        // to be escaped for one: a quote in a filename stays in the filename.
         let values = HandoffValues(link: video, filename: "a \"quoted\" \\ name.mp4")
-        let expanded = DownloadTokens.expand(#"{"name":"{filename}"}"#, with: values, json: true)
-        let data = Data(expanded.utf8)
-        let object = try? JSONSerialization.jsonObject(with: data) as? [String: String]
-        #expect(object?["name"] == "a \"quoted\" \\ name.mp4")
+        let filled = DownloadHandoff.parameters(#"["{filename}"]"#, values: values, secret: "")
+        #expect(filled?.first as? String == "a \"quoted\" \\ name.mp4")
+    }
+
+    @Test func aFileTokenIsBytesInABody() throws {
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("sample.torrent")
+        try Data("d4:infod4:name6:samplee".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let values = HandoffValues(link: video, file: file)
+        let filled = DownloadHandoff.parameters(#"["", "{file_raw}"]"#, values: values, secret: "")
+        #expect(filled?.count == 2)
+        // The value is the file's base64, not its path and not an empty string.
+        let raw = try #require(filled?[1] as? FileRaw)
+        #expect(raw.base64 == Data("d4:infod4:name6:samplee".utf8).base64EncodedString())
+    }
+
+    @Test func anxmlrpcBodyCarriesTheFileAsBase64() throws {
+        // rTorrent reads the binary type; base64 sent as a string is a path it can't open.
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("sample2.torrent")
+        try Data("d4:info".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let body = DownloadHandoff.xmlRPC(method: "load.raw_start",
+                                          parameters: ["", FileRaw(file)])
+        #expect(body.contains("<base64>\(Data("d4:info".utf8).base64EncodedString())</base64>"))
+        #expect(!body.contains("<string>d4:info</string>"))
+    }
+
+    @Test func theOlderFileTokensAreUnchanged() throws {
+        // Compatibility: `{file}` is still the path and `{file_url}` still the file URL, so rules written against a
+        // launch build keep meaning what they meant.
+        let file = URL(fileURLWithPath: "/tmp/a.torrent")
+        let values = HandoffValues(link: video, file: file)
+        #expect(DownloadTokens.expand("{file}", with: values) == "/tmp/a.torrent")
+        #expect(DownloadTokens.expand("{file_url}", with: values) == "file:///tmp/a.torrent")
+    }
+
+    @Test func aRuleThatSendsBytesSaysSoWhenThereAreNone() {
+        // A link handoff has no file: better a plain reason than an empty <base64> the service refuses obscurely.
+        let values = HandoffValues(link: video)
+        let raw = FileRaw(values.file)
+        #expect(raw.problem == .noFile)
+        #expect(raw.base64 == nil)
+    }
+
+    @Test func aFileTooLargeToSendIsRefusedRatherThanRead() throws {
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("big.bin")
+        try Data(count: FileRaw.limit + 1).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let raw = FileRaw(file)
+        #expect(raw.problem == .tooLarge(FileRaw.limit + 1))
+        #expect(raw.base64 == nil)
+    }
+
+    @Test func aJsonBodyCarriesTheBytesAsBase64Text() throws {
+        // JSON has no binary type, so the same token goes as base64 text: aria2.addTorrent takes it that way.
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("sample3.torrent")
+        try Data("d4:info".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let values = HandoffValues(link: video, file: file)
+        let filled = DownloadHandoff.parameters(#"["torrent", "{file_raw}"]"#, values: values, secret: "")
+        let ready = DownloadHandoff.jsonReady(filled ?? []) as? [Any]
+        #expect(ready?.count == 2)
+        #expect(ready?[1] as? String == Data("d4:info".utf8).base64EncodedString())
+    }
+
+    @Test func anEndpointHandsItsCredentialsOver() {
+        // `user:pass@` in an address becomes the two fields, so the rules file keeps an address and nothing else.
+        let split = HandoffSecrets.endpointWithoutCredentials("https://me:p%40ss@daemon.example:8080/RPC2")
+        #expect(split?.endpoint == "https://daemon.example:8080/RPC2")
+        #expect(split?.user == "me")
+        #expect(split?.password == "p@ss")
+    }
+
+    @Test func anEndpointWithoutCredentialsIsLeftAlone() {
+        #expect(HandoffSecrets.endpointWithoutCredentials("http://127.0.0.1:8080/RPC2") == nil)
+        #expect(HandoffSecrets.endpointWithoutCredentials("") == nil)
+    }
+
+    // MARK: Presets
+
+    @Test func theRTorrentPresetSendsTheMetafileItself() {
+        // A tracker passkey is a cookie: rTorrent fetching the address itself would be refused, so the file is sent.
+        let rule = DownloadPreset.rTorrent.rule
+        #expect(rule.match == .fileType)
+        #expect(rule.pattern == "torrent")
+        #expect(rule.handoffType == .file)
+        #expect(rule.action.rpcMethod == "load.raw_start")
+        #expect(rule.action.rpcParameters.contains("{file_raw}"))
+        #expect(rule.applies == .downloads)
     }
 
     // MARK: Cookies

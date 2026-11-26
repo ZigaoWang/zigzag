@@ -53,6 +53,16 @@
   Test: DownloadRuleTests.onlyDownloadsHandOffASavedFile
 - A File handoff's templates → `{file}` is the saved file's path and `{file_url}` its file URL, while `{link}` stays the address.
   Test: DownloadRuleTests.fileTokensAreTheSavedFileAndNothingWithoutOne
+- `{file_raw}` → the saved file's own bytes, base64, for a service that loads the metafile itself; an XML-RPC body sends it as `<base64>` and a JSON-RPC body as base64 text.
+  Test: DownloadRuleTests.aFileTokenIsBytesInABody
+  Test: DownloadRuleTests.anxmlrpcBodyCarriesTheFileAsBase64
+  Test: DownloadRuleTests.aJsonBodyCarriesTheBytesAsBase64Text
+- `{file_raw}` with no saved file → the handoff fails and says why, rather than sending an empty value the service refuses obscurely.
+  Test: DownloadRuleTests.aRuleThatSendsBytesSaysSoWhenThereAreNone
+- `{file_raw}` on a file past 16 MB → refused by size without reading it, since a rule may catch something far bigger than a metafile.
+  Test: DownloadRuleTests.aFileTooLargeToSendIsRefusedRatherThanRead
+- Send to rTorrent → catches `.torrent` files and hands over the metafile itself with `load.raw_start`, so a tracker's cookie-based passkey works.
+  Test: DownloadRuleTests.theRTorrentPresetSendsTheMetafileItself
 - A rule saved before Hand off existed → keeps handing off its URL.
   Test: DownloadRuleTests.aFileHandoffIsOptInAndOlderRulesKeepTheURL
 - A File handoff whose download fails or is cancelled → nothing is handed off. A download you cancel or remove says nothing; only a failure says the download didn't finish.
