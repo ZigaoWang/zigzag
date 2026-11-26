@@ -1318,13 +1318,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 上一次移除了许多内容。它们仍在 iCloud 中。"
+            "value" : "这台 Mac 上一次性移除了许多内容。它们仍在 iCloud 中。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台 Mac 上一次移除了許多內容。它們仍在 iCloud 中。"
+            "value" : "這台 Mac 上一次性移除了許多內容。它們仍在 iCloud 中。"
           }
         }
       }
