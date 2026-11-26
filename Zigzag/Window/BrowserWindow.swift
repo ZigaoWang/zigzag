@@ -519,7 +519,7 @@ final class BrowserWindow: NSWindow {
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             if let b = standardWindowButton(button), !b.isHidden, b.convert(b.bounds, to: nil).insetBy(dx: -4, dy: -4).contains(point) { return false }
         }
-        return control(at: point) == nil
+        return control(at: point) == nil && TouchTargets.point(for: point, in: self) == nil
     }
 
     private func routeTitlebarEvent(_ event: NSEvent) -> Bool {
@@ -856,8 +856,10 @@ extension BrowserWindow: TouchPress.Handling {
     /// A tap on one of our controls in the title bar strip, where AppKit's click from it went to the title bar and
     /// never reached `routeTitlebarEvent`: the control is clicked.
     func touchTapped(_ event: NSEvent, downAt time: TimeInterval) {
-        let point = event.locationInWindow
-        if spentTap.takes(at: point) { return }
+        if spentTap.takes(at: event.locationInWindow) { return }
+        // Beside a small control, the tap is that control's (`TouchTargets`).
+        let point = TouchTargets.point(for: event.locationInWindow, in: self) ?? event.locationInWindow
+        let event = point == event.locationInWindow ? event : TouchPress.mouseDown(at: point, in: self) ?? event
         // Two taps on the title bar strip's empty space: AppKit's own title bar takes them as single clicks.
         if isOnEmptyTitlebar(point) {
             let previous = lastTitlebarTap

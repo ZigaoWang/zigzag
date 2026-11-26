@@ -703,8 +703,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The press the × took over from the row, until it lifts.
     private var closePress: NSEvent?
 
-    /// The × is 20 points; a finger takes it anywhere in `TouchGestures.target` around it, within the row.
-    var closeTouchBox: NSRect { TouchGestures.box(around: closeButton.frame).intersection(bounds) }
+    /// The × is 20 points; a finger takes it anywhere in `TouchTargets.size` around it, within the row.
+    var closeTouchBox: NSRect { TouchGestures.box(around: closeButton.frame, minimum: TouchTargets.size).intersection(bounds) }
 
     /// A finger landed, in window coordinates.
     func touchDown(at windowPoint: NSPoint) {

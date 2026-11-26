@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// Touch on a Mac with a touch display or a Sidecar iPad (TN3212). Every recognizer made here sees fingers only: a
 /// mouse or trackpad never reaches one, so pointer behavior stays exactly as it was.
@@ -354,8 +355,12 @@ enum TouchPress {
 
     static func isTouchScroll(at time: TimeInterval) -> Bool { isTouchScroll(at: time, landedAt: landedAt, fingerDown: fingerDown) }
 
+    /// Where the last finger landed (window coordinates) and in which window.
+    static var landedPoint: (point: NSPoint, window: Int)?
+
     /// A finger landed at `point` (window coordinates): the same hooks a mouse-down runs.
     static func pressed(at point: NSPoint, in window: NSWindow) {
+        landedPoint = (point, window.windowNumber)
         guard let event = mouseDown(at: point, in: window) else { return }
         PopupNotice.noteInput(event)
         (window as? Handling)?.touchPressed(event)
@@ -408,6 +413,116 @@ enum TouchPress {
         }
 
         var isActive: Bool { listener != nil }
+    }
+}
+
+/// Small controls take a finger's click anywhere in a box `size` points each way around them (Apple's touch targets),
+/// where the finger lands on what they sit on rather than on another control; the nearest takes it. Drawing and the
+/// mouse's clicks are unchanged.
+@MainActor
+enum TouchTargets {
+    nonisolated static let size: CGFloat = 44
+
+    /// Whether `event` is AppKit's click from the finger that last landed, near where it landed.
+    static func isFingerClick(_ event: NSEvent) -> Bool {
+        guard TouchDoubleTap.isFromFinger(event.timestamp, landedAt: TouchPress.landedAt) else { return false }
+        guard let landed = TouchPress.landedPoint else { return true }
+        let p = event.locationInWindow
+        return landed.window == event.windowNumber && hypot(p.x - landed.point.x, p.y - landed.point.y) <= TouchGestures.target
+    }
+
+    /// Of controls at `frames`, the one whose box holds `point` with its middle nearest; nil when none does.
+    nonisolated static func nearest(_ frames: [NSRect], to point: NSPoint) -> Int? {
+        frames.indices.filter { TouchGestures.box(around: frames[$0], minimum: size).contains(point) }
+            .min { hypot(frames[$0].midX - point.x, frames[$0].midY - point.y) < hypot(frames[$1].midX - point.x, frames[$1].midY - point.y) }
+    }
+
+    /// Whether a control of `width` by `height` is small enough to take touches around it.
+    nonisolated static func isSmall(width: CGFloat, height: CGFloat) -> Bool { max(width, height) < size }
+
+    /// Where a finger at `windowPoint` clicks instead: the middle of the small control it's for, or nil when it's
+    /// on a control already, on a page or text, or near none.
+    static func point(for windowPoint: NSPoint, in window: NSWindow) -> NSPoint? {
+        guard let hit = hit(at: windowPoint, in: window), !isOnControl(hit), let root = window.contentView?.superview ?? window.contentView else { return nil }
+        let reach = NSRect(x: windowPoint.x - size / 2, y: windowPoint.y - size / 2, width: size, height: size)
+        var controls: [(view: InteractiveView, frame: NSRect)] = []
+        collect(in: root, reach: reach, into: &controls)
+        var frames = controls.map(\.frame)
+        while let index = nearest(frames, to: windowPoint) {
+            let control = controls[index].view
+            // A control that doesn't clip has a visible rect past its bounds.
+            let visible = control.convert(control.visibleRect.intersection(control.bounds), to: nil)
+            let middle = NSPoint(x: visible.midX, y: visible.midY)
+            // Only where a click there reaches it: not under a panel, not scrolled away.
+            if !visible.isEmpty, let there = self.hit(at: middle, in: window), there === control || there.isDescendant(of: control) { return middle }
+            frames[index] = .null
+        }
+        return nil
+    }
+
+    /// What a click at `windowPoint` hits, as our title bar strip routes it: the content's view there, not AppKit's
+    /// title bar over it.
+    static func hit(at windowPoint: NSPoint, in window: NSWindow) -> NSView? {
+        guard let content = window.contentView, let frame = content.superview else { return window.contentView?.hitTest(windowPoint) }
+        let hit = frame.hitTest(frame.convert(windowPoint, from: nil))
+        if let hit, hit === content || hit.isDescendant(of: content) || hit is NSControl { return hit }
+        return content.hitTest(frame.convert(windowPoint, from: nil)) ?? hit
+    }
+
+    /// Whether `view` is in something that takes clicks of its own: a control, text, a page, a resize strip.
+    private static func isOnControl(_ view: NSView) -> Bool {
+        sequence(first: view, next: { $0.superview }).contains {
+            $0 is InteractiveView || $0 is NSControl || $0 is NSText || $0 is WKWebView || $0 is ResizeHandle || $0 is NSScroller
+        }
+    }
+
+    /// The small enabled controls showing in `view`, with frames in window coordinates, whose box may reach `reach`.
+    private static func collect(in view: NSView, reach: NSRect, into controls: inout [(view: InteractiveView, frame: NSRect)]) {
+        for child in view.subviews where !child.isHidden && child.alphaValue > 0.01 && !(child is WKWebView) {
+            let frame = child.convert(child.bounds, to: nil)
+            guard frame.insetBy(dx: -size / 2, dy: -size / 2).intersects(reach) else { continue }
+            if let control = child as? InteractiveView {
+                if control.isEnabled, control.onClick != nil, isSmall(width: frame.width, height: frame.height) { controls.append((control, frame)) }
+                // A control's own small controls are its to place (a row's ×).
+                continue
+            }
+            collect(in: child, reach: reach, into: &controls)
+        }
+    }
+}
+
+/// Moves a finger's click onto the small control it's for (`TouchTargets`), and the drags and lift after it the
+/// same way, so the control sees a press and release inside itself.
+@MainActor
+final class TouchRetarget {
+    static let shared = TouchRetarget()
+    private var shift: (dx: CGFloat, dy: CGFloat, window: Int)?
+
+    /// `event` as the control it's for gets it; `window` is the event's own unless given.
+    func adjust(_ event: NSEvent, in window: NSWindow? = nil) -> NSEvent {
+        switch event.type {
+        case .leftMouseDown:
+            shift = nil
+            guard let window = window ?? event.window, TouchTargets.isFingerClick(event),
+                  let to = TouchTargets.point(for: event.locationInWindow, in: window) else { return event }
+            shift = (to.x - event.locationInWindow.x, to.y - event.locationInWindow.y, event.windowNumber)
+            TouchLog.note("click moved \(Int(to.x - event.locationInWindow.x)),\(Int(to.y - event.locationInWindow.y)) onto a control")
+            return moved(event)
+        case .leftMouseDragged, .leftMouseUp:
+            guard let shift, shift.window == event.windowNumber else { return event }
+            if event.type == .leftMouseUp { self.shift = nil }
+            return moved(event, by: shift)
+        default:
+            return event
+        }
+    }
+
+    private func moved(_ event: NSEvent, by shift: (dx: CGFloat, dy: CGFloat, window: Int)? = nil) -> NSEvent {
+        guard let shift = shift ?? self.shift else { return event }
+        let point = NSPoint(x: event.locationInWindow.x + shift.dx, y: event.locationInWindow.y + shift.dy)
+        return NSEvent.mouseEvent(with: event.type, location: point, modifierFlags: event.modifierFlags, timestamp: event.timestamp,
+                                  windowNumber: event.windowNumber, context: nil, eventNumber: event.eventNumber,
+                                  clickCount: event.clickCount, pressure: event.pressure) ?? event
     }
 }
 

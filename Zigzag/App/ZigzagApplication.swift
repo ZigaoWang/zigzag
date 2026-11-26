@@ -51,7 +51,8 @@ final class ZigzagApplication: NSApplication {
         if MCPKeyDelivery.stopsOnTheWayBack(event) { return }
         // Your own clicks and keys, for a page's pop-up that WebKit didn't count as clicked.
         PopupNotice.noteInput(event)
-        super.sendEvent(event)
+        // A finger's click beside a small control is that control's.
+        super.sendEvent(TouchRetarget.shared.adjust(event))
     }
 
     #if DEBUG
