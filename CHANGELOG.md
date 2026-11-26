@@ -5,16 +5,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
 ### New
 - Sync with iCloud, in Settings › General: your spaces, profiles, pinned tabs, folders, favorites, live folders and settings stay the same on every Mac signed in to your iCloud, kept in your own iCloud's private database. Open tabs, history, website data and extensions stay on each Mac, and passwords keep syncing through iCloud Keychain. Turning it on puts the Mac's library together with iCloud's: where something is in both, the newer edit wins, nothing is removed without asking, and a backup is saved first. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
-- While a live folder checks for new pages, the chip on its icon shows a turning ring, the way Mail shows a mailbox being checked, and it stops the moment the check ends.
-- The New and Edit Live Folder sheet shows the folder's own icon, as the sidebar does: GitHub's for a GitHub list, the site's for a feed, or the one you chose. Click it to change the icon, as Change Icon… does, and a new folder keeps the icon you pick.
-
-- A live folder's menu left open while it updates now changes from Updating… to Updated Just Now, or to why it couldn't refresh, without closing it.
-
-- History's search ignores accents and case, finds every word in any order and marks it, and never hides a match in a stack; each part of the day has one heading, two pages from one site stay two rows, and the list answers the arrow keys, Delete, ⌘Return, ⌘F and a right-click that removes a whole site.
 
 ## [0.10.0] - 2026-11-25
 
