@@ -4426,6 +4426,36 @@
         "value": "Данные профиля, которого больше нет в списке"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "few": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Данные %lld профилей, которых больше нет в списке"
+            }
+          },
+          "many": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Данные %lld профилей, которых больше нет в списке"
+            }
+          },
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Данные %lld профиля, которого больше нет в списке"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Данные %lld профилей, которых больше нет в списке"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",

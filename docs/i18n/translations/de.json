@@ -3904,6 +3904,24 @@
         "value": "Daten eines nicht mehr aufgeführten Profils"
       }
     },
+    "Data from %lld profiles that are no longer listed": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Daten von %lld nicht mehr aufgeführtem Profil"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Daten von %lld nicht mehr aufgeführten Profilen"
+            }
+          }
+        }
+      }
+    },
     "Default": {
       "stringUnit": {
         "state": "translated",
