@@ -2,10 +2,17 @@ import AppKit
 
 /// What the edge preview shows for a row.
 enum EdgeLensPolicy {
-    /// Web pages and local files are previewed; Zigzag's own pages stay in the window.
+    /// Web pages and local files are previewed. Zigzag's own pages (Settings, History) belong to the window, so the
+    /// panel can't show them — but it says so on a card rather than doing nothing.
     static func previews(url: URL?) -> Bool {
         ["http", "https", "file"].contains(url?.scheme?.lowercased() ?? "")
     }
+
+    /// The card a Zigzag page gets in the preview's room: its name and why it can't be shown there.
+    static let systemPageNote = String(localized: "Zigzag's own page.",
+                                       comment: "In the edge sidebar's card over a row of Zigzag's own pages, like Settings or History.")
+    static let systemPageHint = String(localized: "Open it from the sidebar in Zigzag's window.",
+                                       comment: "At the foot of the edge sidebar's card over a row of Zigzag's own pages, like Settings or History.")
 
     /// A running page is lent to the preview; one asleep or not loaded yet shows a card, so a hover never wakes it.
     static func showsLivePage(isLoaded: Bool, isAsleep: Bool) -> Bool { isLoaded && !isAsleep }
@@ -281,6 +288,19 @@ final class EdgeSidebar {
         if MenuPanel.current == nil, panel.frame != frame { panel.setFrame(frame, display: true) }
         // The panel gets no mouse moves with another app in front, so the preview's strip follows from here.
         preview?.pointerMoved(toScreen: NSEvent.mouseLocation)
+        // The preview is a child window, so it composites above everything in the panel — including a menu opened
+        // from the card. While a menu is open the preview stands down, or the menu is drawn underneath it and the
+        // `+`'s menu appears to open in the wrong place.
+        if let preview, (MenuPanel.current != nil) != preview.isCoveredInDock {
+            preview.layoutInDock(force: true)
+        }
+        // The panel is nonactivating and may not be key, and with no key window the menu bar's keys (⌘T, ⌘W, ⌘L)
+        // never arrive. Over the card they should act on the browser, as they did before. The page's pill takes the
+        // keyboard itself when it needs it.
+        if let host, !NSApp.isActive || panel.isKeyWindow == false {
+            let inHost = host.convert(panel.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+            if host.cardFrame.contains(inHost), !panel.isKeyWindow, MenuPanel.current == nil { panel.makeKey() }
+        }
         if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: frame) {
             leftAt = nil
             return
@@ -307,7 +327,7 @@ final class EdgeSidebar {
             if tab == nil { schedulePreviewClose() }
             return
         }
-        guard !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url) else {
+        guard !tab.isPrivate, tab.url != nil else {
             schedulePreviewClose()
             return
         }
@@ -363,11 +383,11 @@ final class EdgeSidebar {
     /// The row's page in a docked Mini beside the sidebar, folding in over the page before it. A page that isn't
     /// running shows its card instead, and stays asleep.
     private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
-        guard isShowing, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
-              preview?.tab !== tab else { return }
-        // A real page takes the blank pill's place.
+        guard isShowing, let panel, let host, !tab.isPrivate, tab.url != nil, preview?.tab !== tab else { return }
+        // A real page, or the card standing in for one, takes the blank pill's place.
         host.showBlankSlate(false)
-        let live = EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
+        let system = !EdgeLensPolicy.previews(url: tab.url)
+        let live = !system && EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
         let previous = preview
         // The panel takes its full width first, so the page is laid out once at its final size.
         let sidebar = controller.edgeSidebarWidth
@@ -382,7 +402,17 @@ final class EdgeSidebar {
             if previous == nil { narrowPanel() }
             return
         }
-        if !live { mini.showAsleepCard() }
+        if !live {
+            mini.showAsleepCard(note: system ? EdgeLensPolicy.systemPageNote : nil,
+                                hint: system ? EdgeLensPolicy.systemPageHint : nil)
+            // A click on the card wakes the page in its own room: the panel stays out and the row needn't be found
+            // again in the browser window.
+            mini.onAsleepCardClicked = { [weak self, weak tab] in
+                guard let self, let tab, self.isShowing, let controller = self.target else { return }
+                controller.listSelect(tab)
+                self.showPreview(tab, in: controller)
+            }
+        }
         mini.onInPageMiniClosed = { [weak self, weak mini] in self?.previewClosed(mini) }
         mini.onInPageMiniDetached = { [weak self, weak mini] in self?.previewDetached(mini) }
         preview = mini
@@ -393,7 +423,7 @@ final class EdgeSidebar {
             guard let previous else { return }
             previous.onInPageMiniClosed = nil
             previous.onInPageMiniDetached = nil
-            previous.closeInPage(focusBack: false, animated: false)
+            previous.closeInPage(focusBack: true, animated: false)
         }
     }
 
@@ -444,11 +474,11 @@ final class EdgeSidebar {
         preview = nil
         previewTab = nil
         if animated {
-            mini.closeInPage(focusBack: false, animated: true)
+            mini.closeInPage(focusBack: true, animated: true)
         } else {
             mini.onInPageMiniClosed = nil
             mini.onInPageMiniDetached = nil
-            mini.closeInPage(focusBack: false, animated: false)
+            mini.closeInPage(focusBack: true, animated: false)
             narrowPanel()
         }
     }
@@ -544,6 +574,9 @@ final class EdgeSidebar {
         host.onRight = onRight
         host.cardWidth = target.edgeSidebarWidth
         host.set(container)
+        // The panel's next responder is the browser's controller, so its menu items and actions reach the same
+        // browser the panel shows: without it a nonactivating panel swallows every key that isn't ⌘T.
+        panel.nextResponder = target
         generation += 1
         cardPanelFrame = EdgeSidebarLayout.frame(in: visible, width: host.cardWidth + host.inset, onRight: onRight)
         shownVisible = visible
@@ -593,11 +626,18 @@ final class EdgeSidebar {
         }
     }
 
-    /// A menu is opening in the panel: it widens on the inner side, the card staying put, so the menu isn't cut off.
+    /// A menu is opening in the panel: it widens toward the screen's inner side, the card staying put, so the menu
+    /// isn't cut off. Which edge grows depends on which side of the screen the panel is on — growing the wrong edge
+    /// moves the card and its button, and the menu opens where the button no longer is.
     func makeRoomForMenu() {
         guard isShowing, let panel else { return }
-        let width = max(cardPanelFrame.width + EdgeSidebarLayout.menuRoom, previewPanelFrame.width)
-        panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: width, onRight: shownOnRight), display: true)
+        let wide = max(cardPanelFrame.width + EdgeSidebarLayout.menuRoom, previewPanelFrame.width)
+        // The panel keeps the screen edge it is pinned to: on the right its left edge grows inward, on the left its
+        // right edge does. `frame(in:width:onRight:)` already anchors the correct edge; the card is placed by `set`.
+        panel.setFrame(EdgeSidebarLayout.frame(in: shownVisible, width: wide, onRight: shownOnRight), display: true)
+        host?.placeCard()
+        // The page has to be out of the way before the menu is placed over the card, since it composites above it.
+        preview?.layoutInDock(force: true)
     }
 
     /// ⌘T with the panel clicked into: a new tab in the window, which comes forward.
@@ -663,6 +703,10 @@ final class EdgeSidebarPanel: NSPanel {
             EdgeSidebar.shared.newTab()
             return true
         }
+        // Everything else that the menu bar answers, answered the same way it is in the window: the panel's next
+        // responder is the browser's controller, so its menu items act on the same browser. A nonactivating panel gets
+        // no key equivalents from the menu bar by itself, which is why they all went dead.
+        if NSApp.mainMenu?.performKeyEquivalent(with: event) == true { return true }
         return super.performKeyEquivalent(with: event)
     }
 }
@@ -785,7 +829,13 @@ extension EdgeSidebar: MiniDockHosting {
     /// No page behind it to dim.
     func dockShowDim(owner: AnyObject, onClick: @escaping () -> Void) -> MiniPeekDimView? { nil }
     func dockHideDim(owner: AnyObject) {}
-    func dockFocusPage() {}
+    /// Where the keyboard goes when the preview closes: back to the panel it came from, not to the browser window
+    /// behind it. Left empty, the key window is the closing Mini's, so AppKit hands the keyboard to the browser and
+    /// the window comes forward as if a row had been clicked.
+    func dockFocusPage() {
+        guard isShowing, let panel else { return }
+        panel.makeKey()
+    }
 }
 
 /// Over the preview's room while the row's page isn't running: its name and why, on the card's own ground.
@@ -797,6 +847,9 @@ final class EdgeAsleepPageView: NSView {
     /// What the card says, for tests.
     private(set) var shownTitle = ""
     private(set) var shownNote = ""
+    /// A click on the card, with the pointer as it was pressed: waking the page here, without going back to the
+    /// browser window for its row.
+    var onClick: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -818,10 +871,17 @@ final class EdgeAsleepPageView: NSView {
 
     override var isFlipped: Bool { true }
 
+    /// The card is the way to wake the page from the panel: a row click takes you back to the browser window, so
+    /// without this the only way to wake a sleeping page was to leave.
+    override func mouseDown(with event: NSEvent) {
+        onClick?()
+    }
+
     /// The row's name and why its page isn't running. Reads the tab only; never wakes it.
-    func show(tab: Tab) {
+    /// `note` and `hint`, when given, replace what the tab would say: Zigzag's own pages explain themselves this way.
+    func show(tab: Tab, note noteText: String? = nil, hint hintText: String? = nil) {
         shownTitle = tab.displayTitle
-        shownNote = tab.notLoadedNote ?? ""
+        shownNote = [noteText ?? tab.notLoadedNote ?? "", hintText ?? ""].filter { !$0.isEmpty }.joined(separator: " ")
         title.stringValue = shownTitle
         note.stringValue = shownNote
         note.isHidden = shownNote.isEmpty

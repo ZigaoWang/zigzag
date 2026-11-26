@@ -4351,9 +4351,9 @@ extension BrowserWindowController: SidebarDelegate {
         if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) }
     }
     func sidebarShowDownloads(from view: NSView) {
-        guard EdgeSidebar.shared.isShowing else { return DownloadsPanel.show(from: view, in: self) }
-        bringForwardForEdge()
-        showDownloads(nil)
+        // In the panel, the list opens over the panel in place: bringing the whole browser forward to show a
+        // downloads list takes the user out of what they were doing and hides the panel they asked from.
+        DownloadsPanel.show(from: view, in: self)
     }
     /// A space dot's menu: Edit Space… opens at the dot.
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? { sidebarSpaceMenu(for: id, anchor: sidebar.dot(for: id)) }
