@@ -205,9 +205,18 @@ final class Profiles {
     /// folder. It's left by a Profiles.json put back from a backup made before the profile was, or one that
     /// couldn't be read and was set aside. Never erased without asking: it may be a profile you still want.
     func orphans() async -> [UUID] {
-        let stores = await WKWebsiteDataStore.allDataStoreIdentifiers
+        let stores = Self.sharesStores ? [] : await WKWebsiteDataStore.allDataStoreIdentifiers
         let folders = (try? FileManager.default.contentsOfDirectory(atPath: Paths.support.appendingPathComponent("Profiles", isDirectory: true).path)) ?? []
         return Library.shared.directory.orphans(amongStores: stores + folders.compactMap(UUID.init(uuidString:)))
+    }
+
+    /// A test copy or the test host shares WebKit's stores, kept by bundle ID, with the dev build and other copies.
+    private static var sharesStores: Bool {
+        #if DEBUG
+        DevDefaults.testsData != nil || !(ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] ?? "").isEmpty
+        #else
+        false
+        #endif
     }
 
     /// Erases what's on disk under an ID that's no profile's, once that's written down, so it's finished at the
