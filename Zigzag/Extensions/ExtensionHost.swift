@@ -180,6 +180,12 @@ struct OnePasswordTrust {
 final class ExtensionHost: NSObject {
     /// Whose extensions these are.
     unowned let profile: Profile
+    /// The same profile, read before `profile` by work that waited: nil once it's gone.
+    private weak var owner: Profile?
+    /// Set when the profile is removed: loading that was waiting stops.
+    private var stopped = false
+    /// Whether the profile is removed or gone, so work that waited mustn't touch it.
+    private var isGone: Bool { stopped || owner == nil }
     let controller: WKWebExtensionController
     private(set) var contexts: [WKWebExtensionContext] = []
     /// Fires when extensions load or their toolbar actions change.
@@ -213,6 +219,7 @@ final class ExtensionHost: NSObject {
 
     init(profile: Profile) {
         self.profile = profile
+        owner = profile
         // Under the profile's own identifier: what its extensions store (chrome.storage, their rules) is kept apart
         // from any other profile's copy of the same extension.
         let configuration = WKWebExtensionController.Configuration(identifier: profile.id)
@@ -272,7 +279,9 @@ final class ExtensionHost: NSObject {
     /// launch: a proxy one of them set applies from the first page, then each that's on is loaded.
     func start() {
         bridge.proxy.restore()
-        Task {
+        Task { [weak self] in
+            // A profile removed or freed before this runs has nothing to load.
+            guard let self, !self.isGone else { return }
             // An extension that went while this profile wasn't in use takes its pin with it.
             profile.installs.pins = profile.installs.pins.keeping(profile.installs.hasRecord)
             await loadInstalled()
@@ -285,11 +294,14 @@ final class ExtensionHost: NSObject {
     /// Loads every installed extension that's turned on, and reads the rest for Settings. Safe to call again:
     /// what's already loaded stays as it is.
     func loadInstalled() async {
+        guard !isGone else { return }
         for id in profile.installs.installedIDs {
+            // Each load waits; the profile may have gone meanwhile.
+            guard !isGone else { return }
             if profile.installs.isEnabled(id) {
                 await load(id)
             } else if installed[id] == nil, let dir = ExtensionStore.packageDirectory(for: id),
-                      let ext = try? await WKWebExtension(resourceBaseURL: dir) {
+                      let ext = try? await WKWebExtension(resourceBaseURL: dir), !isGone {
                 installed[id] = ext
                 changed.send()
             }
@@ -566,6 +578,7 @@ final class ExtensionHost: NSObject {
 
     /// Stops every extension and deletes what each stored here, when the profile is removed.
     func shutDown() async {
+        stopped = true
         for context in contexts { unload(context.uniqueIdentifier) }
         let types = WKWebExtensionController.allExtensionDataTypes
         let records = await controller.dataRecords(ofTypes: types)
@@ -598,9 +611,11 @@ final class ExtensionHost: NSObject {
     @discardableResult
     func load(_ id: String) async -> WKWebExtensionContext? {
         if let existing = context(for: id) { return existing }
-        guard profile.installs.isEnabled(id), let directory = await profile.installs.loadDirectory(for: id) else { return nil }
+        guard !isGone, profile.installs.isEnabled(id), let directory = await profile.installs.loadDirectory(for: id) else { return nil }
         do {
             let ext = try await WKWebExtension(resourceBaseURL: directory)
+            // Removed or freed while it was being read.
+            guard !isGone else { return nil }
             // Asked for twice at once (the profile's extensions starting as one is added): the first to finish stands.
             if let existing = context(for: id) { return existing }
             // Turned off while it was being read.
@@ -791,7 +806,7 @@ final class ExtensionHost: NSObject {
     func applyPrivateAccess(_ id: String) {
         guard context(for: id) != nil else { changed.send(); return }
         unload(id)
-        Task { await load(id) }
+        Task { [weak self] in await self?.load(id) }
     }
 
     /// Whether an extension here is allowed in private windows: only then are they told to WebKit at all.
@@ -810,7 +825,7 @@ final class ExtensionHost: NSObject {
         if Self.narrowed(from: before, to: Self.access(of: context)) {
             ExtensionLog.write("\(displayName(for: id)) has less site access; starting it again")
             unload(id)
-            Task { await load(id) }
+            Task { [weak self] in await self?.load(id) }
             return
         }
         bridge.userScripts.refresh()
