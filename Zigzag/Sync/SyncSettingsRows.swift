@@ -27,7 +27,7 @@ final class SyncSettingsRows {
         toggle.isOn = sync.isOn
         toggle.onChange = { [weak self] on in self?.switched(on) }
         action.onClick = { [weak self] _ in self?.act() }
-        secondAction.onClick = { [weak self] _ in self?.sync.sendRemovals(); self?.refresh() }
+        secondAction.onClick = { [weak self] _ in self?.confirmRemoveEverywhere() }
         token = sync.changed.observe { [weak self] in self?.refresh() }
         // "Last synced 2 minutes ago" keeps its minutes.
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
@@ -54,7 +54,7 @@ final class SyncSettingsRows {
     /// Turning it on: what syncs, what doesn't, and that it merges.
     static var turnOnSheet: Sheet {
         (String(localized: "Sync with iCloud?", comment: "Title of the sheet shown when Sync with iCloud is turned on in Settings › General."),
-         String(localized: "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s on this Mac is merged with what’s in iCloud, never replaced, and a backup is saved first.",
+         String(localized: "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s here and what’s in iCloud are put together: where something is in both, the newer edit wins, and nothing is removed without asking. A backup is saved first.",
                 comment: "Message of the sheet shown when Sync with iCloud is turned on in Settings › General. Passwords already sync through iCloud Keychain."),
          String(localized: "Continue", comment: "Button of the sheet shown when Sync with iCloud is turned on: turns it on."))
     }
@@ -67,8 +67,20 @@ final class SyncSettingsRows {
     }
 
     #if DEBUG
-    static var sheets: [(name: String, sheet: Sheet)] { [("turn on", turnOnSheet), ("remove", removeSheet)] }
+    static var sheets: [(name: String, sheet: Sheet)] {
+        [("turn on", turnOnSheet), ("remove", removeSheet), ("remove everywhere", removeEverywhereSheet([.page: 16, .space: 1]))]
+    }
     #endif
+
+    private func confirmRemoveEverywhere() {
+        guard case .removalsHeld(let counts, _) = sync.status, let host else { return }
+        let sheet = Self.removeEverywhereSheet(counts)
+        ConfirmSheet.show(in: host, title: sheet.title, message: sheet.message, confirmTitle: sheet.confirm, destructive: true) { [weak self] confirmed in
+            guard confirmed, let self else { return }
+            self.sync.sendRemovals()
+            self.refresh()
+        }
+    }
 
     private enum Action { case none, openSettings, remove, bringBack }
     private var current: Action = .none
@@ -95,12 +107,32 @@ final class SyncSettingsRows {
         }
     }
 
-    /// The status line and its button for what sync is doing now.
+    /// The status line and its button for what sync is doing now. Removals held come first, with what else is going on.
     static func describe(_ status: ICloudSync.Status, hasCopy: Bool, now: Date = Date()) -> (text: String, detail: String, action: String?, second: String?) {
-        let shown: (text: String, detail: String, action: String?) = describeOne(status, hasCopy: hasCopy, now: now)
-        guard status == .removalsHeld else { return (shown.text, shown.detail, shown.action, nil) }
-        return (shown.text, shown.detail, shown.action,
-                String(localized: "Remove Everywhere", comment: "Button beside “Many things were removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too."))
+        guard case .removalsHeld(let counts, let other) = status else {
+            let shown = describeOne(status, hasCopy: hasCopy, now: now)
+            return (shown.text, shown.detail, shown.action, nil)
+        }
+        let held = String(localized: "Removed on this Mac at once: \(SyncKind.list(counts))",
+                          comment: "Status under Sync with iCloud in Settings › General, and a toast, when many spaces, pinned tabs or favorites went missing at once at launch or when sync was turned on (an old copy of the library put back, say). The placeholder lists them, like “16 pinned tabs and 1 space”.")
+        let explanation = String(localized: "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too.",
+                                 comment: "Explanation under “Removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it. The rest keeps syncing.")
+        var besides = ""
+        switch other {
+        case .notSignedIn, .otherAccount, .restricted, .full, .offline, .notEntitled, .failed: besides = describeOne(other, hasCopy: hasCopy, now: now).text
+        default: break
+        }
+        return (held, Words.sentences(besides, explanation),
+                String(localized: "Restore", comment: "Button beside “Removed on this Mac at once” in Settings › General: brings them back from iCloud."),
+                String(localized: "Remove Everywhere", comment: "Button beside “Removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too, after asking."))
+    }
+
+    /// Asked before Remove Everywhere: how many of what.
+    static func removeEverywhereSheet(_ counts: [SyncKind: Int]) -> Sheet {
+        (String(localized: "Remove \(SyncKind.list(counts)) from iCloud and every Mac?",
+                comment: "Title of the sheet behind Remove Everywhere in Settings › General. The placeholder lists what was removed on this Mac at once, like “16 pinned tabs and 1 space”."),
+         String(localized: "This can’t be undone.", comment: "Message of the sheet behind Remove Everywhere in Settings › General."),
+         String(localized: "Remove", comment: "Button of the sheet behind Remove Everywhere in Settings › General: removes them from iCloud and every Mac."))
     }
 
     private static func describeOne(_ status: ICloudSync.Status, hasCopy: Bool, now: Date) -> (text: String, detail: String, action: String?) {
@@ -141,10 +173,8 @@ final class SyncSettingsRows {
             return (String(localized: "This copy of Zigzag can’t use iCloud", comment: "Status under Sync with iCloud in Settings › General, for a build signed without iCloud."), "", nil)
         case .failed(let message):
             return (String(localized: "iCloud couldn’t sync: \(message)", comment: "Status under Sync with iCloud in Settings › General. The placeholder is iCloud's own explanation."), "", remove)
-        case .removalsHeld:
-            return (String(localized: "Many things were removed on this Mac at once. They’re still in iCloud.", comment: "Status under Sync with iCloud in Settings › General, and a toast, when many spaces, pinned tabs or favorites went missing at once at launch or when sync was turned on (an old copy of the library put back, say). The rest keeps syncing."),
-                    String(localized: "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.", comment: "Explanation under “Many things were removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it."),
-                    String(localized: "Restore", comment: "Button beside “Many things were removed on this Mac at once” in Settings › General: brings them back from iCloud."))
+        case .removalsHeld(_, let other):
+            return describeOne(other, hasCopy: hasCopy, now: now)
         }
     }
 
@@ -162,7 +192,8 @@ final class SyncSettingsRows {
         if let title = shown.action { action.title = title }
         secondAction.isHidden = shown.second == nil
         if let title = shown.second { secondAction.title = title }
-        current = shown.action == nil ? .none : status == .notSignedIn ? .openSettings : status == .removalsHeld ? .bringBack : .remove
+        let held = if case .removalsHeld = status { true } else { false }
+        current = shown.action == nil ? .none : status == .notSignedIn ? .openSettings : held ? .bringBack : .remove
         if was != (statusRow.isAvailable, statusRow.titleText, statusRow.detailText, action.isHidden, secondAction.isHidden) { onLayout?() }
     }
 
@@ -174,7 +205,8 @@ final class SyncSettingsRows {
         ("not signed in", .notSignedIn, true, true), ("other account", .otherAccount, true, true), ("restricted", .restricted, true, true),
         ("full", .full, true, true), ("offline", .offline, true, true), ("removed elsewhere", .removedElsewhere, false, false),
         ("not entitled", .notEntitled, true, false), ("backup failed", .backupFailed, false, false), ("failed", .failed("The request timed out."), true, true),
-        ("removals held", .removalsHeld, true, true),
+        ("removals held", .removalsHeld([.page: 16, .space: 1], .synced(Date())), true, true),
+        ("removals held, offline", .removalsHeld([.page: 16, .folder: 2], .offline), true, true),
     ]
     #endif
 }

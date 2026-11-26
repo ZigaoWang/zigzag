@@ -499,6 +499,813 @@
         }
       }
     },
+    "%lld favorites" : {
+      "comment" : "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 2 favorites”.",
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Favorit"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Favoriten"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favorite"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favorites"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoritos"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favorito"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoritos"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favori"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoris"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld preferito"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld preferiti"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld個のお気に入り"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "즐겨찾기 %lld개"
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoriet"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favorieten"
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ulubione"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ulubionych"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ulubiona"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ulubionej"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoritos"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favorito"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoritos"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld элемента избранного"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld элементов избранного"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld элемент избранного"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld элемента избранного"
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favori"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favori"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个收藏"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 個收藏"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld folders" : {
+      "comment" : "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 2 folders”.",
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Ordner"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Ordner"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld folder"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld folders"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carpetas"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carpeta"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carpetas"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld dossier"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld dossiers"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cartella"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cartelle"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld個のフォルダ"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "폴더 %lld개"
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld map"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mappen"
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld foldery"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld folderów"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld folder"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld folderu"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pastas"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pasta"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pastas"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld папки"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld папок"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld папка"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld папки"
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld klasör"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld klasör"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个文件夹"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 個資料夾"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld profiles" : {
+      "comment" : "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 1 profile”.",
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Profil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Profile"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profile"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profiles"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perfiles"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perfil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perfiles"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profils"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profilo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profili"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld個のプロファイル"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "프로필 %lld개"
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profiel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profielen"
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profile"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profili"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profilu"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perfis"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perfil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld perfis"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld профиля"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld профилей"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld профиль"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld профиля"
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld profil"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 份个人资料"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 份個人資料"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Checks every %lld minutes, or hourly in Low Power Mode." : {
       "comment" : "Under the fields of the New Live Folder sheet: how often a live folder fetches its feed or list. The number is minutes (30).",
       "localizations" : {
@@ -1246,85 +2053,168 @@
         }
       }
     },
-    "Many things were removed on this Mac at once. They’re still in iCloud." : {
-      "comment" : "Status under Sync with iCloud in Settings › General, and a toast, when many spaces, pinned tabs or favorites went missing at once at launch or when sync was turned on (an old copy of the library put back, say). The rest keeps syncing.",
+    "Remove %@ from iCloud and every Mac?" : {
+      "comment" : "Title of the sheet behind Remove Everywhere in Settings › General. The placeholder lists what was removed on this Mac at once, like “16 pinned tabs and 1 space”.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auf diesem Mac wurde auf einmal vieles entfernt. In iCloud ist noch alles da."
+            "value" : "%@ aus iCloud und von allen Macs entfernen?"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se eliminaron muchas cosas a la vez en este Mac. Siguen en iCloud."
+            "value" : "¿Eliminar %@ de iCloud y de todos los Mac?"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beaucoup d’éléments ont été supprimés d’un coup sur ce Mac. Ils sont toujours dans iCloud."
+            "value" : "Supprimer %@ d’iCloud et de tous les Mac ?"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Molti elementi sono stati rimossi tutti insieme su questo Mac. Sono ancora in iCloud."
+            "value" : "Rimuovere %@ da iCloud e da tutti i Mac?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacで多くの項目が一度に削除されました。iCloudにはまだ残っています。"
+            "value" : "%@をiCloudとすべてのMacから削除しますか？"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 Mac에서 많은 항목이 한꺼번에 제거되었습니다. iCloud에는 아직 남아 있습니다."
+            "value" : "iCloud와 모든 Mac에서 %@을(를) 제거하겠습니까?"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er is op deze Mac in één keer veel verwijderd. Het staat nog in iCloud."
+            "value" : "%@ verwijderen uit iCloud en van elke Mac?"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Na tym Macu usunięto naraz wiele elementów. Wciąż są w iCloud."
+            "value" : "Usunąć z iCloud i ze wszystkich Maców: %@?"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muitos itens foram removidos de uma vez neste Mac. Eles ainda estão no iCloud."
+            "value" : "Remover do iCloud e de todos os Macs: %@?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "На этом Mac сразу удалено много объектов. В iCloud они пока остались."
+            "value" : "Удалить из iCloud и со всех Mac: %@?"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu Mac’te çok sayıda öge aynı anda kaldırıldı. Hâlâ iCloud’dalar."
+            "value" : "%@ iCloud’dan ve tüm Mac’lerden kaldırılsın mı?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 上一次性移除了许多内容。它们仍在 iCloud 中。"
+            "value" : "要从 iCloud 和所有 Mac 上移除%@吗？"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台 Mac 上一次性移除了許多內容。它們仍在 iCloud 中。"
+            "value" : "要從 iCloud 和所有 Mac 上移除%@嗎？"
+          }
+        }
+      }
+    },
+    "Removed on this Mac at once: %@" : {
+      "comment" : "Status under Sync with iCloud in Settings › General, and a toast, when many spaces, pinned tabs or favorites went missing at once at launch or when sync was turned on (an old copy of the library put back, say). The placeholder lists them, like “16 pinned tabs and 1 space”.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Mac auf einmal entfernt: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminado de una vez en este Mac: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimé d’un coup sur ce Mac : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimosso tutto insieme su questo Mac: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacで一度に削除された項目：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac에서 한꺼번에 제거됨: %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In één keer verwijderd op deze Mac: %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usunięto naraz na tym Macu: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removido de uma vez neste Mac: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сразу удалено на этом Mac: %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Mac’te aynı anda kaldırılanlar: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上一次性移除了：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 上一次性移除了：%@"
           }
         }
       }
@@ -2326,7 +3216,7 @@
       }
     },
     "Remove Everywhere" : {
-      "comment" : "Button beside “Many things were removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too.",
+      "comment" : "Button beside “Many things were removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too.\nButton beside “Removed on this Mac at once” in Settings › General: removes them from iCloud and the other Macs too, after asking.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2408,85 +3298,85 @@
         }
       }
     },
-    "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too." : {
-      "comment" : "Explanation under “Many things were removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it.",
+    "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too." : {
+      "comment" : "Explanation under “Removed on this Mac at once” in Settings › General. Restore and Remove Everywhere are the two buttons beside it. The rest keeps syncing.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "„Wiederherstellen“ holt sie aus iCloud zurück. „Überall entfernen“ entfernt sie auch aus iCloud und von deinen anderen Macs."
+            "value" : "Hier sind sie ausgeblendet und bleiben in iCloud, bis du dich entscheidest. „Wiederherstellen“ holt sie hierher zurück; „Überall entfernen“ entfernt sie auch aus iCloud und von deinen anderen Macs."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Restaurar los recupera de iCloud. Eliminar en todas partes los elimina también de iCloud y de tus otros Mac."
+            "value" : "Están ocultos aquí y siguen en iCloud hasta que decidas. Restaurar los recupera aquí; Eliminar en todas partes los elimina también de iCloud y de tus otros Mac."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "« Restaurer » les récupère depuis iCloud. « Supprimer partout » les supprime aussi d’iCloud et de vos autres Mac."
+            "value" : "Ils sont masqués ici et restent dans iCloud jusqu’à votre choix. « Restaurer » les récupère ici ; « Supprimer partout » les supprime aussi d’iCloud et de vos autres Mac."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ripristina li recupera da iCloud. Rimuovi ovunque li rimuove anche da iCloud e dagli altri tuoi Mac."
+            "value" : "Qui sono nascosti e restano in iCloud finché non scegli. Ripristina li riporta qui; Rimuovi ovunque li rimuove anche da iCloud e dagli altri tuoi Mac."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「復元」を選ぶとiCloudから元に戻します。「すべてのMacで削除」を選ぶとiCloudとほかのMacからも削除します。"
+            "value" : "選ぶまでこのMacでは非表示になり、iCloudには残ります。「復元」を選ぶとこのMacに戻し、「すべてのMacで削除」を選ぶとiCloudとほかのMacからも削除します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "복원을 누르면 iCloud에서 되돌립니다. 모든 Mac에서 제거를 누르면 iCloud와 다른 Mac에서도 제거됩니다."
+            "value" : "선택할 때까지 이 Mac에서는 가려지고 iCloud에는 그대로 남습니다. 복원을 누르면 이 Mac으로 되돌리고, 모든 Mac에서 제거를 누르면 iCloud와 다른 Mac에서도 제거됩니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Herstel haalt ze terug uit iCloud. Verwijder overal verwijdert ze ook uit iCloud en van je andere Macs."
+            "value" : "Ze zijn hier verborgen en blijven in iCloud tot je kiest. Herstel zet ze hier terug; Verwijder overal verwijdert ze ook uit iCloud en van je andere Macs."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Przywróć odzyskuje je z iCloud. Usuń wszędzie usuwa je także z iCloud i z innych Maców."
+            "value" : "Są tu ukryte i zostają w iCloud, dopóki nie wybierzesz. Przywróć przywraca je tutaj; Usuń wszędzie usuwa je także z iCloud i z innych Maców."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Restaurar os traz de volta do iCloud. Remover em todos os remove também do iCloud e dos seus outros Macs."
+            "value" : "Eles ficam ocultos aqui e continuam no iCloud até você escolher. Restaurar os traz de volta aqui; Remover em todos os remove também do iCloud e dos seus outros Macs."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«Восстановить» вернёт их из iCloud. «Удалить везде» удалит их также из iCloud и с других ваших Mac."
+            "value" : "Здесь они скрыты и остаются в iCloud, пока вы не выберете. «Восстановить» вернёт их сюда; «Удалить везде» удалит их также из iCloud и с других ваших Mac."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geri Yükle, bunları iCloud’dan geri getirir. Her Yerden Kaldır, bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
+            "value" : "Siz seçene kadar burada gizlenir ve iCloud’da kalırlar. Geri Yükle bunları buraya geri getirir; Her Yerden Kaldır bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“恢复”会从 iCloud 取回它们。“在所有 Mac 上移除”会把它们也从 iCloud 和你的其他 Mac 上移除。"
+            "value" : "在你选择之前，它们在这台 Mac 上隐藏，并保留在 iCloud 中。“恢复”会把它们找回到这里；“在所有 Mac 上移除”会把它们也从 iCloud 和你的其他 Mac 上移除。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「還原」會從 iCloud 取回它們。「在所有 Mac 上移除」會把它們也從 iCloud 和你的其他 Mac 上移除。"
+            "value" : "在你選擇之前，它們在這台 Mac 上隱藏，並保留在 iCloud 中。「還原」會把它們找回到這裡；「在所有 Mac 上移除」會把它們也從 iCloud 和你的其他 Mac 上移除。"
           }
         }
       }
@@ -2819,6 +3709,172 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下載沒有完成。"
+          }
+        }
+      }
+    },
+    "This can’t be undone." : {
+      "comment" : "Message of the sheet behind Remove Everywhere in Settings › General.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das kann nicht widerrufen werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta acción no se puede deshacer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette action est irréversible."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa azione non può essere annullata."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この操作は取り消せません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 작업은 실행 취소할 수 없습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit kan niet ongedaan worden gemaakt."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tej czynności nie można cofnąć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta ação não pode ser desfeita."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это действие нельзя отменить."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu işlem geri alınamaz."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此操作无法撤销。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此動作無法還原。"
+          }
+        }
+      }
+    },
+    "This Mac’s library was older than what it last synced, so iCloud’s version was put back." : {
+      "comment" : "Toast at launch when Library.json was put back from an older copy (Time Machine, say), so Sync with iCloud laid out iCloud's version instead.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Bibliothek dieses Macs war älter als beim letzten Synchronisieren, daher wurde die Version aus iCloud wiederhergestellt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La biblioteca de este Mac era más antigua que la última que sincronizó, así que se repuso la versión de iCloud."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La bibliothèque de ce Mac était plus ancienne que lors de sa dernière synchronisation : la version d’iCloud a été remise."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La libreria di questo Mac era più vecchia di quella sincronizzata l’ultima volta, quindi è stata ripristinata la versione di iCloud."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacのライブラリが最後に同期した時点より古かったため、iCloudの内容に戻しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac의 라이브러리가 마지막으로 동기화한 것보다 오래되어 iCloud의 버전으로 되돌렸습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De bibliotheek van deze Mac was ouder dan bij de laatste synchronisatie, dus de versie uit iCloud is teruggezet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biblioteka tego Maca była starsza niż przy ostatniej synchronizacji, więc przywrócono wersję z iCloud."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A biblioteca deste Mac era mais antiga do que a última sincronizada, então a versão do iCloud foi restaurada."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Библиотека этого Mac оказалась старше, чем при последней синхронизации, поэтому восстановлена версия из iCloud."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Mac’in kitaplığı son eşzamanlanandan daha eskiydi, bu yüzden iCloud’daki sürüm geri getirildi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的资料库比上次同步时的旧，因此已恢复为 iCloud 中的版本。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 上的資料庫比上次同步時的舊，因此已還原為 iCloud 中的版本。"
           }
         }
       }
@@ -24787,7 +25843,7 @@
       }
     },
     "%lld pinned tabs" : {
-      "comment" : "Under a space's name in Settings › Spaces.",
+      "comment" : "Under a space's name in Settings › Spaces.\nPart of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 1 space”.",
       "localizations" : {
         "de" : {
           "variations" : {
@@ -25677,7 +26733,7 @@
       }
     },
     "%lld spaces" : {
-      "comment" : "Item in the list of what came over, in the Import window.\nUnder a profile's name in Settings › Profiles: how many spaces are on it.",
+      "comment" : "Item in the list of what came over, in the Import window.\nUnder a profile's name in Settings › Profiles: how many spaces are on it.\nPart of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 1 space”.",
       "localizations" : {
         "de" : {
           "variations" : {
@@ -132147,7 +133203,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet behind Remove from iCloud… in Settings › General: removes the synced library from iCloud.\nButton of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nRemove a space rule.\nTooltip of a download's button in the downloads panel: takes the download off the list.\nVoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.",
+      "comment" : "Button of the sheet behind Remove from iCloud… in Settings › General: removes the synced library from iCloud.\nButton of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nRemove a space rule.\nTooltip of a download's button in the downloads panel: takes the download off the list.\nVoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.\nButton of the sheet behind Remove Everywhere in Settings › General: removes them from iCloud and every Mac.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -137210,7 +138266,7 @@
       }
     },
     "Restore" : {
-      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nButton in the Import window's question when a Zigzag backup is opened from Finder.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.\nButton beside “Many things were removed on this Mac at once” in Settings › General: brings them back from iCloud.",
+      "comment" : "Button in Settings › Profiles, on data left by a profile that's no longer listed: makes it a profile again.\nButton in the Import window's question when a Zigzag backup is opened from Finder.\nTooltip of the × on one zapped element's row in the site panel and in Settings › Privacy › Sites: shows that element again.\nButton beside “Many things were removed on this Mac at once” in Settings › General: brings them back from iCloud.\nButton beside “Removed on this Mac at once” in Settings › General: brings them back from iCloud.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -208124,85 +209180,85 @@
         }
       }
     },
-    "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s on this Mac is merged with what’s in iCloud, never replaced, and a backup is saved first." : {
+    "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s here and what’s in iCloud are put together: where something is in both, the newer edit wins, and nothing is removed without asking. A backup is saved first." : {
       "comment" : "Message of the sheet shown when Sync with iCloud is turned on in Settings › General. Passwords already sync through iCloud Keychain.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deine Spaces, Profile, fixierten Tabs, Ordner, Favoriten, Live-Ordner und Einstellungen werden über deine eigene iCloud synchronisiert. Offene Tabs, Verlauf, Passwörter, Websitedaten, Erweiterungen und Downloads bleiben auf diesem Mac. Was auf diesem Mac ist, wird mit dem in iCloud zusammengeführt, nie ersetzt, und vorher wird ein Backup gesichert."
+            "value" : "Deine Spaces, Profile, fixierten Tabs, Ordner, Favoriten, Live-Ordner und Einstellungen werden über deine eigene iCloud synchronisiert. Offene Tabs, Verlauf, Passwörter, Websitedaten, Erweiterungen und Downloads bleiben auf diesem Mac. Was hier und was in iCloud ist, wird zusammengeführt: Ist etwas an beiden Orten, gilt die neuere Änderung, und nichts wird entfernt, ohne dass du gefragt wirst. Vorher wird ein Backup gesichert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tus espacios, perfiles, pestañas fijadas, carpetas, favoritos, carpetas dinámicas y ajustes se sincronizan a través de tu propia cuenta de iCloud. Las pestañas abiertas, el historial, las contraseñas, los datos de sitios web, las extensiones y las descargas se quedan en este Mac. Lo que hay en este Mac se combina con lo que hay en iCloud, nunca se reemplaza, y antes se guarda una copia de seguridad."
+            "value" : "Tus espacios, perfiles, pestañas fijadas, carpetas, favoritos, carpetas dinámicas y ajustes se sincronizan a través de tu propia cuenta de iCloud. Las pestañas abiertas, el historial, las contraseñas, los datos de sitios web, las extensiones y las descargas se quedan en este Mac. Lo que hay aquí y lo que hay en iCloud se combina: si algo está en los dos, gana el cambio más reciente, y no se elimina nada sin preguntarte. Antes se guarda una copia de seguridad."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages se synchronisent via votre propre compte iCloud. Les onglets ouverts, l’historique, les mots de passe, les données des sites web, les extensions et les téléchargements restent sur ce Mac. Le contenu de ce Mac est fusionné avec celui d’iCloud, jamais remplacé, et une sauvegarde est enregistrée avant."
+            "value" : "Vos espaces, profils, onglets épinglés, dossiers, favoris, dossiers dynamiques et réglages se synchronisent via votre propre compte iCloud. Les onglets ouverts, l’historique, les mots de passe, les données des sites web, les extensions et les téléchargements restent sur ce Mac. Le contenu de ce Mac et celui d’iCloud sont réunis : quand un élément est des deux côtés, la modification la plus récente l’emporte, et rien n’est supprimé sans vous le demander. Une sauvegarde est enregistrée avant."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I tuoi spazi, profili, pannelli fissati, cartelle, preferiti, cartelle live e impostazioni si sincronizzano tramite il tuo iCloud. I pannelli aperti, la cronologia, le password, i dati dei siti web, le estensioni e i download restano su questo Mac. Ciò che c’è su questo Mac viene unito a ciò che c’è su iCloud, mai sostituito, e prima viene salvato un backup."
+            "value" : "I tuoi spazi, profili, pannelli fissati, cartelle, preferiti, cartelle live e impostazioni si sincronizzano tramite il tuo iCloud. I pannelli aperti, la cronologia, le password, i dati dei siti web, le estensioni e i download restano su questo Mac. Ciò che c’è qui e ciò che c’è su iCloud viene unito: se un elemento è in entrambi, vince la modifica più recente, e niente viene rimosso senza chiedertelo. Prima viene salvato un backup."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スペース、プロファイル、固定タブ、フォルダ、お気に入り、ライブフォルダ、設定は、自分のiCloudを通じて同期されます。開いているタブ、履歴、パスワード、Webサイトデータ、機能拡張、ダウンロードはこのMacに残ります。このMac上のものはiCloud上のものと結合され、置き換えられることはありません。先にバックアップも保存されます。"
+            "value" : "スペース、プロファイル、固定タブ、フォルダ、お気に入り、ライブフォルダ、設定は、自分のiCloudを通じて同期されます。開いているタブ、履歴、パスワード、Webサイトデータ、機能拡張、ダウンロードはこのMacに残ります。このMacとiCloudの内容はまとめられ、両方にあるものは新しい変更が優先されます。確認なしに削除されることはありません。先にバックアップも保存されます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스페이스, 프로필, 고정된 탭, 폴더, 즐겨찾기, 라이브 폴더 및 설정이 사용자의 iCloud를 통해 동기화됩니다. 열린 탭, 방문 기록, 암호, 웹 사이트 데이터, 확장 프로그램 및 다운로드는 이 Mac에만 남습니다. 이 Mac의 항목은 iCloud의 항목과 병합되며 대치되지 않고, 먼저 백업이 저장됩니다."
+            "value" : "스페이스, 프로필, 고정된 탭, 폴더, 즐겨찾기, 라이브 폴더 및 설정이 사용자의 iCloud를 통해 동기화됩니다. 열린 탭, 방문 기록, 암호, 웹 사이트 데이터, 확장 프로그램 및 다운로드는 이 Mac에만 남습니다. 이 Mac과 iCloud의 항목은 합쳐지며, 양쪽에 모두 있는 항목은 더 최근의 변경 사항이 적용되고, 묻지 않고 제거되는 항목은 없습니다. 먼저 백업이 저장됩니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen worden gesynchroniseerd via je eigen iCloud. Open tabbladen, geschiedenis, wachtwoorden, websitegegevens, extensies en downloads blijven op deze Mac. Wat op deze Mac staat, wordt samengevoegd met wat in iCloud staat, nooit vervangen, en eerst wordt er een reservekopie bewaard."
+            "value" : "Je spaces, profielen, vastgezette tabbladen, mappen, favorieten, livemappen en instellingen worden gesynchroniseerd via je eigen iCloud. Open tabbladen, geschiedenis, wachtwoorden, websitegegevens, extensies en downloads blijven op deze Mac. Wat hier staat en wat in iCloud staat, wordt samengevoegd: staat iets op beide plekken, dan geldt de nieuwste wijziging, en niets wordt verwijderd zonder dat je het wordt gevraagd. Eerst wordt er een reservekopie bewaard."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Przestrzenie, profile, przypięte karty, foldery, ulubione, foldery na żywo i ustawienia są synchronizowane przez własne konto iCloud. Otwarte karty, historia, hasła, dane witryn, rozszerzenia i pobrane pliki zostają na tym Macu. To, co jest na tym Macu, zostaje połączone z tym, co jest w iCloud, nigdy zastąpione, a najpierw zachowywana jest kopia zapasowa."
+            "value" : "Przestrzenie, profile, przypięte karty, foldery, ulubione, foldery na żywo i ustawienia są synchronizowane przez własne konto iCloud. Otwarte karty, historia, hasła, dane witryn, rozszerzenia i pobrane pliki zostają na tym Macu. To, co jest tutaj, i to, co jest w iCloud, zostaje połączone: gdy coś jest w obu miejscach, wygrywa nowsza zmiana, a nic nie zostaje usunięte bez pytania. Najpierw zachowywana jest kopia zapasowa."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes são sincronizados pelo seu próprio iCloud. As abas abertas, o histórico, as senhas, os dados de sites, as extensões e os downloads ficam neste Mac. O que está neste Mac é mesclado com o que está no iCloud, nunca substituído, e um backup é salvo antes."
+            "value" : "Seus espaços, perfis, abas fixadas, pastas, favoritos, pastas dinâmicas e ajustes são sincronizados pelo seu próprio iCloud. As abas abertas, o histórico, as senhas, os dados de sites, as extensões e os downloads ficam neste Mac. O que está aqui e o que está no iCloud é reunido: quando algo está nos dois, vale a alteração mais recente, e nada é removido sem perguntar. Um backup é salvo antes."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ваши пространства, профили, закреплённые вкладки, папки, избранное, живые папки и настройки синхронизируются через ваш собственный iCloud. Открытые вкладки, история, пароли, данные сайтов, расширения и загрузки остаются на этом Mac. Данные на этом Mac объединяются с данными в iCloud, а не заменяются, и сначала сохраняется резервная копия."
+            "value" : "Ваши пространства, профили, закреплённые вкладки, папки, избранное, живые папки и настройки синхронизируются через ваш собственный iCloud. Открытые вкладки, история, пароли, данные сайтов, расширения и загрузки остаются на этом Mac. Данные здесь и в iCloud объединяются: если что-то есть и там, и там, остаётся более позднее изменение, и ничего не удаляется без вопроса. Сначала сохраняется резервная копия."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Space’leriniz, profilleriniz, sabitlenmiş sekmeleriniz, klasörleriniz, favorileriniz, canlı klasörleriniz ve ayarlarınız kendi iCloud hesabınız üzerinden eşzamanlanır. Açık sekmeler, geçmiş, parolalar, web sitesi verileri, genişletmeler ve indirilenler bu Mac’te kalır. Bu Mac’teki içerik iCloud’dakiyle birleştirilir, hiçbir zaman üzerine yazılmaz ve önce bir yedek kaydedilir."
+            "value" : "Space’leriniz, profilleriniz, sabitlenmiş sekmeleriniz, klasörleriniz, favorileriniz, canlı klasörleriniz ve ayarlarınız kendi iCloud hesabınız üzerinden eşzamanlanır. Açık sekmeler, geçmiş, parolalar, web sitesi verileri, genişletmeler ve indirilenler bu Mac’te kalır. Buradakiler ile iCloud’dakiler bir araya getirilir: İkisinde de olan bir şeyde daha yeni değişiklik geçerli olur ve size sorulmadan hiçbir şey kaldırılmaz. Önce bir yedek kaydedilir."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的空间、个人资料、已固定标签页、文件夹、收藏、实时文件夹和设置会通过你自己的 iCloud 同步。打开的标签页、历史记录、密码、网站数据、扩展和下载只保留在这台 Mac 上。这台 Mac 上的内容会与 iCloud 中的合并，绝不会被替换，并且会先存储一份备份。"
+            "value" : "你的空间、个人资料、已固定标签页、文件夹、收藏、实时文件夹和设置会通过你自己的 iCloud 同步。打开的标签页、历史记录、密码、网站数据、扩展和下载只保留在这台 Mac 上。这台 Mac 和 iCloud 中的内容会合在一起：两边都有的内容以较新的修改为准，不经询问不会移除任何内容。会先存储一份备份。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的空間、個人資料、已固定分頁、資料夾、收藏、即時資料夾和設定會透過你自己的 iCloud 同步。開啟的分頁、瀏覽記錄、密碼、網站資料、延伸功能和下載項目只保留在這台 Mac 上。這台 Mac 上的內容會與 iCloud 中的合併，絕不會被取代，並且會先儲存一份備份。"
+            "value" : "你的空間、個人資料、已固定分頁、資料夾、收藏、即時資料夾和設定會透過你自己的 iCloud 同步。開啟的分頁、瀏覽記錄、密碼、網站資料、延伸功能和下載項目只保留在這台 Mac 上。這台 Mac 和 iCloud 中的內容會合在一起：兩邊都有的內容以較新的修改為準，不經詢問不會移除任何內容。會先儲存一份備份。"
           }
         }
       }

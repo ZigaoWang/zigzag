@@ -1097,7 +1097,10 @@ extension SyncLibrary {
         relaunch(a, with: old)
         #expect(a.session.state.heldRemovals == 35)
         #expect(a.saves.isEmpty && a.deletes.isEmpty)
-        #expect(SyncSettingsRows.describe(.removalsHeld, hasCopy: true).second != nil)
+        let shown = SyncSettingsRows.describe(.removalsHeld([.page: 35], .offline), hasCopy: true)
+        #expect(shown.second != nil && shown.text.contains("35"))
+        #expect(shown.detail.contains(SyncSettingsRows.describe(.offline, hasCopy: true).text))
+        #expect(SyncSettingsRows.removeEverywhereSheet([.page: 35]).title.contains("35"))
         // A page pinned since goes up at once; the removals don't.
         a.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("new")) } }
         a.sync(); b.sync()
@@ -1183,7 +1186,10 @@ extension SyncLibrary {
         let records = cloud.records
         // Library.json put back from a copy saved before the last sync: one pin fewer, an old title.
         a.host.libraryStamp = Date(timeIntervalSince1970: 1_500)
+        var told = false
+        a.session.onTookICloud = { told = true }
         relaunch(a, with: old)
+        #expect(told)
         #expect(a.saves.isEmpty && a.deletes.isEmpty)
         a.sync(); b.sync()
         #expect(cloud.records.mapValues(\.tag) == records.mapValues(\.tag))

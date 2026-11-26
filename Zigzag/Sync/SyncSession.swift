@@ -191,6 +191,8 @@ final class SyncSession {
     var onChange: (() -> Void)?
     /// Called when removals are held, or no longer are.
     var onHeld: (() -> Void)?
+    /// Called when a Library.json older than what was last synced was laid out from iCloud again, and that changed it.
+    var onTookICloud: (() -> Void)?
     /// Called when a save finds the zone gone after the first sync: removed from iCloud on another Mac.
     var onRemovedElsewhere: (() -> Void)?
     /// Called when the server's version of something is needed before it can be sent again.
@@ -269,7 +271,7 @@ final class SyncSession {
             return stamp < date.addingTimeInterval(-1)
         }
         if older(than: state.libraryStamp) || older(than: state.wroteLibrary) {
-            takeICloudKeepingNew(stamp: changedAt)
+            if takeICloudKeepingNew(stamp: changedAt) { onTookICloud?() }
             return
         }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
@@ -287,12 +289,18 @@ final class SyncSession {
 
     /// iCloud's version of everything this Mac and iCloud both have, laid out here; what's only here is sent, unless
     /// it's something removed since (an old copy's), which goes.
-    private func takeICloudKeepingNew(stamp: Date?) {
+    /// Returns whether that changed anything here.
+    @discardableResult
+    private func takeICloudKeepingNew(stamp: Date?) -> Bool {
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now())
         let new = export.items.filter { state.base[$0.key] == nil && state.removed[$0.key] == nil && SyncName.id($0.key) != nil }
+        let shown = state.base.filter { !state.heldNames.contains($0.key) && SyncName.id($0.key) != nil && !$0.key.hasPrefix(Self.firstSyncPrefix) }
+        let differs = export.items.contains { name, item in new[name] == nil && SyncName.id(name) != nil && shown[name].map { !$0.sameContent(as: item) } ?? true }
+            || shown.keys.contains { export.items[$0] == nil }
         queue(diff(new, deletes: false, stamp: stamp))
         layOut()
+        return differs
     }
 
     /// More than 10 of one kind, and more than a quarter of them, gone at once: a library file replaced or rolled

@@ -123,6 +123,35 @@ enum SyncBody {
     }
 }
 
+// MARK: Kinds, as people see them
+
+/// What a record is to people, for saying how many of each.
+enum SyncKind: String, Codable, CaseIterable, Hashable {
+    case space, page, folder, favorite, profile
+
+    /// How many of each kind among record names.
+    static func count(_ names: Set<String>) -> [SyncKind: Int] {
+        var result: [SyncKind: Int] = [:]
+        for name in names { if let kind = SyncKind(rawValue: String(name.prefix { $0 != "." })) { result[kind, default: 0] += 1 } }
+        return result
+    }
+
+    func phrase(_ count: Int) -> String {
+        switch self {
+        case .space: String(localized: "\(count) spaces", comment: "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 1 space”.")
+        case .page: String(localized: "\(count) pinned tabs", comment: "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 1 space”.")
+        case .folder: String(localized: "\(count) folders", comment: "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 2 folders”.")
+        case .favorite: String(localized: "\(count) favorites", comment: "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 2 favorites”.")
+        case .profile: String(localized: "\(count) profiles", comment: "Part of a list of what was removed at once, in Settings › General under Sync with iCloud and in its confirmation, like “16 pinned tabs and 1 profile”.")
+        }
+    }
+
+    /// "16 pinned tabs and 1 space", as this language lists things.
+    static func list(_ counts: [SyncKind: Int]) -> String {
+        Words.list(allCases.compactMap { kind in counts[kind].map { kind.phrase($0) } })
+    }
+}
+
 // MARK: Record names
 
 /// Records are named by kind and the item's ID: "page.<UUID>". The rules and the settings are one record each.

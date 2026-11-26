@@ -35,7 +35,7 @@
   Test: SyncTests.onlyPreferencesTravelNeverWhatIsAboutThisMac
 
 ## The first sync
-- A second Mac with its own library → merged, never replaced: a space of the same name on the same profile, a folder of the same name in the same place and a pinned page with the same address in the same place are one, as iCloud has them, and what's only on this Mac is added beside where it was.
+- A second Mac with its own library → put together with iCloud's, nothing removed: a space of the same name on the same profile, a folder of the same name in the same place and a pinned page with the same address in the same place are one, as iCloud has them, and what's only on this Mac is added beside where it was.
   Test: SyncTests.theFirstSyncMergesDuplicatesByNameAndAddress
   Test: SyncTests.aSecondMacsFirstSpaceIsMatchedByNameNotCopied
 - Two pinned pages or favorites whose addresses differ only after the # (a web app's views) → stay two.
@@ -178,3 +178,6 @@
   Test: SyncTests.anEditFoundAtLaunchCountsFromWhenItWasMade
 - Zigzag ended (a crash, a power cut) after sync saved its state but before Library.json was saved → at the next launch what had just arrived is laid out again from iCloud, never sent as removed. Library.json is saved before sync's state.
   Test: SyncTests.endingBeforeLibraryJsonIsSavedDoesntRemoveWhatJustArrived
+- Removals held → Settings says how many of what, that they're hidden here and stay in iCloud until you choose, and what else sync is doing (offline, signed out, iCloud full). Remove Everywhere asks first, naming how many of what. Library.json laid out from iCloud at launch because it was older → a toast says so.
+  Test: SyncTests.aLibraryPutBackFromAnOldCopyIsntSentAsRemovals
+  Test: SyncTests.aLibraryOlderThanTheOneLastSyncedSendsNothing

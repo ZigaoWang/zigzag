@@ -28,13 +28,16 @@ final class ICloudSync {
         case notEntitled
         /// Turning it on couldn't save the backup first, so it stayed off.
         case backupFailed
-        /// Many things were removed here at once (an old copy of the library put back, say): nothing goes up until
-        /// asked whether to remove them everywhere or bring them back.
-        case removalsHeld
+        /// Many things were removed here at once (an old copy of the library put back, say), counted by kind: they
+        /// don't go up until asked whether to remove them everywhere or bring them back. With what sync is doing besides.
+        indirect case removalsHeld([SyncKind: Int], Status)
         case failed(String)
     }
 
-    var status: Status { session?.state.heldRemovals != nil ? .removalsHeld : shown }
+    var status: Status {
+        guard let held = session?.state.heldNames, !held.isEmpty else { return shown }
+        return .removalsHeld(SyncKind.count(held), shown)
+    }
     private var shown: Status = .off { didSet { if oldValue != shown { changed.send() } } }
     /// Fires when the status changes.
     let changed = Signal<Void>()
@@ -100,12 +103,22 @@ final class ICloudSync {
     /// Removals held: said in a toast too, not only in Settings, once the windows are up.
     private func tellHeld() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            guard let self, self.status == .removalsHeld,
+            guard let self, case .removalsHeld = self.status,
                   let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
-            let text = SyncSettingsRows.describe(.removalsHeld, hasCopy: true).text
+            let text = SyncSettingsRows.describe(self.status, hasCopy: true).text
             let settings = String(localized: "Settings…", comment: "Zigzag menu item, and a command in the command bar.")
             controller.promptToast(text, symbol: "exclamationmark.icloud", duration: 12,
                                    action: (title: settings, run: { SettingsPage.open(.general, in: controller) }))
+        }
+    }
+
+    /// A Library.json older than what was last synced: iCloud's version put back, said in a toast.
+    private func tellTookICloud() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            guard let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
+            controller.promptToast(String(localized: "This Mac’s library was older than what it last synced, so iCloud’s version was put back.",
+                                          comment: "Toast at launch when Library.json was put back from an older copy (Time Machine, say), so Sync with iCloud laid out iCloud's version instead."),
+                                   symbol: "icloud", duration: 8)
         }
     }
 
@@ -215,6 +228,7 @@ final class ICloudSync {
     private func start(state: SyncState) {
         let session = SyncSession(host: host, state: state)
         session.onChange = { [weak self] in self?.saveSoon() }
+        session.onTookICloud = { [weak self] in self?.tellTookICloud() }
         session.onHeld = { [weak self] in
             self?.changed.send()
             if self?.session?.state.heldRemovals != nil { self?.tellHeld() }

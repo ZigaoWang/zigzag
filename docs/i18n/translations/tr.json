@@ -14871,10 +14871,10 @@
         "value": "iCloud ile eşzamanlansın mı?"
       }
     },
-    "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s on this Mac is merged with what’s in iCloud, never replaced, and a backup is saved first.": {
+    "Your spaces, profiles, pinned tabs, folders, favorites, live folders and settings sync through your own iCloud. Open tabs, history, passwords, website data, extensions and downloads stay on this Mac. What’s here and what’s in iCloud are put together: where something is in both, the newer edit wins, and nothing is removed without asking. A backup is saved first.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Space’leriniz, profilleriniz, sabitlenmiş sekmeleriniz, klasörleriniz, favorileriniz, canlı klasörleriniz ve ayarlarınız kendi iCloud hesabınız üzerinden eşzamanlanır. Açık sekmeler, geçmiş, parolalar, web sitesi verileri, genişletmeler ve indirilenler bu Mac’te kalır. Bu Mac’teki içerik iCloud’dakiyle birleştirilir, hiçbir zaman üzerine yazılmaz ve önce bir yedek kaydedilir."
+        "value": "Space’leriniz, profilleriniz, sabitlenmiş sekmeleriniz, klasörleriniz, favorileriniz, canlı klasörleriniz ve ayarlarınız kendi iCloud hesabınız üzerinden eşzamanlanır. Açık sekmeler, geçmiş, parolalar, web sitesi verileri, genişletmeler ve indirilenler bu Mac’te kalır. Buradakiler ile iCloud’dakiler bir araya getirilir: İkisinde de olan bir şeyde daha yeni değişiklik geçerli olur ve size sorulmadan hiçbir şey kaldırılmaz. Önce bir yedek kaydedilir."
       }
     },
     "Remove your library from iCloud?": {
@@ -14991,22 +14991,94 @@
         "value": "Önce bir yedek kaydedilemedi, bu yüzden eşzamanlama hâlâ kapalı."
       }
     },
-    "Many things were removed on this Mac at once. They’re still in iCloud.": {
+    "Removed on this Mac at once: %@": {
       "stringUnit": {
         "state": "translated",
-        "value": "Bu Mac’te çok sayıda öge aynı anda kaldırıldı. Hâlâ iCloud’dalar."
+        "value": "Bu Mac’te aynı anda kaldırılanlar: %@"
       }
     },
-    "Restore brings them back from iCloud. Remove Everywhere removes them from iCloud and your other Macs too.": {
+    "They’re hidden here and stay in iCloud until you choose. Restore brings them back here; Remove Everywhere removes them from iCloud and your other Macs too.": {
       "stringUnit": {
         "state": "translated",
-        "value": "Geri Yükle, bunları iCloud’dan geri getirir. Her Yerden Kaldır, bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
+        "value": "Siz seçene kadar burada gizlenir ve iCloud’da kalırlar. Geri Yükle bunları buraya geri getirir; Her Yerden Kaldır bunları iCloud’dan ve diğer Mac’lerinizden de kaldırır."
       }
     },
     "Remove Everywhere": {
       "stringUnit": {
         "state": "translated",
         "value": "Her Yerden Kaldır"
+      }
+    },
+    "Remove %@ from iCloud and every Mac?": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "%@ iCloud’dan ve tüm Mac’lerden kaldırılsın mı?"
+      }
+    },
+    "This can’t be undone.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu işlem geri alınamaz."
+      }
+    },
+    "This Mac’s library was older than what it last synced, so iCloud’s version was put back.": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Bu Mac’in kitaplığı son eşzamanlanandan daha eskiydi, bu yüzden iCloud’daki sürüm geri getirildi."
+      }
+    },
+    "%lld folders": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld klasör"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld klasör"
+            }
+          }
+        }
+      }
+    },
+    "%lld favorites": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld favori"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld favori"
+            }
+          }
+        }
+      }
+    },
+    "%lld profiles": {
+      "variations": {
+        "plural": {
+          "one": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld profil"
+            }
+          },
+          "other": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "%lld profil"
+            }
+          }
+        }
       }
     }
   },
