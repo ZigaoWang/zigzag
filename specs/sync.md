@@ -49,7 +49,7 @@
 - iCloud's copy reset, or sync turned on again after it was removed from iCloud → merged again, and nothing is added twice. A Mac that was offline during a reset matches its items as before the reset, even renamed ones, and nothing is copied; but as in any first sync, iCloud's version of what matched wins, so what that Mac changed offline is lost, and what it removed offline comes back from the Mac that sent first.
   Test: SyncTests.aResetWhileAnotherMacWasOfflineAddsNoCopies
   Test: SyncTests.turningSyncOnAgainAddsNothingTwice
-- Sync turned off, things changed, and turned on again → what changed only on this Mac is kept, what changed only in iCloud is taken, and what changed on both goes to the later edit, this Mac's counting from when sync was turned on. What was removed here is removed everywhere, many at once held as at launch; what was removed in iCloud is removed here. Nothing is added twice. Turned on in another account, or after iCloud's copy was removed, it merges afresh as a first sync.
+- Sync turned off, things changed, and turned on again → what changed only on this Mac is kept, what changed only in iCloud is taken, and what changed on both goes to the later edit, this Mac's counting from when its library was last saved. What was removed here is removed everywhere, many at once held as at launch; what was removed in iCloud is removed here. Nothing is added twice. Turned on in another account, or after iCloud's copy was removed, it merges afresh as a first sync.
   Test: SyncTests.turningSyncOffRenamingAndOnAgainAddsNoCopy
   Test: SyncTests.turningSyncOnAgainKeepsWhatChangedOnEachSideWhileOff
   Test: SyncTests.turningSyncOnAgainAfterRemoveFromICloudMergesAfresh
@@ -167,3 +167,5 @@
 - Two fetches crossing, the older bringing a removal after the newer brought the record back → the removal is ignored. Zigzag runs one catch-up at a time.
   Test: SyncTests.aLateRemovalFromAFetchThatCrossedANewerOneIsIgnored
   Test: SyncTests.aRemovalAfterThisMacsOwnSaveIsntTakenForStale
+- Zigzag quit right after an edit → the edit is read before quitting; one found at the next launch counts from when the library was last saved, never from the launch, so it doesn't beat a later edit on another Mac.
+  Test: SyncTests.anEditFoundAtLaunchCountsFromWhenItWasMade

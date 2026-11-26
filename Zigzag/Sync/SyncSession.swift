@@ -232,13 +232,14 @@ final class SyncSession {
 
     /// Reads the library and queues what changed since. What's changed here by hand is always sent: only the first
     /// look after launch (`checkAfterLaunch`) can tell a library put back from a copy.
-    func localChanged() {
+    /// `stamp`: when what changed was changed, if not now.
+    func localChanged(stamp: Date? = nil) {
         guard !isClosed, state.merged, !isApplying else { return }
         let library = host.read()
         let export = SyncMapping.export(library, previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now())
         state.emptyFolders = export.emptyFolders
-        queue(diff(export.items, deletes: true))
+        queue(diff(export.items, deletes: true, stamp: stamp))
         // The file's own date as it is now; one ahead of the clock (a clock set wrong) is no guide.
         if let stamp = host.libraryStamp, stamp <= now().addingTimeInterval(60) { state.libraryStamp = stamp }
         onChange?()
@@ -251,6 +252,8 @@ final class SyncSession {
     /// (Remove Everywhere) or brought back (Restore). Edits made after it go up as usual.
     func checkAfterLaunch() {
         guard !isClosed, state.merged, !isApplying else { return }
+        // What changed since the last sync was changed when Library.json was last saved, never later than now.
+        let changedAt = host.libraryStamp.map { min($0, now()) }
         if let synced = state.libraryStamp, synced <= now().addingTimeInterval(60), let stamp = host.libraryStamp,
            stamp < synced.addingTimeInterval(-1) {
             layOut()
@@ -264,7 +267,7 @@ final class SyncSession {
             onHeld?()
             return
         }
-        localChanged()
+        localChanged(stamp: changedAt)
     }
 
     /// More than 10 of one kind, and more than a quarter of them, gone at once: a library file replaced or rolled
@@ -317,10 +320,10 @@ final class SyncSession {
         server?.queue(saves: SyncName.ordered(changes.saves), deletes: SyncName.ordered(changes.deletes))
     }
 
-    private func diff(_ exported: [String: SyncItem], deletes allowDeletes: Bool) -> (saves: [String], deletes: [String]) {
+    private func diff(_ exported: [String: SyncItem], deletes allowDeletes: Bool, stamp: Date? = nil) -> (saves: [String], deletes: [String]) {
         let items = exported
         var saves: [String] = [], deletes: [String] = []
-        let stamp = now()
+        let stamp = stamp ?? now()
         for (name, var item) in items {
             if let old = state.base[name], old.sameContent(as: item) { continue }
             if item.type != SyncBody.settingsType { item.modified = stamp }

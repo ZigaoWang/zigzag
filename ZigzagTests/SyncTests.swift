@@ -1746,4 +1746,22 @@ extension SyncTests {
         again.sync()
         #expect(again.library.urls(in: "Personal") == ["a", "just before quit"])
     }
+
+    @Test func anEditFoundAtLaunchCountsFromWhenItWasMade() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // Edited on A, and Zigzag quit before sync read it; Library.json saved then.
+        a.clock += 1
+        a.library.editSpace("Personal") { $0.bookmarks[0].title = "A, Monday" }
+        let monday = a.clock
+        let quit = try saved(a.session.state)
+        b.clock = a.clock + 3600
+        b.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "B, Tuesday" } }
+        b.sync()
+        let again = FakeMac(cloud, a.library, clock: b.clock + 86400, state: quit)
+        again.host.libraryStamp = monday
+        again.session.checkAfterLaunch()
+        again.sync(); b.sync()
+        #expect(again.library.titles(in: "Personal") == ["B, Tuesday"])
+        #expect(b.library.titles(in: "Personal") == ["B, Tuesday"])
+    }
 }

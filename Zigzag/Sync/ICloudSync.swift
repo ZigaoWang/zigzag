@@ -173,7 +173,7 @@ final class ICloudSync {
     }
 
     /// Turned on again: what changed only here is kept, what changed only in iCloud is taken, what changed on both
-    /// goes to the later (this Mac's edits made while off count from now), and what was removed here goes as any
+    /// goes to the later (this Mac's edits made while off count from when its library was last saved), and what was removed here goes as any
     /// removal at launch does, many at once held. All of iCloud is read again, so what was removed there goes too.
     static func stateTurningOn(saved: SyncState?) -> SyncState {
         var state = stateTurningOff(saved)
@@ -424,10 +424,18 @@ final class ICloudSync {
 
     // MARK: Saving the state
 
-    private func saveSoon() { saveDebouncer.call { [weak self] in self?.saveNow() } }
+    private func saveSoon() { saveDebouncer.call { [weak self] in self?.writeState() } }
 
-    /// Before quitting, too.
+    /// Before quitting, and when sync stops: Library.json first, then what changed in it read now, not at the next
+    /// launch, then sync's own state.
     func saveNow() {
+        Library.shared.saveNow()
+        localDebouncer.cancel()
+        session?.localChanged()
+        writeState()
+    }
+
+    private func writeState() {
         saveDebouncer.cancel()
         guard let session else { return }
         var state = session.state
