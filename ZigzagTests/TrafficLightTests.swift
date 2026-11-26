@@ -139,6 +139,31 @@ struct TrafficLightTests {
         #expect(BrowserWindowController.trafficLightRoom(fullScreen: false, barKeepsLights: false, width: 60) == 60)
     }
 
+    /// Lights off screen, as in full screen with the menu bar up: the bar's controls start at its inset (#542).
+    @Test func noRoomForTheLightsInTheBarWhileTheyreOffScreen() throws {
+        let width: CGFloat = 60, inset = Tokens.Sidebar.edge
+        for (docked, keeps) in [(false, false), (true, true), (false, true)] {
+            let hidden = BrowserWindowController.barTrafficLightRoom(barShown: true, docked: docked, barKeepsLights: keeps, onScreen: false, width: width)
+            #expect(hidden == 0)
+            let frames = TopBarView.frames(width: 1000, buttons: 3, sidebarButton: !docked, onRight: keeps,
+                                           trafficLightsWidth: hidden, leadingInset: inset, trailingInset: inset)
+            let first = try #require(keeps ? frames.buttons.first : frames.sidebarButton)
+            #expect(first.minX == inset, "docked \(docked) keeps \(keeps)")
+            // Down with the menu bar, or windowed, they're there and the room is too.
+            #expect(BrowserWindowController.barTrafficLightRoom(barShown: true, docked: docked, barKeepsLights: keeps, onScreen: true, width: width) == width)
+        }
+        // Docked on the left they're in the sidebar, and without the bar there's no bar to keep room in.
+        #expect(BrowserWindowController.barTrafficLightRoom(barShown: true, docked: true, barKeepsLights: false, onScreen: true, width: width) == 0)
+        #expect(BrowserWindowController.barTrafficLightRoom(barShown: false, docked: false, barKeepsLights: false, onScreen: true, width: width) == 0)
+    }
+
+    /// A window that isn't in full screen has its lights on screen wherever Zigzag puts them.
+    @Test func aWindowedWindowsLightsAreOnScreen() {
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500))
+        defer { window.close() }
+        #expect(window.trafficLightsOnScreen)
+    }
+
     /// While AppKit moves the title bar into or out of full screen, Zigzag doesn't move or hide the buttons (#401).
     @Test func buttonsAreLeftAloneMidTransition() throws {
         let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500))

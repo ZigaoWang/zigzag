@@ -120,6 +120,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.layoutTrafficLights()
         }
         root.onGrabberMoved = { [weak self] in self?.layoutTrafficLights() }
+        browserWindow.onTrafficLightsOnScreenChange = { [weak self] in self?.trafficLightsOnScreenChanged() }
         root.onFingerWhereBarWent = { [weak self] point in self?.fingerLanded(where: point) ?? false }
         root.onSlide = { [weak self] duration, timing in
             guard let self else { return }
@@ -2844,9 +2845,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         window.trafficLightOrigin = NSPoint(x: x, y: y)
         if !sliding, docked || floating || inBar, let image = window.trafficLightsImage() { trafficLightsPicture = image }
         // The lights' room in the bar stays while the sidebar floats over it, so nothing in the bar moves as it does.
-        // Full screen included: the lights come down with the menu bar, so the bar leaves their space
-        // rather than drawing its controls under them.
-        root.topBar.trafficLightsWidth = root.chromeBarShown && (!docked || barKeepsLights) ? window.trafficLightsWidth : 0
+        // In full screen it's there only while they're down with the menu bar (#542).
+        root.topBar.trafficLightsWidth = Self.barTrafficLightRoom(barShown: root.chromeBarShown, docked: docked, barKeepsLights: barKeepsLights,
+                                                                  onScreen: window.trafficLightsOnScreen, width: window.trafficLightsWidth)
         // With the sidebar hidden its toggle goes with it, so the bar above the page has one of its own. While the
         // sidebar slides back in, the bar's stays where the sidebar's lands, and the sidebar's shows once it's there.
         let held = root.chromeBarShown && holdsToggle
@@ -3036,6 +3037,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fullScreen || barKeepsLights ? 0 : width
     }
 
+    /// The lights' room at the bar's leading end: none while they're elsewhere or off screen (#542).
+    nonisolated static func barTrafficLightRoom(barShown: Bool, docked: Bool, barKeepsLights: Bool, onScreen: Bool, width: CGFloat) -> CGFloat {
+        barShown && (!docked || barKeepsLights) && onScreen ? width : 0
+    }
+
+    /// The lights came on or off screen: the bar's controls glide to their new place.
+    private func trafficLightsOnScreenChanged() {
+        let old = root.topBar.controlPositions
+        let width = root.topBar.trafficLightsWidth
+        layoutTrafficLights()
+        guard root.topBar.trafficLightsWidth != width, root.barOnScreen else { return }
+        root.topBar.layoutSubtreeIfNeeded()
+        root.topBar.slideControls(from: old, curve: Tokens.Motion.gentle)
+    }
+
     /// The window's place before it went full screen: what's saved, so leaving full screen after a relaunch gives
     /// back the window you had, not one the size of the screen.
     private(set) var windowedFrame: NSRect?
@@ -3114,7 +3130,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         if phase.dropsTrafficLightBacking, fullScreenBar != nil { showFullScreenBar(false) }
         guard !phase.isMoving else { return }
-        layoutTrafficLights()
+        trafficLightsOnScreenChanged()
         root.needsLayout = true
     }
     func windowDidResignKey(_ notification: Notification) {
