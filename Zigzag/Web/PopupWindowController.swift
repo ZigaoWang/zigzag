@@ -595,6 +595,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
+        // As in a tab: session cookies an ended network process took go back before the request.
+        let dataStore = webView.configuration.websiteDataStore
+        NetworkProcessCookies.check(dataStore)
+        if SessionCookies.isRestoring(dataStore) { await SessionCookies.ready(dataStore) }
         let policy = await decide(navigationAction, in: webView)
         // Scripts as in a tab (`SiteJavaScript`), with the opener's private choices.
         if policy == .allow {

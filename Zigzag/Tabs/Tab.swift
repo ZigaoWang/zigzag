@@ -1871,8 +1871,9 @@ extension Tab: WKNavigationDelegate {
     nonisolated static func skipsDownloadQuestion(kept: Bool?) -> Bool { kept != false }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
-        // The last session's session cookies go back in before its first request.
+        // The last session's session cookies go back in before its first request, and those an ended network process took.
         let dataStore = webView.configuration.websiteDataStore
+        NetworkProcessCookies.check(dataStore)
         if SessionCookies.isRestoring(dataStore) { await SessionCookies.ready(dataStore) }
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
