@@ -6,10 +6,13 @@ protocol SyncHost: AnyObject {
     func write(_ library: SyncLibrary)
     /// When the library's file was last written, if it has one.
     var libraryStamp: Date? { get }
+    /// When each carried preference last changed while sync wasn't reading them (off), by key.
+    var settingTimes: [String: Date] { get }
 }
 
 extension SyncHost {
     var libraryStamp: Date? { nil }
+    var settingTimes: [String: Date] { [:] }
 }
 
 /// The server's side: CKSyncEngine, or a test's stand-in for iCloud.
@@ -248,7 +251,8 @@ final class SyncSession {
         guard !isClosed, state.merged, !isApplying else { return }
         let library = host.read()
         let export = SyncMapping.export(library, previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now(),
+                                        settingsChanged: host.settingTimes, settingsNow: now())
         state.emptyFolders = export.emptyFolders
         queue(diff(export.items, deletes: true, stamp: stamp))
         // The file's own date as it is now; one ahead of the clock (a clock set wrong) is no guide.
@@ -275,7 +279,8 @@ final class SyncSession {
             return
         }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: changedAt ?? now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: changedAt ?? now(),
+                                        settingsChanged: host.settingTimes, settingsNow: now())
         if let gone = Self.manyRemovals(from: state.base, to: export.items, unsent: state.unsent) {
             state.heldNames.formUnion(gone)
             // Turned on after tidying up while off, the rest is this Mac's own: sent. At a launch, it may be an old
@@ -293,7 +298,8 @@ final class SyncSession {
     @discardableResult
     private func takeICloudKeepingNew(stamp: Date?) -> Bool {
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
-                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now())
+                                        kept: state.keptProfiles, unsent: state.unsent, now: stamp ?? now(),
+                                        settingsChanged: host.settingTimes, settingsNow: now())
         let new = export.items.filter { state.base[$0.key] == nil && state.removed[$0.key] == nil && SyncName.id($0.key) != nil }
         let shown = state.base.filter { !state.heldNames.contains($0.key) && SyncName.id($0.key) != nil && !$0.key.hasPrefix(Self.firstSyncPrefix) }
         let differs = export.items.contains { name, item in new[name] == nil && SyncName.id(name) != nil && shown[name].map { !$0.sameContent(as: item) } ?? true }

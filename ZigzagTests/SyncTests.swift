@@ -65,6 +65,7 @@ import Testing
 @MainActor final class MemoryHost: SyncHost {
     var library: SyncLibrary
     var libraryStamp: Date?
+    var settingTimes: [String: Date] = [:]
     init(_ library: SyncLibrary) { self.library = library }
     func read() -> SyncLibrary { library }
     func write(_ library: SyncLibrary) {
@@ -1975,5 +1976,42 @@ extension SyncTests {
         for mac in [a, c] {
             #expect(mac.library.urls(in: "Work") == ["news"] && mac.library.urls(in: "Personal") == ["news"])
         }
+    }
+
+    @Test func aPreferenceChangedWhileOffCountsFromWhenItChanged() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal")], settings: ["ReaderSize": .int(16), "DarkPages": .bool(false)]))
+        let libSaved = b.clock
+        let off = try saved(ICloudSync.stateTurningOff(b.session.state))
+        // A changes both an hour later.
+        a.clock = libSaved + 3600
+        a.edit { $0.settings["ReaderSize"] = .int(20); $0.settings["DarkPages"] = .bool(true) }
+        a.sync()
+        // B, off, changed ReaderSize two hours later, and DarkPages half an hour after it was saved; Library.json not saved since.
+        var library = b.library
+        library.settings["ReaderSize"] = .int(24)
+        library.settings["DarkPages"] = .bool(false)
+        let again = FakeMac(cloud, library, clock: libSaved + 7200 + 60, state: ICloudSync.stateTurningOn(saved: off))
+        again.host.libraryStamp = libSaved
+        again.host.settingTimes = ["ReaderSize": libSaved + 7200, "DarkPages": libSaved + 1800]
+        again.session.checkAfterLaunch()
+        again.sync(); a.sync()
+        for mac in [again, a] {
+            #expect(mac.library.settings["ReaderSize"] == .int(24))
+            #expect(mac.library.settings["DarkPages"] == .bool(true))
+        }
+        // Without a time noted, it counts from now, never from the library file's date.
+        let (cloud2, c, d) = twoMacs(Sample.library([Sample.space("Personal")], settings: ["ReaderSize": .int(16)]))
+        let saved2 = d.clock
+        let off2 = try saved(ICloudSync.stateTurningOff(d.session.state))
+        c.clock = saved2 + 3600
+        c.edit { $0.settings["ReaderSize"] = .int(20) }
+        c.sync()
+        var library2 = d.library
+        library2.settings["ReaderSize"] = .int(24)
+        let again2 = FakeMac(cloud2, library2, clock: saved2 + 7200, state: ICloudSync.stateTurningOn(saved: off2))
+        again2.host.libraryStamp = saved2
+        again2.session.checkAfterLaunch()
+        again2.sync(); c.sync()
+        #expect(c.library.settings["ReaderSize"] == .int(24))
     }
 }

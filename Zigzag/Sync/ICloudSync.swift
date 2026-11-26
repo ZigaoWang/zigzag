@@ -81,6 +81,7 @@ final class ICloudSync {
 
     /// At launch: picks up where it was, when it's on.
     func startIfOn() {
+        watchPreferencesWhileOff()
         guard isOn, session == nil else { return }
         let library = Library.shared
         let saved = JSONStore.load(SyncState.self, from: Self.stateFile) ?? SyncState()
@@ -148,6 +149,36 @@ final class ICloudSync {
         if !state.merged { state.engine = nil }
         if state.account == nil { state.account = account }
         return state
+    }
+
+    /// When each carried preference changed while sync was off, by key, so turning it on again counts each from then.
+    static let preferenceTimesKey = "SyncWithICloudPreferenceTimes"
+    private var preferenceObserver: NSObjectProtocol?
+    private var lastPreferences: [String: SettingValue] = [:]
+    private let preferenceDebouncer = Debouncer(delay: 1, maxWait: 5)
+
+    private func currentPreferences() -> [String: SettingValue] {
+        SyncPreferences.read(from: .standard, profiles: Set(Library.shared.profiles.map(\.id)))
+    }
+
+    private func watchPreferencesWhileOff() {
+        guard preferenceObserver == nil else { return }
+        lastPreferences = currentPreferences()
+        preferenceObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.preferenceDebouncer.call { self?.notePreferences() } }
+        }
+    }
+
+    private func notePreferences() {
+        let now = currentPreferences()
+        defer { lastPreferences = now }
+        // While on, sync reads them as they change.
+        guard !isOn else { return }
+        var times = UserDefaults.standard.dictionary(forKey: Self.preferenceTimesKey) as? [String: Date] ?? [:]
+        let changed = Set(now.keys).union(lastPreferences.keys).filter { now[$0] != lastPreferences[$0] }
+        guard !changed.isEmpty else { return }
+        for key in changed { times[key] = Date() }
+        UserDefaults.standard.set(times, forKey: Self.preferenceTimesKey)
     }
 
     /// The account sync was turned on with, beside State.json.
@@ -243,6 +274,7 @@ final class ICloudSync {
         self.session = session
         watchLibrary()
         session.checkAfterLaunch()
+        UserDefaults.standard.removeObject(forKey: Self.preferenceTimesKey)
         // CKSyncEngine listens for pushes too, but its own fetch on one goes through a scheduler that can refuse it.
         NSApplication.shared.registerForRemoteNotifications()
         shown = .syncing
@@ -648,6 +680,8 @@ final class AppSyncHost: SyncHost {
     var libraryStamp: Date? {
         (try? FileManager.default.attributesOfItem(atPath: Paths.library.path))?[.modificationDate] as? Date
     }
+
+    var settingTimes: [String: Date] { UserDefaults.standard.dictionary(forKey: ICloudSync.preferenceTimesKey) as? [String: Date] ?? [:] }
 
     func read() -> SyncLibrary {
         let library = Library.shared

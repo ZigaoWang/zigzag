@@ -186,3 +186,5 @@
 - Removals held → Settings says how many of what, that they're hidden here and stay in iCloud until you choose, and what else sync is doing (offline, signed out, iCloud full). Remove Everywhere asks first, naming how many of what. Library.json laid out from iCloud at launch because it was older → a toast says so.
   Test: SyncTests.aLibraryPutBackFromAnOldCopyIsntSentAsRemovals
   Test: SyncTests.aLibraryOlderThanTheOneLastSyncedSendsNothing
+- A preference changed while sync was off → counts from when it changed (noted while off), or from when sync was turned on, never from the library file's date, so a later change on another Mac wins and an earlier one doesn't.
+  Test: SyncTests.aPreferenceChangedWhileOffCountsFromWhenItChanged

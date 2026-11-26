@@ -196,7 +196,10 @@ enum SyncMapping {
     /// `kept`: profiles removed on another Mac and kept here. They and their favorites and settings aren't sent; their
     /// spaces are, on the profile iCloud has them on.
     static func export(_ library: SyncLibrary, previous: [String: SyncItem], aliases: SyncAliases, emptyBefore: Set<UUID> = [],
-                       kept: Set<UUID> = [], unsent: Set<String> = [], now: Date = Date()) -> Export {
+                       kept: Set<UUID> = [], unsent: Set<String> = [], now: Date = Date(),
+                       settingsChanged: [String: Date] = [:], settingsNow: Date? = nil) -> Export {
+        // A preference's change counts from when it was made, never from the library file's date.
+        func changed(_ key: String) -> Date { settingsChanged[SyncPreferences.renamed(key, aliases.local)] ?? settingsNow ?? now }
         let contents = library.contents
         let directory = contents.directory
         var items: [String: SyncItem] = [:]
@@ -350,7 +353,7 @@ enum SyncMapping {
         for (key, value) in current {
             // Too big to send: iCloud keeps what it has, and this Mac its own.
             if SyncPreferences.isTooBig(value) { if let entry = earlier[key] { values[key] = entry }; continue }
-            values[key] = earlier[key].flatMap { $0.value == value ? $0 : nil } ?? .init(value: value, modified: now)
+            values[key] = earlier[key].flatMap { $0.value == value ? $0 : nil } ?? .init(value: value, modified: changed(key))
         }
         // A preference set back to its default is sent as unset; the search engine chosen from an extension stays as it was.
         for (key, entry) in earlier where values[key] == nil {
@@ -359,7 +362,7 @@ enum SyncMapping {
             let owner = SyncPreferences.owner(SyncPreferences.renamed(key, aliases.local))
             if key != SyncPreferences.searchEngineKey, !owner.carried { values[key] = entry; continue }
             if let profile = owner.profile, kept.contains(profile) || directory.profile(profile) == nil { values[key] = entry; continue }
-            values[key] = entry.value == nil ? entry : .init(value: nil, modified: now)
+            values[key] = entry.value == nil ? entry : .init(value: nil, modified: changed(key))
         }
         let settingsModified = values.values.map(\.modified).max() ?? previous[SyncName.settings]?.modified ?? now
         items[SyncName.settings] = SyncItem(.settings(SyncSettings(values: values)), modified: settingsModified)
