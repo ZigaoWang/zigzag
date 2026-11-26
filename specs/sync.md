@@ -44,11 +44,13 @@
   Test: SyncTests.twoMacsTurningSyncOnAtOnceMakeNoCopies
 - Something iCloud doesn't have → added to iCloud, never removed from this Mac.
   Test: SyncTests.theFirstSyncNeverRemovesWhatIsOnlyHere
-- Sync turned on again, or iCloud's copy reset → merged again, and nothing is added twice. A Mac that was offline during a reset matches its items as before the reset, even renamed ones, and nothing is copied; but as in any first sync, iCloud's version of what matched wins, so what that Mac changed offline is lost, and what it removed offline comes back from the Mac that sent first.
+- iCloud's copy reset, or sync turned on again after it was removed from iCloud → merged again, and nothing is added twice. A Mac that was offline during a reset matches its items as before the reset, even renamed ones, and nothing is copied; but as in any first sync, iCloud's version of what matched wins, so what that Mac changed offline is lost, and what it removed offline comes back from the Mac that sent first.
   Test: SyncTests.aResetWhileAnotherMacWasOfflineAddsNoCopies
   Test: SyncTests.turningSyncOnAgainAddsNothingTwice
-- Sync turned off, something renamed, and turned on again → the renamed space, folder or page is matched as it was before, taking iCloud's version, never added again.
+- Sync turned off, things changed, and turned on again → what changed only on this Mac is kept, what changed only in iCloud is taken, and what changed on both goes to the later edit, this Mac's counting from when sync was turned on. What was removed here is removed everywhere, many at once held as at launch; what was removed in iCloud is removed here. Nothing is added twice. Turned on in another account, or after iCloud's copy was removed, it merges afresh as a first sync.
   Test: SyncTests.turningSyncOffRenamingAndOnAgainAddsNoCopy
+  Test: SyncTests.turningSyncOnAgainKeepsWhatChangedOnEachSideWhileOff
+  Test: SyncTests.turningSyncOnAgainAfterRemoveFromICloudMergesAfresh
 - This Mac's library couldn't be read and Zigzag started afresh → merged again as on a first sync, so iCloud fills it in; nothing is removed from iCloud.
   Test: SyncTests.aLibraryThatCouldntBeReadIsFilledFromICloudNotEmptiedInto
 - Zigzag quit before the first sync finished → the next start reads all of iCloud again before merging.

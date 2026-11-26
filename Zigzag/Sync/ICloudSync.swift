@@ -150,23 +150,44 @@ final class ICloudSync {
         start(state: Self.stateTurningOn(saved: JSONStore.load(SyncState.self, from: Self.stateFile)))
     }
 
-    /// What's kept while sync is off: only which items here match which in iCloud, so turning it on again, after a
-    /// rename, finds them instead of adding copies.
-    static func stateTurningOff(_ state: SyncState?) -> SyncState {
+    /// What's kept while sync is off: which items here match which in iCloud, and what this Mac and iCloud last agreed
+    /// on, so turning it on again keeps what changed on each side since (`stateTurningOn`). Not after iCloud's copy
+    /// was removed (`keepingLibrary` false): then it's merged afresh.
+    static func stateTurningOff(_ state: SyncState?, keepingLibrary: Bool = true) -> SyncState {
         var kept = SyncState()
         kept.aliases = state?.aliases ?? SyncAliases()
+        guard keepingLibrary, let state, state.merged else { return kept }
+        kept.merged = true
+        kept.base = state.base
+        kept.serverPayloads = state.serverPayloads
+        kept.serverDates = state.serverDates
+        kept.systemFields = state.systemFields
+        kept.unsent = state.unsent
+        kept.emptyFolders = state.emptyFolders
+        kept.keptProfiles = state.keptProfiles
+        kept.libraryStamp = state.libraryStamp
+        kept.lastSynced = state.lastSynced
+        // Only for the same account: another one is merged afresh.
+        kept.resumeAccount = state.account ?? state.resumeAccount
         return kept
     }
 
-    static func stateTurningOn(saved: SyncState?) -> SyncState { stateTurningOff(saved) }
+    /// Turned on again: what changed only here is kept, what changed only in iCloud is taken, what changed on both
+    /// goes to the later (this Mac's edits made while off count from now), and what was removed here goes as any
+    /// removal at launch does, many at once held. All of iCloud is read again, so what was removed there goes too.
+    static func stateTurningOn(saved: SyncState?) -> SyncState {
+        var state = stateTurningOff(saved)
+        state.resumed = state.merged
+        return state
+    }
 
     /// Turned off: everything stays on this Mac, and iCloud keeps its copy.
-    func turnOff() {
+    func turnOff(keepingLibrary: Bool = true) {
         UserDefaults.standard.set(false, forKey: Self.enabledKey)
         let state = session?.state ?? JSONStore.load(SyncState.self, from: Self.stateFile)
         stop()
         NSApplication.shared.unregisterForRemoteNotifications()
-        JSONStore.save(Self.stateTurningOff(state), to: Self.stateFile)
+        JSONStore.save(Self.stateTurningOff(state, keepingLibrary: keepingLibrary), to: Self.stateFile)
         UserDefaults.standard.removeObject(forKey: Self.accountKey)
         shown = .off
     }
@@ -186,7 +207,7 @@ final class ICloudSync {
             shown = Self.status(for: error) ?? .failed(error.localizedDescription)
             return false
         }
-        turnOff()
+        turnOff(keepingLibrary: false)
         UserDefaults.standard.set(false, forKey: Self.copyKey)
         return true
     }
@@ -243,6 +264,10 @@ final class ICloudSync {
             }
             let user = try await container.userRecordID().recordName
             guard let session, isOn else { return }
+            // What was kept while off belongs to the account it was synced with: another one is merged afresh.
+            if let earlier = session.state.resumeAccount {
+                if earlier != user { session.startOver() } else { session.updateState { $0.resumeAccount = nil } }
+            }
             guard Self.mayUse(account: user, saved: session.state.account) else { shown = .otherAccount; return }
             session.updateState { $0.account = user }
             UserDefaults.standard.set(user, forKey: Self.accountKey)
@@ -283,6 +308,7 @@ final class ICloudSync {
                     UserDefaults.standard.set(true, forKey: Self.copyKey)
                     shown = .synced(session.state.lastSynced)
                 }
+                if session.state.resumed { session.updateState { $0.resumed = false } }
                 retry.succeeded()
             }
         } catch {
@@ -442,7 +468,9 @@ final class ICloudSync {
 
     /// Our zone isn't in iCloud. Before the first sync that's an empty iCloud; after it, the zone was removed.
     fileprivate func zoneMissing(_ error: Error) {
-        guard session?.state.merged == true else { return }
+        guard let session, session.state.merged else { return }
+        // Gone while sync was off here: merged afresh, as sync was just turned on.
+        if session.state.resumed { zoneDeleted(reset: true); return }
         zoneDeleted(reset: false)
     }
 
@@ -462,7 +490,7 @@ final class ICloudSync {
         } else {
             // Remove from iCloud on another Mac, or iCloud's data deleted in System Settings: sync stops here too, and
             // the library here stays.
-            turnOff()
+            turnOff(keepingLibrary: false)
             UserDefaults.standard.set(false, forKey: Self.copyKey)
             shown = .removedElsewhere
         }
@@ -665,6 +693,8 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
         let started = session.now()
         let database = container.privateCloudDatabase
         var token = session.state.zoneToken.flatMap { try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0) }
+        // Read from the start: what isn't there any more was removed.
+        var all: Set<String>? = token == nil ? [] : nil
         var more = true
         while more {
             let changes: (modificationResultsByID: [CKRecord.ID: Result<CKDatabase.RecordZoneChange.Modification, Error>],
@@ -674,17 +704,20 @@ final class CloudEngine: SyncServer, SyncTransport, CKSyncEngineDelegate {
             } catch let error as CKError where error.code == .changeTokenExpired && token != nil {
                 // Read from the start again: what's already here takes no change.
                 token = nil
+                all = []
                 continue
             }
             guard self.session === session else { return }
             let records = changes.modificationResultsByID.values.compactMap { try? $0.get().record }
                 .filter { $0.recordID.zoneID == ICloudSync.zoneID }.map(Self.remote)
             session.fetched(records, deleted: changes.deletions.map(\.recordID.recordName), startedAt: started)
+            all?.formUnion(records.map(\.name))
             token = changes.changeToken
             let archived = try? NSKeyedArchiver.archivedData(withRootObject: changes.changeToken, requiringSecureCoding: true)
             session.updateState { $0.zoneToken = archived }
             more = changes.moreComing
         }
+        if let all { session.readAll(all) }
         if session.state.merged { session.fetchFinished() }
     }
     func sendChanges() async throws { try await engine?.sendChanges() }

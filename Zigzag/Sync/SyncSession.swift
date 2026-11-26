@@ -123,6 +123,10 @@ struct SyncState: Codable {
     var heldRemovals: Int? { heldNames.isEmpty ? nil : heldNames.count }
     /// Library.json's own date when sync last read it, so one put back from an older copy is told apart.
     var libraryStamp: Date?
+    /// While off: the account the kept state was synced with.
+    var resumeAccount: String?
+    /// Turned on again with what was kept while off, until the first catch-up.
+    var resumed = false
     /// When this Mac's first sync found iCloud empty: another Mac turning on at the same time may have sent copies of
     /// the same spaces, matched as they arrive for a while (`SyncSession.copyWindow`).
     var mergedAlone: Date?
@@ -133,7 +137,7 @@ struct SyncState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case base, serverPayloads, systemFields, unsent, aliases, emptyFolders, merged, account, lastSynced, engine, keptProfiles
-        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldNames, libraryStamp, mergedAlone, copies, savedSeen, fetches
+        case incoming, incomingRemoved, serverDates, zoneToken, leftovers, heldNames, libraryStamp, resumeAccount, resumed, mergedAlone, copies, savedSeen, fetches
     }
 
     init() {}
@@ -158,6 +162,8 @@ struct SyncState: Codable {
         leftovers = try c.decodeIfPresent([String: SyncLeftover].self, forKey: .leftovers) ?? [:]
         heldNames = try c.decodeIfPresent(Set<String>.self, forKey: .heldNames) ?? []
         libraryStamp = try c.decodeIfPresent(Date.self, forKey: .libraryStamp)
+        resumeAccount = try c.decodeIfPresent(String.self, forKey: .resumeAccount)
+        resumed = try c.decodeIfPresent(Bool.self, forKey: .resumed) ?? false
         mergedAlone = try c.decodeIfPresent(Date.self, forKey: .mergedAlone)
         copies = try c.decodeIfPresent(Set<String>.self, forKey: .copies) ?? []
         savedSeen = try c.decodeIfPresent([String: Date].self, forKey: .savedSeen) ?? [:]
@@ -356,6 +362,12 @@ final class SyncSession {
         // A removal from a fetch that started before one that brought a newer save is stale.
         for name in deleted where !(state.savedSeen[name].map { $0 > started } ?? false) { arrive(name, nil) }
         if !records.isEmpty || !deleted.isEmpty { onChange?() }
+    }
+
+    /// A read of the whole zone is done: what iCloud had and doesn't any more was removed there.
+    func readAll(_ names: Set<String>) {
+        guard !isClosed, state.merged else { return }
+        for name in state.serverPayloads.keys where !names.contains(name) && state.incoming[name] == nil { arrive(name, nil) }
     }
 
     /// A fetch is done: the first sync merges, later ones settle what came.

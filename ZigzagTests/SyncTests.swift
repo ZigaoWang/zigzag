@@ -155,9 +155,7 @@ import Testing
         guard scope == .zone || pushed else { return }
         pushed = false
         if zoneMissing { throw CKError(.zoneNotFound) }
-        let changes = cloud.changes(since: token)
-        token = changes.token
-        session.fetched(changes.records, deleted: changes.deleted)
+        read()
         if session.state.merged { session.fetchFinished() }
     }
 
@@ -167,10 +165,17 @@ import Testing
     }
 
     func fetch() {
-        let changes = cloud.changes(since: token)
-        token = changes.token
-        session.fetched(changes.records, deleted: changes.deleted)
+        read()
         session.fetchFinished()
+    }
+
+    /// As CloudKit: read from the start, it lists what's there and no removals.
+    private func read() {
+        let changes = cloud.changes(since: token)
+        let all = token == 0
+        token = changes.token
+        session.fetched(changes.records, deleted: all ? [] : changes.deleted)
+        if all { session.readAll(Set(changes.records.map(\.name))) }
     }
 
     func send() {
@@ -448,15 +453,44 @@ extension SyncLibrary {
         let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
         // B's space matched A's by name; sync turns off on B, the space is renamed, and sync turns on again.
         let off = try saved(ICloudSync.stateTurningOff(b.session.state))
-        #expect(!off.merged && off.base.isEmpty && off.account == nil)
+        #expect(off.account == nil && off.engine == nil && off.zoneToken == nil)
         var library = b.library
         library.editSpace("Personal") { $0.name = "Home" }
-        let again = FakeMac(cloud, library, clock: b.clock, state: ICloudSync.stateTurningOn(saved: off))
+        let again = FakeMac(cloud, library, clock: b.clock + 10, state: ICloudSync.stateTurningOn(saved: off))
+        again.session.checkAfterLaunch()
         again.sync(); a.sync()
-        // One space, as iCloud has it, as any first sync's match.
-        #expect(again.library.spaceNames == ["Personal"] && again.library.urls(in: "Personal") == ["a"])
-        #expect(a.library.spaceNames == ["Personal"])
+        #expect(again.library.spaceNames == ["Home"] && again.library.urls(in: "Personal").isEmpty && again.library.urls(in: "Home") == ["a"])
+        #expect(a.library.spaceNames == ["Home"])
         #expect(cloud.records.keys.filter { $0.hasPrefix("space.") }.count == 1)
+    }
+
+    @Test func turningSyncOnAgainKeepsWhatChangedOnEachSideWhileOff() throws {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a"), Sample.page("b"), Sample.page("c"), Sample.page("d")])]))
+        let off = try saved(ICloudSync.stateTurningOff(b.session.state))
+        // While B is off: B retitles a and removes c; A retitles b, removes d and pins e.
+        var library = b.library
+        library.editSpace("Personal") { s in
+            s.bookmarks[0].title = "retitled while off"
+            s.bookmarks.removeAll { $0.url.lastPathComponent == "c" }
+        }
+        a.edit { $0.editSpace("Personal") { s in
+            s.bookmarks[1].title = "retitled in iCloud"
+            s.bookmarks.removeAll { $0.url.lastPathComponent == "d" }
+            s.bookmarks.append(Sample.page("e"))
+        } }
+        a.sync()
+        let again = FakeMac(cloud, library, clock: b.clock + 86400, state: ICloudSync.stateTurningOn(saved: off))
+        again.session.checkAfterLaunch()
+        again.sync(); a.sync()
+        for mac in [again, a] {
+            #expect(mac.library.titles(in: "Personal") == ["retitled while off", "retitled in iCloud", "e"], "\(mac.library.titles(in: "Personal"))")
+        }
+    }
+
+    @Test func turningSyncOnAgainAfterRemoveFromICloudMergesAfresh() {
+        let (_, _, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        let off = ICloudSync.stateTurningOff(b.session.state, keepingLibrary: false)
+        #expect(!off.merged && off.base.isEmpty && !off.aliases.isEmpty)
     }
 
     @Test func aResetWhileAnotherMacWasOfflineAddsNoCopies() {
