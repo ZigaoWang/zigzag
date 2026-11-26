@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Approving an extension update that asks for more no longer takes back what you allowed it later, like Bitwarden's connection to its app for Unlock with biometrics. Thanks to [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Removing a profile while its extensions are still starting no longer quits Zigzag.
 
 ## [0.10.0] - 2026-11-25
 
