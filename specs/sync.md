@@ -153,6 +153,7 @@
   Test: SyncTests.anEditWhileRemovalsAreHeldKeepsItsOwnTime
 - Zigzag opened with a Library.json older than the one sync last read (put back from a copy) → iCloud's version of everything, and nothing is sent.
   Test: SyncTests.aLibraryOlderThanTheOneLastSyncedSendsNothing
+  Test: SyncTests.aClockOnceAheadDoesntMakeLaterLaunchesRollbacks
 - Removing things by hand, however many (a space with all its pins) → sent at once; only a library found changed at launch or when sync is turned on is checked.
   Test: SyncTests.removingASpaceAndItsPinsByHandIsSentAtOnce
 - Profiles.json gone while iCloud has this Mac's other profiles → read as a file that couldn't be read, and merged again as on a first sync; no profile is removed from iCloud.

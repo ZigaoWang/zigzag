@@ -1730,4 +1730,20 @@ extension SyncTests {
         a.session.fetchFinished()
         #expect(a.library.urls(in: "Personal") == ["a"])
     }
+
+    @Test func aClockOnceAheadDoesntMakeLaterLaunchesRollbacks() throws {
+        let (cloud, a, _) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        // The clock a day ahead once, then set right.
+        a.host.libraryStamp = a.clock.addingTimeInterval(86400)
+        a.edit { $0.editSpace("Personal") { $0.bookmarks[0].title = "while ahead" } }
+        a.host.libraryStamp = a.clock
+        a.clock += 1
+        a.library.editSpace("Personal") { $0.bookmarks.append(Sample.page("just before quit")) }
+        a.host.libraryStamp = a.clock
+        let again = FakeMac(cloud, a.library, clock: a.clock + 60, state: try saved(a.session.state))
+        again.host.libraryStamp = a.clock
+        again.session.checkAfterLaunch()
+        again.sync()
+        #expect(again.library.urls(in: "Personal") == ["a", "just before quit"])
+    }
 }

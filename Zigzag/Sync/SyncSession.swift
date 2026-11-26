@@ -239,7 +239,8 @@ final class SyncSession {
                                         kept: state.keptProfiles, unsent: state.unsent, now: now())
         state.emptyFolders = export.emptyFolders
         queue(diff(export.items, deletes: true))
-        if let stamp = host.libraryStamp { state.libraryStamp = max(state.libraryStamp ?? stamp, stamp) }
+        // The file's own date as it is now; one ahead of the clock (a clock set wrong) is no guide.
+        if let stamp = host.libraryStamp, stamp <= now().addingTimeInterval(60) { state.libraryStamp = stamp }
         onChange?()
         if export.needsLayout { layOut() }
     }
@@ -250,7 +251,8 @@ final class SyncSession {
     /// (Remove Everywhere) or brought back (Restore). Edits made after it go up as usual.
     func checkAfterLaunch() {
         guard !isClosed, state.merged, !isApplying else { return }
-        if let synced = state.libraryStamp, let stamp = host.libraryStamp, stamp < synced.addingTimeInterval(-1) {
+        if let synced = state.libraryStamp, synced <= now().addingTimeInterval(60), let stamp = host.libraryStamp,
+           stamp < synced.addingTimeInterval(-1) {
             layOut()
             return
         }
