@@ -261,7 +261,7 @@ struct PrivateWindowAccessTests {
 @Suite(.serialized)
 struct ExtensionUpdateGrantsTests {
     /// Packages in a temporary folder and a profile no list knows, so nothing lands in the person's own.
-    private final class Workspace {
+    fileprivate final class Workspace {
         let folder: URL
         let profile = Profile(id: UUID())
 
@@ -285,7 +285,7 @@ struct ExtensionUpdateGrantsTests {
 
     private static let nativeMessaging = WKWebExtension.Permission.nativeMessaging.rawValue
 
-    private static func manifest(_ gecko: String, _ version: String, permissions: [String] = ["storage"],
+    fileprivate static func manifest(_ gecko: String, _ version: String, permissions: [String] = ["storage"],
                                  optional: [String] = ["nativeMessaging"], hosts: [String] = ["https://a.example/*"],
                                  optionalHosts: [String] = ["https://later.example/*"]) -> [String: Any] {
         XPIArchive.manifest(gecko, version, ["manifest_version": 3, "permissions": permissions, "optional_permissions": optional,
@@ -294,7 +294,7 @@ struct ExtensionUpdateGrantsTests {
 
     /// Installs through the store's own two steps, as the install sheet does.
     @discardableResult
-    private static func install(_ manifest: [String: Any], in profile: Profile) async throws -> String {
+    fileprivate static func install(_ manifest: [String: Any], in profile: Profile) async throws -> String {
         guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(data: try XPIArchive.xpi(manifest)) else {
             throw CocoaError(.fileReadCorruptFile)
         }
@@ -413,5 +413,60 @@ struct ExtensionUpdateGrantsTests {
         try await Self.install(Self.manifest("gone@example.com", "1.0"), in: work.profile)
         #expect(!work.profile.extensions.allowsNativeHosts(id))
         #expect(work.profile.installs.state(id)?.requestedMatchPatterns == nil)
+    }
+}
+
+/// A profile removed or freed while its extensions are still starting: what was waiting stops, and nothing reads
+/// the profile after it's gone.
+@MainActor
+@Suite(.serialized)
+struct ExtensionHostLifetimeTests {
+    /// Another profile with the workspace's extension on record, its extensions not started yet.
+    private static func profile(having id: String, from work: ExtensionUpdateGrantsTests.Workspace) throws -> Profile {
+        let profile = Profile(id: UUID())
+        profile.installs.save(try #require(work.profile.installs.state(id)), for: id)
+        return profile
+    }
+
+    private static func settle() async throws {
+        for _ in 0..<20 { await Task.yield() }
+        try await Task.sleep(for: .milliseconds(300))
+    }
+
+    @Test func aProfileFreedAsItsExtensionsStartIsLeftAlone() async throws {
+        var profile: Profile? = Profile(id: UUID())
+        let folder = try #require(profile).folder
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let host = try #require(profile).extensions
+        profile = nil
+        try await Self.settle()
+        #expect(host.contexts.isEmpty)
+    }
+
+    @Test func aProfileFreedWhileAnExtensionLoadsIsLeftAlone() async throws {
+        let work = try await ExtensionUpdateGrantsTests.Workspace()
+        defer { work.cleanUp() }
+        let id = try await ExtensionUpdateGrantsTests.install(ExtensionUpdateGrantsTests.manifest("freed@example.com", "1.0"), in: work.profile)
+        var profile: Profile? = try Self.profile(having: id, from: work)
+        let folder = try #require(profile).folder
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let host = try #require(profile).extensions
+        await Task.yield()
+        profile = nil
+        try await Self.settle()
+        #expect(host.context(for: id) == nil)
+    }
+
+    @Test func aRemovedProfileLoadsNothingMore() async throws {
+        let work = try await ExtensionUpdateGrantsTests.Workspace()
+        defer { work.cleanUp() }
+        let id = try await ExtensionUpdateGrantsTests.install(ExtensionUpdateGrantsTests.manifest("removed@example.com", "1.0"), in: work.profile)
+        let profile = try Self.profile(having: id, from: work)
+        defer { try? FileManager.default.removeItem(at: profile.folder) }
+        let host = profile.extensions
+        await host.shutDown()
+        try await Self.settle()
+        #expect(host.contexts.isEmpty)
+        #expect(await host.load(id) == nil)
     }
 }
