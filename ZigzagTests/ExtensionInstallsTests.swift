@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// An extension's package record and the first profile's answers about it share one file. Each is written without
@@ -251,5 +252,221 @@ struct PrivateWindowAccessTests {
             installs.save(ExtensionInstalls.State(), for: id)
             #expect(!installs.allowsPrivate(id))
         }
+    }
+}
+
+/// What the person granted an extension later (an optional permission, an optional site) stays through an update
+/// while the new version still declares it, and through a relaunch after, as in Chrome (#484).
+@MainActor
+@Suite(.serialized)
+struct ExtensionUpdateGrantsTests {
+    /// Packages in a temporary folder and a profile no list knows, so nothing lands in the person's own.
+    fileprivate final class Workspace {
+        let folder: URL
+        let profile = Profile(id: UUID())
+
+        init() async throws {
+            folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-update-grants-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: folder.appendingPathComponent("Extensions"), withIntermediateDirectories: true)
+            ExtensionStore.rootOverride = folder.appendingPathComponent("Extensions", isDirectory: true)
+            ExtensionStore.forgetWhatWasRead()
+            // The profile's own start reads it later; done before the test ends with it.
+            while !profile.extensions.finishedLoading { await Task.yield() }
+        }
+
+        func cleanUp() {
+            for id in profile.installs.installedIDs { profile.extensions.unload(id) }
+            ExtensionStore.rootOverride = nil
+            ExtensionStore.forgetWhatWasRead()
+            try? FileManager.default.removeItem(at: folder)
+            try? FileManager.default.removeItem(at: profile.folder)
+        }
+    }
+
+    private static let nativeMessaging = WKWebExtension.Permission.nativeMessaging.rawValue
+
+    fileprivate static func manifest(_ gecko: String, _ version: String, permissions: [String] = ["storage"],
+                                 optional: [String] = ["nativeMessaging"], hosts: [String] = ["https://a.example/*"],
+                                 optionalHosts: [String] = ["https://later.example/*"]) -> [String: Any] {
+        XPIArchive.manifest(gecko, version, ["manifest_version": 3, "permissions": permissions, "optional_permissions": optional,
+                                             "host_permissions": hosts, "optional_host_permissions": optionalHosts])
+    }
+
+    /// Installs through the store's own two steps, as the install sheet does.
+    @discardableResult
+    fileprivate static func install(_ manifest: [String: Any], in profile: Profile) async throws -> String {
+        guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(data: try XPIArchive.xpi(manifest)) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        guard case .success = await ExtensionStore.finishInstall(prepared, in: profile) else { throw CocoaError(.fileWriteUnknown) }
+        // No list knows the profile, so the install's own reload doesn't reach it.
+        await relaunch(prepared.id, in: profile)
+        return prepared.id
+    }
+
+    /// What allowing native messaging records (the more-access sheet), with an optional site it asked for.
+    private static func grantOptional(_ id: String, in profile: Profile) {
+        profile.installs.update(id) {
+            $0.grantedPermissions = (($0.grantedPermissions ?? []) + [nativeMessaging]).sorted()
+            $0.requestedMatchPatterns = ["https://later.example/*"]
+        }
+    }
+
+    /// A new version stored beside the current one, as a store download is.
+    private static func stage(_ manifest: [String: Any], version: String, for id: String) throws {
+        let folder = ExtensionStore.folder(for: id).appendingPathComponent("versions/\(version)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try XPIArchive.json(manifest).write(to: folder.appendingPathComponent("manifest.json"))
+        ExtensionStore.forgetWhatWasRead()
+    }
+
+    /// What a relaunch does: the extension is read again from its record.
+    private static func relaunch(_ id: String, in profile: Profile) async {
+        profile.extensions.unload(id)
+        #expect(await profile.extensions.load(id) != nil)
+    }
+
+    private static func keepsOptional(_ id: String, in profile: Profile) {
+        #expect(profile.extensions.allowsNativeHosts(id))
+        #expect(profile.installs.state(id)?.grantedPermissions?.contains(nativeMessaging) == true)
+        #expect(profile.installs.state(id)?.requestedMatchPatterns == ["https://later.example/*"])
+    }
+
+    @Test func aHeldBackUpdateKeepsGrantedOptionalPermissions() async throws {
+        let work = try await Workspace()
+        defer { work.cleanUp() }
+        let id = try await Self.install(Self.manifest("held@example.com", "1.0"), in: work.profile)
+        Self.grantOptional(id, in: work.profile)
+        #expect(work.profile.extensions.allowsNativeHosts(id))
+
+        try Self.stage(Self.manifest("held@example.com", "2.0", permissions: ["storage", "tabs"]), version: "2.0", for: id)
+        ExtensionStore.update(id) { $0.pendingVersion = "2.0" }
+        await ExtensionStore.approvePendingUpdate(id, in: [work.profile])
+        #expect(ExtensionStore.package(id)?.version == "2.0")
+        // What the update asked for was approved with it.
+        #expect(work.profile.installs.state(id)?.grantedPermissions?.contains("tabs") == true)
+        Self.keepsOptional(id, in: work.profile)
+        await Self.relaunch(id, in: work.profile)
+        Self.keepsOptional(id, in: work.profile)
+    }
+
+    @Test func aSilentUpdateKeepsGrantedOptionalPermissions() async throws {
+        let work = try await Workspace()
+        defer { work.cleanUp() }
+        let id = try await Self.install(Self.manifest("silent@example.com", "1.0"), in: work.profile)
+        Self.grantOptional(id, in: work.profile)
+
+        try Self.stage(Self.manifest("silent@example.com", "1.1"), version: "1.1", for: id)
+        #expect(await ExtensionStore.switchVersion(of: id, to: "1.1", in: [work.profile]))
+        Self.keepsOptional(id, in: work.profile)
+        await Self.relaunch(id, in: work.profile)
+        Self.keepsOptional(id, in: work.profile)
+    }
+
+    @Test func installingOverAnInstallKeepsGrantedOptionalPermissions() async throws {
+        let work = try await Workspace()
+        defer { work.cleanUp() }
+        let id = try await Self.install(Self.manifest("again@example.com", "1.0"), in: work.profile)
+        Self.grantOptional(id, in: work.profile)
+
+        try await Self.install(Self.manifest("again@example.com", "2.0"), in: work.profile)
+        Self.keepsOptional(id, in: work.profile)
+        await Self.relaunch(id, in: work.profile)
+        Self.keepsOptional(id, in: work.profile)
+    }
+
+    @Test func whatTheNewVersionNoLongerDeclaresIsDropped() async throws {
+        let work = try await Workspace()
+        defer { work.cleanUp() }
+        let id = try await Self.install(Self.manifest("dropped@example.com", "1.0", hosts: ["https://a.example/*", "https://b.example/*"]),
+                                        in: work.profile)
+        Self.grantOptional(id, in: work.profile)
+
+        try Self.stage(Self.manifest("dropped@example.com", "1.1", optional: [], optionalHosts: []), version: "1.1", for: id)
+        #expect(await ExtensionStore.switchVersion(of: id, to: "1.1", in: [work.profile]))
+        let state = try #require(work.profile.installs.state(id))
+        #expect(!work.profile.extensions.allowsNativeHosts(id))
+        #expect(state.grantedPermissions?.contains(Self.nativeMessaging) == false)
+        #expect(state.grantedPermissions?.contains("storage") == true)
+        #expect(state.grantedMatchPatterns == ["https://a.example/*"])
+        #expect(state.requestedMatchPatterns == nil)
+    }
+
+    /// A site stays while a declared pattern covers it, the way WebKit matches one pattern against another.
+    @Test func aSiteStaysWhileADeclaredPatternCoversIt() throws {
+        let all = try WKWebExtension.MatchPattern(string: "<all_urls>"), one = try WKWebExtension.MatchPattern(string: "https://one.example/*")
+        let state = ExtensionInstalls.State(grantedPermissions: ["storage"], grantedMatchPatterns: ["https://one.example/*"],
+                                            requestedMatchPatterns: ["<all_urls>"])
+        // Every site covers one; one site doesn't cover every site.
+        #expect(ExtensionHost.boundedGrants(state, declared: ["storage"], patterns: [all]) == nil)
+        let underOne = try #require(ExtensionHost.boundedGrants(state, declared: ["storage"], patterns: [one]))
+        #expect(underOne.grantedMatchPatterns == ["https://one.example/*"] && underOne.requestedMatchPatterns == nil)
+        #expect(underOne.grantedPermissions == ["storage"])
+    }
+
+    @Test func uninstallingForgetsEveryGrant() async throws {
+        let work = try await Workspace()
+        defer { work.cleanUp() }
+        let id = try await Self.install(Self.manifest("gone@example.com", "1.0"), in: work.profile)
+        Self.grantOptional(id, in: work.profile)
+        ExtensionStore.uninstall(id, from: work.profile)
+        try await Self.install(Self.manifest("gone@example.com", "1.0"), in: work.profile)
+        #expect(!work.profile.extensions.allowsNativeHosts(id))
+        #expect(work.profile.installs.state(id)?.requestedMatchPatterns == nil)
+    }
+}
+
+/// A profile removed or freed while its extensions are still starting: what was waiting stops, and nothing reads
+/// the profile after it's gone.
+@MainActor
+@Suite(.serialized)
+struct ExtensionHostLifetimeTests {
+    /// Another profile with the workspace's extension on record, its extensions not started yet.
+    private static func profile(having id: String, from work: ExtensionUpdateGrantsTests.Workspace) throws -> Profile {
+        let profile = Profile(id: UUID())
+        profile.installs.save(try #require(work.profile.installs.state(id)), for: id)
+        return profile
+    }
+
+    private static func settle() async throws {
+        for _ in 0..<20 { await Task.yield() }
+        try await Task.sleep(for: .milliseconds(300))
+    }
+
+    @Test func aProfileFreedAsItsExtensionsStartIsLeftAlone() async throws {
+        var profile: Profile? = Profile(id: UUID())
+        let folder = try #require(profile).folder
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let host = try #require(profile).extensions
+        profile = nil
+        try await Self.settle()
+        #expect(host.contexts.isEmpty)
+    }
+
+    @Test func aProfileFreedWhileAnExtensionLoadsIsLeftAlone() async throws {
+        let work = try await ExtensionUpdateGrantsTests.Workspace()
+        defer { work.cleanUp() }
+        let id = try await ExtensionUpdateGrantsTests.install(ExtensionUpdateGrantsTests.manifest("freed@example.com", "1.0"), in: work.profile)
+        var profile: Profile? = try Self.profile(having: id, from: work)
+        let folder = try #require(profile).folder
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let host = try #require(profile).extensions
+        await Task.yield()
+        profile = nil
+        try await Self.settle()
+        #expect(host.context(for: id) == nil)
+    }
+
+    @Test func aRemovedProfileLoadsNothingMore() async throws {
+        let work = try await ExtensionUpdateGrantsTests.Workspace()
+        defer { work.cleanUp() }
+        let id = try await ExtensionUpdateGrantsTests.install(ExtensionUpdateGrantsTests.manifest("removed@example.com", "1.0"), in: work.profile)
+        let profile = try Self.profile(having: id, from: work)
+        defer { try? FileManager.default.removeItem(at: profile.folder) }
+        let host = profile.extensions
+        await host.shutDown()
+        try await Self.settle()
+        #expect(host.contexts.isEmpty)
+        #expect(await host.load(id) == nil)
     }
 }

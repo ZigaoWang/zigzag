@@ -185,6 +185,19 @@ import Testing
         #expect(second.contents.favorites.count == 1)
     }
 
+    @Test func pinsThatDifferOnlyAfterTheHashAreBothRestored() {
+        var space = SpaceInfo(name: "Work", color: .sky)
+        space.bookmarks = [page("app#inbox", "Inbox"), page("app#sent", "Sent")]
+        var backup = ZigzagBackup()
+        backup.spaces = [space]
+        backup.favorites = [page("mail#one", "One"), page("mail#two", "Two")]
+        var here = space
+        here.bookmarks = [page("app#inbox", "Inbox")]
+        let merge = backup.merged(into: contents([here]))
+        #expect(merge.contents.spaces[0].bookmarks.map(\.title).sorted() == ["Inbox", "Sent"])
+        #expect(merge.contents.favorites.map(\.title).sorted() == ["One", "Two"])
+    }
+
     /// Pinned by hand since the backup: only what the space doesn't have comes over, into the folder it was in.
     @Test func aSpaceThatsStillHereGainsOnlyWhatItLacks() {
         var space = sampleSpace()

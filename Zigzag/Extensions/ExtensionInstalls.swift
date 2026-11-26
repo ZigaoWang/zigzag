@@ -36,6 +36,13 @@ final class ExtensionInstalls {
 
         static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "requestedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites", "localReceivers", "allowsPrivate"]
 
+        /// A new version approved over this record (a held-back update, or the install sheet over an install): what it
+        /// asks for joins what was granted before, which its load keeps only while the new version declares it.
+        mutating func approve(_ asked: (permissions: Set<String>, patterns: Set<String>)) {
+            grantedPermissions = grantedPermissions.map { Set($0).union(asked.permissions).sorted() }
+            grantedMatchPatterns = grantedMatchPatterns.map { Set($0).union(asked.patterns).sorted() }
+        }
+
         /// What another profile starts with when it gets this extension too: what was approved here and where it
         /// may run, so it gets nothing it wasn't allowed without the install sheet. Sites it was clicked on stay
         /// this profile's: they'd tell the other profile where you've been.

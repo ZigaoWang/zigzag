@@ -14,6 +14,7 @@ L’interface française de Zigzag est `fr`. Vérifiez le sens de chaque chaîne
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Épinglés / Épingler l’onglet / Désépingler l’onglet / Revenir à la page épinglée |
 | Pin to Address / Unpin from Address (an extension’s button) | Épingler dans la barre d’adresse / Retirer de la barre d’adresse |
 | Favorites / Bookmarks / Folder / Group | favoris / signets / dossier / groupe |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | synchroniser / synchronisation / Synchroniser avec iCloud / Stockage iCloud saturé / bibliothèque |
 | Live Folder | dossier dynamique |
 | Command Bar / Site Controls | barre de commandes / Réglages du site |
 | Zigzag Mini / Mini player | Zigzag Mini / mini-lecteur |

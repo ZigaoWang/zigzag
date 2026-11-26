@@ -700,6 +700,8 @@ enum ExtensionStore {
         let id = prepared.id
         let installs = profile.installs
         let isNew = !installs.hasRecord(id)
+        // Over an install, what was granted before stays while the new version declares it, as in Chrome.
+        let asked = isNew ? nil : manifest(in: prepared.folder).map { askedGrants(of: prepared.extensionInfo, manifest: $0) }
         guard store((prepared.folder, prepared.version), for: id) else { return .failure(.unpack) }
         // A package already here keeps its own kind when this one is a Chrome install for the same ID; a legacy
         // record's absent kind reads as Chrome's, and its gecko ID is kept when this package doesn't name one.
@@ -710,8 +712,12 @@ enum ExtensionStore {
                      firefoxID: prepared.firefoxID ?? existing.flatMap(\.firefoxID)), for: id)
         var next = installs.state(id) ?? ExtensionInstalls.State()
         // Approved just now, from what the sheet showed.
-        next.grantedPermissions = nil
-        next.grantedMatchPatterns = nil
+        if let asked {
+            next.approve(asked)
+        } else {
+            next.grantedPermissions = nil
+            next.grantedMatchPatterns = nil
+        }
         installs.save(next, for: id)
         removedIDs.remove(id)
         removeVersions(of: id, keeping: [prepared.version])
@@ -1076,28 +1082,37 @@ enum ExtensionStore {
         return await switchVersion(of: id, to: package.version) ? .updated : .failed
     }
 
-    /// Approves a held-back update: its new permissions are granted and it replaces the running version.
-    static func approvePendingUpdate(_ id: String) async {
-        guard let pending = package(id)?.pendingVersion else { return }
+    /// Approves a held-back update: its new permissions are granted and it replaces the running version. What was
+    /// granted before stays while the new version declares it, as in Chrome (#484).
+    static func approvePendingUpdate(_ id: String, in profiles: [Profile]? = nil) async {
+        guard #available(macOS 15.4, *), let pending = package(id)?.pendingVersion else { return }
+        let profiles = profiles ?? self.profiles(with: id)
         update(id) { $0.pendingVersion = nil }
-        for profile in profiles(with: id) {
-            profile.installs.update(id) {
-                // Re-recorded from the new version's request on load.
-                $0.grantedPermissions = nil
-                $0.grantedMatchPatterns = nil
-            }
+        // A version WebKit can't read won't load either, and the old one comes back with its record as it was.
+        if let folder = packageDirectory(for: id, version: pending), let manifest = manifest(in: folder),
+           let ext = try? await WKWebExtension(resourceBaseURL: folder) {
+            let asked = askedGrants(of: ext, manifest: manifest)
+            for profile in profiles { profile.installs.update(id) { $0.approve(asked) } }
         }
-        await switchVersion(of: id, to: pending)
+        await switchVersion(of: id, to: pending, in: profiles)
+    }
+
+    /// What a version asks for as it installs: the permissions its sheet shows, and its sites.
+    @available(macOS 15.4, *)
+    static func askedGrants(of ext: WKWebExtension, manifest: [String: Any]) -> (permissions: Set<String>, patterns: Set<String>) {
+        let required = Set(manifest["permissions"] as? [String] ?? [])
+        return (ExtensionHost.askedPermissions(requested: Set(ext.requestedPermissions.map(\.rawValue)), declared: required),
+                Set(ext.allRequestedMatchPatterns.map(\.string)))
     }
 
     /// Makes a version current and reloads the extension with it, going back to the old one if it won't load. True
-    /// when the new version runs.
+    /// when the new version runs. `profiles` is the profiles that have it.
     @discardableResult
-    private static func switchVersion(of id: String, to version: String) async -> Bool {
+    static func switchVersion(of id: String, to version: String, in profiles: [Profile]? = nil) async -> Bool {
         guard #available(macOS 15.4, *), let previous = package(id)?.version else { return false }
         update(id) { $0.version = version; $0.pendingVersion = nil }
         // Every profile running it moves to the new version together; if one can't load it, all go back.
-        let running = profiles(with: id).filter { $0.installs.isEnabled(id) }
+        let running = (profiles ?? self.profiles(with: id)).filter { $0.installs.isEnabled(id) }
         var loadedEverywhere = true
         for profile in running {
             profile.extensions.unload(id)

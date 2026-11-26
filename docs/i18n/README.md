@@ -140,15 +140,34 @@ before using a new one.
 4. Run the pseudo-locale and the layout tests, then run the app in the language and take screenshots of the main
    surfaces. Fix anything cut off in the layout, not by shortening one translation.
 5. Add `docs/i18n/readme/README.<lang>.md`, translated from `README.md`, and add it to the language line at the top of every README.
+   For the website, add `scripts/site-strings/<lang>.json` and the language to `LANGS` in `scripts/site-languages.py`.
 6. Add the language's own name to `AppLanguage.ownName` (Settings › General › Language), and its code to
    `knownRegions` in `Zigzag.xcodeproj/project.pbxproj`, `CFBundleLocalizations` in `project.yml` and
    `Zigzag/Info.plist`, and `LocalizationTests.translated`. The code is the one Xcode and Bundle use (`pt-BR`, not
    `pt_BR`). `LocalizationTests.everyLanguageKeepsNamesSymbolsAndPlurals` then checks it keeps product names,
    keyboard symbols and addresses, ends "…" items in "…", and has CLDR's plural forms.
-7. Add `docs/i18n/changelog/CHANGELOG.<lang>.md` with the current version's notes, and add it to the `changelog`
-   group and the Zigzag target's resources in `Zigzag.xcodeproj/project.pbxproj` by hand. Add the code to
-   `WhatsNew.notesLanguages`, its New and Fixed headings to `WhatsNew.newHeadings` and `fixedHeadings`, and the code
-   to `WhatsNewTests.languages`.
+7. Add `docs/i18n/changelog/CHANGELOG.<lang>.md` with the current version's notes. `project.yml` bundles the whole
+   folder, so run `xcodegen generate` and commit only the lines that add the new file. Add the code to
+   `WhatsNew.notesLanguages`, its New, Fixed and Changed headings to `WhatsNew.newHeadings`, `fixedHeadings` and
+   `changedHeadings`, and the code to `WhatsNewTests.languages`.
+
+## The website
+
+zigzagbrowser.com has the home page in every app language, at `/<lang>/` (`/ja/`, `/pt-br/`). `site/index.html` is
+the English source; `scripts/site-strings/en.json` lists its pieces to translate, and `scripts/site-strings/<lang>.json`
+gives each one's translation, in the glossary's words. After changing either, rebuild the pages, the language links
+and the sitemap:
+
+```sh
+scripts/site-languages.py           # writes site/<lang>/index.html and site/sitemap.xml
+scripts/site-languages.py --check   # fails if a page is out of date or the English changed under a translation
+```
+
+`scripts/changelog-page.py` writes the release notes at `/<lang>/release-notes/` from `changelog/CHANGELOG.<lang>.md`,
+only versions with a stable tag, and takes the page's words from the `release-notes` part of the same strings files.
+
+Never edit `site/<lang>/index.html` or `site/<lang>/release-notes/` by hand. When an English line changes, change it in `en.json` and every
+language file too.
 
 ## The release gate
 

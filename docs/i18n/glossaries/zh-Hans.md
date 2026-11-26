@@ -44,6 +44,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Pin Tab | 固定标签页 | | Safari's menu item. |
 | Back to Pinned Page | 回到固定的页面 | 返回固定页面 | Plain and short; 回到 reads warmer than 返回. |
 | Favorites | 收藏 | 个人收藏, 常用 | Zigzag's Favorites are the row of icons on top, and 收藏 fits it and tight places. Safari's 个人收藏 is longer and names a different thing; 常用 sounds like most visited. |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | 同步 / 与 iCloud 同步 / iCloud 储存空间已满 / 资料库 |  | Apple's macOS words for iCloud syncing and its storage. |
 | Bookmarks | 书签 | | Safari, Chrome. |
 | Folder | 文件夹 | | macOS. |
 | Group (tabs grouped in the sidebar) | 分组 | | Short beside 文件夹 in the sidebar: 新建分组, 取消分组, 关闭分组, and 编组 as the verb (将 3 个标签页编组). Chrome's tab groups API, named in an extension's limits, is 标签页组, as Safari names its Tab Groups. |

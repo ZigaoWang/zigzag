@@ -749,17 +749,20 @@ final class Library {
     /// Profiles.json was there but couldn't be read, so it was set aside (JSONStore) and every space is on the first
     /// profile for now. Said once, at launch.
     let profilesWereSetAside: Bool
+    /// Profiles.json was there at launch.
+    let profilesFileExisted: Bool
 
     /// Fires whenever spaces or bookmarks change.
     let changed = Signal<Void>()
     /// Whether the library was read from its file, not started afresh (a first run, or a file that couldn't be read).
-    private let wasRead: Bool
+    let wasRead: Bool
 
     private init() {
         let hadProfiles = FileManager.default.fileExists(atPath: Paths.profiles.path)
         let readProfiles = hadProfiles ? JSONStore.load(ProfileDirectory.self, from: Paths.profiles) : nil
         directory = readProfiles ?? ProfileDirectory()
         profilesWereSetAside = hadProfiles && readProfiles == nil
+        profilesFileExisted = hadProfiles
         savedDirectory = directory
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = Self.keepingDefaultColors(stored.spaces.map(\.upgraded))
@@ -2110,6 +2113,21 @@ final class Library {
         favoriteSplits = new.favoriteSplits
         siteRoutes = new.siteRoutes
         directory = new.directory
+        tidyFavorites()
+        commit()
+    }
+
+    /// Puts in what iCloud sync laid out, each space's folders and splits kept honest; nothing happens when it's what's
+    /// here already.
+    func applySynced(_ new: Contents) {
+        guard new.spaces != spaces || new.favorites != favorites || new.favoriteSplits.map(\.ids) != favoriteSplits.map(\.ids)
+                || new.siteRoutes != siteRoutes || new.directory != directory else { return }
+        spaces = new.spaces
+        favorites = new.favorites
+        favoriteSplits = new.favoriteSplits
+        siteRoutes = new.siteRoutes
+        directory = new.directory
+        for s in spaces.indices { tidyFolders(s) }
         tidyFavorites()
         commit()
     }

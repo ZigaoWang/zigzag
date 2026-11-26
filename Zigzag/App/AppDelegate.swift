@@ -109,6 +109,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         _ = Library.shared
         _ = Profiles.shared.default.history
+        // Sync with iCloud, when it's on.
+        ICloudSync.shared.startIfOn()
         // Deletes empty-page backgrounds no space uses; kept until now for ⌘Z.
         let backgrounds = Set(Library.shared.spaces.compactMap(\.backgroundImage))
         DispatchQueue.global(qos: .utility).async { SpaceBackground.prune(keeping: backgrounds) }
@@ -240,6 +242,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillBecomeActive(_ notification: Notification) { MiniLinkWake.appWillActivate() }
+
+    // Sync with iCloud: a push says another Mac changed something.
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        ICloudSync.shared.remoteNotification(userInfo)
+    }
     func applicationWillResignActive(_ notification: Notification) {
         // A Picture in Picture window that hasn't floated yet does before you're in the other app (#210).
         PictureInPicture.floatPanels()
@@ -398,6 +405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FaviconStore.finishWriting()
         StrictTransport.finishWriting()
         LiveFolders.shared.saveNow()
+        ICloudSync.shared.saveNow()
         // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Clears a copied password from the clipboard on quit.

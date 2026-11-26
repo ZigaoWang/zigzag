@@ -13,6 +13,7 @@ Zigzag arayüzünü `tr` olarak Türkçe sunar. Anlam, İngilizce kaynakta ve he
 | Space / Profile | Space (değişmez; Space’ler, Space’i, Space’in) / Profil |
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Sabitlenmiş / Sekmeyi Sabitle / Sekmenin Sabitlemesini Kaldır / Sabitlenmiş Sayfaya Dön |
 | Favorites / Bookmarks / Folder / Group | Favoriler / Yer İşaretleri / Klasör / Grup |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | eşzamanla / eşzamanlama / iCloud ile eşzamanla / iCloud saklama alanı dolu / kitaplık |
 | Live Folder | Canlı Klasör |
 | Command Bar / Site Controls | Komut Çubuğu / Site Ayarları |
 | Zigzag Mini / Mini player | Zigzag Mini / mini oynatıcı |

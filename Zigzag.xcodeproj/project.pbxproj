@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		77A198DFB4E445EE2C61702E /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3099C3E94756F3E4F4C4782 /* SyncTests.swift */; };
+		C752A99327423A4601F37275 /* SyncSettingsRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD1F8636E632A6F45792C2E /* SyncSettingsRows.swift */; };
+		5AD599D69B04D697EC40293B /* SyncSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D866549DC3C6AFB95B08014 /* SyncSession.swift */; };
+		103E7614ED1883AB5C8F3F2A /* SyncRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5DF77B3FB8794EF231BE5A /* SyncRecords.swift */; };
+		2F7D57983315EDC35D666097 /* SyncMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 158524CDE8AFA794C9C77C4D /* SyncMerge.swift */; };
+		6359AC4E6BB036CCF40C45BF /* SyncMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBDE36FFCBB9BF0F6CBAD56 /* SyncMapping.swift */; };
+		36E10707A1BD1F90BB41D465 /* ICloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA3AC11EB62FCBDB675D3B9 /* ICloudSync.swift */; };
 		002274F2A1CF4A93D4ADCC4D /* PageLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44F4A7AED8299B48EF5D9D5 /* PageLinkTests.swift */; };
 		002B25577DA7A6048EB83469 /* CommandClickedLinksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653F557876B05509C125FEB3 /* CommandClickedLinksTests.swift */; };
 		0DB6AAD1F794C121E96A9DE6 /* CHANGELOG.pt-BR.md in Resources */ = {isa = PBXBuildFile; fileRef = B7EA6EEFD4F757A2F64329AE /* CHANGELOG.pt-BR.md */; };
@@ -697,6 +704,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D3099C3E94756F3E4F4C4782 /* SyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTests.swift; sourceTree = "<group>"; };
+		3DD1F8636E632A6F45792C2E /* SyncSettingsRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsRows.swift; sourceTree = "<group>"; };
+		7D866549DC3C6AFB95B08014 /* SyncSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSession.swift; sourceTree = "<group>"; };
+		3E5DF77B3FB8794EF231BE5A /* SyncRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecords.swift; sourceTree = "<group>"; };
+		158524CDE8AFA794C9C77C4D /* SyncMerge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMerge.swift; sourceTree = "<group>"; };
+		1CBDE36FFCBB9BF0F6CBAD56 /* SyncMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMapping.swift; sourceTree = "<group>"; };
+		8BA3AC11EB62FCBDB675D3B9 /* ICloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSync.swift; sourceTree = "<group>"; };
 		0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneHeader.swift; sourceTree = "<group>"; };
 		012184AB9B6339550C39951A /* Zigzag.sdef */ = {isa = PBXFileReference; path = Zigzag.sdef; sourceTree = "<group>"; };
 		0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChanges.swift; sourceTree = "<group>"; };
@@ -1330,6 +1344,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A8CCB947131D5CC66DBD4F20 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				3DD1F8636E632A6F45792C2E /* SyncSettingsRows.swift */,
+				7D866549DC3C6AFB95B08014 /* SyncSession.swift */,
+				3E5DF77B3FB8794EF231BE5A /* SyncRecords.swift */,
+				158524CDE8AFA794C9C77C4D /* SyncMerge.swift */,
+				1CBDE36FFCBB9BF0F6CBAD56 /* SyncMapping.swift */,
+				8BA3AC11EB62FCBDB675D3B9 /* ICloudSync.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
 		6D1A0C3E9B2F47A8C5E01D72 /* changelog */ = {
 			isa = PBXGroup;
 			children = (
@@ -1817,6 +1844,7 @@
 				AD198676FC355DA00F18BD4B /* Settings */,
 				45578458512E00D5EB7061BF /* Sidebar */,
 				1A4CDB5B71DD2C4947122E55 /* Support */,
+				A8CCB947131D5CC66DBD4F20 /* Sync */,
 				0DA4CA999A3CAEBA6DD1E436 /* Switcher */,
 				B5D091B4DB5A1AF40C949AA9 /* Tabs */,
 				AFF355173E201043FA2E138C /* Web */,
@@ -1988,6 +2016,7 @@
 				888D287756137DE5F88678F5 /* FaviconRankTests.swift */,
 				111BB58676C39406F3B81A0E /* FavoriteTests.swift */,
 				DBB135AC52784EF0AE698534 /* ExportTests.swift */,
+				D3099C3E94756F3E4F4C4782 /* SyncTests.swift */,
 				90E2676D1635794C7B91868A /* FeatureFlagsTests.swift */,
 				6FCB792604C01E2E8F11B27E /* FindCountTests.swift */,
 				DDDEAD8D5639DB397CB99CB5 /* FindMarksTests.swift */,
@@ -2782,6 +2811,12 @@
 				FBD68377266A432841C2E71D /* EdgeSidebar.swift in Sources */,
 				E7E71F580428AFC67EE93EA2 /* SignInImporter.swift in Sources */,
 				6358AB53F0B1E9EAD7CB79AD /* Signal.swift in Sources */,
+				C752A99327423A4601F37275 /* SyncSettingsRows.swift in Sources */,
+				5AD599D69B04D697EC40293B /* SyncSession.swift in Sources */,
+				103E7614ED1883AB5C8F3F2A /* SyncRecords.swift in Sources */,
+				2F7D57983315EDC35D666097 /* SyncMerge.swift in Sources */,
+				6359AC4E6BB036CCF40C45BF /* SyncMapping.swift in Sources */,
+				36E10707A1BD1F90BB41D465 /* ICloudSync.swift in Sources */,
 				8829A04A0E6843179890FCB3 /* SiteBoosts.swift in Sources */,
 				915210234137A2CB955111A1 /* SiteData.swift in Sources */,
 				FE400E2557BD9FF239AAB016 /* SiteDataBench.swift in Sources */,
@@ -2941,6 +2976,7 @@
 				95A0A278C6E484155212F812 /* FaviconRankTests.swift in Sources */,
 				A09C2F4CA62DE77E8D73B853 /* FavoriteTests.swift in Sources */,
 				F89713BB4F9E4FCD967A34E1 /* ExportTests.swift in Sources */,
+				77A198DFB4E445EE2C61702E /* SyncTests.swift in Sources */,
 				B0A9891F04D0F9370624DAAD /* FeatureFlagsTests.swift in Sources */,
 				E3DB108E2FCB680F0EF592AC /* FindCountTests.swift in Sources */,
 				BC5CC5CE3A1E300D17C62198 /* FindMarksTests.swift in Sources */,
@@ -3231,7 +3267,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 167;
+				CURRENT_PROJECT_VERSION = 168;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -3350,7 +3386,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 167;
+				CURRENT_PROJECT_VERSION = 168;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 432GL3WKY2;

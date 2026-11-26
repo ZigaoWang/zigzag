@@ -1932,6 +1932,13 @@ final class TabManager {
         return components.string ?? url.absoluteString
     }
 
+    /// The address a pinned page or favorite is matched by: as `normalize`, with its #fragment, since two pins can
+    /// differ only there (a web app's views).
+    static func pinnedKey(_ url: URL) -> String {
+        let fragment = URLComponents(url: url, resolvingAgainstBaseURL: false)?.fragment
+        return normalize(url) + (fragment.map { "#" + $0 } ?? "")
+    }
+
     /// An open tab (or live bookmark) already showing this address in the profile you're in, preferring the
     /// current space. The same address open in another profile is another page: other sign-ins, other extensions.
     func existingTab(for url: URL) -> Tab? {

@@ -23,9 +23,11 @@ Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, frances
 - La ricerca nella Cronologia ignora accenti e maiuscole, trova ogni parola in qualsiasi ordine e la evidenzia, e non nasconde mai un risultato in una pila; ogni parte della giornata ha un solo titolo, due pagine dello stesso sito restano due righe, e l’elenco risponde ai tasti freccia, il tasto Elimina, ⌘Return, ⌘F e a un clic destro che rimuove un intero sito.
 - Mentre una cartella live cerca nuove pagine, il badge sulla sua icona mostra un anello che gira, come Mail mostra una casella mentre la controlla, e si ferma appena il controllo finisce.
 - Le finestre Nuova cartella live e Modifica cartella live mostrano l’icona della cartella, come la barra laterale: quella di GitHub per un elenco GitHub, quella del sito per un feed o quella che hai scelto. Fai clic per cambiare l’icona, come con Cambia icona…, e una nuova cartella mantiene l’icona scelta.
+- «Sincronizza con iCloud», in Impostazioni › Generali: i tuoi spazi, profili, pannelli fissati, cartelle, preferiti, cartelle live e impostazioni restano uguali su ogni Mac in cui hai effettuato l’accesso a iCloud, conservati nel tuo database privato di iCloud. Pannelli aperti, cronologia, dati dei siti web ed estensioni restano su ciascun Mac, e le password continuano a sincronizzarsi con il Portachiavi di iCloud. Attivandola, la libreria del Mac viene unita a quella di iCloud: dove un elemento è in entrambe, vince la modifica più recente, niente viene rimosso senza chiedere e prima viene salvato un backup. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
 ### Modifiche
 - Gli scorrimenti a due dita indietro e avanti sono più fluidi, partono con una distanza più breve o un gesto più leggero, non fanno slittare la pagina in su e in giù e non lasciano mai la freccia visibile o la pagina spostata, nei pannelli, nella vista divisa e in Zigzag Mini.
+- La modalità compatibilità è ora la prima riga di Questo sito nei Controlli del sito, sopra le righe che disattiva. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
 ### Correzioni
 - Con Zigzag Mini aperto sopra una pagina, scorrere sulla pagina oscurata non muove più la pagina dietro. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -41,4 +43,6 @@ Zigzag in altre tredici lingue, dal giapponese e dal coreano al tedesco, frances
 - Indietro, Avanti e Ricarica non lasciano più uno spazio vuoto per i pulsanti della finestra dove non sono mostrati, come a schermo intero prima che scenda la barra dei menu, e i pulsanti della finestra restano nella barra mentre è aperta la barra laterale mobile, più corta. Grazie a [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - Il menu di una cartella live lasciato aperto durante l’aggiornamento ora passa da Aggiornamento in corso… ad Aggiornata proprio ora, o al motivo per cui non è stato possibile aggiornare, senza chiudersi.
 - Con Preferiti per riga su Automatico, i preferiti si distribuiscono in modo uniforme sulle righe: sei dove ne starebbero quattro diventano due righe da tre, non quattro e due.
+- Approvare l’aggiornamento di un’estensione che richiede di più non toglie più in seguito ciò che avevi consentito, come la connessione di Bitwarden alla sua app per «Sblocca con i dati biometrici». Grazie a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Rimuovere un profilo mentre le sue estensioni si stanno ancora avviando non fa più chiudere Zigzag.
 

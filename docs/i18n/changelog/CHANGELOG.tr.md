@@ -23,9 +23,11 @@ Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç 
 - Geçmişteki arama aksanları ve harf büyüklüğünü yok sayar, her sözcüğü herhangi bir sırada bulup işaretler ve hiçbir eşleşmeyi bir yığının içinde gizlemez; günün her bölümünün tek bir başlığı vardır, aynı siteden iki sayfa iki satır olarak kalır ve liste ok tuşlarına, Sil’e, ⌘Return’e, ⌘F’ye ve bir sitenin tamamını kaldıran sağ tıklamaya yanıt verir.
 - Canlı klasör yeni sayfaları denetlerken simgesindeki rozet, Mail’in denetlenen bir posta kutusunu gösterdiği gibi dönen bir halka gösterir ve denetim biter bitmez durur.
 - “Yeni Canlı Klasör” ve “Canlı Klasörü Düzenle” penceresi klasörün simgesini kenar çubuğundaki gibi gösterir: GitHub listesi için GitHub’ınkini, akış için sitenin simgesini veya seçtiğiniz simgeyi. Simgeyi “Simgeyi Değiştir…” ile olduğu gibi değiştirmek için üzerine tıklayın; yeni klasör seçtiğiniz simgeyi korur.
+- “iCloud ile eşzamanla”, Ayarlar › Genel bölümünde: Space’leriniz, profilleriniz, sabitlenmiş sekmeleriniz, klasörleriniz, favorileriniz, canlı klasörleriniz ve ayarlarınız iCloud’unuzda oturum açmış her Mac’te aynı kalır ve kendi iCloud’unuzun özel veritabanında tutulur. Açık sekmeler, geçmiş, web sitesi verileri ve genişletmeler her Mac’te kalır, parolalar ise iCloud Anahtar Zinciri üzerinden eşzamanlanmaya devam eder. Açtığınızda bu Mac’in kitaplığı iCloud’dakiyle birleştirilir: ikisinde de olan öğede daha yeni düzenleme geçerli olur, sormadan hiçbir şey kaldırılmaz ve önce bir yedek kaydedilir. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
 ### Değişiklikler
 - İki parmakla geri ve ileri kaydırmalar daha akıcıdır, daha kısa bir mesafede veya daha hafif bir fırlatmada çalışır, sayfanın yukarı aşağı kaymasını önler ve sekmelerde, Bölünmüş Görünümde ve Zigzag Mini’de oku ekranda veya sayfayı kaymış halde bırakmaz.
+- Uyumluluk modu artık Site Ayarları’ndaki Bu Site bölümünün ilk satırı; kapattığı satırların üstünde yer alır. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
 
 ### Düzeltmeler
 - Zigzag Mini bir sayfanın üzerinde açıkken karartılmış sayfada kaydırmak artık arkadaki sayfayı kaydırmaz. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#531](https://github.com/ZigaoWang/zigzag/pull/531))
@@ -41,4 +43,6 @@ Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç 
 - Geri, ileri ve yeniden yükle artık pencere düğmeleri gösterilmeyen yerde, örneğin menü çubuğu inmeden önceki tam ekranda, boş yer bırakmaz; daha kısa kayan kenar çubuğu açıkken de pencere düğmeleri çubukta kalır. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
 - Güncellenirken açık bırakılan canlı klasör menüsü artık kapanmadan “Güncelleniyor…” durumundan “Az Önce Güncellendi” durumuna veya neden yenilenemediğine geçer.
 - Satır başına favori Otomatik olduğunda favoriler satırlara eşit dağılır: dördün sığacağı yerde altı favori, dört ve iki değil, üçer favorilik iki satır olur.
+- Daha fazlasını isteyen bir genişletme güncellemesini onaylamak, daha sonra izin verdiklerinizi, örneğin Bitwarden’ın “Biyometri ile kilidi aç” için uygulamasına bağlantısını artık geri almıyor. Teşekkürler: [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Genişletmeleri hâlâ başlarken bir profili kaldırmak artık Zigzag’ı kapatmıyor.
 

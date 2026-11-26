@@ -13,6 +13,7 @@ Zigzag bietet seine Oberfläche als `de` auf Deutsch an. Die Bedeutung steht im 
 | Space / Profile | Space (der, Plural Spaces) / Profil |
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Fixiert / Tab fixieren / Tab lösen / Zurück zur fixierten Seite |
 | Favorites / Bookmarks / Folder / Group | Favoriten / Lesezeichen / Ordner / Gruppe |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | synchronisieren / Synchronisierung / Mit iCloud synchronisieren / iCloud-Speicher ist voll / Bibliothek |
 | Live Folder | Live-Ordner |
 | Command Bar / Site Controls | Befehlsleiste / Website-Einstellungen (auch für „site settings“: dieselben Entscheidungen pro Website) |
 | Zigzag Mini / Mini player | Zigzag Mini (das Mini) / Mini-Player |

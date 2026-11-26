@@ -203,6 +203,47 @@ import Testing
         }
     }
 
+    /// Sync with iCloud's row in every status it can show.
+    @Test(arguments: [1040, 560] as [CGFloat]) func syncWithICloudFits(width: CGFloat) {
+        pseudo {
+            var found: [String] = []
+            for (name, status, isOn, hasCopy) in SyncSettingsRows.everyStatus {
+                let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false
+                defer { window.close() }
+                let rows = SyncSettingsRows()
+                rows.show(status, isOn: isOn, hasCopy: hasCopy)
+                let group = FormGroup()
+                group.add(rows.row)
+                group.add(rows.statusRow)
+                group.frame = NSRect(x: 0, y: 0, width: width, height: group.fittingHeight(for: width))
+                window.contentView?.addSubview(group)
+                group.layoutSubtreeIfNeeded()
+                found += Self.cutOff(under: group, "Sync with iCloud \(name) at \(Int(width))")
+            }
+            #expect(found.isEmpty, "\(found.joined(separator: "\n"))")
+        }
+    }
+
+    /// The sheet that turns it on, and the one behind Remove from iCloud….
+    @Test func syncWithICloudSheetsFit() {
+        pseudo {
+            window(width: 900) { controller in
+                guard let host = controller.window?.contentView else { Issue.record("no content view"); return }
+                var found: [String] = []
+                for (name, sheet) in SyncSettingsRows.sheets {
+                    ConfirmSheet.show(in: host, title: sheet.title, message: sheet.message, confirmTitle: sheet.confirm) { _ in }
+                    for shown in host.subviews.compactMap({ $0 as? ConfirmSheet }) {
+                        shown.layoutSubtreeIfNeeded()
+                        found += Self.cutOff(under: shown, "Sync with iCloud \(name) sheet")
+                        shown.removeFromSuperview()
+                    }
+                }
+                #expect(found.isEmpty, "\(found.joined(separator: "\n"))")
+            }
+        }
+    }
+
     @Test func theSheetsFit() {
         pseudo {
             window(width: 900) { controller in

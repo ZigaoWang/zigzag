@@ -109,6 +109,16 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 APP_SIGNATURE=$(codesign -dvv "$APP" 2>&1 || true)
 print -r -- "$APP_SIGNATURE" | grep -E "Authority=Developer ID|TeamIdentifier" || true
 [[ "$APP_SIGNATURE" == *"TeamIdentifier=$TEAM"* ]] || { echo "Zigzag isn't signed by team $TEAM"; exit 1; }
+# Sync with iCloud: the production database and pushes, allowed by the Developer ID profile inside the app. A
+# restricted entitlement the profile doesn't allow would stop Zigzag from opening at all.
+print -r -- "$(codesign -d --entitlements - --xml "$APP" 2>/dev/null || true)" > "$WORK/app-entitlements.plist"
+ICLOUD_ENV=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.icloud-container-environment" "$WORK/app-entitlements.plist" 2>/dev/null || true)
+APS_ENV=$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.aps-environment" "$WORK/app-entitlements.plist" 2>/dev/null || true)
+[[ "$ICLOUD_ENV" == "Production" ]] || { echo "Zigzag's iCloud container environment is '$ICLOUD_ENV', not Production"; exit 1; }
+[[ "$APS_ENV" == "production" ]] || { echo "Zigzag's push environment is '$APS_ENV', not production"; exit 1; }
+security cms -D -i "$APP/Contents/embedded.provisionprofile" > "$WORK/profile.plist" 2>/dev/null || { echo "Zigzag has no provisioning profile"; exit 1; }
+PROFILE_CONTAINERS=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-container-identifiers" "$WORK/profile.plist" 2>/dev/null || true)
+[[ "$PROFILE_CONTAINERS" == *"iCloud.wang.zigao.zigzag"* ]] || { echo "Zigzag's provisioning profile doesn't allow its iCloud container"; exit 1; }
 # The helpers read what websites send (the picture helper their pictures, the PDF helper their PDFs): each must be
 # signed like the app, with the hardened runtime, and sandboxed. Exporting signs them with the app; a release where
 # one isn't stops here.

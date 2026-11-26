@@ -14,6 +14,7 @@ A interface em português do Brasil do Zigzag é `pt-BR`. Confirme o sentido de 
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Fixadas / Fixar aba / Desafixar aba / Voltar à página fixada |
 | Pin to Address / Unpin from Address (an extension’s button) | Fixar na barra de endereço / Desafixar da barra de endereço |
 | Favorites / Bookmarks / Folder / Group | favoritos / marcadores / pasta / grupo |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | sincronizar / sincronização / Sincronizar com o iCloud / Armazenamento do iCloud cheio / biblioteca |
 | Live Folder | pasta dinâmica |
 | Command Bar / Site Controls | barra de comandos / Ajustes do site |
 | Zigzag Mini / Mini player | Zigzag Mini / mini player |

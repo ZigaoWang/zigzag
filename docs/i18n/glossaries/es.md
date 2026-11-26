@@ -14,6 +14,7 @@ La interfaz en español de Zigzag es `es`: un solo español neutro que se lee bi
 | Pinned / Pin Tab / Unpin Tab / Back to Pinned Page | Fijadas / Fijar pestaña / Dejar de fijar pestaña / Volver a la página fijada |
 | Pin to Address / Unpin from Address (an extension's button) | Fijar en la barra de direcciones / Quitar de la barra de direcciones |
 | Favorites / Bookmarks / Folder / Group | favoritos / marcadores / carpeta / grupo |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | sincronizar / sincronización / Sincronizar con iCloud / El almacenamiento de iCloud está lleno / biblioteca |
 | Live Folder | carpeta dinámica |
 | Command Bar / Site Controls | barra de comandos / Ajustes del sitio |
 | Zigzag Mini / Mini player | Zigzag Mini / minirreproductor |

@@ -25,6 +25,8 @@
   Test: ExportTests.restoringTwiceAddsNothingTheSecondTime
 - A space that's still here → gains only the pages it doesn't have, in the folders they were in.
   Test: ExportTests.aSpaceThatsStillHereGainsOnlyWhatItLacks
+- Pinned pages or favorites whose addresses differ only after the # → both come back.
+  Test: ExportTests.pinsThatDifferOnlyAfterTheHashAreBothRestored
 - A new Mac's first space, of the same name and with nothing pinned → takes the backup's look and pages, not a second copy.
   Test: ExportTests.aNewMacsFirstSpaceTakesTheBackupsLook
 - Profiles → come back with their spaces and favorites.

@@ -13,6 +13,7 @@ Zigzag の日本語インターフェイスは `ja` です。意味は英語の�
 | Space / Profile | スペース／プロファイル |
 | Pinned / Pin Tab / Back to Pinned Page | 固定タブ／タブを固定／固定したページに戻る |
 | Favorites / Bookmarks / Folder / Group | お気に入り／ブックマーク／フォルダ／グループ |
+| Sync / Sync with iCloud / iCloud is full / Library (what syncs) | 同期／iCloudと同期／iCloudストレージがいっぱいです／ライブラリ |
 | Live Folder | ライブフォルダ |
 | Command Bar / Site Controls | コマンドバー／サイトコントロール |
 | Zigzag Mini / Mini player | Zigzag Mini／ミニプレーヤー |
