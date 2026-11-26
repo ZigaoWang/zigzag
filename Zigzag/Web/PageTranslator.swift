@@ -188,8 +188,16 @@ enum PageTranslator {
 
     /// Whether Apple can translate this pair here: installed, downloadable, or unsupported.
     static func status(from source: Locale.Language, to target: Locale.Language) async -> LanguageAvailability.Status {
-        await LanguageAvailability().status(from: source, to: target)
+        #if DEBUG
+        if fakesTranslation { return .installed }
+        #endif
+        return await LanguageAvailability().status(from: source, to: target)
     }
+
+    #if DEBUG
+    /// ZIGZAG_FAKE_TRANSLATION=1: each piece comes back marked instead of translated, for a test copy without Apple's languages.
+    static let fakesTranslation = ProcessInfo.processInfo.environment["ZIGZAG_FAKE_TRANSLATION"] == "1"
+    #endif
 
     /// The page's main language, or nil when there's too little text. Each visible paragraph is detected separately
     /// and weighted by length, combined with the page's `lang`. A few foreign words on an English page don't change
@@ -340,6 +348,8 @@ enum PageTranslator {
         var blockTexts: [String]
         /// Pieces on screen when it was read, translated first.
         var shown: [Int]? = nil
+        /// How many pieces are still waiting after these.
+        var more: Int? = nil
     }
 
     /// Most pieces in one request to Apple's translation.
@@ -387,9 +397,59 @@ enum PageTranslator {
 
     /// The text pieces to translate, in page order, and the blocks they're in. Translations put back with `apply`
     /// go by these pieces' places.
-    static func text(in webView: WKWebView) async -> PageText {
-        let json = try? await webView.runOwnScript(script("collect()")) as? String
+    /// At most `firstPieces`, the ones on screen and near it first; the rest wait for `more(in:)`. `watching`: from
+    /// now until `restore`, text the page adds or changes waits there too, and `follow` hears of it.
+    static func text(in webView: WKWebView, watching: Bool = false) async -> PageText {
+        if watching { listen(in: webView) }
+        return await read("collect(\(watching), \(firstPieces))", in: webView)
+    }
+
+    /// Text still to translate: what the first reading left, and what the page added or changed since, near the
+    /// screen first. Text already translated is never read again.
+    static func more(in webView: WKWebView, limit: Int = roundPieces) async -> PageText {
+        await read("more(\(limit))", in: webView)
+    }
+
+    private static func read(_ call: String, in webView: WKWebView) async -> PageText {
+        let json = try? await webView.runOwnScript(script(call)) as? String
         return json.flatMap { try? JSONDecoder().decode(PageText.self, from: Data($0.utf8)) } ?? PageText(pieces: [], blocks: [], blockTexts: [])
+    }
+
+    /// Most pieces the first reading of a page hands out.
+    nonisolated static let firstPieces = 1500
+    /// Most pieces handed out at a time after that, so a long feed goes in small rounds.
+    nonisolated static let roundPieces = 300
+
+    /// Calls `changed` when a page read with `watching` has new text to translate; nil stops.
+    static func follow(_ webView: WKWebView, _ changed: (() -> Void)?) {
+        if let changed { followers.setObject(Follower(changed), forKey: webView) } else { followers.removeObject(forKey: webView) }
+    }
+
+    private static let messageName = "zigzagTranslate"
+    private static let followers = NSMapTable<WKWebView, Follower>.weakToStrongObjects()
+    private static let listening = NSHashTable<WKUserContentController>.weakObjects()
+
+    private final class Follower {
+        let changed: () -> Void
+        init(_ changed: @escaping () -> Void) { self.changed = changed }
+    }
+
+    private static func listen(in webView: WKWebView) {
+        let controller = webView.configuration.userContentController
+        guard !listening.contains(controller) else { return }
+        controller.removeScriptMessageHandler(forName: messageName, contentWorld: .defaultClient)
+        controller.add(Messages.shared, contentWorld: .defaultClient, name: messageName)
+        listening.add(controller)
+    }
+
+    private final class Messages: NSObject, WKScriptMessageHandler {
+        static let shared = Messages()
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            MainActor.assumeIsolated {
+                guard message.frameInfo.isMainFrame, let webView = message.webView else { return }
+                PageTranslator.followers.object(forKey: webView)?.changed()
+            }
+        }
     }
 
     /// The language a page is taken to be in when you ask for it translated. Seen as in your own language, or as
@@ -601,21 +661,121 @@ enum PageTranslator {
       const blockTags = new Set(['P', 'DIV', 'LI', 'DT', 'DD', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'FIGCAPTION', 'TD', 'TH',
         'CAPTION', 'SECTION', 'ARTICLE', 'ASIDE', 'HEADER', 'FOOTER', 'NAV', 'MAIN', 'FORM', 'FIELDSET', 'LEGEND', 'LABEL', 'BUTTON',
         'OPTION', 'SUMMARY', 'DETAILS', 'ADDRESS', 'BODY']);
-      let nodes = [];
-      const originals = new WeakMap();
+      // Most text nodes waiting to be translated; past it, a page's text isn't kept.
+      const queueLimit = 30000;
+      // The pieces handed out last, and their text then: a piece the page changed since isn't written over.
+      let nodes = [], expected = [];
+      // Each node's own text, and the translation Zigzag wrote in it.
+      let originals = new WeakMap(), ours = new WeakMap();
+      // Nodes holding a translation, for Show Original; nodes and added elements still to translate.
+      let written = new Set(), queue = new Set(), roots = new Set(), pruneAt = 2000;
+      let watching = false, timer = 0, firstChange = 0, observedRoots = new WeakSet();
+      const up = (el) => el.parentElement || (el.parentNode && el.parentNode.host) || null;
+      const excluded = (el) => skip.has(el.tagName) || el.isContentEditable || el.getAttribute('translate') === 'no' || el.classList.contains('notranslate');
+      const blocked = (node) => {
+        for (let el = node.nodeType === 1 ? node : up(node); el; el = up(el)) { if (el.nodeType === 1 && excluded(el)) return true; }
+        return false;
+      };
       const wanted = (node) => {
         const text = node.nodeValue;
-        if (!text || !/\\p{L}/u.test(text)) return false;
-        for (let el = node.parentElement; el; el = el.parentElement) {
-          if (skip.has(el.tagName) || el.isContentEditable || el.getAttribute('translate') === 'no' || el.classList.contains('notranslate')) return false;
-        }
-        return true;
+        return !!text && /\\p{L}/u.test(text) && !blocked(node);
       };
-      const walk = () => {
-        const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
-        const found = [];
-        while (walker.nextNode() && found.length < 4000) { if (wanted(walker.currentNode)) found.push(walker.currentNode); }
-        return found;
+      const options = { childList: true, subtree: true, characterData: true };
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.type === 'characterData') {
+            const node = record.target;
+            // Zigzag's own translation going in.
+            if (ours.get(node) === node.nodeValue) continue;
+            // The page wrote new text: that's its original now.
+            ours.delete(node);
+            originals.delete(node);
+            if (queue.size < queueLimit) queue.add(node);
+          } else {
+            for (const added of record.addedNodes) {
+              if (added.nodeType === 3 && queue.size < queueLimit) queue.add(added);
+              else if (added.nodeType === 1) roots.add(added);
+            }
+          }
+        }
+        schedule();
+      });
+      const observe = (root) => {
+        if (!watching || observedRoots.has(root)) return;
+        observedRoots.add(root);
+        observer.observe(root, options);
+      };
+      const filter = { acceptNode: (node) => node.nodeType === 1 && excluded(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT };
+      // Queues the text under `root`, in page order, open shadow roots included.
+      const gather = (root) => {
+        if (root.nodeType === 3) { if (queue.size < queueLimit) queue.add(root); return; }
+        if (root.nodeType === 1 && blocked(root)) return;
+        if (root.shadowRoot) { observe(root.shadowRoot); gather(root.shadowRoot); }
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, filter);
+        while (queue.size < queueLimit && walker.nextNode()) {
+          const node = walker.currentNode;
+          if (node.nodeType === 3) { if (/\\p{L}/u.test(node.nodeValue)) queue.add(node); }
+          else if (node.shadowRoot) { observe(node.shadowRoot); gather(node.shadowRoot); }
+        }
+      };
+      const tell = () => {
+        try { window.webkit.messageHandlers.zigzagTranslate.postMessage(queue.size); } catch (error) {}
+      };
+      const settle = () => {
+        clearTimeout(timer);
+        timer = 0;
+        for (const root of roots) { if (root.isConnected) gather(root); }
+        roots.clear();
+      };
+      // A quiet moment after the page changes, and at most a second after it started changing.
+      const schedule = () => {
+        const now = Date.now();
+        if (timer) clearTimeout(timer); else firstChange = now;
+        timer = setTimeout(() => { settle(); if (queue.size) tell(); }, Math.max(0, Math.min(300, firstChange + 1000 - now)));
+      };
+      const stop = () => {
+        observer.disconnect();
+        watching = false;
+        observedRoots = new WeakSet();
+        clearTimeout(timer);
+        timer = 0;
+      };
+      const boxOf = (node) => {
+        const el = node.parentElement || (node.parentNode && node.parentNode.host);
+        return el ? el.getBoundingClientRect() : null;
+      };
+      // Up to `limit` queued pieces, the ones on or near the screen first, then the rest in page order.
+      const handout = (limit) => {
+        const height = window.innerHeight, width = window.innerWidth;
+        const near = [], far = [];
+        for (const node of [...queue]) {
+          if (!node.isConnected || ours.get(node) === node.nodeValue || !wanted(node)) { queue.delete(node); continue; }
+          const box = boxOf(node);
+          if (box && box.bottom > -height && box.top < height * 2) { near.push(node); if (near.length >= limit) break; }
+          else if (far.length < limit) far.push(node);
+        }
+        const picked = near.concat(far.slice(0, Math.max(0, limit - near.length)));
+        nodes = [];
+        expected = [];
+        const pieces = [], blocks = [], blockTexts = [], shown = [], places = new Map();
+        for (const node of picked) {
+          queue.delete(node);
+          const box = boxOf(node);
+          if (box && box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < height && box.right > 0 && box.left < width) shown.push(pieces.length);
+          originals.set(node, node.nodeValue);
+          const text = node.nodeValue.trim();
+          let block = node.parentElement;
+          while (block && !blockTags.has(block.tagName)) block = block.parentElement;
+          let place = places.get(block);
+          if (place === undefined) { place = blockTexts.length; places.set(block, place); blockTexts.push(''); }
+          // Enough of each block to tell its language by.
+          if (blockTexts[place].length < 600) blockTexts[place] += (blockTexts[place] ? ' ' : '') + text;
+          nodes.push(node);
+          expected.push(node.nodeValue);
+          pieces.push(text);
+          blocks.push(place);
+        }
+        return JSON.stringify({ pieces, blocks, blockTexts, shown, more: queue.size });
       };
       return {
         // The text of the paragraphs showing, a block each, leaving out the site's menus, header and footer; and the
@@ -648,39 +808,47 @@ enum PageTranslator {
           const lang = document.documentElement.getAttribute('lang') || root.getAttribute('lang') || '';
           return JSON.stringify({ blocks, all: (root.innerText || '').slice(0, 2000), lang });
         },
-        collect: () => {
-          nodes = walk();
-          const pieces = [], blocks = [], blockTexts = [], shown = [], places = new Map();
-          const height = window.innerHeight, width = window.innerWidth;
-          for (const node of nodes) {
-            const box = node.parentElement && node.parentElement.getBoundingClientRect();
-            if (box && box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < height && box.right > 0 && box.left < width) shown.push(pieces.length);
-            if (!originals.has(node)) originals.set(node, node.nodeValue);
-            const text = originals.get(node).trim();
-            let block = node.parentElement;
-            while (block && !blockTags.has(block.tagName)) block = block.parentElement;
-            let place = places.get(block);
-            if (place === undefined) { place = blockTexts.length; places.set(block, place); blockTexts.push(''); }
-            // Enough of each block to tell its language by.
-            if (blockTexts[place].length < 600) blockTexts[place] += (blockTexts[place] ? ' ' : '') + text;
-            pieces.push(text);
-            blocks.push(place);
-          }
-          return JSON.stringify({ pieces, blocks, blockTexts, shown });
+        // The page's text from the start. `watch`: its new and changed text is kept for `more` until `restore`.
+        collect: (watch, limit) => {
+          stop();
+          queue = new Set();
+          roots.clear();
+          if (watch) { watching = true; observe(document.documentElement); }
+          gather(document.body || document.documentElement);
+          return handout(limit);
+        },
+        more: (limit) => {
+          settle();
+          return handout(limit);
         },
         apply: (translations) => {
           for (const [index, text] of Object.entries(translations)) {
             const node = nodes[+index];
-            if (!node) continue;
+            if (!node || node.nodeValue !== expected[+index]) continue;
             const original = originals.get(node) || node.nodeValue;
             // Keep the spacing around the words, so the page's layout doesn't shift.
             const lead = original.match(/^\\s*/)[0], trail = original.match(/\\s*$/)[0];
             node.nodeValue = lead + text + trail;
+            ours.set(node, node.nodeValue);
+            written.add(node);
+          }
+          // Nodes the page took away are let go.
+          if (written.size > pruneAt) {
+            written = new Set([...written].filter((node) => node.isConnected));
+            pruneAt = Math.max(2000, written.size * 2);
           }
           document.documentElement.setAttribute('data-zigzag-translated', '');
         },
         restore: () => {
-          for (const node of nodes) { if (originals.has(node)) node.nodeValue = originals.get(node); }
+          stop();
+          for (const node of written) { if (ours.get(node) === node.nodeValue && originals.has(node)) node.nodeValue = originals.get(node); }
+          written = new Set();
+          queue = new Set();
+          roots.clear();
+          nodes = [];
+          expected = [];
+          originals = new WeakMap();
+          ours = new WeakMap();
           document.documentElement.removeAttribute('data-zigzag-translated');
         },
       };
@@ -796,20 +964,51 @@ final class TranslationHost {
     /// Text in `memory` goes straight in, and other text is translated once however often it's on the page.
     /// Calls back with what happened.
     func translate(_ webView: WKWebView, pieces: [String], shown: Set<Int> = [], groups: [PageTranslator.Group], into target: Locale.Language,
-                   memory: TranslationMemory = TranslationMemory(), progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
+                   memory: TranslationMemory = TranslationMemory(), samePage: (() -> Bool)? = nil,
+                   progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let first = groups.first else { completion(.success(())); return }
-        model.job = Job(webView: webView, url: webView.url, pieces: pieces, shown: shown, groups: groups, target: target, memory: memory,
+        let url = webView.url
+        let samePage = samePage ?? { [weak webView] in webView?.url == url }
+        #if DEBUG
+        if PageTranslator.fakesTranslation {
+            fake(webView, pieces: pieces, shown: shown, groups: groups, samePage: samePage, progress: progress, completion: completion)
+            return
+        }
+        #endif
+        model.job = Job(webView: webView, samePage: samePage, pieces: pieces, shown: shown, groups: groups, target: target, memory: memory,
                         total: groups.reduce(0) { $0 + $1.pieces.count }, progress: progress, completion: completion)
         model.start(from: first.source, to: target)
     }
+
+    #if DEBUG
+    /// The same batches, a moment apart, each piece marked "[en]".
+    private func fake(_ webView: WKWebView, pieces: [String], shown: Set<Int>, groups: [PageTranslator.Group], samePage: @escaping () -> Bool,
+                      progress: @escaping (Double) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
+        let total = groups.reduce(0) { $0 + $1.pieces.count }
+        Task { @MainActor [weak self, weak webView] in
+            var done = 0
+            for group in groups {
+                for chunk in PageTranslator.batches(group.pieces, pieces: pieces, shown: shown) {
+                    try? await Task.sleep(for: .milliseconds(120))
+                    guard let self, !self.model.isCancelled else { return }
+                    guard let webView, samePage() else { completion(.failure(Cancelled())); return }
+                    await PageTranslator.apply(Dictionary(uniqueKeysWithValues: chunk.map { ($0, "[en] " + pieces[$0]) }), in: webView)
+                    done += chunk.count
+                    progress(Double(done) / Double(max(total, 1)))
+                }
+            }
+            completion(.success(()))
+        }
+    }
+    #endif
 
     /// The page went away before it was done: navigated elsewhere, or its tab closed.
     struct Cancelled: Error {}
 
     struct Job {
         weak var webView: WKWebView?
-        /// The page it was asked for: a different page in the same web view is never translated by it.
-        let url: URL?
+        /// Whether it's still the page it was asked for: a different page in the same web view is never translated by it.
+        let samePage: () -> Bool
         let pieces: [String]
         let shown: Set<Int>
         let groups: [PageTranslator.Group]
@@ -841,7 +1040,7 @@ final class TranslationHost {
         func run(_ session: TranslationSession) async {
             guard !isCancelled, var job else { return }
             self.job = nil
-            guard let webView = job.webView, webView.url == job.url else { job.completion(.failure(Cancelled())); return }
+            guard let webView = job.webView, job.samePage() else { job.completion(.failure(Cancelled())); return }
             let group = job.groups[job.current]
             let key = { [job] (text: String) in TranslationMemory.Key(text, from: group.source, to: job.target) }
             // Text already translated goes in now; the rest is asked for once, for every place it's in.
@@ -882,7 +1081,7 @@ final class TranslationHost {
                     }
                     // Cancelled meanwhile: quietly, with nothing more put in the page.
                     if isCancelled { return }
-                    guard webView.url == job.url else { throw Cancelled() }
+                    guard job.samePage() else { throw Cancelled() }
                     await PageTranslator.apply(translated, in: webView)
                     finished += chunk.reduce(0) { $0 + (places[job.pieces[$1]]?.count ?? 0) }
                     job.progress(Double(job.done + finished) / Double(max(job.total, 1)))

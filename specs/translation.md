@@ -13,3 +13,12 @@
   Test: PageTranslatorTests.aChinesePageOfEnglishPostsIsEnglish
 - A list of language names in their own scripts (हिंदी, मराठी, বাংলা and more) → never read as one of them.
   Test: PageTranslatorTests.aLanguagePickerOnAShortEnglishPageIsNotHindi
+
+## A page that changes
+- Text added or changed while a page shows translated (more of a feed, comments opened) → translated too, only what's new; code, fields, what you're editing and `translate="no"` stay as they are, and Zigzag's own translations never come back to be translated again.
+  Test: PageTranslatorTests.textAddedOrChangedWhileTranslatedIsTranslatedToo
+- Another route of the same page (pushState) → still translated, and its text is translated as it arrives. Show Original puts back all of it, including what was translated later, and stops following the page.
+  Test: PageTranslatorTests.aNewRouteIsTranslatedAndShowOriginalPutsAllOfItBack
+  Test: PageTranslatorTests.aTranslatedPageStaysTranslatedOnARouteOfItsOwn
+- A long page → translated all the way down, a round at a time, what's on and near the screen first.
+  Test: PageTranslatorTests.aLongPageIsTranslatedAllTheWayDownWhatsOnScreenFirst

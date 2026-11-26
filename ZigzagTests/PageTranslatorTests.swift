@@ -120,6 +120,131 @@ struct PageTranslatorTests {
         #expect((try await webView.evaluateJavaScript("document.getElementById('zh').textContent") as? String)?.hasPrefix("上海是") == true)
     }
 
+    // MARK: Pages that change while translated
+
+    /// Stands in for Apple's translation: each piece comes back marked, so what was translated shows.
+    private func fakeTranslate(_ text: PageTranslator.PageText, in webView: WKWebView) async {
+        var translations: [Int: String] = [:]
+        for (index, piece) in text.pieces.enumerated() { translations[index] = "EN " + piece }
+        await PageTranslator.apply(translations, in: webView)
+    }
+
+    /// Waits up to `seconds` for `done` to turn true.
+    private func waitFor(_ seconds: Double = 3, _ done: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(seconds)
+        while !done(), Date() < end { try? await Task.sleep(for: .milliseconds(50)) }
+        return done()
+    }
+
+    private final class Heard { var count = 0 }
+
+    private func pageText(_ webView: WKWebView, _ selector: String) async throws -> String? {
+        try await webView.evaluateJavaScript("document.querySelector('\(selector)').textContent") as? String
+    }
+
+    @Test func textAddedOrChangedWhileTranslatedIsTranslatedToo() async throws {
+        let (webView, loading) = await page("<html><body><main><p id='first'>Bonjour tout le monde, voici le premier article de la page.</p></main></body></html>")
+        defer { _ = loading }
+        let heard = Heard()
+        PageTranslator.follow(webView) { heard.count += 1 }
+        defer { PageTranslator.follow(webView, nil) }
+        let first = await PageTranslator.text(in: webView, watching: true)
+        #expect(first.pieces == ["Bonjour tout le monde, voici le premier article de la page."])
+        await fakeTranslate(first, in: webView)
+        _ = try await webView.evaluateJavaScript("""
+        const more = document.createElement('article');
+        more.innerHTML = '<p id="added">Un nouvel article arrive en bas.</p><pre><code>let x = "bonjour"</code></pre><input value="champ">'
+          + '<div contenteditable="true">texte en cours</div><p translate="no">Nom propre</p><p class="notranslate">Marque déposée</p>';
+        document.querySelector('main').appendChild(more); 0
+        """)
+        #expect(await waitFor { heard.count > 0 })
+        // Only what's new, and none of what's never translated.
+        let added = await PageTranslator.more(in: webView)
+        #expect(added.pieces == ["Un nouvel article arrive en bas."])
+        await fakeTranslate(added, in: webView)
+        #expect(try await pageText(webView, "#added") == "EN Un nouvel article arrive en bas.")
+        #expect(try await pageText(webView, "#first") == "EN Bonjour tout le monde, voici le premier article de la page.")
+        // Zigzag's own writes never come back to be translated again.
+        heard.count = 0
+        try await Task.sleep(for: .milliseconds(700))
+        #expect(heard.count == 0)
+        #expect(await PageTranslator.more(in: webView).pieces.isEmpty)
+        // Text the page changes is translated again.
+        _ = try await webView.evaluateJavaScript("document.getElementById('first').firstChild.nodeValue = 'Le texte a changé depuis.'; 0")
+        #expect(await waitFor { heard.count > 0 })
+        #expect(await PageTranslator.more(in: webView).pieces == ["Le texte a changé depuis."])
+        PageTranslator.restore(in: webView)
+    }
+
+    @Test func aNewRouteIsTranslatedAndShowOriginalPutsAllOfItBack() async throws {
+        let (webView, loading) = await page("<html><body><main><p id='home'>Bienvenue sur la page d’accueil du site.</p></main></body></html>")
+        defer { _ = loading }
+        let heard = Heard()
+        PageTranslator.follow(webView) { heard.count += 1 }
+        defer { PageTranslator.follow(webView, nil) }
+        await fakeTranslate(await PageTranslator.text(in: webView, watching: true), in: webView)
+        _ = try await webView.evaluateJavaScript("""
+        history.pushState({}, '', '/articles/1');
+        document.querySelector('main').innerHTML = '<h1 id="title">Un article sur une autre route</h1><p id="body">Le contenu de la nouvelle route arrive sans recharger la page.</p>'; 0
+        """)
+        #expect(webView.url?.path == "/articles/1")
+        #expect(await waitFor { heard.count > 0 })
+        let route = await PageTranslator.more(in: webView)
+        #expect(route.pieces == ["Un article sur une autre route", "Le contenu de la nouvelle route arrive sans recharger la page."])
+        await fakeTranslate(route, in: webView)
+        #expect(try await pageText(webView, "#title") == "EN Un article sur une autre route")
+        // Show Original: what was translated later comes back too, and the page is no longer followed.
+        PageTranslator.restore(in: webView)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(try await pageText(webView, "#title") == "Un article sur une autre route")
+        #expect(try await pageText(webView, "#body") == "Le contenu de la nouvelle route arrive sans recharger la page.")
+        heard.count = 0
+        _ = try await webView.evaluateJavaScript("document.querySelector('main').insertAdjacentHTML('beforeend', '<p>Encore un paragraphe en français.</p>'); 0")
+        try await Task.sleep(for: .milliseconds(700))
+        #expect(heard.count == 0)
+        #expect(await PageTranslator.more(in: webView).pieces.isEmpty)
+    }
+
+    @Test func aLongPageIsTranslatedAllTheWayDownWhatsOnScreenFirst() async throws {
+        let paragraphs = (0..<5000).map { "<p>Paragraphe numéro \($0) de la page.</p>" }.joined()
+        let (webView, loading) = await page("<html><body style='margin:0'>\(paragraphs)</body></html>")
+        defer { _ = loading }
+        let first = await PageTranslator.text(in: webView, watching: true)
+        #expect(first.pieces.count == PageTranslator.firstPieces)
+        #expect(first.pieces.first == "Paragraphe numéro 0 de la page.")
+        #expect(first.more == 5000 - PageTranslator.firstPieces)
+        await fakeTranslate(first, in: webView)
+        // Scrolled to the end: what's on screen there comes next.
+        _ = try await webView.evaluateJavaScript("window.scrollTo(0, document.body.scrollHeight); 0")
+        let bottom = await PageTranslator.more(in: webView, limit: 20)
+        #expect(bottom.pieces.count == 20)
+        #expect(bottom.pieces.allSatisfy { piece in Int(piece.split(separator: " ")[2]).map { $0 > 4900 } ?? false })
+        await fakeTranslate(bottom, in: webView)
+        // The rest follows, each piece once.
+        var seen = Set(first.pieces + bottom.pieces)
+        for _ in 0..<100 {
+            let next = await PageTranslator.more(in: webView)
+            if next.pieces.isEmpty { break }
+            #expect(next.pieces.count <= PageTranslator.roundPieces)
+            #expect(seen.isDisjoint(with: next.pieces))
+            seen.formUnion(next.pieces)
+            await fakeTranslate(next, in: webView)
+        }
+        #expect(seen.count == 5000)
+        PageTranslator.restore(in: webView)
+    }
+
+    @Test func aTranslatedPageStaysTranslatedOnARouteOfItsOwn() async throws {
+        let tab = Tab(url: URL(string: "https://example.com/a"), spaceID: UUID())
+        let webView = tab.ensureWebView()
+        webView.loadHTMLString("<html><body><p>Une page.</p></body></html>", baseURL: URL(string: "https://example.com/a"))
+        #expect(await waitFor(5) { !webView.isLoading && webView.url?.path == "/a" })
+        tab.isTranslated = true
+        _ = try await webView.evaluateJavaScript("history.pushState({}, '', '/b'); 0")
+        #expect(await waitFor { tab.url?.path == "/b" })
+        #expect(tab.isTranslated)
+    }
+
     @Test func aPageTypedIntoATranslatedTabIsntTakenAsTranslated() {
         // Without this, Translate on the new page took it as translated and only "showed the original".
         let tab = Tab(url: URL(string: "http://127.0.0.1:1/a.html"), spaceID: UUID())
