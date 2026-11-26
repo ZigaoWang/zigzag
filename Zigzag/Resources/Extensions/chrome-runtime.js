@@ -19,7 +19,32 @@
   };
   // The extensions that let this page message them: a message for any other gets Chrome's answer at once.
   const reachable = Object.keys(patterns).filter((id) => patterns[id].some(matches));
-  if (!reachable.length) return;
+  if (!reachable.length) {
+    // Chrome gives a page no extension runtime at all unless an extension names it in externally_connectable. WebKit
+    // hands the page `browser` whenever extensions are loaded for the web view, whether or not any of them may be
+    // spoken to, and a site that feature-tests it takes a companion-extension path that can't work — Zoom's web
+    // client does, and never starts. Take it back here, in the page's own world.
+    // WebKit puts `browser` on the page after a document-start script runs, so it can't simply be deleted here: the
+    // names are blocked with an accessor that answers nothing and swallows the write, and re-blocked for a moment in
+    // case WebKit defines it again after us. Nothing in the page can see a runtime it was never given.
+    const block = (name) => {
+      try {
+        Object.defineProperty(globalThis, name, { get: () => undefined, set: () => {}, configurable: true, enumerable: false });
+      } catch (e) {}
+    };
+    const blocked = () => typeof globalThis.browser === 'undefined' && typeof globalThis.chrome === 'undefined';
+    block('browser');
+    block('chrome');
+    let tries = 0;
+    const again = () => {
+      if (blocked()) return;
+      block('browser');
+      block('chrome');
+      if (++tries < 60) setTimeout(again, 10);
+    };
+    setTimeout(again, 0);
+    return;
+  }
   const runtime = window.browser && window.browser.runtime;
   if (!runtime || typeof runtime.sendMessage !== 'function') return;
   // Inside one of these extensions' own pages (Claude's side panel shows claude.ai in a frame), the site checks it's

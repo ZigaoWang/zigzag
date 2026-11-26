@@ -143,13 +143,13 @@ enum WebKitSetup {
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
+            // Always, even with nothing to reach: with no extension naming this page in externally_connectable, the
+            // script takes WebKit's extension runtime back out of the page's own world, as Chrome never puts it there.
             let patterns = profile.installs.externallyConnectablePatterns()
             // Once: a new tab's setup is made and then configured again, which put it in twice.
-            if !patterns.isEmpty {
-                let script = PageScripts.chromeRuntime(matching: patterns)
-                if !configuration.userContentController.userScripts.contains(where: { $0.source == script.source }) {
-                    configuration.userContentController.addUserScript(script)
-                }
+            let script = PageScripts.chromeRuntime(matching: patterns)
+            if !configuration.userContentController.userScripts.contains(where: { $0.source == script.source }) {
+                configuration.userContentController.addUserScript(script)
             }
         }
         // With an extension that can capture tabs (Shazam), pages note where their Web Audio plays, so it can hear them.
