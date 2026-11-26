@@ -294,13 +294,9 @@ final class EdgeSidebar {
         if let preview, (MenuPanel.current != nil) != preview.isCoveredInDock {
             preview.layoutInDock(force: true)
         }
-        // The panel is nonactivating and may not be key, and with no key window the menu bar's keys (⌘T, ⌘W, ⌘L)
-        // never arrive. Over the card they should act on the browser, as they did before. The page's pill takes the
-        // keyboard itself when it needs it.
-        if let host, !NSApp.isActive || panel.isKeyWindow == false {
-            let inHost = host.convert(panel.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
-            if host.cardFrame.contains(inHost), !panel.isKeyWindow, MenuPanel.current == nil { panel.makeKey() }
-        }
+        // The panel is nonactivating: it is not made key by hovering it. Doing so activated Zigzag, which read as the
+        // browser coming forward and collapsed the panel by leaving the pointer on its rows. A click takes the
+        // keyboard, as the panel's own `sendEvent` does.
         if held || EdgeSidebarLayout.keeps(at: NSEvent.mouseLocation, panel: frame) {
             leftAt = nil
             return

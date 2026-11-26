@@ -1812,6 +1812,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowDidBecomeKey(_ notification: Notification) {
         // A borrowed page is the browser's tab, not a Mini the extensions know: only a Mini of its own tells them.
         if #available(macOS 15.4, *), !isBorrowingPage { ExtensionCenter.miniFocused(self) }
+        // A click that focuses a sleeping preview wakes it: the press itself is the intentional one, so asking for a
+        // second click would be asking for the same thing twice.
+        if asleepCard != nil { onAsleepCardClicked?() }
         // Became key: show a held question.
         promptFrontChanged.send()
     }
