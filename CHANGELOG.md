@@ -8,6 +8,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Sync with iCloud, in Settings › General: your spaces, profiles, pinned tabs, folders, favorites, live folders and settings stay the same on every Mac signed in to your iCloud, kept in your own iCloud's private database. Open tabs, history, website data and extensions stay on each Mac, and passwords keep syncing through iCloud Keychain. Turning it on puts the Mac's library together with iCloud's: where something is in both, the newer edit wins, nothing is removed without asking, and a backup is saved first. ([#459](https://github.com/ZigaoWang/zigzag/issues/459))
 
+### Changed
+- Compatibility mode is now the first row of This Site in Site Controls, above the rows it turns off. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#497](https://github.com/ZigaoWang/zigzag/issues/497))
+
 ## [0.10.0] - 2026-11-25
 
 Zigzag in thirteen more languages, from Japanese and Korean to German, French, Spanish and Russian; download rules that hand off the saved file; live folders that say when they last updated; and typing Chinese Pinyin then switching to English without stray spaces.

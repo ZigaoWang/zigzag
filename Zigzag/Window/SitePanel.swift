@@ -2545,7 +2545,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, compatibility, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
+    enum Row: Equatable { case compatibility, zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, userAgent, fullScreenFills, alwaysTranslate, localApps, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2584,11 +2584,11 @@ enum SitePanelRows {
 
     static func rows(_ c: Context) -> [Row] {
         var rows: [Row] = []
+        // First, above the rows it turns off (#497). Kept for the site: private windows follow it, as they do allowing ads.
+        if c.isWeb, !c.isPrivate { rows.append(.compatibility) }
         if c.isWeb, !c.coveredPage { rows.append(.zoom) }
         if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
-        // Kept for the site: private windows follow it, as they do allowing ads.
-        if c.isWeb, !c.isPrivate { rows.append(.compatibility) }
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
