@@ -1421,3 +1421,21 @@ extension SyncLibrary {
         #expect(!sync.retry.isWaiting && sync.retry.failures == 0)
     }
 }
+
+// MARK: - Found in review
+
+extension SyncTests {
+    @Test func aFetchStillOnItsWayWhenSyncIsTurnedOffChangesNothing() {
+        let (cloud, a, b) = twoMacs(Sample.library([Sample.space("Personal", [Sample.page("a")])]))
+        b.edit { $0.editSpace("Personal") { $0.bookmarks.append(Sample.page("new")) } }
+        b.sync()
+        // Sync turned off on A while its fetch is out.
+        a.session.close()
+        let changes = cloud.changes(since: 0)
+        a.session.fetched(changes.records, deleted: changes.deleted)
+        a.session.fetchFinished()
+        a.session.localChanged()
+        #expect(a.library.urls(in: "Personal") == ["a"])
+        #expect(a.saves.isEmpty && a.deletes.isEmpty)
+    }
+}

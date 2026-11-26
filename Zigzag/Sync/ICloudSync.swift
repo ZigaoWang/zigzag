@@ -197,6 +197,7 @@ final class ICloudSync {
         saveNow()
         engine?.stop()
         engine = nil
+        session?.close()
         session = nil
         tokens = []
         observers.forEach(NotificationCenter.default.removeObserver)

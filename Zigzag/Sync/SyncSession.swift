@@ -163,6 +163,13 @@ final class SyncSession {
     var onNeedsFetch: (() -> Void)?
     /// True while it writes into the library, so the change that causes isn't read as one made here.
     private(set) var isApplying = false
+    /// Sync turned off or started again: a fetch still on its way changes nothing.
+    private(set) var isClosed = false
+
+    func close() {
+        isClosed = true
+        server = nil
+    }
 
     /// What the server sent since the last settle: a record, or nil for one removed.
     private var incoming: [String: SyncRemote?] {
@@ -200,7 +207,7 @@ final class SyncSession {
 
     /// Reads the library and queues what changed since.
     func localChanged(allowingManyRemovals: Bool = false) {
-        guard state.merged, !isApplying, state.heldRemovals == nil else { return }
+        guard !isClosed, state.merged, !isApplying, state.heldRemovals == nil else { return }
         let export = SyncMapping.export(host.read(), previous: state.base, aliases: state.aliases, emptyBefore: state.emptyFolders,
                                         kept: state.keptProfiles, unsent: state.unsent, now: now())
         if !allowingManyRemovals, let count = Self.manyRemovals(from: state.base, to: export.items) {
@@ -252,6 +259,7 @@ final class SyncSession {
     /// Everything the server hasn't confirmed, from the state rather than the server's own queue: edits made while
     /// there was no server (offline, before connecting) and what a quit before the server saved its queue lost.
     func requeue() {
+        guard !isClosed else { return }
         let deletes = state.serverPayloads.keys.filter { state.base[$0] == nil }
         queue((Array(state.unsent), deletes))
     }
@@ -296,6 +304,7 @@ final class SyncSession {
     // MARK: Changes from the server
 
     func fetched(_ records: [SyncRemote], deleted: [String]) {
+        guard !isClosed else { return }
         for record in records { arrive(record.name, record) }
         for name in deleted { arrive(name, nil) }
         if !records.isEmpty || !deleted.isEmpty { onChange?() }
@@ -303,6 +312,7 @@ final class SyncSession {
 
     /// A fetch is done: the first sync merges, later ones settle what came.
     func fetchFinished() {
+        guard !isClosed else { return }
         // While removals are held, what comes waits too: laying it out would bring them back unasked.
         if state.heldRemovals != nil { onChange?(); return }
         if !state.merged { mergeFirst() } else { settle() }
@@ -654,6 +664,7 @@ final class SyncSession {
     }
 
     func saved(_ records: [SyncRemote]) {
+        guard !isClosed else { return }
         for record in records {
             state.systemFields[record.name] = record.systemFields
             state.serverPayloads[record.name] = record.payload
@@ -674,6 +685,7 @@ final class SyncSession {
     }
 
     func deleted(_ names: [String]) {
+        guard !isClosed else { return }
         for name in names where state.base[name] == nil {
             state.systemFields[name] = nil
             state.serverPayloads[name] = nil
@@ -683,6 +695,7 @@ final class SyncSession {
     }
 
     func saveFailed(_ name: String, _ failure: SyncSaveFailure) {
+        guard !isClosed else { return }
         switch failure {
         case .conflict(let record):
             arrive(name, record)

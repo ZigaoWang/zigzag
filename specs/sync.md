@@ -144,3 +144,5 @@
   Test: SyncTests.aRemovalOfWhatsAlreadyGoneIsntAskedAgain
 - iCloud refuses a save as stale without sending its own version → Zigzag fetches it, merges, and sends again; the change isn't dropped.
   Test: SyncTests.aConflictWithoutTheServersVersionIsFetchedThenSentAgain
+- Sync turned off while a fetch is on its way → what it brings changes nothing here.
+  Test: SyncTests.aFetchStillOnItsWayWhenSyncIsTurnedOffChangesNothing
