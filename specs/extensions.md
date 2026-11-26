@@ -120,6 +120,8 @@
 - An `alarms` call, `downloads.open` or `identity.getAccounts` without a callback → returns a promise, as in Chrome MV3; with one → the callback gets the answer.
   Test: ExtensionScriptTests.alarmCallsReturnPromisesAsInChrome
   Test: ExtensionScriptTests.bridgedCallsChromeAnswersWithAPromiseReturnOne
+- `webNavigation.getAllFrames` for a tab asleep → no frames; for a tab or frame that isn't there, it and `getFrame` → null, not an error, as in Chrome; frames come with Chrome's frameType, documentLifecycle and parentDocumentId.
+  Test: ExtensionScriptTests.framesOfAMissingOrSleepingTabAnswerAsInChrome
 
 ## Windows
 - An extension's `windows.create` with `state: 'minimized'` → the window goes straight to the Dock, never shown in front or focused, as in Chrome.

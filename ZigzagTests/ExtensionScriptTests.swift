@@ -1332,6 +1332,41 @@ struct ExtensionScriptTests {
         #expect(background.evaluateScript("__seen.sort().join()").toString() == "a,all cleared,callback,cleared,created")
     }
 
+    @Test func framesOfAMissingOrSleepingTabAnswerAsInChrome() {
+        // WebKit fails these for a tab with no page (asleep) or a frame that's gone; Chrome answers null, and [] for
+        // a tab with no page. iCloud Passwords lists every tab's frames as it starts and stopped at the first asleep.
+        let background = Self.workerWorld(worker: true, setup: """
+        const refuse = (name, what) => Promise.reject(new Error('Invalid call to webNavigation.' + name + '(). ' + what + ' not found.'));
+        chrome.tabs = { get: (id) => (id === 2 ? Promise.resolve({ id: 2 }) : Promise.reject(new Error('Invalid call to tabs.get(). Tab not found.'))) };
+        chrome.webNavigation = {
+          getAllFrames: (details) => (details.tabId === 1 ? Promise.resolve([
+            { frameId: 0, parentFrameId: -1, documentId: 'top', url: 'https://a.example/' },
+            { frameId: 7, parentFrameId: 0, documentId: 'sub', url: 'https://b.example/' }]) : refuse('getAllFrames', 'Tab')),
+          getFrame: (details) => (details.tabId === 1 && details.frameId === 7
+            ? Promise.resolve({ parentFrameId: 0, documentId: 'sub', url: 'https://b.example/', errorOccurred: false })
+            : refuse('getFrame', details.tabId === 1 ? 'Frame' : 'Tab')),
+          onCompleted: event(),
+        };
+        """)
+        background.evaluateScript("""
+        var __seen = {};
+        const keep = (name) => (value) => { __seen[name] = JSON.stringify(value); };
+        chrome.webNavigation.getAllFrames({ tabId: 1 }).then(keep('frames'));
+        chrome.webNavigation.getAllFrames({ tabId: 2 }).then(keep('asleep'), keep('asleep refused'));
+        chrome.webNavigation.getAllFrames({ tabId: 3 }).then(keep('missing'), keep('missing refused'));
+        chrome.webNavigation.getFrame({ tabId: 1, frameId: 7 }).then(keep('frame'));
+        chrome.webNavigation.getFrame({ tabId: 1, frameId: 8 }).then(keep('gone'), keep('gone refused'));
+        chrome.webNavigation.getFrame({ tabId: 2, frameId: 0 }, (frame) => { __seen.callback = JSON.stringify(frame) + ' ' + (chrome.runtime.lastError === undefined); });
+        """)
+        background.evaluateScript("__flush()")
+        #expect(background.evaluateScript("__seen.frames").toString() == #"[{"frameId":0,"parentFrameId":-1,"documentId":"top","url":"https://a.example/","frameType":"outermost_frame","documentLifecycle":"active"},{"frameId":7,"parentFrameId":0,"documentId":"sub","url":"https://b.example/","frameType":"sub_frame","documentLifecycle":"active","parentDocumentId":"top"}]"#)
+        #expect(background.evaluateScript("__seen.asleep").toString() == "[]")
+        #expect(background.evaluateScript("__seen.missing").toString() == "null")
+        #expect(background.evaluateScript("__seen.frame").toString() == #"{"parentFrameId":0,"documentId":"sub","url":"https://b.example/","errorOccurred":false,"frameType":"sub_frame","documentLifecycle":"active"}"#)
+        #expect(background.evaluateScript("__seen.gone").toString() == "null")
+        #expect(background.evaluateScript("__seen.callback").toString() == "null true")
+    }
+
     @Test func cookiesAsChromeDescribesThemAreSet() {
         // A cookie Chrome listed names its store "0" and may have a SameSite of "unspecified"; WebKit refuses both.
         let page = Self.workerWorld(worker: false, setup: """

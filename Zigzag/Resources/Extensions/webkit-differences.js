@@ -1163,6 +1163,47 @@
       }
     }
 
+    // webNavigation.getFrame and getAllFrames: for a tab or frame that isn't there, Chrome answers null, and for a tab
+    // with no page (asleep) no frames; WebKit fails them, and a tab asleep is a tab it can't find. iCloud Passwords lists
+    // every tab's frames as it starts, and stopped at the first tab asleep. Chrome's frameType, documentLifecycle and
+    // parentDocumentId, which WebKit leaves out, are added.
+    const navigation = api.webNavigation;
+    if (navigation && typeof navigation.getAllFrames === 'function' && typeof navigation.getFrame === 'function') {
+      const getAllFrames = navigation.getAllFrames.bind(navigation);
+      const getFrame = navigation.getFrame.bind(navigation);
+      const described = (frame, frameId) => (frame && typeof frame === 'object' ? Object.assign(frame, {
+        frameType: frameId === 0 ? 'outermost_frame' : 'sub_frame',
+        documentLifecycle: frame.documentLifecycle || 'active',
+      }) : frame);
+      const tabExists = (tabId) => Promise.resolve().then(() => api.tabs.get(tabId)).then((tab) => !!tab, () => false);
+      const answer = (result, callback) => {
+        if (!callback) return result;
+        result.then((value) => callback(value), (error) => {
+          if (typeof globalThis.__zigzagWithLastError === 'function') globalThis.__zigzagWithLastError(callback, error);
+          else callback();
+        });
+        return undefined;
+      };
+      setMember(['webNavigation'], 'getAllFrames', (details, callback) => {
+        const asked = getAllFrames(details);
+        return answer(Promise.resolve(asked).then((frames) => {
+          if (!Array.isArray(frames)) return frames;
+          const documents = new Map(frames.map((frame) => [frame.frameId, frame.documentId]));
+          return frames.map((frame) => {
+            described(frame, frame.frameId);
+            const parent = documents.get(frame.parentFrameId);
+            if (parent && frame.parentDocumentId === undefined) frame.parentDocumentId = parent;
+            return frame;
+          });
+        }, () => tabExists(details && details.tabId).then((exists) => (exists ? [] : null))), typeof callback === 'function' ? callback : null);
+      });
+      setMember(['webNavigation'], 'getFrame', (details, callback) => {
+        const asked = getFrame(details);
+        return answer(Promise.resolve(asked).then((frame) => described(frame, details && details.frameId), () => null),
+          typeof callback === 'function' ? callback : null);
+      });
+    }
+
     // webRequest.handlerBehaviorChanged: in Chrome it only empties a cache so changed listeners apply at once. WebKit
     // keeps no such cache, so there's nothing to do; refused, it left an unhandled error in Tampermonkey's start.
     if (webRequest && typeof webRequest.handlerBehaviorChanged !== 'function') {
