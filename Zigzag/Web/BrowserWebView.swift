@@ -88,54 +88,94 @@ final class BrowserWebView: WKWebView {
     // WKWebView's text input methods aren't public, so these take their selectors; WebKit's hasMarkedText reads false.
     private var markedLetters: String?
     private var composingSource: IMECommit.Source?
+    private var urlObservation: NSKeyValueObservation?
 
-    @objc(setMarkedText:selectedRange:replacementRange:)
+    override init(frame: NSRect, configuration: WKWebViewConfiguration) {
+        _ = Self.interposed
+        super.init(frame: frame, configuration: configuration)
+        // A composition doesn't outlive its page.
+        urlObservation = observe(\.url) { webView, _ in MainActor.assumeIsolated { webView.forgetComposition() } }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// The page took the composition away (a click, a new page): what was marked is no longer coming.
+    private func forgetComposition() {
+        markedLetters = nil
+        composingSource = nil
+    }
+
+    #if DEBUG
+    var debugMarkedLetters: String? { markedLetters }
+    #endif
+
+    /// WebKit's text input selectors and the ones here that stand in for them.
+    static let imeSelectors: [(webKit: Selector, ours: Selector)] = [
+        (NSSelectorFromString("setMarkedText:selectedRange:replacementRange:"), #selector(imeSetMarkedText(_:selectedRange:replacementRange:))),
+        (NSSelectorFromString("insertText:replacementRange:"), #selector(imeInsertText(_:replacementRange:))),
+        (NSSelectorFromString("unmarkText"), #selector(imeUnmarkText)),
+    ]
+
+    static let interposed: [Selector] = interpose(into: BrowserWebView.self, over: WKWebView.self)
+
+    /// Adds the stand-ins to `cls` for each selector `base` implements; the others are left to `base`. Returns the
+    /// selectors it took.
+    static func interpose(into cls: AnyClass, over base: AnyClass) -> [Selector] {
+        imeSelectors.compactMap { webKit, ours in
+            guard class_getInstanceMethod(base, webKit) != nil, let method = class_getInstanceMethod(BrowserWebView.self, ours) else { return nil }
+            return class_addMethod(cls, webKit, method_getImplementation(method), method_getTypeEncoding(method)) ? webKit : nil
+        }
+    }
+
+    @objc(zigzagSetMarkedText:selectedRange:replacementRange:)
     func imeSetMarkedText(_ string: AnyObject, selectedRange: NSRange, replacementRange: NSRange) {
         let text = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
-        markedLetters = text.isEmpty ? nil : text
-        composingSource = text.isEmpty ? nil : composingSource ?? IMECommit.currentSource()
+        if text.isEmpty { forgetComposition() } else {
+            composingSource = markedLetters == nil ? IMECommit.currentSource() : composingSource
+            markedLetters = text
+        }
         typealias Call = @convention(c) (AnyObject, Selector, AnyObject, NSRange, NSRange) -> Void
-        let selector = #selector(imeSetMarkedText(_:selectedRange:replacementRange:))
+        let selector = Self.imeSelectors[0].webKit
         Self.webKit(selector, as: Call.self)(self, selector, string, selectedRange, replacementRange)
     }
 
-    @objc(insertText:replacementRange:)
+    @objc(zigzagInsertText:replacementRange:)
     func imeInsertText(_ string: AnyObject, replacementRange: NSRange) {
-        let composing = markedLetters != nil
+        let plain = (string as? String) ?? (string as? NSAttributedString)?.string
+        // Only the marked letters themselves, committed: never dictation or a text replacement.
+        let composing = markedLetters != nil && plain == markedLetters
         let source = composing ? composingSource ?? IMECommit.currentSource() : nil
-        markedLetters = nil
-        composingSource = nil
+        forgetComposition()
         superInsertText(IMECommit.cleaned(string as Any, composing: composing, source: source) as AnyObject, replacementRange)
     }
 
     /// Switching to English mid-word commits the marked text this way.
-    @objc(unmarkText)
+    @objc(zigzagUnmarkText)
     func imeUnmarkText() {
         let marked = markedLetters
         let source = composingSource ?? IMECommit.currentSource()
-        markedLetters = nil
-        composingSource = nil
+        forgetComposition()
         if let marked {
             let text = IMECommit.cleaned(marked, composing: true, source: source)
             if text != marked { superInsertText(text as NSString, NSRange(location: NSNotFound, length: 0)); return }
         }
         typealias Call = @convention(c) (AnyObject, Selector) -> Void
-        let selector = #selector(imeUnmarkText)
+        let selector = Self.imeSelectors[2].webKit
         Self.webKit(selector, as: Call.self)(self, selector)
     }
 
     private func superInsertText(_ string: AnyObject, _ replacementRange: NSRange) {
         typealias Call = @convention(c) (AnyObject, Selector, AnyObject, NSRange) -> Void
-        let selector = #selector(imeInsertText(_:replacementRange:))
+        let selector = Self.imeSelectors[1].webKit
         Self.webKit(selector, as: Call.self)(self, selector, string, replacementRange)
     }
 
     override func resignFirstResponder() -> Bool {
-        markedLetters = nil
-        composingSource = nil
+        forgetComposition()
         return super.resignFirstResponder()
     }
 
+    /// WebKit's own implementation; only called for selectors `interpose` found it has.
     private static func webKit<Call>(_ selector: Selector, as: Call.Type) -> Call {
         unsafeBitCast(class_getMethodImplementation(WKWebView.self, selector), to: Call.self)
     }
@@ -156,6 +196,7 @@ final class BrowserWebView: WKWebView {
 
     override func mouseDown(with event: NSEvent) {
         owner?.scrolledSinceSave = true
+        forgetComposition()
         if event.modifierFlags.contains(.control) { readSelectionForMenu() }
         super.mouseDown(with: event)
     }
