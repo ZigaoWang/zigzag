@@ -726,12 +726,16 @@ calm: things drawn as objects under one light straight above. `Materials.swift` 
   light. Typing, the accent rings it with a soft glow.
 - **`EmbossedWordmark`**: the drawn ZIGZAG as an object: solid navy with a fine top light by day, the ribbon's
   pale blue, beveled, by night; a glint follows the pointer only while it's over the mark.
-- **Your Zigzag Card** (`CardStage`, About's hero): a bank card that turns up to `Keepsake.tilt` (8°) toward the
-  pointer and settles back on a soft spring; a click turns it over to the wordmark alone. Four finishes, picked with
-  round swatches under it (`SwatchRing`, the chosen one in the accent ring, as Reader's colors): Space, Holographic,
-  Graphite, Paper. Each has its grain made at the size it's drawn,
-  small ribbon Zs pressed into it and the wordmark stamped in foil; only the foil, the sheen and the wordmark's shine
-  move with the light. The saved picture is the same drawing at `Keepsake.exportScale`, lit at rest.
+- **Your Zigzag Card** (`CardStage`, About's hero): an ID-1 card (85.6 × 54 mm, 428 × 270) that turns up to
+  `Keepsake.tilt` (8°) toward the pointer and settles back on a soft spring; a click turns it over to the wordmark
+  alone. The front: the wordmark in foil at the top left, the name (regular, 28, smaller only to fit) over "Since
+  <month year>" at the bottom left, and the ribbon Z pressed in at the bottom right, everything on one 28pt margin
+  measured by the ink. Four finishes, picked with swatches cut from the material itself (`SwatchRing`, the chosen
+  one in the accent ring, as Reader's colors), the chosen or pointed-at one named beside them: Space (frosted
+  glass in the space's colors), Holographic (pearl foil), Graphite (anodized), Paper (linen). Each has its grain made
+  at the size it's drawn; only the foil, the sheen and the wordmark's shine move with the light. Save and Share
+  are quiet symbols at the row's end. The saved picture is a 16:10 scene, 2400 × 1500, the card lit at rest on a
+  ground of its finish's own tones.
 - **A brand moment's words**: the wordmark, one headline (`Material.headline`, semibold) saying plainly what Zigzag
   is, one quiet line (`largeText`, `textSecondary`), then the one big action.
 - **Recipes**: `MaterialShape.rounded` (continuous corners as a path), `GradientStroke` (rims, bevels, lips),
