@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import os
 #if DEBUG
 import ScreenCaptureKit
 #endif
@@ -824,6 +825,7 @@ enum DebugBridge {
         if name == "fpsbench" { FrameRateBench.run(arg, in: controller); return }
         if name == "perfsuite" { PerfBench.run(arg); return }
         if name == "idle" { IdleWorkCommand.run(arg); return }
+        if name == "redraws" { RedrawCounter.run(arg); return }
         // glassvariant <name>: draws clear glass another way (`GlassVariant`), until relaunch.
         if name == "glassvariant" { if let variant = GlassVariant(rawValue: arg) { DebugMenu.apply(variant) }; return }
         // card [tilt <x> <y>|tilt off|finish <name>|flip|hover <n>|save <path>|shot <path>|close]: About with Your Zigzag Card, opened behind, leaning as if
@@ -4751,7 +4753,7 @@ enum PerfBench {
 #endif
 
 #if DEBUG
-/// idle audit <path> | idle back | idle stopanims | idle clearbg [class]: what keeps the window server drawing windows
+/// idle audit <path> | idle back | idle front | idle stopanims | idle clearbg [class]: what keeps the window server drawing windows
 /// that sit still; `back` orders them behind every other app's, `clearbg` makes shadowed see-through windows wholly clear again.
 @MainActor
 enum IdleWorkCommand {
@@ -4764,6 +4766,7 @@ enum IdleWorkCommand {
                 ["class": "\(type(of: window))", "frame": NSStringFromRect(window.frame), "opaque": window.isOpaque,
                  "background": window.backgroundColor.description, "shadow": window.hasShadow,
                  "occlusionVisible": window.occlusionState.contains(.visible), "key": window.isKeyWindow,
+                 "firstResponder": window.firstResponder.map { "\(type(of: $0))" } ?? "none",
                  "animations": IdleWork.animations(in: window, longerThan: 1), "blurs": IdleWork.liveBlurs(in: window),
                  "hdr": IdleWork.extendedRangeLayers(in: window), "glass": (window.contentView as? SpaceFrameView)?.debugGlass ?? [:]]
             }
@@ -4771,6 +4774,19 @@ enum IdleWorkCommand {
                 try? data.write(to: URL(fileURLWithPath: path))
             }
         case "back": windows.forEach { $0.orderBack(nil) }
+        case "front": windows.forEach { $0.orderFrontRegardless() }
+        case "powerpulse":
+            // powerpulse <n>: the power source reports a change once a second, n times, as some Macs' do.
+            let n = f.dropFirst().first.flatMap { Int($0) } ?? 10
+            for i in 0..<n {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i)) { NotificationCenter.default.post(name: PowerSaving.changed, object: nil) }
+            }
+        case "librarypulse":
+            // librarypulse <n>: the library says it changed once a second, n times, with nothing changed.
+            let n = f.dropFirst().first.flatMap { Int($0) } ?? 10
+            for i in 0..<n {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i)) { MainActor.assumeIsolated { Library.shared.changed.send() } }
+            }
         case "clearbg":
             let only = f.dropFirst().first
             windows.filter { !$0.isOpaque && $0.hasShadow && (only == nil || "\(type(of: $0))" == only) }.forEach { $0.backgroundColor = .clear }
@@ -4785,5 +4801,142 @@ enum IdleWorkCommand {
         default: break
         }
     }
+}
+#endif
+
+#if DEBUG
+/// Debug only: counts view redraws, layouts and layer changes while on, by kind, class and the app's caller.
+@MainActor
+enum RedrawCounter {
+    nonisolated(unsafe) private(set) static var isOn = false
+    nonisolated(unsafe) private static var counts: [String: Int] = [:]
+    nonisolated private static let offMain = OSAllocatedUnfairLock<[String: Int]>(initialState: [:])
+    private static var swapped = false
+
+    private static let swaps: [(AnyClass, String, String)] = [
+        (NSView.self, "setNeedsDisplayInRect:", "zz_setNeedsDisplayInRect:"),
+        (NSView.self, "setNeedsLayout:", "zz_setNeedsLayout:"),
+        (NSView.self, "layout", "zz_layout"),
+        (NSView.self, "drawRect:", "zz_drawRect:"),
+        (CALayer.self, "setNeedsDisplay", "zz_setNeedsDisplay"),
+        (CALayer.self, "display", "zz_display"),
+        (CALayer.self, "setOpacity:", "zz_setOpacity:"),
+        (CALayer.self, "setBackgroundColor:", "zz_setBackgroundColor:"),
+        (CALayer.self, "setContents:", "zz_setContents:"),
+        (CALayer.self, "setHidden:", "zz_setHidden:"),
+        (CALayer.self, "setPosition:", "zz_setPosition:"),
+        (CALayer.self, "setBounds:", "zz_setBounds:"),
+        (CALayer.self, "addAnimation:forKey:", "zz_addAnimation:forKey:"),
+    ]
+
+    private static func exchange() {
+        swapped.toggle()
+        for (cls, original, stand) in swaps {
+            if let a = class_getInstanceMethod(cls, NSSelectorFromString(original)),
+               let b = class_getInstanceMethod(cls, NSSelectorFromString(stand)) {
+                method_exchangeImplementations(a, b)
+            }
+        }
+    }
+
+    static func start() {
+        counts = [:]
+        if !swapped { exchange() }
+        isOn = true
+    }
+
+    /// Stops counting and returns "kind class <- caller" with how many times, most first.
+    static func stop() -> [(String, Int)] {
+        isOn = false
+        if swapped { exchange() }
+        offMain.withLock { counts.merge($0, uniquingKeysWith: +); $0 = [:] }
+        return counts.sorted { $0.value > $1.value }
+    }
+
+    nonisolated static func note(_ kind: String, _ object: AnyObject) {
+        guard isOn else { return }
+        guard Thread.isMainThread else {
+            let key = "\(kind) \(type(of: object)) off main"
+            offMain.withLock { $0[key, default: 0] += 1 }
+            return
+        }
+        do {
+            isOn = false
+            defer { isOn = true }
+            let name: String
+            let owner: AnyObject = (object as? CALayer)?.delegate ?? object
+            var named = "\(type(of: owner))"
+            if let view = owner as? NSView {
+                if let field = view as? NSTextField { named += " '\(field.stringValue.prefix(24))'" }
+                named += " in \(view.superview.map { "\(type(of: $0))" } ?? "-")/\(view.superview?.superview.map { "\(type(of: $0))" } ?? "-")"
+                if view.window == nil { named += " no window" }
+            }
+            name = named
+            // The first frames of the app's own code above this call.
+            let caller = Thread.callStackSymbols.dropFirst(2).map { $0.split(separator: " ", omittingEmptySubsequences: true) }
+                .filter { $0.count > 3 && $0[1].hasPrefix("Zigzag") && !$0[3].contains("zz_") && !$0[3].contains("RedrawCounter") }
+                .prefix(8).map { String($0[3]) }
+            counts["\(kind) \(name) <- \(caller.joined(separator: " | "))", default: 0] += 1
+        }
+    }
+
+    /// redraws key: the app counts as active and its windows as key from now on, as if in front.
+    static func pretendKey() {
+        for (cls, original, stand) in [(NSWindow.self as AnyClass, "isKeyWindow", "zz_isKeyWindow"), (NSWindow.self, "isMainWindow", "zz_isKeyWindow"),
+                                       (NSApplication.self, "isActive", "zz_isActive")] {
+            if let a = class_getInstanceMethod(cls, NSSelectorFromString(original)), let b = class_getInstanceMethod(cls, NSSelectorFromString(stand)) {
+                method_setImplementation(a, method_getImplementation(b))
+            }
+        }
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        for window in NSApp.windows where window.isVisible {
+            NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+            NotificationCenter.default.post(name: NSWindow.didBecomeMainNotification, object: window)
+        }
+    }
+
+    /// redraws <seconds> <path>: counts for that long, then writes the counts as JSON.
+    static func run(_ arg: String) {
+        if arg == "key" { pretendKey(); return }
+        let f = arg.split(separator: " ").map(String.init)
+        guard f.count >= 2, let seconds = Double(f[0]) else { return }
+        start()
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+            MainActor.assumeIsolated {
+                let rows = stop().map { ["what": $0.0, "count": $0.1] as [String: Any] }
+                if let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted]) {
+                    try? data.write(to: URL(fileURLWithPath: f[1]))
+                }
+            }
+        }
+    }
+}
+
+extension NSView {
+    // After the exchange, these names call AppKit's own.
+    @objc func zz_setNeedsDisplayInRect(_ rect: NSRect) { RedrawCounter.note("needsDisplay", self); zz_setNeedsDisplayInRect(rect) }
+    @objc func zz_setNeedsLayout(_ flag: Bool) { if flag { RedrawCounter.note("needsLayout", self) }; zz_setNeedsLayout(flag) }
+    @objc func zz_layout() { RedrawCounter.note("layout", self); zz_layout() }
+    @objc func zz_drawRect(_ rect: NSRect) { RedrawCounter.note("draw", self); zz_drawRect(rect) }
+}
+
+extension NSWindow {
+    @objc func zz_isKeyWindow() -> Bool { isVisible }
+}
+
+extension NSApplication {
+    @objc func zz_isActive() -> Bool { true }
+}
+
+extension CALayer {
+    @objc func zz_setNeedsDisplay() { RedrawCounter.note("layerNeedsDisplay", self); zz_setNeedsDisplay() }
+    @objc func zz_display() { RedrawCounter.note("layerDisplay", self); zz_display() }
+    @objc func zz_setOpacity(_ value: Float) { if value != opacity { RedrawCounter.note("opacity", self) }; zz_setOpacity(value) }
+    @objc func zz_setBackgroundColor(_ value: CGColor?) { if value != backgroundColor { RedrawCounter.note("backgroundColor", self) }; zz_setBackgroundColor(value) }
+    @objc func zz_setContents(_ value: Any?) { RedrawCounter.note("contents", self); zz_setContents(value) }
+    @objc func zz_setHidden(_ value: Bool) { if value != isHidden { RedrawCounter.note("hidden", self) }; zz_setHidden(value) }
+    @objc func zz_setPosition(_ value: CGPoint) { if value != position { RedrawCounter.note("position", self) }; zz_setPosition(value) }
+    @objc func zz_setBounds(_ value: CGRect) { if value != bounds { RedrawCounter.note("bounds", self) }; zz_setBounds(value) }
+    @objc func zz_addAnimation(_ animation: CAAnimation, forKey key: String?) { RedrawCounter.note("animation \(key ?? "-")", self); zz_addAnimation(animation, forKey: key) }
 }
 #endif
