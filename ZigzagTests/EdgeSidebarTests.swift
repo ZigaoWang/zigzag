@@ -269,5 +269,471 @@ struct EdgeSidebarTests {
         #expect(!row.isSplit)
         #expect(row.debugPointedPart == nil)
     }
-}
 
+    /// A row clicked in the panel: the browser selects the tab, and the panel's page pill is the Mini's whole frame.
+    /// The page is laid out once, at the pill's size, instead of at the Mini's remembered window size.
+    @Test func aClickedRowShowsItsPageInThePagePillAtItsFinalSize() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let second = manager.newTab(url: URL(string: "https://example.test/second"), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        defer { EdgeSidebar.shared.hide(animated: false) }
+
+        // The click's own path, as the list's delegate calls it.
+        controller.listSelect(second)
+
+        let panel = try #require(NSApp.windows.first { $0.contentView is EdgeSidebarHost })
+        let host = try #require(panel.contentView as? EdgeSidebarHost)
+        let wide = EdgeSidebarLayout.width(sidebar: controller.edgeSidebarWidth, page: true, inset: host.inset, in: visible)
+        #expect(panel.frame == EdgeSidebarLayout.frame(in: visible, width: wide, onRight: controller.edgeSidebarOnRight))
+        #expect(host.pageShowing)
+        #expect(host.container?.frame == host.cardFrame)
+
+        let mini = try #require(MiniWindowController.all.first { $0.tab === second })
+        let window = try #require(mini.window)
+        let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
+        #expect(window.frame == pill)
+        // The page fills the pill: the browser's page did not lend it its own, larger size.
+        let webView = try #require(second.webView)
+        #expect(webView.frame.size == pill.size)
+    }
+
+    /// The flow the panel is used in: rest on a row until its page is out, then click another row. The page keeps the
+    /// pill's size through the swap; the browser's card that showed it for an instant doesn't lend it a larger one.
+    @Test func clickingAnotherRowAfterAHoverKeepsThePagePillSize() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let second = manager.newTab(url: URL(string: "https://example.test/second"), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        defer { EdgeSidebar.shared.hide(animated: false) }
+
+        EdgeSidebar.shared.previewNow(first, in: controller)
+        let panel = try #require(NSApp.windows.first { $0.contentView is EdgeSidebarHost })
+        let host = try #require(panel.contentView as? EdgeSidebarHost)
+        let hovered = try #require(MiniWindowController.all.first { $0.tab === first })
+        #expect(hovered.window?.frame == panel.convertToScreen(host.convert(host.pageFrame, to: nil)))
+
+        controller.listSelect(second)
+        let clicked = try #require(MiniWindowController.all.first { $0.tab === second })
+        let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
+        #expect(clicked.window?.frame == pill)
+        #expect(second.webView?.frame.size == pill.size)
+    }
+
+    /// The panel and its preview hand the menu bar's tab and sidebar keys to the browser window, so ⌘W, ⌘1–9 and the
+    /// rest act on its tabs from either one.
+    @Test func thePanelAndItsPreviewHandTabKeysToTheBrowserWindow() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let second = manager.newTab(url: URL(string: "https://example.test/second"), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        defer { EdgeSidebar.shared.hide(animated: false) }
+
+        let panel = try #require(NSApp.windows.first { $0.contentView is EdgeSidebarHost })
+        #expect(panel.nextResponder === controller)
+        controller.listSelect(second)
+        let mini = try #require(MiniWindowController.all.first { $0.tab === second })
+        let target = #selector(BrowserWindowController.selectNextTab(_:))
+        #expect(mini.supplementalTarget(forAction: target, sender: nil) as? BrowserWindowController === controller)
+    }
+
+    /// The address row is the page beside the panel: its back, forward, reload, star and site controls must answer
+    /// for the previewed tab, not for whichever tab was selected behind the panel.
+    @Test func theAddressRowAnswersForThePreviewedPage() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: "https://first.test/one"), spaceID: space)
+        let second = manager.newTab(url: URL(string: "https://second.test/two"), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        defer { EdgeSidebar.shared.hide(animated: false) }
+        let mirror = try #require(controller.edgeSidebar)
+
+        EdgeSidebar.shared.previewNow(first, in: controller)
+        let firstMini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(EdgeSidebar.shared.displayedTab === first)
+        #expect(mirror.address.debugText == "first.test")
+
+        EdgeSidebar.shared.previewNow(second, in: controller)
+        let secondMini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(EdgeSidebar.shared.displayedTab === second)
+        #expect(mirror.address.debugText == "second.test")
+        // The page being left stays under the new one's fold, so the swap is a transition rather than a fresh fold
+        // over an empty page area.
+        #expect(secondMini !== firstMini)
+        #expect(firstMini.window?.isVisible == true)
+        #expect(secondMini.root.layer?.mask != nil)
+    }
+
+    /// The panel goes out from under the pointer, so its rows never get the exit that would put their hover away.
+    /// A row left lit looks like a selection that cannot be cleared.
+    @Test func hidingThePanelClearsTheRowsHover() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = manager.newTab(url: URL(string: "https://example.test/hover"), spaceID: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        let mirror = try #require(controller.edgeSidebar)
+        let row = try #require(mirror.list.row(for: tab) as? SidebarRowView)
+        row.isHovered = true
+        EdgeSidebar.shared.hide(animated: false)
+        #expect(!row.isHovered)
+    }
+
+    /// A tile group's part must be previewed at the page pill's size from its first layout: the page may not be
+    /// laid out at its pane's size (or the Mini's remembered window size) and then adjusted, moving its content.
+    @Test func aTileGroupPreviewStartsAtThePagePillSize() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let pages = (0..<4).map { i in
+            manager.newTab(url: URL(string: "https://tile.test/\(i)"), spaceID: space)
+        }
+        manager.makeGroup(pages, shape: TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight],
+                                                  column: 0.5, row: 0.5))
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1200, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        defer { EdgeSidebar.shared.hide(animated: false) }
+        // The pointer is not really on the panel in a test: keep it out while the frames are watched.
+        EdgeSidebar.debugHoldsOpen = true
+        defer { EdgeSidebar.debugHoldsOpen = false }
+        let panel = try #require(NSApp.windows.first { $0.contentView is EdgeSidebarHost })
+        let host = try #require(panel.contentView as? EdgeSidebarHost)
+        let paneSize = try #require(pages[2].pageHolder?.frame.size)
+        var seen: [NSSize] = []
+        let watch = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: pages[2].webView,
+                                                           queue: .main) { _ in
+            MainActor.assumeIsolated {
+                if let size = pages[2].webView?.frame.size { seen.append(size) }
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(watch) }
+        EdgeSidebar.shared.previewNow(pages[2], in: controller)
+        let mini = try #require(MiniWindowController.all.first { $0.tab === pages[2] })
+        let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
+        // Exactly one size change, straight to the pill: the page never believes it has the pane's or the Mini's
+        // remembered window size and then has to lay itself out again.
+        #expect(!seen.isEmpty)
+        #expect(seen.last == pill.size, "sizes \(seen); pill \(pill.size)")
+        #expect(seen.allSatisfy { $0 == pill.size }, "sizes \(seen); pane \(paneSize); pill \(pill.size)")
+
+        // Across the fold, the window and its card keep the one frame: a later resize would show as a jerk even
+        // though the page's own layout is already final.
+        var frames: [NSRect] = []
+        let end = Date().addingTimeInterval(0.4)
+        while Date() < end {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+            if let frame = mini.window?.frame { frames.append(frame) }
+        }
+        let sizes = Set(frames.map { NSStringFromRect($0) })
+        #expect(sizes.count == 1, "window frames \(sizes)")
+        // No run loop yet: this is the frame the page is first laid out in.
+        #expect(mini.window?.frame == pill, "mini window \(String(describing: mini.window?.frame)) pill \(pill)")
+        #expect(mini.root.card.frame.size == pill.size, "card \(mini.root.card.frame) pill \(pill)")
+        #expect(pages[2].pageHolder?.frame.size == pill.size, "holder \(String(describing: pages[2].pageHolder?.frame)) pill \(pill)")
+        #expect(pages[2].webView?.frame.size == pill.size, "web \(String(describing: pages[2].webView?.frame)) pill \(pill)")
+    }
+
+    /// The + menu's actions work from the panel: New Tab opens the panel's own command bar, New Folder lands in the
+    /// panel's list, and New Space names the space in an editor over the panel rather than in the window behind.
+    @Test func thePlusMenuActsInThePanel() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { EdgeSidebar.shared.hide(animated: false); manager.invalidate(); Library.shared.restore(before) }
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        let panelWindow = try #require(EdgeSidebar.shared.sheetHost?.window)
+
+        let entries = controller.sidebarAddMenu()
+        let items = entries.compactMap { entry -> MenuPanel.Item? in
+            if case .item(let item) = entry { return item }
+            return nil
+        }
+
+        // New Tab: the bar over the screen, not the one in the window behind.
+        let newTab = try #require(items.first { $0.title == SidebarMenus.title(of: .newTab) })
+        newTab.action()
+        #expect(EdgeSidebar.shared.isCommandBarOpen)
+
+        // New Folder: in the current space, and the panel's list reloads for it.
+        let folders = Library.shared.folders(in: space).count
+        let newFolder = try #require(items.first { $0.title == SidebarMenus.title(of: .newFolder) })
+        newFolder.action()
+        #expect(Library.shared.folders(in: space).count == folders + 1)
+
+        // New Space: its editor is a card on the panel, so the browser stays behind.
+        let madeBefore = Library.shared.spaces.count
+        let newSpace = try #require(items.first { $0.title == SidebarMenus.title(of: .newSpace) })
+        newSpace.action()
+        #expect(Library.shared.spaces.count == madeBefore + 1)
+        #expect(Library.shared.space(manager.currentSpaceID) != nil)
+        let editor = try #require(SpaceEditorPanel.current)
+        #expect(editor.superview === EdgeSidebar.shared.sheetHost)
+        #expect(editor.window === panelWindow)
+    }
+
+    /// A sleeping row is the same pill a running page is: the Mini is there, with the card over its room. Resting on
+    /// it never wakes the tab, and clicking wakes it in place — the card goes, the Mini stays.
+    @Test func aSleepingRowIsThePagePillWithItsCardOverIt() async throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { EdgeSidebar.shared.hide(animated: false); manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let second = manager.newTab(url: URL(string: "https://example.test/second"), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        second.ensureWebView()
+        second.suspend(because: "test", chosen: true)
+        #expect(await until { second.isAsleep && !second.isLoaded })
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        EdgeSidebar.shared.previewNow(second, in: controller)
+
+        let panel = try #require(NSApp.windows.first { $0.contentView is EdgeSidebarHost })
+        let host = try #require(panel.contentView as? EdgeSidebarHost)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        let pill = panel.convertToScreen(host.convert(host.pageFrame, to: nil))
+        #expect(mini.tab === second)
+        #expect(mini.asleepCardTitle == second.displayTitle)
+        #expect(mini.window?.frame == pill)
+        #expect(host.pageShowing)
+        // Resting made no page for it.
+        #expect(!second.isLoaded)
+
+        // The click wakes it: the card goes and the page is there.
+        controller.listSelect(second)
+        #expect(await until { second.isLoaded })
+        #expect(await until { mini.asleepCardTitle == nil })
+        #expect(mini.tab === second)
+        // The panel is a shared singleton: another test's window becoming key hides it (as another window's does in
+        // the app), so what it shows is only meaningful while it is still out. Either way, no second Mini takes the
+        // page over: the one that had it keeps it.
+        if EdgeSidebar.shared.isShowing {
+            #expect(EdgeSidebar.shared.pagePreview === mini)
+        }
+        #expect(MiniWindowController.all.filter { $0.isDockedInPage && $0.tab === second }.count <= 1)
+    }
+
+    /// Moving between a sleeping row and a running one keeps the panel at its one wide frame: the card and the page
+    /// are the same pill, so neither swap narrows it or folds a new Mini over an empty page area.
+    @Test func movingBetweenACardAndAPageKeepsThePanelWide() async throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { EdgeSidebar.shared.hide(animated: false); manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let second = manager.newTab(url: URL(string: "https://example.test/second"), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        second.ensureWebView()
+        second.suspend(because: "test", chosen: true)
+        #expect(await until { second.isAsleep && !second.isLoaded })
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        let panel = try #require(NSApp.windows.first { $0.contentView is EdgeSidebarHost })
+        let host = try #require(panel.contentView as? EdgeSidebarHost)
+        let wide = EdgeSidebarLayout.frame(in: visible,
+                                           width: EdgeSidebarLayout.width(sidebar: controller.edgeSidebarWidth,
+                                                                          page: true, inset: host.inset, in: visible),
+                                           onRight: controller.edgeSidebarOnRight)
+
+        EdgeSidebar.shared.previewNow(second, in: controller)
+        #expect(panel.frame == wide)
+        EdgeSidebar.shared.previewNow(first, in: controller)
+        #expect(panel.frame == wide)
+        let page = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(page.tab === first)
+        #expect(page.window?.frame == panel.convertToScreen(host.convert(host.pageFrame, to: nil)))
+    }
+
+    /// New Tab from the panel is the spotlight over the screen, in the middle: not a bar squeezed into the sidebar's
+    /// width when no page is out beside it.
+    @Test func newTabFromThePanelCentersOverTheScreen() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { EdgeSidebar.shared.hide(animated: false); manager.invalidate(); Library.shared.restore(before) }
+        manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        controller.newTab(nil)
+
+        #expect(EdgeSidebar.shared.isCommandBarOpen)
+        #expect(controller.commandBar.isVisible)
+        let card = try #require(EdgeSidebar.shared.commandBarPageFrame)
+        #expect(card.width == visible.width)
+        let bar = controller.commandBar.panelView.frame
+        #expect(abs(bar.midX - visible.midX) <= 2)
+        #expect(bar.width >= Tokens.Metric.commandBarWidth * 0.9)
+    }
+
+    /// Choosing a result in the panel's bar is the panel doing its job: the window stays behind and the panel stays
+    /// out, where the page it opened becomes the page beside the sidebar.
+    @Test func choosingAResultKeepsThePanelOut() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { EdgeSidebar.shared.hide(animated: false); manager.invalidate(); Library.shared.restore(before) }
+        manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        EdgeSidebar.shared.newTabInPlace()
+        controller.commandBarChoseResult()
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(EdgeSidebar.shared.isCommandBarOpen)
+    }
+
+    /// Clicking the card standing in for the previewed page is a click on the tab: the page wakes in the same Mini,
+    /// the panel stays out, and the tab becomes the browser's selected one.
+    @Test func clickingTheCardInThePreviewWakesTheTab() async throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { EdgeSidebar.shared.hide(animated: false); manager.invalidate(); Library.shared.restore(before) }
+        let first = manager.newTab(url: URL(string: "https://example.test/first"), spaceID: space)
+        let second = manager.newTab(url: URL(string: "https://example.test/second"), spaceID: space)
+        manager.select(first)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        second.ensureWebView()
+        second.suspend(because: "test", chosen: true)
+        #expect(await until { second.isAsleep && !second.isLoaded })
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        EdgeSidebar.shared.previewNow(second, in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(mini.asleepCardTitle == second.displayTitle)
+        #expect(!second.isLoaded)
+
+        mini.clickAsleepCard()
+        #expect(await until { second.isLoaded })
+        #expect(await until { mini.asleepCardTitle == nil })
+        #expect(manager.selectedTab === second)
+        #expect(EdgeSidebar.shared.pagePreview === mini)
+        #expect(MiniWindowController.all.filter { $0.isDockedInPage && $0.tab === second }.count == 1)
+    }
+
+    /// Activation changes are judged a grace later: a blink of focus keeps the panel the pointer is on, while a
+    /// real switch of app still puts it away.
+    @Test func anActivationBlinkKeepsThePanelUnderThePointer() {
+        #expect(EdgeSidebarLayout.keepsAfterActivation(appIsActive: true, panelIsKey: false, previewIsKey: false,
+                                                      pointerOnPanel: true))
+        #expect(EdgeSidebarLayout.keepsAfterActivation(appIsActive: true, panelIsKey: true, previewIsKey: false,
+                                                      pointerOnPanel: false))
+        #expect(EdgeSidebarLayout.keepsAfterActivation(appIsActive: true, panelIsKey: false, previewIsKey: true,
+                                                      pointerOnPanel: false))
+        #expect(!EdgeSidebarLayout.keepsAfterActivation(appIsActive: false, panelIsKey: true, previewIsKey: true,
+                                                       pointerOnPanel: true))
+        #expect(!EdgeSidebarLayout.keepsAfterActivation(appIsActive: true, panelIsKey: false, previewIsKey: false,
+                                                       pointerOnPanel: false))
+    }
+
+    /// Expand in the preview's strip takes the page out of the row and leaves a Mini of its own: the panel goes, the
+    /// window stays, and the tab lives outside the browser's list.
+    @Test func expandingTheEdgePreviewLeavesAnIndependentMini() async throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { EdgeSidebar.shared.hide(animated: false); manager.invalidate(); Library.shared.restore(before) }
+        let tab = manager.newTab(url: URL(string: "https://example.test/expand"), spaceID: space)
+        manager.select(tab)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 100, y: 100, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        controller.window?.layoutIfNeeded()
+        tab.ensureWebView()
+        #expect(tab.isLoaded)
+
+        let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+        EdgeSidebar.shared.show(on: visible, for: controller)
+        EdgeSidebar.shared.previewNow(tab, in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(mini.isDockedInPage)
+        #expect(mini.window?.parent != nil)
+
+        mini.promoteFromPage()
+        #expect(await until { !mini.isDockedInPage })
+        #expect(mini.window?.isVisible == true)
+        #expect(manager.tab(with: tab.id) == nil)
+        #expect(tab.isOutsideTabList)
+        #expect(tab.host === mini)
+        #expect(!EdgeSidebar.shared.isShowing)
+        mini.window?.close()
+    }
+
+    private func until(_ seconds: Double = 8, _ condition: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+        return condition()
+    }
+}

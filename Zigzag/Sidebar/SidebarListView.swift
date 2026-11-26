@@ -961,6 +961,14 @@ final class SidebarListView: NSView {
     #endif
     override func mouseExited(with event: NSEvent) { isPointerInside = false }
 
+    /// Puts every row's hover away, for a list whose window goes out from under the pointer: the exit never arrives,
+    /// and a row left lit reads as a selection that can't be cleared.
+    func clearHover() {
+        isPointerInside = false
+        for case let row as InteractiveView in rows.values { row.isHovered = false }
+        (rows[.separator] as? SeparatorRowView)?.showsClear = false
+    }
+
     // MARK: Rows
 
     private func makeView(for item: SidebarItem) -> NSView {

@@ -546,6 +546,10 @@ final class AddressView: InteractiveView {
     /// What `show` last put up: the site's name and whether it's marked not secure.
     private var shown: (name: String, insecure: Bool)?
 
+    #if DEBUG
+    var debugText: String { label.stringValue }
+    #endif
+
     func show(url: URL?, notSecure: Bool) {
         // The same site as it was: a page moving its address as you scroll it (a forum's post number) redraws nothing.
         let now = (name: Self.name(of: url), insecure: notSecure && url != nil)

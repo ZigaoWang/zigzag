@@ -12,6 +12,12 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// Pressing the same shortcut again closes the command bar, like Raycast.
     @objc func newTab(_ sender: Any?) {
         if commandBar.isVisible && commandBar.mode == .newTab { commandBar.dismiss(); return }
+        // In the edge panel, the new tab belongs to the panel: its bar opens over the screen and the page stays
+        // beside the sidebar instead of the window coming forward.
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.newTabInPlace()
+            return
+        }
         // An extension that replaces the new tab page (Momentum, say) gets a real tab, as in Chrome; ⌘L still searches.
         if #available(macOS 15.4, *), let page = tabManager.extensionHost?.newTabOverride() {
             tabManager.newTab(url: page)
@@ -910,7 +916,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
         Tutorial.complete("space")
-        // At the button or menu row it came from; from the menu bar or command bar, beside the space's name.
+        // At the button or menu row it came from; from the menu bar or command bar, beside the space's name. In the
+        // edge panel the editor opens over the panel itself, so the browser behind stays put.
         openSpaceEditor(tabManager.currentSpaceID, anchor: sender as? NSView)
         if let madeProfile { SpaceEditorPanel.current?.follow(madeProfile: madeProfile) }
         // Esc while naming it: never mind. Back where you were, without the space, and the guide still asks for one.

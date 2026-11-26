@@ -787,18 +787,22 @@ final class PageCardView: NSView {
         // A tab's page comes in the tab's own holder, with whatever is docked beside it.
         let newHolder = owner?.pageHolder
         if let newHolder {
-            let top = contentTop
-            let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
-            let fit = Self.pageFit(content: content, size: pageSize, docked: newHolder.dockedRoom, scales: Self.canScale(newWebView))
-            newHolder.frame = fit.frame
-            Self.apply(scale: fit.scale, to: newWebView)
-            newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
-            // The Web Inspector docking beside a page with a size of its own makes room for itself.
-            newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
             // A page in a Mini (the in-page peek or the edge preview) is the Mini's to show; a card laid out again
-            // under it must say the page is its own without pulling the holder out of the Mini. Pulling it back made
-            // the preview blank while the card had the page.
+            // under it must say the page is its own without touching its place, room or scale. Pulling it back made
+            // the preview blank while the card had the page; sizing it to the card's room left the page laid out
+            // wider than the Mini and clipped (the card's page size showing in the edge preview).
             let inMini = newHolder.window?.windowController is MiniWindowController
+            let inAnotherMini = inMini && newHolder.superview !== clip
+            if !inAnotherMini {
+                let top = contentTop
+                let content = NSRect(x: 0, y: 0, width: clip.bounds.width, height: clip.bounds.height - top)
+                let fit = Self.pageFit(content: content, size: pageSize, docked: newHolder.dockedRoom, scales: Self.canScale(newWebView))
+                newHolder.frame = fit.frame
+                Self.apply(scale: fit.scale, to: newWebView)
+                newHolder.autoresizingMask = pageSize == nil ? [.width, .height] : []
+                // The Web Inspector docking beside a page with a size of its own makes room for itself.
+                newHolder.onDockedRoomChange = { [weak self] in self?.needsLayout = true }
+            }
             if newHolder.superview !== clip, !inMini {
                 clip.addSubview(newHolder, positioned: .below, relativeTo: placeholder)
             }

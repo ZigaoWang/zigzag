@@ -7,10 +7,14 @@ import WebKit
 @MainActor
 private final class SlidingDockHost: MiniDockHosting {
     let browser: BrowserWindowController
-    init(browser: BrowserWindowController) { self.browser = browser }
+    let pageFrame: NSRect?
+    init(browser: BrowserWindowController, pageFrame: NSRect? = nil) {
+        self.browser = browser
+        self.pageFrame = pageFrame
+    }
     var dockParentWindow: NSWindow? { browser.window }
     var dockPageView: NSView { browser.root }
-    var dockPageFrame: NSRect { browser.root.cardFrame }
+    var dockPageFrame: NSRect { pageFrame ?? browser.root.cardFrame }
     var dockHasShadow: Bool { true }
     var dockSlidesPage: Bool { true }
     var dockPageOnRight: Bool { false }
@@ -292,6 +296,31 @@ struct InPageMiniHostTests {
             mini.closeInPage(focusBack: false, animated: false)
             #expect(holder.window === browser.window)
             #expect(holder.superview != nil)
+        }
+    }
+
+    @Test func aCardLayoutDoesNotResizeAPageDockedInAMini() throws {
+        try inWindow(pageAt: "https://example.test/room") { browser, tab in
+            // The edge's page pill is narrower than the browser's card, as it is on screen.
+            let card = browser.root.cardFrame
+            let host = SlidingDockHost(browser: browser, pageFrame: NSRect(x: card.minX, y: card.minY,
+                                                                           width: card.width / 2, height: card.height))
+            let mini = try #require(MiniWindowController.openPreview(of: tab, from: browser, dockedIn: host))
+            let holder = try #require(tab.pageHolder)
+            let page = try #require(tab.webView)
+            let room = holder.frame
+            #expect(holder.window === mini.window)
+            #expect(room.width < card.width)
+            // The row's tab becomes the browser's while the Mini has its page: the card lays out again for it.
+            browser.root.card.show(nil)
+            browser.root.card.show(tab.webView)
+            // The card says the page is its own; the Mini keeps the page's room, so the page is not laid out
+            // for the card and clipped by the Mini.
+            #expect(browser.root.card.webView === page)
+            #expect(mini.root.card.webView === page)
+            #expect(holder.window === mini.window)
+            #expect(holder.frame == room)
+            mini.closeInPage(focusBack: false, animated: false)
         }
     }
 
