@@ -178,6 +178,37 @@ struct SidebarSlideTests {
         }
     }
 
+    /// A library change that leaves the space as it was (sync, a favicon, another space) fades nothing: a fade from
+    /// the window's color to the same color had the window server redraw the whole window for nothing.
+    @Test func aLibraryChangeThatKeepsTheSpaceFadesNothing() throws {
+        try inWindow { controller in
+            guard let window = controller.window, let top = window.contentView?.superview?.layer else { return }
+            SettingsPage.open(in: controller)
+            controller.root.layoutSubtreeIfNeeded()
+            func animations(_ layer: CALayer) -> [String] {
+                (layer.animationKeys() ?? []).map { "\(layer.delegate.map { "\(type(of: $0))" } ?? "layer") \($0)" } + (layer.sublayers ?? []).flatMap(animations)
+            }
+            func stop(_ layer: CALayer) { layer.removeAllAnimations(); (layer.sublayers ?? []).forEach(stop) }
+            stop(top)
+            Library.shared.changed.send()
+            #expect(animations(top).isEmpty)
+            // The power source reporting with nothing changed for the glass is the same.
+            NotificationCenter.default.post(name: PowerSaving.changed, object: nil)
+            #expect(animations(top).isEmpty)
+        }
+    }
+
+    @Test func aLayerKeepsItsColorWithoutAFade() {
+        let layer = CALayer()
+        layer.set(backgroundColor: NSColor.red.cgColor, animated: false)
+        // The same color from another color space is the same color.
+        layer.set(backgroundColor: NSColor.red.usingColorSpace(.displayP3)?.cgColor, animated: true)
+        #expect(layer.animationKeys() == nil)
+        #expect(CALayer.sameColor(nil, NSColor.clear.cgColor))
+        layer.set(backgroundColor: NSColor.blue.cgColor, animated: true)
+        #expect(layer.animationKeys() == ["backgroundColor"])
+    }
+
     /// The update card's bar slides only while it shows, waiting for a size; hidden, as it is in every window until
     /// an update downloads, it holds still.
     @Test func theUpdateBarSlidesOnlyWhileItShows() {
