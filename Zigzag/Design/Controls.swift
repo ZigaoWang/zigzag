@@ -514,6 +514,8 @@ class InteractiveView: NSView {
     private(set) var isTouchLifted = false
     /// How far the finger has moved it meanwhile, in its superview's terms.
     private(set) var touchLiftOffset = CGSize.zero
+    /// The controls that rise with it when a finger lifts it, and are carried with it (the other picked rows).
+    var touchLiftsWith: (() -> [InteractiveView])?
 
     func setTouchLifted(_ lifted: Bool, animated: Bool = true) {
         guard lifted != isTouchLifted else { return }

@@ -912,6 +912,8 @@ final class TouchHold {
     private weak var source: NSView?
     /// The control lifted under the finger until it's picked up or let go.
     private weak var lifted: InteractiveView?
+    /// What rises with it: the other picked rows, carried with it.
+    private var companions: [InteractiveView] = []
     /// When it was recognized, and the farthest the finger has strayed since.
     private var beganAt: TimeInterval = 0
     private var strayed: CGFloat = 0
@@ -952,6 +954,8 @@ final class TouchHold {
         if canDrag, let control = view as? InteractiveView {
             hold.lifted = control
             control.setTouchLifted(true)
+            hold.companions = control.touchLiftsWith?() ?? []
+            hold.companions.forEach { $0.setTouchLifted(true) }
             Haptics.lift()
         }
         if openMenu != nil {
@@ -1086,6 +1090,8 @@ final class TouchHold {
         // The carried copy takes over from the lifted control, where it is now.
         lifted?.setTouchLifted(false, animated: false)
         lifted = nil
+        companions.forEach { $0.setTouchLifted(false, animated: false) }
+        companions = []
         let carry = TouchCarry()
         TouchCarry.starting = carry
         let started = startDrag(start)
@@ -1107,6 +1113,8 @@ final class TouchHold {
         menu?.touchLifted()
         lifted?.setTouchLifted(false)
         lifted = nil
+        companions.forEach { $0.setTouchLifted(false) }
+        companions = []
         if #available(macOS 27, *) { frozen?.isTouchScrollingEnabled = true }
         frozen = nil
         if Self.current === self { Self.current = nil }

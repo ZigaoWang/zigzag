@@ -1003,6 +1003,7 @@ final class SidebarListView: NSView {
                 return self.beginDrag(item, view: row, event: event)
             }
             row.dragsByTouch = true
+            row.touchLiftsWith = { [weak self] in self?.pickedRows(besides: item) ?? [] }
             return row
         case .tabGroup(let id):
             // Same as a folder: click toggles, menu renames, ungroups or closes.
@@ -1018,6 +1019,7 @@ final class SidebarListView: NSView {
                 return self.beginDrag(item, view: row, event: event)
             }
             row.dragsByTouch = true
+            row.touchLiftsWith = { [weak self] in self?.pickedRows(besides: item) ?? [] }
             return row
         case .separator:
             let separator = SeparatorRowView()
@@ -1077,6 +1079,7 @@ final class SidebarListView: NSView {
                 return self.beginDrag(item, view: row, event: event)
             }
             row.dragsByTouch = true
+            row.touchLiftsWith = { [weak self] in self?.pickedRows(besides: item) ?? [] }
             observeHover(row)
             return row
         case .bookmark(let id):
@@ -1145,6 +1148,7 @@ final class SidebarListView: NSView {
                 return self.beginDrag(item, view: row, event: event)
             }
             row.dragsByTouch = true
+            row.touchLiftsWith = { [weak self] in self?.pickedRows(besides: item) ?? [] }
             observeHover(row)
             return row
         }
@@ -1980,6 +1984,12 @@ final class SidebarListView: NSView {
 
     /// Where a tab from another window would land, for a screen point over this list.
     func dropIndex(at screenPoint: NSPoint) -> Int { dropTarget(at: screenPoint, allowsPinned: false).index }
+
+    /// The other picked rows, which rise with `item`'s row when a finger lifts it.
+    private func pickedRows(besides item: SidebarItem) -> [InteractiveView] {
+        guard marked.count > 1, marked.contains(item) else { return [] }
+        return marked.filter { $0 != item }.compactMap { rows[$0] as? InteractiveView }
+    }
 
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
         guard allowsDragging, let window, let manager, item.isDraggable else { return false }
