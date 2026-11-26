@@ -200,12 +200,12 @@ struct EdgeSidebarTests {
     @Test func zigzagsOwnPagesOpenInTheWindow() async throws {
         let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/first", "zigzag://history"])
         defer { done() }
+        EdgeSidebar.shared.hover(tabs[1], in: controller)
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(EdgeSidebar.shared.pagePreview == nil)
+        // The same rest on a web page's row does bring it out.
         EdgeSidebar.shared.hover(tabs[0], in: controller)
         #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === tabs[0] })
-        EdgeSidebar.shared.hover(tabs[1], in: controller)
-        #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
-        try? await Task.sleep(for: .milliseconds(400))
-        #expect(EdgeSidebar.shared.pagePreview == nil)
 
         controller.listSelect(tabs[1])
         #expect(!EdgeSidebar.shared.isShowing)
