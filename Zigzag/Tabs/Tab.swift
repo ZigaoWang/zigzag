@@ -994,8 +994,9 @@ final class Tab: NSObject {
     /// Another page: what was known of the one before (its language, that it's shown translated) goes with it.
     /// Called before the tab takes the new address, wherever it does, so a page you typed in isn't still taken
     /// as translated (#197).
-    private func leavePage(for url: URL) {
-        guard url != self.url, foreignLanguage != nil || isTranslated else { return }
+    /// `sameDocument`: the page moved to another of its own routes (pushState); it stays as it's shown.
+    private func leavePage(for url: URL, sameDocument: Bool = false) {
+        guard url != self.url, !(sameDocument && isTranslated), foreignLanguage != nil || isTranslated else { return }
         foreignLanguage = nil
         isTranslated = false
         changed.send(.language)
@@ -1329,7 +1330,8 @@ final class Tab: NSObject {
         guard let url = wv.url else { return }
         let siteChanged = FaviconStore.siteKey(for: url) != self.url.flatMap { FaviconStore.siteKey(for: $0) }
         if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
-        leavePage(for: url)
+        // Not loading: a route of the same page, which a translated page keeps translating.
+        leavePage(for: url, sameDocument: !wv.isLoading)
         let changedPage = url != self.url
         self.url = url
         self.navigatedSinceSave = true

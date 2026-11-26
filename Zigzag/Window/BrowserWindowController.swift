@@ -2066,14 +2066,60 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var lastProgress = Date()
         /// How much of it is done, 0 to 1.
         var fraction: Double = 0
+        /// Text a translated page added or changed: no toasts, and the page stays translated if it fails.
+        let quiet: Bool
 
-        init(tab: Tab, webView: WKWebView, name: String, site: String?, source: Locale.Language?) {
+        /// Still the page it was asked for: the same address, or another route of it (pushState).
+        var onItsPage: Bool {
+            guard let webView, tab?.webView === webView else { return false }
+            return webView.url == page || !webView.isLoading
+        }
+
+        init(tab: Tab, webView: WKWebView, name: String, site: String?, source: Locale.Language?, quiet: Bool) {
             self.tab = tab
             self.webView = webView
             self.page = webView.url
             self.name = name
             self.site = site
             self.source = source
+            self.quiet = quiet
+        }
+    }
+
+    /// Translated tabs whose page's new text is being read.
+    private var followingTranslation: Set<ObjectIdentifier> = []
+
+    /// While the page shows translated, text it adds or changes (a feed loading more, another route) is translated
+    /// too, a round at a time, from `source`.
+    private func followTranslation(_ tab: Tab, webView: WKWebView, from source: Locale.Language?) {
+        PageTranslator.follow(webView) { [weak self, weak tab] in
+            if let self, let tab { self.translateMore(tab, from: source) }
+        }
+        translateMore(tab, from: source)
+    }
+
+    private func translateMore(_ tab: Tab, from source: Locale.Language?) {
+        let key = ObjectIdentifier(tab)
+        guard tab.isTranslated, !tab.isClosed, let webView = tab.webView, translations.run(for: key) == nil,
+              !planningTranslation.contains(key), followingTranslation.insert(key).inserted else { return }
+        Task { @MainActor [weak self, weak tab] in
+            let text = await PageTranslator.more(in: webView)
+            let target = PageTranslator.readerLanguage
+            let planned = text.pieces.isEmpty ? [] : await Task.detached(priority: .utility) {
+                PageTranslator.plan(text, page: source, into: target)
+            }.value
+            // Only languages already on this Mac: a round never brings up macOS's download sheet.
+            var groups: [PageTranslator.Group] = []
+            for group in planned where await PageTranslator.status(from: group.source, to: target) == .installed { groups.append(group) }
+            self?.followingTranslation.remove(key)
+            guard let self, let tab, tab.isTranslated, tab.webView === webView else { return }
+            if groups.isEmpty {
+                // All of it already in your language, or in one that can't be translated here: on to the rest.
+                if (text.more ?? 0) > 0, !text.pieces.isEmpty { self.translateMore(tab, from: source) }
+                return
+            }
+            self.startTranslating(tab, webView: webView, pieces: text.pieces, shown: Set(text.shown ?? []), groups: groups,
+                                  into: target, site: ContentBlocker.site(of: tab.url), quiet: true, from: source)
         }
     }
 
@@ -2177,7 +2223,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let key = ObjectIdentifier(tab)
         sidebar.address.setTranslation(available: PageTranslator.offersButton(foreign: foreign, translated: tab.isTranslated, never: never),
                                        translated: tab.isTranslated,
-                                       translating: translations.run(for: key) != nil || planningTranslation.contains(key))
+                                       translating: translations.run(for: key).map { !$0.quiet } ?? planningTranslation.contains(key))
     }
 
     /// The translate button's menu: Translate or Show Original, then the Always and Never choices.
@@ -2250,6 +2296,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func translatePage(tab chosen: Tab? = nil, asked: Bool = true) {
         guard let tab = chosen ?? tabManager.selectedTab, let webView = tab.webView else { return }
         let key = ObjectIdentifier(tab)
+        // A round for the page's new text gives way to Show Original.
+        if let running = translations.run(for: key), running.quiet { endTranslation(running, for: key) }
         // Already on its way: asked again, it just says so.
         if let running = translations.run(for: key) {
             if translationInView(tab) { showTranslating(running) }
@@ -2258,6 +2306,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard !planningTranslation.contains(key) else { return }
         let site = ContentBlocker.site(of: tab.url)
         if tab.isTranslated {
+            PageTranslator.follow(webView, nil)
             PageTranslator.restore(in: webView)
             tab.isTranslated = false
             if let site { translatedSites[site] = nil }
@@ -2282,7 +2331,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let target = PageTranslator.readerLanguage
             let kept = site.flatMap { self?.translatedSites[$0] }
             let seen = await PageTranslator.pageLanguage(of: webView) ?? (webView.isLoading ? tab.foreignLanguage : nil)
-            let text = await PageTranslator.text(in: webView)
+            // Watched from here, so nothing the page adds while it's translated is missed.
+            let text = await PageTranslator.text(in: webView, watching: true)
             let planned = await Task.detached(priority: .userInitiated) {
                 let page = PageTranslator.keeping(kept, over: PageTranslator.sourceLanguage(seen: seen, text: text, into: target))
                 return PageTranslator.plan(text, page: page, into: target)
@@ -2291,6 +2341,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             for group in planned { status.append(await PageTranslator.status(from: group.source, to: target)) }
             let (groups, unsupported, offer) = PageTranslator.runnable(planned, status: status, asked: asked)
             guard let self, tab.webView === webView, !tab.isClosed else { return }
+            // Not translating after all: the page isn't watched.
+            if offer || groups.isEmpty { PageTranslator.restore(in: webView) }
             // Language not installed: offer it so the user starts the download.
             if offer {
                 if self.translationInView(tab), let language = planned.first?.source { self.showTranslationOffer(tab, language: language) }
@@ -2331,32 +2383,41 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if translationToastTab == nil, let inView = tabManager.selectedTab, let run = translations.run(for: ObjectIdentifier(inView)) { showTranslating(run) }
     }
 
+    /// `quiet`: a round for text a translated page added or changed, from `source`, the page's language.
     private func startTranslating(_ tab: Tab, webView: WKWebView, pieces: [String], shown: Set<Int>, groups: [PageTranslator.Group],
-                                  into target: Locale.Language, site: String?) {
+                                  into target: Locale.Language, site: String?, quiet: Bool = false, from source: Locale.Language? = nil) {
         var names: [String] = []
         for group in groups where !names.contains(PageTranslator.name(of: group.source)) { names.append(PageTranslator.name(of: group.source)) }
-        let run = PageTranslation(tab: tab, webView: webView, name: Words.list(names), site: site, source: groups.first?.source)
+        let run = PageTranslation(tab: tab, webView: webView, name: Words.list(names), site: site, source: quiet ? source : groups.first?.source, quiet: quiet)
         let key = ObjectIdentifier(tab)
         guard translations.begin(run, for: key) else { return }
         updateTranslateButton()
         (translationMini(tab)?.overlay ?? root.overlay).addSubview(run.host.view)
-        // Another page in the tab, or this one loaded again: it isn't translated, and there's nothing to say.
-        run.token = tab.changed.observe { [weak self, weak run, weak tab] change in
-            guard let self, let run, change == .document || (change == .url && tab?.webView?.url != run.page) else { return }
+        // Another page in the tab, or this one loaded again: it isn't translated, and there's nothing to say. Another
+        // route of the same page (pushState) is still this page.
+        run.token = tab.changed.observe { [weak self, weak run] change in
+            guard let self, let run, change == .document || change == .webView || (change == .url && !run.onItsPage) else { return }
             self.endTranslation(run, for: key)
         }
-        if translationInView(tab) { showTranslating(run) }
+        if !quiet, translationInView(tab) { showTranslating(run) }
         watchTranslation(run, for: key)
         run.host.translate(webView, pieces: pieces, shown: shown, groups: groups, into: target,
-                           memory: tab.isPrivate ? TranslationMemory() : .shared, progress: { [weak self, weak run] fraction in
+                           memory: tab.isPrivate ? TranslationMemory() : .shared, samePage: { [weak run] in run?.onItsPage ?? false },
+                           progress: { [weak self, weak run] fraction in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             run.lastProgress = Date()
             run.fraction = fraction
+            guard !run.quiet else { return }
             if let tab = run.tab, self.translationToastTab === tab || self.translationMini(tab) != nil, self.translationInView(tab) { self.showTranslating(run, announces: false) }
         }, completion: { [weak self, weak run, weak tab] result in
             guard let self, let run, self.translations.isCurrent(run, for: key) else { return }
             self.endTranslation(run, for: key)
-            guard let tab, !tab.isClosed, tab.webView?.url == run.page else { return }
+            guard let tab, !tab.isClosed, run.onItsPage else { return }
+            if run.quiet {
+                // On to what's still waiting; a round that failed leaves the rest for the page's next change.
+                if case .success = result { self.translateMore(tab, from: run.source) }
+                return
+            }
             if case .failure(let error) = result, error is TranslationHost.Cancelled { return }
             let inView = self.translationInView(tab)
             switch result {
@@ -2364,6 +2425,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 tab.isTranslated = true
                 if let site = run.site, let source = run.source { self.translatedSites[site] = source }
                 self.updateTranslateButton()
+                self.followTranslation(tab, webView: webView, from: run.source)
                 guard inView else { return }
                 self.translationToast(tab, String(localized: "Translated from \(run.name)", comment: "Toast after a page is translated. The language is its name, like French."), symbol: "translate",
                                       action: (title: String(localized: "Show Original", comment: "Button in the toast after a page is translated: shows it untranslated again."), run: { [weak self, weak tab] in
@@ -2408,12 +2470,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 return
             }
             if (run.host.view.window ?? self.window)?.attachedSheet != nil {
-                if self.translationInView(tab) { self.showTranslating(run) }
+                if !run.quiet, self.translationInView(tab) { self.showTranslating(run) }
                 self.watchTranslation(run, for: key)
                 return
             }
             self.endTranslation(run, for: key)
-            if let webView = run.webView, webView.url == run.page { PageTranslator.restore(in: webView) }
+            // A round for new text gives up quietly: what's translated stays.
+            guard !run.quiet else { return }
+            if let webView = run.webView, run.onItsPage { PageTranslator.restore(in: webView) }
             guard self.translationInView(tab) else { return }
             self.showTranslationFailed(tab, from: run.source.map { [$0] } ?? [], into: PageTranslator.readerLanguage)
         }
