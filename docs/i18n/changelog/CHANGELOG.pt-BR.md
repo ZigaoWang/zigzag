@@ -4,10 +4,6 @@ Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do 
 
 ## [Unreleased]
 
-### Corrigido
-- Fechar uma aba que você acabou de abrir com ⌘T leva de volta à aba em que você estava, como no Safari e no Chrome, em vez da aba logo abaixo.
-- A prévia da página da barra lateral a partir da borda da tela não fecha mais e volta quando você passa de uma aba para a próxima, se recolhe quando o ponteiro sai das abas e da página para a parte vazia da barra lateral, e não aparece mais para as extensões como uma janela própria. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanhol e russo; regras de download que entregam o arquivo salvo; pastas dinâmicas que mostram quando foram atualizadas pela última vez; e digitar em pinyin chinês e mudar para o inglês sem espaços sobrando.
@@ -54,4 +50,6 @@ Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanh
 - Remover um perfil enquanto suas extensões ainda estão iniciando não fecha mais o Zigzag.
 - Senhas do iCloud é configurado nas páginas de login mesmo com abas suspensas: pedir os frames de uma aba suspensa não falha mais, como no Chrome.
 - The Marvellous Suspender e outras extensões que definem alarmes voltam a funcionar: definir um alarme agora devolve uma promessa a elas, como no Chrome.
+- Fechar uma aba que você acabou de abrir com ⌘T leva de volta à aba em que você estava, como no Safari e no Chrome, em vez da aba logo abaixo.
+- A prévia da página da barra lateral a partir da borda da tela não fecha mais e volta quando você passa de uma aba para a próxima, se recolhe quando o ponteiro sai das abas e da página para a parte vazia da barra lateral, e não aparece mais para as extensões como uma janela própria. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 

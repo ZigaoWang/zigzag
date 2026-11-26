@@ -4,10 +4,6 @@ Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.m
 
 ## [Unreleased]
 
-### Opgelost
-- Als je een tabblad sluit dat je net met ⌘T hebt geopend, ga je terug naar het tabblad waar je op zat, zoals in Safari en Chrome, in plaats van naar het tabblad eronder.
-- Het paginavoorbeeld van de navigatiekolom vanaf de schermrand sluit en komt niet meer terug als je van het ene tabblad naar het volgende gaat, klapt weer in als de aanwijzer de tabbladen en de pagina verlaat voor het lege deel van de navigatiekolom, en is voor extensies niet meer te zien als een eigen venster. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans en Russisch; downloadregels die het bewaarde bestand doorgeven; livemappen die laten zien wanneer ze voor het laatst zijn bijgewerkt; en na Chinees Pinyin overschakelen naar Engels zonder losse spaties.
@@ -54,4 +50,6 @@ Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans e
 - Als je een profiel verwijdert terwijl de extensies nog opstarten, sluit Zigzag niet meer af.
 - iCloud-wachtwoorden wordt ook ingesteld op inlogpagina’s als er tabbladen in de slaapstand staan: de frames van een tabblad in de slaapstand opvragen mislukt niet meer, zoals in Chrome.
 - The Marvellous Suspender en andere extensies die alarmen instellen werken weer: een alarm instellen geeft nu een promise terug, zoals in Chrome.
+- Als je een tabblad sluit dat je net met ⌘T hebt geopend, ga je terug naar het tabblad waar je op zat, zoals in Safari en Chrome, in plaats van naar het tabblad eronder.
+- Het paginavoorbeeld van de navigatiekolom vanaf de schermrand sluit en komt niet meer terug als je van het ene tabblad naar het volgende gaat, klapt weer in als de aanwijzer de tabbladen en de pagina verlaat voor het lege deel van de navigatiekolom, en is voor extensies niet meer te zien als een eigen venster. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 

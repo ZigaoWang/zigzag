@@ -4,10 +4,6 @@ Estas son las notas de versión de Zigzag en español, traducidas de CHANGELOG.m
 
 ## [Unreleased]
 
-### Correcciones
-- Al cerrar una pestaña que acabas de abrir con ⌘T, vuelves a la pestaña en la que estabas, como en Safari y Chrome, en lugar de ir a la pestaña de debajo.
-- La vista previa de la página de la barra lateral desde el borde de la pantalla ya no se cierra y vuelve a abrirse al pasar de una pestaña a la siguiente, se recoge cuando el puntero sale de las pestañas y de la página hacia la parte vacía de la barra lateral, y las extensiones ya no la ven como una ventana propia. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
-
 ## [0.10.0] - 2026-11-25
 
 Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés, el español y el ruso; reglas de descarga que envían el archivo guardado; carpetas dinámicas que dicen cuándo se actualizaron por última vez, y escribir en pinyin chino y pasar al inglés sin espacios de más.
@@ -54,4 +50,6 @@ Zigzag en trece idiomas más, del japonés y el coreano al alemán, el francés,
 - Eliminar un perfil mientras sus extensiones aún se están iniciando ya no cierra Zigzag.
 - Contraseñas de iCloud se configura en las páginas de inicio de sesión aunque haya pestañas suspendidas: pedir los marcos de una pestaña suspendida ya no falla, como en Chrome.
 - The Marvellous Suspender y otras extensiones que crean alarmas vuelven a funcionar: crear una alarma ahora les devuelve una promesa, como en Chrome.
+- Al cerrar una pestaña que acabas de abrir con ⌘T, vuelves a la pestaña en la que estabas, como en Safari y Chrome, en lugar de ir a la pestaña de debajo.
+- La vista previa de la página de la barra lateral desde el borde de la pantalla ya no se cierra y vuelve a abrirse al pasar de una pestaña a la siguiente, se recoge cuando el puntero sale de las pestañas y de la página hacia la parte vacía de la barra lateral, y las extensiones ya no la ven como una ventana propia. Gracias a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
