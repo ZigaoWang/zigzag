@@ -318,6 +318,20 @@ final class UpdateBar: NSView {
         apply(from: share, animated: false)
     }
 
+    // Hidden, the bar holds still.
+    override func viewDidHide() {
+        super.viewDidHide()
+        fill.removeAnimation(forKey: "slide")
+    }
+
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        apply(from: share, animated: false)
+    }
+
+    /// Whether the indeterminate segment is sliding now.
+    var isSliding: Bool { fill.animation(forKey: "slide") != nil }
+
     private func apply(from old: Double?, animated: Bool = true) {
         let w = bounds.width, h = bounds.height
         guard w > 0 else { return }
@@ -325,7 +339,8 @@ final class UpdateBar: NSView {
             // Indeterminate: a quarter-width segment looping across.
             let piece = round(w * 0.28)
             Tokens.Motion.withoutAnimation { fill.frame = CGRect(x: 0, y: 0, width: piece, height: h) }
-            guard fill.animation(forKey: "slide") == nil, window != nil else { return }
+            guard window != nil, !isHiddenOrHasHiddenAncestor else { fill.removeAnimation(forKey: "slide"); return }
+            guard fill.animation(forKey: "slide") == nil else { return }
             fill.removeAnimation(forKey: "grow")
             let slide = CABasicAnimation(keyPath: "position.x")
             slide.fromValue = -piece
