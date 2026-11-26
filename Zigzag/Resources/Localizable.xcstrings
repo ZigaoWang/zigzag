@@ -1318,13 +1318,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 上一次移除了许多内容，因此同步已暂停"
+            "value" : "这台 Mac 上一次性移除了许多内容，因此同步已暂停"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台 Mac 上一次移除了許多內容，因此同步已暫停"
+            "value" : "這台 Mac 上一次性移除了許多內容，因此同步已暫停"
           }
         }
       }
@@ -2379,7 +2379,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remover em todos"
+            "value" : "Remover de todos os Macs"
           }
         },
         "ru" : {
