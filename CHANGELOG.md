@@ -14,6 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - iCloud Passwords sets up on login pages even with tabs asleep: asking for an asleep tab's frames no longer fails, as in Chrome.
 - The Marvellous Suspender and other extensions that set alarms work again: setting an alarm now gives them back a promise, as in Chrome.
+- Your Zigzag Card in About is redrawn as a real card: your name larger, Since with the month and year, the Z pressed into its corner, and finishes of frosted glass, pearl foil, anodized graphite and linen paper, each named beside its swatch. Save as Image and Share make a 2400 × 1500 picture with the card on a matching background.
 
 ## [0.10.0] - 2026-11-25
 
