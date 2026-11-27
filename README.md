@@ -12,7 +12,7 @@
 
 <p align="center">
   Your tabs in a sidebar, grouped into spaces. A native Mac app in Swift on WebKit,<br>
-  about 35 MB installed, with no account and no telemetry.
+  about 55 MB installed, with no account and no telemetry.
 </p>
 
 ## Why I built it
@@ -72,10 +72,10 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Profiles** | Keep work and personal apart. Each profile has its own extensions, sign-ins, history and favorites, and every space is on one. |
 | **Sites in spaces** | Choose a space for a site in Site Controls or Settings › Spaces, and its links open there wherever they come from: another app, ⌘T or another space, as with Arc's Air Traffic Control. Paths can go to their own spaces too, like `github.com/org1` to one and `github.com/org2` to another. A space on its own profile works like a Firefox container. |
 | **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. Type `you`, press Tab, and you're searching YouTube. Drag the bar anywhere in the window and it opens there from then on. |
-| **Tab groups** | Pick some tabs and choose Group Tabs, and they become a folder in the sidebar that opens and closes, renames, and moves as one. Drag a tab to the right to nest it under the tab above, and to the left to take it back out. |
+| **Tab groups** | Pick some tabs and choose Group Tabs from their menu, and they become a folder in the sidebar that opens and closes, renames, and moves as one. Drag a tab to the right to nest it under the tab above, and to the left to take it back out. |
 | **Live folders** | A pinned folder that fills itself from a feed or a site, or from GitHub: pull requests, review requests, or the open issues and pull requests in your repositories. New pages come with a dot. |
 | **Split view** | Up to four tabs: drag a tab onto the page's edges for a half, or its corners for a quarter. Drag a page by its strip to move it, and pin a split to keep it. |
-| **Windows** | Drag a tab to another window and it moves as it is, without loading again. Turn on Settings › Tabs › Windows share a space's tabs and every window on a space lists the same tabs, as in Arc. The sidebar sits on the left or the right. |
+| **Windows** | Drag a tab to another window and it moves as it is, without loading again. Turn on Settings › Tabs › Windows share a space's tabs and every window on a space lists the same tabs, as in Arc. The sidebar sits on the left or the right. Turn on Settings › Appearance › Sidebar from the screen edge, and pushing the pointer against that edge brings the sidebar out over other apps; rest on a tab to see its page beside it. |
 | **Web apps** | Install as App makes a site an app of its own, in your Applications folder, the Dock and ⌘Tab, with a toolbar in the site's color. |
 | **Mini player** | Leave a tab while its video plays and the video follows you in a small player. Resize it from any edge and put it anywhere, even outside the window over other apps. Turn it off from its menu if you'd rather not have it. Switch to another app and the video floats over it in Picture in Picture. |
 | **Streaming** | Protected music and video play as in Safari, through WebKit's FairPlay Streaming: Spotify's web player works, and so do other services that support Safari. |
@@ -88,12 +88,12 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, compiled into WebKit content rule lists, plus uBlock Origin's filter lists, which update on their own. |
 | **WebRTC** | Turn on Protect IP address from WebRTC, and sites can't learn your real IP address through WebRTC while you use a proxy or VPN. Calls work on the sites you allow, and a site that tries WebRTC while it's blocked says so, with Allow for This Site. |
 | **Cookie pop-ups** | Turned down for you, never accepted, with DuckDuckGo's Autoconsent rules. Leave them alone everywhere or for one site if you'd rather answer yourself. |
-| **Site Controls** | One panel per site: zoom, permissions (camera, microphone, location, notifications, pop-ups, opening apps, screen sharing, WebRTC), each set to Ask, Allow or Block, JavaScript on or off, the certificate, extensions, and switches for dark pages, ad blocking and cookie pop-ups. When a site asks for one of these, it asks on one card over the page, for this time or always, and a site you said no to stops asking. |
+| **Site Controls** | One panel per site: zoom, permissions (camera, microphone, location, notifications, pop-ups, opening apps, screen sharing, WebRTC), each set to Ask, Allow or Block, JavaScript on or off, the certificate, extensions, and switches for dark pages, ad blocking and cookie pop-ups. Compatibility mode turns off extensions, ad blocking, cookie pop-up handling and zapped elements on a site that breaks, in one switch. When a site asks for one of these, it asks on one card over the page, for this time or always, and a site you said no to stops asking. |
 | **Boosts** | Zap Element hides the parts of a site you don't want, like a banner or a sidebar, and Edit Style gives a site CSS of your own. Both are in Site Controls' ⋯ menu and stay with the site. |
 | **Developer Mode** | For the sites you build, `localhost` to begin with: the console with an error count, Inspect Element, device sizes, light and dark, print styles, JavaScript, images or styles off, another user agent, and a QR code to open the page on your phone. |
-| **Extensions** | From the Chrome Web Store, where the store's own button reads Add to Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
+| **Extensions** | From the Chrome Web Store or Firefox Add-ons, where the store's own button reads Add to Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
 | **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen and Orion. |
-| **Downloads** | Send files of a type to a folder of their own, or open safe ones like PDFs once they're saved. Rules hand a link or a download to an app, a script or a download manager like aria2, asking you first. See [docs/download-rules.md](docs/download-rules.md). |
+| **Downloads** | Send files of a type to a folder of their own, or open safe ones like PDFs once they're saved. Rules hand a link or a download to an app, a script or a download manager like aria2, asking you first, and can download the file first and hand over the saved file. See [docs/download-rules.md](docs/download-rules.md). |
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
 | **Your data** | Turn on Sync with iCloud in Settings › General, and your spaces, profiles, pinned tabs, favorites and settings are the same on every Mac signed in to your iCloud. File › Export Your Data… saves your bookmarks as a standard HTML file any browser imports, and a full Zigzag backup you can restore on another Mac. |
@@ -107,20 +107,20 @@ It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc u
 - No iPhone or iPad app. Spaces, pinned tabs, favorites and settings sync between Macs through iCloud, but open tabs and history stay on each Mac.
 - Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
 - No Easels or Notes, and Boosts are CSS only (Zap Element and Edit Style, no per-site scripts). No AI built into the browser: AI apps can use Zigzag over MCP only if you turn it on.
-- A few Chrome extension APIs aren't there yet: the tab groups API, debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work.
+- A few Chrome extension APIs aren't there yet: the tab groups API, the debugger API, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work. Add-ons from Firefox Add-ons don't update on their own; add a newer version from the store to replace one.
 - EasyList and the other built-in blocking lists update with Zigzag, not on their own; only uBlock Origin's lists do.
 - macOS 15.4 or later only.
 
 ## How it's built
 
-Zigzag is about 120,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
+Zigzag is about 170,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
 engine is the WebKit that ships with macOS, which is why the app is small and why engine security fixes arrive
 with macOS updates rather than from me.
 
 | Part | How |
 |---|---|
 | **Pages** | One `WKWebView` per tab. Tabs you haven't used in a while can be suspended: the web view is released and the tab keeps its snapshot and state, then reloads when you come back. Private windows use a non-persistent data store. |
-| **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store, checks its signatures, and loads it. Chrome APIs WebKit doesn't have (history, bookmarks, downloads, notifications, side panels, offscreen pages, web sign-in, tab audio, new tab pages, user scripts, proxies and more) are answered by Zigzag itself through a small bridge, checked against each extension's own permissions. A search engine an extension gives (`search_provider`) joins the choices in Settings, used only once you pick it. Native messaging connects the helper apps of 1Password and other extensions. |
+| **Extensions** | WebKit's web extension support (`WKWebExtensionController`, the reason for the macOS 15.4 minimum). Zigzag downloads the CRX3 package from the Chrome Web Store and checks its signatures, or an add-on's package from addons.mozilla.org and checks it against the sha256 the store publishes, and loads it. Chrome APIs WebKit doesn't have (history, bookmarks, downloads, notifications, side panels, offscreen pages, web sign-in, tab audio, new tab pages, user scripts, proxies and more) are answered by Zigzag itself through a small bridge, checked against each extension's own permissions. A search engine an extension gives (`search_provider`) joins the choices in Settings, used only once you pick it. Native messaging connects the helper apps of 1Password and other extensions. |
 | **Sandboxing** | Pictures and PDFs from websites are read in two sandboxed XPC helpers, `ZigzagImageDecoder` and `ZigzagPDFRenderer`, with no network and no file access, so a malformed image or PDF can't reach your passwords or profiles. The PDF viewer draws the pages the helper renders; the app never opens a site's PDF itself. |
 | **Secure connections** | Certificate warnings say what's wrong under Details. A site that asked for secure connections only, by its HSTS header or on Chromium's preload list (bundled, about 95,000 names, read in place only when a warning needs it), gets no Visit anyway, as in Safari and Chrome. A site that asks for a certificate to identify you is offered the ones in your Keychain that it would take, as in Safari: add one by opening its .p12 in Keychain Access. |
 | **Ad blocking** | EasyList, EasyPrivacy and EasyList China converted ahead of time with SafariConverterLib into content rule lists (`WKContentRuleListStore`), compiled once and cached. uBlock Origin's lists, downloaded as they expire, are matched by Ghostery's adblocker engine in its own JavaScript context, and each page gets the scriptlets and hiding rules its site needs as it starts to load. |
@@ -134,8 +134,8 @@ with macOS updates rather than from me.
 | **Updates** | Sparkle 2, with EdDSA-signed updates from zigzagbrowser.com, on a stable or a beta feed. Releases are signed with Developer ID and notarized. |
 
 The source is organized by feature: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Passwords`, `Import`, `Profiles`,
-`CommandBar`, `Desk` (every tab at once), `WebApps`, `Developer`, `MCP` (AI apps), `Settings`, `Window` and
-`Design` (Zigzag's own drawn controls and design tokens). Over 2,000 tests cover importing, passwords, extensions,
+`CommandBar`, `Desk` (every tab at once), `WebApps`, `Developer`, `MCP` (AI apps), `Sync` (iCloud), `Settings`, `Window` and
+`Design` (Zigzag's own drawn controls and design tokens). Over 4,000 tests cover importing, passwords, extensions,
 address handling, history, AI apps and the security fixes.
 
 ## Privacy
@@ -146,22 +146,25 @@ connections Zigzag makes on its own, apart from the pages you open:
 - **Updates.** Every few hours, and after your Mac wakes, Zigzag reads the update feed at zigzagbrowser.com. The
   request says Zigzag's version and nothing else; no system profile is sent. A new version downloads from there too.
 - **Search suggestions.** As you type in the address bar, the text goes to your search engine for suggestions,
-  without cookies. Google, DuckDuckGo, Brave, Bing, Kagi and Ecosia offer them; with any other engine, nothing is
-  sent. Turn them off in Settings › Search.
+  without cookies. Google, DuckDuckGo, Brave, Bing, Kagi and Ecosia offer them, and so does an extension's engine
+  that names a suggestions address; with any other engine, nothing is sent. Turn them off in Settings › Search.
 - **Site icons.** Icons come from each site itself, also for pinned tabs, favorites and imported bookmarks you
   haven't opened yet.
 - **Filter lists.** At launch and then as they expire, every few hours to once a day, Zigzag downloads uBlock
   Origin's filter lists from uBlock Origin's own addresses (GitHub Pages, Cloudflare Pages or jsDelivr) and its
   scriptlets from Ghostery's CDN. It also downloads Zigzag's own short list of site fixes from zigzagbrowser.com.
   The requests carry no cookies, and nothing about you or your browsing.
-- **Extensions.** Installing one downloads it from the Chrome Web Store. At launch, at most once a day, Zigzag
-  asks the store whether your extensions have updates, which sends their IDs and versions to Google.
+- **Extensions.** Installing one downloads it from the Chrome Web Store, or from addons.mozilla.org for a Firefox
+  add-on. At launch, at most once a day, Zigzag asks the Chrome Web Store whether your extensions from it have
+  updates, which sends their IDs and versions to Google.
+- **Live folders.** A live folder checks its feed, site or GitHub list every 30 minutes (hourly in Low Power Mode),
+  without cookies.
 - **Setup.** The welcome screens show a few site icons from Google's icon service and load Wikipedia's front page
   as a preview.
 - **iCloud sync.** Off until you turn on Sync with iCloud in Settings › General. Then your spaces, profiles' names,
-  pinned tabs, folders, favorites, live folders' sources and settings go to the private database of your own iCloud
-  account, which only you can read; nothing goes to me. Open tabs, history, cookies, website data, extensions and
-  downloads stay on your Mac.
+  pinned tabs, folders, favorites, live folders' sources, the sites you chose for spaces and settings go to the
+  private database of your own iCloud account, which only you can read; nothing goes to me. Open tabs, history,
+  cookies, website data, extensions and downloads stay on your Mac.
 
 Translation runs on your Mac, with Apple's on-device Translation. Fraudulent website warnings are WebKit's own,
 the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
@@ -188,7 +191,7 @@ Updates install by themselves. What changed in each version is in the
 
 ## Build from source
 
-Requirements: macOS 15.4 or later, Xcode 27 or later, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Requirements: macOS 15.4 or later, Xcode 27 or later with the macOS 27 SDK, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 brew install xcodegen
@@ -211,8 +214,10 @@ Signing is set up for my team. To build on your Mac, change two things in `proje
 Run the tests:
 
 ```sh
-xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
+TEST_RUNNER_ZIGZAG_TEST_VAULT=memory xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 ```
+
+`ZIGZAG_TEST_VAULT=memory` keeps the tests out of your keychain; [CONTRIBUTING.md](CONTRIBUTING.md#tests) has more.
 
 ## Contributing
 
