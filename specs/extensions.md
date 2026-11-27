@@ -47,6 +47,10 @@
   Test: SiteAccessContentScriptTests.contentScriptsFollowSiteAccess
 - Extensions off for a site in Site Controls → their scripts stay out there at once, no restart, and the extension keeps running elsewhere.
   Test: SiteAccessContentScriptTests.anOffSiteNeedsNoRestart
+- A web page, with or without extensions → no `browser` and no `chrome.runtime`, as in Chrome; content scripts and extension pages keep theirs.
+  Test: PageBrowserGlobalTests.anOrdinaryPageHasNoBrowserWithNoExtensions
+- A site an extension lists in `externally_connectable` → `chrome.runtime` with only `sendMessage`, `connect` and `lastError`, and WebKit's own `browser.runtime`; other sites get neither.
+  Test: PageBrowserGlobalTests.onlyAListedSiteGetsChromesMessagingAndContentScriptsKeepTheirs
 - An extension asking for a site its site access doesn't cover (`permissions.request`) right after you used it → the more-access sheet asks; Allow grants it, Don't Allow or no recent use answers false.
   Test: ExtensionPermissionRequestTests.sitesOutsideAccessAreAskedAbout
 - A site you allowed it → kept under any site access, until the extension removes it or you choose another site access; a site where extensions are off stays off.

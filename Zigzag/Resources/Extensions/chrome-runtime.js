@@ -2,7 +2,9 @@
 // chrome.runtime.sendMessage(id, …), as sites written for Chrome do (claude.ai, to finish Claude's sign-in). WebKit
 // offers that as browser.runtime, so on those sites alone it's offered under Chrome's name too, with Chrome's
 // callbacks. Every other page is left as it was: no `chrome` that would make it think it's in Chrome.
+// WebKit also gives every web page `browser.runtime`; only the sites above keep it (#551).
 (() => {
+  if (location.protocol === 'webkit-extension:' || String(self.origin).startsWith('webkit-extension:')) return;
   const patterns = __PATTERNS__;   // extension ID -> the sites it lets message it
   // Chrome's match patterns ("https://*.claude.ai/*"): scheme, host (a leading "*." for any subdomain), path.
   const matches = (pattern) => {
@@ -19,7 +21,16 @@
   };
   // The extensions that let this page message them: a message for any other gets Chrome's answer at once.
   const reachable = Object.keys(patterns).filter((id) => patterns[id].some(matches));
-  if (!reachable.length) return;
+  if (!reachable.length) {
+    // WebKit sets it again as the page's other worlds start, so the slot stays and drops WebKit's object.
+    const isWebKits = (value) => !!value && typeof value === 'object' && Object.keys(value).join() === 'runtime' &&
+      !!value.runtime && typeof value.runtime.sendMessage === 'function';
+    let own;
+    try {
+      Object.defineProperty(window, 'browser', { get: () => own, set: (value) => { if (!isWebKits(value)) own = value; }, configurable: true, enumerable: false });
+    } catch (e) {}
+    return;
+  }
   const runtime = window.browser && window.browser.runtime;
   if (!runtime || typeof runtime.sendMessage !== 'function') return;
   // Inside one of these extensions' own pages (Claude's side panel shows claude.ai in a frame), the site checks it's

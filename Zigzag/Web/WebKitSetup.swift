@@ -141,16 +141,10 @@ enum WebKitSetup {
                 injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
             configuration.userContentController.addScriptMessageHandler(FramedExtensionPopups.shared, contentWorld: .page, name: FramedExtensionPopups.messageName)
         }
-        // Sites an extension lets message it get Chrome's name for that messaging.
+        // Sites an extension lets message it get Chrome's name for that messaging; other pages get no `browser`.
         if #available(macOS 15.4, *) {
-            let patterns = profile.installs.externallyConnectablePatterns()
-            // Once: a new tab's setup is made and then configured again, which put it in twice.
-            if !patterns.isEmpty {
-                let script = PageScripts.chromeRuntime(matching: patterns)
-                if !configuration.userContentController.userScripts.contains(where: { $0.source == script.source }) {
-                    configuration.userContentController.addUserScript(script)
-                }
-            }
+            let script = PageScripts.chromeRuntime(matching: profile.installs.externallyConnectablePatterns())
+            PageScripts.replaceChromeRuntime(with: script, in: configuration.userContentController)
         }
         // With an extension that can capture tabs (Shazam), pages note where their Web Audio plays, so it can hear them.
         if #available(macOS 15.4, *), profile.installs.someEnabledExtensionDeclares("tabCapture"),
@@ -282,6 +276,14 @@ enum PageScripts {
         let json = (try? JSONSerialization.data(withJSONObject: patterns)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         return WKUserScript(source: chromeRuntimeSource.replacingOccurrences(of: "__PATTERNS__", with: json),
                             injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
+    }
+
+    /// Once per controller: a popup shares its opener's, whose copy may name the sites from before an install.
+    static func replaceChromeRuntime(with script: WKUserScript, in controller: WKUserContentController) {
+        if controller.userScripts.contains(where: { $0.source == script.source }) { return }
+        let head = chromeRuntimeSource.components(separatedBy: "__PATTERNS__")[0]
+        if !head.isEmpty { OwnScripts.remove(from: controller) { $0.source.hasPrefix(head) } }
+        controller.addUserScript(script)
     }
 
     private static let chromeRuntimeSource: String = {
