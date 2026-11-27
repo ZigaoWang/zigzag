@@ -498,6 +498,64 @@ struct EdgeSidebarTests {
         #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
     }
 
+    // MARK: Switching spaces
+
+    /// A space switch while a page is out: the page goes back to its tab at once and the sidebar stays out with the
+    /// new space's list. A row of the space left, reported late or still under the pointer, brings nothing out; the
+    /// next rest on one of the new space's rows brings its page out as before.
+    @Test func aSpaceSwitchPutsThePageAwayAndNeverShowsTheOldSpace() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let other = Library.shared.addSpace(name: "Edge switch").id
+        let there = manager.newTab(url: URL(string: "https://example.test/there"), spaceID: other, select: false)
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        #expect(EdgeSidebar.shared.pagePreview?.tab === tabs[1])
+        // A rest begun on the other row of this space, not done yet.
+        EdgeSidebar.shared.hover(tabs[0], in: controller)
+
+        manager.switchToSpace(other)
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(EdgeSidebar.shared.pagePreview == nil)
+        #expect(tabs[1].host === controller)
+        #expect(MiniWindowController.all.allSatisfy { $0.tab !== tabs[1] })
+        // An old row's report, as the list slides away under the pointer.
+        EdgeSidebar.shared.hover(tabs[1], in: controller)
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(EdgeSidebar.shared.pagePreview == nil)
+        #expect(tabs[0].host === controller && tabs[1].host === controller)
+
+        EdgeSidebar.shared.hover(there, in: controller)
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview?.tab === there })
+    }
+
+    /// With no page out, a rest begun on a row just before a space switch brings nothing out after it.
+    @Test func aRestBegunBeforeASpaceSwitchShowsNothing() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let other = Library.shared.addSpace(name: "Edge rest").id
+        _ = manager.newTab(url: URL(string: "https://example.test/there"), spaceID: other, select: false)
+        EdgeSidebar.shared.hover(tabs[1], in: controller)
+        manager.switchToSpace(other)
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(EdgeSidebar.shared.pagePreview == nil)
+        #expect(tabs[1].host === controller)
+    }
+
+    /// A page still folding back when the space changes goes home at once, not after its fold.
+    @Test func aSpaceSwitchDuringTheFoldGivesThePageBackAtOnce() throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let other = Library.shared.addSpace(name: "Edge fold").id
+        _ = manager.newTab(url: URL(string: "https://example.test/there"), spaceID: other, select: false)
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        #expect(EdgeSidebar.shared.dismissPreview())
+        manager.switchToSpace(other)
+        #expect(tabs[1].host === controller)
+        #expect(mini.window?.isVisible != true)
+        #expect(EdgeSidebar.shared.isShowing)
+    }
+
     // MARK: Keys and menus in the panel
 
     /// A shortcut as the keyboard sends it to a window.

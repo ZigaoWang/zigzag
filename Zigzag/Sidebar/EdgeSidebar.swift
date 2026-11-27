@@ -363,8 +363,10 @@ final class EdgeSidebar {
         closeWork?.cancel()
         closeWork = nil
         hoverCheck += 1
-        // Rows report leaving and arriving in either order: the row under the pointer counts.
-        guard let tab = tab ?? pageOnRow(at: pointer) else {
+        // Rows report leaving and arriving in either order: the row under the pointer counts. A row of the space just
+        // left, still sliding out, is no row.
+        let shown = { (tab: Tab?) in tab.flatMap { Self.isInShownSpace($0, of: controller) ? $0 : nil } }
+        guard let tab = shown(tab) ?? shown(pageOnRow(at: pointer)) else {
             schedulePreviewClose()
             return
         }
@@ -434,7 +436,7 @@ final class EdgeSidebar {
     /// running shows its card instead, and stays asleep.
     private func showPreview(_ tab: Tab, in controller: BrowserWindowController) {
         guard isShowing, !menuCoversPage, let panel, let host, !tab.isPrivate, EdgeLensPolicy.previews(url: tab.url),
-              preview?.tab !== tab else { return }
+              Self.isInShownSpace(tab, of: controller), preview?.tab !== tab else { return }
         let live = EdgeLensPolicy.showsLivePage(isLoaded: tab.isLoaded, isAsleep: tab.isAsleep)
         let previous = preview
         // The panel takes its full width first, so the page is laid out once at its final size.
@@ -597,17 +599,23 @@ final class EdgeSidebar {
         panel.setFrame(cardPanelFrame, display: true)
     }
 
+    /// A tab of the space the panel's list shows; a favorite belongs to every space.
+    private static func isInShownSpace(_ tab: Tab, of controller: BrowserWindowController) -> Bool {
+        tab.isFavorite || tab.spaceID == controller.tabManager.currentSpaceID
+    }
+
     private func managerChanged(_ change: TabManager.Change) {
-        guard preview != nil else { return }
-        switch change {
-        case .space:
-            // The row it came from is no longer on screen.
+        if change == .space {
+            // The row it came from is no longer on screen: its page goes back to its tab at once, and a rest begun on
+            // a row of the space left never brings that row's page out. The sidebar stays.
+            hoverCheck += 1
             closePreview(animated: false)
-        case .structure:
-            if previewTab?.isClosed == true { closePreview(animated: false) }
-        case .selection, .content:
-            break
+            // A page still folding back goes home now too, rather than showing through the switch.
+            for mini in MiniWindowController.all where mini.isLeavingDock && mini.isDocked(in: self) { mini.endBorrowingNow() }
+            if preview == nil { narrowPanel() }
+            return
         }
+        if change == .structure, preview != nil, previewTab?.isClosed == true { closePreview(animated: false) }
     }
 
     // MARK: The panel

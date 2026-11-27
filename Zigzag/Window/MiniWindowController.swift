@@ -226,6 +226,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var tabToken: SignalToken?
     /// The preview is showing a row's live tab rather than a page of its own.
     var isBorrowingPage: Bool { borrowed != nil }
+    func isDocked(in host: any MiniDockHosting) -> Bool { dockedHost === host }
     /// Extensions see it as a window: every Mini but the edge preview, whose page is a tab of the browser's.
     var isExtensionWindow: Bool { !isBorrowingPage && !isEndingBorrow }
     /// The docked page is sliding away already: a second close would only restart it.
