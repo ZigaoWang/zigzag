@@ -161,6 +161,11 @@ final class BrowserWindow: NSWindow {
            !Self.browserKeeps(event, in: NSApp.mainMenu) {
             return super.performKeyEquivalent(with: event)
         }
+        // The edge preview's page is part of the panel: what its Mini doesn't answer goes where the panel sends it.
+        if let mini = windowController as? MiniWindowController, EdgeSidebar.shared.pagePreview === mini,
+           EdgeSidebar.shared.performKeyEquivalent(event, own: EdgeSidebar.responders(of: self, viewsOnly: false)) {
+            return true
+        }
 
         if let menu = NSApp.mainMenu, menu.performKeyEquivalent(with: event) { return true }
         return super.performKeyEquivalent(with: event)
@@ -183,7 +188,13 @@ final class BrowserWindow: NSWindow {
     /// Whether the menu item these keys belong to is one the browser keeps (`browserActions`). Keys no item has are
     /// the page's.
     static func browserKeeps(_ event: NSEvent, in menu: NSMenu?) -> Bool {
-        guard let menu, let pressed = Shortcuts.combo(from: event) else { return false }
+        guard let item = menuItem(for: event, in: menu), let action = item.action else { return false }
+        return browserActions.contains(NSStringFromSelector(action))
+    }
+
+    /// The menu bar item these keys belong to, if any.
+    static func menuItem(for event: NSEvent, in menu: NSMenu?) -> NSMenuItem? {
+        guard let menu, let pressed = Shortcuts.combo(from: event) else { return nil }
         func combo(of item: NSMenuItem) -> Shortcuts.Combo? {
             guard !item.keyEquivalent.isEmpty else { return nil }
             var key = item.keyEquivalent
@@ -199,8 +210,7 @@ final class BrowserWindow: NSWindow {
             }
             return nil
         }
-        guard let item = walk(menu), let action = item.action else { return false }
-        return browserActions.contains(NSStringFromSelector(action))
+        return walk(menu)
     }
 
     /// A text field or editor becoming first responder takes ⌘A back from the sidebar.

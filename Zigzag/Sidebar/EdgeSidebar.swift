@@ -626,9 +626,6 @@ final class EdgeSidebar {
         host.onRight = onRight
         host.cardWidth = target.edgeSidebarWidth
         host.set(container)
-        // The panel's next responder is the browser's controller, so its menu items and actions reach the same
-        // browser the panel shows: without it a nonactivating panel swallows every key that isn't ⌘T.
-        panel.nextResponder = target
         generation += 1
         cardPanelFrame = EdgeSidebarLayout.frame(in: visible, width: host.cardWidth + host.inset, onRight: onRight)
         shownVisible = visible
@@ -698,6 +695,61 @@ final class EdgeSidebar {
     /// ⌘T with the panel clicked into: a new tab in the window, which comes forward.
     func newTab() { target?.newTabFromEdge() }
 
+    /// Menu bar actions done where they are, the panel's list showing what they did. Every other one is done in the
+    /// window, which comes forward, as for a menu item picked in the panel.
+    static let actsInPanel: Set<Selector> = [
+        #selector(BrowserWindowController.closeTab(_:)), #selector(BrowserWindowController.closeOtherTabs(_:)),
+        #selector(BrowserWindowController.reloadPage(_:)), #selector(BrowserWindowController.reloadPageFromOrigin(_:)),
+        #selector(BrowserWindowController.stopLoading(_:)), #selector(BrowserWindowController.nextSpace(_:)),
+        #selector(BrowserWindowController.previousSpace(_:)), #selector(BrowserWindowController.selectSpaceByNumber(_:)),
+    ]
+
+    /// A menu bar shortcut pressed in the panel or in its page. `own` answers first: the panel's views, or the page's
+    /// window and its Mini. The browser's own keys (`BrowserWindow.browserActions`) then go to the browser, as in its
+    /// window, and to the app after that. False: the keys are left to the panel.
+    func performKeyEquivalent(_ event: NSEvent, own: [NSResponder]) -> Bool {
+        guard isShowing, let target, let item = BrowserWindow.menuItem(for: event, in: NSApp.mainMenu),
+              let action = item.action else { return false }
+        if let answer = own.first(where: { $0.responds(to: action) }) {
+            if Self.validates(answer, item) { NSApp.sendAction(action, to: answer, from: item) }
+            return true
+        }
+        guard BrowserWindow.browserActions.contains(NSStringFromSelector(action)) else { return false }
+        if target.responds(to: action) {
+            if target.validateMenuItem(item) {
+                if !Self.actsInPanel.contains(action) { target.bringForwardForEdge() }
+                NSApp.sendAction(action, to: target, from: item)
+            }
+            return true
+        }
+        guard let app = [NSApp.delegate as AnyObject?, NSApp].compactMap({ $0 as? NSObject }).first(where: { $0.responds(to: action) })
+        else { return false }
+        if Self.validates(app, item) { NSApp.sendAction(action, to: app, from: item) }
+        return true
+    }
+
+    /// The responders a window's keys reach before the browser: its first responder up through its views, and with
+    /// `viewsOnly` false the window and its controller too.
+    static func responders(of window: NSWindow, viewsOnly: Bool) -> [NSResponder] {
+        var found: [NSResponder] = []
+        var responder = window.firstResponder
+        while let current = responder, current !== window {
+            found.append(current)
+            responder = current.nextResponder
+        }
+        if !viewsOnly {
+            found.append(window)
+            if let controller = window.windowController { found.append(controller) }
+        }
+        return found
+    }
+
+    private static func validates(_ responder: AnyObject, _ item: NSMenuItem) -> Bool {
+        if let validating = responder as? NSMenuItemValidation { return validating.validateMenuItem(item) }
+        if let validating = responder as? NSUserInterfaceValidations { return validating.validateUserInterfaceItem(item) }
+        return true
+    }
+
     /// A menu item picked in the panel: the window comes forward with its sidebar out, where the item acts.
     func chose() {
         guard let target else { return }
@@ -764,10 +816,8 @@ final class EdgeSidebarPanel: NSPanel {
             EdgeSidebar.shared.newTab()
             return true
         }
-        // Everything else that the menu bar answers, answered the same way it is in the window: the panel's next
-        // responder is the browser's controller, so its menu items act on the same browser. A nonactivating panel gets
-        // no key equivalents from the menu bar by itself, which is why they all went dead.
-        if NSApp.mainMenu?.performKeyEquivalent(with: event) == true { return true }
+        // A nonactivating panel gets no key equivalents from the menu bar by itself: the rest are routed here.
+        if EdgeSidebar.shared.performKeyEquivalent(event, own: EdgeSidebar.responders(of: self, viewsOnly: true)) { return true }
         return super.performKeyEquivalent(with: event)
     }
 }

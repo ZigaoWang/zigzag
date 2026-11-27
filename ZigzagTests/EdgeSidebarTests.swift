@@ -466,6 +466,53 @@ struct EdgeSidebarTests {
         #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil })
     }
 
+    // MARK: Keys and menus in the panel
+
+    /// A shortcut as the keyboard sends it to a window.
+    private func keys(_ key: String, code: UInt16, _ flags: NSEvent.ModifierFlags = .command, in window: NSWindow) throws -> NSEvent {
+        try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                      windowNumber: window.windowNumber, context: nil, characters: key,
+                                      charactersIgnoringModifiers: key, isARepeat: false, keyCode: code))
+    }
+
+    /// The menu bar's keys work in the panel: ⌘W closes the tab whose row is lit and the panel stays; ⌘L edits the
+    /// address in the window, which comes forward to do it, as ⌘T does.
+    @Test func theMenuBarsKeysActOnThePanelsBrowser() throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        let (panel, _) = try panelParts()
+        #expect(panel.performKeyEquivalent(with: try keys("w", code: 13, in: panel)))
+        #expect(manager.tab(with: tabs[0].id) == nil)
+        #expect(EdgeSidebar.shared.isShowing)
+        #expect(!controller.commandBar.isVisible)
+
+        #expect(panel.performKeyEquivalent(with: try keys("l", code: 37, in: panel)))
+        #expect(!EdgeSidebar.shared.isShowing)
+        #expect(controller.commandBar.isVisible && controller.commandBar.mode == .editCurrent)
+        controller.commandBar.dismiss()
+    }
+
+    /// Keys pressed in the page beside the panel are the page's Mini's first: ⌘W puts the page away, its tab still in
+    /// the list, and ⌘L edits the page's own address, not the window's.
+    @Test func keysInThePreviewActOnThePanel() async throws {
+        let (controller, manager, tabs, done) = panelWithTabs(["https://example.test/a", "https://example.test/b"])
+        defer { done() }
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let mini = try #require(EdgeSidebar.shared.pagePreview)
+        let window = try #require(mini.window)
+        #expect(window.performKeyEquivalent(with: try keys("w", code: 13, in: window)))
+        #expect(await until(3) { EdgeSidebar.shared.pagePreview == nil && tabs[1].host === controller })
+        #expect(manager.tab(with: tabs[0].id) === tabs[0])
+        #expect(manager.tab(with: tabs[1].id) === tabs[1])
+        #expect(EdgeSidebar.shared.isShowing)
+
+        EdgeSidebar.shared.previewNow(tabs[1], in: controller)
+        let again = try #require(EdgeSidebar.shared.pagePreview?.window)
+        #expect(again.performKeyEquivalent(with: try keys("l", code: 37, in: again)))
+        #expect(!controller.commandBar.isVisible)
+        #expect(EdgeSidebar.shared.isShowing)
+    }
+
     /// A page clicked into has the keyboard: when it folds back and the panel stays out, the panel takes the keyboard,
     /// not the browser window behind it.
     @Test func aPageFoldingBackGivesTheKeyboardToThePanel() async throws {
