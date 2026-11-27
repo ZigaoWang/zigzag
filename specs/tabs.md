@@ -293,6 +293,28 @@
 - The trackpad's swipes, the pointer at the window's edge and the sidebar toggles work as before alongside all of it.
   Test: TouchMovesTests.theTrackpadsScrollsAreNotClaimed
 
+## Menus
+- Right-press a row, a favorite, a folder, a space or the sidebar's empty space (a two-finger click held on the trackpad, the right button held, or a Control-press) → its menu opens at once; slide onto an item without letting go → it lights; let go on it → it runs, and nothing under it is clicked.
+  Test: MenuPressTests.aRightPressSlidOntoAnItemAndLetGoChoosesIt
+  Test: MenuPressTests.aControlPressSlidOntoAnItemChoosesItWithoutAClick
+  Test: MenuPressTests.aTabRowsMenuFollowsAPressThroughTheWindow
+  Test: MenuPressTests.aRightPressOnTheSidebarsEmptySpaceSlidesThroughItsMenu
+- A right-click let go where it opened, or let go within a moment of the press → the menu stays open to click.
+  Test: MenuPressTests.aRightClickInPlaceLeavesTheMenuOpenToClick
+  Test: MenuPressTests.aQuickWobblyClickLeavesTheMenuOpen
+- Slide onto a line, a heading or a dimmed item and let go → the menu stays open; slide off the menu and let go → it closes with nothing chosen.
+  Test: MenuPressTests.lettingGoOnALineOrADimmedItemLeavesItOpenAndOutsideClosesIt
+- Slide onto an item with a submenu → it opens beside it, as on hover; slide into it and let go on an item → that item runs.
+  Test: MenuPressTests.slidingOntoASubmenuOpensItAndLettingGoInItChooses
+- Press a menu button (a dropdown, the sidebar's +, a … button, the address bar's camera or translate button) → its menu opens on the press; slide onto an item and let go → it runs once.
+  Test: MenuPressTests.aDropdownPressedSlidAndLetGoChoosesOnce
+  Test: MenuPressTests.aMenuButtonPressedSlidAndLetGoChoosesOnce
+  Test: MenuPressTests.menuButtonsOpenOnThePress
+- A press whose drags and release the window never hears (the title bar's band) → the menu follows the pointer and the button itself, the same way.
+  Test: MenuPressTests.aPressWhoseDragsNeverArriveStillChooses
+- A menu a finger opens → the finger's slide and lift, as under Touch, not the mouse's.
+  Test: MenuPressTests.aMenuAFingerOpensDoesntFollowAPress
+
 ## Back and Forward
 - Press and hold Back or Forward for half a second → the pages that way, nearest first, in Zigzag's menu under the button; let go on the button and it stays open to click, Esc closes it. The sidebar's, the bar above the page's, a split pane's strip, Zigzag Mini's and a web app's.
   Test: SidebarRowMenuTests.holdingBackOpensItsListUnderItAfterTheDelay
@@ -309,6 +331,8 @@
   Test: SidebarRowMenuTests.aDisabledBackOpensNothing
 - A finger held on Back or Forward → the same list; slide onto a page and lift to go there.
   Test: SidebarRowMenuTests.aFingerHeldOnBackOpensTheSameList
+- Right-press Back or Forward, the sidebar's in the title bar's strip too → the same list at once; slide onto a page and let go to go there.
+  Test: BackHoldEventTests.aRightPressOnTheSidebarsBackSlidesToAPage
 - Hold the mouse's Back or Forward button for half a second anywhere in a page window → the same list at the pointer; slide onto a page and let go to go there, let go anywhere else and it stays open to click. A quick press → one page that way, no list. The browser window, a split's pane under the pointer, Zigzag Mini and a web app.
   Test: SideButtonTests.holdingBackOpensItsListAtThePointerAfterTheDelay
   Test: SideButtonTests.aQuickSideButtonPressGoesOneStepWithNoList
