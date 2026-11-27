@@ -1916,10 +1916,11 @@ extension Tab: WKNavigationDelegate {
                 pendingHTTPFallback = nil
             }
         }
-        // Clicked downloads save. Script-started ones save too, but not a burst (`DownloadPolicy`). A click in a frame
-        // lets it hand over a file shortly after (hidden download frames).
+        // Clicked downloads save. Script-started ones save too, but not a burst (`DownloadPolicy`); a click or key in
+        // the page since the last one lets the next through.
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: userInitiated || ownLoad,
-                                         isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
+                                         isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
+                                         lastInput: DownloadPolicy.lastInput(in: webView)) {
             // A download rule may take it; then WebKit makes no download.
             if policy == .download, let target = navigationAction.request.url,
                await handOffIfWanted(target, request: navigationAction.request, appliesToLinks: false, webView: webView,
@@ -2250,20 +2251,21 @@ extension Tab: WKNavigationDelegate {
         }
         let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
         let policy = downloads.decide(mimeType: mime, contentDisposition: disposition.lowercased(), canShowMIMEType: navigationResponse.canShowMIMEType,
-                                      isMainFrame: navigationResponse.isForMainFrame)
+                                      isMainFrame: navigationResponse.isForMainFrame,
+                                      lastInput: DownloadPolicy.lastInput(in: webView))
         // WebRTC follows the shown page after redirects; a response that isn't shown changes nothing.
         if navigationResponse.isForMainFrame {
             WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, in: self)
         }
-        // A main-frame file blocked by `DownloadPolicy`.
-        if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload(in: webView) }
+        // A file blocked by `DownloadPolicy`, a frame's too: a refused export never goes without a word.
+        if policy == .cancel { refusedDownload(in: webView) }
         #if DEBUG
         if policy == .download {
             debugLog("download chosen: mime=\(mime) canShow=\(navigationResponse.canShowMIMEType) mainFrame=\(navigationResponse.isForMainFrame) attachment=\(!disposition.isEmpty)")
         }
         #endif
         // A server-sent file (attachment, or a type WebKit can't show) may go to another app. Cancelling here avoids a
-        // download row and a blank tab. `decide` already held back unclicked frame files.
+        // download row and a blank tab. `decide` already held back a burst of unclicked ones.
         if policy == .download, let target = response.url {
             let filename = DownloadTokens.filename(for: target, suggested: Self.filename(from: disposition) ?? "")
             let wasClicked = downloads.mainFrameWasClicked && navigationResponse.isForMainFrame

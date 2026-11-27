@@ -44,14 +44,38 @@ struct DownloadPolicyTests {
         #expect(policy.decide(mimeType: "application/zip", contentDisposition: nil, canShowMIMEType: false, isMainFrame: true) == .download)
     }
 
-    @Test func aFrameSavesOnlyJustAfterAClick() {
+    /// A hidden frame handing over a file the page made after a click long gone (Feishu's export, #535) saves like
+    /// the page's own unrequested download: once, then held back until you click or type.
+    @Test func aFrameSavesLikeThePageItIsIn() {
         let policy = DownloadPolicy()
         let now = Date()
-        #expect(policy.decide(mimeType: "application/zip", contentDisposition: nil, canShowMIMEType: false, isMainFrame: false, now: now) == .cancel)
-        _ = policy.decide(shouldDownload: false, clicked: true, isMainFrame: false, now: now)
-        #expect(policy.decide(mimeType: "application/zip", contentDisposition: nil, canShowMIMEType: false, isMainFrame: false, now: now.addingTimeInterval(2)) == .download)
-        #expect(policy.decide(mimeType: "application/zip", contentDisposition: nil, canShowMIMEType: false, isMainFrame: false,
-                              now: now.addingTimeInterval(DownloadPolicy.frameClickWindow + 1)) == .cancel)
+        let frameFile = { (at: TimeInterval, input: TimeInterval?) in
+            policy.decide(mimeType: "application/zip", contentDisposition: "attachment", canShowMIMEType: false, isMainFrame: false,
+                          now: now.addingTimeInterval(at), lastInput: input.map { now.addingTimeInterval($0) })
+        }
+        #expect(frameFile(0, nil) == .download)
+        #expect(frameFile(2, nil) == .cancel)
+        // A click in the page since the last one lets the next through, as a second export would.
+        #expect(frameFile(4, 3) == .download)
+        #expect(frameFile(5, 3) == .cancel)
+        // A click in the frame itself saves its file whatever came before.
+        _ = policy.decide(shouldDownload: false, clicked: true, isMainFrame: false, now: now.addingTimeInterval(6))
+        #expect(frameFile(7, 3) == .download)
+        #expect(frameFile(DownloadPolicy.scriptDownloadGap + 8, nil) == .download)
+    }
+
+    /// A click or key in the page counts for a download its script starts later, which WebKit no longer sees as
+    /// clicked once the page has waited on its server.
+    @Test func aClickInThePageCountsForItsNextDownload() {
+        let policy = DownloadPolicy()
+        let now = Date()
+        #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now) == .download)
+        #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now.addingTimeInterval(1)) == .cancel)
+        // Input before the last download doesn't count again.
+        #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now.addingTimeInterval(2),
+                              lastInput: now.addingTimeInterval(-1)) == .cancel)
+        #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now.addingTimeInterval(4),
+                              lastInput: now.addingTimeInterval(3)) == .download)
     }
 
     @Test func downloadsNobodyClickedForDontComeInAStream() {

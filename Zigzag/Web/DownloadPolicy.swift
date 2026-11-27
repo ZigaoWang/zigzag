@@ -3,9 +3,9 @@ import WebKit
 /// What a page may download and which responses are shown, shared by tabs and pop-ups so an attachment is never shown
 /// (and run) as a page, and neither can start a download stream. Attachments (`Content-Disposition: attachment`) and
 /// types WebKit can't show are saved; web pages are always shown, even from a service worker before WebKit knows it
-/// can. Frames download only right after a click in them. A file you navigated to (click, typed or pasted address,
-/// plus redirects) always saves. An unrequested download (a script's, or the page navigating to a file) is allowed
-/// once, then refused for 30 seconds unless you click or type.
+/// can. A file you navigated to (click, typed or pasted address, plus redirects) always saves, and so does a frame's
+/// right after a click in it. An unrequested download (a script's, the page navigating to a file, a hidden frame
+/// handing over an export) is allowed once, then refused for 30 seconds unless you click or type in the page.
 @MainActor
 final class DownloadPolicy {
     static let scriptDownloadGap: TimeInterval = 30
@@ -23,22 +23,33 @@ final class DownloadPolicy {
 
     /// Records a navigation and decides `download`-attribute links: `.download`, or `.cancel` for an unclicked one
     /// too soon after another. Nil for normal navigations. `clicked`: user-started, or Zigzag's own load.
-    func decide(shouldDownload: Bool, clicked: Bool, isMainFrame: Bool, now: Date = Date()) -> WKNavigationActionPolicy? {
+    /// `lastInput`: your last click or key in the page, which WebKit stops counting once the page has waited on its
+    /// server.
+    func decide(shouldDownload: Bool, clicked: Bool, isMainFrame: Bool, now: Date = Date(), lastInput: Date? = nil) -> WKNavigationActionPolicy? {
         if isMainFrame { mainFrameClicked = clicked } else if clicked { frameClickedAt = now }
         if clicked { actedSinceScriptDownload = true }
         guard shouldDownload else { return nil }
-        return clicked || mayDownloadUnasked(now: now) ? .download : .cancel
+        return clicked || mayDownloadUnasked(now: now, lastInput: lastInput) ? .download : .cancel
     }
 
     /// `.cancel` refuses a download.
-    func decide(mimeType: String?, contentDisposition: String?, canShowMIMEType: Bool, isMainFrame: Bool, now: Date = Date()) -> WKNavigationResponsePolicy {
+    func decide(mimeType: String?, contentDisposition: String?, canShowMIMEType: Bool, isMainFrame: Bool, now: Date = Date(),
+                lastInput: Date? = nil) -> WKNavigationResponsePolicy {
         guard Self.downloads(mimeType: mimeType, contentDisposition: contentDisposition, canShowMIMEType: canShowMIMEType) else { return .allow }
+        // A frame's file counts as the page's own unrequested download, as in Chrome and Safari: a hidden frame is how
+        // web apps hand over an export long after the click (#535).
         guard isMainFrame else {
-            return frameClickedAt.map { now.timeIntervalSince($0) < Self.frameClickWindow } == true ? .download : .cancel
+            if frameClickedAt.map({ now.timeIntervalSince($0) < Self.frameClickWindow }) == true { return .download }
+            return mayDownloadUnasked(now: now, lastInput: lastInput) ? .download : .cancel
         }
         // A user-started navigation (redirects included, since their own decisions aren't clicks) saves; a page
         // navigating on its own ("your download starts in 5 seconds") counts as unrequested.
-        return mainFrameClicked || mayDownloadUnasked(now: now) ? .download : .cancel
+        return mainFrameClicked || mayDownloadUnasked(now: now, lastInput: lastInput) ? .download : .cancel
+    }
+
+    /// Your last click or key in this page, as a date for `decide`.
+    static func lastInput(in webView: WKWebView, now: Date = Date()) -> Date? {
+        PopupNotice.sinceInput(in: webView).map { now.addingTimeInterval(-$0) }
     }
 
     /// Whether a download is a Firefox extension package, which is installed rather than kept as a file. AMO's
@@ -62,7 +73,8 @@ final class DownloadPolicy {
         return isAttachment || !(isWebPage || canShowMIMEType)
     }
 
-    private func mayDownloadUnasked(now: Date) -> Bool {
+    private func mayDownloadUnasked(now: Date, lastInput: Date?) -> Bool {
+        if let lastInput, let last = lastScriptDownload, lastInput > last { actedSinceScriptDownload = true }
         if !actedSinceScriptDownload, let last = lastScriptDownload, now.timeIntervalSince(last) < Self.scriptDownloadGap { return false }
         lastScriptDownload = now
         actedSinceScriptDownload = false

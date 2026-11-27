@@ -13,6 +13,25 @@
   Test: DownloadPolicyTests.whereYouSentThePageAlwaysSaves
 - A download nobody clicked for → one goes through, then more are blocked for 30 seconds unless you click or type.
   Test: DownloadPolicyTests.downloadsNobodyClickedForDontComeInAStream
+- A click or key in the page since the last download nobody clicked for → the next one the page starts goes through, even after it waited on its server.
+  Test: DownloadPolicyTests.aClickInThePageCountsForItsNextDownload
+- A hidden frame handing over a file the page made after your click (an export) → saved under the name the server gives, like the page's own download; a burst of them is held back the same way.
+  Test: DownloadPolicyTests.aFrameSavesLikeThePageItIsIn
+  Test: PageDownloadsTests.aHiddenFrameHandingOverAnExportSaves
+  Test: PageDownloadsTests.aHiddenFrameNobodyClickedForSavesOnceThenAfterAClick
+- A download held back → a note says the page's download was blocked, a frame's included.
+  No test yet.
+- A page's own file (a blob: or data: link with a download name, revoked right after its click, or never added to the page) → saved under that name.
+  Test: PageDownloadsTests.aBlobRevokedRightAfterItsClickSaves
+  Test: PageDownloadsTests.aDataAddressSavesUnderItsName
+  Test: PageDownloadsTests.anAnchorNeverAddedToThePageSaves
+- A page's file made after it fetched something, with no click left → saved under its download name.
+  Test: PageDownloadsTests.aFetchedBlobClickedAfterAnAwaitSaves
+- A page's own file opened in a new window, or a form answered with an attachment → saved.
+  Test: PageDownloadsTests.aBlobOpenedInANewWindowSaves
+  Test: PageDownloadsTests.aFormPostAnsweredWithAnAttachmentSaves
+- A download link to another origin → opens like any link; the download name only counts on the page's own origin, as in Chrome and Safari.
+  Test: PageDownloadsTests.anotherOriginsDownloadLinkOpens
 
 ## Asking before a site downloads
 - Out of the box → off; sites download without a question.

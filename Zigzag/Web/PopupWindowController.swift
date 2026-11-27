@@ -622,7 +622,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // Unclicked download streams are refused, as in a tab.
         let clicked = PopupNotice.isUserInitiated(navigationAction)
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: clicked,
-                                         isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
+                                         isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
+                                         lastInput: DownloadPolicy.lastInput(in: webView)) {
             // A download rule may take it; then WebKit makes no download.
             if policy == .download, let url = navigationAction.request.url,
                await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: false,
@@ -716,7 +717,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         StrictTransport.note(response, in: webView.configuration.websiteDataStore)
         // As in a tab: an attachment is saved, never shown as the page.
         let policy = downloads.decide(mimeType: response.mimeType, contentDisposition: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
-                                      canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame)
+                                      canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame,
+                                      lastInput: DownloadPolicy.lastInput(in: webView))
         if policy == .download, let url = response.url {
             let mime = (response.mimeType ?? "").lowercased()
             let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
@@ -729,7 +731,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             // Then the site's download permission decides. Unclicked responses never ask.
             if await !mayDownload(url, asking: wasClicked) { return .cancel }
         }
-        if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
+        // A frame's file too: a refused export never goes without a word.
+        if policy == .cancel { refusedDownload() }
         // WebRTC follows a redirect's destination.
         if navigationResponse.isForMainFrame {
             WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, here: webRTCChoices)
