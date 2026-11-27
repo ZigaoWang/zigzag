@@ -1,6 +1,6 @@
 # Registro de alterações
 
-Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do CHANGELOG.md. O app mostra as notas da versão que você está usando, e [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) mostra todas as versões. As versões anteriores à 0.10.0 estão em inglês no [CHANGELOG.md](../../../CHANGELOG.md).
+Estas são as notas de versão do Zigzag em português do Brasil, traduzidas do CHANGELOG.md. O app mostra as notas da versão que você está usando, e [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) mostra todas as versões. As versões anteriores à 0.9.6 estão em inglês no [CHANGELOG.md](../../../CHANGELOG.md).
 
 ## [Unreleased]
 
@@ -53,3 +53,25 @@ Zigzag em mais treze idiomas, do japonês e coreano ao alemão, francês, espanh
 - Fechar uma aba que você acabou de abrir com ⌘T leva de volta à aba em que você estava, como no Safari e no Chrome, em vez da aba logo abaixo.
 - A prévia da página da barra lateral a partir da borda da tela não fecha mais e volta quando você passa de uma aba para a próxima, se recolhe quando o ponteiro sai das abas e da página para a parte vazia da barra lateral, e não aparece mais para as extensões como uma janela própria. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+Correções da 0.9.5: logins mantidos depois que o processo de rede do WebKit termina, Desbloquear com biometria do Bitwarden, extensões que definem alarmes, vídeos em tela cheia sob as barras do próprio site, ⌘W logo depois de ⌘T, Pinyin trocado para inglês e janelas transparentes que deixavam os gráficos do Mac ocupados.
+
+### Corrigido
+- Mudar do pinyin chinês para o inglês no meio de uma palavra não deixa mais espaços entre as letras, numa página ou na barra de endereço, como no Chrome.
+- Um espaço com transparência e vidro Transparente não deixa mais os gráficos do Mac ocupados enquanto o Zigzag está parado, mesmo numa página em branco ou nos Ajustes. O macOS redesenhava a janela inteira e a sombra dela a cada quadro; agora só desenha quando algo muda. A barra de progresso do cartão de atualização também para de deslizar enquanto está oculta.
+- Com a barra de endereço acima da página e um espaço com transparência, um vídeo em reprodução não deixa mais os gráficos do Mac muito mais ocupados do que com a barra desativada. Agora o vidro da janela fica atrás da barra lateral, e não atrás da janela toda.
+- Uma janela parada não deixa mais os gráficos do Mac ocupados em rajadas: uma mudança que deixava o espaço como estava, como o novo ícone de um site, ou a bateria informando a carga, fazia a janela inteira passar da cor dela para a mesma cor.
+- Fechar uma aba que você acabou de abrir com ⌘T leva de volta à aba em que você estava, como no Safari e no Chrome, em vez da aba logo abaixo.
+- Fechar com ⌘W uma aba fixada enquanto as abas fixadas do espaço estão recolhidas, ou uma mostrada sob uma pasta fechada, não tira mais a linha dela da barra lateral: ela fica, descarregada, até você trocar de espaço ou abrir ou fechar de novo as abas fixadas ou aquela pasta.
+- Sites que pedem para mostrar notificações, como o app web do Zoom, não quebram mais com um erro de script quando pedem. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Uma aba que ficou suspensa por horas enquanto o Mac estava com pouca memória não volta mais desconectada de sites como Azure DevOps e Microsoft 365: se a parte do WebKit que guarda os cookies de login parar, como o macOS pode fazer quando falta memória, o Zigzag os restaura antes de a página carregar. Sair do Zigzag e abri-lo de novo na sua última sessão também mantém esses logins. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Desbloquear com biometria do Bitwarden agora alcança o app do Bitwarden. O Zigzag tinha dito ao Bitwarden que já podia falar com o app, então o Bitwarden nunca pedia, e depois o Zigzag o mantinha longe do app. Agora o Bitwarden pede e o Zigzag pergunta se você permite. Se você ativou a biometria antes, desative e ative de novo Desbloquear com biometria nos ajustes do Bitwarden. Agradecimentos a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Aprovar a atualização de uma extensão que pede mais não tira mais depois o que você permitiu, como a conexão do Bitwarden com o app para “Desbloquear com biometria”. Agradecimentos a [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Remover um perfil enquanto suas extensões ainda estão iniciando não fecha mais o Zigzag.
+- Senhas do iCloud é configurado nas páginas de login mesmo com abas suspensas: pedir os frames de uma aba suspensa não falha mais, como no Chrome.
+- The Marvellous Suspender e outras extensões que definem alarmes voltam a funcionar: definir um alarme agora devolve uma promessa a elas, como no Chrome.
+- Um vídeo em tela cheia não fica mais coberto pela barra superior ou pela coluna lateral do próprio site, como no Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Voltar, avançar e recarregar não deixam mais um espaço vazio para os botões da janela onde eles não aparecem, como em tela cheia antes de a barra de menus descer. Agradecimentos a [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Com Favoritos por linha em Automático, os favoritos se distribuem igualmente pelas linhas: seis onde caberiam quatro viram duas linhas de três, e não quatro e duas.
+- A borda superior de um favorito selecionado fica na largura do bloco quando o número de colunas muda.

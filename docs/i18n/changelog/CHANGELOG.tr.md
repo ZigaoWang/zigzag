@@ -1,6 +1,6 @@
 # Değişiklik Günlüğü
 
-Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. Uygulama, kullandığınız sürümün notlarını gösterir; tüm sürümler [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) adresindedir. 0.10.0’dan önceki sürümler [CHANGELOG.md](../../../CHANGELOG.md) dosyasında İngilizcedir.
+Bunlar Zigzag’in CHANGELOG.md’den çevrilen Türkçe sürüm notlarıdır. Uygulama, kullandığınız sürümün notlarını gösterir; tüm sürümler [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) adresindedir. 0.9.6’dan önceki sürümler [CHANGELOG.md](../../../CHANGELOG.md) dosyasında İngilizcedir.
 
 ## [Unreleased]
 
@@ -53,3 +53,25 @@ Japonca ve Koreceden Almanca, Fransızca, İspanyolca ve Rusçaya kadar on üç 
 - ⌘T ile az önce açtığınız bir sekmeyi kapatmak, Safari ve Chrome’daki gibi, alttaki sekmeye değil bulunduğunuz sekmeye geri götürür.
 - Ekranın kenarından açılan kenar çubuğunun sayfa önizlemesi, bir sekmeden diğerine geçerken artık kapanıp geri gelmez, imleç sekmelerden ve sayfadan kenar çubuğunun boş kısmına geçtiğinde kapanır ve eklentilere artık ayrı bir pencere olarak görünmez. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+0.9.5 düzeltmeleri: WebKit’in ağ işlemi sona erdikten sonra korunan girişler, Bitwarden’ın “Biyometri ile kilidi aç” seçeneği, alarm kuran genişletmeler, sitenin kendi çubuklarının altında kalan tam ekran videolar, ⌘T’den hemen sonra ⌘W, İngilizceye geçirilen Pinyin ve Mac’in grafik işlemcisini meşgul eden saydam pencereler.
+
+### Düzeltmeler
+- Bir sözcüğün ortasında Çince Pinyin’den İngilizceye geçmek, Chrome’daki gibi, artık sayfada veya adres çubuğunda harflerin arasında boşluk bırakmaz.
+- “Şeffaf” camlı, arkası görünen bir Space, Zigzag boşta dururken, boş bir sayfada veya Ayarlar’da bile artık Mac’in grafik işlemcisini meşgul etmez. macOS her karede tüm pencereyi ve gölgesini yeniden çiziyordu; artık yalnızca bir şey değiştiğinde çiziyor. Güncelleme kartının ilerleme çubuğu da gizliyken kaymayı bırakır.
+- Adres çubuğu sayfanın üstündeyken ve Space saydamken, oynatılan bir video artık Mac’in grafiklerini çubuk kapalıyken olduğundan çok daha fazla meşgul etmez. Pencerenin camı artık tüm pencerenin değil, kenar çubuğunun arkasında kalır.
+- Hareketsiz duran bir pencere artık Mac’in grafik işlemcisini ara ara meşgul etmez: Space’i olduğu gibi bırakan bir değişiklik, örneğin bir sitenin yeni simgesi ya da pilin şarjını bildirmesi, tüm pencereyi rengiyle aynı renge soldurup duruyordu.
+- ⌘T ile az önce açtığınız bir sekmeyi kapatmak, Safari ve Chrome’daki gibi, alttaki sekmeye değil bulunduğunuz sekmeye geri götürür.
+- Space’in sabitlenmiş sekmeleri katlanmışken ⌘W ile bir sabitlenmiş sekmeyi ya da kapalı bir klasörün altında görünen birini kapatmak artık satırını kenar çubuğundan çıkarmaz: siz Space’i değiştirene ya da sabitlenmiş sekmeleri veya o klasörü yeniden açıp kapatana kadar bellekten kaldırılmış olarak kalır.
+- Bildirim göstermek isteyen siteler, örneğin Zoom’un web uygulaması, isterken artık bir komut dosyası hatasıyla bozulmaz. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Düşük bellekli Mac’te saatlerce uykuya alınmış bir sekme artık Azure DevOps ve Microsoft 365 gibi sitelerde giriş yapılmamış olarak uyanmaz: giriş çerezlerini tutan WebKit parçası, macOS’un bellek azken yapabileceği gibi durursa Zigzag onları sayfa yüklenmeden önce geri koyar. Zigzag’i kapatıp son oturumunuzla yeniden açmak da bu girişleri korur. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Bitwarden’ın “Biyometri ile kilidi aç” seçeneği artık Bitwarden uygulamasına ulaşıyor. Zigzag, Bitwarden’a uygulamayla zaten konuşabildiğini söylemişti; bu yüzden Bitwarden hiç sormuyordu, sonra da Zigzag onu uygulamadan uzak tutuyordu. Artık Bitwarden soruyor ve Zigzag size buna izin verip vermeyeceğinizi soruyor. Biyometriyi daha önce açtıysanız Bitwarden’ın ayarlarında “Biyometri ile kilidi aç” seçeneğini kapatıp yeniden açın. Teşekkürler: [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Daha fazlasını isteyen bir genişletme güncellemesini onaylamak, daha sonra izin verdiklerinizi, örneğin Bitwarden’ın “Biyometri ile kilidi aç” için uygulamasına bağlantısını artık geri almıyor. Teşekkürler: [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Genişletmeleri hâlâ başlarken bir profili kaldırmak artık Zigzag’ı kapatmıyor.
+- iCloud Parolaları, sekmeler uykudayken bile giriş sayfalarında kurulur: uykudaki bir sekmenin çerçevelerini istemek artık başarısız olmaz, tıpkı Chrome’daki gibi.
+- Alarm kuran The Marvellous Suspender ve diğer genişletmeler yeniden çalışıyor: alarm kurmak artık onlara bir Promise döndürür, tıpkı Chrome’daki gibi.
+- Tam ekrandaki bir video artık Bilibili’de olduğu gibi sitenin kendi üst çubuğu veya yan sütunuyla örtülmez. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Geri, ileri ve yeniden yükle artık pencere düğmeleri gösterilmeyen yerde, örneğin menü çubuğu inmeden önceki tam ekranda, boş yer bırakmaz. Teşekkürler: [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Satır başına favori Otomatik olduğunda favoriler satırlara eşit dağılır: dördün sığacağı yerde altı favori, dört ve iki değil, üçer favorilik iki satır olur.
+- Seçili bir favorinin üst kenarı, sütun sayısı değiştiğinde kutucuğun genişliğinde kalır.

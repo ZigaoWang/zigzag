@@ -1,6 +1,6 @@
 # Lista zmian
 
-To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplikacja pokazuje informacje o wersji, której używasz, a [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) pokazuje wszystkie wersje. Wersje sprzed 0.10.0 są po angielsku w [CHANGELOG.md](../../../CHANGELOG.md).
+To informacje o wersjach Zigzag po polsku, przetłumaczone z CHANGELOG.md. Aplikacja pokazuje informacje o wersji, której używasz, a [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) pokazuje wszystkie wersje. Wersje sprzed 0.9.6 są po angielsku w [CHANGELOG.md](../../../CHANGELOG.md).
 
 ## [Unreleased]
 
@@ -53,3 +53,25 @@ Zigzag w trzynastu kolejnych językach, od japońskiego i koreańskiego po niemi
 - Zamknięcie karty, którą właśnie otwarto skrótem ⌘T, wraca do karty, na której byłeś, tak jak w Safari i Chrome, a nie do karty poniżej.
 - Podgląd strony w pasku bocznym wysuwanym od krawędzi ekranu nie zamyka się już i nie wraca, gdy przesuwasz wskaźnik z jednej karty na następną, zwija się, gdy wskaźnik opuści karty i stronę i trafi na puste miejsce paska bocznego, i nie jest już widoczny dla rozszerzeń jako osobne okno. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+Poprawki w 0.9.5: logowania zachowane po zakończeniu procesu sieciowego WebKit, „Odblokuj za pomocą biometrii” w Bitwarden, rozszerzenia, które ustawiają alarmy, wideo na pełnym ekranie pod własnymi paskami witryny, ⌘W zaraz po ⌘T, pinyin przełączony na angielski i prześwitujące okna, które obciążały grafikę Maca.
+
+### Naprawiono
+- Przełączenie z chińskiego pinyin na angielski w środku słowa nie zostawia już spacji między literami, na stronie ani na pasku adresu, tak jak w Chrome.
+- Prześwitująca przestrzeń ze szkłem „Przezroczyste” nie obciąża już grafiki Maca, gdy Zigzag nic nie robi, nawet na pustej stronie lub w oknie „Ustawienia”. macOS przerysowywał całe okno i jego cień w każdej klatce; teraz rysuje je tylko wtedy, gdy coś się zmienia. Pasek postępu na karcie aktualizacji też przestaje się przesuwać, gdy jest ukryty.
+- Gdy pasek adresu jest nad stroną, a przestrzeń jest przezroczysta, odtwarzane wideo nie obciąża już grafiki Maca dużo bardziej niż przy wyłączonym pasku. Szkło okna zostaje teraz za paskiem bocznym, a nie za całym oknem.
+- Okno, które stoi w miejscu, nie obciąża już grafiki Maca zrywami: zmiana, która zostawiała przestrzeń taką, jaka była, jak nowa ikona witryny, albo bateria zgłaszająca swój poziom naładowania, przenikała całe okno z jego koloru w ten sam kolor.
+- Zamknięcie karty, którą właśnie otwarto skrótem ⌘T, wraca do karty, na której byłeś, tak jak w Safari i Chrome, a nie do karty poniżej.
+- Zamknięcie przypiętej karty skrótem ⌘W, gdy przypięte karty przestrzeni są zwinięte, albo karty widocznej pod zamkniętym folderem, nie usuwa już jej wiersza z paska bocznego: zostaje, wyładowana, dopóki nie zmienisz przestrzeni albo nie otworzysz lub nie zamkniesz ponownie przypiętych kart lub tego folderu.
+- Witryny, które proszą o pokazywanie powiadomień, jak aplikacja internetowa Zoom, nie przestają już działać z powodu błędu skryptu, gdy o to proszą. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Karta, która spała przez wiele godzin, gdy Mac miał mało pamięci, nie budzi się już wylogowana z witryn takich jak Azure DevOps i Microsoft 365: jeśli część WebKit przechowująca pliki cookie logowania się zatrzyma, co macOS może zrobić przy braku pamięci, Zigzag przywraca je przed wczytaniem strony. Zamknięcie Zigzag i otwarcie go ponownie z ostatnią sesją też zachowuje te logowania. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- „Odblokuj za pomocą biometrii” w Bitwarden dociera teraz do aplikacji Bitwarden. Zigzag powiedział Bitwarden, że już może rozmawiać z aplikacją, więc Bitwarden nigdy nie pytał, a potem Zigzag nie dopuszczał go do aplikacji. Teraz Bitwarden pyta, a Zigzag pyta ciebie, czy na to zezwolić. Jeśli wcześniej włączono biometrię, wyłącz i ponownie włącz „Odblokuj za pomocą biometrii” w ustawieniach Bitwarden. Podziękowania dla [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Zatwierdzenie aktualizacji rozszerzenia, które prosi o więcej, nie odbiera już później tego, na co się zgodzono, jak połączenie Bitwardena z jego aplikacją do „Odblokuj za pomocą biometrii”. Podziękowania dla [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Usunięcie profilu, gdy jego rozszerzenia jeszcze się uruchamiają, nie zamyka już Zigzaga.
+- Hasła iCloud konfigurują się na stronach logowania także przy uśpionych kartach: pobieranie ramek uśpionej karty już się nie kończy się błędem, tak jak w Chrome.
+- The Marvellous Suspender i inne rozszerzenia, które ustawiają alarmy, znów działają: ustawienie alarmu zwraca im teraz obietnicę, tak jak w Chrome.
+- Wideo w trybie pełnoekranowym nie jest już zasłaniane przez górny pasek ani boczną kolumnę samej witryny, jak na Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Przyciski wstecz, dalej i ponownego wczytania nie zostawiają już pustego miejsca na przyciski okna tam, gdzie ich nie ma, jak w trybie pełnoekranowym, zanim opadnie pasek menu. Podziękowania dla [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Gdy „Ulubione w wierszu” ma wartość „Automatycznie”, ulubione rozkładają się równo na wiersze: sześć tam, gdzie zmieściłoby się cztery, to dwa wiersze po trzy, a nie cztery i dwa.
+- Górna krawędź zaznaczonego ulubionego trzyma się szerokości kafelka, gdy zmienia się liczba kolumn.

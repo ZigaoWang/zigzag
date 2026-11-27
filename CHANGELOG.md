@@ -70,6 +70,29 @@ Zigzag in thirteen more languages, from Japanese and Korean to German, French, S
 - Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
 - The screen edge's page preview no longer closes and comes back while you move from one tab to the next, folds back when the pointer leaves the tabs and the page for the sidebar's empty part, and no longer shows up to extensions as a window of its own. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+Fixes for 0.9.5: sign-ins kept after WebKit's network process ends, Bitwarden's Unlock with biometrics, extensions that set alarms, full screen videos under a site's own bars, ⌘W right after ⌘T, Pinyin switched to English, and see-through windows that kept the Mac's graphics busy.
+
+### Fixed
+- Switching from Chinese Pinyin to English mid-word no longer leaves spaces between the letters, on a page or in the address bar, as in Chrome.
+- A see-through space with Clear glass no longer keeps the Mac's graphics busy while Zigzag sits still, even on a blank page or in Settings. macOS was redrawing the whole window and its shadow every frame; it now draws it only when something changes. The update card's progress bar also stops sliding while it's hidden.
+- With the address bar above the page and a see-through space, a playing video no longer keeps the Mac's graphics much busier than with the bar off. The window's glass now stays behind the sidebar instead of the whole window.
+- A window sitting still no longer keeps the Mac's graphics busy in bursts: a change that left the space as it was, like a site's new icon, or the battery reporting its charge, faded the whole window from its color to the same color.
+- Closing a tab you just opened with ⌘T goes back to the tab you were on, as in Safari and Chrome, instead of the tab below it.
+- Closing a pinned tab with ⌘W while the space's pinned tabs are folded, or one shown under a closed folder, no longer takes its row out of the sidebar: it stays, unloaded, until you switch spaces or open or close the pinned tabs or that folder again.
+- Sites that ask to show notifications, like Zoom's web app, no longer break on a script error when they ask. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/551))
+- A tab that slept for hours while your Mac was low on memory no longer wakes signed out of sites like Azure DevOps and Microsoft 365: if the part of WebKit that holds sign-in cookies stops, as macOS may make it when memory is short, Zigzag puts them back before the page loads. Quitting and opening Zigzag again on your last session keeps those sign-ins too. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Bitwarden's Unlock with biometrics now reaches the Bitwarden app. Zigzag told Bitwarden it could already talk to the app, so Bitwarden never asked, and Zigzag then kept it from the app. Now Bitwarden asks and Zigzag asks you to allow it. If you turned biometrics on before, turn Unlock with biometrics off and on again in Bitwarden's settings. Thanks to [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Approving an extension update that asks for more no longer takes back what you allowed it later, like Bitwarden's connection to its app for Unlock with biometrics. Thanks to [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Removing a profile while its extensions are still starting no longer quits Zigzag.
+- iCloud Passwords sets up on login pages even with tabs asleep: asking for an asleep tab's frames no longer fails, as in Chrome.
+- The Marvellous Suspender and other extensions that set alarms work again: setting an alarm now gives them back a promise, as in Chrome.
+- A video in full screen is no longer covered by the site's own top bar or side column, as on Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Back, forward and reload no longer leave an empty space for the window buttons where none are shown, as in full screen before the menu bar comes down. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- With Favorites per row on Automatic, favorites spread evenly over their rows: six where four would fit are two rows of three, not four and two.
+- A selected favorite's top edge keeps to the tile's width when the number of columns changes.
+
 ## [0.9.5] - 2026-11-25
 
 Export Your Data so you can always take everything with you, live folders, nesting tabs by dragging, Traditional Chinese, full screen that stays in the browser, an Autohide address bar, the sidebar from the screen edge, smoother scrolling with less of Zigzag's own work on every page, pages at your display's full 120 Hz, touch that feels native on a touch display, Dia's pinned tabs on import, press and hold Back or Forward for history, sign-ins and YouTube's theater mode kept after a relaunch, and password manager extensions in Settings.

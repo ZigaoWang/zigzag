@@ -1,6 +1,6 @@
 # Änderungsprotokoll
 
-Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.md. Die App zeigt die Hinweise zu der Version, die du verwendest, und [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) zeigt alle Versionen. Versionen vor 0.10.0 findest du auf Englisch in [CHANGELOG.md](../../../CHANGELOG.md).
+Das sind die Versionshinweise von Zigzag auf Deutsch, übersetzt aus CHANGELOG.md. Die App zeigt die Hinweise zu der Version, die du verwendest, und [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) zeigt alle Versionen. Versionen vor 0.9.6 findest du auf Englisch in [CHANGELOG.md](../../../CHANGELOG.md).
 
 ## [Unreleased]
 
@@ -53,3 +53,25 @@ Zigzag in dreizehn weiteren Sprachen, von Japanisch und Koreanisch bis Deutsch, 
 - Wenn du einen Tab schließt, den du gerade mit ⌘T geöffnet hast, kommst du zurück zum vorherigen Tab, wie in Safari und Chrome, statt zum Tab darunter.
 - Die Seitenvorschau der Seitenleiste vom Bildschirmrand schließt sich nicht mehr und kommt wieder, wenn du von einem Tab zum nächsten fährst, klappt wieder ein, wenn der Zeiger die Tabs und die Seite verlässt und in den leeren Teil der Seitenleiste wandert, und erscheint für Erweiterungen nicht mehr als eigenes Fenster. Danke an [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+Korrekturen für 0.9.5: Anmeldungen, die erhalten bleiben, nachdem der Netzwerkprozess von WebKit endet, „Mit Biometrie entsperren“ von Bitwarden, Erweiterungen, die Wecker setzen, Vollbildvideos unter den eigenen Leisten einer Website, ⌘W direkt nach ⌘T, von Pinyin zu Englisch gewechselt und durchsichtige Fenster, die die Grafik des Mac beschäftigt hielten.
+
+### Behoben
+- Wer mitten im Wort von chinesischem Pinyin zu Englisch wechselt, bekommt keine Leerzeichen mehr zwischen den Buchstaben, weder auf einer Seite noch in der Adressleiste, wie in Chrome.
+- Ein durchsichtiger Space mit dem Glas „Klar“ hält die Grafik des Mac nicht mehr beschäftigt, während Zigzag nichts tut, auch nicht auf einer leeren Seite oder in den Einstellungen. macOS hat das ganze Fenster samt Schatten in jedem Frame neu gezeichnet; jetzt zeichnet es nur, wenn sich etwas ändert. Auch der Fortschrittsbalken der Update-Karte läuft nicht mehr weiter, während sie ausgeblendet ist.
+- Steht die Adressleiste über der Seite und ist ein Space durchsichtig, belastet ein laufendes Video die Grafik des Mac nicht mehr deutlich stärker als bei ausgeschalteter Leiste. Das Glas des Fensters bleibt jetzt nur hinter der Seitenleiste statt hinter dem ganzen Fenster.
+- Ein Fenster, das stillsteht, hält die Grafik des Mac nicht mehr stoßweise beschäftigt: Eine Änderung, die den Space so ließ, wie er war, etwa das neue Symbol einer Website, oder der Ladestand der Batterie blendete das ganze Fenster von seiner Farbe in dieselbe Farbe über.
+- Wenn du einen Tab schließt, den du gerade mit ⌘T geöffnet hast, kommst du zurück zum vorherigen Tab, wie in Safari und Chrome, statt zum Tab darunter.
+- Wenn du einen fixierten Tab mit ⌘W schließt, während die fixierten Tabs des Space eingeklappt sind, oder einen, der unter einem geschlossenen Ordner steht, verschwindet seine Zeile nicht mehr aus der Seitenleiste: Sie bleibt entladen, bis du den Space wechselst oder die fixierten Tabs oder diesen Ordner wieder öffnest oder schließt.
+- Websites, die fragen, ob sie Mitteilungen zeigen dürfen, etwa die Web-App von Zoom, brechen dabei nicht mehr mit einem Skriptfehler ab. Danke an [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Ein Tab, der stundenlang im Ruhezustand war, während dem Mac der Speicher knapp wurde, wacht nicht mehr abgemeldet von Websites wie Azure DevOps und Microsoft 365 auf: Wenn der Teil von WebKit, der die Anmelde-Cookies hält, stoppt, wie es macOS bei knappem Speicher erzwingen kann, stellt Zigzag sie wieder her, bevor die Seite lädt. Wenn du Zigzag beendest und mit deiner letzten Sitzung wieder öffnest, bleiben diese Anmeldungen ebenfalls erhalten. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- „Mit Biometrie entsperren“ von Bitwarden erreicht jetzt die Bitwarden-App. Zigzag hatte Bitwarden gesagt, es könne schon mit der App sprechen, sodass Bitwarden nie fragte, und hat es dann von der App ferngehalten. Jetzt fragt Bitwarden, und Zigzag fragt dich, ob du es erlauben willst. Falls du die Biometrie früher eingeschaltet hast, schalte „Mit Biometrie entsperren“ in den Einstellungen von Bitwarden aus und wieder ein. Danke an [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Wenn du ein Erweiterungs-Update genehmigst, das mehr verlangt, wird dir später nicht mehr entzogen, was du erlaubt hattest, etwa Bitwardens Verbindung zur App für „Mit Biometrie entsperren“. Danke an [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Wenn du ein Profil entfernst, während seine Erweiterungen noch starten, wird Zigzag nicht mehr beendet.
+- iCloud-Passwörter lässt sich auf Anmeldeseiten auch bei ruhenden Tabs einrichten: Die Abfrage der Frames eines ruhenden Tabs schlägt nicht mehr fehl, wie in Chrome.
+- The Marvellous Suspender und andere Erweiterungen, die Wecker setzen, funktionieren wieder: Wer einen Wecker setzt, bekommt jetzt ein Promise zurück, wie in Chrome.
+- Ein Video im Vollbild wird nicht mehr von der oberen Leiste oder der Seitenspalte der Website verdeckt, etwa bei Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Zurück, Vorwärts und Neu laden lassen keinen leeren Platz mehr für die Fensterknöpfe, wo keine angezeigt werden, etwa im Vollbild, bevor die Menüleiste herunterkommt. Danke an [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Steht „Favoriten pro Reihe“ auf „Automatisch“, verteilen sich die Favoriten gleichmäßig auf ihre Reihen: Sechs, wo vier passen würden, werden zwei Reihen mit je drei, nicht vier und zwei.
+- Die Oberkante eines ausgewählten Favoriten bleibt auf die Breite der Kachel beschränkt, wenn sich die Zahl der Spalten ändert.

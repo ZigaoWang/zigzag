@@ -1,6 +1,6 @@
 # Wijzigingslogboek
 
-Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.md. De app toont de notities bij de versie die je gebruikt, en [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) toont alle versies. Versies vóór 0.10.0 staan in het Engels in [CHANGELOG.md](../../../CHANGELOG.md).
+Dit zijn de release notes van Zigzag in het Nederlands, vertaald uit CHANGELOG.md. De app toont de notities bij de versie die je gebruikt, en [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) toont alle versies. Versies vóór 0.9.6 staan in het Engels in [CHANGELOG.md](../../../CHANGELOG.md).
 
 ## [Unreleased]
 
@@ -53,3 +53,25 @@ Zigzag in dertien extra talen, van Japans en Koreaans tot Duits, Frans, Spaans e
 - Als je een tabblad sluit dat je net met ⌘T hebt geopend, ga je terug naar het tabblad waar je op zat, zoals in Safari en Chrome, in plaats van naar het tabblad eronder.
 - Het paginavoorbeeld van de navigatiekolom vanaf de schermrand sluit en komt niet meer terug als je van het ene tabblad naar het volgende gaat, klapt weer in als de aanwijzer de tabbladen en de pagina verlaat voor het lege deel van de navigatiekolom, en is voor extensies niet meer te zien als een eigen venster. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+Oplossingen voor 0.9.5: aanmeldingen die behouden blijven nadat het netwerkproces van WebKit stopt, Ontgrendelen met biometrie van Bitwarden, extensies die alarmen instellen, schermvullende video’s onder de eigen balken van een website, ⌘W vlak na ⌘T, pinyin gewisseld naar Engels en doorzichtige vensters die de grafische chip van de Mac bezig hielden.
+
+### Opgelost
+- Als je midden in een woord van Chinees Pinyin naar Engels overschakelt, blijven er geen spaties meer tussen de letters staan, op een pagina of in de adresbalk, net als in Chrome.
+- Een doorzichtige space met Helder glas houdt de grafische chip van de Mac niet meer bezig terwijl Zigzag niets doet, zelfs op een lege pagina of in Instellingen. macOS tekende elk frame het hele venster en de schaduw ervan opnieuw; nu gebeurt dat alleen als er iets verandert. De voortgangsbalk van de updatekaart stopt ook met schuiven als die verborgen is.
+- Met de adresbalk boven de pagina en een doorzichtige space houdt een video die wordt afgespeeld de grafische onderdelen van de Mac niet langer veel drukker bezig dan met de balk uit. Het glas van het venster blijft nu achter de navigatiekolom in plaats van achter het hele venster.
+- Een venster dat stilstaat houdt de grafische chip van de Mac niet meer bij vlagen bezig: een wijziging die de space liet zoals hij was, zoals het nieuwe icoon van een website, of de batterij die haar oplaadniveau meldde, liet het hele venster van zijn kleur naar dezelfde kleur vervagen.
+- Als je een tabblad sluit dat je net met ⌘T hebt geopend, ga je terug naar het tabblad waar je op zat, zoals in Safari en Chrome, in plaats van naar het tabblad eronder.
+- Een vastgezet tabblad sluiten met ⌘W terwijl de vastgezette tabbladen van de space zijn ingeklapt, of een tabblad onder een gesloten map, haalt de rij niet meer uit de navigatiekolom: die blijft staan, uit het geheugen gehaald, tot je van space wisselt of de vastgezette tabbladen of die map weer opent of sluit.
+- Websites die vragen om meldingen te tonen, zoals de web-app van Zoom, lopen daarbij niet meer vast op een scriptfout. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Een tabblad dat uren in de slaapstand stond terwijl je Mac weinig geheugen had, is daarna niet langer afgemeld bij websites als Azure DevOps en Microsoft 365: als het deel van WebKit dat aanmeldcookies bewaart stopt, zoals macOS kan doen bij geheugentekort, zet Zigzag ze terug voordat de pagina laadt. Ook als je Zigzag afsluit en weer opent met je laatste sessie, blijven die aanmeldingen behouden. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Ontgrendelen met biometrie van Bitwarden bereikt nu de Bitwarden-app. Zigzag had Bitwarden gezegd dat het al met de app kon praten, waardoor Bitwarden nooit vroeg, en daarna hield Zigzag het bij de app weg. Nu vraagt Bitwarden het en vraagt Zigzag jou het toe te staan. Heb je biometrie eerder aangezet, zet dan Ontgrendelen met biometrie in de instellingen van Bitwarden uit en weer aan. Met dank aan [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Als je een extensie-update goedkeurt die meer vraagt, wordt wat je had toegestaan later niet meer ingetrokken, zoals de verbinding van Bitwarden met zijn app voor “Ontgrendelen met biometrie”. Met dank aan [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Als je een profiel verwijdert terwijl de extensies nog opstarten, sluit Zigzag niet meer af.
+- iCloud-wachtwoorden wordt ook ingesteld op inlogpagina’s als er tabbladen in de slaapstand staan: de frames van een tabblad in de slaapstand opvragen mislukt niet meer, zoals in Chrome.
+- The Marvellous Suspender en andere extensies die alarmen instellen werken weer: een alarm instellen geeft nu een promise terug, zoals in Chrome.
+- Een video in schermvullende weergave wordt niet langer bedekt door de eigen bovenbalk of zijkolom van de website, zoals bij Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Terug, vooruit en opnieuw laden laten niet langer een lege plek over voor de vensterknoppen waar die niet worden getoond, zoals in schermvullende weergave voordat de menubalk omlaag komt. Met dank aan [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Met Favorieten per rij op Automatisch worden favorieten gelijk over hun rijen verdeeld: zes waar er vier passen zijn twee rijen van drie, niet vier en twee.
+- De bovenrand van een geselecteerde favoriet blijft binnen de breedte van de tegel als het aantal kolommen verandert.

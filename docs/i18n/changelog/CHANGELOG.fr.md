@@ -1,6 +1,6 @@
 # Historique des versions
 
-Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L’app affiche les notes de la version que vous utilisez, et [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) présente toutes les versions. Les versions antérieures à 0.10.0 sont en anglais dans [CHANGELOG.md](../../../CHANGELOG.md).
+Voici les notes de version de Zigzag en français, traduites de CHANGELOG.md. L’app affiche les notes de la version que vous utilisez, et [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes) présente toutes les versions. Les versions antérieures à 0.9.6 sont en anglais dans [CHANGELOG.md](../../../CHANGELOG.md).
 
 ## [Unreleased]
 
@@ -53,3 +53,25 @@ Zigzag dans treize langues de plus, du japonais et du coréen à l’allemand, a
 - Fermer un onglet que vous venez d’ouvrir avec ⌘T vous ramène à l’onglet où vous étiez, comme dans Safari et Chrome, au lieu de l’onglet situé en dessous.
 - L’aperçu de page de la barre latérale depuis le bord de l’écran ne se ferme plus pour revenir quand vous passez d’un onglet au suivant, se replie quand le pointeur quitte les onglets et la page pour la partie vide de la barre latérale, et n’apparaît plus aux extensions comme une fenêtre à part. Merci à [Lakeland97](https://github.com/Lakeland97). ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+Corrections de la 0.9.5 : connexions conservées après l’arrêt du processus réseau de WebKit, Déverrouiller avec la biométrie de Bitwarden, extensions qui programment des alarmes, vidéos en plein écran sous les barres propres d’un site, ⌘W juste après ⌘T, pinyin basculé vers l’anglais et fenêtres translucides qui occupaient le processeur graphique du Mac.
+
+### Corrections
+- Passer du pinyin chinois à l’anglais au milieu d’un mot ne laisse plus d’espaces entre les lettres, sur une page comme dans la barre d’adresse, comme dans Chrome.
+- Un espace translucide avec le verre Transparent n’occupe plus le processeur graphique du Mac quand Zigzag est inactif, même sur une page vide ou dans Réglages. macOS redessinait toute la fenêtre et son ombre à chaque image ; il ne la redessine plus que lorsque quelque chose change. La barre de progression de la carte de mise à jour cesse aussi de défiler quand elle est masquée.
+- Avec la barre d’adresse au-dessus de la page et un espace transparent, une vidéo en lecture ne sollicite plus les graphismes du Mac bien plus qu’avec la barre désactivée. Le verre de la fenêtre reste désormais derrière la barre latérale, et non plus derrière toute la fenêtre.
+- Une fenêtre immobile ne sollicite plus par à-coups le processeur graphique du Mac : un changement qui laissait l’espace tel quel, comme la nouvelle icône d’un site, ou la batterie qui indiquait sa charge, fondait toute la fenêtre de sa couleur vers la même couleur.
+- Fermer un onglet que vous venez d’ouvrir avec ⌘T vous ramène à l’onglet où vous étiez, comme dans Safari et Chrome, au lieu de l’onglet situé en dessous.
+- Fermer avec ⌘W un onglet épinglé quand les onglets épinglés de l’espace sont repliés, ou un onglet affiché sous un dossier fermé, ne retire plus sa ligne de la barre latérale : elle reste, déchargée, jusqu’à ce que vous changiez d’espace ou que vous ouvriez ou fermiez de nouveau les onglets épinglés ou ce dossier.
+- Les sites qui demandent à afficher des notifications, comme l’app web de Zoom, ne plantent plus sur une erreur de script quand ils le demandent. Merci à [Lakeland97](https://github.com/Lakeland97). ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Un onglet resté en veille pendant des heures alors que la mémoire du Mac était faible ne se réveille plus déconnecté de sites comme Azure DevOps et Microsoft 365 : si la partie de WebKit qui conserve les cookies de connexion s’arrête, comme macOS peut la forcer à le faire quand la mémoire manque, Zigzag les remet en place avant le chargement de la page. Quitter Zigzag puis le rouvrir sur votre dernière session conserve aussi ces connexions. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Déverrouiller avec la biométrie de Bitwarden atteint désormais l’app Bitwarden. Zigzag avait dit à Bitwarden qu’il pouvait déjà communiquer avec l’app, si bien que Bitwarden ne demandait jamais, puis Zigzag l’empêchait d’y accéder. Maintenant Bitwarden demande et Zigzag vous demande de l’autoriser. Si vous aviez activé la biométrie auparavant, désactivez puis réactivez Déverrouiller avec la biométrie dans les réglages de Bitwarden. Merci à [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Approuver la mise à jour d’une extension qui demande davantage ne retire plus ensuite ce que vous aviez autorisé, comme la connexion de Bitwarden à son app pour « Déverrouiller avec la biométrie ». Merci à [retorquere](https://github.com/retorquere). ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- Supprimer un profil pendant que ses extensions démarrent encore ne fait plus quitter Zigzag.
+- Mots de passe iCloud s’installe sur les pages de connexion même quand des onglets sont en veille : demander les cadres d’un onglet en veille n’échoue plus, comme dans Chrome.
+- The Marvellous Suspender et d’autres extensions qui programment des alarmes fonctionnent de nouveau : programmer une alarme leur renvoie maintenant une promesse, comme dans Chrome.
+- Une vidéo en plein écran n’est plus recouverte par la barre supérieure ou la colonne latérale du site, comme sur Bilibili. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- Précédent, Suivant et Recharger ne laissent plus un espace vide pour les boutons de la fenêtre là où ils ne sont pas affichés, comme en plein écran avant que la barre des menus ne descende. Merci à [Lakeland97](https://github.com/Lakeland97). ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- Quand Favoris par ligne est sur Automatique, les favoris se répartissent également sur leurs lignes : six là où quatre tiendraient font deux lignes de trois, et non quatre et deux.
+- Le bord supérieur d’un favori sélectionné reste à la largeur de la vignette quand le nombre de colonnes change.

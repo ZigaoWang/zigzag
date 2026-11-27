@@ -1,6 +1,6 @@
 # 변경 기록
 
-CHANGELOG.md를 한국어로 옮긴 Zigzag의 릴리스 노트입니다. 앱에는 사용 중인 버전의 노트가 표시되고, [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes)에서 모든 버전을 볼 수 있습니다. 0.10.0 이전 버전은 영어로 [CHANGELOG.md](../../../CHANGELOG.md)에 있습니다.
+CHANGELOG.md를 한국어로 옮긴 Zigzag의 릴리스 노트입니다. 앱에는 사용 중인 버전의 노트가 표시되고, [zigzagbrowser.com/release-notes](https://zigzagbrowser.com/release-notes)에서 모든 버전을 볼 수 있습니다. 0.9.6 이전 버전은 영어로 [CHANGELOG.md](../../../CHANGELOG.md)에 있습니다.
 
 ## [Unreleased]
 
@@ -53,3 +53,25 @@ Zigzag가 일본어와 한국어부터 독일어, 프랑스어, 스페인어, �
 - ⌘T로 막 연 탭을 닫으면 Safari와 Chrome처럼 아래 탭이 아니라 보고 있던 탭으로 돌아갑니다.
 - 화면 가장자리에서 여는 사이드바의 페이지 미리 보기가 탭에서 다음 탭으로 포인터를 옮기는 동안 닫혔다가 다시 열리지 않습니다. 포인터가 탭과 페이지를 벗어나 사이드바의 빈 부분으로 가면 미리 보기가 접히고, 확장 프로그램에는 더 이상 별도의 윈도우로 보이지 않습니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#546](https://github.com/ZigaoWang/zigzag/pull/546))
 
+## [0.9.6] - 2026-11-27
+
+0.9.5 수정 사항: WebKit의 네트워크 프로세스가 끝나도 유지되는 로그인, Bitwarden의 ‘생체 인식으로 잠금 해제’, 알람을 설정하는 확장 프로그램, 사이트 자체 막대 아래에 놓이는 전체 화면 동영상, ⌘T 직후의 ⌘W, 병음에서 영어로 전환, Mac의 그래픽 처리를 붙잡아 두던 비치는 윈도우.
+
+### 수정 사항
+- 중국어 병음에서 단어 중간에 영어로 바꿔도 페이지나 주소 막대에서 글자 사이에 공백이 남지 않습니다. Chrome과 같습니다.
+- 유리가 ‘투명’인 비치는 스페이스에서 Zigzag가 아무것도 하지 않을 때, 빈 페이지나 설정에서도 더 이상 Mac의 그래픽 처리를 계속 붙잡아 두지 않습니다. macOS가 매 프레임마다 윈도우 전체와 그림자를 다시 그리고 있었는데, 이제 무언가 바뀔 때만 그립니다. 업데이트 카드의 진행 막대도 가려져 있는 동안에는 움직이지 않습니다.
+- 주소 막대를 페이지 위에 두고 스페이스를 투명하게 했을 때, 재생 중인 동영상이 막대를 끈 때보다 Mac의 그래픽을 훨씬 많이 쓰지 않습니다. 이제 윈도우의 유리는 윈도우 전체가 아니라 사이드바 뒤에만 남습니다.
+- 아무것도 하지 않는 윈도우가 더 이상 Mac의 그래픽 처리를 간헐적으로 붙잡아 두지 않습니다. 사이트의 새 아이콘처럼 스페이스를 그대로 두는 변경이나 배터리가 충전량을 알리는 일이 있으면, 윈도우 전체가 자기 색에서 같은 색으로 페이드되고 있었습니다.
+- ⌘T로 막 연 탭을 닫으면 Safari와 Chrome처럼 아래 탭이 아니라 보고 있던 탭으로 돌아갑니다.
+- 스페이스의 고정된 탭이 접혀 있을 때, 또는 닫힌 폴더 아래에 표시된 고정된 탭을 ⌘W로 닫아도 그 행이 사이드바에서 사라지지 않습니다. 스페이스를 전환하거나 고정된 탭이나 그 폴더를 다시 열거나 닫을 때까지 로드 해제된 채로 남습니다.
+- Zoom의 웹 앱처럼 알림 표시를 요청하는 사이트가 요청할 때 스크립트 오류로 깨지지 않습니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#551](https://github.com/ZigaoWang/zigzag/issues/542))
+- Mac의 메모리가 부족한 상태에서 몇 시간 동안 잠들어 있던 탭이 Azure DevOps나 Microsoft 365 같은 사이트에서 로그아웃된 채로 깨어나는 일이 없어졌습니다. 메모리가 부족할 때 macOS가 로그인 쿠키를 보관하는 WebKit 부분을 멈추게 하면, Zigzag가 페이지를 불러오기 전에 쿠키를 되돌려 놓습니다. Zigzag를 종료했다가 마지막 세션으로 다시 열어도 그 로그인이 유지됩니다. ([#502](https://github.com/ZigaoWang/zigzag/issues/502))
+- Bitwarden의 ‘생체 인식으로 잠금 해제’가 이제 Bitwarden 앱에 연결됩니다. Zigzag가 Bitwarden에 앱과 이미 통신할 수 있다고 알려서 Bitwarden이 허용을 요청하지 않았고, 그다음에는 Zigzag가 앱 연결을 막고 있었습니다. 이제 Bitwarden이 요청하고 Zigzag가 허용할지 묻습니다. 전에 생체 인식을 켜 두었다면 Bitwarden 설정에서 ‘생체 인식으로 잠금 해제’를 껐다가 다시 켜세요. [retorquere](https://github.com/retorquere) 님께 감사드립니다. ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- 더 많은 권한을 요청하는 확장 프로그램 업데이트를 승인해도 나중에 허용해 둔 항목이 사라지지 않습니다. 예를 들어 Bitwarden이 ‘생체 인식으로 잠금 해제’를 위해 앱에 연결하는 권한입니다. [retorquere](https://github.com/retorquere) 님께 감사드립니다. ([#484](https://github.com/ZigaoWang/zigzag/issues/484))
+- 프로필을 제거할 때 확장 프로그램이 아직 시작되는 중이어도 Zigzag가 종료되지 않습니다.
+- 잠자기 상태의 탭이 있어도 로그인 페이지에서 iCloud 암호를 설정할 수 있습니다. 잠자기 상태 탭의 프레임을 요청해도 더 이상 실패하지 않으며, Chrome과 같습니다.
+- 알람을 설정하는 The Marvellous Suspender 등의 확장 프로그램이 다시 작동합니다. 알람을 설정하면 이제 Promise가 반환되며, Chrome과 같습니다.
+- 전체 화면 동영상이 Bilibili처럼 사이트 자체의 상단 막대나 옆 열에 가려지지 않습니다. ([#543](https://github.com/ZigaoWang/zigzag/issues/543))
+- 윈도우 버튼이 표시되지 않는 곳에서 뒤로, 앞으로, 다시 로드 버튼 앞에 빈 공간이 남지 않습니다. 메뉴 막대가 내려오기 전의 전체 화면이 그런 경우입니다. [Lakeland97](https://github.com/Lakeland97) 님께 감사드립니다. ([#542](https://github.com/ZigaoWang/zigzag/issues/542))
+- ‘행당 즐겨찾기 수’가 ‘자동’일 때 즐겨찾기가 행마다 고르게 나뉩니다. 네 개가 들어갈 자리에 여섯 개가 있으면 네 개와 두 개가 아니라 세 개씩 두 행이 됩니다.
+- 선택한 즐겨찾기의 윗가장자리가 열 수가 바뀌어도 타일의 너비에 맞춰 유지됩니다.
